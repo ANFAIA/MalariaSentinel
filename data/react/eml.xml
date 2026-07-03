@@ -1,0 +1,892 @@
+    <eml:eml xmlns:eml="eml://ecoinformatics.org/eml-2.1.1"
+             xmlns:dc="http://purl.org/dc/terms/"
+             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+             xsi:schemaLocation="eml://ecoinformatics.org/eml-2.1.1 http://rs.gbif.org/schema/eml-gbif-profile/1.2/eml.xsd"
+             packageId="9f6ad2af-34cb-4f69-8436-1a41c2b43c62/v1.1" system="http://gbif.org" scope="system"
+    xml:lang="eng">
+
+        <dataset>
+                <alternateIdentifier>9f6ad2af-34cb-4f69-8436-1a41c2b43c62</alternateIdentifier>
+                <alternateIdentifier>https://ipt.gbif.fr/resource?r=anopheles_collections_react_project</alternateIdentifier>
+                <title xml:lang="eng">Anopheles collections in the health districts of Korhogo (Côte d&apos;Ivoire) and Diébougou (Burkina Faso) (2016-2018)</title>
+                    <creator>
+            <individualName>
+                    <givenName>Dieudonné Diloma</givenName>
+                <surName>Soma</surName>
+            </individualName>
+            <organizationName>Institut de Recherche en Sciences de La Santé (IRSS)</organizationName>
+            <positionName>Researcher</positionName>
+            <address>
+                    <city>Bobo‐Dioulasso</city>
+                    <country>BF</country>
+            </address>
+            <electronicMailAddress>dieusoma@yahoo.fr</electronicMailAddress>
+                    <userId directory="https://orcid.org/">0000-0001-8294-9110</userId>
+                    </creator>
+                    <creator>
+            <individualName>
+                    <givenName>Barnabas</givenName>
+                <surName>Zogo</surName>
+            </individualName>
+            <organizationName>Institut Pierre Richet</organizationName>
+            <positionName>Researcher</positionName>
+            <address>
+                    <city>Bouaké</city>
+                    <country>CI</country>
+            </address>
+            <electronicMailAddress>barnabaszogo@gmail.com</electronicMailAddress>
+                    </creator>
+                    <creator>
+            <individualName>
+                    <givenName>Paul</givenName>
+                <surName>Taconet</surName>
+            </individualName>
+            <organizationName>MIVEGEC, Université de Montpellier, CNRS, IRD</organizationName>
+            <positionName>Research engineer</positionName>
+            <address>
+                    <deliveryPoint>911 avenue Agropolis</deliveryPoint>
+                    <city>Montpellier</city>
+                    <country>FR</country>
+            </address>
+            <electronicMailAddress>paul.taconet@ird.fr</electronicMailAddress>
+                    <userId directory="https://orcid.org/">0000-0001-7429-7204</userId>
+                    </creator>
+                    <creator>
+            <individualName>
+                    <givenName>Karine</givenName>
+                <surName>Mouline</surName>
+            </individualName>
+            <organizationName>MIVEGEC, Université de Montpellier, CNRS, IRD</organizationName>
+            <positionName>Researcher</positionName>
+            <address>
+                    <deliveryPoint>911 avenue Agropolis</deliveryPoint>
+                    <city>Montpellier</city>
+                    <country>FR</country>
+            </address>
+            <electronicMailAddress>karine.mouline@ird.fr</electronicMailAddress>
+                    <userId directory="https://orcid.org/">0000-0001-9523-2506</userId>
+                    </creator>
+                    <creator>
+            <individualName>
+                    <givenName>Ludovic P</givenName>
+                <surName>Ahoua Alou</surName>
+            </individualName>
+            <organizationName>Institut Pierre Richet</organizationName>
+            <positionName>Researcher</positionName>
+            <address>
+                    <city>Bouaké</city>
+                    <country>CI</country>
+            </address>
+            <electronicMailAddress>ludovicalou@gmail.com</electronicMailAddress>
+                    <userId directory="https://orcid.org/">0000-0003-1444-297X</userId>
+                    </creator>
+                    <creator>
+            <individualName>
+                    <givenName>Roch Kounbobr</givenName>
+                <surName>Dabiré</surName>
+            </individualName>
+            <organizationName>Institut de Recherche en Sciences de La Santé</organizationName>
+            <positionName>Researcher</positionName>
+            <address>
+                    <city>Bobo-Dioulasso</city>
+                    <country>BF</country>
+            </address>
+            <electronicMailAddress>dabireroch@gmail.com</electronicMailAddress>
+                    <userId directory="https://orcid.org/">0000-0002-3471-3506</userId>
+                    </creator>
+                    <creator>
+            <individualName>
+                    <givenName>Alphonsine</givenName>
+                <surName>Amanan Koffi</surName>
+            </individualName>
+            <organizationName>Institut Pierre Richet</organizationName>
+            <positionName>Researcher</positionName>
+            <address>
+                    <city>Bouaké</city>
+                    <country>CI</country>
+            </address>
+            <electronicMailAddress>koffi_alphonsine@yahoo.fr</electronicMailAddress>
+                    </creator>
+                    <creator>
+            <individualName>
+                    <givenName>Cédric</givenName>
+                <surName>Pennetier</surName>
+            </individualName>
+            <organizationName>MIVEGEC, Université de Montpellier, CNRS, IRD</organizationName>
+            <positionName>Researcher</positionName>
+            <address>
+                    <deliveryPoint>911 Avenue Agropolis</deliveryPoint>
+                    <city>Montpellier</city>
+                    <country>FR</country>
+            </address>
+            <electronicMailAddress>cedric.pennetier@ird.fr</electronicMailAddress>
+                    <userId directory="https://orcid.org/">0000-0002-3362-6371</userId>
+                    </creator>
+                    <creator>
+            <individualName>
+                    <givenName>Nicolas</givenName>
+                <surName>Moiroux</surName>
+            </individualName>
+            <organizationName>MIVEGEC, Université de Montpellier, CNRS, IRD</organizationName>
+            <positionName>Researcher</positionName>
+            <address>
+                    <deliveryPoint>911 Avenue Agropolis</deliveryPoint>
+                    <city>Montpellier</city>
+                    <country>FR</country>
+            </address>
+            <electronicMailAddress>nicolas.moiroux@ird.fr</electronicMailAddress>
+                    <userId directory="https://orcid.org/">0000-0001-6755-6167</userId>
+                    </creator>
+                    <metadataProvider>
+            <individualName>
+                    <givenName>Paul</givenName>
+                <surName>Taconet</surName>
+            </individualName>
+            <organizationName>MIVEGEC, Université de Montpellier, CNRS, IRD</organizationName>
+            <positionName>Research engineer</positionName>
+            <address>
+                    <deliveryPoint>911 avenue Agropolis</deliveryPoint>
+                    <city>Montpellier</city>
+                    <country>FR</country>
+            </address>
+            <electronicMailAddress>paul.taconet@ird.fr</electronicMailAddress>
+                    <userId directory="https://orcid.org/">0000-0001-7429-7204</userId>
+                    </metadataProvider>
+                    <associatedParty>
+            <individualName>
+                    <givenName>Nicolas</givenName>
+                <surName>Moiroux</surName>
+            </individualName>
+            <organizationName>MIVEGEC, Université de Montpellier, CNRS, IRD</organizationName>
+            <positionName>Researcher</positionName>
+            <address>
+                    <deliveryPoint>911 avenue Agropolis</deliveryPoint>
+                    <city>Montpellier</city>
+                    <country>FR</country>
+            </address>
+            <electronicMailAddress>nicolas.moiroux@ird.fr</electronicMailAddress>
+                    <userId directory="https://orcid.org/">0000-0001-6755-6167</userId>
+            <role>pointOfContact</role>
+                    </associatedParty>
+                    <associatedParty>
+            <individualName>
+                    <givenName>Cédric</givenName>
+                <surName>Pennetier</surName>
+            </individualName>
+            <organizationName>MIVEGEC, Université de Montpellier, CNRS, IRD</organizationName>
+            <positionName>Researcher</positionName>
+            <address>
+                    <deliveryPoint>911 avenue Agropolis</deliveryPoint>
+                    <city>Montpellier</city>
+                    <country>FR</country>
+            </address>
+            <electronicMailAddress>cedric.pennetier@ird.fr</electronicMailAddress>
+                    <userId directory="https://orcid.org/">0000-0002-3362-6371</userId>
+            <role>principalInvestigator</role>
+                    </associatedParty>
+                    <associatedParty>
+            <individualName>
+                    <givenName>Paul</givenName>
+                <surName>Taconet</surName>
+            </individualName>
+            <organizationName>MIVEGEC, Université de Montpellier, CNRS, IRD</organizationName>
+            <positionName>Research engineer</positionName>
+            <address>
+                    <deliveryPoint>911 avenue Agropolis</deliveryPoint>
+                    <city>Montpellier</city>
+                    <country>FR</country>
+            </address>
+            <electronicMailAddress>paul.taconet@ird.fr</electronicMailAddress>
+                    <userId directory="https://orcid.org/">0000-0001-7429-7204</userId>
+            <role>metadataProvider</role>
+                    </associatedParty>
+                    <associatedParty>
+            <individualName>
+                    <givenName>Barnabas</givenName>
+                <surName>Zogo</surName>
+            </individualName>
+            <organizationName>Institut Pierre Richet</organizationName>
+            <positionName>Researcher</positionName>
+            <address>
+                    <city>Bouaké</city>
+                    <country>CI</country>
+            </address>
+            <electronicMailAddress>barnabaszogo@gmail.com</electronicMailAddress>
+            <role>author</role>
+                    </associatedParty>
+                    <associatedParty>
+            <individualName>
+                    <givenName>Dieudonné Diloma</givenName>
+                <surName>Soma</surName>
+            </individualName>
+            <organizationName>Institut de Recherche en Sciences de La Santé</organizationName>
+            <positionName>Researcher</positionName>
+            <address>
+                    <city>Bobo-Dioulasso</city>
+                    <country>BF</country>
+            </address>
+            <role>author</role>
+                    </associatedParty>
+                    <associatedParty>
+            <individualName>
+                    <givenName>Ludovic P</givenName>
+                <surName>Ahoua Alou</surName>
+            </individualName>
+            <organizationName>Institut Pierre Richet</organizationName>
+            <positionName>Researcher</positionName>
+            <address>
+                    <city>Bouaké</city>
+                    <country>CI</country>
+            </address>
+            <electronicMailAddress>ludovicalou@gmail.com</electronicMailAddress>
+            <role>principalInvestigator</role>
+                    </associatedParty>
+                    <associatedParty>
+            <individualName>
+                    <givenName>Karine</givenName>
+                <surName>Mouline</surName>
+            </individualName>
+            <organizationName>MIVEGEC, Université de Montpellier, CNRS, IRD</organizationName>
+            <positionName>Researcher</positionName>
+            <address>
+                    <city>Montpellier</city>
+                    <country>FR</country>
+            </address>
+            <role>principalInvestigator</role>
+                    </associatedParty>
+                    <associatedParty>
+            <individualName>
+                    <givenName>Roch Kounbobr</givenName>
+                <surName>Dabiré</surName>
+            </individualName>
+            <organizationName>Institut de Recherche en Sciences de La Santé</organizationName>
+            <positionName>Researcher</positionName>
+            <address>
+                    <city>Bobo-Dioulasso</city>
+                    <country>BF</country>
+            </address>
+            <role>principalInvestigator</role>
+                    </associatedParty>
+                    <associatedParty>
+            <individualName>
+                    <givenName>Alphonsine Amanan</givenName>
+                <surName>Koffi</surName>
+            </individualName>
+            <organizationName>Institut Pierre Richet</organizationName>
+            <address>
+                    <city>Bouaké</city>
+                    <country>CI</country>
+            </address>
+            <role>principalInvestigator</role>
+                    </associatedParty>
+                    <associatedParty>
+            <individualName>
+                    <givenName>François de Sales</givenName>
+                <surName>Hien Domonbabele</surName>
+            </individualName>
+            <organizationName>Institut de Recherche en Sciences de La Santé</organizationName>
+            <positionName>Researcher</positionName>
+            <address>
+                    <city>Bobo-Dioulasso</city>
+            </address>
+            <role>contentProvider</role>
+                    </associatedParty>
+                    <associatedParty>
+            <individualName>
+                    <givenName>Mahamadi</givenName>
+                <surName>Kientega</surName>
+            </individualName>
+            <organizationName>Institut de Recherche en Sciences de La Santé</organizationName>
+            <positionName>Researcher</positionName>
+            <address>
+                    <city>Bobo-Dioulasso</city>
+                    <country>BF</country>
+            </address>
+            <role>contentProvider</role>
+                    </associatedParty>
+                    <associatedParty>
+            <individualName>
+                    <givenName>Alexandre</givenName>
+                <surName>Kaboré Didier</surName>
+            </individualName>
+            <organizationName>Institut de Recherche en Sciences de La Santé</organizationName>
+            <positionName>Researcher</positionName>
+            <address>
+                    <city>Bobo-Dioulasso</city>
+                    <country>BF</country>
+            </address>
+            <role>contentProvider</role>
+                    </associatedParty>
+                    <associatedParty>
+            <individualName>
+                    <givenName>Coulibaly</givenName>
+                <surName>Sanata</surName>
+            </individualName>
+            <organizationName>Institut de Recherche en Sciences de La Santé</organizationName>
+            <positionName>Researcher</positionName>
+            <address>
+                    <city>Bobo-Dioulasso</city>
+                    <country>BF</country>
+            </address>
+            <role>contentProvider</role>
+                    </associatedParty>
+                    <associatedParty>
+            <individualName>
+                    <givenName>Gnanbani</givenName>
+                <surName>Jacques</surName>
+            </individualName>
+            <organizationName>Institut de Recherche en Sciences de La Santé</organizationName>
+            <positionName>Researcher</positionName>
+            <address>
+                    <city>Bobo-Dioulasso</city>
+                    <country>BF</country>
+            </address>
+            <role>contentProvider</role>
+                    </associatedParty>
+                    <associatedParty>
+            <individualName>
+                    <givenName>Millogo Souro</givenName>
+                <surName>Abel</surName>
+            </individualName>
+            <organizationName>Institut de Recherche en Sciences de La Santé</organizationName>
+            <positionName>Researcher</positionName>
+            <address>
+                    <city>Bobo-Dioulasso</city>
+                    <country>BF</country>
+            </address>
+            <role>contentProvider</role>
+                    </associatedParty>
+                    <associatedParty>
+            <individualName>
+                    <givenName>Ali</givenName>
+                <surName>Ouari</surName>
+            </individualName>
+            <organizationName>Institut de Recherche en Sciences de La Santé</organizationName>
+            <positionName>Technician</positionName>
+            <address>
+                    <city>Bobo-Dioulasso</city>
+                    <country>BF</country>
+            </address>
+            <role>contentProvider</role>
+                    </associatedParty>
+                    <associatedParty>
+            <individualName>
+                    <givenName>Meda Georges</givenName>
+                <surName>Benson</surName>
+            </individualName>
+            <organizationName>Institut de Recherche en Sciences de La Santé</organizationName>
+            <positionName>Technician</positionName>
+            <address>
+                    <city>Bobo-Dioulasso</city>
+                    <country>BF</country>
+            </address>
+            <role>contentProvider</role>
+                    </associatedParty>
+                    <associatedParty>
+            <individualName>
+                    <givenName>Hamadou</givenName>
+                <surName>Konaté</surName>
+            </individualName>
+            <organizationName>Institut de Recherche en Sciences de La Santé</organizationName>
+            <positionName>Technician</positionName>
+            <address>
+                    <city>Bobo-Dioulasso</city>
+                    <country>BF</country>
+            </address>
+            <role>contentProvider</role>
+                    </associatedParty>
+                    <associatedParty>
+            <individualName>
+                    <givenName>Stephane</givenName>
+                <surName>Somda</surName>
+            </individualName>
+            <organizationName>Institut de Recherche en Sciences de La Santé</organizationName>
+            <positionName>Technician</positionName>
+            <address>
+                    <city>Bobo-Dioulasso</city>
+                    <country>BF</country>
+            </address>
+            <role>contentProvider</role>
+                    </associatedParty>
+                    <associatedParty>
+            <individualName>
+                    <givenName>Richard</givenName>
+                <surName>Bationo</surName>
+            </individualName>
+            <organizationName>Institut de Recherche en Sciences de La Santé</organizationName>
+            <positionName>Technician</positionName>
+            <address>
+                    <city>Bobo-Dioulasso</city>
+                    <country>BF</country>
+            </address>
+            <role>contentProvider</role>
+                    </associatedParty>
+                    <associatedParty>
+            <individualName>
+                    <givenName>Janvier</givenName>
+                <surName>Tapsoba</surName>
+            </individualName>
+            <organizationName>Institut de Recherche en Sciences de La Santé</organizationName>
+            <positionName>Technician</positionName>
+            <address>
+                    <city>Bobo-Dioulasso</city>
+                    <country>BF</country>
+            </address>
+            <role>contentProvider</role>
+                    </associatedParty>
+                    <associatedParty>
+            <individualName>
+                    <givenName>Boubakar</givenName>
+                <surName>Nikiema</surName>
+            </individualName>
+            <organizationName>Institut de Recherche en Sciences de La Santé</organizationName>
+            <positionName>Technician</positionName>
+            <address>
+                    <city>Bobo-Dioulasso</city>
+                    <country>BF</country>
+            </address>
+            <role>contentProvider</role>
+                    </associatedParty>
+                    <associatedParty>
+            <individualName>
+                    <givenName>Bodoin</givenName>
+                <surName>Dabiré</surName>
+            </individualName>
+            <organizationName>Institut de Recherche en Sciences de La Santé</organizationName>
+            <positionName>Technician</positionName>
+            <address>
+                    <city>Bobo-Dioulasso</city>
+                    <country>BF</country>
+            </address>
+            <role>contentProvider</role>
+                    </associatedParty>
+                    <associatedParty>
+            <individualName>
+                    <givenName>Guel</givenName>
+                <surName>Zila Y</surName>
+            </individualName>
+            <organizationName>Institut de Recherche en Sciences de La Santé</organizationName>
+            <positionName>Technician</positionName>
+            <address>
+                    <city>Bobo-Dioulasso</city>
+                    <country>BF</country>
+            </address>
+            <role>contentProvider</role>
+                    </associatedParty>
+                    <associatedParty>
+            <individualName>
+                    <givenName>Seni</givenName>
+                <surName>Ilboudo</surName>
+            </individualName>
+            <organizationName>Institut de Recherche en Sciences de La Santé</organizationName>
+            <positionName>Technician</positionName>
+            <address>
+                    <city>Bobo-Dioulasso</city>
+                    <country>BF</country>
+            </address>
+            <role>custodianSteward</role>
+                    </associatedParty>
+                    <associatedParty>
+            <individualName>
+                    <givenName>Ali</givenName>
+                <surName>Sanou</surName>
+            </individualName>
+            <organizationName>Institut de Recherche en Sciences de La Santé</organizationName>
+            <positionName>Technician</positionName>
+            <address>
+                    <city>Bobo-Dioulasso</city>
+                    <country>BF</country>
+            </address>
+            <role>contentProvider</role>
+                    </associatedParty>
+                    <associatedParty>
+            <individualName>
+                    <givenName>Wilfried</givenName>
+                <surName>Ouédraogo</surName>
+            </individualName>
+            <organizationName>Institut de Recherche en Sciences de La Santé</organizationName>
+            <positionName>Technician</positionName>
+            <address>
+                    <city>Bobo-Dioulasso</city>
+                    <country>BF</country>
+            </address>
+            <role>contentProvider</role>
+                    </associatedParty>
+                    <associatedParty>
+            <individualName>
+                    <givenName>Arzouma</givenName>
+                <surName>Diasso</surName>
+            </individualName>
+            <organizationName>Institut de Recherche en Sciences de La Santé</organizationName>
+            <positionName>Driver</positionName>
+            <address>
+                    <city>Bobo-Dioulasso</city>
+                    <country>BF</country>
+            </address>
+            <role>contentProvider</role>
+                    </associatedParty>
+                    <associatedParty>
+            <individualName>
+                    <givenName>Souleymane</givenName>
+                <surName>Traoré</surName>
+            </individualName>
+            <organizationName>Institut de Recherche en Sciences de La Santé</organizationName>
+            <positionName>Driver</positionName>
+            <address>
+                    <city>Bobo-Dioulasso</city>
+                    <country>BF</country>
+            </address>
+            <role>contentProvider</role>
+                    </associatedParty>
+                    <associatedParty>
+            <individualName>
+                    <givenName>Baba</givenName>
+                <surName>Coulibaly</surName>
+            </individualName>
+            <organizationName>Institut Pierre Richet</organizationName>
+            <positionName>Researcher</positionName>
+            <address>
+                    <city>Bouaké</city>
+                    <country>CI</country>
+            </address>
+            <role>contentProvider</role>
+                    </associatedParty>
+                    <associatedParty>
+            <individualName>
+                    <givenName>Rosine</givenName>
+                <surName>Wolie</surName>
+            </individualName>
+            <organizationName>Institut Pierre Richet</organizationName>
+            <positionName>Researcher</positionName>
+            <address>
+                    <city>Bouaké</city>
+                    <country>CI</country>
+            </address>
+            <role>contentProvider</role>
+                    </associatedParty>
+                    <associatedParty>
+            <individualName>
+                    <givenName>Tchiekoi</givenName>
+                <surName>N’Cho</surName>
+            </individualName>
+            <organizationName>Institut Pierre Richet</organizationName>
+            <positionName>Researcher</positionName>
+            <address>
+                    <city>Bouaké</city>
+                    <country>CI</country>
+            </address>
+            <role>contentProvider</role>
+                    </associatedParty>
+                    <associatedParty>
+            <individualName>
+                    <givenName>Issa</givenName>
+                <surName>Coulibaly</surName>
+            </individualName>
+            <organizationName>Institut Pierre Richet</organizationName>
+            <positionName>Researcher</positionName>
+            <address>
+                    <city>Bouaké</city>
+                    <country>CI</country>
+            </address>
+            <role>contentProvider</role>
+                    </associatedParty>
+                    <associatedParty>
+            <individualName>
+                    <givenName>Youssouf</givenName>
+                <surName>Dosso</surName>
+            </individualName>
+            <organizationName>Institut Pierre Richet</organizationName>
+            <positionName>Researcher</positionName>
+            <address>
+                    <city>Bouaké</city>
+                    <country>CI</country>
+            </address>
+            <role>contentProvider</role>
+                    </associatedParty>
+                    <associatedParty>
+            <individualName>
+                    <givenName>Guillaume</givenName>
+                <surName>Konan Koffi</surName>
+            </individualName>
+            <organizationName>Institut Pierre Richet</organizationName>
+            <positionName>Researcher</positionName>
+            <address>
+                    <city>Bouaké</city>
+                    <country>CI</country>
+            </address>
+            <role>contentProvider</role>
+                    </associatedParty>
+                    <associatedParty>
+            <individualName>
+                    <givenName>Serges</givenName>
+                <surName>Koffi</surName>
+            </individualName>
+            <organizationName>Institut Pierre Richet</organizationName>
+            <positionName>Researcher</positionName>
+            <address>
+                    <city>Bouaké</city>
+                    <country>CI</country>
+            </address>
+            <role>contentProvider</role>
+                    </associatedParty>
+                    <associatedParty>
+            <individualName>
+                    <givenName>Patrice</givenName>
+                <surName>Azaibou Akoliba</surName>
+            </individualName>
+            <organizationName>Institut Pierre Richet</organizationName>
+            <positionName>Researcher</positionName>
+            <address>
+                    <city>Bouaké</city>
+                    <country>CI</country>
+            </address>
+            <role>contentProvider</role>
+                    </associatedParty>
+            <pubDate>
+                    2024-05-17
+            </pubDate>
+            <language>eng</language>
+                <abstract>
+                            <para>This dataset contains the result of a set of anopheles mosquitoes (Diptera : Culicidae) collections performed in several villages of the rural districts of Korhogo (Côte d&apos;Ivoire) and Diébougou (Burkina Faso) between 2016 and 2018. 
+
+These mosquito collections were carried-out in the frame of the REACT project (Insecticide resistance management in Burkina Faso and Côte d&apos;Ivoire: research on vector control strategies), involving three partners : Institut de Recherche pour le Développement (IRD, France), Institut de Recherche en Science de la Santé (IRSS, Burkina Faso) and Institut Pierre Richet (IPR, Côte d&apos;Ivoire).
+
+The collections were performed using the Human Landing Catch method. In the Diébougou (Burkina Faso) area, seven entomological surveys were carried-out in 27 villages. In the Korhogo (Côte d&apos;Ivoire) area, eight entomological surveys were carried-out in 28 villages. Mosquitoes were collected from 17:00 to 09:00 both indoors and outdoors at 4 sites per village. Overall, more than 3000 human-nights of collection were performed, representing a total sampling effort of approximately 45000 hours, during which more than 60000 anopheles were captured. The dataset provides the dates and places of samplings (Event core) along with the identification of each Anopheles captured (Occurrence, 1 row by mosquito). 
+
+Additionally, we provide three kinds of information to enrich this dataset :
+
+- for all the mosquitoes, the place of collection - i.e. indoors or outdoors (available in the Extended Measurement or Facts extension) ;
+- for a sub-sample of the mosquitoes, a set of characteristics of importance for malaria transmission risk (genetic mutations conferring resistance to insecticides, plasmodium falciparum infection, parity state) (available in the Extended Measurement or Facts extension) ;
+- for all the sampling events, a set of environmental data (related to temperature, rainfall and landscape) extracted from satellite data (available in the Measurement or Facts extension).</para>
+                            <para>A data paper describing the data exhaustively is available at: 
+Taconet P, Soma DD, Zogo B, Mouline K, Simard F, Koffi AA, Dabiré RK, Pennetier C, Moiroux N (2023). Anopheles sampling collections in the health districts of Korhogo (Côte d’Ivoire) and Diébougou (Burkina Faso) between 2016 and 2018. Gigabyte. https://doi.org/10.46471/gigabyte.83</para>
+                </abstract>
+                        <keywordSet>
+                                    <keyword>samplingEvent</keyword>
+                            <keywordThesaurus>GBIF Dataset Type Vocabulary: http://rs.gbif.org/vocabulary/gbif/dataset_type_2015-07-10.xml</keywordThesaurus>
+                        </keywordSet>
+                        <keywordSet>
+                                    <keyword>malaria ; vectors ; resistance ; human landing catch ; exophagy ; endophagy ; biting behaviour</keyword>
+                            <keywordThesaurus>n/a</keywordThesaurus>
+                        </keywordSet>
+                <intellectualRights>
+                    <para>This work is licensed under a <ulink url="http://creativecommons.org/licenses/by/4.0/legalcode"><citetitle>Creative Commons Attribution (CC-BY 4.0) License</citetitle></ulink>.</para>
+                </intellectualRights>
+                <coverage>
+                        <geographicCoverage>
+                                <geographicDescription>The geographic coverage includes the health districts of Korhogo (Nothern Côte d&apos;Ivoire) and Diébougou (South-West Burkina Faso). Each study area is around 2500 squared km.</geographicDescription>
+                            <boundingCoordinates>
+                                <westBoundingCoordinate>-5.81</westBoundingCoordinate>
+                                <eastBoundingCoordinate>-3.12</eastBoundingCoordinate>
+                                <northBoundingCoordinate>11</northBoundingCoordinate>
+                                <southBoundingCoordinate>8.84</southBoundingCoordinate>
+                            </boundingCoordinates>
+                        </geographicCoverage>
+                                <temporalCoverage>
+                                        <rangeOfDates>
+                                                <beginDate>
+                                                    <calendarDate>2016-09-21</calendarDate>
+                                                </beginDate>
+                                            <endDate>
+                                                <calendarDate>2018-04-04</calendarDate>
+                                            </endDate>
+                                        </rangeOfDates>
+                                </temporalCoverage>
+                                <taxonomicCoverage>
+                                        <generalTaxonomicCoverage>Several anopheles mosquitoes are included</generalTaxonomicCoverage>
+                                        <taxonomicClassification>
+                                            <taxonRankValue>Anopheles gambiae complex</taxonRankValue>
+                                                <commonName>Anopheles gambiae sensu lato</commonName>
+                                        </taxonomicClassification>
+                                        <taxonomicClassification>
+                                                <taxonRankName>species</taxonRankName>
+                                            <taxonRankValue>Anopheles (Cellia) gambiae Giles, 1902</taxonRankValue>
+                                                <commonName>Anopheles gambiae sensu stricto</commonName>
+                                        </taxonomicClassification>
+                                        <taxonomicClassification>
+                                                <taxonRankName>species</taxonRankName>
+                                            <taxonRankValue>Anopheles (Cellia) coluzzii Coetzee &amp; Wilkerson, 2013</taxonRankValue>
+                                                <commonName>Anopheles coluzzii</commonName>
+                                        </taxonomicClassification>
+                                        <taxonomicClassification>
+                                                <taxonRankName>species</taxonRankName>
+                                            <taxonRankValue>Anopheles (Cellia) funestus Giles, 1900</taxonRankValue>
+                                                <commonName>Anopheles funestus</commonName>
+                                        </taxonomicClassification>
+                                        <taxonomicClassification>
+                                            <taxonRankValue>Anopheles (Cellia) nili (Theobald, 1904)</taxonRankValue>
+                                                <commonName>Anopheles nili</commonName>
+                                        </taxonomicClassification>
+                                        <taxonomicClassification>
+                                            <taxonRankValue>Anopheles (Cellia) pharoensis Theobald, 1901</taxonRankValue>
+                                                <commonName>Anopheles pharoensi</commonName>
+                                        </taxonomicClassification>
+                                        <taxonomicClassification>
+                                                <taxonRankName>species</taxonRankName>
+                                            <taxonRankValue>Anopheles (Cellia) arabiensis Patton, 1905</taxonRankValue>
+                                                <commonName>Anopheles arabiensis</commonName>
+                                        </taxonomicClassification>
+                                        <taxonomicClassification>
+                                            <taxonRankValue>Anopheles (Cellia) coustani Laveran, 1900</taxonRankValue>
+                                                <commonName>Anopheles coustani</commonName>
+                                        </taxonomicClassification>
+                                        <taxonomicClassification>
+                                            <taxonRankValue>Anopheles (Cellia) ziemanni Grünberg, 1902</taxonRankValue>
+                                                <commonName>Anopheles ziemanni</commonName>
+                                        </taxonomicClassification>
+                                        <taxonomicClassification>
+                                            <taxonRankValue>Anopheles (Cellia) rufipes (Gough, 1910)</taxonRankValue>
+                                                <commonName>Anopheles rufipes</commonName>
+                                        </taxonomicClassification>
+                                        <taxonomicClassification>
+                                            <taxonRankValue>Anopheles (Cellia) squamosus Theobald, 1901</taxonRankValue>
+                                                <commonName>Anopheles squamosus</commonName>
+                                        </taxonomicClassification>
+                                        <taxonomicClassification>
+                                            <taxonRankValue>Anopheles (Cellia) flavicosta Edwards, 1911</taxonRankValue>
+                                                <commonName>Anopheles flavicosta</commonName>
+                                        </taxonomicClassification>
+                                </taxonomicCoverage>
+                </coverage>
+                <maintenance>
+                    <description>
+                        <para></para>
+                    </description>
+                    <maintenanceUpdateFrequency>notPlanned</maintenanceUpdateFrequency>
+                </maintenance>
+
+                    <contact>
+            <individualName>
+                    <givenName>Nicolas</givenName>
+                <surName>Moiroux</surName>
+            </individualName>
+            <organizationName>MIVEGEC, Université de Montpellier, CNRS, IRD</organizationName>
+            <positionName>Researcher</positionName>
+            <address>
+                    <deliveryPoint>911 avenue Agropolis</deliveryPoint>
+                    <city>Montpellier</city>
+                    <country>FR</country>
+            </address>
+            <electronicMailAddress>nicolas.moiroux@ird.fr</electronicMailAddress>
+                    <userId directory="https://orcid.org/">0000-0001-6755-6167</userId>
+                    </contact>
+                <methods>
+                            <methodStep>
+                                <description>
+                                    <para>Several villages were selected as detailed in the Sampling Method section.</para>
+                                </description>
+                            </methodStep>
+                            <methodStep>
+                                <description>
+                                    <para>In each village, several rounds of mosquito collections (surveys) were carried out using the Human Landing Catch (HLC) sampling method between 2016 and 2018 as detailed in the Sampling Method section.</para>
+                                </description>
+                            </methodStep>
+                            <methodStep>
+                                <description>
+                                    <para>Morphological identification of the captured mosquitoes was performed as detailed in the Sampling Method section.
+Methods used are detailed in the following publications : 
+
+Gillies MT. 1987. A supplement to the Anophelinae of Africa south of the Sahara (Afrotropical Region). Publications of the South African Institute for Medical Research, 55, 1–143.
+
+Gillies M, Meillon D. 1968. The Anophelinae of Africa south of the Sahara. Publication of the South African Institute for Medical Research, Johannesburg, 54, 1–343.
+
+Mattingly PF, Rageau J, La CA, Des F, Du M, Xii SA. Contributions de la faune des moustiques du Sud-Est Asiatique. XII. Contrib Am Entomol Inst. 1973; 7.</para>
+                                </description>
+                            </methodStep>
+                            <methodStep>
+                                <description>
+                                    <para>Molecular analysis of some of the captured anopheles was performed as detailed in the Sampling Method section.
+Methods used are detailed in the following publications : 
+
+Detection of the  L1014F (kdr-w) mutation by PCR in the Burkina Faso area : https://doi.org/10.1046/j.1365-2583.1998.72062.x 
+Detection of the  L1014S (kdr-e) mutation by PCR in the Burkina Faso area : https://doi.org/10.1046/j.1365-2583.2000.00209.x
+Detection of the  G119S (ace-1) mutation by qPCR in the Burkina Faso area :  https://doi.org/10.1186/1475-2875-12-404
+Detection of Plasmodium falciparum infection by qPCR in the Burkina Faso area : https://doi.org/10.1371/journal.pone.0054820
+
+Detection of the  L1014F (kdr-w) mutation by PCR in the Côte d&apos;Ivoire area : https://doi.org/10.1186/1475-2875-6-111
+Detection of the  G119S (ace-1) mutation by qPCR in the Côte d&apos;Ivoire area :  https://doi.org/10.1186/1475-2875-12-404
+Detection of Plasmodium falciparum infection by qPCR in the Côte d&apos;Ivoire area : https://doi.org/10.1371/journal.pone.0054820</para>
+                                </description>
+                            </methodStep>
+                            <methodStep>
+                                <description>
+                                    <para>Environmental data were collected and prepared as detailed in the Sampling Method section.
+Methods used are detailed in the following publication : https://doi.org/10.1186/s13071-021-04851-x</para>
+                                </description>
+                            </methodStep>
+                            <methodStep>
+                                <description>
+                                    <para>The collected data were digitized when relevant.</para>
+                                </description>
+                            </methodStep>
+                            <methodStep>
+                                <description>
+                                    <para>A custom R script was created to map the original data to Darwin Core as an event core with the relevant extensions (occurrence, Measurements or Facts, and Extended Measurements or Facts).</para>
+                                </description>
+                            </methodStep>
+                            <methodStep>
+                                <description>
+                                    <para>The Darwin Core files were connected to the French IPT and documented with metadata.</para>
+                                </description>
+                            </methodStep>
+                            <methodStep>
+                                <description>
+                                    <para>The data was published and registered with GBIF</para>
+                                </description>
+                            </methodStep>
+                        <sampling>
+                            <studyExtent>
+                                <description>
+                                    <para>Temporal coverage and sampling frequency : In the Burkina Faso area, seven entomological surveys were conducted during 15 months between January 2017 and April 2018. In the Côte d&apos;Ivoire area, eight entomological surveys were conducted during 18 months between October 2016 and April 2018. The dates of the surveys were selected to (i) spanning the typical climatic conditions of these tropical areas.
+Geographic coverage : 27 villages in the Burkina Faso area and 28 in the Côte d&apos;Ivoire d&apos;area.</para>
+                                </description>
+                            </studyExtent>
+                            <samplingDescription>
+                                <para>Several villages (27 in Burkina Faso, 28 in Côte d&apos;Ivoire) were selected within each area at the beginning of the project according to the following criteria : accessibility during the rainy season, 200 to 500 inhabitants per village, and distance between villages greater than 2 km. In each village, several rounds of mosquito collections (surveys) were carried out using the Human Landing Catch (HLC) sampling method. The procedure for conducting HLC was for a person to sit on a stool, and mosquitoes to alight on his exposed legs where they were then collected using a hemolysis tube. Mosquitoes were collected from 17:00 to 09:00 both indoors and outdoors at 4 sites per village. Collectors were organized into two teams of eight persons in each village; the first group collected from 17:00 to 01:00 and the second from 01:00 to 09:00. Collectors were rotated between indoor and outdoor collection sites every hour at each selected house to reduce potential collector bias. Indoor collection points were rooms that meet the following criteria: being usually inhabited; quiet without excessive movement of peoples; open to the outside through a door or a window. Outdoor collection was conducted in areas usually occupied by people but are sheltered from wind, traffic, fires and are not large meeting areas. The distance between collection sites was at least 50 m. The distance between indoors and outdoors collection points in one site was at least 10 m to minimize competition between mosquito collectors. Mosquitoes were collected in individual tubes plugged with cotton and stored in hourly bags.
+
+Morphological identification : All captured mosquitoes were morphologically identified in the field to genus and where possible to species levels according to established taxonomic keys.
+
+Molecular analysis : 
+
+In the Burkina Faso area, for all the entomological surveys :
+- a subsample of 100 non blood-fed Anopheles spp. individuals was randomly selected per survey and per village and dissected to identify their parity state (parous or nulliparous) (parous female are those that have laid eggs at least once);
+- all individuals belonging to the Funestus group or Anopheles gambiae complex were identified to species by PCR; 
+- DNA extracted from head-thorax of Anopheles spp. individuals was used to detect Plasmodium falciparum infection using quantitative polymerase chain reaction (qPCR) assay;
+- PCR assay were carried out on all mosquitoes belonging to the An. gambiae complex to detect the L1014F (kdr-w), G119S (ace-1), and L1014S (kdr-e) mutations (kdr-w and kdr-e mutations confer insecticide resistance to pyrethroids whereas ace-1 confers resistance to carbamates and organophosphates).
+
+In the Côte d&apos;Ivoire area, for the first four entomological surveys :  due to the very large numbers of vectors collected, a subsample of Anopheles spp. vectors from six villages randomly chosen out of the 28 villages included in the study were further analyzed :
+- For all the individuals belonging to the Anopheles nili complex or An. funestus group collected in these six villages : Plasmodium falciparum infection was detected using quantitative polymerase chain reaction (qPCR);
+- For one individual of Anopheles gambiae complex randomly selected per hour per collection site (indoor/outdoor) during each survey in these six villages : identification of species (PCR), Plasmodium falciparum infection (qPCR), L1014F (kdr-w) and G119S (ace-1) mutations (qPCR).
+
+In the Côte d&apos;Ivoire area, for the last four entomological surveys : 
+- For all the individuals belonging to the Anopheles nili complex or An. funestus group : identification of Plasmodium falciparum infection (qPCR);
+- For a subsample representing 25% of the total of the Anopheles gambiae captured : identification of species (PCR), Plasmodium falciparum infection (qPCR), L1014F (kdr-w) and G119S (ace-1) mutations (qPCR).
+
+
+The results of the molecular analysis are made available in the Extended Measurement or Facts extension. This extension also includes the place of collection of each mosquito (indoors or outdoors).
+
+In addition, a set of environmental data were extracted at the places and times of samplings from Earth-observation satellite products. These data are made available in the Measurement or Facts extension. The following measurements are provided : % of landscape occupied by each land cover type in a 2-km radius buffer zone around the sampling site, weekly rainfall and weekly land surface temperature up to 6 weeks before each collection date.</para>
+                            </samplingDescription>
+                        </sampling>
+                        <qualityControl>
+                            <description>
+                                <para>Each night of collection, one technician assisted by two local supervisors supervised the mosquito collections in each village to ensure that they were performed properly.
+
+Independent staff supervised rotation of the mosquito collection and regularly checked for the quality of the mosquito collection. The following criteria were checked and reported on an electronic tablet : respected collection location, collector at his post, collector awake, collector in a correct position, collector adequately dressed, correct hourly bags used. If one of the criteria was not respected, required arrangements were immediately made by the supervisor.
+
+All data reported has been curated and the terminology has been homogenized. Data has been validated using the validator available in GBIF.</para>
+                            </description>
+                        </qualityControl>
+                </methods>
+        </dataset>
+            <additionalMetadata>
+                <metadata>
+                    <gbif>
+                            <dateStamp>2023-05-02T15:12:14.264+00:00</dateStamp>
+                            <hierarchyLevel>dataset</hierarchyLevel>
+                                <citation>Soma D D, Zogo B, Taconet P, Mouline K, Ahoua Alou L P, Dabiré R K, Amanan Koffi A, Pennetier C, Moiroux N (2024). Anopheles collections in the health districts of Korhogo (Côte d&apos;Ivoire) and Diébougou (Burkina Faso) (2016-2018). Version 1.1. IRD - Institute of Research for Development. Samplingevent dataset. https://ipt.gbif.fr/resource?r=anopheles_collections_react_project&amp;v=1.1</citation>
+                            <dc:replaces>9f6ad2af-34cb-4f69-8436-1a41c2b43c62/v1.1.xml</dc:replaces>
+                    </gbif>
+                </metadata>
+            </additionalMetadata>
+    </eml:eml>

@@ -1,0 +1,18 @@
+[project]
+name = "mal-data-explorer"
+version = "0.1.0"
+description = "MalariaSentinel — Anopheles dataset visualization, mapping, and bias analysis scripts"
+requires-python = ">=3.11"
+dependencies = [
+    "pandas>=2.0",
+    "matplotlib>=3.8",
+    "geopandas>=1.0",
+    "shapely>=2.0",
+    "cartopy>=0.24",
+    "contextily>=1.6",
+    "pypdf>=6.14.2",
+    "scipy>=1.17.1",
+]
+
+[tool.uv]
+package = false

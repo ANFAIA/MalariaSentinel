@@ -1,0 +1,237 @@
+<eml:eml xmlns:eml="https://eml.ecoinformatics.org/eml-2.2.0"
+         xmlns:dc="http://purl.org/dc/terms/"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="https://eml.ecoinformatics.org/eml-2.2.0 https://rs.gbif.org/schema/eml-gbif-profile/1.3/eml.xsd"
+         packageId="37139ff7-9c38-4de1-8a22-09d2d0a29eab/v1.4" system="http://gbif.org" scope="system"
+         xml:lang="eng">
+    <dataset>
+        <alternateIdentifier>37139ff7-9c38-4de1-8a22-09d2d0a29eab</alternateIdentifier>
+        <alternateIdentifier>https://cloud.gbif.org/africa/resource?r=anopheles_phenotypic</alternateIdentifier>
+        <title xml:lang="eng">Phenotypic and Genotypic Insecticide Resistance Profiles of Anopheles Mosquitoes Across Ghana</title>
+        <creator>
+            <individualName>
+                <givenName>Yaw Asare</givenName>
+                <surName>Afrane</surName>
+            </individualName>
+            <organizationName>Department of Medical Microbiology, University of Ghana Medical School</organizationName>
+            <positionName>Professor</positionName>
+            <address>
+                <city>Accra</city>
+                <administrativeArea>Greater Accra</administrativeArea>
+                <postalCode>000</postalCode>
+                <country>GH</country>
+            </address>
+            <phone>+233542286113</phone>
+            <electronicMailAddress>Yafrane@ug.edu.gh</electronicMailAddress>
+            <onlineUrl>http://www.ug.edu.gh</onlineUrl>
+            <userId directory="https://orcid.org/">0000-0001-9069-3979</userId>
+        </creator>
+        <creator>
+            <individualName>
+                <givenName>Christopher Mfum</givenName>
+                <surName>Owusu-Asenso</surName>
+            </individualName>
+            <organizationName>Department of Medical Microbiology, University of Ghana Medical School</organizationName>
+            <positionName>PhD student</positionName>
+            <address>
+                <city>Accra</city>
+                <administrativeArea>Greater Accra</administrativeArea>
+                <postalCode>0000</postalCode>
+                <country>GH</country>
+            </address>
+            <phone>+233244946047</phone>
+            <electronicMailAddress>cmowusu.asenso@gmail.com</electronicMailAddress>
+            <userId directory="https://orcid.org/">0000-0002-4839-3232</userId>
+        </creator>
+        <creator>
+            <individualName>
+                <givenName>Yaw</givenName>
+                <surName>Akuamoah-Boateng</surName>
+            </individualName>
+            <organizationName>Department of Medical Microbiology, University of Ghana Medical School</organizationName>
+            <positionName>PhD student</positionName>
+            <address>
+                <city>Accra</city>
+                <administrativeArea>Greater Accra</administrativeArea>
+                <postalCode>0000</postalCode>
+                <country>GH</country>
+            </address>
+            <phone>+233243088861</phone>
+            <electronicMailAddress>Akuamoahboateng58@yahoo.com</electronicMailAddress>
+        </creator>
+        <creator>
+            <individualName>
+                <givenName>Anisa</givenName>
+                <surName>Abdulai</surName>
+            </individualName>
+            <organizationName>Department of Medical Microbiology, University of Ghana Medical School</organizationName>
+            <positionName>PhD student</positionName>
+            <address>
+                <city>Accra</city>
+                <administrativeArea>Greater Accra</administrativeArea>
+                <postalCode>0000</postalCode>
+                <country>GH</country>
+            </address>
+            <phone>+233550326583</phone>
+            <electronicMailAddress>anismarjem@yahoo.com</electronicMailAddress>
+        </creator>
+        <creator>
+            <individualName>
+                <givenName>Abdul Rahim</givenName>
+                <surName>Mohammed Sabtui</surName>
+            </individualName>
+            <organizationName>Department of Medical Microbiology, University of Ghana Medical School</organizationName>
+            <positionName>PhD student</positionName>
+            <address>
+                <city>Accra</city>
+                <administrativeArea>Greater Accra</administrativeArea>
+                <postalCode>0000</postalCode>
+                <country>GH</country>
+            </address>
+            <phone>+233242778716</phone>
+            <electronicMailAddress>abdulrahimmoh16@gmail.com</electronicMailAddress>
+        </creator>
+        <metadataProvider>
+            <individualName>
+                <givenName>Yaw Asare</givenName>
+                <surName>Afrane</surName>
+            </individualName>
+            <organizationName>Department of Medical Microbiology, University of Ghana Medical School</organizationName>
+            <positionName>Professor</positionName>
+            <address>
+                <city>Accra</city>
+                <administrativeArea>Greater Accra</administrativeArea>
+                <postalCode>000</postalCode>
+                <country>GH</country>
+            </address>
+            <phone>+233542286113</phone>
+            <electronicMailAddress>Yafrane@ug.edu.gh</electronicMailAddress>
+            <onlineUrl>http://www.ug.edu.gh</onlineUrl>
+            <userId directory="https://orcid.org/">0000-0001-9069-3979</userId>
+        </metadataProvider>
+        <pubDate>
+            2026-03-09
+        </pubDate>
+        <language>eng</language>
+        <abstract>
+            This dataset includes data on the phenotypic and genotypic insecticide resistance profiles of Anopheles mosquito populations across various ecological zones in Ghana. This dataset will contribute to resistance management efforts by identifying key resistance patterns and mechanisms affecting vector control interventions such as long-lasting insecticidal nets (LLINs) and indoor residual spraying (IRS).
+        </abstract>
+        <keywordSet>
+            <keyword>Occurrence</keyword>
+            <keyword>Anopheles mosquitoes</keyword>
+            <keyword>Phenotypic</keyword>
+            <keyword>Genotypic</keyword>
+            <keyword>insecticide resistance</keyword>
+            <keyword>Ghana</keyword>
+            <keywordThesaurus>GBIF Dataset Type Vocabulary: http://rs.gbif.org/vocabulary/gbif/dataset_type_2015-07-10.xml</keywordThesaurus>
+        </keywordSet>
+        <intellectualRights>
+            <para>To the extent possible under law, the publisher has waived all rights to these data and has dedicated them to the <ulink url="http://creativecommons.org/publicdomain/zero/1.0/legalcode"><citetitle>Public Domain (CC0 1.0)</citetitle></ulink>. Users may copy, modify, distribute and use the work, including for commercial purposes, without restriction.</para>
+        </intellectualRights>
+        <licensed>
+            <licenseName>Creative Commons Zero v1.0 Universal</licenseName>
+            <url>https://spdx.org/licenses/CC0-1.0.html</url>
+            <identifier>CC0-1.0</identifier>
+        </licensed>
+        <distribution scope="document">
+            <online>
+                <url function="download">https://cloud.gbif.org/africa/archive.do?r=anopheles_phenotypic</url>
+            </online>
+        </distribution>
+        <coverage>
+            <geographicCoverage>
+                <geographicDescription>Across various ecological zones in Ghana</geographicDescription>
+                <boundingCoordinates>
+                    <westBoundingCoordinate>-2.766664</westBoundingCoordinate>
+                    <eastBoundingCoordinate>0.588194</eastBoundingCoordinate>
+                    <northBoundingCoordinate>9.592294</northBoundingCoordinate>
+                    <southBoundingCoordinate>4.892967</southBoundingCoordinate>
+                </boundingCoordinates>
+            </geographicCoverage>
+            <temporalCoverage>
+                <rangeOfDates>
+                    <beginDate>
+                        <calendarDate>2023-02-01</calendarDate>
+                    </beginDate>
+                    <endDate>
+                        <calendarDate>2025-03-30</calendarDate>
+                    </endDate>
+                </rangeOfDates>
+            </temporalCoverage>
+            <taxonomicCoverage>
+                <taxonomicClassification>
+                    <taxonRankName>species</taxonRankName>
+                    <taxonRankValue>Anopheles arabiensis Patton, 1905</taxonRankValue>
+                </taxonomicClassification>
+                <taxonomicClassification>
+                    <taxonRankName>species</taxonRankName>
+                    <taxonRankValue>Anopheles coluzzii Coetzee &amp; Wilkerson, 2013</taxonRankValue>
+                </taxonomicClassification>
+                <taxonomicClassification>
+                    <taxonRankName>species</taxonRankName>
+                    <taxonRankValue>Anopheles gambiae Giles, 1900</taxonRankValue>
+                </taxonomicClassification>
+                <taxonomicClassification>
+                    <taxonRankName>species</taxonRankName>
+                    <taxonRankValue>Anopheles Meigen, 1818</taxonRankValue>
+                </taxonomicClassification>
+                <taxonomicClassification>
+                    <taxonRankName>species</taxonRankName>
+                    <taxonRankValue>Anopheles melas Theobald, 1903</taxonRankValue>
+                </taxonomicClassification>
+            </taxonomicCoverage>
+        </coverage>
+        <purpose>This dataset includes geographic distribution and molecular drivers of insecticide resistance in Ghanaian Anopheles populations. It informs strategic decision-making for insecticide choice, resistance management plans, and long-term malaria vector control policies in the face of evolving resistance patterns.</purpose>
+        <maintenance>
+            <description>
+                <para></para>
+            </description>
+            <maintenanceUpdateFrequency>notPlanned</maintenanceUpdateFrequency>
+        </maintenance>
+        <contact>
+            <individualName>
+                <givenName>Yaw Asare</givenName>
+                <surName>Afrane</surName>
+            </individualName>
+            <organizationName>Department of Medical Microbiology, University of Ghana Medical School</organizationName>
+            <positionName>Professor</positionName>
+            <address>
+                <city>Accra</city>
+                <administrativeArea>Greater Accra</administrativeArea>
+                <postalCode>000</postalCode>
+                <country>GH</country>
+            </address>
+            <phone>+233542286113</phone>
+            <electronicMailAddress>Yafrane@ug.edu.gh</electronicMailAddress>
+            <onlineUrl>http://www.ug.edu.gh</onlineUrl>
+            <userId directory="https://orcid.org/">0000-0001-9069-3979</userId>
+        </contact>
+        <project id="IDIT">
+            <title>Spatial and temporal distribution of mosquitoes and their insecticide resistant status in Ghana</title>
+            <personnel>
+                <individualName>
+                    <givenName>Yaw Asare</givenName>
+                    <surName>Afrane</surName>
+                </individualName>
+                <userId directory="https://orcid.org/">0000-0001-9069-3979</userId>
+                <role></role>
+            </personnel>
+            <abstract>
+                <para>This project investigates  the spatial and temporal distribution and insecticide resistance statusof mosquito vectors in different ecological zones of Ghana</para>
+            </abstract>
+            <funding>
+                <para>National Institute of Health (https://www.nih.gov/) received by YAA (Grant numbers: R01 A1123074, R03AI186018 and D43 TW 011513).</para>
+            </funding>
+        </project>
+    </dataset>
+    <additionalMetadata>
+        <metadata>
+            <gbif>
+                <dateStamp>2025-07-23T07:45:02.913+00:00</dateStamp>
+                <hierarchyLevel>dataset</hierarchyLevel>
+                <citation>Afrane Y A, Owusu-Asenso C M, Akuamoah-Boateng Y, Abdulai A, Mohammed Sabtui A R (2026). Phenotypic and Genotypic Insecticide Resistance Profiles of Anopheles Mosquitoes Across Ghana. Version 1.4. University of Ghana Medical School. Occurrence dataset. https://cloud.gbif.org/africa/resource?r=anopheles_phenotypic&amp;v=1.4</citation>
+                <dc:replaces>37139ff7-9c38-4de1-8a22-09d2d0a29eab/v1.4.xml</dc:replaces>
+            </gbif>
+        </metadata>
+    </additionalMetadata>
+</eml:eml>

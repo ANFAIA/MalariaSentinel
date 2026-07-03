@@ -1,0 +1,274 @@
+<eml:eml xmlns:eml="eml://ecoinformatics.org/eml-2.1.1"
+         xmlns:dc="http://purl.org/dc/terms/"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="eml://ecoinformatics.org/eml-2.1.1 http://rs.gbif.org/schema/eml-gbif-profile/1.1/eml.xsd"
+         packageId="fc8a216d-4467-449f-b0c6-84cd905deb6e/v1.3" system="http://gbif.org" scope="system"
+         xml:lang="eng">
+
+<dataset>
+  <alternateIdentifier>fc8a216d-4467-449f-b0c6-84cd905deb6e</alternateIdentifier>
+  <alternateIdentifier>http://ipt.gbif.fr/resource?r=pasteur_guyane_anopheles</alternateIdentifier>
+  <title xml:lang="eng">A database of Anopheles (Diptera, Culicidae): historical presence records in French Guiana and in the state of Amapá, in South America</title>
+      <creator>
+    <individualName>
+        <givenName>Yi</givenName>
+      <surName>Moua</surName>
+    </individualName>
+    <organizationName>Université de Guyane, ESPACE-DEV, UMR 228 (IRD, UM, UR, UA, UG)</organizationName>
+    <positionName>Researcher</positionName>
+    <address>
+        <deliveryPoint>275 Route de Montabo</deliveryPoint>
+        <city>Cayenne</city>
+        <postalCode>97300</postalCode>
+        <country>GF</country>
+    </address>
+    <electronicMailAddress>mmoua.yi@gmail.com</electronicMailAddress>
+      </creator>
+      <creator>
+    <individualName>
+        <givenName>Emmanuel</givenName>
+      <surName>Roux</surName>
+    </individualName>
+    <organizationName>ESPACE-DEV, UMR 228 (IRD, UM, UR, UA, UG), Institut de Recherche pour le Développement</organizationName>
+    <positionName>Researcher</positionName>
+    <address>
+        <deliveryPoint>FIOCRUZ - ICICT Avenida Brasil, 4365</deliveryPoint>
+        <city>Rio de Janeiro</city>
+        <postalCode>21045-900</postalCode>
+        <country>BR</country>
+    </address>
+    <electronicMailAddress>emmanuel.roux@ird.fr</electronicMailAddress>
+      </creator>
+      <creator>
+    <individualName>
+        <givenName>Isabelle</givenName>
+      <surName>Dusfour</surName>
+    </individualName>
+    <organizationName>Unité d’entomologie médicale, Institut Pasteur de la Guyane</organizationName>
+    <positionName>Researcher</positionName>
+    <address>
+        <deliveryPoint>23, Avenue Pasteur B.P. 6010</deliveryPoint>
+        <city>Cayenne</city>
+        <postalCode>97300</postalCode>
+        <country>GF</country>
+    </address>
+    <electronicMailAddress>isabelle.dusfour@pasteur.fr</electronicMailAddress>
+      </creator>
+      <creator>
+    <individualName>
+        <givenName>Romain</givenName>
+      <surName>Girod</surName>
+    </individualName>
+    <organizationName>Unité d’entomologie médicale, Institut Pasteur de Madagascar</organizationName>
+    <positionName>Researcher</positionName>
+    <address>
+        <deliveryPoint>BP 1274, Ambatofotsikeky</deliveryPoint>
+        <city>Antananarivo 101</city>
+        <country>MG</country>
+    </address>
+    <electronicMailAddress>rgirod@pasteur.mg</electronicMailAddress>
+      </creator>
+      <creator>
+    <individualName>
+        <givenName>Sandrine</givenName>
+      <surName>Chantilly</surName>
+    </individualName>
+    <organizationName>Service de démoustication de la Collectivité territoriale de Guyane</organizationName>
+    <positionName>-</positionName>
+    <address>
+        <deliveryPoint>Hôtel de la Collectivité Territoriale de Guyane - Carrefour de Suzini - 4179 route de Montabo</deliveryPoint>
+        <city>Cayenne</city>
+        <postalCode>97300</postalCode>
+    </address>
+    <electronicMailAddress>sandrine.chantilly@ctguyane.fr</electronicMailAddress>
+      </creator>
+      <creator>
+    <individualName>
+        <givenName>Frédérique</givenName>
+      <surName>Seyler</surName>
+    </individualName>
+    <organizationName>ESPACE-DEV, UMR 228 (IRD, UM, UR, UA, UG), Institut de Recherche pour le Développement</organizationName>
+    <positionName>Researcher</positionName>
+    <address>
+        <deliveryPoint>Maison de la Télédétection, 500 rue Jean-François Breton</deliveryPoint>
+        <city>Montpellier Cedex 5</city>
+        <postalCode>34093</postalCode>
+        <country>FR</country>
+    </address>
+    <electronicMailAddress>frederique.seyler@ird.fr</electronicMailAddress>
+      </creator>
+      <creator>
+    <individualName>
+        <givenName>Margarete do Socorro Mendonça</givenName>
+      <surName>Gomes</surName>
+    </individualName>
+    <organizationName>Laboratório Central de Saúde Pública do Amapá</organizationName>
+    <positionName>Researcher</positionName>
+    <address>
+        <deliveryPoint>Rua Tancredo Neves, 1118 - São Lázaro</deliveryPoint>
+        <city>Macapá</city>
+        <postalCode>68909-816</postalCode>
+        <country>BR</country>
+    </address>
+    <electronicMailAddress>margarete.m.gomes@gmail.com</electronicMailAddress>
+      </creator>
+      <creator>
+    <individualName>
+        <givenName>Volmir</givenName>
+      <surName>Zanini</surName>
+    </individualName>
+    <organizationName>Laboratório Central de Saúde Pública do Amapá.</organizationName>
+    <positionName>Researcher</positionName>
+    <address>
+        <deliveryPoint>Rua Tancredo Neves, 1118 - São Lázaro</deliveryPoint>
+        <city>Macapá</city>
+        <postalCode>68909-816</postalCode>
+        <country>BR</country>
+    </address>
+    <electronicMailAddress>vmzanini@hotmail.com</electronicMailAddress>
+      </creator>
+      <creator>
+    <individualName>
+        <givenName>Allan Kardec Ribeiro</givenName>
+      <surName>Galardo</surName>
+    </individualName>
+    <organizationName>Laboratório de Entomologia Médica, Instituto de Pesquisas Cientificas e Tecnológicas do Estado do Amapá</organizationName>
+    <positionName>Researcher</positionName>
+    <address>
+        <deliveryPoint>Rodovia JK, Km 10 - Campus do IEPA da Fazendinha</deliveryPoint>
+        <city>Macapá</city>
+        <postalCode>68912-250</postalCode>
+        <country>BR</country>
+    </address>
+    <electronicMailAddress>allangalardo@gmail.com</electronicMailAddress>
+      </creator>
+      <creator>
+    <individualName>
+        <givenName>Ana Cristina da Silva Ferreira</givenName>
+      <surName>Lima</surName>
+    </individualName>
+    <organizationName>Laboratório de Entomologia Médica, Instituto de Pesquisas Cientificas e Tecnológicas do Estado do Amapá</organizationName>
+    <positionName>Researcher</positionName>
+    <address>
+        <deliveryPoint> Rodovia JK, Km 10 - Campus do IEPA da Fazendinha</deliveryPoint>
+        <city>Macapá</city>
+        <postalCode>68912-250</postalCode>
+        <country>BR</country>
+    </address>
+    <electronicMailAddress>crisbio.lima@gmail.com</electronicMailAddress>
+      </creator>
+      <metadataProvider>
+    <individualName>
+        <givenName>Yi</givenName>
+      <surName>Moua</surName>
+    </individualName>
+    <organizationName>Université de Guyane, ESPACE-DEV, UMR 228 (IRD, UM, UR, UA, UG)</organizationName>
+    <positionName>Research team</positionName>
+    <address>
+        <deliveryPoint>275 Route de Montabo</deliveryPoint>
+        <city>Cayenne</city>
+        <postalCode>97300</postalCode>
+        <country>GF</country>
+    </address>
+    <electronicMailAddress>mmoua.yi@gmail.com</electronicMailAddress>
+      </metadataProvider>
+      <associatedParty>
+    <individualName>
+      <surName>GBIF France</surName>
+    </individualName>
+    <organizationName>GBIF France</organizationName>
+    <positionName>IT support</positionName>
+    <address>
+        <deliveryPoint>GBIF France - MNHN Géologie CP48, 43 rue Buffon</deliveryPoint>
+        <city>Paris</city>
+        <administrativeArea>Île-de-France</administrativeArea>
+        <postalCode>75005</postalCode>
+        <country>FR</country>
+    </address>
+    <phone>140798065</phone>
+    <electronicMailAddress>connexion@gbif.fr</electronicMailAddress>
+    <role>distributor</role>
+      </associatedParty>
+  <pubDate>
+      2019-01-31
+  </pubDate>
+  <language>eng</language>
+  <abstract>
+    <para>French Guiana, a French territory, and Amapá, a Brazilian state, are situated in an inter-tropical area in South America. They provide an excellent climate to the presence of malaria vectors, and particularly the main vector in South America, Anopheles darlingi. This database is a collection of different occurences of Anopheles in French Guiana and in the state of Amapá, between 1902 and 2014. Its aim is to complete the limited knowledge of the distribution of Anopheles in this area, where the cross border situation is major barrier to the elimination of Malaria.</para>
+  </abstract>
+      <keywordSet>
+            <keyword>Occurrence</keyword>
+        <keywordThesaurus>GBIF Dataset Type Vocabulary: http://rs.gbif.org/vocabulary/gbif/dataset_type.xml</keywordThesaurus>
+      </keywordSet>
+      <keywordSet>
+            <keyword>Specimen</keyword>
+        <keywordThesaurus>GBIF Dataset Subtype Vocabulary: http://rs.gbif.org/vocabulary/gbif/dataset_subtype.xml</keywordThesaurus>
+      </keywordSet>
+      <keywordSet>
+            <keyword>Anopheles</keyword>
+            <keyword>Amazonian</keyword>
+            <keyword>presence</keyword>
+        <keywordThesaurus>n/a</keywordThesaurus>
+      </keywordSet>
+  <intellectualRights>
+    <para>This work is licensed under a <ulink url="http://creativecommons.org/licenses/by-nc/4.0/legalcode"><citetitle>Creative Commons Attribution Non Commercial (CC-BY-NC) 4.0 License</citetitle></ulink>.</para>
+  </intellectualRights>
+  <coverage>
+      <geographicCoverage>
+          <geographicDescription>French Guiana; Amapa</geographicDescription>
+        <boundingCoordinates>
+          <westBoundingCoordinate>-54.888</westBoundingCoordinate>
+          <eastBoundingCoordinate>-49.834</eastBoundingCoordinate>
+          <northBoundingCoordinate>5.835</northBoundingCoordinate>
+          <southBoundingCoordinate>-1.318</southBoundingCoordinate>
+        </boundingCoordinates>
+      </geographicCoverage>
+          <temporalCoverage>
+              <rangeOfDates>
+                  <beginDate>
+                    <calendarDate>1902</calendarDate>
+                  </beginDate>
+                <endDate>
+                  <calendarDate>2014</calendarDate>
+                </endDate>
+              </rangeOfDates>
+          </temporalCoverage>
+          <taxonomicCoverage>
+              <taxonomicClassification>
+                  <taxonRankName>genus</taxonRankName>
+                <taxonRankValue>Anopheles</taxonRankValue>
+              </taxonomicClassification>
+          </taxonomicCoverage>
+  </coverage>
+  <maintenance>
+    <description>
+      <para></para>
+    </description>
+    <maintenanceUpdateFrequency>unkown</maintenanceUpdateFrequency>
+  </maintenance>
+
+      <contact>
+    <individualName>
+      <surName>Unité d’entomologie médicale</surName>
+    </individualName>
+    <organizationName>Institut Pasteur de la Guyane</organizationName>
+    <positionName>Research team</positionName>
+    <address>
+        <deliveryPoint>23, Avenue Pasteur B.P. 6010</deliveryPoint>
+        <city>Cayenne</city>
+        <postalCode>97300</postalCode>
+        <country>GF</country>
+    </address>
+      </contact>
+</dataset>
+  <additionalMetadata>
+    <metadata>
+      <gbif>
+          <dateStamp>2019-01-30T03:52:00.364+00:00</dateStamp>
+          <hierarchyLevel>dataset</hierarchyLevel>
+            <citation>Moua Y., Roux E., Dusfour I., Girod R., Chantilly S., Seyler F., Gomes M. S. M., Zanini V., Galardo A. K. R., Lima A. C. S. F., Briolant S. (2019). IPG/IRBA/SSA/IRD/CTG/IEPA/LACEN. A database of Anopheles (Diptera, Culicidae): historical presence records in French Guiana and in the state of Amapá, in South America.</citation>
+          <dc:replaces>fc8a216d-4467-449f-b0c6-84cd905deb6e/v1.3.xml</dc:replaces>
+      </gbif>
+    </metadata>
+  </additionalMetadata>
+</eml:eml>

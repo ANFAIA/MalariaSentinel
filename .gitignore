@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+.python-version
+
+# Heavy datasets (re-downloadable via scripts/restore_data.py)
+#   DwC occurrence files + raw archives (kept out: ~80 MB of text + zips)
+data/**/*.txt
+data/**/*.zip
+data/pasteur_anopheles.zip
+data/occurrence.txt
+#   SRTM / DEM rasters (kept out: ~480 MB of .tif)
+terrain/**/*.tif
+runs/layers/*.tif
+runs/layers/*.zip
+
+# Experiment artifacts (regenerable from the pipeline)
+runs/
+*.pt
+*.npz
+*.log
+
+# macOS
+.DS_Store
+
+# Editors
+.vscode/
+.idea/
+*.swp
+
+# Tooling locais
+.conductor/
+node_modules/
+package-lock.json

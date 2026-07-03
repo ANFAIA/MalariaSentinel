@@ -1,0 +1,499 @@
+<eml:eml xmlns:eml="eml://ecoinformatics.org/eml-2.1.1"
+         xmlns:dc="http://purl.org/dc/terms/"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="eml://ecoinformatics.org/eml-2.1.1 http://rs.gbif.org/schema/eml-gbif-profile/1.1/eml.xsd"
+         packageId="https://ipt.biodiversidad.co/sib/resource?id=ins_mosquiteros_malaria/v1.0" system="http://gbif.org" scope="system"
+         xml:lang="spa">
+
+<dataset>
+  <alternateIdentifier>https://ipt.biodiversidad.co/sib/resource?r=ins_mosquiteros_malaria</alternateIdentifier>
+  <title xml:lang="spa">Especies del género Anopheles (Diptera: Culicidae) asociadas al domicilio humano en 25 localidades de los municipios de Timbiquí, Guapi y Santa Bárbara ubicadas un área endémica para malaria al suroccidente de Colombia</title>
+      <creator>
+    <individualName>
+        <givenName>Manuela</givenName>
+      <surName>Herrera</surName>
+    </individualName>
+    <organizationName>USAID - VectorLink Colombia - Abt Associates</organizationName>
+    <positionName>Gerente técnica en Entomología</positionName>
+    <address>
+        <city>Medellín</city>
+        <administrativeArea>Antioquia</administrativeArea>
+        <country>CO</country>
+    </address>
+    <electronicMailAddress>manuelahv82@gmail.com</electronicMailAddress>
+          <userId directory="http://orcid.org/">0000-0002-5021-6091</userId>
+      </creator>
+      <creator>
+    <individualName>
+        <givenName>Nicole</givenName>
+      <surName>Vargas-García</surName>
+    </individualName>
+    <organizationName>USAID - Proyecto VectorLink Colombia - Abt Associates</organizationName>
+    <positionName>Entomóloga</positionName>
+    <address>
+        <city>Guapi</city>
+        <administrativeArea>Cauca</administrativeArea>
+        <country>CO</country>
+    </address>
+    <electronicMailAddress>nicolevg32@gmail.com</electronicMailAddress>
+          <userId directory="http://orcid.org/">0000-0002-1444-4214</userId>
+      </creator>
+      <creator>
+    <individualName>
+        <givenName>Jennifer</givenName>
+      <surName>Ballesteros</surName>
+    </individualName>
+    <organizationName>VectorLink Colombia</organizationName>
+    <positionName>Entomóloga</positionName>
+    <address>
+        <city>Timbiquí</city>
+        <administrativeArea>Cauca</administrativeArea>
+        <country>CO</country>
+    </address>
+    <electronicMailAddress>jennifer.ballesteros.velasquez@gmail.com</electronicMailAddress>
+          <userId directory="http://orcid.org/">0000-0001-7174-4355</userId>
+      </creator>
+      <metadataProvider>
+    <individualName>
+        <givenName>Manuela</givenName>
+      <surName>Herrera-Varela</surName>
+    </individualName>
+    <organizationName>VectorLink Colombia</organizationName>
+    <positionName>Gerente técnica en Entomología</positionName>
+    <address>
+        <city>Medellín</city>
+        <administrativeArea>Antioquia</administrativeArea>
+        <country>CO</country>
+    </address>
+    <electronicMailAddress>manuelahv82@gmail.com</electronicMailAddress>
+          <userId directory="http://orcid.org/">0000-0002-5021-6091</userId>
+      </metadataProvider>
+      <metadataProvider>
+    <individualName>
+        <givenName>Martha Liliana</givenName>
+      <surName>Ahumada</surName>
+    </individualName>
+    <organizationName>Instituto Nacional de Salud</organizationName>
+    <positionName>Grupo de Entomología</positionName>
+    <address>
+        <deliveryPoint>Avenida calle 26 No. 51-20 - Zona 6 CAN</deliveryPoint>
+        <city>Bogotá D.C.</city>
+        <administrativeArea>Bofgotá D.C.</administrativeArea>
+        <postalCode>111321</postalCode>
+        <country>CO</country>
+    </address>
+    <phone>57 1 2207700</phone>
+    <electronicMailAddress>mahumada@ins.gov.co</electronicMailAddress>
+    <onlineUrl>https://www.ins.gov.co/Paginas/Inicio.aspx</onlineUrl>
+          <userId directory="http://orcid.org/">0000-0002-5153-8383</userId>
+      </metadataProvider>
+      <associatedParty>
+    <individualName>
+        <givenName>United States Agency for International Development</givenName>
+      <surName>USAID</surName>
+    </individualName>
+    <organizationName>United States Agency for International Development (USAID)</organizationName>
+    <positionName>Agencia gubernamental</positionName>
+    <address>
+        <deliveryPoint>American Embassy/Bogota</deliveryPoint>
+        <city>Bogotá, D.C.</city>
+        <administrativeArea>Bogotá, D.C.</administrativeArea>
+        <country>CO</country>
+    </address>
+    <phone>571-275-2000</phone>
+    <electronicMailAddress>colombiausaidwebinfo@usaid.gov</electronicMailAddress>
+    <onlineUrl>https://www.usaid.gov/es/colombia</onlineUrl>
+    <role>owner</role>
+      </associatedParty>
+      <associatedParty>
+    <individualName>
+        <givenName>Instituto Nacional de Salud</givenName>
+      <surName>INS</surName>
+    </individualName>
+    <organizationName>Instituto Nacional de Salud</organizationName>
+    <positionName>Entidad pública</positionName>
+    <address>
+        <deliveryPoint>Calle 26 No, 51-20 -Zona 6 CAN</deliveryPoint>
+        <city>Bogotá D.C.</city>
+        <administrativeArea>Bogotá D. C.</administrativeArea>
+        <postalCode>111321</postalCode>
+        <country>CO</country>
+    </address>
+    <phone>57 1 2207700</phone>
+    <onlineUrl>https://www.ins.gov.co/Paginas/Inicio.aspx</onlineUrl>
+    <role>author</role>
+      </associatedParty>
+      <associatedParty>
+    <individualName>
+        <givenName>Centros para el Control y la Prevención de Enfermedades</givenName>
+      <surName>CDC</surName>
+    </individualName>
+    <organizationName>Centros para el Control y la Prevención de Enfermedades</organizationName>
+    <positionName>Agencia gubernamental</positionName>
+    <address>
+        <deliveryPoint>1600 Clifton Road Atlanta, GA 30329-4027 EE. UU.</deliveryPoint>
+        <city>Atlanta, GA 30329-4027 EE. UU.</city>
+        <administrativeArea>Georgia</administrativeArea>
+        <country>US</country>
+    </address>
+    <phone>800-232-4636</phone>
+    <onlineUrl>https://www.cdc.gov/spanish/acercacdc/index.html</onlineUrl>
+    <role>author</role>
+      </associatedParty>
+      <associatedParty>
+    <individualName>
+        <givenName>Secretaria de Salud</givenName>
+      <surName>Gobernación del Cauca</surName>
+    </individualName>
+    <organizationName>Secretaria de Salud - Gobernación del Cauca</organizationName>
+    <positionName>Entidad pública</positionName>
+    <address>
+        <deliveryPoint>Calle 5 No. 15 - 57</deliveryPoint>
+        <city>Popayán</city>
+        <administrativeArea>Cauca</administrativeArea>
+        <country>CO</country>
+    </address>
+    <phone>57 28209607</phone>
+    <onlineUrl>https://www.saludcauca.gov.co/</onlineUrl>
+    <role>author</role>
+      </associatedParty>
+      <associatedParty>
+    <individualName>
+        <givenName>Ministerio de Salud y Protección Social</givenName>
+      <surName>Minsalud</surName>
+    </individualName>
+    <organizationName>Ministerio de Salud y Protección Social</organizationName>
+    <positionName>Entidad pública</positionName>
+    <address>
+        <deliveryPoint>Carrera 13 No. 32-76</deliveryPoint>
+        <city>Bogotá D.C.</city>
+        <administrativeArea>Bogotá D.C.</administrativeArea>
+        <postalCode>111321</postalCode>
+        <country>CO</country>
+    </address>
+    <phone>+571 601 330 5000</phone>
+    <electronicMailAddress>correo@minsalud.gov.co</electronicMailAddress>
+    <onlineUrl>https://www.minsalud.gov.co/Portada2021/index.html</onlineUrl>
+    <role>author</role>
+      </associatedParty>
+  <pubDate>
+      2023-11-21
+  </pubDate>
+  <language>spa</language>
+  <abstract>
+    <para>La malaria es una enfermedad infecciosa causada por parásitos del género Plasmodium los cuales son transmitidos de una persona a otra por la picadura de mosquitos hembra del género Anopheles. En Colombia, nueve especies son consideradas vectores: An. darlingi, An. nuneztovari C, An. albimanus, considerados vectores principales, y An. calderoni, An. neivai s.l., An. pholidotus, An. pseudopunctipennis s.l., An. punctimacula s.l. An. benarrochi B, considerados vectores secundarios y con importancia local. El estudio de la biología y comportamiento de los vectores de malaria con respecto al domicilio humano incluye la realización de capturas con atrayente humano protegido metodología que permite determinar la presencia de especies antropofílicas (incluyen al humano como fuente de alimentación sanguínea), establecer el nivel de exposición de la población humana a las picaduras de los mosquitos (contacto humano-vector) y estimar el riesgo de infección de la población con esta enfermedad (tasa de inoculación entomológica).</para>
+    <para>En Colombia, las principales medidas para el control de los mosquitos vectores de malaria son el uso de mosquiteros o con insecticida de larga duración (MILD) y el rociado residual intradomiciliario (RRI). Se ha demostrado que son efectivas para reducir la transmisión de la malaria, particularmente en África, sin embargo, en América son pocos los estudios acerca de su efectividad. La efectividad de los MILD y el RRI se puede ver afectada por el comportamiento de picadura y reposo de los mosquitos, dado que estas medidas son más eficaces para las especies de mosquitos que se alimentan preferiblemente en humanos (antropofílicos), pican (endofágicos) y reposan al interior de la vivienda (endofílicos). En el caso de las especies que se alimentan y reposan preferiblemente fuera de la vivienda se reduce su eficacia dado que es menor la probabilidad de contacto de los mosquitos con las superficies tratadas.</para>
+    <para>A partir de capturas con atrayante humano protegido (AHP) realizadas durante 285 noches en los municipios de Guapi (n=145), Timbiquí (n=105) y Santa Bárbara (n=35), se determinó que An. albimanus y An. neivai son los mosquitos vectores de malaria más abundantes en el área de estudio, las cuales están presentes dentro y fuera de las viviendas. Los resultados han permitido caracterizar los hábitos de picadura de estas dos especies con respecto al domicilio humano y confirmar su papel como vector en el mantenimiento de la transmisión en el departamento de Cauca y Nariño. Adicionalmente se han identificado aspectos de su comportamiento que pueden tener un efecto sobre la efectividad de los MILD y RRI principales estrategias implementadas por las autoridades de salud para el control de las áreas endémica de transmisión de malaria en Colombia.</para>
+    <para>Este conjunto de datos incluye la información de 1.502 registros biológicos, representados en 229.394 mosquitos recolectados con AHP en 10 localidades del municipio de Timbiquí, 11 de Guapi en el departamento del Cauca y 4 en el municipio de Santa Bárbara, departamento de Nariño. Los mosquitos están agrupados en las especies: Anopheles neivai (n=194.356), An. albimanus (n=34.424) y An. apicimacula (n=614).</para>
+  </abstract>
+      <keywordSet>
+            <keyword>Anopheles albimanus</keyword>
+            <keyword>Anopheles neivai</keyword>
+            <keyword>Anopheles apicimacula</keyword>
+            <keyword>Control vectorial</keyword>
+            <keyword>Malaria</keyword>
+            <keyword>Colombia</keyword>
+        <keywordThesaurus>n/a</keywordThesaurus>
+      </keywordSet>
+      <keywordSet>
+            <keyword>PERMISO_COLECTA</keyword>
+        <keywordThesaurus>SiB Colombia</keywordThesaurus>
+      </keywordSet>
+      <keywordSet>
+            <keyword>Occurrence</keyword>
+        <keywordThesaurus>GBIF Dataset Type Vocabulary: http://rs.gbif.org/vocabulary/gbif/dataset_type.xml</keywordThesaurus>
+      </keywordSet>
+      <keywordSet>
+            <keyword>Observation</keyword>
+        <keywordThesaurus>GBIF Dataset Subtype Vocabulary: http://rs.gbif.org/vocabulary/gbif/dataset_subtype.xml</keywordThesaurus>
+      </keywordSet>
+      <keywordSet>
+            <keyword>Occurrence</keyword>
+        <keywordThesaurus>GBIF Dataset Type Vocabulary: http://rs.gbif.org/vocabulary/gbif/dataset_type_2015-07-10.xml</keywordThesaurus>
+      </keywordSet>
+  <intellectualRights>
+    <para>This work is licensed under a <ulink url="http://creativecommons.org/licenses/by-nc/4.0/legalcode"><citetitle>Creative Commons Attribution Non Commercial (CC-BY-NC) 4.0 License</citetitle></ulink>.</para>
+  </intellectualRights>
+  <coverage>
+      <geographicCoverage>
+          <geographicDescription>El área de estudio del proyecto VectorLink-Colombia está ubicada en la zona rural de los municipios de Timbiquí y Guapi, departamento del Cauca y el municipio de Santa Bárbara, departamento de Nariño, Colombia. Para Timbiquí se incluyeron 10 localidades distribuidas a lo largo del río Timbiquí: Brazo Corto, Calle del Pueblo, Cheté, Coteje, El Charco, Mataco, Nueva Esperanza, Puerto Saija, San Miguel y Velásquez. Para se incluyeron 11 localidades, Chamón, Joanico, Limones, Penitente, Quiroga, Sabana, Sansón, Santa Rosa, San José de Guare, El Carmelo y Temuey y para Santa Bárbara, 4 localidades, Bellavista, El Firme, Las Peñas y Micaelita. En el caso de los dos últimos municipios las localidades están ubicadas a lo largo del río Guapi.</geographicDescription>
+        <boundingCoordinates>
+          <westBoundingCoordinate>-77.956</westBoundingCoordinate>
+          <eastBoundingCoordinate>-77.59</eastBoundingCoordinate>
+          <northBoundingCoordinate>2.883</northBoundingCoordinate>
+          <southBoundingCoordinate>2.549</southBoundingCoordinate>
+        </boundingCoordinates>
+      </geographicCoverage>
+          <temporalCoverage>
+              <rangeOfDates>
+                  <beginDate>
+                    <calendarDate>2021-01-02</calendarDate>
+                  </beginDate>
+                <endDate>
+                  <calendarDate>2023-03-21</calendarDate>
+                </endDate>
+              </rangeOfDates>
+          </temporalCoverage>
+          <taxonomicCoverage>
+              <generalTaxonomicCoverage>Este recurso incluye 1.502 registros que incluyen 229.394 mosquitos del género Anopheles los cuales se encuentran identificados hasta nivel de especie: Anopheles albimanus (n=34424), Anopheles neivai (n=194356), y Anopheles apicimacula (n=614).</generalTaxonomicCoverage>
+              <taxonomicClassification>
+                  <taxonRankName>species</taxonRankName>
+                <taxonRankValue>Anopheles albimanus</taxonRankValue>
+                  <commonName>Clavito</commonName>
+              </taxonomicClassification>
+              <taxonomicClassification>
+                  <taxonRankName>species</taxonRankName>
+                <taxonRankValue>Anopheles neivai</taxonRankValue>
+                  <commonName>Clavito</commonName>
+              </taxonomicClassification>
+              <taxonomicClassification>
+                  <taxonRankName>species</taxonRankName>
+                <taxonRankValue>Anopheles apicimacula</taxonRankValue>
+                  <commonName>Clavito</commonName>
+              </taxonomicClassification>
+          </taxonomicCoverage>
+  </coverage>
+  <maintenance>
+    <description>
+      <para></para>
+    </description>
+    <maintenanceUpdateFrequency>unkown</maintenanceUpdateFrequency>
+  </maintenance>
+
+      <contact>
+    <individualName>
+        <givenName>Martha Liliana</givenName>
+      <surName>Ahumada</surName>
+    </individualName>
+    <organizationName>Instituto Nacional de Salud</organizationName>
+    <positionName>Grupo de Entomología</positionName>
+    <address>
+        <deliveryPoint>Avenida calle 26 No. 51-20 - Zona 6 CAN</deliveryPoint>
+        <city>Bogotá</city>
+        <administrativeArea>Bogotá D.C.</administrativeArea>
+        <postalCode>111321</postalCode>
+        <country>CO</country>
+    </address>
+    <phone>571 2207700</phone>
+    <electronicMailAddress>mahumada@ins.gov.co</electronicMailAddress>
+    <onlineUrl>https://www.ins.gov.co/Paginas/Inicio.aspx</onlineUrl>
+          <userId directory="http://orcid.org/">0000-0002-5153-8383</userId>
+      </contact>
+      <contact>
+    <individualName>
+        <givenName>Manuela</givenName>
+      <surName>Herrera</surName>
+    </individualName>
+    <organizationName>PMI VectorLink Colombia Project</organizationName>
+    <positionName>Gerente técnica en Entomología</positionName>
+    <address>
+        <city>Medellín</city>
+        <administrativeArea>Antioquia</administrativeArea>
+        <country>CO</country>
+    </address>
+    <electronicMailAddress>manuelahv82@gmail.com</electronicMailAddress>
+          <userId directory="http://orcid.org/">0000-0002-5021-6091</userId>
+      </contact>
+      <contact>
+    <individualName>
+        <givenName>Sussane Carolina</givenName>
+      <surName>Ardila Roldán</surName>
+    </individualName>
+    <organizationName>Instituto Nacional de Salud</organizationName>
+    <positionName>Grupo de Entomología</positionName>
+    <address>
+        <deliveryPoint>Avenida calle 26 No. 51-20 - Zona 6 CAN</deliveryPoint>
+        <city>Bogotá</city>
+        <administrativeArea>Bogotá D.C.</administrativeArea>
+        <postalCode>111321</postalCode>
+        <country>CO</country>
+    </address>
+    <phone>571 2207700</phone>
+    <electronicMailAddress>sardila@ins.gov.co</electronicMailAddress>
+    <onlineUrl>https://www.ins.gov.co/Paginas/Inicio.aspx</onlineUrl>
+          <userId directory="http://orcid.org/">0000-0002-7143-1508</userId>
+      </contact>
+  <methods>
+        <methodStep>
+          <description>
+            <para>Capturas con mosquitos para caracterización de comportamiento de picadura en el domicilio: Selección aleatoria de las viviendas a muestrear con atrayente humano protegido en cada uno de los conglomerados.</para>
+          </description>
+        </methodStep>
+        <methodStep>
+          <description>
+            <para>Recolección de los mosquitos con atrayente humano protegido entre las 17:00 y 5:00 h.</para>
+          </description>
+        </methodStep>
+        <methodStep>
+          <description>
+            <para>Empaque de los mosquitos en frascos recolectores indicado el conglomerado, la vivienda, el sitio de captura (intradomicilio/peridomicilio) y la hora.</para>
+          </description>
+        </methodStep>
+        <methodStep>
+          <description>
+            <para>Diligenciamiento el formato con la información de la captura.</para>
+          </description>
+        </methodStep>
+        <methodStep>
+          <description>
+            <para>Envío de los mosquitos vivos al laboratorio.</para>
+          </description>
+        </methodStep>
+        <methodStep>
+          <description>
+            <para>Identificación de los mosquitos utilizando claves dicotómicas.</para>
+          </description>
+        </methodStep>
+        <methodStep>
+          <description>
+            <para>Empaque y envío de mosquitos para detección de infección natural con parásitos del género Plasmodium.</para>
+          </description>
+        </methodStep>
+        <methodStep>
+          <description>
+            <para>Captura de mosquitos en reposo dentro de las viviendas: Selección de las viviendas para realizar la recolección de mosquitos en reposo.</para>
+          </description>
+        </methodStep>
+        <methodStep>
+          <description>
+            <para>Recolección de mosquitos con aspirador mecánico prockopack entre las 5:00 y 8:00 h.</para>
+          </description>
+        </methodStep>
+        <methodStep>
+          <description>
+            <para>Empaque de los mosquitos en frascos recolectores indicado el conglomerado, código de la vivienda, el sitio de captura, hora y altura.</para>
+          </description>
+        </methodStep>
+        <methodStep>
+          <description>
+            <para>Diligenciar el formato con la información de la captura de mosquitos en reposo.</para>
+          </description>
+        </methodStep>
+        <methodStep>
+          <description>
+            <para>Envío de los mosquitos vivos al laboratorio.</para>
+          </description>
+        </methodStep>
+        <methodStep>
+          <description>
+            <para>Identificación de los mosquitos utilizando claves dicotómicas.</para>
+          </description>
+        </methodStep>
+        <methodStep>
+          <description>
+            <para>Empaque y envío de mosquitos para identificación de fuentes de alimento sanquíneo.</para>
+          </description>
+        </methodStep>
+      <sampling>
+        <studyExtent>
+          <description>
+            <para>Los registros de los mosquitos del género Anopheles corresponden a capturas realizadas con atrayente humano protegido entre enero de 2021 y marzo de 2023 en 25 localidades de los municipios de Timbiquí y Guapi en el departamento del Cauca, y Santa Bárbara de Iscuandé en Nariño. Las localidades se encuentran ubicadas a lo largo del río Timbiquí: Brazo Corto, Calle del Pueblo, Cheté, Coteje, El Charco, Mataco, Nueva Esperanza, Puerto Saija, San Miguel y Velásquez; en el río Guapi se encuentran Santa Rosa, Chamón, Sansón, Sabana, Penitente y   Temuey; en el río Guajui se encuentran Joanico, Quiroga, Limones, El Carmelo y San José; y en el río Chanzará se encuentran Bellavista, El Firme, Micaelita y Las Peñas.</para>
+          </description>
+        </studyExtent>
+        <samplingDescription>
+          <para>En cada uno de los conglomerados se seleccionaron aleatoriamente las viviendas en las cuales se realizarían las capturas de mosquitos por parte de personal entrenado del proyecto. Después de seleccionada la vivienda dos recolectores harán la captura de los mosquitos mediante atrayente humano protegido, método que consiste en exponer una de las piernas a partir de la rodilla y recolectar con un aspirador bucal los mosquitos que lleguen a posarse. Los dos recolectores se ubican, uno al interior de la vivienda (intradomicilio) y el otro fuera (peridomicilio) y simultáneamente realizan la captura de los mosquitos hora a hora entre las 17:00 y 5:00 horas (a excepción de la línea base que duró 14 horas, entre las 17:00 y 7:00), rotando de lugar cada hora. Por otra parte, la captura de los mosquitos Anopheles en reposo se realizaron en las localidades de Brazo Corto y el Charco en Timbiquí con un aspirador mecánico recolectando los mosquitos posados en la pared al interior de las viviendas a tres diferentes alturas: 0,5, 1,0, 2,0 m medidos desde el piso de la vivienda.</para>
+        </samplingDescription>
+      </sampling>
+      <qualityControl>
+        <description>
+          <para>Los métodos empleados para la recolección de mosquitos son métodos estandarizados y descritos en documentos técnicos preparados por los entomólogos del proyecto VectorLink Colombia quienes tienen experiencia en la recolección de vectores de malaria. Los técnicos que recolectan los mosquitos en las viviendas fueron seleccionados, entrenados y supervisados por los entomólogos de VectorLink Colombia.</para>
+        </description>
+      </qualityControl>
+  </methods>
+  <project id="Proyecto VectorLink Colombia - USAID">
+    <title>Determinación del impacto entomológico del uso de mosquiteros tratados con insecticida de larga duración (MILD) y el rociado residual intradomiciliario (RRI) en un área endémica para la transmisión de malaria del departamento de Cauca, Colombia.</title>
+      <personnel>
+        <individualName>
+            <givenName>Manuela</givenName>
+          <surName>Herrera-Varela</surName>
+        </individualName>
+              <userId directory="http://orcid.org/">0000-0002-5021-6091</userId>
+        <role>originator</role>
+      </personnel>
+      <personnel>
+        <individualName>
+            <givenName>Carlos Andrés</givenName>
+          <surName>Morales</surName>
+        </individualName>
+              <userId directory="http://orcid.org/">0000-0002-9887-1044</userId>
+        <role>contentProvider</role>
+      </personnel>
+      <personnel>
+        <individualName>
+            <givenName>Audrey</givenName>
+          <surName>Lenhart</surName>
+        </individualName>
+              <userId directory="http://orcid.org/">0000-0002-9156-4228</userId>
+        <role>principalInvestigator</role>
+      </personnel>
+      <personnel>
+        <individualName>
+            <givenName>Liliana</givenName>
+          <surName>Santacoloma</surName>
+        </individualName>
+              <userId directory="http://orcid.org/">0000-0002-5077-2151</userId>
+        <role>principalInvestigator</role>
+      </personnel>
+      <personnel>
+        <individualName>
+            <givenName>Martha Liliana</givenName>
+          <surName>Ahumada</surName>
+        </individualName>
+              <userId directory="http://orcid.org/">0000-0002-5153-8383</userId>
+        <role>custodianSteward</role>
+      </personnel>
+      <abstract>
+        <para>En Colombia cerca del 92% del territorio posee condiciones ambientales que favorecen la transmisión de la malaria. Se han identificado 6 regiones ecoepidemiológicas, siendo la costa Pacífica a la que pertenece el departamento del Cauca, la que aporta cerca del 55% de los casos registrados anualmente en el país. Para el control de malaria las principales medidas de control vectorial utilizadas son el rociado residual intradomiciliario (RRI) y el uso de mosquiteros tratados con insecticida (MTI) las cuales han demostrado ser eficaces para la reducción de la malaria principalmente en África. En América son pocas las evidencias de la eficacia de estas dos medidas y del efecto que tienen sobre el comportamiento de los vectores locales. Es por esta razón que es necesario generar evidencia acerca del efecto del RRI y el uso de los mosquiteros insecticida de larga duración (MILD) sobre los hábitos de picadura los vectores con el fin de identificar los factores que pueden afectar su eficacia en la reducción del contacto humano vector en el continente americano.
+El proyecto “Determinación del impacto entomológico del uso de mosquiteros tratados con insecticida de larga duración (MILD) y el rociado residual intradomiciliario (RRI) en un área endémica para la transmisión de malaria del departamento de Cauca, Colombia”, tiene como objetivo determinar el impacto entomológico del uso de mosquiteros tratados con insecticida de larga duración (MILD) y el rociado residual intradomiciliario (RRI) en un área endémica para la transmisión de malaria del departamento de Cauca donde está presente Anopheles albimanus como vector principal de malaria. Este proyecto incluye tres fases, línea base (muestreo pre-intervención), intervención (entrega de MILD y rociado de viviendas con insecticida de acción residual) y evaluación. Utilizando un ensayo de conglomerados aleatorizados de dos brazos se está evaluando el efecto de estas dos estrategias de control sobre las poblaciones de mosquitos vectores de malaria: Brazo (1) MILD y brazo (2) RRI. En cada uno de los conglomerados intervenidos, mensualmente, se han seleccionado viviendas donde se realizan capturas de mosquitos con atrayente humano protegido y en sitios de reposo para identificar cambios en el comportamiento de picadura de los mosquitos como consecuencia de las intervenciones. Adicionalmente, se han capturado mosquitos para determinar el estado de paridad de las hembras, detectar la infección natural con especies de Plasmodium y establecer la proporción de mosquitos con alimentados en humanos variables que permitirán evidenciar otros efectos del RRI y los MILD sobre los hábitos de los vectores de malaria. La fase de evaluación ha incluido la evaluación de la durabilidad de los mosquiteros y la residualidad del insecticida en las paredes utilizando las metodologías propuestas por la OMS. Se espera con la ejecución de este proyecto realizar una comparación del efecto entomológico del uso de mosquiteros tratados con insecticida de larga duración de la marca Safenet ® y el RRI sobre las poblaciones de mosquitos del género Anopheles con el fin de determinar la eficacia de estas dos medidas para el control de los vectores de malaria responsables de la transmisión en las áreas intervenidas en el departamento del Cauca.</para>
+      </abstract>
+      <funding>
+        <para>U.S. Agency for International Development (USAID)
+Secretaría de Salud Departamental de Salud (SDSC)
+Instituto Nacional de Salud - Colombia (INS)
+Centros para el Control y la Prevención de Enfermedades (CDC)
+Ministerio de Salud y Protección Social (Minsalud)</para>
+      </funding>
+      <studyAreaDescription>
+        <descriptor name="generic"
+                    citableClassificationSystem="false">
+          <descriptorValue>El proyecto se desarolla en los municipios de Guapi y Timbiquí localizados en el área endémica para la transmisión de malaria del Pacífico caucano.</descriptorValue>
+        </descriptor>
+      </studyAreaDescription>
+      <designDescription>
+        <description>
+          <para>Ensayo por conglomerados aleatorizados con dos brazos para la evaluación de dos intervenciones, aplicadas al interior de las viviendas, para el control de vectores de malaria: (1) Mosquiteros insecticida de larga duración (MILD) y (2) Rociado residual intradomiciliario (RRI). Con el fin de comparar el efecto de estas dos intervenciones sobre las poblaciones de mosquitos vectores de malaria se harán capturas dentro y fuera de las viviendas con atrayente humano protegido y aspirador mecánico (Prockopak). Entre los indicadores entomológicos utilizados para la comparación se tendrán: (1) Tasa de picadura dentro y fuera de las viviendas para mosquitos Anopheles, (2) Densidad de mosquitos dentro de las viviendas capturados en reposo, (3) Tasa de paridad por especie de Anopheles, (4) Proporción de infección natural con Plasmodium spp. de las especies de Anopheles, (5) Índice de sangre humana y (6) Tasa de inoculación entomológica.</para>
+        </description>
+      </designDescription>
+  </project>
+</dataset>
+  <additionalMetadata>
+    <metadata>
+      <gbif>
+          <dateStamp>2021-05-26T19:56:14.191+00:00</dateStamp>
+          <hierarchyLevel>dataset</hierarchyLevel>
+            <citation identifier="https://doi.org/10.15472/kftrcn">Ahumada ML, Vargas-García N, Ballesteros J, Díaz-Herrera T, Cotazo K, Vargas E, Alvarez-Fernández N, Moreno C, Calderón N, Aguirre J, Lucumí D, Vargas E, Levine R, Lenhart A, Morales CA, Herrera-Varela M. (2021). Especies del género Anopheles (Diptera: Culicidae) asociadas al domicilio humano en 25 localidades de los municipios de Timbiquí, Guapi y Santa Bárbara ubicadas un área endémica para malaria al suroccidente de Colombia. v1.0. Instituto Nacional de Salud. Dataset/Occurrence. https://doi.org/10.15472/kftrcn</citation>
+          <bibliography>
+                <citation>González, R. &amp; Carrejo, N. (2009) Introducción al estudio taxonómico de Anopheles de Colombia, 2ed, Cali: Universidad del Valle</citation>
+                <citation identifier="https://pubmed.ncbi.nlm.nih.gov/26726290/">Harrison, B. A., Ruiz-Lopez, F., Falero, G. C., Savage, H. M., Pecor, J. E., &amp; Wilkerson, R. C. (2012). Anopheles (Kerteszia) lepidotus (Diptera: Culicidae), not the malaria vector we thought it was: Revised male and female morphology; larva, pupa, and male genitalia characters; and molecular verification. Zootaxa, 3218, 1–17.</citation>
+                <citation identifier="https://doi.org/10.1186/s13071-020-04301-0">Sallum, M., Obando, R. G., Carrejo, N., &amp; Wilkerson, R. C. (2020). Identification keys to the Anopheles mosquitoes of South America (Diptera: Culicidae). IV. Adult females. Parasites &amp; vectors, 13(1), 584.</citation>
+          </bibliography>
+            <physical>
+              <objectName>01300_ins-anophele-timbi_20210604</objectName>
+              <characterEncoding>UTF-8</characterEncoding>
+              <dataFormat>
+                <externallyDefinedFormat>
+                  <formatName>DWC-A</formatName>
+                    <formatVersion>1</formatVersion>
+                </externallyDefinedFormat>
+              </dataFormat>
+              <distribution>
+                <online>
+                  <url function="download">https://ipt.biodiversidad.co/cr-sib/resource.do?r=01300_ins-anophele-timbi_20210604</url>
+                </online>
+              </distribution>
+            </physical>
+          <resourceLogoUrl>https://raw.githubusercontent.com/SIB-Colombia/logos/main/socio-SiB-ins.png</resourceLogoUrl>
+      </gbif>
+    </metadata>
+  </additionalMetadata>
+</eml:eml>
