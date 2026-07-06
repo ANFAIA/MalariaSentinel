@@ -252,3 +252,49 @@ which bypasses the LLM extractor that mis-classifies JSON bodies.
 **Recall before writing:** always run `tools/memory/memory.sh query` or the MCP `search_nodes` first. If a relevant node or fact already exists, supersede it with a new write — never duplicate.
 
 **Edit this section when patterns emerge:** if you find yourself writing the same kind of episode repeatedly, propose a new convention here. Don't let the graph become a junk drawer.
+
+## Git Push Workflow
+
+The project uses a single `main` branch and the user is the sole contributor,
+but local `git reset` / `git commit --amend` always diverges from `origin/main`
+by construction. A plain `git push` then refuses with "non-fast-forward", and
+a naive `git push --force` would silently clobber any remote work that
+appeared since the last fetch.
+
+**Rule: when local history has been rewritten (reset, rebase, amend), push
+with `git ps`, never `git push --force`.** `git ps` is a global alias for
+`push --force-with-lease`:
+
+```bash
+git config --global alias.ps "push --force-with-lease"
+```
+
+| Command | Behaviour |
+|---|---|
+| `git push origin main` | Default: refuses if `origin/main` is not an ancestor of `HEAD`. Safe. |
+| `git ps origin main` | Force-pushes `HEAD` to `origin/main`, but **aborts** if the remote ref moved since the last `git fetch`. Safe-by-default for the "I rewrote my local history" case. |
+| `git push --force origin main` | Unconditional clobber. **Do not use.** |
+
+**Pre-push sanity check** (run whenever a push feels weird):
+
+```bash
+git fetch origin
+git log --oneline origin/main..HEAD   # commits you have that the remote does not
+git log --oneline HEAD..origin/main   # commits the remote has that you do not
+git merge-base HEAD origin/main       # the divergence point, if any
+```
+
+If the second list is non-empty, you have a real divergence — stop, look at
+the commits, and decide between rebase / merge / `git ps` based on whether
+the remote commits should survive.
+
+**Why `--force-with-lease` and not `--force`:** `--force` overwrites
+unconditionally. `--force-with-lease` first checks that the remote ref
+matches what you last fetched; if anyone (or any other agent) pushed in
+the meantime, it aborts with a clear error and you can re-fetch + re-decide
+instead of silently destroying their work. Same power, much smaller blast
+radius.
+
+**Why a global alias and not a project setting:** the divergence is a
+property of the user's workflow, not of this repo. The alias travels with
+the user across all checkouts.
