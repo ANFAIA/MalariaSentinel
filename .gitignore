@@ -28,6 +28,7 @@ tools/hitl/.protected-allowances
 
 # macOS
 .DS_Store
+**/.DS_Store
 
 # Editors
 .vscode/
