@@ -1,0 +1,18 @@
+// PROTECTED: requires human-in-the-loop approval to edit.
+// See tools/memory/.protected and AGENTS.md (Protected files).
+
+# tools/memory/.project.example
+# Template for the runtime project name file. The agent that bootstraps
+# the project copies this to tools/memory/.project (no extension) and
+# replaces the value with the actual project slug (the Neo4j group_id).
+#
+#   cp tools/memory/.project.example tools/memory/.project
+#   # edit tools/memory/.project and replace the value below
+#
+# Rules for the project slug:
+#   - Lowercase, no spaces, ASCII letters/digits/underscore/hyphen only.
+#   - Must match the Neo4j group_id used by every write in this checkout.
+#   - Re-running the seed is idempotent within a slug; switching slugs
+#     creates a fresh, isolated graph.
+
+malariasentinel

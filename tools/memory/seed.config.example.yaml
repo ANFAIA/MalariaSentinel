@@ -1,0 +1,106 @@
+# PROTECTED: requires human-in-the-loop approval to edit.
+# See tools/memory/.protected and AGENTS.md (Protected files).
+
+# seed.config.example.yaml
+# Example declarative seed for a project. Copy this file to
+# tools/memory/seed/<your-project>.yaml and edit. Then run
+# `tools/memory/seed.sh <your-project>` (or `memory.sh seed <your-project>`).
+#
+# Conventions:
+#   - Every node MUST have a stable `uuid`. Re-running the seed must be a
+#     no-op (MERGE on uuid).
+#   - Every node's label is implied by the top-level key it sits under
+#     (components -> :Component, etc.). The seed script validates every
+#     label against memory/config/config.yaml before any write.
+#   - `group_id` is set at the top of the yaml and applied to every node
+#     and relation.
+#   - Relations are flat: {src, type, dst, props?}. The type is the rel
+#     name; props is an optional inline map for extra attributes.
+#   - Multi-line summaries use the `summary: |` block scalar; they are
+#     joined with single spaces in the generated Cypher (no newlines in
+#     a property string).
+
+project: ExampleProject
+group_id: example
+schema_source: memory/config/config.yaml
+
+# ---------- Nodes ----------
+components:
+  - uuid: pkg-example-core
+    name: example-core
+    path: example-core/
+    summary: |
+      Core library of ExampleProject. No internal dependencies. Holds the
+      canonical types and helpers every other package imports.
+
+  - uuid: data-example-dataset
+    name: Example dataset
+    path: data/example/
+    summary: |
+      Public dataset used to validate the ExampleProject pipeline. Three
+      CSV files at 1km resolution covering 2018-2024.
+
+investigations:
+  - uuid: inv-example-main
+    name: ExampleProject investigation
+    status: open
+    summary: |
+      Top-level investigation for ExampleProject. Tests three sub-hypotheses
+      (H1, H2, H3) and promotes stable code from research packages to core.
+
+pitfalls:
+  - uuid: pitfall-example-typo
+    name: PITFALL-example-typo
+    summary: |
+      The legacy `add_memoery` (note the typo) is a stale alias for
+      add_memory that the old scheduler used. Do not introduce new callers.
+
+preferences:
+  - uuid: pref-example-conventional-commits
+    name: PREF-example-conventional-commits
+    summary: |
+      Every commit message must use Conventional Commits prefixes
+      (feat:, fix:, docs:, etc.). The CI lint step rejects non-conforming
+      commits.
+
+architectures:
+  - uuid: arch-example-monorepo
+    name: example monorepo rule
+    summary: |
+      Architectural rule: no internal package may depend on a research
+      package. Research packages depend on core; core depends on commonlib;
+      commonlib depends on nothing.
+
+tools:
+  - uuid: tool-example-uv
+    name: uv
+    summary: |
+      The Python package manager used across ExampleProject. `uv sync
+      --all-packages` syncs the workspace; `uv run` is the standard
+      invocation for scripts.
+
+patterns:
+  - uuid: pattern-example-replay-buffer
+    name: replay buffer
+    summary: |
+      A ring buffer of the last N rollouts, used to decorrelate batches
+      during PPO-style training. Standard pattern in the simulation
+      packages.
+
+operational:
+  - uuid: op-example-bring-up
+    name: bring-up-example
+    summary: |
+      `cd example && docker compose up -d && uv sync --all-packages`.
+      Brings the local stack to a working state.
+
+# ---------- Relations ----------
+relations:
+  - { src: inv-example-main,             type: TESTS,         dst: pkg-example-core }
+  - { src: inv-example-main,             type: INCLUDES,      dst: data-example-dataset }
+  - { src: inv-example-main,             type: TRIGGERED_BY,  dst: pitfall-example-typo }
+  - { src: pref-example-conventional-commits, type: SCOPES, dst: inv-example-main }
+  - { src: arch-example-monorepo,        type: GOVERNS,       dst: pkg-example-core }
+  - { src: inv-example-main,             type: USES,          dst: tool-example-uv }
+  - { src: inv-example-main,             type: DRAWS_FROM,    dst: pattern-example-replay-buffer }
+  - { src: inv-example-main,             type: REQUIRES,      dst: op-example-bring-up }

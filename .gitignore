@@ -22,6 +22,10 @@ runs/
 *.npz
 *.log
 
+# Per-machine runtime state (not committed)
+tools/memory/.project
+tools/hitl/.protected-allowances
+
 # macOS
 .DS_Store
 
@@ -34,3 +38,5 @@ runs/
 .conductor/
 node_modules/
 package-lock.json
+
+.env
