@@ -1,0 +1,97 @@
+server:
+  transport: "http"
+  host: "0.0.0.0"
+  port: 8000
+
+llm:
+  provider: "openai"
+  model: ${MODEL_NAME:gpt-4o-mini}
+  max_tokens: 4096
+
+  providers:
+    openai:
+      api_key: ${OPENAI_API_KEY}
+      api_url: ${OPENAI_API_URL:https://api.openai.com/v1}
+      organization_id: ${OPENAI_ORGANIZATION_ID:}
+
+    azure_openai:
+      api_key: ${AZURE_OPENAI_API_KEY}
+      api_url: ${AZURE_OPENAI_ENDPOINT}
+      api_version: ${AZURE_OPENAI_API_VERSION:2024-10-21}
+      deployment_name: ${AZURE_OPENAI_DEPLOYMENT}
+      use_azure_ad: ${USE_AZURE_AD:false}
+
+    anthropic:
+      api_key: ${ANTHROPIC_API_KEY}
+      api_url: ${ANTHROPIC_API_URL:https://api.anthropic.com}
+      max_retries: 3
+
+    gemini:
+      api_key: ${GOOGLE_API_KEY}
+      project_id: ${GOOGLE_PROJECT_ID:}
+      location: ${GOOGLE_LOCATION:us-central1}
+
+    groq:
+      api_key: ${GROQ_API_KEY}
+      api_url: ${GROQ_API_URL:https://api.groq.com/openai/v1}
+
+embedder:
+  provider: "openai"
+  model: ${EMBEDDER_MODEL:text-embedding-3-small}
+  dimensions: 1536
+
+  providers:
+    openai:
+      api_key: ${OPENAI_API_KEY}
+      api_url: ${OPENAI_API_URL:https://api.openai.com/v1}
+      organization_id: ${OPENAI_ORGANIZATION_ID:}
+
+    azure_openai:
+      api_key: ${AZURE_OPENAI_API_KEY}
+      api_url: ${AZURE_OPENAI_EMBEDDINGS_ENDPOINT}
+      api_version: ${AZURE_OPENAI_API_VERSION:2024-10-21}
+      deployment_name: ${AZURE_OPENAI_EMBEDDINGS_DEPLOYMENT}
+      use_azure_ad: ${USE_AZURE_AD:false}
+
+    gemini:
+      api_key: ${GOOGLE_API_KEY}
+      project_id: ${GOOGLE_PROJECT_ID:}
+      location: ${GOOGLE_LOCATION:us-central1}
+
+    voyage:
+      api_key: ${VOYAGE_API_KEY}
+      api_url: ${VOYAGE_API_URL:https://api.voyageai.com/v1}
+      model: "voyage-3"
+
+database:
+  provider: "neo4j"
+
+  providers:
+    neo4j:
+      uri: ${NEO4J_URI:bolt://neo4j:7687}
+      username: ${NEO4J_USER:neo4j}
+      password: ${NEO4J_PASSWORD:malariasentinel_dev}
+      database: ${NEO4J_DATABASE:neo4j}
+      use_parallel_runtime: ${USE_PARALLEL_RUNTIME:false}
+
+graphiti:
+  group_id: ${GRAPHITI_GROUP_ID:malariasentinel}
+  episode_id_prefix: ${EPISODE_ID_PREFIX:}
+  user_id: ${USER_ID:mcp_user}
+  entity_types:
+    - name: "Preference"
+      description: "User/team preferences about how work should be done (e.g. naming, tools, never commit without ask). Use for ProjectPreference in the project map."
+    - name: "Pattern"
+      description: "A reusable solution, idiom, or convention that works well in this project. Discovered by /review, /ship, or /office-hours."
+    - name: "Pitfall"
+      description: "A known gotcha, mistake, or anti-pattern to avoid. Often discovered by /investigate or /review."
+    - name: "Architecture"
+      description: "An architectural decision, dependency rule, or structural fact about the project."
+    - name: "Tool"
+      description: "A specific tool, command, or library that proved useful in this project."
+    - name: "Operational"
+      description: "A practical fix or command pattern that saves time (e.g. docker compose config to validate before up)."
+    - name: "Component"
+      description: "A unit of the project — a package, file, service, dataset, or external dependency. The structural backbone of the project map. One Component node per AGENTS.md package or significant file."
+    - name: "Investigation"
+      description: "A bounded research thread with a goal, status (open/closed), and findings attached. Use as a thematic organizer: group related Pitfall, Architecture, Tool, or Pattern findings under one Investigation node via [:PART_OF] edges."
