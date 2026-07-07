@@ -13,7 +13,7 @@
 #   add-rel.sh --type INCLUDES --src inv-foo --dst paper-x --prop role=anchor
 #
 # Project name (group_id) is resolved via lib/project.sh:
-#   --group-id <gid> > $GROUP_ID env > tools/memory/.project
+#   --group-id <gid> > $GROUP_ID env > agents/memory/.project
 
 set -euo pipefail
 

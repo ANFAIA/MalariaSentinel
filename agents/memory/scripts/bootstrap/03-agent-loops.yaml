@@ -1,10 +1,10 @@
-# tools/memory/bootstrap/03-agent-loops.yaml
+# agents/memory/scripts/bootstrap/03-agent-loops.yaml
 # Convention: every specialised agent is a loop with a check command,
 # an exit condition, and guardrails. The 4 loops shipped in 2026-07.
 
 project: MalariaSentinel
 group_id: malariasentinel
-schema_source: memory/config/config.yaml
+schema_source: agents/memory/runtime/config/config.yaml
 
 patterns:
   - uuid: pattern-agent-loop
@@ -20,21 +20,26 @@ patterns:
       independently). A loop is not done until the check command
       actually passes — there is no "I think this is good enough"
       path. If a loop needs more context, it queries the knowledge
-      base first (tools/memory/memory.sh query), then asks the
-      supervisor via the question tool. Loops are stateless; each
-      invocation is independent.
+      base first (memory_query custom tool, then
+      mcp__graphiti-memory__search_nodes), then asks the supervisor
+      via the question tool. Loops are stateless; each invocation is
+      independent.
 
 tools:
-  - uuid: tool-tools-memory
-    name: tools/memory
+  - uuid: tool-agents-memory
+    name: agents/memory
     summary: |
-      Project memory subsystem. Provides tools/memory/memory.sh as the
-      single dispatcher (subcommands: schema, node, rel, query, seed,
-      bootstrap-apply, audit, status) and mcp__graphiti-memory__* as
-      the MCP front-end. All graph writes go through
-      memory.sh node/rel — never through add_memory with a typed
-      body (MCP 1.26.0 mis-classifies). Audit (three invariants) runs
-      on every session-start and after every seed / bootstrap-apply.
+      Project memory subsystem (installable module). Provides the
+      custom tools memory_node / memory_rel / memory_query /
+      memory_audit / memory_seed / memory_status as the typed
+      write/read surface, and mcp__graphiti-memory__* as the MCP
+      front-end (search_nodes for semantic recall; add_memory with
+      source: "text" for free-form episodes). All graph writes go
+      through the custom tools (or bash agents/memory/scripts/memory.sh
+      node/rel for human operators) — never through add_memory with a
+      typed body (MCP 1.26.0 mis-classifies). Audit (three invariants)
+      runs on every session-start and after every seed /
+      bootstrap-apply.
 
   - uuid: tool-neo4j-cli
     name: neo4j-cli
@@ -43,7 +48,9 @@ tools:
       ~/.local/bin/neo4j-cli (not an MCP tool). Every memory write
       ultimately funnels through neo4j-cli query --rw --atomic with
       parameterised Cypher, which bypasses the LLM extractor that
-      mis-classifies typed JSON bodies.
+      mis-classifies typed JSON bodies. The agents/memory/scripts/
+      wrapper is the labelled entry point; neo4j-cli itself is the
+      driver.
 
 operational:
   - uuid: op-new-loop

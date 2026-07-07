@@ -9,11 +9,11 @@
 # Usage:
 #   add-node.sh --type <Label> --uuid <id> --name <n> --summary <s> [--path <p>] [--group-id <gid>]
 #
-# The label is validated against tools/memory/schema.sh. If invalid, exits 1
+# The label is validated against agents/memory/scripts/schema.sh. If invalid, exits 1
 # without writing. The script always uses --rw (it is a write).
 #
 # Project name (group_id) is resolved via lib/project.sh:
-#   --group-id <gid> > $GROUP_ID env > tools/memory/.project
+#   --group-id <gid> > $GROUP_ID env > agents/memory/.project
 
 set -euo pipefail
 

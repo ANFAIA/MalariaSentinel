@@ -39,7 +39,7 @@ Output format:
 
 How to find project conventions:
 1. If `conventions_ref` is provided, query the knowledge base:
-   `bash tools/memory/memory.sh query "MATCH (n {uuid: '<ref>'}) RETURN n"`
+   `memory_query` (custom tool) with a cypher like `MATCH (n {uuid: '<ref>'}) RETURN n`
 2. Otherwise, run `mcp__graphiti-memory__search_nodes` with terms from
    `focus_areas`.
 3. If neither returns a convention, fall back to the

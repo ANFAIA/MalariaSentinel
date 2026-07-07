@@ -1,10 +1,10 @@
-# tools/memory/bootstrap/02-context-3layers.yaml
+# agents/memory/scripts/bootstrap/02-context-3layers.yaml
 # Pattern: 3-layer context architecture (operational / compaction /
 # episodic / semantic). Mapped to the OpenCode runtime, no Python code.
 
 project: MalariaSentinel
 group_id: malariasentinel
-schema_source: memory/config/config.yaml
+schema_source: agents/memory/runtime/config/config.yaml
 
 patterns:
   - uuid: pattern-context-3layers
@@ -16,14 +16,15 @@ patterns:
       agent summarises automatically when the operational layer grows
       large (no config knob, intentionally). Episodic: typed nodes
       (Investigation, Operational) plus free-form episodes via
-      mcp__graphiti-memory__add_memory. Semantic: the knowledge graph
-      in tools/memory/ (Neo4j via Graphiti MCP 1.26.0). The supervisor
-      keeps only what the current task needs in prompt; long outputs
-      are summarised, stored, or replaced with UUID references. If a
-      primary agent's context grows past ~70K-100K tokens during a
-      session, that is a signal to check that loop agents return
-      structured artifacts and that the supervisor queries the graph
-      instead of re-reading source files.
+      mcp__graphiti-memory__add_memory (source: "text"). Semantic: the
+      knowledge graph in agents/memory/ (Neo4j via Graphiti MCP 1.26.0,
+      accessed via the memory_query custom tool or mcp__search_nodes).
+      The supervisor keeps only what the current task needs in prompt;
+      long outputs are summarised, stored, or replaced with UUID
+      references. If a primary agent's context grows past ~70K-100K
+      tokens during a session, that is a signal to check that loop
+      agents return structured artifacts and that the supervisor
+      queries the graph instead of re-reading source files.
 
   - uuid: pattern-supervisor-thin
     name: thin supervisor

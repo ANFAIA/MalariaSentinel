@@ -50,7 +50,7 @@ Output format:
 How to find project security conventions:
 - Query the knowledge base for `Pattern` or `Operational` nodes whose
   name includes "security" or "owasp":
-  `bash tools/memory/memory.sh query "MATCH (n) WHERE n.name =~ '(?i).*security.*' RETURN n.uuid, n.name"`
+  `memory_query` (custom tool) with `MATCH (n) WHERE n.name =~ '(?i).*security.*' RETURN n.uuid, n.name`
 
 Guardrails:
 - Read-only. `edit: deny`. `bash: deny`. No network calls (`webfetch`,

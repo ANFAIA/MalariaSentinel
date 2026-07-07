@@ -22,8 +22,10 @@ runs/
 *.npz
 *.log
 
-# Per-machine runtime state (not committed)
-tools/memory/.project
+# Per-machine / per-project state for the agents/memory module
+agents/memory/.project
+agents/memory/runtime/.env
+agents/memory/seed/*.yaml
 
 # macOS
 .DS_Store

@@ -37,24 +37,31 @@ The supervisor passes you a brief (goal, check command, target paths,
 optional context). You do **not** receive the full conversation. If you
 need more context:
 
-1. Query the knowledge base first: `bash tools/memory/memory.sh query
-   "<cypher>"` or `mcp__graphiti-memory__search_nodes`.
+1. Query the knowledge base first: the `memory_query` custom tool
+   (Cypher), `mcp__graphiti-memory__search_nodes` (semantic recall), or
+   `bash agents/memory/scripts/memory.sh query "<cypher>"` for a
+   human-style invocation.
 2. If the KB is empty, ask the supervisor via the `question` tool. Do not
    invent context.
 3. As a last resort, use `websearch` / `webfetch` (if your permissions
    allow it). For everything research-shaped, the `doc-researcher` loop
    is the right tool, not you.
 
-## When to use `tools/memory/memory.sh` vs the MCP tools
+## When to use the custom tools vs the MCP tools
 
-- `tools/memory/memory.sh node / rel / query` — for typed nodes, relations,
-  and audited reads. This is the canonical write path.
-- `mcp__graphiti-memory__add_memory` — for free-form episode text only
-  (session summaries, observations). Never use it for typed nodes; the
-  Graphiti MCP 1.26.0 extractor ignores the `type` field and re-classifies
-  from text, producing mis-labelled graphs.
-- `mcp__graphiti-memory__search_nodes` — for free-form search over the
-  knowledge base.
+- `memory_node` / `memory_rel` / `memory_query` / `memory_audit` custom
+  tools — for typed nodes, relations, and audited reads. This is the
+  canonical write path. The tools validate the label against the schema
+  before any Cypher runs. They delegate to
+  `bash agents/memory/scripts/memory.sh` so the same rules apply for
+  humans (`make -f agents/memory/scripts/Makefile`).
+- `mcp__graphiti-memory__add_memory` with `source: "text"` — for free-form
+  episode text only (session summaries, observations). Never use it for
+  typed nodes with `source: "json"`; the Graphiti MCP 1.26.0 extractor
+  ignores the `type` field and re-classifies from text, producing
+  mis-labelled graphs.
+- `mcp__graphiti-memory__search_nodes` — for free-form semantic search
+  over the knowledge base.
 
 ## Returning results
 

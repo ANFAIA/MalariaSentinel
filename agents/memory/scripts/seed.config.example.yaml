@@ -2,8 +2,8 @@
 
 # seed.config.example.yaml
 # Example declarative seed for a project. Copy this file to
-# tools/memory/seed/<your-project>.yaml and edit. Then run
-# `tools/memory/seed.sh <your-project>` (or `memory.sh seed <your-project>`).
+# agents/memory/scripts/seed/<your-project>.yaml and edit. Then run
+# `agents/memory/scripts/seed.sh <your-project>` (or `memory.sh seed <your-project>`).
 #
 # Conventions:
 #   - Every node MUST have a stable `uuid`. Re-running the seed must be a

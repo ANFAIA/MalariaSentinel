@@ -18,7 +18,7 @@ Before you stop, do the following in order:
 
 1. UPDATE Investigations
    For every Investigation node you worked on:
-     bash tools/memory/memory.sh node \
+     bash agents/memory/scripts/memory.sh node \
        --type Investigation --uuid <inv-uuid> \
        --name "<name>" \
        --summary "Goal: ... Method: ... Findings: ... Status: open|blocked|closed"
@@ -27,8 +27,8 @@ Before you stop, do the following in order:
 
 2. ADD any new Components, Tools, Patterns, Pitfalls, Architecture, or
    Operational nodes you discovered:
-     bash tools/memory/memory.sh node --type <L> --uuid <id> --name <n> --summary <s>
-     bash tools/memory/memory.sh rel --type <R> --src <a> --dst <b>
+     bash agents/memory/scripts/memory.sh node --type <L> --uuid <id> --name <n> --summary <s>
+     bash agents/memory/scripts/memory.sh rel --type <R> --src <a> --dst <b>
 
 3. WRITE a session episode (one per session, not per day):
    mcp__graphiti-memory__add_memory \

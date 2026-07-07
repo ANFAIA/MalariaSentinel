@@ -11,7 +11,7 @@
 #
 # The script is project-agnostic — the Makefile passes the resolved slug.
 # It runs:
-#   0. apply pre-configured bootstrap entries (tools/memory/bootstrap/*.yaml)
+#   0. apply pre-configured bootstrap entries (agents/memory/scripts/bootstrap/*.yaml)
 #   1. audit (fail fast on drift)
 #   2. open investigations
 #   3. active pitfalls (must-read)
@@ -30,7 +30,7 @@ echo "=== session-start: $GID ==="
 echo
 
 # 0. apply pre-configured bootstrap entries (idempotent; safe every session)
-echo "--- 0. apply bootstrap entries (tools/memory/bootstrap/) ---"
+echo "--- 0. apply bootstrap entries (agents/memory/scripts/bootstrap/) ---"
 bash "$HERE/bootstrap-apply.sh" "$GID" || { echo "BOOTSTRAP APPLY FAILED — fix the offending yaml and re-run."; exit 1; }
 echo
 

@@ -1,25 +1,25 @@
-# tools/memory/Makefile
+# agents/memory/scripts/Makefile
 # Project-agnostic entry points for the memory infrastructure.
 # The agent that bootstraps the project writes the project name to
-# tools/memory/.project (a single line — the Neo4j group_id). Every target
+# agents/memory/.project (a single line — the Neo4j group_id). Every target
 # resolves PROJECT from there. Override on a single command with
 # `make seed PROJECT=foo`.
 #
 # Usage:
-#   make -f tools/memory/Makefile set-project PROJECT=malariasentinel  # one-time
-#   make -f tools/memory/Makefile bootstrap                            # cold start
-#   make -f tools/memory/Makefile seed                                # idempotent
-#   make -f tools/memory/Makefile audit                               # invariants
+#   make -f agents/memory/scripts/Makefile set-project PROJECT=malariasentinel  # one-time
+#   make -f agents/memory/scripts/Makefile bootstrap                            # cold start
+#   make -f agents/memory/scripts/Makefile seed                                # idempotent
+#   make -f agents/memory/scripts/Makefile audit                               # invariants
 #
 # NOTE: The protected-files / HITL policy (`.protected`, `check-edit.sh`,
-# `pre-commit` hook, `OPENCODE-PERMISSIONS.md`) used to live here. It
-# was moved to its own package (`tools/hitl/`) and then dropped in
-# 2026-07 in favour of OpenCode-native `permission.edit: "ask"`. See
-# AGENTS.md → "Protected files" and `opencode.json`.
+# `pre-commit` hook, `OPENCODE-PERMISSIONS.md`) used to live in a sibling
+# `tools/hitl/` package. It was dropped in 2026-07 in favour of
+# OpenCode-native `permission.edit: "ask"`. See AGENTS.md → "Protected
+# files" and `opencode.json`.
 #
 # Invoked from the project root. The Makefile's own location determines
-# paths so `make -C tools/memory ...` and `cd tools/memory && make ...`
-# also work.
+# paths so `make -C agents/memory/scripts ...` and
+# `cd agents/memory/scripts && make ...` also work.
 
 PROJECT ?= malariasentinel
 CYPHER  ?=
@@ -41,14 +41,14 @@ help: ## Show this help.
 show-project: ## Print the resolved project (group_id).
 	@if [ -z "$(PROJECT_RESOLVED)" ]; then \
 	  echo "no project set"; \
-	  echo "  fix: make -f tools/memory/Makefile set-project PROJECT=name"; \
+	  echo "  fix: make -f agents/memory/scripts/Makefile set-project PROJECT=name"; \
 	  exit 1; \
 	fi
 	@echo "$(PROJECT_RESOLVED)"
 
-set-project: ## Set the project name (writes tools/memory/.project). Usage: make set-project PROJECT=name
+set-project: ## Set the project name (writes agents/memory/.project). Usage: make set-project PROJECT=name
 	@if [ -z "$(PROJECT)" ]; then \
-	  echo "usage: make -f tools/memory/Makefile set-project PROJECT=name" >&2; \
+	  echo "usage: make -f agents/memory/scripts/Makefile set-project PROJECT=name" >&2; \
 	  exit 2; \
 	fi
 	@echo "$(PROJECT)" > $(PROJECT_FILE)
@@ -57,7 +57,7 @@ set-project: ## Set the project name (writes tools/memory/.project). Usage: make
 # --- project-agnostic helpers (defined once, used by every target) ---
 define require_project
 	@if [ -z "$(PROJECT_RESOLVED)" ]; then \
-	  echo "no project set — run: make -f tools/memory/Makefile set-project PROJECT=name" >&2; \
+	  echo "no project set — run: make -f agents/memory/scripts/Makefile set-project PROJECT=name" >&2; \
 	  echo "  or override: make ... PROJECT=name" >&2; \
 	  exit 2; \
 	fi
@@ -85,7 +85,7 @@ seed: ## Seed the graph for PROJECT. Requires set-project first (or override).
 	$(require_project)
 	bash $(SEED_SH) $(PROJECT_RESOLVED)
 
-bootstrap-apply: ## Apply all tools/memory/bootstrap/*.yaml as one atomic write. Idempotent; safe to run on every session.
+bootstrap-apply: ## Apply all agents/memory/scripts/bootstrap/*.yaml as one atomic write. Idempotent; safe to run on every session.
 	$(require_project)
 	bash $(HERE)bootstrap-apply.sh $(PROJECT_RESOLVED)
 

@@ -2,12 +2,12 @@
 # PROTECTED: requires user approval to edit (see opencode.json permission.edit).
 #
 # agents/memory/scripts/bootstrap-apply.sh
-# Reads every *.yaml in tools/memory/bootstrap/ and applies it as ONE
+# Reads every *.yaml in agents/memory/scripts/bootstrap/ and applies it as ONE
 # atomic write. Idempotent: every MERGE keys on uuid + group_id, so
 # re-running converges.
 #
 # This is the "pre-configured knowledge" mechanism: drop a yaml in
-# tools/memory/bootstrap/ and the next invocation of this script (or
+# agents/memory/scripts/bootstrap/ and the next invocation of this script (or
 # `make bootstrap-apply`, or `make session-start`) will add it to the
 # graph. Use it for entries that should be present in every session —
 # project-level architecture, conventions, modules, the agents layer.

@@ -1,6 +1,6 @@
 // Module: agents/memory — see AGENTS.md (Protected files) and opencode.json permission.edit.
 
-// tools/memory/seed.template.cypher
+// agents/memory/scripts/seed.template.cypher
 // Reference template for what a seed Cypher looks like once seed.sh has
 // compiled the project yaml. NOT executed directly. The actual generated
 // cypher is what seed.sh pipes into `neo4j-cli query --atomic --rw`.

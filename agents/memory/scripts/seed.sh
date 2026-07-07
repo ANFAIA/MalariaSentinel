@@ -19,7 +19,7 @@
 # The yaml's `project:` field is required (used as the project name in
 # logs). The yaml's `group_id:` field is documentation-only — the
 # positional argument is the authoritative group_id (this is what the
-# Makefile passes from tools/memory/.project). If the yaml's group_id
+# Makefile passes from agents/memory/.project). If the yaml's group_id
 # disagrees, seed.sh warns and uses the argument.
 #
 # Multi-line summaries use `summary: |` block scalars and are joined with
@@ -222,7 +222,7 @@ project_name="$(cat "$TMPDIR_RUN/project")"
 yaml_group_id="$(cat "$TMPDIR_RUN/group_id")"
 
 # The positional argument is the authoritative group_id (this is what the
-# Makefile passes from tools/memory/.project). The yaml's `group_id:` field
+# Makefile passes from agents/memory/.project). The yaml's `group_id:` field
 # is treated as documentation only — if present and non-empty, we warn if
 # it disagrees with the positional arg.
 group_id="$project"

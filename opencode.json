@@ -6,18 +6,24 @@
       "AGENTS.md": "ask",
       ".gitignore": "ask",
       "opencode.json": "ask",
-      "tools/memory/.project": "ask"
+      "agents/memory/.project": "ask"
     },
     "bash": {
       "*": "allow",
-      "make -f tools/memory/Makefile wipe *": "deny",
-      "make -f tools/memory/Makefile set-project *": "deny",
+      "make -f agents/memory/scripts/Makefile wipe *": "deny",
+      "make -f agents/memory/scripts/Makefile set-project *": "deny",
       "*make*wipe*": "deny",
       "*make*set-project*": "deny"
     },
     "webfetch": "allow",
     "todowrite": "allow",
-    "question": "allow"
+    "question": "allow",
+    "memory_node": "ask",
+    "memory_rel": "ask",
+    "memory_query": "allow",
+    "memory_audit": "allow",
+    "memory_seed": "ask",
+    "memory_status": "allow"
   },
   "agent": {
     "build": {

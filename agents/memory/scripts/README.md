@@ -22,7 +22,7 @@ required the 2026-07-04 wipe of 261 mis-labelled nodes:
 A thin shell wrapper around `neo4j-cli` (v1.10+) that:
 
 - Is **project-agnostic**: the project name (Neo4j `group_id`) is read
-  from `tools/memory/.project` (a single line, one source of truth). The
+  from `agents/memory/scripts/.project` (a single line, one source of truth). The
   initializing agent picks the slug; every script reads it. See
   "Project resolution" below.
 - Validates every label against `memory/config/config.yaml` (lines 81-99)
@@ -40,13 +40,13 @@ A thin shell wrapper around `neo4j-cli` (v1.10+) that:
 
 ## Project resolution (`.project`)
 
-The project name (Neo4j `group_id`) lives in `tools/memory/.project` —
+The project name (Neo4j `group_id`) lives in `agents/memory/scripts/.project` —
 one line, no extension. This file is gitignored (per-machine runtime
 state). The initializing agent writes it:
 
 ```bash
-make -f tools/memory/Makefile set-project PROJECT=myslug
-# writes 'myslug' to tools/memory/.project
+make -f agents/memory/scripts/Makefile set-project PROJECT=myslug
+# writes 'myslug' to agents/memory/scripts/.project
 ```
 
 Every other target reads it. Override on a single command with
@@ -56,22 +56,22 @@ Resolution order inside every script (first non-empty wins):
 
 1. explicit `--group-id <gid>` on the CLI
 2. `$GROUP_ID` env var
-3. `tools/memory/.project`
+3. `agents/memory/scripts/.project`
 4. fail with a clear message
 
 ## Quick start (cold start)
 
 ```bash
 # 1. Pick the project slug (one-time per checkout)
-make -f tools/memory/Makefile set-project PROJECT=myslug
+make -f agents/memory/scripts/Makefile set-project PROJECT=myslug
 
 # 2. Cold start: up + status + seed + audit
-make -f tools/memory/Makefile bootstrap
+make -f agents/memory/scripts/Makefile bootstrap
 
 # 3. Verify
-make -f tools/memory/Makefile audit
-make -f tools/memory/Makefile status
-make -f tools/memory/Makefile show-project
+make -f agents/memory/scripts/Makefile audit
+make -f agents/memory/scripts/Makefile status
+make -f agents/memory/scripts/Makefile show-project
 ```
 
 ## Subcommands (low-level; usually you use the Makefile)
@@ -91,7 +91,7 @@ memory.sh query "MATCH (n:Component) WHERE n.group_id='myslug' RETURN n.uuid, n.
 memory.sh query "MATCH (a)-[r:TESTS]->(b) WHERE r.group_id='myslug' RETURN a.name, b.name" --rw
 
 # Project seed (uses .project if no arg, else takes a slug)
-memory.sh seed                          # reads tools/memory/seed/<.project>.yaml
+memory.sh seed                          # reads agents/memory/scripts/seed/<.project>.yaml
 memory.sh seed myslug                   # explicit
 
 # Audit
@@ -104,16 +104,16 @@ memory.sh status                        # docker + neo4j-cli + graphiti mcp
 ## Makefile targets
 
 ```bash
-make -f tools/memory/Makefile help
-make -f tools/memory/Makefile set-project PROJECT=name
-make -f tools/memory/Makefile bootstrap        # up + status + seed + audit
-make -f tools/memory/Makefile seed
-make -f tools/memory/Makefile audit
-make -f tools/memory/Makefile query CYPHER="..."
-make -f tools/memory/Makefile wipe             # destructive; backs up to /tmp
-make -f tools/memory/Makefile status
-make -f tools/memory/Makefile schema-labels
-make -f tools/memory/Makefile clean-schema-cache
+make -f agents/memory/scripts/Makefile help
+make -f agents/memory/scripts/Makefile set-project PROJECT=name
+make -f agents/memory/scripts/Makefile bootstrap        # up + status + seed + audit
+make -f agents/memory/scripts/Makefile seed
+make -f agents/memory/scripts/Makefile audit
+make -f agents/memory/scripts/Makefile query CYPHER="..."
+make -f agents/memory/scripts/Makefile wipe             # destructive; backs up to /tmp
+make -f agents/memory/scripts/Makefile status
+make -f agents/memory/scripts/Makefile schema-labels
+make -f agents/memory/scripts/Makefile clean-schema-cache
 ```
 
 ## Files in this package
@@ -149,17 +149,17 @@ operate on the project resolved from `.project` (not a hardcoded group_id).
 
 ## How to seed a project
 
-1. Set the project slug (one-time): `make -f tools/memory/Makefile set-project PROJECT=myproject`
-2. `cp tools/memory/seed.config.example.yaml tools/memory/seed/myproject.yaml`
+1. Set the project slug (one-time): `make -f agents/memory/scripts/Makefile set-project PROJECT=myproject`
+2. `cp agents/memory/scripts/seed.config.example.yaml agents/memory/scripts/seed/myproject.yaml`
 3. Edit the yaml. Every node needs `uuid`, `name`, `summary` (and
    optionally `path`). Every relation needs `src`, `type`, `dst`. The
    `project:` field is required (used in logs); `group_id:` is optional
    (the resolved slug is authoritative).
-4. `make -f tools/memory/Makefile seed`. The seed runs atomically and
+4. `make -f agents/memory/scripts/Makefile seed`. The seed runs atomically and
    immediately audits. If the audit fails, the script exits 1; the graph
    may be in a partial state but a re-run converges (every `MERGE` is
    idempotent).
-5. If the seed is bad and you need a clean slate: `make -f tools/memory/Makefile wipe`
+5. If the seed is bad and you need a clean slate: `make -f agents/memory/scripts/Makefile wipe`
    (backs up to `/tmp/<project>-wipe-<ts>.json` first).
 
 ## How to extend the schema

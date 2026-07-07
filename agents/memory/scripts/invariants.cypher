@@ -6,12 +6,12 @@
 // them is a schema violation that the seed pipeline must not produce.
 //
 // Two placeholders are substituted at runtime by audit.sh:
-//   __GROUP_ID__        — the project's group_id (from tools/memory/.project)
+//   __GROUP_ID__        — the project's group_id (from agents/memory/.project)
 //   __SCHEMA_LABELS__   — the schema's label list (from runs/schema.cache)
 
 // Invariant 1: no Entity node without a secondary label.
 // A :Entity-only node means the LLM extractor absorbed a value that did not
-// match any schema label, OR a write bypassed tools/memory/. Either way,
+// match any schema label, OR a write bypassed agents/memory/scripts/. Either way,
 // the node is ungoverned.
 MATCH (n:Entity) WHERE n.group_id = '__GROUP_ID__' AND size(labels(n)) = 1 RETURN count(n) AS unlabeled;
 

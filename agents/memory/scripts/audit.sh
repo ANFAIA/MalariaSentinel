@@ -2,7 +2,7 @@
 # Module: agents/memory — see AGENTS.md (Protected files) and opencode.json permission.edit.
 
 # agents/memory/scripts/audit.sh
-# Runs the three schema invariants in tools/memory/invariants.cypher.
+# Runs the three schema invariants in agents/memory/scripts/invariants.cypher.
 # Exits 0 if all three return zero (or only the dump returns data), exits
 # 1 if any invariant returns > 0.
 #

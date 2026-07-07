@@ -39,6 +39,6 @@ resolve_project() {
 }
 
 # Anchor for the .project file when the helper is sourced from a script
-# that lives in tools/memory/. The script that sources us should set
+# that lives in agents/memory/scripts/. The script that sources us should set
 # PROJECT_FILE explicitly if it lives elsewhere.
 : "${PROJECT_FILE:=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/.project}"

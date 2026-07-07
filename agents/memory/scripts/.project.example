@@ -2,11 +2,12 @@
 
 # agents/memory/.project.example
 # Template for the runtime project name file. The agent that bootstraps
-# the project copies this to tools/memory/.project (no extension) and
-# replaces the value with the actual project slug (the Neo4j group_id).
+# the project copies this to agents/memory/.project (no extension, at the
+# top of the module) and replaces the value with the actual project
+# slug (the Neo4j group_id).
 #
-#   cp tools/memory/.project.example tools/memory/.project
-#   # edit tools/memory/.project and replace the value below
+#   cp agents/memory/.project.example agents/memory/.project
+#   # edit agents/memory/.project and replace the value below
 #
 # Rules for the project slug:
 #   - Lowercase, no spaces, ASCII letters/digits/underscore/hyphen only.

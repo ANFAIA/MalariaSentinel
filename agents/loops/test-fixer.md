@@ -44,7 +44,7 @@ Inputs you receive from the supervisor (the brief):
 - `context` (free-form, optional)
 
 You do NOT receive the full conversation. If you need more:
-1. Query the knowledge base: `bash tools/memory/memory.sh query "<cypher>"`
+1. Query the knowledge base: `memory_query` (custom tool) with a cypher, or `mcp__graphiti-memory__search_nodes` for fuzzy recall.
    or `mcp__graphiti-memory__search_nodes`.
 2. Ask the supervisor via the `question` tool.
 

@@ -1,26 +1,26 @@
-# tools/memory/bootstrap/01-opencode-native-protection.yaml
+# agents/memory/scripts/bootstrap/01-opencode-native-protection.yaml
 # Architecture decision: drop tools/hitl/ in favour of opencode-native
 # permission.edit: "ask". Recorded 2026-07-07.
 
 project: MalariaSentinel
 group_id: malariasentinel
-schema_source: memory/config/config.yaml
+schema_source: agents/memory/runtime/config/config.yaml
 
 architectures:
   - uuid: arch-opencode-native-protection
     name: opencode-native file protection
     summary: |
       Project-level governance files (AGENTS.md, .gitignore,
-      opencode.json, tools/memory/.project) are protected by OpenCode's
+      opencode.json, agents/memory/.project) are protected by OpenCode's
       permission.edit: "ask" block in opencode.json. Every attempt to
       edit one of them prompts the user, no exceptions, no allowances.
       The previous tools/hitl/ subsystem (with its own .protected list,
       .protected-allowances, pre-commit hook, and Makefile-driven
       check) was dropped in 2026-07 because it duplicated what OpenCode
       already does in one place and added three enforcement layers
-      where one suffices. The small bash deny list (make wipe, make
-      set-project) is kept as defence against typos, not as file
-      protection.
+      where one suffices. The small bash deny list
+      (make -f agents/memory/scripts/Makefile {wipe,set-project}) is
+      kept as defence against typos, not as file protection.
 
 preferences:
   - uuid: pref-protected-paths-in-opencode-json

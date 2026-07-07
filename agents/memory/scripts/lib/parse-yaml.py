@@ -2,8 +2,8 @@
 # Module: agents/memory — see AGENTS.md (Protected files) and opencode.json permission.edit.
 #
 # agents/memory/scripts/lib/parse-yaml.py
-# Parse a seed-style yaml file (same shape as tools/memory/seed/<project>.yaml
-# and tools/memory/bootstrap/*.yaml) and emit a flat representation that the
+# Parse a seed-style yaml file (same shape as agents/memory/scripts/seed/<project>.yaml
+# and agents/memory/scripts/bootstrap/*.yaml) and emit a flat representation that the
 # shell scripts can consume.
 #
 # Usage:
