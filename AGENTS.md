@@ -382,6 +382,43 @@ single point that knows "the whole story".
 - Treating the graph as the prompt. The graph is the backing store;
   the prompt is the working set.
 
+## Supervisor
+
+The `supervisor` is the **primary agent the user talks to**. It owns
+the running context of the project, decomposes work, and delegates
+execution to loops and subagents. It does not edit code or run
+mutating commands itself — those go through subagents, and any
+subagent that edits does its work inside a `gitagent` worktree (see
+§4 of the supervisor prompt).
+
+The supervisor's prompt lives at
+`.opencode/agents/supervisor.md`. It is **generic and reusable**:
+it only specifies the orchestration pattern (cycle, brief format,
+context discipline, gitagent isolation, limits, degradation). It
+does **not** restate project structure, memory procedure, git
+workflow, available loops, or the context architecture — those are
+defined here in `AGENTS.md` and auto-loaded as project rules.
+
+**Separation of concerns:**
+
+| | `AGENTS.md` (this file) | `.opencode/agents/supervisor.md` |
+|---|---|---|
+| Scope | The **stack of this project**: structure, conventions, memory subsystem, git push workflow, context architecture, available loops, session close contract | The **orchestration pattern**: how to coordinate subagents, brief format, when to isolate with `gitagent`, context discipline, limits |
+| Project-specific | Yes (MalariaSentinel) | No — generic, portable |
+| Loaded by | OpenCode auto-discovery of `AGENTS.md` | OpenCode auto-discovery of `.opencode/agents/` |
+
+**How to use it.** The supervisor is the default primary agent
+(`default_agent: "supervisor"` in `opencode.json`). Tab cycles
+between supervisor, `build`, and `plan`:
+
+- `supervisor` (default) — orchestration, plan, delegate, integrate.
+- `build` — quick, single-tool, ad-hoc work that does not need the
+  full delegation cycle.
+- `plan` — read-only analysis and review.
+
+You can also invoke the supervisor explicitly with `@supervisor`
+when you are running under another primary.
+
 ## Specialised Loops
 
 Specialised loop agents live in `agents/loops/<name>.md` and are
@@ -391,7 +428,7 @@ the common contract every loop follows.
 
 The current set:
 
-| Agent | Purpose | Auto-invoked by `build`? | Permission shape |
+| Agent | Purpose | Auto-invoked by `supervisor`? | Permission shape |
 |---|---|---|---|
 | `test-fixer` | Iterate a check command until it exits 0. | `allow` | `read/edit/grep/glob/bash(uv run pytest, git diff/status/log)`; no `webfetch`. |
 | `code-reviewer` | Review a diff and return structured findings. | `ask` | Read-only. `edit/bash/websearch` denied. |
@@ -399,17 +436,20 @@ The current set:
 | `security-auditor` | OWASP-style audit of a scope. | `ask` | Read-only. `edit/bash/webfetch/websearch` denied. |
 
 Auto-invocation is configured in `opencode.json` under
-`agent.build.permission.task`. `allow` means the primary agent can
-invoke the loop without prompting the user; `ask` means every
-invocation is gated by user approval. The current split is intentional:
-`test-fixer` is mechanical (safe to auto-invoke); the other three
-return findings that the user usually wants to see the context of.
+`agent.supervisor.permission.task` (the supervisor owns delegation;
+`agent.build.permission.task` is preserved as a no-op for the
+`build` primary, which is still reachable via Tab). `allow` means
+the supervisor can invoke the loop without prompting the user;
+`ask` means every invocation is gated by user approval. The current
+split is intentional: `test-fixer` is mechanical (safe to
+auto-invoke); the other three return findings that the user usually
+wants to see the context of.
 
 **Adding a new loop:** create `agents/loops/<name>.md` with frontmatter
 (`description`, `mode: subagent`, `permission`) and a prompt body
 that follows the structure in `agents/loops/AGENTS.md`. Restart
 OpenCode to register the new agent. Decide whether to add it to
-`agent.build.permission.task` based on whether it is mechanical
+`agent.supervisor.permission.task` based on whether it is mechanical
 (`allow`) or judgement-bearing (`ask`).
 
 ## Session Close Contract

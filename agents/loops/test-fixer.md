@@ -41,12 +41,25 @@ Guardrails:
 Inputs you receive from the supervisor (the brief):
 - `check_command` (string, required)
 - `target_paths` (list, optional)
+- `worktree_path` (string, optional but expected) — the gitagent
+  worktree directory you must stay inside. If the brief is missing
+  this AND the failure requires editing files, return a `blocked`
+  artifact asking the supervisor for the worktree path. **Do not
+  edit files in the main repo worktree.** The only case where no
+  worktree_path is needed is a pure investigation with no edits.
 - `context` (free-form, optional)
 
 You do NOT receive the full conversation. If you need more:
 1. Query the knowledge base: `memory_query` (custom tool) with a cypher, or `mcp__graphiti-memory__search_nodes` for fuzzy recall.
    or `mcp__graphiti-memory__search_nodes`.
 2. Ask the supervisor via the `question` tool.
+
+When you finish (success or blocker):
+- If you edited files, finish with
+  `gitagent propose --agent <your-agent-id> --title "<short>" --confidence <0..1>`
+  from inside your worktree. The supervisor integrates from there.
+- If you only ran read-only diagnostics, return the artifact directly
+  via the `task` tool — no `gitagent propose` needed.
 
 Permission notes:
 - `bash` defaults to `ask` so the user sees destructive commands.
