@@ -24,7 +24,7 @@
 PROJECT ?= malariasentinel
 CYPHER  ?=
 
-PROJECT_FILE := $(CURDIR)/tools/memory/.project
+PROJECT_FILE := $(abspath $(HERE)../.project)
 
 # Resolve PROJECT: env override > file > empty (most targets fail clearly).
 ifdef PROJECT
@@ -65,7 +65,7 @@ endef
 
 # Resolve absolute paths regardless of cwd of make.
 HERE := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
-PROJECT_ROOT := $(abspath $(HERE)../..)
+PROJECT_ROOT := $(abspath $(HERE)../../..)
 MEMORY_SH := $(HERE)memory.sh
 SEED_SH   := $(HERE)seed.sh
 SCHEMA_SH := $(HERE)schema.sh
@@ -74,10 +74,10 @@ status: ## Stack health: docker + neo4j-cli + graphiti.
 	bash $(MEMORY_SH) status
 
 up: ## Start Neo4j + Graphiti MCP containers.
-	cd $(PROJECT_ROOT)/memory && docker compose up -d
+	cd $(PROJECT_ROOT)/agents/memory/runtime && docker compose up -d
 
 down: ## Stop Neo4j + Graphiti MCP containers.
-	cd $(PROJECT_ROOT)/memory && docker compose down
+	cd $(PROJECT_ROOT)/agents/memory/runtime && docker compose down
 
 bootstrap: up status seed bootstrap-apply audit ## Cold start: up + status + seed + bootstrap-apply + audit. Use this on a fresh clone.
 
@@ -101,7 +101,7 @@ wipe: ## Wipe all data for PROJECT. DESTRUCTIVE — backs up to /tmp first.
 	$(require_project)
 	@bash -c 'set -e; \
 	  ts=$$(date +%Y%m%d-%H%M%S); \
-	  cd $(PROJECT_ROOT)/memory && \
+	  cd $(PROJECT_ROOT)/agents/memory/runtime && \
 	  neo4j-cli query "MATCH (n) WHERE n.group_id=\"$(PROJECT_RESOLVED)\" RETURN n.uuid, n.name, labels(n)" --format json > "/tmp/$(PROJECT_RESOLVED)-wipe-$$ts.json" && \
 	  echo "backup: /tmp/$(PROJECT_RESOLVED)-wipe-$$ts.json" && \
 	  neo4j-cli query "MATCH (n) WHERE n.group_id=\"$(PROJECT_RESOLVED)\" DETACH DELETE n" --rw --atomic && \

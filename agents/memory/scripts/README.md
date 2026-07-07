@@ -1,7 +1,6 @@
-<!-- PROTECTED: requires user approval to edit (see opencode.json permission.edit). -->
+<!-- Module: agents/memory — see AGENTS.md (Protected files) and opencode.json permission.edit. -->
 
-
-# `tools/memory/` — Project Memory Infrastructure
+# `agents/memory/scripts/` — Project Memory Infrastructure
 
 The single entry point for the project's knowledge graph. Every write goes
 through this package. Every read can either go through it or use the MCP

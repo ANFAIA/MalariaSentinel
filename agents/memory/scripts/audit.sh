@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
-# PROTECTED: requires human-in-the-loop approval to edit.
-# See tools/memory/.protected and AGENTS.md (Protected files).
+# Module: agents/memory — see AGENTS.md (Protected files) and opencode.json permission.edit.
 
-# tools/memory/audit.sh
+# agents/memory/scripts/audit.sh
 # Runs the three schema invariants in tools/memory/invariants.cypher.
 # Exits 0 if all three return zero (or only the dump returns data), exits
 # 1 if any invariant returns > 0.
@@ -21,13 +20,13 @@ source "$HERE/lib/project.sh"
 _find_root() {
   local d="${1:-$PWD}"
   while [ "$d" != "/" ]; do
-    [ -d "$d/memory" ] && [ -f "$d/memory/config/config.yaml" ] && { echo "$d"; return 0; }
+    [ -d "$d/agents/memory" ] && [ -f "$d/agents/memory/runtime/config/config.yaml" ] && [ -f "$d/agents/memory/scripts/memory.sh" ] && { echo "$d"; return 0; }
     d="$(dirname "$d")"
   done
   return 1
 }
 ROOT="$(_find_root)"
-cd "$ROOT/memory"
+cd "$ROOT/agents/memory/runtime"
 
 # --- project (group_id) resolution ---
 resolve_project || exit 2

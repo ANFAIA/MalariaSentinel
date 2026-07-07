@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-# PROTECTED: requires user approval to edit (see opencode.json permission.edit).
+# Module: agents/memory — see AGENTS.md (Protected files) and opencode.json permission.edit.
 #
-# tools/memory/lib/parse-yaml.py
+# agents/memory/scripts/lib/parse-yaml.py
 # Parse a seed-style yaml file (same shape as tools/memory/seed/<project>.yaml
 # and tools/memory/bootstrap/*.yaml) and emit a flat representation that the
 # shell scripts can consume.

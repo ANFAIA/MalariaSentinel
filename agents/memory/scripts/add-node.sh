@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
-# PROTECTED: requires human-in-the-loop approval to edit.
-# See tools/memory/.protected and AGENTS.md (Protected files).
+# Module: agents/memory — see AGENTS.md (Protected files) and opencode.json permission.edit.
 
-# tools/memory/add-node.sh
+# agents/memory/scripts/add-node.sh
 # Validates a label against the schema, then runs a MERGE that creates or
 # updates a typed node. Idempotent: re-running with the same uuid is a no-op
 # except for property updates.
@@ -97,7 +96,7 @@ RETURN n.uuid AS uuid, labels(n) AS labels"
 _find_root() {
   local d="${1:-$PWD}"
   while [ "$d" != "/" ]; do
-    [ -d "$d/memory" ] && [ -f "$d/memory/config/config.yaml" ] && { echo "$d"; return 0; }
+    [ -d "$d/agents/memory" ] && [ -f "$d/agents/memory/runtime/config/config.yaml" ] && [ -f "$d/agents/memory/scripts/memory.sh" ] && { echo "$d"; return 0; }
     d="$(dirname "$d")"
   done
   return 1
@@ -105,7 +104,7 @@ _find_root() {
 ROOT="$(_find_root)"
 
 (
-  cd "$ROOT/memory" && \
+  cd "$ROOT/agents/memory/runtime" && \
   neo4j-cli query "$cypher" "${params[@]}" --rw --format toon
 )
 

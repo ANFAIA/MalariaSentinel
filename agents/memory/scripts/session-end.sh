@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
-# PROTECTED: requires human-in-the-loop approval to edit.
-# See tools/memory/.protected and AGENTS.md (Protected files).
+# Module: agents/memory — see AGENTS.md (Protected files) and opencode.json permission.edit.
 
-# tools/memory/session-end.sh
+# agents/memory/scripts/session-end.sh
 # Prints the session-end checklist. The agent reads it, follows it, and
 # writes a session summary. The narrative goes in a free-form episode;
 # the structure goes in typed node updates.

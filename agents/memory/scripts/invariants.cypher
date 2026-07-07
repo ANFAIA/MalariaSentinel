@@ -1,7 +1,6 @@
-// PROTECTED: requires human-in-the-loop approval to edit.
-// See tools/memory/.protected and AGENTS.md (Protected files).
+// Module: agents/memory — see AGENTS.md (Protected files) and opencode.json permission.edit.
 
-// tools/memory/invariants.cypher
+// agents/memory/scripts/invariants.cypher
 // The three schema invariants. Each statement is a single count/dump query
 // that audit.sh runs in its own transaction. A non-zero result on any of
 // them is a schema violation that the seed pipeline must not produce.

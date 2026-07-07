@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
-# PROTECTED: requires human-in-the-loop approval to edit.
-# See tools/memory/.protected and AGENTS.md (Protected files).
+# Module: agents/memory — see AGENTS.md (Protected files) and opencode.json permission.edit.
 
-# tools/memory/add-rel.sh
+# agents/memory/scripts/add-rel.sh
 # Validates that src and dst exist, then runs a MERGE that creates or
 # updates a typed relation. Idempotent.
 #
@@ -25,13 +24,13 @@ source "$HERE/lib/project.sh"
 _find_root() {
   local d="${1:-$PWD}"
   while [ "$d" != "/" ]; do
-    [ -d "$d/memory" ] && [ -f "$d/memory/config/config.yaml" ] && { echo "$d"; return 0; }
+    [ -d "$d/agents/memory" ] && [ -f "$d/agents/memory/runtime/config/config.yaml" ] && [ -f "$d/agents/memory/scripts/memory.sh" ] && { echo "$d"; return 0; }
     d="$(dirname "$d")"
   done
   return 1
 }
 ROOT="$(_find_root)"
-cd "$ROOT/memory"
+cd "$ROOT/agents/memory/runtime"
 
 # --- defaults ---
 type=""

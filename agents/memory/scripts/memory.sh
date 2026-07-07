@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
-# PROTECTED: requires human-in-the-loop approval to edit.
-# See tools/memory/.protected and AGENTS.md (Protected files).
+# Module: agents/memory — see AGENTS.md (Protected files) and opencode.json permission.edit.
 
-# tools/memory/memory.sh
+# agents/memory/scripts/memory.sh
 # The single entry point for the project memory infrastructure.
 #
 # Usage:
@@ -26,7 +25,7 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 _find_root() {
   local d="${1:-$PWD}"
   while [ "$d" != "/" ]; do
-    [ -d "$d/memory" ] && [ -f "$d/memory/config/config.yaml" ] && { echo "$d"; return 0; }
+    [ -d "$d/agents/memory" ] && [ -f "$d/agents/memory/runtime/config/config.yaml" ] && [ -f "$d/agents/memory/scripts/memory.sh" ] && { echo "$d"; return 0; }
     d="$(dirname "$d")"
   done
   return 1
@@ -36,9 +35,9 @@ _find_root() {
 # Individual subcommands (node, rel, seed, audit) cd themselves; this
 # default keeps `memory.sh query "<cypher>"` working from any cwd.
 if root="$(_find_root)"; then
-  cd "$root/memory"
+  cd "$root/agents/memory/runtime"
 else
-  echo "memory.sh: cannot find project root (no memory/config/config.yaml)" >&2
+  echo "memory.sh: cannot find project root (no agents/memory/runtime/config/config.yaml or agents/memory/scripts/memory.sh)" >&2
   exit 2
 fi
 
@@ -101,7 +100,7 @@ case "$sub" in
   status)
     echo "--- docker ---"
     if root="$(_find_root)"; then
-      ( cd "$root/memory" && docker compose ps 2>&1 ) || echo "docker compose: not available"
+      ( cd "$root/agents/memory/runtime" && docker compose ps 2>&1 ) || echo "docker compose: not available"
     else
       echo "project root not found"
     fi
@@ -109,7 +108,7 @@ case "$sub" in
     echo "--- neo4j-cli ---"
     if command -v neo4j-cli >/dev/null 2>&1; then
       if root="$(_find_root)"; then
-        ( cd "$root/memory" && neo4j-cli query 'RETURN 1 AS ok' --format toon 2>&1 ) || echo "neo4j-cli: query failed"
+        ( cd "$root/agents/memory/runtime" && neo4j-cli query 'RETURN 1 AS ok' --format toon 2>&1 ) || echo "neo4j-cli: query failed"
       else
         echo "project root not found, cannot pick up memory/.env"
       fi

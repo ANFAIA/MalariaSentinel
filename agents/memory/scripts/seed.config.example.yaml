@@ -1,5 +1,4 @@
-# PROTECTED: requires human-in-the-loop approval to edit.
-# See tools/memory/.protected and AGENTS.md (Protected files).
+# Module: agents/memory — see AGENTS.md (Protected files) and opencode.json permission.edit.
 
 # seed.config.example.yaml
 # Example declarative seed for a project. Copy this file to

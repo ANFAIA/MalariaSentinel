@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
-# PROTECTED: requires human-in-the-loop approval to edit.
-# See tools/memory/.protected and AGENTS.md (Protected files).
+# Module: agents/memory — see AGENTS.md (Protected files) and opencode.json permission.edit.
 
-# tools/memory/session-start.sh
+# agents/memory/scripts/session-start.sh
 # The session-start routine. Run at the start of every session that
 # touches the project. The agent should glance at the output, then know
 # what state the project is in before they do anything.

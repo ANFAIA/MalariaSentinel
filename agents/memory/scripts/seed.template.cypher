@@ -1,5 +1,4 @@
-// PROTECTED: requires human-in-the-loop approval to edit.
-// See tools/memory/.protected and AGENTS.md (Protected files).
+// Module: agents/memory — see AGENTS.md (Protected files) and opencode.json permission.edit.
 
 // tools/memory/seed.template.cypher
 // Reference template for what a seed Cypher looks like once seed.sh has

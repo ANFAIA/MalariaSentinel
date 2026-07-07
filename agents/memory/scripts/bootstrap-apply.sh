@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # PROTECTED: requires user approval to edit (see opencode.json permission.edit).
 #
-# tools/memory/bootstrap-apply.sh
+# agents/memory/scripts/bootstrap-apply.sh
 # Reads every *.yaml in tools/memory/bootstrap/ and applies it as ONE
 # atomic write. Idempotent: every MERGE keys on uuid + group_id, so
 # re-running converges.
@@ -35,7 +35,7 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 _find_root() {
   local d="${1:-$PWD}"
   while [ "$d" != "/" ]; do
-    [ -d "$d/memory" ] && [ -f "$d/memory/config/config.yaml" ] && { echo "$d"; return 0; }
+    [ -d "$d/agents/memory" ] && [ -f "$d/agents/memory/runtime/config/config.yaml" ] && [ -f "$d/agents/memory/scripts/memory.sh" ] && { echo "$d"; return 0; }
     d="$(dirname "$d")"
   done
   return 1
@@ -56,14 +56,14 @@ if [ -z "$group_id" ]; then
 fi
 
 if ! ROOT="$(_find_root)"; then
-  echo "bootstrap-apply.sh: cannot find project root (no memory/config/config.yaml)" >&2
+  echo "bootstrap-apply.sh: cannot find project root (no agents/memory/runtime/config/config.yaml or agents/memory/scripts/memory.sh)" >&2
   exit 2
 fi
 
-BOOTSTRAP_DIR="$HERE/../bootstrap"
+BOOTSTRAP_DIR="$HERE/bootstrap"
 # Resolve absolute so it works regardless of cwd.
 BOOTSTRAP_DIR="$(cd "$BOOTSTRAP_DIR" 2>/dev/null && pwd)" || {
-  echo "bootstrap-apply.sh: missing bootstrap directory at $HERE/../bootstrap" >&2
+  echo "bootstrap-apply.sh: missing bootstrap directory at $HERE/bootstrap" >&2
   exit 2
 }
 
@@ -217,7 +217,7 @@ mkdir -p "$ROOT/runs"
 
 # Run from the memory/ dir so neo4j-cli picks up the .env.
 (
-  cd "$ROOT/memory" && \
+  cd "$ROOT/agents/memory/runtime" && \
   neo4j-cli query "$(cat "$cypher")" --rw --atomic --format toon "${params[@]}"
 )
 

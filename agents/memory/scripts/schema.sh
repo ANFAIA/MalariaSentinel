@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
-# PROTECTED: requires human-in-the-loop approval to edit.
-# See tools/memory/.protected and AGENTS.md (Protected files).
+# Module: agents/memory — see AGENTS.md (Protected files) and opencode.json permission.edit.
 
-# tools/memory/schema.sh
+# agents/memory/scripts/schema.sh
 # Reads memory/config/config.yaml and exposes the entity_types schema.
 # Caches the parsed label list in runs/schema.cache to avoid re-parsing on
 # every write.
@@ -19,14 +18,14 @@ set -euo pipefail
 _find_root() {
   local d="${1:-$PWD}"
   while [ "$d" != "/" ]; do
-    [ -d "$d/memory" ] && [ -f "$d/memory/config/config.yaml" ] && { echo "$d"; return 0; }
+    [ -d "$d/agents/memory" ] && [ -f "$d/agents/memory/runtime/config/config.yaml" ] && [ -f "$d/agents/memory/scripts/memory.sh" ] && { echo "$d"; return 0; }
     d="$(dirname "$d")"
   done
   return 1
 }
 
-ROOT="$(_find_root "$PWD")" || { echo "schema.sh: cannot find project root (no memory/config/config.yaml)" >&2; exit 2; }
-CONFIG="$ROOT/memory/config/config.yaml"
+ROOT="$(_find_root "$PWD")" || { echo "schema.sh: cannot find project root (no agents/memory/runtime/config/config.yaml or agents/memory/scripts/memory.sh)" >&2; exit 2; }
+CONFIG="$ROOT/agents/memory/runtime/config/config.yaml"
 CACHE_DIR="$ROOT/runs"
 CACHE="$CACHE_DIR/schema.cache"
 

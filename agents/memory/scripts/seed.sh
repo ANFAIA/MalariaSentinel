@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
-# PROTECTED: requires human-in-the-loop approval to edit.
-# See tools/memory/.protected and AGENTS.md (Protected files).
+# Module: agents/memory — see AGENTS.md (Protected files) and opencode.json permission.edit.
 
-# tools/memory/seed.sh
+# agents/memory/scripts/seed.sh
 # Compiles a project seed yaml into Cypher, validates every label against
 # the schema, and runs the result as a single atomic write against Neo4j.
 #
@@ -34,7 +33,7 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 _find_root() {
   local d="${1:-$PWD}"
   while [ "$d" != "/" ]; do
-    [ -d "$d/memory" ] && [ -f "$d/memory/config/config.yaml" ] && { echo "$d"; return 0; }
+    [ -d "$d/agents/memory" ] && [ -f "$d/agents/memory/runtime/config/config.yaml" ] && [ -f "$d/agents/memory/scripts/memory.sh" ] && { echo "$d"; return 0; }
     d="$(dirname "$d")"
   done
   return 1
@@ -342,7 +341,7 @@ mkdir -p "$ROOT/runs"
 
 # Run from the memory/ dir so neo4j-cli picks up the .env.
 (
-  cd "$ROOT/memory" && \
+  cd "$ROOT/agents/memory/runtime" && \
   neo4j-cli query "$(cat "$cypher")" --rw --atomic --format toon "${params[@]}"
 )
 

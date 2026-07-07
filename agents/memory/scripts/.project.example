@@ -1,7 +1,6 @@
-// PROTECTED: requires human-in-the-loop approval to edit.
-// See tools/memory/.protected and AGENTS.md (Protected files).
+// Module: agents/memory — see AGENTS.md (Protected files) and opencode.json permission.edit.
 
-# tools/memory/.project.example
+# agents/memory/.project.example
 # Template for the runtime project name file. The agent that bootstraps
 # the project copies this to tools/memory/.project (no extension) and
 # replaces the value with the actual project slug (the Neo4j group_id).
