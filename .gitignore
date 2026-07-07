@@ -24,7 +24,6 @@ runs/
 
 # Per-machine runtime state (not committed)
 tools/memory/.project
-tools/hitl/.protected-allowances
 
 # macOS
 .DS_Store

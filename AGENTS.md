@@ -7,59 +7,42 @@
 - **`add_memory` (MCP) for typed node creation** — the LLM extractor in Graphiti MCP 1.26.0 ignores the `type` field of `source: "json"` bodies and re-classifies entities from text, producing dozens of unlabeled `:Entity` nodes and mis-labelled `:Architecture`/`:Pattern`/`:Preference` nodes. Verified 2026-07-04 via `neo4j-cli query ":schema"` after a 261-node / 411-relation wipe. For any node that needs a label, use `tools/memory/memory.sh node` (which validates against the schema before any write). `add_memory` remains acceptable only for free-form episode text that does not need a label.
 - **`add_triplet` (MCP)** — not available in Graphiti MCP 1.26.0. Previous AGENTS.md guidance recommending it for pre-seeding is obsolete; use `tools/memory/seed.sh` or `memory.sh seed` instead.
 
-## Protected files — human-in-the-loop required
+## Protected files — opencode-native ask
 
-The project has a list of files that are **reusable infrastructure**:
-the `tools/hitl/` package, its templates, this agent guide, and
-`.gitignore`. These files are designed to be copy-pasted into other
-projects as-is, so modifying them is a project-level decision, not an
-agent-level one.
+A small set of files govern this project's agent behaviour and
+identity. They are protected by **OpenCode's `permission.edit` block**
+in `opencode.json`, not by a separate subsystem: every attempt to edit
+one of them prompts the user, no exceptions, no allowances.
 
-> **The HITL permission guard is a separate subsystem from memory.** It
-> used to live under `tools/memory/`. It is now its own package at
-> `tools/hitl/`. See `tools/hitl/README.md` for the spec and
-> `tools/memory/README.md` for the memory subsystem. They are
-> independent.
+The protected list (4 paths, inline in `opencode.json`):
 
-**Rule: an agent MUST NOT edit a protected file without explicit user
-approval.** The list lives at `tools/hitl/.protected` and is enforced
-at three levels:
+- `AGENTS.md` — the agent's own instructions.
+- `.gitignore` — affects git tracking.
+- `opencode.json` — affects all permissions and agent config.
+- `tools/memory/.project` — the Neo4j `group_id` (project identity).
 
-1. **Agent-level (this section).** Before any `Edit` or `Write` tool
-   call on a path, run
-   `make -f tools/hitl/Makefile protected-check P=<path>`. If it
-   returns non-zero, **stop and ask the user**. The user can grant a
-   one-off allowance with:
-   `make -f tools/hitl/Makefile protected-allow P=<path>`.
-   Wildcards work (`P='tools/hitl/*.sh'`). Every allowance is logged
-   to `runs/protected.log` (gitignored) for audit.
-2. **OpenCode-level (`opencode.json` at project root).** Runtime deny
-   rules in the `permission:` block run *before* the tool call. The
-   agent cannot bypass them from inside a session. See
-   `tools/hitl/OPENCODE-PERMISSIONS.md` for the spec of what is
-   hard-denied.
-3. **Git-level (backstop).** `tools/hitl/hooks/pre-commit` (installable
-   via `make -f tools/hitl/Makefile install-hooks`) refuses any
-   commit that touches a protected file unless the change is covered by
-   an allowance in `tools/hitl/.protected-allowances` (gitignored).
-   Without the hook installed, the agent-level and opencode-level
-   policies are still active.
+**Rule: an agent MUST treat every `permission.edit: "ask"` prompt on
+these paths as a real question.** If the user approves, proceed. If
+the user denies, stop. Do not retry with a different phrasing, do not
+batch the change with another edit, do not delegate the edit to a
+subagent (subagents inherit the same `ask` semantics — they are not a
+way around it).
 
-**Why this matters:** the protected files encode conventions that the
-next agent will read cold. A silent change in `Makefile` or `AGENTS.md`
-will quietly propagate. The human-in-the-loop gate is the right cost.
+**Why opencode-native and not a custom subsystem:** the previous design
+(`tools/hitl/`) maintained a separate `.protected` list, an allowances
+file, a pre-commit hook, and a Makefile-driven check. All of that
+duplicated what OpenCode already does in one place. The user dropped
+the subsystem in 2026-07 in favour of the simpler model.
 
-**Adaptation is allowed.** When a project genuinely needs a different
-default (e.g., a new schema label, a different entry point, a
-project-specific convention), the user can:
+**Bash denies (orthogonal, kept):** the small `permission.bash` block
+in `opencode.json` still hard-denies two destructive operations
+(`make wipe` and `make set-project`). Those are not file protection —
+they are defence against typos. Use `make` itself for normal work; the
+deny patterns only block the destructive subcommands.
 
-- Add a one-off allowance: `make -f tools/hitl/Makefile protected-allow P=<path>`, then edit.
-- Or, for permanent changes, run `make -f tools/hitl/Makefile install-hooks` to enable the
-  git backstop, then `git commit --no-verify` for the deliberate
-  override.
-
-The list itself (`tools/hitl/.protected`) is also protected — adding
-or removing paths is itself a protected operation.
+**Adding a new protected file:** edit `opencode.json` and add a
+`"<path>": "ask"` entry under `permission.edit`. No allowance, no
+allowances file, no commit marker.
 
 ## Monorepo Structure
 
@@ -71,12 +54,21 @@ MalariaSentinel/
   mal-ghana-sim/       Ghana spread simulation + U-Net surrogate (research)
   mal-data-explorer/   Dataset visualization, mapping, bias analysis (scripts)
 
+  agents/              Agent infrastructure (loops, knowledge base index)
   data/                Datasets
   papers/              Research PDFs
   terrain/             SRTM DEM tiles and download scripts
   runs/                Experiment outputs (gitignored)
-  tools/               Dev scripts
+  tools/               Dev scripts (memory subsystem, helpers)
+  memory/              Neo4j config + docker compose for the graph backend
 ```
+
+The `memory/` directory at the project root holds the docker compose
+stack (Neo4j + Graphiti MCP) and the schema config (`memory/config/
+config.yaml`). It is distinct from `tools/memory/` (the shell wrapper
+that validates labels and writes Cypher) — they cooperate but live in
+different trees on purpose, so the wrapper can be copy-pasted into
+other projects.
 
 ## Dependency Rules
 
@@ -133,6 +125,8 @@ uv run python 12_bias_plot.py
 | Datasets | `data/<region>/` |
 | Terrain / SRTM | `terrain/` |
 | Dev tooling | `tools/` |
+| Specialised loop agents | `agents/loops/<name>.md` |
+| Pre-configured knowledge entries | `tools/memory/bootstrap/<NN>-<name>.yaml` |
 
 ## Memory Operating Procedure
 
@@ -160,16 +154,13 @@ Read `tools/memory/README.md` for the full contract. Quick reference:
 | End a session (printable checklist) | `make -f tools/memory/Makefile session-end` |
 | Set the project slug (one-time) | `make -f tools/memory/Makefile set-project PROJECT=<name>` |
 | Seed the graph | `make -f tools/memory/Makefile seed` (uses `.project`) |
+| Apply pre-configured bootstrap entries | `make -f tools/memory/Makefile bootstrap-apply` (idempotent) |
 | Add a typed node | `bash tools/memory/memory.sh node --type <L> --uuid <id> --name <n> --summary <s> [--path <p>]` |
 | Add a typed relation | `bash tools/memory/memory.sh rel --type <R> --src <uuid> --dst <uuid> [--prop k=v]` |
 | Read or one-off write | `bash tools/memory/memory.sh query "<cypher>" [--rw]` |
 | Audit invariants | `make -f tools/memory/Makefile audit` |
 | Check the stack | `make -f tools/memory/Makefile status` |
 | Wipe the project (destructive) | `make -f tools/memory/Makefile wipe` |
-| List protected files | `make -f tools/hitl/Makefile protected-list` |
-| Check a path against the protected list | `make -f tools/hitl/Makefile protected-check P=<path>` |
-| Grant an allowance | `make -f tools/hitl/Makefile protected-allow P=<path>` |
-| Install the pre-commit hook (backstop) | `make -f tools/hitl/Makefile install-hooks` |
 
 Run `make session-start` at the beginning of every session, and
 `make session-end` before you stop. Run `make audit` before any
@@ -240,6 +231,19 @@ which bypasses the LLM extractor that mis-classifies JSON bodies.
 - Code already in the repo (memory complements, doesn't duplicate).
 - Reproducible one-off queries.
 
+**Bootstrap knowledge (recurring entries):** some facts are durable
+enough that every session should re-assert them — project architecture,
+conventions, the agents layer, the protection model. These live in
+`tools/memory/bootstrap/*.yaml`, one entry per file, in the same yaml
+format as `tools/memory/seed/<project>.yaml`. On every
+`make session-start` (and standalone via
+`make -f tools/memory/Makefile bootstrap-apply`), the
+`bootstrap-apply.sh` script reads the folder and applies all entries
+as ONE atomic write, idempotent on `uuid + group_id`. Use it for
+"things that should always be in the graph". For one-shot project
+init, use `seed/<project>.yaml` and `make seed` — see the
+`pitfall-bootstrap-vs-seed` node in the knowledge base.
+
 **Conventions:**
 
 - `name` is short and dated if session-like: `ADR-2026-07-04: Neo4j as memory backend`.
@@ -298,3 +302,104 @@ radius.
 **Why a global alias and not a project setting:** the divergence is a
 property of the user's workflow, not of this repo. The alias travels with
 the user across all checkouts.
+
+## Context Architecture
+
+This project follows a three-layer context model. The layers are not
+implemented as Python classes — they are roles played by the OpenCode
+runtime, the knowledge graph, and the loop agents.
+
+| Layer | What lives there | Owner |
+|---|---|---|
+| **Operational** | The active primary agent's context window: last exchanges, current task, recent tool outputs. | OpenCode (the primary agent). |
+| **Compaction** | Auto-managed by OpenCode's hidden `compaction` agent when the operational layer grows large. Trims and summarises. | OpenCode (built-in, no config knob). |
+| **Episodic** | What was done, when, with what result, in which session. Lives as typed nodes and free-form episodes in the knowledge graph. | `tools/memory/`. |
+| **Semantic** | Components, investigations, patterns, architecture decisions, conventions, pitfalls. Queryable via `mcp__graphiti-memory__search_nodes` or `tools/memory/memory.sh query`. | `tools/memory/`. |
+
+**Supervisor (the primary agent) keeps in its context only what the
+current task needs.** Long tool outputs are not pasted in; the supervisor
+either summarises them, stores them in the knowledge graph, or tells the
+user. If a primary agent's context grows past ~70K–100K tokens during a
+session, that is a signal to:
+1. Check that the loop agents are returning structured artifacts (not
+   raw output) — see `agents/loops/AGENTS.md`.
+2. Check that the supervisor is querying the knowledge graph for
+   durable context, not re-reading source files.
+3. Consider whether the task should be split across sessions.
+
+**Subagents (loop agents) do not see the full conversation.** They
+receive a brief from the supervisor (goal, check command, scope) and
+return a structured artifact. If they need more context, they query
+the knowledge graph or ask the supervisor. The supervisor is the
+single point that knows "the whole story".
+
+**Anti-patterns:**
+- Pasting a multi-thousand-line tool output into the supervisor's
+  prompt. Summarise or store in the graph.
+- Re-reading large source files instead of querying the graph for
+  previous notes about them.
+- Using `add_memory` for typed data (see FORBIDDEN TOOLS).
+- Treating the graph as the prompt. The graph is the backing store;
+  the prompt is the working set.
+
+## Specialised Loops
+
+Specialised loop agents live in `agents/loops/<name>.md` and are
+invoked by the supervisor (the active primary agent) via the `task`
+tool or by the user with `@<name>`. See `agents/loops/AGENTS.md` for
+the common contract every loop follows.
+
+The current set:
+
+| Agent | Purpose | Auto-invoked by `build`? | Permission shape |
+|---|---|---|---|
+| `test-fixer` | Iterate a check command until it exits 0. | `allow` | `read/edit/grep/glob/bash(uv run pytest, git diff/status/log)`; no `webfetch`. |
+| `code-reviewer` | Review a diff and return structured findings. | `ask` | Read-only. `edit/bash/websearch` denied. |
+| `doc-researcher` | Answer a research question from the knowledge base first; web is a fallback. | `ask` | Read + `webfetch` + `websearch` (if `OPENCODE_ENABLE_EXA=1`). No `edit`. |
+| `security-auditor` | OWASP-style audit of a scope. | `ask` | Read-only. `edit/bash/webfetch/websearch` denied. |
+
+Auto-invocation is configured in `opencode.json` under
+`agent.build.permission.task`. `allow` means the primary agent can
+invoke the loop without prompting the user; `ask` means every
+invocation is gated by user approval. The current split is intentional:
+`test-fixer` is mechanical (safe to auto-invoke); the other three
+return findings that the user usually wants to see the context of.
+
+**Adding a new loop:** create `agents/loops/<name>.md` with frontmatter
+(`description`, `mode: subagent`, `permission`) and a prompt body
+that follows the structure in `agents/loops/AGENTS.md`. Restart
+OpenCode to register the new agent. Decide whether to add it to
+`agent.build.permission.task` based on whether it is mechanical
+(`allow`) or judgement-bearing (`ask`).
+
+## Session Close Contract
+
+A session is not over when the model says "task complete". It is over
+when the knowledge graph reflects what happened. This is the close
+contract — every session **MUST** end with:
+
+1. **Update affected Investigation nodes.** If the session opened,
+   progressed, or closed an investigation, write the status (open /
+   in-progress / resolved / blocked) and the evidence (file paths,
+   commands run, results).
+2. **Add any newly-discovered typed nodes.** Patterns, pitfalls,
+   components, architecture decisions that emerged during the session
+   and are worth keeping.
+3. **Write a free-form session episode via `add_memory`.** Source
+   `agent`, name `session-YYYY-MM-DD: <one-line summary>`, body a
+   short paragraph (10–20 lines) of "what was done, decisions taken,
+   blockers hit, next step". The supervisor uses these to reconstruct
+   context in the next session.
+4. **Edit `AGENTS.md` if a new convention was introduced.** A
+   convention that was followed once is a hack; a convention written
+   into AGENTS.md is reusable. Do not let the graph become the only
+   record of how the project actually works.
+5. **Re-run `make -f tools/memory/Makefile audit`.** Catches schema
+   drift before the next session.
+
+The `make -f tools/memory/Makefile session-end` target prints this
+checklist. Treat it as a release gate, not a suggestion.
+
+**When to skip the contract:** trivial sessions (single tool call, no
+state change). For anything that touched a package, a configuration,
+or the knowledge graph, follow it.

@@ -1,0 +1,72 @@
+# tools/memory/bootstrap/04-session-close.yaml
+# Operational contract for closing a session. Documented in AGENTS.md
+# (Session Close Contract) and enforced by make session-end.
+
+project: MalariaSentinel
+group_id: malariasentinel
+schema_source: memory/config/config.yaml
+
+operational:
+  - uuid: op-session-close
+    name: session-close-contract
+    summary: |
+      Every non-trivial session ends with: (1) update affected
+      Investigation nodes (open / in-progress / resolved / blocked +
+      evidence: paths, commands, results); (2) add any newly-discovered
+      typed nodes (Patterns, Pitfalls, Components, Architecture
+      decisions) that emerged during the session; (3) write a free-form
+      session episode via mcp__graphiti-memory__add_memory with name
+      session-YYYY-MM-DD: <one-line summary> and a 10-20 line body
+      describing what was done, decisions taken, blockers hit, next
+      step. Source: agent. (4) Edit AGENTS.md if a new convention was
+      introduced. (5) Re-run make -f tools/memory/Makefile audit. The
+      make -f tools/memory/Makefile session-end target prints this
+      checklist; treat it as a release gate, not a suggestion. Skip
+      only for trivial sessions (single tool call, no state change).
+
+  - uuid: op-bootstrap-knowledge
+    name: bootstrap-knowledge
+    summary: |
+      Pre-configured knowledge lives in tools/memory/bootstrap/*.yaml.
+      Each file is one "entry" (a logical group of nodes + relations)
+      in the same yaml format as tools/memory/seed/<project>.yaml.
+      Filename prefix (00-, 01-, 02-) gives a stable order. On every
+      session-start, tools/memory/bootstrap-apply.sh reads the folder
+      and applies all entries as ONE atomic write (idempotent on
+      uuid + group_id). The script also runs standalone via
+      `make -f tools/memory/Makefile bootstrap-apply` or
+      `memory.sh bootstrap-apply`. Use this for entries that should
+      be present in every session — project-level architecture,
+      conventions, modules, the agents layer. Do NOT use it for
+      one-shot project init (that's seed / make seed).
+
+preferences:
+  - uuid: pref-bootstrap-yaml-format
+    name: PREF-bootstrap-yaml-format
+    summary: |
+      Every tools/memory/bootstrap/*.yaml MUST declare
+      `project: <name>` and `group_id: <slug>` at the top, matching
+      the project in tools/memory/.project. Every node MUST have a
+      stable uuid (re-running must be a no-op). Relations are flat
+      {src, type, dst, props?} and may cross files (the script
+      collects all first, then writes atomically). Multi-line
+      summaries use the `summary: |` block scalar.
+
+pitfalls:
+  - uuid: pitfall-bootstrap-vs-seed
+    name: PITFALL-bootstrap-vs-seed
+    summary: |
+      seed/ and bootstrap/ are NOT the same thing. seed/<project>.yaml
+      is the one-shot project init (modules, datasets, top-level
+      investigation) — read once, applied once. bootstrap/*.yaml is
+      the recurring "things that should always be in the graph" —
+      read every session, applied atomically. Putting project init
+      in bootstrap/ makes it re-apply on every session, which is
+      noise; putting always-on knowledge in seed/ means it can drift
+      if the seed is later regenerated. Use the right folder.
+
+relations:
+  - { src: op-session-close,            type: GOVERNS,    dst: pattern-supervisor-thin }
+  - { src: op-bootstrap-knowledge,      type: ENABLES,     dst: agents-module }
+  - { src: pref-bootstrap-yaml-format,  type: ENFORCES,    dst: op-bootstrap-knowledge }
+  - { src: pitfall-bootstrap-vs-seed,   type: MOTIVATED_BY, dst: op-bootstrap-knowledge }

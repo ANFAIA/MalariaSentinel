@@ -1,0 +1,52 @@
+# tools/memory/bootstrap/02-context-3layers.yaml
+# Pattern: 3-layer context architecture (operational / compaction /
+# episodic / semantic). Mapped to the OpenCode runtime, no Python code.
+
+project: MalariaSentinel
+group_id: malariasentinel
+schema_source: memory/config/config.yaml
+
+patterns:
+  - uuid: pattern-context-3layers
+    name: 3-layer context architecture
+    summary: |
+      Four context layers, no Python wrapper. Operational: the active
+      primary agent's context window (last exchanges, current task,
+      recent tool outputs). Compaction: OpenCode's hidden compaction
+      agent summarises automatically when the operational layer grows
+      large (no config knob, intentionally). Episodic: typed nodes
+      (Investigation, Operational) plus free-form episodes via
+      mcp__graphiti-memory__add_memory. Semantic: the knowledge graph
+      in tools/memory/ (Neo4j via Graphiti MCP 1.26.0). The supervisor
+      keeps only what the current task needs in prompt; long outputs
+      are summarised, stored, or replaced with UUID references. If a
+      primary agent's context grows past ~70K-100K tokens during a
+      session, that is a signal to check that loop agents return
+      structured artifacts and that the supervisor queries the graph
+      instead of re-reading source files.
+
+  - uuid: pattern-supervisor-thin
+    name: thin supervisor
+    summary: |
+      The primary agent (build by default) is the single point that
+      knows the whole story. Subagents (loops) do not see the full
+      conversation — they receive a brief (goal, check command, scope)
+      and return a structured artifact. If a loop needs more context,
+      it queries the knowledge base or asks the supervisor via the
+      question tool; it does not request a history dump.
+
+  - uuid: pattern-no-trust-in-prompts
+    name: never trust prompts alone
+    summary: |
+      Convention-level rules (do not weaken tests, do not write to the
+      KB from a loop, etc.) are documented in agents/loops/AGENTS.md
+      and re-stated in each loop's prompt. But the source of truth for
+      what an agent MAY do is opencode.json:permission, not the prompt.
+      A loop whose prompt is bypassed or hallucinated is still gated
+      by its narrow permission set. Always layer prompt + permission +
+      audit, in that order of reliability.
+
+relations:
+  - { src: pattern-context-3layers, type: GOVERNS,    dst: agents-module }
+  - { src: pattern-supervisor-thin, type: IMPLEMENTS, dst: pattern-context-3layers }
+  - { src: pattern-no-trust-in-prompts, type: APPLIED_VIA, dst: opencode-config }

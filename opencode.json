@@ -1,30 +1,35 @@
 {
   "$schema": "https://opencode.ai/config.json",
-
+  "instructions": ["agents/loops/AGENTS.md"],
   "permission": {
     "edit": {
-      "tools/hitl/.protected": "deny",
-      "tools/hitl/.protected-allowances": "deny",
-      "tools/memory/.project": "deny",
-      "tools/hitl/OPENCODE-PERMISSIONS.md": "deny",
-      "opencode.json": "deny"
+      "AGENTS.md": "ask",
+      ".gitignore": "ask",
+      "opencode.json": "ask",
+      "tools/memory/.project": "ask"
     },
     "bash": {
       "*": "allow",
-      "make -f tools/hitl/Makefile protected-allow *": "deny",
-      "make -f tools/memory/Makefile set-project *": "deny",
-      "make -f tools/hitl/Makefile install-hooks *": "deny",
       "make -f tools/memory/Makefile wipe *": "deny",
-      "git commit --no-verify *": "deny",
-      "git commit -n *": "deny",
-      "*protected-allow*": "deny",
-      "*make*set-project*": "deny",
-      "*make*install-hooks*": "deny",
+      "make -f tools/memory/Makefile set-project *": "deny",
       "*make*wipe*": "deny",
-      "bash tools/hitl/check-edit.sh*": "deny"
+      "*make*set-project*": "deny"
     },
     "webfetch": "allow",
     "todowrite": "allow",
     "question": "allow"
+  },
+  "agent": {
+    "build": {
+      "permission": {
+        "task": {
+          "*": "ask",
+          "test-fixer": "allow",
+          "code-reviewer": "ask",
+          "doc-researcher": "ask",
+          "security-auditor": "ask"
+        }
+      }
+    }
   }
 }

@@ -12,12 +12,15 @@
 #
 # The script is project-agnostic — the Makefile passes the resolved slug.
 # It runs:
+#   0. apply pre-configured bootstrap entries (tools/memory/bootstrap/*.yaml)
 #   1. audit (fail fast on drift)
 #   2. open investigations
 #   3. active pitfalls (must-read)
 #   4. architecture decisions in force
 #   5. component map (one row per Component)
-#   6. recent free-form episodes (last 14 days, via MCP search_nodes)
+#   6. preferences (user-stated, treat as immutable)
+#   7. operational patterns
+#   8. recent free-form episodes (last 14 days, via MCP search_nodes)
 
 set -uo pipefail
 
@@ -25,6 +28,11 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 GID="${1:?usage: session-start.sh <group_id>}"
 
 echo "=== session-start: $GID ==="
+echo
+
+# 0. apply pre-configured bootstrap entries (idempotent; safe every session)
+echo "--- 0. apply bootstrap entries (tools/memory/bootstrap/) ---"
+bash "$HERE/bootstrap-apply.sh" "$GID" || { echo "BOOTSTRAP APPLY FAILED — fix the offending yaml and re-run."; exit 1; }
 echo
 
 # 1. audit

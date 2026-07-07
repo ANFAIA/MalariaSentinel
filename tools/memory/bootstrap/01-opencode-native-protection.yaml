@@ -1,0 +1,50 @@
+# tools/memory/bootstrap/01-opencode-native-protection.yaml
+# Architecture decision: drop tools/hitl/ in favour of opencode-native
+# permission.edit: "ask". Recorded 2026-07-07.
+
+project: MalariaSentinel
+group_id: malariasentinel
+schema_source: memory/config/config.yaml
+
+architectures:
+  - uuid: arch-opencode-native-protection
+    name: opencode-native file protection
+    summary: |
+      Project-level governance files (AGENTS.md, .gitignore,
+      opencode.json, tools/memory/.project) are protected by OpenCode's
+      permission.edit: "ask" block in opencode.json. Every attempt to
+      edit one of them prompts the user, no exceptions, no allowances.
+      The previous tools/hitl/ subsystem (with its own .protected list,
+      .protected-allowances, pre-commit hook, and Makefile-driven
+      check) was dropped in 2026-07 because it duplicated what OpenCode
+      already does in one place and added three enforcement layers
+      where one suffices. The small bash deny list (make wipe, make
+      set-project) is kept as defence against typos, not as file
+      protection.
+
+preferences:
+  - uuid: pref-protected-paths-in-opencode-json
+    name: PREF-protected-paths-live-in-opencode-json
+    summary: |
+      The list of protected paths lives inline under
+      opencode.json:permission.edit. Adding a new protected file means
+      editing opencode.json — not a separate .protected file. The
+      trade-off: discoverability lives in opencode.json, the protected
+      list travels with the config in git history, and there is no
+      second source of truth to keep in sync.
+
+pitfalls:
+  - uuid: pitfall-do-not-rewrite-opencode-protection
+    name: PITFALL-do-not-rewrite-opencode-protection
+    summary: |
+      Do not reintroduce a tools/hitl/ subsystem or a Makefile-driven
+      protected-check. The whole point of the 2026-07 simplification
+      was to collapse three enforcement layers (agent-level, git hook,
+      opencode deny) into one (opencode ask). If a new requirement
+      appears, extend permission.edit or permission.bash in
+      opencode.json — do not create a parallel subsystem.
+
+relations:
+  - { src: arch-opencode-native-protection,        type: GOVERNS,       dst: opencode-config }
+  - { src: pref-protected-paths-in-opencode-json,  type: ENFORCES,       dst: arch-opencode-native-protection }
+  - { src: pitfall-do-not-rewrite-opencode-protection, type: MOTIVATED_BY, dst: arch-opencode-native-protection }

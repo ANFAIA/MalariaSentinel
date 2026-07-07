@@ -1,0 +1,76 @@
+# tools/memory/bootstrap/00-agents-module.yaml
+# Project-level knowledge: the agents/ module and the 4 specialised loops
+# introduced in 2026-07. Idempotent — re-applied on every session-start.
+
+project: MalariaSentinel
+group_id: malariasentinel
+schema_source: memory/config/config.yaml
+
+components:
+  - uuid: agents-module
+    name: agents module
+    path: agents/
+    summary: |
+      Logical umbrella for the project's agent infrastructure. Houses the
+      specialised loop subagents (agents/loops/*.md) and the common
+      rules they all follow (agents/loops/AGENTS.md). Not a runtime:
+      OpenCode is the runtime, configured at the project root via
+      opencode.json. Memory and knowledge live in tools/memory/ (kept
+      separate to preserve the package's copy-pasteable contract).
+
+  - uuid: agents-loops-test-fixer
+    name: test-fixer loop
+    path: agents/loops/test-fixer.md
+    summary: |
+      Subagent that iterates a defined check command until it exits 0.
+      Auto-invoked by the primary build agent (permission.task: allow).
+      Pre-allowed bash: uv run pytest, git diff/status/log. Read+edit
+      on source. No web. Returns a structured {status, summary,
+      evidence_refs} artifact.
+
+  - uuid: agents-loops-code-reviewer
+    name: code-reviewer loop
+    path: agents/loops/code-reviewer.md
+    summary: |
+      Read-only subagent that reviews a code change and returns a
+      structured findings list. Invoked via @code-reviewer or the task
+      tool (permission.task: ask, user-gated). edit: deny. Queries the
+      knowledge base for project conventions before reviewing.
+
+  - uuid: agents-loops-doc-researcher
+    name: doc-researcher loop
+    path: agents/loops/doc-researcher.md
+    summary: |
+      Subagent that searches the project knowledge base (Neo4j via
+      tools/memory/memory.sh and mcp__graphiti-memory__*) first; falls
+      back to websearch/webfetch only when the KB is empty or stale.
+      Returns a brief with cited evidence, not raw content. edit: deny.
+      websearch requires OPENCODE_ENABLE_EXA=1.
+
+  - uuid: agents-loops-security-auditor
+    name: security-auditor loop
+    path: agents/loops/security-auditor.md
+    summary: |
+      Read-only OWASP Top 10 audit. Returns a structured findings list
+      with severity, CWE IDs, and fix suggestions. edit: deny, bash:
+      deny, no network calls. Invoked via @security-auditor (task:
+      ask, user-gated).
+
+  - uuid: opencode-config
+    name: opencode.json
+    path: opencode.json
+    summary: |
+      Project root config. Defines (1) the protected-files list under
+      permission.edit (each entry: "ask" so the user is prompted on
+      every edit), (2) the bash deny patterns for destructive
+      operations (make wipe, make set-project), (3) the loadable
+      instructions files (currently agents/loops/AGENTS.md), and (4)
+      the auto-invoke permissions for the primary build agent under
+      agent.build.permission.task.
+
+relations:
+  - { src: agents-module,                  type: INCLUDES, dst: agents-loops-test-fixer }
+  - { src: agents-module,                  type: INCLUDES, dst: agents-loops-code-reviewer }
+  - { src: agents-module,                  type: INCLUDES, dst: agents-loops-doc-researcher }
+  - { src: agents-module,                  type: INCLUDES, dst: agents-loops-security-auditor }
+  - { src: opencode-config,                type: GOVERNS,  dst: agents-module }

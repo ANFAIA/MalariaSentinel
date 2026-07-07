@@ -12,10 +12,10 @@
 #   make -f tools/memory/Makefile audit                               # invariants
 #
 # NOTE: The protected-files / HITL policy (`.protected`, `check-edit.sh`,
-# `pre-commit` hook, `OPENCODE-PERMISSIONS.md`) used to live here. It has
-# been moved to its own package: see `tools/hitl/Makefile` and
-# `tools/hitl/README.md`. Memory and permissions are independent
-# subsystems that previously shared this directory for convenience.
+# `pre-commit` hook, `OPENCODE-PERMISSIONS.md`) used to live here. It
+# was moved to its own package (`tools/hitl/`) and then dropped in
+# 2026-07 in favour of OpenCode-native `permission.edit: "ask"`. See
+# AGENTS.md → "Protected files" and `opencode.json`.
 #
 # Invoked from the project root. The Makefile's own location determines
 # paths so `make -C tools/memory ...` and `cd tools/memory && make ...`
@@ -33,7 +33,7 @@ else
   PROJECT_RESOLVED := $(shell test -f $(PROJECT_FILE) && cat $(PROJECT_FILE) | tr -d '[:space:]')
 endif
 
-.PHONY: help status up down bootstrap seed audit query wipe schema-labels clean-schema-cache set-project show-project session-start session-end
+.PHONY: help status up down bootstrap seed bootstrap-apply audit query wipe schema-labels clean-schema-cache set-project show-project session-start session-end
 
 help: ## Show this help.
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "  \033[36m%-22s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -79,11 +79,15 @@ up: ## Start Neo4j + Graphiti MCP containers.
 down: ## Stop Neo4j + Graphiti MCP containers.
 	cd $(PROJECT_ROOT)/memory && docker compose down
 
-bootstrap: up status seed audit ## Cold start: up + status + seed + audit. Use this on a fresh clone.
+bootstrap: up status seed bootstrap-apply audit ## Cold start: up + status + seed + bootstrap-apply + audit. Use this on a fresh clone.
 
 seed: ## Seed the graph for PROJECT. Requires set-project first (or override).
 	$(require_project)
 	bash $(SEED_SH) $(PROJECT_RESOLVED)
+
+bootstrap-apply: ## Apply all tools/memory/bootstrap/*.yaml as one atomic write. Idempotent; safe to run on every session.
+	$(require_project)
+	bash $(HERE)bootstrap-apply.sh $(PROJECT_RESOLVED)
 
 audit: ## Run the three schema invariants. Exits 1 on any failure.
 	$(require_project)

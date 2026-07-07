@@ -1,5 +1,4 @@
-<!-- PROTECTED: requires human-in-the-loop approval to edit.
-     See tools/hitl/.protected and AGENTS.md (Protected files).  -->
+<!-- PROTECTED: requires user approval to edit (see opencode.json permission.edit). -->
 
 
 # `tools/memory/` — Project Memory Infrastructure
@@ -13,11 +12,11 @@ required the 2026-07-04 wipe of 261 mis-labelled nodes:
 > Graphiti MCP `add_memory` path with `source: "json"` ignores the `type`
 > field and re-classifies from text. Do not use it for typed nodes.
 
-> **This package is memory only.** The human-in-the-loop permission guard
-> (file protection, pre-commit hook, OpenCode `permission:` block) used
-> to live here. It has been moved to its own package:
-> `tools/hitl/`. The two subsystems share a `tools/` parent for
-> convenience but are otherwise independent. See `tools/hitl/README.md`.
+> **This package is memory only.** Project-level governance (which files
+> are protected, who can modify what) is enforced by OpenCode's
+> `permission.edit` block in `opencode.json`. The historical HITL
+> subsystem (`tools/hitl/`) was removed in 2026-07 in favour of
+> OpenCode-native `ask` prompts. See `AGENTS.md` → "Protected files".
 
 ## What this is
 

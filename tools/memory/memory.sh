@@ -90,6 +90,10 @@ case "$sub" in
     exec "$HERE/seed.sh" "$@"
     ;;
 
+  bootstrap-apply)
+    exec "$HERE/bootstrap-apply.sh" "$@"
+    ;;
+
   audit)
     exec "$HERE/audit.sh"
     ;;

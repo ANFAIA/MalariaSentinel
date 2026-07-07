@@ -1,0 +1,81 @@
+# tools/memory/bootstrap/03-agent-loops.yaml
+# Convention: every specialised agent is a loop with a check command,
+# an exit condition, and guardrails. The 4 loops shipped in 2026-07.
+
+project: MalariaSentinel
+group_id: malariasentinel
+schema_source: memory/config/config.yaml
+
+patterns:
+  - uuid: pattern-agent-loop
+    name: agent loop convention
+    summary: |
+      Every specialised agent is a loop: (1) read a brief from the
+      supervisor, (2) run a check command or read-only investigation,
+      (3) inspect the result, (4) take the minimal next action, (5)
+      repeat until the exit condition holds, (6) return a structured
+      artifact. The brief is the only context the loop receives. The
+      artifact must contain status, summary, and evidence_refs (file
+      paths, UUIDs, or command outputs the supervisor can verify
+      independently). A loop is not done until the check command
+      actually passes — there is no "I think this is good enough"
+      path. If a loop needs more context, it queries the knowledge
+      base first (tools/memory/memory.sh query), then asks the
+      supervisor via the question tool. Loops are stateless; each
+      invocation is independent.
+
+tools:
+  - uuid: tool-tools-memory
+    name: tools/memory
+    summary: |
+      Project memory subsystem. Provides tools/memory/memory.sh as the
+      single dispatcher (subcommands: schema, node, rel, query, seed,
+      bootstrap-apply, audit, status) and mcp__graphiti-memory__* as
+      the MCP front-end. All graph writes go through
+      memory.sh node/rel — never through add_memory with a typed
+      body (MCP 1.26.0 mis-classifies). Audit (three invariants) runs
+      on every session-start and after every seed / bootstrap-apply.
+
+  - uuid: tool-neo4j-cli
+    name: neo4j-cli
+    summary: |
+      CLI for direct Cypher against the project Neo4j. Installed at
+      ~/.local/bin/neo4j-cli (not an MCP tool). Every memory write
+      ultimately funnels through neo4j-cli query --rw --atomic with
+      parameterised Cypher, which bypasses the LLM extractor that
+      mis-classifies typed JSON bodies.
+
+operational:
+  - uuid: op-new-loop
+    name: adding-a-new-loop
+    summary: |
+      1. Create agents/loops/<name>.md with frontmatter (description,
+      mode: subagent, permission, optional model/temperature). 2. If
+      the loop should be auto-invoked by the primary agent, add a
+      permission.task entry for it in opencode.json:agent.build
+      ("allow" for mechanical, "ask" for judgement-bearing). 3.
+      Restart OpenCode so the new agent is registered. 4. Add a
+      Component node to the knowledge base so the next session can
+      recall it exists.
+
+  - uuid: op-loop-permission-shape
+    name: loop permission shape
+    summary: |
+      Loops are layered: (1) the agent's permission block in its
+      frontmatter narrows what the loop can touch (read vs edit, bash
+      allowlist); (2) the opencode.json:agent.build.permission.task
+      block decides whether the primary agent can auto-invoke it;
+      (3) the protected-files list in opencode.json:permission.edit
+      still asks the user for governance files regardless of what
+      the loop's own permission allows. A loop is only as safe as the
+      strictest of the three.
+
+relations:
+  - { src: pattern-agent-loop,     type: GOVERNS, dst: agents-loops-test-fixer }
+  - { src: pattern-agent-loop,     type: GOVERNS, dst: agents-loops-code-reviewer }
+  - { src: pattern-agent-loop,     type: GOVERNS, dst: agents-loops-doc-researcher }
+  - { src: pattern-agent-loop,     type: GOVERNS, dst: agents-loops-security-auditor }
+  - { src: tool-tools-memory,      type: USED_BY, dst: agents-loops-doc-researcher }
+  - { src: tool-neo4j-cli,         type: USED_BY, dst: tool-tools-memory }
+  - { src: op-new-loop,            type: ENABLES, dst: agents-module }
+  - { src: op-loop-permission-shape, type: APPLIES, dst: pattern-no-trust-in-prompts }
