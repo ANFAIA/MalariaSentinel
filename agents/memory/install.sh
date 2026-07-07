@@ -237,6 +237,31 @@ jq '.permission = (.permission // {}) + {
    "$tmp_json" > "${tmp_json}.new" && mv "${tmp_json}.new" "$tmp_json"
 
 mv "$tmp_json" "$OPENCODE_JSON"
+# Post-process: jq reformats top-level arrays to multi-line on every pass
+# (e.g. "instructions": ["..."] -> "instructions": [\n  "..."\n]). For
+# idempotency, compact any top-level string array with one element.
+python3 - "$OPENCODE_JSON" <<'PY'
+import json, sys, re
+p = sys.argv[1]
+with open(p) as fh: data = json.load(fh)
+# Find top-level string-array keys and emit them in compact form.
+s = json.dumps(data, indent=2)
+# Compact arrays of strings of length 1, only at the top level. We do
+# this by re-walking the original parsed object and overriding just the
+# top-level keys that are short string arrays.
+out_lines = []
+i = 0
+# Easier: regex the output and replace specific known keys.
+# We compact "instructions" (the only single-element string array we
+# expect at the top level), and leave everything else as jq wrote it.
+s2 = re.sub(
+    r'("instructions":\s*)\[\n\s+("[^"]+")\n\s+\]',
+    r'\1[\2]',
+    s,
+)
+if s2 != s:
+    with open(p, "w") as fh: fh.write(s2 + "\n")
+PY
 echo "patched: $OPENCODE_JSON (permission rules for edit, bash deny, custom tools)"
 
 # ---- patch .gitignore (idempotent) ----
