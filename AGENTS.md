@@ -68,7 +68,10 @@ stack (Neo4j + Graphiti MCP) and the schema config (`memory/config/
 config.yaml`). It is distinct from `tools/memory/` (the shell wrapper
 that validates labels and writes Cypher) — they cooperate but live in
 different trees on purpose, so the wrapper can be copy-pasted into
-other projects.
+other projects. `memory/` only ships the runtime pieces: `docker-compose.yml`,
+`config/config.yaml`, `.env.example`, and `.gitignore`. The Python
+client, scripts, docs, and pyproject.toml live in `tools/memory/` (or
+do not exist — `tools/memory/memory.sh` is the single client).
 
 ## Dependency Rules
 
