@@ -43,7 +43,7 @@
         "read": "allow",
         "glob": "allow",
         "grep": "allow",
-        "bash":{
+        "bash": {
           "*": "deny",
           "gitagents *": "allow"
         }
