@@ -38,7 +38,6 @@
     "supervisor": {
       "description": "Primary orchestrator. Delegates to loops and subagents, isolates edit-work via the gitagent skill. Plan-like baseline.",
       "permission": {
-        "*": "deny",
         "task": "allow",
         "question": "allow",
         "skill": "allow",

@@ -15,7 +15,7 @@
 # paths so `make -C agents/memory/scripts ...` and
 # `cd agents/memory/scripts && make ...` also work.
 
-PROJECT ?= malariasentinel
+PROJECT ?=
 CYPHER  ?=
 
 PROJECT_FILE := $(abspath $(HERE)../.project)

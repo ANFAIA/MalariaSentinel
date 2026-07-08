@@ -82,7 +82,7 @@ relations:
   - { src: pattern-agent-loop,     type: GOVERNS, dst: agents-loops-code-reviewer }
   - { src: pattern-agent-loop,     type: GOVERNS, dst: agents-loops-doc-researcher }
   - { src: pattern-agent-loop,     type: GOVERNS, dst: agents-loops-security-auditor }
-  - { src: tool-tools-memory,      type: USED_BY, dst: agents-loops-doc-researcher }
-  - { src: tool-neo4j-cli,         type: USED_BY, dst: tool-tools-memory }
+  - { src: tool-agents-memory,     type: USED_BY, dst: agents-loops-doc-researcher }
+  - { src: tool-neo4j-cli,         type: USED_BY, dst: tool-agents-memory }
   - { src: op-new-loop,            type: ENABLES, dst: agents-module }
   - { src: op-loop-permission-shape, type: APPLIES, dst: pattern-no-trust-in-prompts }
