@@ -15,6 +15,8 @@
 # paths so `make -C agents/memory/scripts ...` and
 # `cd agents/memory/scripts && make ...` also work.
 
+# --- paths resolved regardless of make's cwd (HERE is set early so PROJECT_FILE below can use it) ---
+HERE := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 PROJECT ?=
 CYPHER  ?=
 
@@ -58,7 +60,6 @@ define require_project
 endef
 
 # Resolve absolute paths regardless of cwd of make.
-HERE := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 PROJECT_ROOT := $(abspath $(HERE)../../..)
 MEMORY_SH := $(HERE)memory.sh
 SEED_SH   := $(HERE)seed.sh
