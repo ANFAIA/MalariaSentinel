@@ -1,6 +1,5 @@
 {
   "$schema": "https://opencode.ai/config.json",
-  "instructions": ["agents/loops/AGENTS.md"],
   "default_agent": "supervisor",
   "permission": {
     "edit": {
@@ -52,6 +51,7 @@
     "test-fixer": {
       "description": "Iterates a check command until it exits 0. Proactive on test failures.",
       "mode": "subagent",
+      "prompt": "{file:agents/loops/test-fixer.md}",
       "permission": {
         "edit": "allow",
         "read": "allow",
@@ -73,6 +73,7 @@
     "code-reviewer": {
       "description": "Reviews code changes against project conventions. Read-only: returns findings, does not modify files.",
       "mode": "subagent",
+      "prompt": "{file:agents/loops/code-reviewer.md}",
       "permission": {
         "edit": "deny",
         "read": "allow",
@@ -91,6 +92,7 @@
     "doc-researcher": {
       "description": "Searches the knowledge base in Neo4j first; web is a fallback. Returns a brief, not raw content.",
       "mode": "subagent",
+      "prompt": "{file:agents/loops/doc-researcher.md}",
       "permission": {
         "edit": "deny",
         "read": "allow",
@@ -105,6 +107,7 @@
     "security-auditor": {
       "description": "OWASP Top 10 audit. Read-only: returns findings list, no file edits or network calls.",
       "mode": "subagent",
+      "prompt": "{file:agents/loops/security-auditor.md}",
       "permission": {
         "edit": "deny",
         "read": "allow",

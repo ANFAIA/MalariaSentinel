@@ -423,8 +423,7 @@ when you are running under another primary.
 
 Specialised loop agents live in `agents/loops/<name>.md` and are
 invoked by the supervisor (the active primary agent) via the `task`
-tool or by the user with `@<name>`. See `agents/loops/AGENTS.md` for
-the common contract every loop follows.
+tool or by the user with `@<name>`. Each subagent's system prompt lives in `agents/loops/<name>.md` and is loaded via the `prompt` field in `opencode.json`.
 
 The current set:
 
