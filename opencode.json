@@ -48,6 +48,73 @@
           "gitagents *": "allow"
         }
       }
+    },
+    "test-fixer": {
+      "description": "Iterates a check command until it exits 0. Proactive on test failures.",
+      "mode": "subagent",
+      "permission": {
+        "edit": "allow",
+        "read": "allow",
+        "grep": "allow",
+        "glob": "allow",
+        "bash": {
+          "*": "ask",
+          "uv run pytest *": "allow",
+          "git diff *": "allow",
+          "git status *": "allow",
+          "git log *": "allow"
+        },
+        "webfetch": "deny",
+        "websearch": "deny",
+        "todowrite": "allow",
+        "question": "allow"
+      }
+    },
+    "code-reviewer": {
+      "description": "Reviews code changes against project conventions. Read-only: returns findings, does not modify files.",
+      "mode": "subagent",
+      "permission": {
+        "edit": "deny",
+        "read": "allow",
+        "grep": "allow",
+        "glob": "allow",
+        "bash": {
+          "*": "ask",
+          "git diff *": "allow",
+          "git log *": "allow"
+        },
+        "webfetch": "ask",
+        "websearch": "deny",
+        "question": "allow"
+      }
+    },
+    "doc-researcher": {
+      "description": "Searches the knowledge base in Neo4j first; web is a fallback. Returns a brief, not raw content.",
+      "mode": "subagent",
+      "permission": {
+        "edit": "deny",
+        "read": "allow",
+        "grep": "allow",
+        "glob": "allow",
+        "bash": "ask",
+        "webfetch": "allow",
+        "websearch": "allow",
+        "question": "allow"
+      }
+    },
+    "security-auditor": {
+      "description": "OWASP Top 10 audit. Read-only: returns findings list, no file edits or network calls.",
+      "mode": "subagent",
+      "permission": {
+        "edit": "deny",
+        "read": "allow",
+        "grep": "allow",
+        "glob": "allow",
+        "bash": "deny",
+        "webfetch": "deny",
+        "websearch": "deny",
+        "question": "allow"
+      }
     }
   }
 }
