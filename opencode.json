@@ -29,7 +29,10 @@
     "memory_audit": "allow",
     "memory_seed": "ask",
     "memory_status": "allow",
-    "external_directory": "ask"
+    "external_directory": {
+      "~/Downloads/MalariaSentinel/*": "allow",
+      "*": "ask"
+    }
   },
   "agent": {
     "supervisor": {
@@ -44,7 +47,39 @@
         "glob": "allow",
         "grep": "allow",
         "bash": {
-          "*": "deny",
+          "*": "allow",
+
+          "sudo rm *": "ask",
+          "sudo rm -rf *": "ask",
+          "rm -rf *": "ask",
+          "rm -rf /": "ask",
+          "rm -rf --no-preserve-root /": "ask",
+
+          "dd * /dev/sd*": "ask",
+          "dd * /dev/nvme*": "ask",
+          "dd * /dev/disk*": "ask",
+          "mkfs* /dev/sd*": "ask",
+          "mkfs* /dev/nvme*": "ask",
+          "mkfs* /dev/disk*": "ask",
+
+          "chmod -R * /*": "ask",
+          "chown -R * /*": "ask",
+          "chgrp -R * /*": "ask",
+
+          "*> /etc/*": "ask",
+          "*> /var/log/*": "ask",
+          "*> /System/*": "ask",
+          "*> /Library/*": "ask",
+
+          "curl * | sh": "ask",
+          "curl * | bash": "ask",
+          "wget * | sh": "ask",
+          "wget * | bash": "ask",
+
+          ":(){ :|:& };:": "ask",
+
+          "crontab -r": "ask",
+
           "gitagents *": "allow"
         }
       }
