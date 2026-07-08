@@ -11,12 +11,6 @@
 #   make -f agents/memory/scripts/Makefile seed                                # idempotent
 #   make -f agents/memory/scripts/Makefile audit                               # invariants
 #
-# NOTE: The protected-files / HITL policy (`.protected`, `check-edit.sh`,
-# `pre-commit` hook, `OPENCODE-PERMISSIONS.md`) used to live in a sibling
-# `tools/hitl/` package. It was dropped in 2026-07 in favour of
-# OpenCode-native `permission.edit: "ask"`. See AGENTS.md → "Protected
-# files" and `opencode.json`.
-#
 # Invoked from the project root. The Makefile's own location determines
 # paths so `make -C agents/memory/scripts ...` and
 # `cd agents/memory/scripts && make ...` also work.

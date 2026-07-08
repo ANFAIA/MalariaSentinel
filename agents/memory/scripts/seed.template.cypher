@@ -32,22 +32,6 @@ MERGE (n:Entity:Investigation {uuid: 'inv-malariasentinel', group_id: 'malariase
                 n.summary = 'Build a malaria Sentinel / SDSS...',
                 n.status = 'open';
 
-// Pitfalls
-MERGE (n:Entity:Pitfall {uuid: 'pitfall-supermemory-deprecated', group_id: 'malariasentinel'})
-  ON CREATE SET n.name = 'PITFALL-supermemory-deprecated',
-                n.summary = 'The supermemory tool is a generic system template...',
-                n.created_at = datetime()
-  ON MATCH  SET n.name = 'PITFALL-supermemory-deprecated',
-                n.summary = 'The supermemory tool is a generic system template...';
-
-// Preferences
-MERGE (n:Entity:Preference {uuid: 'pref-supermemory-globally-deprecated', group_id: 'malariasentinel'})
-  ON CREATE SET n.name = 'PREF-supermemory-globally-deprecated',
-                n.summary = 'User preference: supermemory is descatalogated...',
-                n.created_at = datetime()
-  ON MATCH  SET n.name = 'PREF-supermemory-globally-deprecated',
-                n.summary = 'User preference: supermemory is descatalogated...';
-
 // Architecture
 MERGE (n:Entity:Architecture {uuid: 'arch-forbidden-tools', group_id: 'malariasentinel'})
   ON CREATE SET n.name = 'FORBIDDEN TOOLS section',

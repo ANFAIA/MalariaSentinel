@@ -70,9 +70,4 @@ tools) into the project's `.agents/skills/` and `.opencode/tools/`,
 and patches `opencode.json` and `.gitignore` idempotently. The
 `uninstall.sh` script reverses the install.
 
-`tools/hitl/` was removed in 2026-07 in favour of OpenCode-native
-`permission.edit`. The earlier design (with `tools/memory/` and `memory/` at the
-project root) was project-agnostic but split across two trees. The
-consolidated form under `agents/memory/` is the same idea — copy-
-pasteable to other repos — but with a single installer, a single
-file-protect scheme, and a single entry point for the agent.
+

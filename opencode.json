@@ -6,7 +6,8 @@
       "AGENTS.md": "ask",
       ".gitignore": "ask",
       "opencode.json": "ask",
-      "agents/memory/.project": "ask"
+      "agents/memory/.project": "ask",
+      "data/": "ask"
     },
     "bash": {
       "*": "allow",
@@ -62,7 +63,11 @@
           "uv run pytest *": "allow",
           "git diff *": "allow",
           "git status *": "allow",
-          "git log *": "allow"
+          "git log *": "allow",
+          "make -f agents/memory/scripts/Makefile wipe *": "deny",
+          "make -f agents/memory/scripts/Makefile set-project *": "deny",
+          "*make*wipe*": "deny",
+          "*make*set-project*": "deny"
         },
         "webfetch": "deny",
         "websearch": "deny",
@@ -82,7 +87,11 @@
         "bash": {
           "*": "ask",
           "git diff *": "allow",
-          "git log *": "allow"
+          "git log *": "allow",
+          "make -f agents/memory/scripts/Makefile wipe *": "deny",
+          "make -f agents/memory/scripts/Makefile set-project *": "deny",
+          "*make*wipe*": "deny",
+          "*make*set-project*": "deny"
         },
         "webfetch": "ask",
         "websearch": "deny",
@@ -98,7 +107,13 @@
         "read": "allow",
         "grep": "allow",
         "glob": "allow",
-        "bash": "ask",
+        "bash": {
+          "*": "ask",
+          "make -f agents/memory/scripts/Makefile wipe *": "deny",
+          "make -f agents/memory/scripts/Makefile set-project *": "deny",
+          "*make*wipe*": "deny",
+          "*make*set-project*": "deny"
+        },
         "webfetch": "allow",
         "websearch": "allow",
         "question": "allow"

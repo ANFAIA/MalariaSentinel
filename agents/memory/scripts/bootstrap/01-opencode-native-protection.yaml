@@ -1,6 +1,5 @@
 # agents/memory/scripts/bootstrap/01-opencode-native-protection.yaml
-# Architecture decision: drop tools/hitl/ in favour of opencode-native
-# permission.edit: "ask". Recorded 2026-07-07.
+# Architecture decision: opencode-native file protection (recorded 2026-07-07).
 
 project: MalariaSentinel
 group_id: malariasentinel
@@ -14,11 +13,8 @@ architectures:
       opencode.json, agents/memory/.project) are protected by OpenCode's
       permission.edit: "ask" block in opencode.json. Every attempt to
       edit one of them prompts the user, no exceptions, no allowances.
-      The previous tools/hitl/ subsystem (with its own .protected list,
-      .protected-allowances, pre-commit hook, and Makefile-driven
-      check) was dropped in 2026-07 because it duplicated what OpenCode
-      already does in one place and added three enforcement layers
-      where one suffices. The small bash deny list
+      No parallel file-protection subsystem; everything lives in
+      `opencode.json` under `permission.edit` and `permission.bash`. The small bash deny list
       (make -f agents/memory/scripts/Makefile {wipe,set-project}) is
       kept as defence against typos, not as file protection.
 
@@ -37,8 +33,8 @@ pitfalls:
   - uuid: pitfall-do-not-rewrite-opencode-protection
     name: PITFALL-do-not-rewrite-opencode-protection
     summary: |
-      Do not reintroduce a tools/hitl/ subsystem or a Makefile-driven
-      protected-check. The whole point of the 2026-07 simplification
+      Do not reintroduce a parallel file-protection subsystem. Extend
+      `permission.edit` or `permission.bash` in `opencode.json`. The whole point of the 2026-07 simplification
       was to collapse three enforcement layers (agent-level, git hook,
       opencode deny) into one (opencode ask). If a new requirement
       appears, extend permission.edit or permission.bash in
