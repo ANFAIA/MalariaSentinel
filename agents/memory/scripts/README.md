@@ -32,6 +32,52 @@ A thin shell wrapper around `neo4j-cli` (v1.10+) that:
 - Runs the three schema invariants on demand via `memory.sh audit` and
   after every `seed.sh` call.
 
+## Architecture in 3 layers
+
+The memory module is organised as three layers; this README documents
+the middle one (the wrapper). The other two are documented in their own
+places (the LLM-facing tools and skill in `../opencode-stubs/`, the
+storage in `../runtime/`).
+
+```
+┌──────────────────────────────────────────────────────────┐
+│ Layer 3: AGENT INTERFACE                                 │
+│   - 7 custom tools TypeScript  (../opencode-stubs/tools/)│
+│   - 1 skill project-memory     (../opencode-stubs/skills/)│
+│   - MCP graphiti-memory (search_nodes, add_memory text)  │
+└──────────────────────────────────────────────────────────┘
+                │ typed args (Zod-validated)
+                ▼
+┌──────────────────────────────────────────────────────────┐
+│ Layer 2: WRAPPER SHELL  (this directory)                 │
+│   - memory.sh: dispatcher (schema|node|rel|query|seed|  │
+│                              audit|status|bootstrap)    │
+│   - add-node.sh / add-rel.sh: one validated write each   │
+│   - seed.sh / bootstrap-apply.sh: bulk apply             │
+│   - audit.sh: 3 invariants                               │
+│   - schema.sh: parse schema yaml + cache                 │
+│   - session-start.sh / session-end.sh                    │
+│   - lib/project.sh: resolve group_id                     │
+│   - lib/parse-yaml.py: minimal yaml parser               │
+└──────────────────────────────────────────────────────────┘
+                │ parameterised Cypher (--param, no interpolation)
+                ▼
+┌──────────────────────────────────────────────────────────┐
+│ Layer 1: STORAGE  (../runtime/)                          │
+│   - Neo4j 5.26 (docker-compose.yml, :7474 + :7687)       │
+│   - Graphiti MCP (HTTP :8000, for semantic search)        │
+│   - config/config.yaml: the 8-label schema               │
+│   - .env: credentials (gitignored)                       │
+└──────────────────────────────────────────────────────────┘
+```
+
+The wrapper validates every label against the schema before issuing
+Cypher, and never interpolates user input into the query string — every
+value goes through `neo4j-cli --param`. That is the only reason a
+custom wrapper is worth its weight; without that discipline, an
+agent could write whatever shape it wanted and the schema invariant
+"no `Entity`-only node" would eventually fail.
+
 ## Project resolution (`.project`)
 
 The project name (Neo4j `group_id`) lives in `agents/memory/scripts/.project` —

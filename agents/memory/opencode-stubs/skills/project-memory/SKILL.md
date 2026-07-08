@@ -34,26 +34,19 @@ of 8 labels. This skill tells you when to use which path.
 | `Operational` | A practical fix or command pattern that saves time. |
 | `Preference` | A team preference (naming, commit policy, never-do rules). |
 
-## Decision tree: which path to use
+## Decision table: which path to use
 
-```
-Need to remember a typed fact (one of the 8 labels)?
-  └─ YES → memory_node (one tool call)
-            if it points to another node: memory_rel
-Need to look up a typed fact by uuid or cypher?
-  └─ YES → memory_query
-Need fuzzy semantic recall ("what do we know about X?")?
-  └─ YES → mcp__graphiti-memory__search_nodes
-Need to record a session summary or free-form observation?
-  └─ YES → mcp__graphiti-memory__add_memory  (source MUST be "text")
-Need to verify the graph is consistent?
-  └─ YES → memory_audit
-Need to check the stack is up?
-  └─ YES → memory_status
-Not sure if the memory module is wired up in this project?
-  └─ YES → memory_init  (read-only install-state check; pass verbose=true
-            to also probe the docker stack)
-```
+| If you need to... | Use |
+|---|---|
+| Check if the memory module is wired up in this project | `memory_init` (read-only; pass `verbose=true` to also probe the docker stack) |
+| Record a typed fact (one of the 8 labels) | `memory_node({ type, uuid, name, summary, path? })` |
+| Connect two nodes | `memory_rel({ type, src, dst, props? })` |
+| Look up by uuid or known-shape cypher | `memory_query({ cypher, rw? })` |
+| Fuzzy recall ("what do we know about X?") | `mcp__graphiti-memory__search_nodes({ query })` |
+| Record a session summary or free-form observation | `mcp__graphiti-memory__add_memory({ name, episode_body })` with `source: "text"` (MUST be "text") |
+| Verify the graph is consistent (3 invariants) | `memory_audit({})` |
+| Check stack health (docker + neo4j-cli + graphiti) | `memory_status({})` |
+| Re-apply the seed yaml | `memory_seed({ project? })` |
 
 ## The custom tools (typed args, no shell escape)
 
@@ -189,3 +182,20 @@ All three should be 0. Any non-zero is a `Pitfall` worth recording
 - `agents/memory/bootstrap/*.yaml` — pre-configured knowledge that
   every session re-asserts (architecture decisions, conventions,
   the agents layer, the protection model).
+
+## What this module does NOT do
+
+- **No automatic RAG.** The agent decides when to query. The cost of
+  `memory_query` / `search_nodes` is paid only when you call it.
+- **No automatic entity extraction.** Every typed write takes explicit
+  args from the agent. There is no LLM in the write path that re-classifies
+  your input. The 2026-07-04 wipe (261 mis-labelled nodes) was caused
+  by the Graphiti MCP extractor re-classifying text from `add_memory
+  source: "json"`. Never use that path. Use `memory_node` + `memory_rel`
+  for anything with a structural class.
+- **No multi-user.** `group_id` is per-checkout (one `.project` per
+  repo). Multi-user collaboration would need an additional `user_id`
+  discriminator on every node — not currently supported.
+- **No code index.** Use Component nodes for packages / significant
+  files, not for every line. The graph is for project facts, not for
+  grep.

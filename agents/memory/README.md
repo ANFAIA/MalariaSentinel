@@ -160,6 +160,15 @@ MCP server** (in the `runtime/` docker stack):
 **conceptual skill** (`project-memory`) loads on demand and tells the
 agent when to use which path.
 
+## Multi-tenancy
+
+Every node and relation written to Neo4j carries a `group_id` set from
+`agents/memory/.project` (one line, the project's slug). A single Neo4j
+instance can therefore host several projects without mixing their data —
+each project writes to its own `group_id` partition. To switch project,
+change `agents/memory/.project` (or pass `PROJECT=...` on a single
+command) and re-run the seed. The schema is shared; the data is not.
+
 ## Why install via the wrapper, not via `mcp__add_memory`
 
 `mcp__graphiti-memory__add_memory` with `source: "json"` accepts a
@@ -199,6 +208,32 @@ graphiti-mcp`).
    references after a partial wipe.
 3. **No label outside the schema.** Every label is in
    `runtime/config/config.yaml`. Catches typos in ad-hoc Cypher.
+
+## What this module does NOT do
+
+To set expectations clearly — the agents/memory module is a typed,
+validated write-path to a knowledge graph. It is deliberately NOT:
+
+- **Not an automatic RAG pipeline.** The LLM decides when to query
+  (`memory_query` or `mcp__graphiti-memory__search_nodes`). No retrieval
+  is triggered on every turn; the cost is paid only when the agent asks.
+- **Not an automatic entity extractor.** Every typed write takes explicit
+  args (`type`, `uuid`, `name`, `summary`) from the agent. There is no
+  LLM in the write path that re-classifies your input. The 2026-07-04
+  wipe (261 mis-labelled nodes) was caused by letting the Graphiti MCP
+  extractor classify text — never use `mcp__graphiti-memory__add_memory`
+  with `source: "json"`.
+- **Not multi-user.** `.project` is per-checkout. Multi-user
+  collaboration inside one checkout would need a `n.user_id` field on
+  top of `group_id` — not currently supported.
+- **Not a replacement for `AGENTS.md`.** `AGENTS.md` is procedural how-to
+  that enters every session; the knowledge graph holds project-specific
+  facts that the agent queries just-in-time. The two are complementary,
+  not substitutes.
+- **Not a source-code index.** Use it for components at the package
+  level (`mal-core/`, `mal-ghana-sim/`, etc.), not for every file or
+  function. The graph gets unreadable if you treat it as a code search
+  engine.
 
 ## Uninstalling
 

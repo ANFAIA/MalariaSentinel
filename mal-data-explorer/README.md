@@ -7,7 +7,7 @@ Anopheles dataset visualization, mapping, and bias analysis scripts.
 | # | Script | Description |
 |---|--------|-------------|
 | 01 | `01_dataset_metadata.py` | Metadata audit of Anopheles GBIF dataset (GUF) |
-| 02 | `02_map_anopheles_guf.py` | Map of Anopheles occurrences in Guayana Francesa + Amapá |
+| 02 | `02_map_anopheles_guf.py` | Map of Anopheles occurrences in French Guiana + Amapá |
 | 03 | `03_map_ghana.py` | Map of Ghana IDIT larval sites |
 | 04 | `04_map_colombia.py` | Map of Colombia VectorLink (PMI) sites |
 | 05 | `05_map_react.py` | Map of REACT (IRD) Burkina Faso + Côte d'Ivoire |
