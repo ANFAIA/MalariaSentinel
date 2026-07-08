@@ -14,7 +14,11 @@
       "make -f agents/memory/scripts/Makefile wipe *": "deny",
       "make -f agents/memory/scripts/Makefile set-project *": "deny",
       "*make*wipe*": "deny",
-      "*make*set-project*": "deny"
+      "*make*set-project*": "deny",
+      "rm *": "ask",
+      "rmdir *": "ask",
+      "git push *": "ask",
+      "git checkout *": "ask"
     },
     "webfetch": "allow",
     "todowrite": "allow",
@@ -24,22 +28,26 @@
     "memory_query": "allow",
     "memory_audit": "allow",
     "memory_seed": "ask",
-    "memory_status": "allow"
+    "memory_status": "allow",
+    "external_directory": "ask"
   },
   "agent": {
-    "build": {
+    "supervisor": {
+      "description": "Primary orchestrator. Delegates to loops and subagents, isolates edit-work via the gitagent skill. Plan-like baseline.",
       "permission": {
-        "task": {
-          "*": "ask",
-          "test-fixer": "allow",
-          "code-reviewer": "ask",
-          "doc-researcher": "ask",
-          "security-auditor": "ask"
+        "*": "deny",
+        "task": "allow",
+        "question": "allow",
+        "skill": "allow",
+        "todowrite": "allow",
+        "read": "allow",
+        "glob": "allow",
+        "grep": "allow",
+        "bash":{
+          "*": "deny",
+          "gitagents *": "allow"
         }
       }
-    },
-    "supervisor": {
-      "description": "Primary orchestrator. Delegates to loops and subagents, isolates edit-work via the gitagent skill. Plan-like baseline; project conventions live in AGENTS.md."
     }
   }
 }
