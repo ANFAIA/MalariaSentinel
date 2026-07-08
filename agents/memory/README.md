@@ -11,9 +11,9 @@ project and wired up by `install.sh`.
   schema-checks every label before any Cypher runs. Avoids the
   Graphiti-MCP `add_memory json` footgun that re-classifies text into
   mislabelled nodes.
-- **Six native custom tools** (memory_node, memory_rel, memory_query,
-  memory_audit, memory_seed, memory_status) that the LLM can call
-  directly — no shell-escaping the agent has to remember.
+- **Seven native custom tools** (memory_node, memory_rel, memory_query,
+  memory_audit, memory_seed, memory_status, memory_init) that the LLM
+  can call directly — no shell-escaping the agent has to remember.
 - **One conceptual skill** (`project-memory`) the agent loads on
   demand to know the schema, the write/read split, the session
   lifecycle, and the "do not use" rules.
@@ -59,6 +59,50 @@ The installer wires up:
 - `opencode.json` (new permission rules, idempotent)
 - `.gitignore` (new ignore patterns, idempotent)
 
+## For agents: discover me
+
+If you are an agent landing in a project that contains `agents/memory/`
+and you want to know whether the module is wired up, call the
+`memory_init` tool (after a restart if it isn't in your toolset yet).
+It returns a JSON report — read-only, no files modified, no Cypher run:
+
+```json
+{
+  "project_root": "/abs/path/to/project",
+  "project_slug": "myproject" | null,
+  "checks": [
+    { "name": ".project",                                 "ok": true,  "detail": "slug='myproject'" },
+    { "name": "opencode tool: memory_node.ts",            "ok": true,  "detail": "installed" },
+    { "name": "opencode tool: memory_init.ts",            "ok": true,  "detail": "installed" },
+    { "name": "skill: project-memory",                    "ok": true,  "detail": "installed" },
+    { "name": "runtime .env",                             "ok": true,  "detail": "present" },
+    { "name": "opencode.json perms",                      "ok": true,  "detail": "edit(.project)=ok, bash-deny=ok, memory-tools=ok" }
+  ],
+  "next_step": "Memory module is fully wired up. ...",
+  "ready": true
+}
+```
+
+- If `ready` is `true`, follow `next_step` and start using the other six
+  tools.
+- If `ready` is `false`, follow `next_step`. Typical fix:
+  `bash agents/memory/install.sh` (the installer is idempotent).
+- Pass `verbose=true` to also probe the docker stack (slower — runs
+  `memory.sh status` under the hood).
+
+If `memory_init` is not in your toolset, the project has the module as
+source (`agents/memory/opencode-stubs/tools/`) but the stubs were never
+copied to `.opencode/tools/`. Re-run the installer: it's idempotent and
+the tool-copy loop is a `*.ts` glob, so it picks up new tools on the
+next pass. If the installer is not available, the install steps are
+documented above in "Quick start (in another project)".
+
+If you are an agent in a different harness (not OpenCode) and
+`memory_init` is not available, the source TypeScript at
+`agents/memory/opencode-stubs/tools/memory_init.ts` shows exactly what
+to check — it is a single file with a `Check` / `Report` shape, no
+harness-specific APIs.
+
 ## Layout
 
 ```
@@ -74,6 +118,7 @@ agents/memory/
     tools/memory_audit.ts
     tools/memory_seed.ts
     tools/memory_status.ts
+    tools/memory_init.ts
   runtime/                      docker stack (Neo4j + Graphiti MCP)
     docker-compose.yml
     .env.example
@@ -101,15 +146,19 @@ agents/memory/
 
 The agent uses the **custom tools** for typed writes (memory_node,
 memory_rel) and reads (memory_query, memory_audit, memory_status,
-memory_seed) — these are native LLM-callable functions with Zod-typed
-args. Behind the scenes each tool delegates to a shell script in
-`scripts/`, which validates the label against `runtime/config/config.yaml`
-and runs parameterised Cypher via `neo4j-cli`. Semantic recall and
-free-form text episodes go through the **Graphiti MCP server** (in the
-`runtime/` docker stack): `mcp__graphiti-memory__search_nodes`,
-`mcp__graphiti-memory__search_facts`, `mcp__graphiti-memory__add_memory`
-with `source: "text"`. The **conceptual skill** (`project-memory`)
-loads on demand and tells the agent when to use which path.
+memory_seed, memory_init) — these are native LLM-callable functions
+with Zod-typed args. Behind the scenes the six write/read tools
+delegate to a shell script in `scripts/`, which validates the label
+against `runtime/config/config.yaml` and runs parameterised Cypher
+via `neo4j-cli`. `memory_init` is the odd one out: it stays in
+TypeScript, runs no Cypher, and just inspects files (and optionally
+probes the docker stack) to tell you whether the module is wired up.
+Semantic recall and free-form text episodes go through the **Graphiti
+MCP server** (in the `runtime/` docker stack):
+`mcp__graphiti-memory__search_nodes`, `mcp__graphiti-memory__search_facts`,
+`mcp__graphiti-memory__add_memory` with `source: "text"`. The
+**conceptual skill** (`project-memory`) loads on demand and tells the
+agent when to use which path.
 
 ## Why install via the wrapper, not via `mcp__add_memory`
 

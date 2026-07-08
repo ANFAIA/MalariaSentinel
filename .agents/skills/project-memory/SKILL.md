@@ -1,6 +1,6 @@
 ---
 name: project-memory
-description: Operate the project knowledge graph (Neo4j via the agents/memory module). Use when the user says "remember this", "log a pitfall", "note this pattern", "find what's been said about X", "audit the graph", or any task that should create/read a typed node, relation, or free-form episode in the project's memory subsystem. The eight schema labels are Component, Investigation, Architecture, Pattern, Pitfall, Tool, Operational, Preference. Use the custom tools memory_node / memory_rel / memory_query / memory_audit for typed writes and reads; use mcp__graphiti-memory__search_nodes for fuzzy semantic recall; use mcp__graphiti-memory__add_memory with source "text" only for free-form session summaries. Never use mcp__graphiti-memory__add_memory with source "json" or the add_triplet tool.
+description: Operate the project knowledge graph (Neo4j via the agents/memory module). Use when the user says "remember this", "log a pitfall", "note this pattern", "find what's been said about X", "audit the graph", or any task that should create/read a typed node, relation, or free-form episode in the project's memory subsystem. The eight schema labels are Component, Investigation, Architecture, Pattern, Pitfall, Tool, Operational, Preference. Use the custom tools memory_node / memory_rel / memory_query / memory_audit / memory_seed / memory_status for typed writes, reads, and stack checks; use memory_init first to verify the module is wired up in the current project; use mcp__graphiti-memory__search_nodes for fuzzy semantic recall; use mcp__graphiti-memory__add_memory with source "text" only for free-form session summaries. Never use mcp__graphiti-memory__add_memory with source "json" or the add_triplet tool.
 ---
 
 # Project Memory
@@ -50,14 +50,27 @@ Need to verify the graph is consistent?
   └─ YES → memory_audit
 Need to check the stack is up?
   └─ YES → memory_status
+Not sure if the memory module is wired up in this project?
+  └─ YES → memory_init  (read-only install-state check; pass verbose=true
+            to also probe the docker stack)
 ```
 
 ## The custom tools (typed args, no shell escape)
 
-All six are Zod-validated. They delegate to shell scripts in
+All seven are Zod-validated. Six delegate to shell scripts in
 `agents/memory/scripts/` which validate labels against the schema
-before any Cypher runs.
+before any Cypher runs. The seventh (`memory_init`) is read-only and
+stays in TypeScript — it only inspects files and (optionally) the
+status script.
 
+- `memory_init({ verbose? })`
+  Read-only install-state check. Returns a JSON report with what is
+  in place (project slug, all six other tools, the skill, the runtime
+  `.env`, the `opencode.json` permission rules) and the recommended
+  next step. Pass `verbose=true` to also probe the docker stack. Use
+  this first when you land in a project that has `agents/memory/`
+  but you don't know if it's wired up. The result is a JSON string
+  the agent can parse.
 - `memory_node({ type, uuid, name, summary, path? })`
   Create or update one typed node. `type` is the label (must be one of
   the 8). `uuid` is your stable id (use a kebab-case slug like

@@ -4,13 +4,14 @@
 
 ## What this project is
 
-MalariaSentinel: a malaria Sentinel / Decision Support System (SDSS).
-Uses spread simulations, U-Net surrogates, and dataset visualisation
-to model and predict malaria risk in target regions.
+**MalariaSentinel is a malaria Sentinel / Decision Support System (SDSS) for malaria elimination.** It is the "Centinela" — a framework that ingests spatial and epidemiological data, models transmission risk, and surfaces actionable insights to support elimination programmes in target regions.
 
-- **Stack**: Python (uv workspace), Neo4j + Graphiti MCP for the knowledge graph.
-- **Layout**: monorepo with 5 packages plus `agents/`, `data/`, `papers/`, `terrain/`, `runs/`.
+**The reference framework is the SDSS for malaria elimination proposed by Kelly et al. (2012)** — see `papers/spatial-analysis/MalariaEliminationWithSpatialDecisionSupportSystems.md`. That paper argues for a spatial decision support framework that integrates surveillance, targeted interventions, and service delivery in endemic settings. The Centinela is the engineering realisation of that framework, parameterised for specific regions (Ghana being the first working case).
+
+- **Stack**: Python (uv workspace), Neo4j + Graphiti MCP for the project knowledge graph.
+- **Layout**: monorepo with 5 packages (see "Monorepo layout" below).
 - **Runtime**: OpenCode is the agent harness. Configuration lives in `opencode.json` at the project root.
+- **Why a knowledge graph**: the SDSS decision pipeline accumulates components, investigations, patterns, pitfalls, and architecture decisions across sessions. A typed graph (queried just-in-time) is a better fit than a single growing `AGENTS.md` — see "Where knowledge lives".
 
 ## How to build, test, run
 
@@ -55,6 +56,43 @@ make -f agents/memory/scripts/Makefile session-end
 
 **Naming**: branches/PRs use `common/`, `core/`, `exec/`, `sim/`, `data/`, `docs/`. Python modules use `mal_commonlib.*`, `mal_core.*`, `mal_cli.*`, `mal_ghana_sim.*`.
 
+## Experiments vs core
+
+The monorepo separates **production code** (the Centinela) from **experiments** (proof-of-concept work that informs the Centinela's design). This separation is structural, not aspirational — promotion is one-way and explicit.
+
+| Tier | Packages | Purpose | Promotion? |
+|---|---|---|---|
+| **Core (the Centinela)** | `mal-commonlib/`, `mal-core/`, `mal-execution/` | Stable, reusable code that makes up the SDSS. `mal-core` is empty at the start of the project and is populated by promoting stable parts from experiments. `mal-execution` holds CLI scripts that call into `mal-core` and `mal-commonlib`. | Receives code from experiments. |
+| **Experiments** | `mal-ghana-sim/`, `mal-data-explorer/` | Hypothesis-driven, replaceable work that explores one approach to one piece of the SDSS. `mal-ghana-sim` is a Ghana spread simulation + U-Net surrogate. `mal-data-explorer` is a dataset visualisation + bias-analysis sandbox. Both depend on `mal-commonlib` but NOT on each other and NOT on `mal-core`. | Each experiment either dies (gets archived) or **promotes** parts of itself into `mal-core` or `mal-commonlib` (see "Promotion flow" below). |
+| **Infrastructure** | `agents/`, `data/`, `papers/`, `terrain/`, `runs/` | Not part of the Centinela's runtime. The agent infrastructure (`agents/`), input data, research papers, terrain, and experiment outputs. | Never promoted. |
+
+**The `mal-core` directory is the goal of the project.** Every stable function in the Centinela should eventually live there or in `mal-commonlib`. Experiments exist to discover what should go into core, and to be deleted once their insight has been promoted.
+
+**Naming tells you which tier a package is in**:
+- `mal-core`, `mal-commonlib`, `mal-execution` → core tier.
+- `mal-<topic>-sim`, `mal-<topic>-explorer` → experiment tier. New experiments follow this pattern.
+
+## Promotion flow
+
+Promotion moves stable, useful code from an experiment into the core tier. It is one-way (no demotion) and explicit (no auto-promotion).
+
+1. **Verify the experiment works end-to-end** on real data. Tests pass, results are reproducible.
+2. **Identify the stable parts** — functions, classes, modules that are not specific to the experiment's hypothesis and would be useful in the next experiment or in the Centinela.
+3. **Refactor** those parts into the right home in `mal-core/` or `mal-commonlib/`. Add unit tests. Update any `pyproject.toml` deps.
+4. **Delete the original code** from the experiment package. Leave a one-line comment pointing to the new location.
+5. **Update `mal-execution/`** scripts to use the promoted module. The experiment may keep a thin wrapper for its own use, but the canonical implementation lives in core.
+
+**Decision table: what goes where when promoting?**
+
+| Stable code from experiment | Lives in |
+|---|---|
+| Configuration, paths, data utilities (no domain logic) | `mal-commonlib/` |
+| Pipeline logic (a complete, reusable piece of the Centinela) | `mal-core/` |
+| A CLI script that orchestrates the pipeline | `mal-execution/scripts/` |
+| A new schema label or domain entity in the knowledge graph | `agents/memory/runtime/config/config.yaml` (after a `pitfall-` recording explains why) |
+
+**When NOT to promote**: code that is tied to the experiment's specific hypothesis (e.g., Ghana-specific terrain processing that won't generalise to another region), code that is exploratory (changes too fast to be "stable"), code that has no tests.
+
 ## Important tools (use these)
 
 | Tool | Use it for | Notes |
@@ -68,6 +106,7 @@ make -f agents/memory/scripts/Makefile session-end
 | `skill` | Loading a specialised skill on demand. | E.g. `project-memory` for the knowledge graph manual. |
 | `todowrite` | Tracking multi-step work. | One list; exactly one item `in_progress` at a time. |
 | `question` | Asking the user when you need a decision. | Don't guess on irreversible choices. |
+| `gitagent` (CLI, via bash) | Multi-agent git isolation: spawn worktrees, propose patches, integrate, finalize. | The supervisor pattern. Subagents do all their edits in isolated worktrees; the supervisor accepts and integrates. Never push with `git push --force` — use `git ps`. |
 | `memory_node`, `memory_rel`, `memory_query`, `memory_audit`, `memory_status`, `memory_seed` | Knowledge graph reads and writes. | All validate labels against the schema before any write. |
 
 ## Protected files (opencode-native `permission.edit: "ask"`)
@@ -97,6 +136,7 @@ make -f agents/memory/scripts/Makefile session-end
 | `memory_query` / `memory_audit` / `memory_status` | Reads and invariants. |
 | `mcp__graphiti-memory__add_memory` with `source: "json"` | **Forbidden.** The LLM extractor in MCP 1.26.0 ignores `type` and re-classifies from text, producing mis-labelled graphs (verified 2026-07-04: 261-node / 411-rel wipe). |
 | `mcp__graphiti-memory__add_triplet` | **Not available in MCP 1.26.0.** Use `memory_node` + `memory_rel`. |
+| `memory_init` (custom tool) | Check the memory module's installation state. Returns: which files are in place, whether Neo4j is up, what the next step is. Call this when you land in a project that may or may not have the memory module wired up. | Lives at `agents/memory/opencode-stubs/tools/memory_init.ts`; installed copy at `.opencode/tools/memory_init.ts`. |
 
 **Schema (8 labels, validated on every write)**: `Component`, `Investigation`, `Architecture`, `Pattern`, `Pitfall`, `Tool`, `Operational`, `Preference`. The full manual — schema details, 3 invariants, session lifecycle, recall-before-write rule — is in the `project-memory` skill: `skill({ name: "project-memory" })` on demand.
 
@@ -122,8 +162,11 @@ make -f agents/memory/scripts/Makefile session-end
 
 | If you want to… | Do this | Not this |
 |---|---|---|
-| Add a stable helper | Put it in `mal-commonlib/`. | Don't put it in `mal-ghana-sim/` (research) or `mal-core/` if it's not stable yet. |
+| Add a stable helper (reusable, no domain) | Put it in `mal-commonlib/`. | Don't put it in `mal-ghana-sim/` (experiment) or `mal-core/` if it's not stable yet. |
 | Add a CLI script | Put it in `mal-execution/scripts/`. | Don't put a batch job in `mal-core/` (core is library, not scripts). |
+| Run a Ghana-specific experiment | Put it in `mal-ghana-sim/scripts/`. | Don't run it inline in `mal-execution/`; that tier is for production. |
+| Run a dataset visualisation / bias analysis | Put it in `mal-data-explorer/`. | Don't put it in `mal-core/`; that's for reusable pipeline logic. |
+| Promote stable code from an experiment to core | Follow the "Promotion flow" above. | Don't copy-and-tweak — refactor + tests + delete the original. |
 | Record a project fact | Use `memory_node` / `memory_rel`. | Don't paste it into `AGENTS.md` (one-off facts bloat the file). |
 | Recall a fact from last session | Use `memory_query` or `mcp__graphiti-memory__search_nodes`. | Don't re-read source files hoping to find it. |
 | Ask a one-off question | Use the `question` tool. | Don't guess on irreversible choices. |
