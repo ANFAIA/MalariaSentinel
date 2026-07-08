@@ -105,11 +105,6 @@
     "security-auditor": {
       "description": "OWASP Top 10 audit. Read-only: returns findings list, no file edits or network calls.",
       "mode": "subagent",
-      "model": {
-        "modelID": "claude-sonnet-4-20250514",
-        "providerID": "anthropic"
-      },
-      "temperature": 0.1,
       "permission": {
         "edit": "deny",
         "read": "allow",
