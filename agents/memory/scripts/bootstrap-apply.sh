@@ -92,6 +92,7 @@ merge_section() {
   local section="$1"
   : > "$MERGED/$section"
   for d in "$RUN"/*/; do
+    [ "$(basename "$d")" = "merged" ] && continue
     [ -f "$d/$section" ] || continue
     cat "$d/$section" >> "$MERGED/$section"
   done
