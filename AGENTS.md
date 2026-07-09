@@ -106,7 +106,7 @@ Promotion moves stable, useful code from an experiment into the core tier. It is
 | `skill` | Loading a specialised skill on demand. | E.g. `project-memory` for the knowledge graph manual. |
 | `todowrite` | Tracking multi-step work. | One list; exactly one item `in_progress` at a time. |
 | `question` | Asking the user when you need a decision. | Don't guess on irreversible choices. |
-| `gitagent` (CLI, via bash) | Multi-agent git isolation: spawn worktrees, propose patches, integrate, finalize. | The supervisor pattern. Subagents do all their edits in isolated worktrees; the supervisor accepts and integrates. Never push with `git push --force` — use `git ps`. |
+| `gitagent` (CLI, via bash) | Multi-agent git isolation: spawn worktrees, propose patches, integrate, finalize. | The supervisor pattern. Subagents do all their edits in isolated worktrees; the supervisor accepts and integrates. Never push with `git push --force` — use `git ps`. When delegating edits to any subagent, include in the brief: `Load the gitagent skill via skill({name: "gitagent"})` so it understands the propose workflow. |
 | `memory_node`, `memory_rel`, `memory_query`, `memory_audit`, `memory_status`, `memory_seed` | Knowledge graph reads and writes. | All validate labels against the schema before any write. |
 
 ## Protected files (opencode-native `permission.edit: "ask"`)

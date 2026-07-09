@@ -34,8 +34,9 @@ export default tool({
       "agents/memory/scripts/memory.sh",
     )
 
-    const rwFlag = args.rw ? "--rw" : ""
-    const result = await Bun.$`bash ${script} query ${args.cypher} ${rwFlag}`.text()
+    const result = args.rw
+      ? await Bun.$`bash ${script} query ${args.cypher} --rw`.text()
+      : await Bun.$`bash ${script} query ${args.cypher}`.text()
     return result.trim()
   },
 })
