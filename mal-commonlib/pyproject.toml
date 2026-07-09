@@ -1,7 +1,7 @@
 [project]
 name = "mal-commonlib"
 version = "0.1.0"
-description = "MalariaSentinel — shared config, paths, data utilities"
+description = "MalariaSentinel — shared config, paths, data utilities, and data loaders (CHIRPS, ERA5-Land, MOD13A3, MERIT DEM, ESA WorldCover)"
 requires-python = ">=3.12"
 dependencies = [
     "numpy>=2.5.0",
@@ -13,6 +13,9 @@ dependencies = [
     "pyproj>=3.6",
     "shapely>=2.0",
     "geopandas>=0.14",
+    "cdsapi>=0.7",
+    "earthaccess>=0.12",
+    "requests>=2.32",
 ]
 
 [build-system]
