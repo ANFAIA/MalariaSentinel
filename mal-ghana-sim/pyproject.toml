@@ -13,6 +13,13 @@ dependencies = [
     "scipy>=1.18.0",
     "torch>=2.12.1",
     "mal-commonlib",
+    "mesa-geo>=0.9.3,<0.10",
+    "xarray>=2024.7",
+    "cdsapi>=0.7",
+    "earthaccess>=0.12",
+    "fastapi>=0.115",
+    "typer>=0.12",
+    "uvicorn>=0.30",
 ]
 
 [build-system]
@@ -24,3 +31,6 @@ packages = ["src/mal_ghana_sim"]
 
 [tool.uv.sources]
 mal-commonlib = { workspace = true }
+
+[dependency-groups]
+dev = ["pytest>=8.0"]
