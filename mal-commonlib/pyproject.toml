@@ -9,6 +9,10 @@ dependencies = [
     "rasterio>=1.5.0",
     "rioxarray>=0.22.0",
     "scipy>=1.18.0",
+    "pydantic>=2.7",
+    "pyproj>=3.6",
+    "shapely>=2.0",
+    "geopandas>=0.14",
 ]
 
 [build-system]
@@ -17,3 +21,6 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/mal_commonlib"]
+
+[dependency-groups]
+dev = ["pytest>=8.0"]
