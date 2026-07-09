@@ -224,6 +224,40 @@ git merge-base HEAD origin/main       # divergence point, if any
 
 **Skip the contract for trivial sessions** (single tool call, no state change).
 
+## Milestones and kanban (M* system)
+
+The project follows numbered milestones (**M1**, **M2**, …). Each milestone is a named deliverable (e.g. "ABM scaffolding", "U-Net training", "End-to-end run"). The set of milestones, their descriptions, and their KB references live in the knowledge graph (labels: `Operational`, prefix `op-m`); this file only describes the format and the workflow.
+
+**Milestone shape** (what every milestone looks like):
+- A numbered identifier (`M<n>`), a short deliverable name, and an acceptance threshold (model metric, run time, artifact output).
+- A list of granular issues in GitHub, each with the milestone label (`M<n>`) and a type label (`enhancement`, `investigation`).
+- A `blocked` label on any issue gated by an external dependency.
+- A KB `Operational` node with a stable uuid (`op-m<n>-<slug>`), so the agent can recall the plan from the graph. The GitHub milestone has the same name and due date.
+
+### Issue <-> board <-> agent workflow
+
+Every milestone decomposes into issues tracked on the **MalariaSentinel GitHub Project v2 kanban** (ANFAIA #11). The board has three status columns:
+
+| Column | Meaning |
+|---|---|
+| **Todo** | Issue is scoped but not yet in progress |
+| **In Progress** | Exactly one issue at a time; the active task the agent is working on |
+| **Done** | Completed, verified, closed |
+
+**Labels on every issue**: the milestone (`M1`...`M6`), the type (`enhancement`, `investigation`), and `blocked` if an external dependency is unresolved.
+
+### How the agent manages the board
+
+The agent (supervisor) is responsible for keeping the board in sync with the session's work:
+
+1. **Entering a milestone**: read the open issues for the milestone from GitHub. Move the highest-priority unblocked issue to **In Progress**.
+2. **Working on an issue**: keep it in **In Progress** until all acceptance criteria pass. If a new blocker is discovered, add the `blocked` label, post a comment with the reason, and move to **Todo**.
+3. **Completing an issue**: run the acceptance criteria (tests pass, lint clean). Close the issue with a comment referencing the commit SHA. Move it to **Done**.
+4. **New work emerging mid-session**: create the issue in Todo with the right milestone/labels. Do not derail the current In Progress item — finish it first.
+5. **End of milestone**: close the GitHub milestone (which auto-closes remaining issues or moves them to the next milestone). Write a KB entry summarising the milestone's outcome.
+
+**Discipline**: exactly one issue In Progress at a time. Never batch closes. Always reference the commit SHA in the closing comment so the board is traceable.
+
 ## Specialised loops
 
 Invoke with `@<name>` or the `task` tool. Each subagent's prompt lives at `agents/loops/<name>.md`. Brief summary:
