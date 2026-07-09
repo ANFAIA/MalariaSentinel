@@ -24,6 +24,7 @@ dependencies = [
 
 [project.scripts]
 build_env = "mal_ghana_sim.scripts.build_env:app"
+abm_run = "mal_ghana_sim.abm.run:main"
 
 [build-system]
 requires = ["hatchling"]
