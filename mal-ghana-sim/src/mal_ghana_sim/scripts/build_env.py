@@ -377,7 +377,7 @@ def main(
     )
 
     water_frac = _load_with_fallback(
-        load_worldcover_water_frac, aoi_obj, year, month, "water_frac",
+        load_worldcover_water_frac, aoi_obj, 2021, month, "water_frac",
     )
     rainfall = _load_with_fallback(
         load_chirps_rainfall, aoi_obj, year, month, "rainfall",
