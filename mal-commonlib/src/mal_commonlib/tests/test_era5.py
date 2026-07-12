@@ -95,11 +95,21 @@ def _make_era5_dataset_K(
 # -- tests ------------------------------------------------------------------
 
 
-def test_era5_requires_cds_auth(ghana_aoi: AOI) -> None:
-    """In an env without CDS auth, the loader raises ``RuntimeError``."""
-    # Make sure no CDS env vars / config leak in. cdsapi.Client() reads
-    # ~/.cdsapirc and CDSAPI_URL/KEY; we just call the loader and expect it
-    # to detect the missing auth and raise.
+def test_era5_requires_cds_auth(
+    ghana_aoi: AOI, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """In an env without CDS auth, the loader raises ``RuntimeError``.
+
+    The check is made env-independent by monkeypatching ``cdsapi.Client``
+    to raise on construction — simulating missing auth regardless of
+    whether ``~/.cdsapirc`` is present in the developer's environment.
+    """
+    import cdsapi
+
+    def _raise_on_init(*_args, **_kwargs):
+        raise RuntimeError("simulated missing CDS auth for test")
+
+    monkeypatch.setattr(cdsapi, "Client", _raise_on_init)
     with pytest.raises(RuntimeError, match="CDS auth"):
         load_era5_temp_suitability(ghana_aoi, 2024, 6)
 

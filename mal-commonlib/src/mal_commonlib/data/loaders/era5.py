@@ -46,6 +46,13 @@ ERA5_VARIABLE: str = "2m_temperature"
 ERA5_DAILY_STATISTIC: str = "daily_mean"  # daily mean; we aggregate to monthly mean
 ERA5_FREQ: str = "1_hourly"               # CDS frequency for daily-statistics dataset
 
+# CDS API requests use the long variable name "2m_temperature", but the
+# NetCDF files it ships use the short name "t2m". Map long → short so the
+# reader can find the variable in the downloaded file.
+ERA5_VARIABLE_NETCDF_ALIAS: dict[str, str] = {
+    "2m_temperature": "t2m",
+}
+
 # v1 thermal response (Mordecai 2013 parabolic approximation).
 T_OPT: float = 25.0
 T_HALF_WIDTH: float = 8.0
@@ -209,17 +216,22 @@ def load_era5_temp_suitability(
             result.download(str(target))
 
     ds = xr.open_dataset(str(target))
-    if ERA5_VARIABLE not in ds.data_vars and ERA5_VARIABLE not in ds:
+    if ERA5_VARIABLE in ds.data_vars or ERA5_VARIABLE in ds:
+        var_name = ERA5_VARIABLE
+    elif ERA5_VARIABLE in ERA5_VARIABLE_NETCDF_ALIAS and (
+        ERA5_VARIABLE_NETCDF_ALIAS[ERA5_VARIABLE] in ds.data_vars
+        or ERA5_VARIABLE_NETCDF_ALIAS[ERA5_VARIABLE] in ds
+    ):
+        var_name = ERA5_VARIABLE_NETCDF_ALIAS[ERA5_VARIABLE]
+    else:
         # Some products use capitalisation; fall back to first 2m_temperature-like var.
         candidates = [v for v in ds.data_vars if "temper" in v.lower() and "2m" in v.lower()]
         if not candidates:
             raise KeyError(
-                f"ERA5 dataset {target} has no '{ERA5_VARIABLE}' variable; "
+                f"ERA5 dataset {target} has no '{ERA5_VARIABLE}' or alias found; "
                 f"available: {list(ds.data_vars)}"
             )
         var_name = candidates[0]
-    else:
-        var_name = ERA5_VARIABLE
     da_K = ds[var_name]
     if "expver" in da_K.dims:
         # CDS sometimes ships both ecmwf versions on the same axis; pick the
