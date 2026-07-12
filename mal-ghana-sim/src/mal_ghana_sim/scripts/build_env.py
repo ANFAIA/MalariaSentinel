@@ -359,6 +359,10 @@ def main(
         False, "--skip-modis",
         help="Skip the MODIS download (channel becomes NoData regardless of EARTHDATA_TOKEN).",
     ),
+    skip_worldcover: bool = typer.Option(
+        False, "--skip-worldcover",
+        help="Skip WorldCover download (use NoData -9999.0 for the water_frac channel).",
+    ),
 ) -> None:
     """Build the M1 env tensor + habitat patches for an AOI + month."""
     if not (1 <= month <= 12):
@@ -376,9 +380,14 @@ def main(
         f"grid={h}x{w} year={year} month={month:02d}"
     )
 
-    water_frac = _load_with_fallback(
-        load_worldcover_water_frac, aoi_obj, 2021, month, "water_frac",
-    )
+    water_frac: xr.DataArray
+    if skip_worldcover:
+        typer.echo("skip-worldcover set: filling water_frac with NoData (-9999.0).", err=True)
+        water_frac = _empty_channel(aoi_obj, value=NODATA_SENTINEL, band_name="water_frac")
+    else:
+        water_frac = _load_with_fallback(
+            load_worldcover_water_frac, aoi_obj, 2021, month, "water_frac",
+        )
     rainfall = _load_with_fallback(
         load_chirps_rainfall, aoi_obj, year, month, "rainfall",
     )

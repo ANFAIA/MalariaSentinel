@@ -105,6 +105,7 @@ def _run_build_env(
     scale: Scale = Scale.REGIONAL,
     skip_era5: bool = False,
     skip_modis: bool = False,
+    skip_worldcover: bool = False,
 ) -> None:
     """Invoke the M1.3b build_env CLI as a subprocess.
 
@@ -124,6 +125,8 @@ def _run_build_env(
         cmd.append("--skip-era5")
     if skip_modis:
         cmd.append("--skip-modis")
+    if skip_worldcover:
+        cmd.append("--skip-worldcover")
     subprocess.run(
         cmd, check=True, cwd=str(_GHANA_SIM_ROOT), env=os.environ.copy(),
     )
@@ -520,6 +523,7 @@ def main(
     scale: Scale = typer.Option(Scale.REGIONAL, "--scale", help="Multi-scale level (mirrors build_env / abm_run)."),
     skip_era5: bool = typer.Option(False, "--skip-era5", help="Skip the ERA5 download (channel becomes NoData)."),
     skip_modis: bool = typer.Option(False, "--skip-modis", help="Skip the MODIS download (channel becomes NoData)."),
+    skip_worldcover: bool = typer.Option(False, "--skip-worldcover", help="Skip the WorldCover download (water_frac channel becomes NoData)."),
     strict: bool = typer.Option(
         False, "--strict",
         help="Exit with code 1 if the lower 95% CI is below 0.65 (default: 0, the verdict is in the report).",
@@ -541,6 +545,7 @@ def main(
     _run_build_env(
         aoi, year, month, output_dir,
         scale=scale, skip_era5=skip_era5, skip_modis=skip_modis,
+        skip_worldcover=skip_worldcover,
     )
 
     # 2. N rollouts

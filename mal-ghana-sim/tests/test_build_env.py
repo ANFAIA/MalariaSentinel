@@ -248,3 +248,58 @@ def test_build_env_validates_month(
     assert "month" in out.lower(), (
         f"error message must mention 'month'; got:\n{out}"
     )
+
+
+def test_build_env_handles_worldcover_skip(
+    patch_ghana_registry: None,
+    small_ghana_aoi: AOI,
+    tmp_path: pathlib.Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """`--skip-worldcover` fills the water_frac band with NoData (-9999.0) and
+    does not call the WorldCover loader at all."""
+    outputs = _make_synthetic_loader_outputs(small_ghana_aoi)
+    _patch_loaders(monkeypatch, outputs)
+
+    worldcover_called = {"n": 0}
+
+    def _tracking_worldcover(*args, **kwargs):
+        worldcover_called["n"] += 1
+        return outputs["water_frac"]
+    monkeypatch.setattr(
+        build_env, "load_worldcover_water_frac", _tracking_worldcover,
+    )
+
+    result = runner.invoke(
+        build_env.app,
+        [
+            "--aoi", "ghana", "--year", "2024", "--month", "6",
+            "--output-dir", str(tmp_path),
+            "--skip-worldcover",
+        ],
+    )
+    assert result.exit_code == 0, (
+        f"CLI must exit 0 with --skip-worldcover; got {result.exit_code}, "
+        f"output:\n{result.stdout}"
+    )
+    out = (result.stdout or "") + (result.stderr or "")
+    assert "skip-worldcover" in out, (
+        f"CLI must announce the skip; got:\n{out}"
+    )
+    assert worldcover_called["n"] == 0, (
+        f"WorldCover loader must not be called when --skip-worldcover is set; "
+        f"was called {worldcover_called['n']} times"
+    )
+
+    env_path = tmp_path / "ghana_regional_2024_06_env.tif"
+    assert env_path.exists(), f"env COG missing: {env_path}"
+    with rasterio.open(env_path) as src:
+        assert src.count == 4
+        assert tuple(src.descriptions) == (
+            "water_frac", "rainfall", "temp_suitability", "ndvi",
+        )
+        water_band = src.read(1)  # band 1 = water_frac
+        assert np.all(water_band == -9999.0), (
+            f"water_frac band must be -9999.0 when --skip-worldcover is set; "
+            f"got unique values: {np.unique(water_band)[:5]}"
+        )
