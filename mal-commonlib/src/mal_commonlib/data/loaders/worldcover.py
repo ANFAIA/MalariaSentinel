@@ -28,10 +28,13 @@ that thrashes on machines with <16 GB RAM.
 
 This loader now uses the **Planetary Computer** STAC catalog as the
 primary source. The STAC search returns the intersecting 3°×3° tiles
-and we read only the **AOI bbox window** from each (typically a few
-hundred KB instead of 1.3 GB) before merging. The output contract is
-unchanged. The S3 URL is still listed as a reference in this docstring
-in case a future user wants to add it as an explicit fallback.
+and we stream-reproject each tile's AOI bbox window directly into the
+AOI grid via two ``rasterio.warp.reproject`` calls (binary water mask
++ valid-pixel mask) per tile — no full-tile read, no merged mosaic.
+Memory is bounded by the AOI grid (~0.4 MB for Ghana) plus a single
+tile window (≤180 MB). The S3 URL is still listed as a reference in
+this docstring in case a future user wants to add it as an explicit
+fallback.
 
 Output contract (per ``docs/abm-output-contract.md`` §2, channel 0):
     * dims (y, x), dtype ``float32``
@@ -144,25 +147,35 @@ def _load_worldcover_pc(
     year: int,
     water_classes: tuple[int, ...],
 ) -> tuple[np.ndarray, dict]:
-    """Read the WorldCover ``map`` band for the AOI bbox via the Planetary
-    Computer STAC catalog and return a (binary-water-mask) mosaic in
-    memory.
+    """Read the WorldCover ``map`` band for the AOI via the Planetary
+    Computer STAC catalog, streaming each tile window directly into the
+    AOI grid (no full-tile or merged-mosaic allocation).
 
-    This is the primary download path (M2): the 3°×3° tiles are 1.3 GB
-    each in memory, so we read only the AOI bbox window from each
-    intersecting tile (typically a few hundred KB) and merge those
-    small windows with ``rasterio.merge``. The result has the same CRS
-    and dtype as a single tile.
+    Memory is bounded by:
+      * the AOI grid itself (~0.4 MB for a 779×551 AOI at 1 km), plus
+      * one tile window (≤180 MB worst case for the 3°×3° tiles at 10 m)
+        plus the per-tile ``tile_water`` / ``tile_valid`` reproject
+        destinations (two float32 arrays of AOI-grid shape, freed at the
+        end of each iteration).
+
+    The previous implementation called ``rasterio.merge`` on the per-tile
+    windows, which allocated a full mosaic in memory — ~1.6 GB for the
+    9 Ghana tiles, OOMing on the user's Mac. This version replaces the
+    merge with two ``rasterio.warp.reproject`` calls per tile: one for
+    the binary water mask, one for a "1" valid-pixel mask, accumulated
+    directly into ``water_count`` / ``valid_count`` on the AOI grid.
 
     Returns:
-        (arr, profile) where ``arr`` is a ``(H, W)`` float32 array in
-        [0, 1] (per-cell water fraction within the merged AOI bbox
-        window) and ``profile`` is a dict with ``crs``, ``transform``,
-        ``height``, ``width``.
+        (arr, profile) where ``arr`` is a ``(H, W)`` float32 array on the
+        AOI's grid (CRS = AOI CRS, transform = AOI transform), values in
+        [0, 1] (per-AOI-cell water fraction = mean of binary water mask
+        over all tiles that covered the cell), and ``-9999.0`` for cells
+        that no tile covered. ``profile`` is a dict with ``crs``,
+        ``transform``, ``height``, ``width``.
     """
     import planetary_computer
     import pystac_client
-    from rasterio.merge import merge as rio_merge
+    from rasterio.warp import reproject
     from rasterio.windows import from_bounds as rio_window_from_bounds
 
     bbox = _aoi_bbox_wgs84(aoi)
@@ -179,11 +192,14 @@ def _load_worldcover_pc(
         )
     signed_items = [planetary_computer.sign(item) for item in items]
 
-    # For each tile, read ONLY the AOI bbox window. Each 3°×3° tile at 10 m
-    # is 36 000 × 36 000 pixels; the AOI window is typically a few hundred
-    # pixels on a side.
-    bin_windows: list[tuple[np.ndarray, object, object]] = []
-    water_arr = np.asarray(water_classes, dtype=np.uint8)
+    H, W = aoi.cells_per_side()
+    H = int(H)
+    W = int(W)
+    ref_transform = from_bounds(*aoi.bbox, W, H)
+    water_count = np.zeros((H, W), dtype=np.float64)
+    valid_count = np.zeros((H, W), dtype=np.float64)
+    water_set = np.asarray(water_classes, dtype=np.uint8)
+
     for item in signed_items:
         href = item.assets["map"].href
         with rasterio.open(href) as src:
@@ -194,45 +210,46 @@ def _load_worldcover_pc(
             raw = src.read(1, window=win)
             if hasattr(raw, "filled"):
                 raw = np.ma.filled(raw, 0)
-            arr = np.asarray(raw, dtype=np.uint8)
-            bin_arr = np.isin(arr, water_arr).astype(np.uint8, copy=False)
             win_transform = src.window_transform(win)
-            bin_windows.append((bin_arr, win_transform, src.crs))
+            tile_water = np.zeros((H, W), dtype=np.float32)
+            reproject(
+                source=np.isin(np.asarray(raw, dtype=np.uint8), water_set).astype(np.float32),
+                destination=tile_water,
+                src_transform=win_transform,
+                src_crs=src.crs,
+                dst_transform=ref_transform,
+                dst_crs=aoi.crs_obj,
+                resampling=Resampling.nearest,
+            )
+            tile_valid = np.zeros((H, W), dtype=np.float32)
+            reproject(
+                source=np.ones((int(win.height), int(win.width)), dtype=np.float32),
+                destination=tile_valid,
+                src_transform=win_transform,
+                src_crs=src.crs,
+                dst_transform=ref_transform,
+                dst_crs=aoi.crs_obj,
+                resampling=Resampling.nearest,
+            )
+            water_count += tile_water
+            valid_count += tile_valid
 
-    if not bin_windows:
-        raise ValueError(
-            f"No WorldCover tile windows intersected the AOI bbox={bbox}"
+    if not np.any(valid_count > 0):
+        out = np.full((H, W), _NODATA_OUT_SCALAR, dtype=np.float32)
+    else:
+        water_frac = np.where(
+            valid_count > 0,
+            water_count / np.maximum(valid_count, 1e-9),
+            _NODATA_OUT_SCALAR,
         )
-
-    # Merge the small per-tile windows in memory. Each window is much
-    # smaller than the full tile, so this is fast.
-    sources = [
-        rasterio.io.MemoryFile().open(
-            driver="GTiff",
-            height=a.shape[0],
-            width=a.shape[1],
-            count=1,
-            dtype="uint8",
-            crs=c,
-            transform=t,
-        )
-        for (a, t, c) in bin_windows
-    ]
-    try:
-        for src, (a, _, _) in zip(sources, bin_windows):
-            src.write(a, indexes=1)
-        merged, transform = rio_merge(sources, nodata=0)
-    finally:
-        for s in sources:
-            s.close()
-    arr = np.asarray(merged).squeeze(0).astype(np.float32)
+        out = water_frac.astype(np.float32)
     profile = {
-        "crs": bin_windows[0][2],
-        "transform": transform,
-        "height": arr.shape[0],
-        "width": arr.shape[1],
+        "crs": aoi.crs_obj,
+        "transform": ref_transform,
+        "height": H,
+        "width": W,
     }
-    return arr, profile
+    return out, profile
 
 
 # -- legacy S3 path (kept for tests / future fallback) ---------------------
@@ -381,9 +398,10 @@ def load_worldcover_water_frac(
 
     arr, profile = _load_worldcover_pc(aoi, year, water_classes)
 
-    # Treat the binary mosaic as a continuous variable in [0, 1] and
-    # reproject onto the AOI grid with average resampling — that's what
-    # turns it into a per-AOI-cell *fraction*.
+    # If the loader already produced an AOI-grid-shaped array in the AOI's
+    # CRS, skip the second reproject_match (it would be a no-op and would
+    # double the memory traffic for no benefit). The streaming loader does
+    # this by construction.
     da = xr.DataArray(
         arr,
         dims=("y", "x"),
@@ -398,14 +416,18 @@ def load_worldcover_water_frac(
     da.rio.write_crs(profile["crs"], inplace=True)
     da.rio.write_transform(profile["transform"], inplace=True)
 
-    ref = _make_reference_grid(aoi)
-    rep = da.rio.reproject_match(ref, resampling=Resampling.average)
-    rep = rep.astype(np.float32)
+    if str(profile.get("crs")) == str(aoi.crs_obj):
+        rep = da.astype(np.float32)
+    else:
+        ref = _make_reference_grid(aoi)
+        rep = da.rio.reproject_match(ref, resampling=Resampling.average)
+        rep = rep.astype(np.float32)
     rep = rep.rio.write_nodata(_NODATA_OUT_SCALAR)
     # If the source mosaic is all zero (no water in the bbox), arr is all zero
     # and the average remains zero — that is a valid result, NOT nodata.
     values = rep.values
-    values = np.clip(values, 0.0, 1.0).astype(np.float32)
+    values = np.where(values == _NODATA_OUT_SCALAR, values, np.clip(values, 0.0, 1.0))
+    values = values.astype(np.float32)
     out = xr.DataArray(
         values,
         dims=("y", "x"),
