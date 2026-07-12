@@ -18,6 +18,8 @@ dependencies = [
     "requests>=2.32",
     "h5py>=3.10",
     "pyhdf>=0.11",
+    "planetary-computer>=1.0",
+    "pystac-client>=0.8",
 ]
 
 [build-system]

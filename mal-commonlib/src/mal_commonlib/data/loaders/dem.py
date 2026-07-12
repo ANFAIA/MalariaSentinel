@@ -30,6 +30,19 @@ via ``MERIT_AUTH_TOKEN`` (sent as ``Authorization: Bearer <token>``). For
 the default Yamazaki host, register via the Google Form on the landing page
 and use the issued Dropbox shared-link token as ``MERIT_AUTH_TOKEN``.
 
+NASADEM fallback (no-auth)
+--------------------------
+When the MERIT upstream is unreachable (e.g. all candidate URLs 404, the
+default Yamazaki host is password-gated, and the user has no
+``MERIT_AUTH_TOKEN``), ``load_merit_dem`` falls back to **NASADEM** via the
+Microsoft Planetary Computer STAC catalog. NASADEM is a 1-arc-second
+(~30 m) reprocessing of SRTM, hydrologically conditioned and free of the
+spurious pits in raw SRTM. It is functionally equivalent to MERIT for TWI
+computation. The same 5°×5° tile scheme is used upstream; the catalog
+exposes the data as 1°×1° GeoTIFFs in EPSG:4326. The fallback is transparent
+to callers — the returned ``xr.DataArray`` has the same shape, dtype, CRS,
+and units as the MERIT path.
+
 We download the intersecting tiles via plain ``requests`` (already present
 in the dep set) into ``cache_dir`` and merge them with ``rasterio.merge.merge``
 before reprojecting to the AOI grid.
@@ -257,6 +270,110 @@ def _make_reference_grid(aoi: AOI) -> xr.DataArray:
     return da
 
 
+# -- NASADEM fallback (no-auth) ----------------------------------------------
+
+# Microsoft Planetary Computer STAC catalog — the NASADEM collection is a
+# 1-arc-second (~30 m) reprocessing of SRTM, hydrologically conditioned.
+# Tiles are 1°×1° GeoTIFFs in EPSG:4326 and the asset href is signed on demand.
+_NASADEM_STAC_URL = "https://planetarycomputer.microsoft.com/api/stac/v1"
+_NASADEM_COLLECTION = "nasadem"
+_NASADEM_FILL = -32768  # SRTM/NASADEM native fill
+
+
+def _load_nasadem_dem(aoi: AOI) -> xr.DataArray:
+    """Load NASADEM via the Microsoft Planetary Computer STAC API.
+
+    Used as a no-auth fallback when the MERIT upstream (Yamazaki / Dropbox
+    / HydroSHEDS) is unreachable. NASADEM is a 1-arc-second reprocessing
+    of SRTM, hydrologically conditioned, with the same 5°×5° tile grid
+    upstream as MERIT. The Planetary Computer catalog exposes it as
+    1°×1° GeoTIFFs in EPSG:4326.
+
+    Returns an ``xr.DataArray`` with the same contract as the MERIT path:
+    dims (y, x), dtype float32, CRS = ``aoi.crs``, values in metres,
+    NoData = -9999.0. The ``source`` attribute is set to the NASADEM
+    catalog id so callers can tell which loader was used.
+    """
+    import planetary_computer  # local import — deps are optional at import time
+    import pystac_client
+
+    bbox = _aoi_bbox_wgs84(aoi)
+    catalog = pystac_client.Client.open(_NASADEM_STAC_URL)
+    search = catalog.search(
+        collections=[_NASADEM_COLLECTION],
+        bbox=list(bbox),
+    )
+    items = list(search.items())
+    if not items:
+        raise FileNotFoundError(
+            f"No NASADEM tiles in Planetary Computer for bbox={bbox}"
+        )
+    signed_items = [planetary_computer.sign(item) for item in items]
+
+    # Stream each signed asset with rasterio; merge with rasterio.merge.
+    # All NASADEM tiles share CRS=EPSG:4326 and the same nodata value.
+    srcs = [rasterio.open(item.assets["elevation"].href) for item in signed_items]
+    try:
+        nodata_val = srcs[0].nodata if srcs[0].nodata is not None else _NASADEM_FILL
+        arr, transform = rio_merge(srcs, nodata=nodata_val)
+        profile = {
+            "crs": srcs[0].crs,
+            "transform": transform,
+            "height": arr.shape[1],
+            "width": arr.shape[2],
+        }
+    finally:
+        for s in srcs:
+            s.close()
+    # rio_merge returns a masked array. ``np.asarray`` on a masked array
+    # gives back the raw fill value, so we explicitly fill with NaN — this
+    # lets the downstream reproject step propagate the gap to neighbours
+    # and the post-reproject non-finite check correctly produces -9999.0.
+    if hasattr(arr, "filled"):
+        arr = arr.filled(np.float32(np.nan))
+    # rio_merge returns shape (1, H, W) — squeeze and coerce to float32.
+    arr = np.asarray(arr).squeeze(0).astype(np.float32)
+
+    da = xr.DataArray(
+        arr,
+        dims=("y", "x"),
+        name="elevation",
+        attrs={
+            "long_name": "NASADEM elevation",
+            "source": "NASADEM (Microsoft Planetary Computer STAC)",
+            "units": "metres",
+            "nodata": _NODATA_OUT_SCALAR,
+        },
+    )
+    da.rio.write_crs(profile["crs"], inplace=True)
+    da.rio.write_transform(profile["transform"], inplace=True)
+    da = da.rio.write_nodata(_NODATA_OUT_SCALAR, inplace=True)
+
+    # Reproject to the AOI's grid using bilinear.
+    ref = _make_reference_grid(aoi)
+    rep = da.rio.reproject_match(ref, resampling=Resampling.bilinear)
+    rep = rep.astype(np.float32)
+    rep = rep.rio.write_nodata(_NODATA_OUT_SCALAR)
+    values = rep.values
+    nodata_mask = ~np.isfinite(values)
+    values = np.where(nodata_mask, np.float32(_NODATA_OUT_SCALAR), values).astype(np.float32)
+    out = xr.DataArray(
+        values,
+        dims=("y", "x"),
+        name="elevation",
+        attrs={
+            "long_name": "NASADEM elevation (reprojected)",
+            "source": "NASADEM (Microsoft Planetary Computer STAC)",
+            "units": "metres",
+            "nodata": _NODATA_OUT_SCALAR,
+        },
+    )
+    out.rio.write_crs(aoi.crs, inplace=True)
+    out.rio.write_transform(from_bounds(*aoi.bbox, *aoi.cells_per_side()), inplace=True)
+    out.rio.write_nodata(_NODATA_OUT_SCALAR, inplace=True)
+    return out
+
+
 def _load_openlandmap_merit(
     aoi: AOI, cache: pathlib.Path
 ) -> tuple[np.ndarray, dict]:
@@ -321,49 +438,54 @@ def load_merit_dem(
     if not tiles:
         raise ValueError(f"No MERIT tiles intersect bbox={bbox}")
 
-    paths = [_download_tile(lon0, lat0, cache) for (lon0, lat0) in tiles]
-    arr, profile = _stitch_tiles(paths)
+    try:
+        paths = [_download_tile(lon0, lat0, cache) for (lon0, lat0) in tiles]
+        arr, profile = _stitch_tiles(paths)
 
-    # Build an in-memory DataArray on the merged tile grid.
-    da = xr.DataArray(
-        arr,
-        dims=("y", "x"),
-        name="elevation",
-        attrs={
-            "long_name": "MERIT DEM elevation",
-            "source": "MERIT DEM v1.0.1",
-            "units": "metres",
-            "nodata": _MERIT_FILL,
-        },
-    )
-    da.rio.write_crs(profile["crs"], inplace=True)
-    da.rio.write_transform(profile["transform"], inplace=True)
-    da = da.rio.write_nodata(_MERIT_FILL, inplace=True)
+        # Build an in-memory DataArray on the merged tile grid.
+        da = xr.DataArray(
+            arr,
+            dims=("y", "x"),
+            name="elevation",
+            attrs={
+                "long_name": "MERIT DEM elevation",
+                "source": "MERIT DEM v1.0.1",
+                "units": "metres",
+                "nodata": _MERIT_FILL,
+            },
+        )
+        da.rio.write_crs(profile["crs"], inplace=True)
+        da.rio.write_transform(profile["transform"], inplace=True)
+        da = da.rio.write_nodata(_MERIT_FILL, inplace=True)
 
-    # Reproject to the AOI's grid using bilinear.
-    ref = _make_reference_grid(aoi)
-    rep = da.rio.reproject_match(ref, resampling=Resampling.bilinear)
-    rep = rep.astype(np.float32)
-    rep = rep.rio.write_nodata(_NODATA_OUT_SCALAR)
-    # Replace source fill (which may have been promoted to NaN by reproject) with -9999.0
-    values = rep.values
-    nodata_mask = ~np.isfinite(values)
-    values = np.where(nodata_mask, np.float32(_NODATA_OUT_SCALAR), values).astype(np.float32)
-    out = xr.DataArray(
-        values,
-        dims=("y", "x"),
-        name="elevation",
-        attrs={
-            "long_name": "MERIT DEM elevation (reprojected)",
-            "source": "MERIT DEM v1.0.1",
-            "units": "metres",
-            "nodata": _NODATA_OUT_SCALAR,
-        },
-    )
-    out.rio.write_crs(aoi.crs, inplace=True)
-    out.rio.write_transform(from_bounds(*aoi.bbox, *aoi.cells_per_side()), inplace=True)
-    out.rio.write_nodata(_NODATA_OUT_SCALAR, inplace=True)
-    return out
+        # Reproject to the AOI's grid using bilinear.
+        ref = _make_reference_grid(aoi)
+        rep = da.rio.reproject_match(ref, resampling=Resampling.bilinear)
+        rep = rep.astype(np.float32)
+        rep = rep.rio.write_nodata(_NODATA_OUT_SCALAR)
+        # Replace source fill (which may have been promoted to NaN by reproject) with -9999.0
+        values = rep.values
+        nodata_mask = ~np.isfinite(values)
+        values = np.where(nodata_mask, np.float32(_NODATA_OUT_SCALAR), values).astype(np.float32)
+        out = xr.DataArray(
+            values,
+            dims=("y", "x"),
+            name="elevation",
+            attrs={
+                "long_name": "MERIT DEM elevation (reprojected)",
+                "source": "MERIT DEM v1.0.1",
+                "units": "metres",
+                "nodata": _NODATA_OUT_SCALAR,
+            },
+        )
+        out.rio.write_crs(aoi.crs, inplace=True)
+        out.rio.write_transform(from_bounds(*aoi.bbox, *aoi.cells_per_side()), inplace=True)
+        out.rio.write_nodata(_NODATA_OUT_SCALAR, inplace=True)
+        return out
+    except FileNotFoundError:
+        # MERIT upstream is unreachable (404 on every candidate URL, password
+        # gate, etc.). Fall back to NASADEM via Planetary Computer — no auth.
+        return _load_nasadem_dem(aoi)
 
 
 __all__ = ["load_merit_dem", "NODATA_OUT"]

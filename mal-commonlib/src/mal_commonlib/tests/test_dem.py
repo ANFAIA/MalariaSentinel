@@ -18,6 +18,7 @@ import xarray as xr
 from rasterio.transform import from_bounds
 
 from mal_commonlib.aoi import AOI
+from mal_commonlib.data.loaders import dem as dem_mod
 from mal_commonlib.data.loaders.dem import NODATA_OUT, load_merit_dem
 from mal_commonlib.terrain.twi import compute_twi
 
@@ -105,3 +106,52 @@ def test_dem_download(tmp_path: pathlib.Path) -> None:
     # band: -100..3000 m.
     assert valid.min() > -100.0
     assert valid.max() < 3000.0
+
+
+# -- NASADEM fallback (unit) -------------------------------------------------
+
+
+def test_merit_falls_back_to_nasadem(monkeypatch: pytest.MonkeyPatch) -> None:
+    """When MERIT download raises FileNotFoundError, fall back to NASADEM.
+
+    Both layers are stubbed so no network is required. The test asserts:
+      1. The MERIT download path was attempted and failed.
+      2. The NASADEM loader was called exactly once.
+      3. The returned DataArray honours the loader's public contract
+         (dims, dtype, CRS).
+    """
+    # 1) Force the MERIT download to fail.
+    def _fail_download(*args, **kwargs):  # noqa: ARG001
+        raise FileNotFoundError(
+            "MERIT upstream 404 (simulated) — falling back to NASADEM"
+        )
+
+    monkeypatch.setattr(dem_mod, "_download_tile", _fail_download)
+
+    # 2) Stub the NASADEM loader to return a synthetic valid DataArray.
+    called = {"n": 0}
+
+    def _fake_nasadem(aoi: AOI) -> xr.DataArray:
+        called["n"] += 1
+        h, w = aoi.cells_per_side()
+        arr = np.full((h, w), 200.0, dtype=np.float32)
+        da = xr.DataArray(arr, dims=("y", "x"), name="elevation")
+        transform = from_bounds(*aoi.bbox, w, h)
+        da.rio.write_crs(aoi.crs, inplace=True)
+        da.rio.write_transform(transform, inplace=True)
+        return da
+
+    monkeypatch.setattr(dem_mod, "_load_nasadem_dem", _fake_nasadem)
+
+    # 3) Exercise the public entry point.
+    aoi = AOI.from_bbox(-3.5, 4.5, 1.5, 11.5, "EPSG:4326", "ghana-nasadem", 1000)
+    out = load_merit_dem(aoi)
+
+    # Assertions
+    assert called["n"] == 1, "NASADEM fallback loader was not invoked"
+    assert isinstance(out, xr.DataArray)
+    assert out.dtype == np.float32
+    assert out.dims == ("y", "x")
+    assert str(out.rio.crs).upper() == "EPSG:4326"
+    # Synthetic fill is 200 m everywhere — the fallback returned our stub.
+    assert np.all(out.values == 200.0)
