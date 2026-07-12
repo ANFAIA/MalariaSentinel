@@ -256,7 +256,7 @@ def load_modis_ndvi(
             f"No MOD13A3 v061 granules found for {aoi.slug} {year}-{month:02d} "
             f"(bbox={bbox}, window={start}..{end})"
         )
-    paths = earthaccess.download(results, path=str(cache))
+    paths = earthaccess.download(results, local_path=str(cache))
     flat_paths: list[pathlib.Path] = []
     for p in paths:
         if isinstance(p, (list, tuple)):
