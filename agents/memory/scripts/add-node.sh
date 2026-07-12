@@ -7,10 +7,14 @@
 # except for property updates.
 #
 # Usage:
-#   add-node.sh --type <Label> --uuid <id> --name <n> --summary <s> [--path <p>] [--group-id <gid>]
+#   add-node.sh --type <Label> --uuid <id> --name <n> --summary <s> \
+#               [--path <p>] [--parent <uuid>] [--group-id <gid>]
 #
 # The label is validated against agents/memory/scripts/schema.sh. If invalid, exits 1
 # without writing. The script always uses --rw (it is a write).
+#
+# If --parent is passed, a (parent)-[:PART_OF]-(child) edge is created in the
+# same Cypher. The parent must exist or the write fails.
 #
 # Project name (group_id) is resolved via lib/project.sh:
 #   --group-id <gid> > $GROUP_ID env > agents/memory/.project
@@ -28,6 +32,7 @@ name=""
 summary=""
 path=""
 group_id=""
+parent=""
 
 # --- parse flags ---
 while [ $# -gt 0 ]; do
@@ -37,9 +42,10 @@ while [ $# -gt 0 ]; do
     --name)    name="${2:-}"; shift 2 ;;
     --summary) summary="${2:-}"; shift 2 ;;
     --path)    path="${2:-}"; shift 2 ;;
+    --parent)  parent="${2:-}"; shift 2 ;;
     --group-id) group_id="${2:-}"; shift 2 ;;
     -h|--help)
-      sed -n '2,16p' "$0"; exit 0 ;;
+      sed -n '2,18p' "$0"; exit 0 ;;
     *)
       echo "add-node.sh: unknown flag '$1'" >&2
       exit 2 ;;
@@ -79,18 +85,101 @@ params=(
   "--param" "path=$path"
 )
 
+# --- Embedding: call embed.py to get a 1536-dim vector for the
+# concatenation of name + summary. If embed.py fails (OpenAI down, no key),
+# we log a warning and skip the embedding — the node is still created
+# (degraded mode: the node is valid but won't be findable by memory_recall
+# until reembedded). ---
+emb_text="${name} — ${summary}"
+emb_json="$("$HERE/embed.py" "$emb_text" 2>/dev/null || true)"
+if [ -n "$emb_json" ] && [ "${emb_json:0:1}" = "[" ]; then
+  params+=("--param" "embedding=$emb_json")
+  HAS_EMBEDDING=1
+else
+  echo "add-node.sh: WARNING: embedding skipped (embed.py failed). Node will be invisible to memory_recall until reembedded." >&2
+  HAS_EMBEDDING=0
+fi
+
 # --- the actual Cypher. We MERGE on (uuid, group_id) so a second run with
 # the same uuid updates the visible properties without changing the
-# identity. ---
-cypher="MERGE (n:Entity:${type} {uuid: \$uuid, group_id: \$gid})
-  ON CREATE SET n.name = \$name,
-                n.summary = \$summary,
-                n.path = \$path,
-                n.created_at = datetime()
-  ON MATCH  SET n.name = \$name,
-                n.summary = \$summary,
-                n.path = \$path
-RETURN n.uuid AS uuid, labels(n) AS labels"
+# identity. The schema label is set via SET (not in the MERGE pattern)
+# so an existing Entity-only node can be "promoted" to the right schema
+# label by a subsequent memory_node call — the previous version had the
+# label inside the MERGE pattern (:Entity:${type}) which forced a fresh
+# node to be created when the existing one didn't yet carry the label,
+# producing duplicate nodes on promotion. ---
+if [ -n "$parent" ]; then
+  # With parent: the (parent)-[:PART_OF]->(child) edge is created in the
+  # same transaction. We use MATCH (not MERGE) for the parent so the
+  # write fails loudly if the parent does not exist (no silent-orphan
+  # creation — better to fail than to have a child with a fake parent).
+  if [ "$HAS_EMBEDDING" = "1" ]; then
+    cypher="MATCH (parent:Entity {uuid: \$parent_uuid, group_id: \$gid})
+  WITH parent
+  MERGE (n:Entity {uuid: \$uuid, group_id: \$gid})
+    ON CREATE SET n:${type},
+                  n.name = \$name,
+                  n.summary = \$summary,
+                  n.path = \$path,
+                  n.name_embedding = \$embedding,
+                  n.created_at = datetime()
+    ON MATCH  SET n:${type},
+                  n.name = \$name,
+                  n.summary = \$summary,
+                  n.path = \$path,
+                  n.name_embedding = \$embedding
+  WITH parent, n
+  MERGE (n)-[r:PART_OF {group_id: \$gid}]->(parent)
+    ON CREATE SET r.created_at = datetime()
+  RETURN n.uuid AS uuid, labels(n) AS labels"
+  else
+    cypher="MATCH (parent:Entity {uuid: \$parent_uuid, group_id: \$gid})
+  WITH parent
+  MERGE (n:Entity {uuid: \$uuid, group_id: \$gid})
+    ON CREATE SET n:${type},
+                  n.name = \$name,
+                  n.summary = \$summary,
+                  n.path = \$path,
+                  n.created_at = datetime()
+    ON MATCH  SET n:${type},
+                  n.name = \$name,
+                  n.summary = \$summary,
+                  n.path = \$path
+  WITH parent, n
+  MERGE (n)-[r:PART_OF {group_id: \$gid}]->(parent)
+    ON CREATE SET r.created_at = datetime()
+  RETURN n.uuid AS uuid, labels(n) AS labels"
+  fi
+  params+=("--param" "parent_uuid=$parent")
+else
+  if [ "$HAS_EMBEDDING" = "1" ]; then
+    cypher="MERGE (n:Entity {uuid: \$uuid, group_id: \$gid})
+    ON CREATE SET n:${type},
+                  n.name = \$name,
+                  n.summary = \$summary,
+                  n.path = \$path,
+                  n.name_embedding = \$embedding,
+                  n.created_at = datetime()
+    ON MATCH  SET n:${type},
+                  n.name = \$name,
+                  n.summary = \$summary,
+                  n.path = \$path,
+                  n.name_embedding = \$embedding
+  RETURN n.uuid AS uuid, labels(n) AS labels"
+  else
+    cypher="MERGE (n:Entity {uuid: \$uuid, group_id: \$gid})
+    ON CREATE SET n:${type},
+                  n.name = \$name,
+                  n.summary = \$summary,
+                  n.path = \$path,
+                  n.created_at = datetime()
+    ON MATCH  SET n:${type},
+                  n.name = \$name,
+                  n.summary = \$summary,
+                  n.path = \$path
+  RETURN n.uuid AS uuid, labels(n) AS labels"
+  fi
+fi
 
 # --- find the project root, then run from memory/ so neo4j-cli finds .env ---
 _find_root() {

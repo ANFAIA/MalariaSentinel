@@ -47,15 +47,24 @@ export default tool({
       .string()
       .optional()
       .describe("Optional filesystem path inside the project (e.g. 'mal-core/')."),
+    parent: tool.schema
+      .string()
+      .optional()
+      .describe(
+        "Optional parent uuid. If passed, creates (child)-[:PART_OF]->(parent) " +
+          "in the same transaction. The parent must exist; the write fails loudly " +
+          "if it doesn't (no silent-orphan). Use this to place new nodes into the " +
+          "6-tree structure (obj-centinela-sdss, comp-centinela, " +
+          "research-knowledge-base, project-wisdom, architecture-decisions, " +
+          "agents-module).",
+      ),
   },
   async execute(args, context) {
     const script = path.join(
       context.worktree,
       "agents/memory/scripts/memory.sh",
     )
-    const cmd = [
-      "bash",
-      script,
+    const flags = [
       "node",
       "--type",
       args.type,
@@ -66,9 +75,10 @@ export default tool({
       "--summary",
       args.summary,
     ]
-    if (args.path) cmd.push("--path", args.path)
+    if (args.path) flags.push("--path", args.path)
+    if (args.parent) flags.push("--parent", args.parent)
 
-    const result = await Bun.$`bash ${script} node --type ${args.type} --uuid ${args.uuid} --name ${args.name} --summary ${args.summary}${args.path ? ` --path ${args.path}` : ""}`.text()
+    const result = await Bun.$`bash ${script} ${flags}`.text()
     return result.trim()
   },
 })
