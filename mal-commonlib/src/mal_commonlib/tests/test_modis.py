@@ -78,29 +78,56 @@ def test_modis_with_fake_token_calls_earthaccess_login(
 
 
 def _write_synthetic_modis_hdf(path: pathlib.Path, arr: np.ndarray) -> None:
-    """Write a single-band GeoTIFF that pretends to be a MOD13A3 NDVI band.
+    """Write a synthetic HDF4 file that the pyhdf-based MOD13A3 reader accepts.
 
-    We use a GeoTIFF instead of an HDF4 file because the dry-run path is
-    fully synthetic — the function under test doesn't actually need a
-    real MOD13A3 file. We set the band description to match the MOD13A3
-    "1 km monthly NDVI" long name.
+    The real MOD13A3 product is HDF4-EOS2 with a ``1 km monthly NDVI`` SDS
+    (int16, fill ``-3000``, scale ``0.0001``) and a ``StructMetadata.0``
+    top-level attribute holding the grid extent. We mock all of those here.
+    The values are written as int16 — the loader's rescale is responsible
+    for converting them to ``[-0.2, 1.0]`` and then to ``[0, 1]``.
     """
+    from pyhdf.SD import SD, SDC
+
     h, w = arr.shape
-    transform = from_bounds(-1.0, 6.0, 0.0, 7.0, w, h)
-    with rasterio.open(
-        path,
-        "w",
-        driver="GTiff",
-        height=h,
-        width=w,
-        count=1,
-        dtype="float32",
-        crs="EPSG:4326",
-        transform=transform,
-        nodata=np.nan,
-    ) as dst:
-        dst.write(arr.astype(np.float32), 1)
-        dst.set_band_description(1, "1 km monthly NDVI")
+    # 1 km × N pixels × M pixels = extent in metres. Place the synthetic
+    # tile's NW corner at (-1, 7) in lon/lat and SE corner at (0, 6) so the
+    # tile covers the same AOI as the test's _small_aoi() helper.
+    R = 6371007.181
+    west, north = -1.0, 7.0
+    east, south = 0.0, 6.0
+    x_ul = west * R
+    y_ul = north * R
+    x_lr = east * R
+    y_lr = south * R
+
+    # Map a [-0.2, 1.0] float array back to MOD13A3 int16 raw values so the
+    # loader's rescale is exercised exactly as it is on real data.
+    arr_int16 = np.clip(np.round(arr * 10000.0), -3000, 10000).astype(np.int16)
+
+    sd = SD(str(path), SDC.WRITE | SDC.CREATE | SDC.TRUNC)
+    sds = sd.create("1 km monthly NDVI", SDC.INT16, (h, w))
+    sds[:] = arr_int16
+    sds.setfillvalue(-3000)
+    sds.long_name = "1 km monthly NDVI"
+    sds.units = "NDVI"
+    sds.valid_range = [-2000, 10000]
+    sds.scale_factor = 0.0001
+    sds.endaccess()
+    struct = (
+        "GROUP=GridStructure\n"
+        "  GROUP=GRID_1\n"
+        "    GridName=MOD_Grid_monthly_1km_VI\n"
+        f"    XDim={w}\n"
+        f"    YDim={h}\n"
+        f"    UpperLeftPointMtrs=({x_ul}, {y_ul})\n"
+        f"    LowerRightMtrs=({x_lr}, {y_lr})\n"
+        "    Projection=GCTP_SNSOID\n"
+        "  END_GROUP=GRID_1\n"
+        "END_GROUP=GridStructure\n"
+        "END"
+    )
+    sd.StructMetadata_0 = struct
+    sd.end()
 
 
 def test_modis_dry_run_no_network(

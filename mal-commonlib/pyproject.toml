@@ -16,6 +16,8 @@ dependencies = [
     "cdsapi>=0.7",
     "earthaccess>=0.12",
     "requests>=2.32",
+    "h5py>=3.10",
+    "pyhdf>=0.11",
 ]
 
 [build-system]

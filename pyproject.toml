@@ -4,6 +4,9 @@ version = "0.1.0"
 description = "MalariaSentinel — AI-driven predictive malaria surveillance (monorepo)"
 readme = "README.md"
 requires-python = ">=3.12"
+dependencies = [
+    "pyhdf>=0.11.7",
+]
 
 [tool.uv]
 package = false

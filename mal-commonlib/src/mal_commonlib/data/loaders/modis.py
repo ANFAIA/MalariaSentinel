@@ -8,8 +8,18 @@ The MOD13A3 product (MODIS/Terra Vegetation Indices Monthly L3 Global 1 km SIN
 Grid, v061) is hosted by NASA LP DAAC and accessible via ``earthaccess``. We
 search by ``short_name="MOD13A3", version="061"`` over a one-month temporal
 window and bounding box covering the AOI, download the intersecting HDFs
-(into ``cache_dir`` if provided), open with ``rasterio`` (MOD13A3 is HDF4)
+(into ``cache_dir`` if provided), open with ``pyhdf`` (MOD13A3 is HDF4-EOS2)
 and reproject the NDVI band from the 1 km sinusoidal grid to the AOI's grid.
+
+HDF4 vs HDF5
+------------
+``rasterio``'s GDAL build on this platform does not include the HDF4 driver,
+so ``rasterio.open()`` on a plain ``.hdf`` MOD13A3 file fails with
+``RasterioIOError: .hdf not recognized``. We use ``pyhdf`` (the canonical
+Python HDF4 reader, built on the HDF4 C library) instead. ``h5py`` is **not**
+an option — it reads HDF5, which is a different file format despite the
+similar name. (We keep ``h5py`` in the dep set because it is a useful
+building block for other loaders, but the MOD13A3 reader does not use it.)
 
 Output contract (per ``docs/abm-output-contract.md`` §2, channel 3):
     * dims (y, x), dtype ``float32``
@@ -27,11 +37,12 @@ from __future__ import annotations
 import datetime as _dt
 import os
 import pathlib
+import re
 import tempfile
 from typing import Iterable
 
 import numpy as np
-import rasterio
+import rasterio  # noqa: F401  (still used by the reproject step)
 import rioxarray  # noqa: F401  (registers the .rio accessor)
 import xarray as xr
 from rasterio.transform import from_bounds
@@ -39,13 +50,18 @@ from rasterio.warp import Resampling
 
 from mal_commonlib.aoi import AOI
 
-# MOD13A3 fill / out-of-range sentinel: the source uses 0 as "no data" for the
-# NDVI SDS, with valid raw values in [-2000, 10000] scaled to [-0.2, 1.0]. We
-# treat 0 (and any negative or NaN) as fill. The rescaled [0, 1] value of fill
-# is -9999.0 in the output.
-_FILL_RAW = 0
+# MOD13A3 fill value: -3000 in the raw int16 SDS. The original code assumed 0
+# (which was a bug — 0 is a valid NDVI value). Fill cells are caught by the
+# downstream ``arr < -0.2`` check in ``_rescale_ndvi`` because -3000 × 0.0001
+# = -0.3 < -0.2. We still keep the explicit constant for documentation.
+_FILL_RAW = -3000
 _NODATA_OUT = np.float32(-9999.0)
 _NODATA_OUT_SCALAR = -9999.0
+
+# MODIS sinusoidal sphere radius (m). Used to convert the file's
+# UpperLeftPointMtrs / LowerRightMtrs (in metres on the sinusoidal grid) to
+# WGS-84 lat/lon.
+_MODIS_SPHERE_RADIUS_M = 6371007.181
 
 
 def _ensure_cache_dir(cache_dir: pathlib.Path | None) -> pathlib.Path:
@@ -100,68 +116,154 @@ def _earthaccess_login() -> None:
     earthaccess.login()
 
 
+def _parse_modis_grid_extent(
+    struct_metadata: str,
+) -> tuple[float, float, float, float]:
+    """Parse ``(x_ul, y_ul, x_lr, y_lr)`` in sinusoidal metres from a MODIS
+    HDF-EOS2 ``StructMetadata.0`` block.
+
+    Returns the upper-left and lower-right corners in metres on the MODIS
+    sinusoidal grid (not lat/lon — use ``_sinusoidal_to_lonlat`` to convert).
+    Raises ``ValueError`` if the block is missing or unparseable.
+    """
+    if not struct_metadata:
+        raise ValueError("StructMetadata.0 is empty")
+    ul = re.search(
+        r"UpperLeftPointMtrs\s*=\s*\(\s*([-\d\.eE]+)\s*,\s*([-\d\.eE]+)\s*\)",
+        struct_metadata,
+    )
+    lr = re.search(
+        r"LowerRightMtrs\s*=\s*\(\s*([-\d\.eE]+)\s*,\s*([-\d\.eE]+)\s*\)",
+        struct_metadata,
+    )
+    if not ul or not lr:
+        raise ValueError(
+            "StructMetadata.0 missing UpperLeftPointMtrs or LowerRightMtrs"
+        )
+    return (float(ul.group(1)), float(ul.group(2)), float(lr.group(1)), float(lr.group(2)))
+
+
+def _sinusoidal_to_lonlat(x_m: float, y_m: float) -> tuple[float, float]:
+    """Inverse GCTP_SNSOID (sinusoidal) for the standard parallel = 0.
+
+    With ``R = 6371007.181 m`` (MODIS sphere), the forward mapping is
+    ``x = R * lon``, ``y = R * lat``. The inverse is therefore trivial.
+    Returns ``(lon_rad, lat_rad)``.
+    """
+    return (x_m / _MODIS_SPHERE_RADIUS_M, y_m / _MODIS_SPHERE_RADIUS_M)
+
+
 def _ndvi_band_from_hdf(hdf_path: pathlib.Path) -> xr.DataArray:
     """Open a MOD13A3 HDF4 file and return the 1 km monthly NDVI band.
 
-    MOD13A3 HDF4 subdataset names include ``HDF4_EOS:EOS_GRID:"<file>":MOD_Grid_monthly_1km_VI:1 km monthly NDVI``.
-    We open with rasterio, identify the band matching the NDVI long name,
-    and return a single-band ``xr.DataArray`` with CRS set.
+    Uses ``pyhdf.SD`` (HDF4) — see the module docstring for why ``h5py`` and
+    ``rasterio`` are not used here. The MOD13A3 SDS is named ``1 km monthly
+    NDVI`` with ``int16`` storage, fill ``-3000`` and a scale factor of
+    ``0.0001`` (raw valid range ``[-2000, 10000]`` mapping to NDVI in
+    ``[-0.2, 1.0]``). The grid bounding box is reconstructed from the file's
+    ``StructMetadata.0`` ``UpperLeftPointMtrs`` / ``LowerRightMtrs`` using
+    the inverse sinusoidal projection; we store the result in ``EPSG:4326``
+    so the downstream ``reproject_match`` to the AOI's grid is straightforward.
     """
-    with rasterio.open(hdf_path) as src:
-        descriptions = list(src.descriptions or ())
-        band_index = None
-        for i, desc in enumerate(descriptions, start=1):
-            if desc and "NDVI" in desc.upper() and "1 km" in desc:
-                band_index = i
+    from pyhdf.SD import SD, SDC  # imported lazily for a clear ModuleNotFoundError on import
+
+    sd = SD(str(hdf_path), SDC.READ)
+    try:
+        # 1. Find the NDVI SDS. Try a few common naming conventions before
+        #    falling back to a long_name search.
+        sds_obj = None
+        sds_name: str | None = None
+        for candidate in ("1 km monthly NDVI", "NDVI"):
+            if candidate in sd.datasets():
+                sds_obj = sd.select(candidate)
+                sds_name = candidate
                 break
-        if band_index is None:
-            for i, desc in enumerate(descriptions, start=1):
-                if desc and "NDVI" in desc.upper():
-                    band_index = i
+        if sds_obj is None:
+            for name in sd.datasets():
+                t = sd.select(name)
+                ln = t.attributes().get("long_name", "")
+                if "NDVI" in ln.upper() and "1 km" in ln.upper():
+                    sds_obj = t
+                    sds_name = name
                     break
-        if band_index is None:
-            band_index = 1
-        raw = src.read(band_index)
-        if hasattr(raw, "filled"):
-            raw = np.ma.filled(raw, np.nan)
-        # rasterio returns (count, H, W) — squeeze to (H, W) so the rest of
-        # the pipeline is 2-D. Use np.asarray with copy=False to avoid the
-        # numpy 2.5 "shape assignment" deprecation.
-        arr = np.asarray(raw, dtype=np.float32)
-        if arr.ndim == 3 and arr.shape[0] == 1:
-            arr = arr.reshape(arr.shape[1], arr.shape[2])
-        crs = src.crs
-        transform = src.transform
+                t.endaccess()
+        if sds_obj is None:
+            raise ValueError(
+                f"No MOD13A3 NDVI SDS found in {hdf_path} "
+                f"(datasets: {sorted(sd.datasets().keys())})"
+            )
+        try:
+            arr_int16 = np.asarray(sds_obj[:], dtype=np.int16)
+            sds_attrs = dict(sds_obj.attributes())
+        finally:
+            sds_obj.endaccess()
+
+        # 2. Read StructMetadata.0 (top-level SD attribute) for the grid
+        #    bounding box. Real MOD13A3 files expose the key as
+        #    "StructMetadata.0"; some test fixtures / older tools use
+        #    "StructMetadata_0" because dots are not valid Python identifiers.
+        sd_attrs = sd.attributes()
+        struct = sd_attrs.get("StructMetadata.0", "")
+        if not struct:
+            for k, v in sd_attrs.items():
+                if k.replace(".", "_") == "StructMetadata_0":
+                    struct = v
+                    break
+    finally:
+        sd.end()
+
+    # 3. Compute the geographic bounding box and the rasterio transform.
+    x_ul, y_ul, x_lr, y_lr = _parse_modis_grid_extent(struct)
+    west, north = _sinusoidal_to_lonlat(x_ul, y_ul)
+    east, south = _sinusoidal_to_lonlat(x_lr, y_lr)
+    h, w = arr_int16.shape
+    transform = from_bounds(west, south, east, north, w, h)
+
     da = xr.DataArray(
-        arr,
+        arr_int16,
         dims=("y", "x"),
         name="ndvi",
         attrs={
-            "long_name": "1 km monthly NDVI",
+            "long_name": sds_attrs.get("long_name", "1 km monthly NDVI"),
             "source": "MOD13A3 v061",
-            "units": "raw [-1, 1]",
+            "units": "raw int16 (×0.0001 → NDVI in [-0.2, 1.0])",
+            "fill_value": int(sds_attrs.get("_FillValue", _FILL_RAW)),
+            "sds_name": sds_name,
         },
     )
-    da.rio.write_crs(crs, inplace=True)
+    da.rio.write_crs("EPSG:4326", inplace=True)
     da.rio.write_transform(transform, inplace=True)
     return da
 
 
 def _rescale_ndvi(arr_raw: np.ndarray) -> np.ndarray:
-    """Rescale MOD13A3 raw NDVI ∈ [-1, 1] to [0, 1]; emit -9999.0 for fill.
+    """Rescale MOD13A3 raw NDVI ∈ [-0.2, 1.0] to [0, 1]; emit -9999.0 for fill.
 
     The MOD13A3 SDS is stored as int16 in [-2000, 10000] corresponding to
     NDVI in [-0.2, 1.0]. If we get the raw int16 range we rescale by
     ``(raw * 0.0001)`` first to land in [-0.2, 1.0] then by ``(x + 1) / 2``
     to land in [0, 1]. If the values are already in [-1, 1] floats, we
     rescale directly.
+
+    Fill handling: the MOD13A3 fill value is ``-3000`` (int16), which after
+    the ``*0.0001`` rescale becomes ``-0.3``. The ``arr < -0.2`` mask below
+    catches it (and any other out-of-range noise). We also keep an explicit
+    check on ``_FILL_RAW`` for documentation.
     """
     arr = arr_raw.astype(np.float32)
     if np.nanmax(arr) > 1.5 or np.nanmin(arr) < -1.5:
         # Looks like raw int16 scale [-2000, 10000].
         arr = arr * np.float32(1e-4)
-    # Fill: source fill is 0; also treat NaN, out-of-range as fill.
-    fill_mask = ~np.isfinite(arr) | (arr == _FILL_RAW) | (arr < -0.2) | (arr > 1.0)
+    # Fill: source fill is -3000 (catches as "out of range"). Treat NaN,
+    # the explicit _FILL_RAW value, and any value outside [-0.2, 1.0] as
+    # fill. The reproject step above may also produce NaN at the seams,
+    # so we drop those here.
+    fill_mask = (
+        ~np.isfinite(arr)
+        | (arr == np.float32(_FILL_RAW) * np.float32(1e-4))
+        | (arr < -0.2)
+        | (arr > 1.0)
+    )
     out = (arr + np.float32(1.0)) / np.float32(2.0)
     out = np.clip(out, np.float32(0.0), np.float32(1.0))
     out = np.where(fill_mask, _NODATA_OUT, out).astype(np.float32)

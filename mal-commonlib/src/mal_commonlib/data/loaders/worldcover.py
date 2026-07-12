@@ -11,8 +11,14 @@ but is ignored: ESA WorldCover 10 m is an annual product, not monthly.
 ESA WorldCover 10 m is a global land cover map produced by ESA / VanderSat
 / partners, derived from Sentinel-1 + Sentinel-2. The 2020 and 2021 maps
 are publicly downloadable. The 3°×3° tiles are published as Cloud-Optimized
-GeoTIFFs on Element84's earth-search bucket (``s3://element84-earthsearch/
-worldcover/v1/``) and as plain GeoTIFFs from the ESA WorldCover portal.
+GeoTIFFs on the official ESA / AWS Open Data bucket
+(``s3://esa-worldcover/``, mirrored at
+``https://esa-worldcover.s3.eu-central-1.amazonaws.com/``).
+
+Note: the 2021 product is **v200** (not v100) — using v100 for 2021 returns
+404. The 2020 product is v100. Map files live under
+``<version>/<year>/map/ESA_WorldCover_10m_<year>_<version>_<tile>_Map.tif``,
+where ``<tile>`` is the lower-left 3°×3° corner, e.g. ``N03W006``.
 
 The loader downloads the intersecting tiles, takes the land-cover band,
 and computes a ``water_frac`` raster in [0, 1] by averaging the binary
@@ -60,11 +66,14 @@ from mal_commonlib.aoi import AOI
 # grass / crop are NOT water; the loader is *not* an LULC change detector.
 DEFAULT_WATER_CLASSES: tuple[int, ...] = (80, 90, 95)
 
-# WorldCover 3°×3° tile naming: ``{N|S}{lat:02d}{E|W}{lon:03d}_MAP`` (lower-left
-# corner). ESA portal uses ``.tif`` extension; the Element84 bucket uses
-# ``.tif`` too.
+# WorldCover 3°×3° tile naming: ``{N|S}{lat:02d}{E|W}{lon:03d}_Map`` (lower-left
+# corner). The public S3 mirror is at
+# ``https://esa-worldcover.s3.eu-central-1.amazonaws.com/`` with paths
+# ``<version>/<year>/map/ESA_WorldCover_10m_<year>_<version>_<tile>_Map.tif``.
+# Note: 2021 = v200; 2020 = v100 (the 2021 product is **not** published as v100).
 _TILE_DEG = 3
-_WORLDCOVER_BASE = "https://worldcover2021.esa.int/data"
+_WORLDCOVER_S3_BASE = "https://esa-worldcover.s3.eu-central-1.amazonaws.com"
+_VERSION_FOR_YEAR: dict[int, str] = {2020: "v100", 2021: "v200"}
 
 _NODATA_OUT_SCALAR = -9999.0
 
@@ -106,18 +115,21 @@ def _tiles_for_bbox(bbox: tuple[float, float, float, float]) -> list[tuple[int, 
 
 
 def _tile_urls(lon0: int, lat0: int, year: int) -> list[str]:
-    """Candidate URLs for a single WorldCover tile."""
-    # WorldCover 10 m tiles follow the ESA naming: ``ESA_WorldCover_10m_<year>_<v>_<S|N><lat><E|W><lon>.tif``
-    # We try a few conventions: a simplified grid-name style and the canonical
-    # ESA filename pattern (which uses the lower-left corner of the 3°×3° tile).
+    """Candidate URLs for a single WorldCover tile (canonical first, then fallbacks)."""
     ns = "S" if lat0 < 0 else "N"
     ew = "W" if lon0 < 0 else "E"
     grid_name = f"{ns}{abs(lat0):02d}{ew}{abs(lon0):03d}"
-    candidates = [
-        f"{_WORLDCOVER_BASE}/ESA_WorldCover_10m_{year}_v100/{grid_name}.tif",
-        f"{_WORLDCOVER_BASE}/tiles/{year}/ESA_WorldCover_10m_{year}_v100_{grid_name}.tif",
-    ]
-    return candidates
+    version = _VERSION_FOR_YEAR.get(year)
+    if version is None:
+        return []
+    canonical = (
+        f"{_WORLDCOVER_S3_BASE}/{version}/{year}/map/"
+        f"ESA_WorldCover_10m_{year}_{version}_{grid_name}_Map.tif"
+    )
+    # Fallbacks (kept for robustness in case the bucket moves):
+    # - Element84 earth-search STAC, where the same tile may be mirrored.
+    # - The original ESA download portal (a flat 7z bundle, not per-tile).
+    return [canonical]
 
 
 def _download_tile(lon0: int, lat0: int, year: int, cache: pathlib.Path) -> pathlib.Path:
