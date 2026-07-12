@@ -43,8 +43,8 @@ from mal_commonlib.aoi import AOI
 ERA5_NODATA: float = -9999.0
 ERA5_DATASET: str = "derived-era5-land-daily-statistics"
 ERA5_VARIABLE: str = "2m_temperature"
-ERA5_STATISTIC: str = "daily_mean"  # daily mean; we aggregate to monthly mean
-ERA5_FREQ: str = "mon"             # request only this month
+ERA5_DAILY_STATISTIC: str = "daily_mean"  # daily mean; we aggregate to monthly mean
+ERA5_FREQ: str = "1_hourly"               # CDS frequency for daily-statistics dataset
 
 # v1 thermal response (Mordecai 2013 parabolic approximation).
 T_OPT: float = 25.0
@@ -140,7 +140,7 @@ def _cds_request(year: int, month: int, bbox_wsen: tuple[float, float, float, fl
     w, s, e, n = bbox_wsen
     return {
         "variable": [ERA5_VARIABLE],
-        "statistic": [ERA5_STATISTIC],
+        "daily_statistic": [ERA5_DAILY_STATISTIC],
         "year": [f"{year:04d}"],
         "month": [f"{month:02d}"],
         "day": _days_in_month(year, month),
@@ -250,7 +250,7 @@ def load_era5_temp_suitability(
         attrs={
             "long_name": "temp_suitability (Sharpe-DeMichele growth response)",
             "units": "normalized (parabolic, T_OPT=25, T_HALF_WIDTH=8)",
-            "source": f"ERA5-Land daily stats {ERA5_VARIABLE} {ERA5_STATISTIC}",
+            "source": f"ERA5-Land daily stats {ERA5_VARIABLE} {ERA5_DAILY_STATISTIC}",
             "aoi_slug": aoi.slug,
             "year": year,
             "month": month,

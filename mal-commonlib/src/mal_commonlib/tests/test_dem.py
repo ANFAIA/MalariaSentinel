@@ -155,3 +155,82 @@ def test_merit_falls_back_to_nasadem(monkeypatch: pytest.MonkeyPatch) -> None:
     assert str(out.rio.crs).upper() == "EPSG:4326"
     # Synthetic fill is 200 m everywhere — the fallback returned our stub.
     assert np.all(out.values == 200.0)
+
+
+def test_merit_corrupt_cache_triggers_redownload(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path,
+) -> None:
+    """A non-zero cache file that is not a valid GeoTIFF must be detected
+    and replaced with a freshly downloaded valid tile.
+
+    The MERIT upstream now serves a Dropbox login page (HTML) for the
+    per-tile URL. ``_download_tile`` writes whatever it gets to cache, so
+    a subsequent call would return the cached HTML — which ``rasterio.open``
+    cannot read. ``_is_valid_geotiff`` must detect this, fall through to
+    re-download, and the resulting tile must be openable.
+    """
+    import requests
+
+    # 1) Pre-populate the cache with an HTML page — the symptom of a
+    # password-gated upstream that returns the Dropbox login page.
+    cache_dir = tmp_path / "cache"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    corrupt_path = cache_dir / "merit_+000_+005.tif"  # the bbox tile is lon0=0, lat0=5
+    corrupt_path.write_bytes(b"<html>login required</html>")
+    assert corrupt_path.stat().st_size > 0
+    # The real validator must reject the HTML.
+    assert dem_mod._is_valid_geotiff(corrupt_path) is False
+
+    # 2) Build a 1×1 valid GeoTIFF and capture its bytes for the fake
+    # downloader to return.
+    real_tif = cache_dir / "merit_+000_+005_valid.tif"
+    with rasterio.open(
+        real_tif,
+        "w",
+        driver="GTiff",
+        height=1,
+        width=1,
+        count=1,
+        dtype="float32",
+        crs="EPSG:4326",
+        transform=from_bounds(0.0, 0.0, 5.0, 5.0, 1, 1),
+    ) as dst:
+        dst.write(np.array([[100.0]], dtype="float32"), indexes=1)
+    real_bytes = real_tif.read_bytes()
+
+    # 3) Stub ``requests.get`` to return those bytes — simulating a
+    # successful re-download after the corruption was detected.
+    class _Resp:
+        def __init__(self, body: bytes) -> None:
+            self._body = body
+            self.status_code = 200
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+        def raise_for_status(self) -> None:
+            return None
+
+        def iter_content(self, chunk_size: int):
+            yield self._body
+
+    def _fake_get(url, stream=True, timeout=120, headers=None, allow_redirects=True):  # noqa: ARG001
+        return _Resp(real_bytes)
+
+    monkeypatch.setattr(requests, "get", _fake_get)
+
+    # 4) Drive the download loop directly.
+    out_path = dem_mod._download_tile(0, 5, cache_dir)
+
+    # The file at ``dest`` is the freshly written GeoTIFF, not the HTML.
+    assert out_path == corrupt_path
+    assert out_path.exists()
+    assert out_path.stat().st_size > 0
+    # rasterio must be able to open the new file.
+    with rasterio.open(str(out_path)) as src:
+        assert src.count >= 1
+    # The validator now agrees the cached file is valid.
+    assert dem_mod._is_valid_geotiff(out_path) is True

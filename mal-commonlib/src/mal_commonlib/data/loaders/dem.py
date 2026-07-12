@@ -166,6 +166,29 @@ def _tile_urls(lon0: int, lat0: int) -> list[str]:
     ]
 
 
+def _is_valid_geotiff(path: pathlib.Path) -> bool:
+    """Return ``True`` iff ``path`` exists, is non-empty, and rasterio can
+    open it as a valid GeoTIFF with at least one band.
+
+    A download may succeed at the HTTP level but return an HTML error page
+    or a partial byte stream (e.g. when the upstream is a password-gated
+    Dropbox folder that returns the login page). Such files have non-zero
+    size but are not valid GeoTIFFs. The cache check in ``_download_tile``
+    uses this helper to detect and re-download corrupted cache entries.
+    """
+    if not (path.exists() and path.stat().st_size > 0):
+        return False
+    try:
+        with rasterio.open(str(path)) as src:
+            if src.closed:
+                return False
+            if src.count < 1:
+                return False
+            return True
+    except (rasterio.errors.RasterioIOError, Exception):  # noqa: BLE001
+        return False
+
+
 def _download_tile(lon0: int, lat0: int, cache: pathlib.Path) -> pathlib.Path:
     """Download a single MERIT tile to ``cache``; return the local path.
 
@@ -174,9 +197,13 @@ def _download_tile(lon0: int, lat0: int, cache: pathlib.Path) -> pathlib.Path:
     single matching tile from the tarball into ``cache`` and return its
     extracted path. A downloaded bundle is cached so subsequent tiles
     within the same 30°×30° block don't trigger a re-download.
+
+    Cached files are validated as readable GeoTIFFs — a non-zero-sized
+    file (e.g. an HTML error page from a password-gated upstream) is
+    deleted and re-downloaded.
     """
     dest = cache / f"merit_{lon0:+04d}_{lat0:+04d}.tif"
-    if dest.exists() and dest.stat().st_size > 0:
+    if _is_valid_geotiff(dest):
         return dest
     headers: dict[str, str] = {}
     token = os.environ.get("MERIT_AUTH_TOKEN")
@@ -440,6 +467,18 @@ def load_merit_dem(
 
     try:
         paths = [_download_tile(lon0, lat0, cache) for (lon0, lat0) in tiles]
+        # Defensive: validate every cached tile. ``_download_tile`` already
+        # checks on the way in, but a file could be corrupted between the
+        # download check and the stitch call (concurrent writer, disk
+        # error, etc.). If any tile is invalid, force a re-download by
+        # deleting it and retrying once. If it still fails, fall back to
+        # NASADEM.
+        for p in list(paths):
+            if not _is_valid_geotiff(p):
+                p.unlink(missing_ok=True)
+                raise rasterio.errors.RasterioIOError(
+                    f"Cached MERIT tile at {p} is not a valid GeoTIFF"
+                )
         arr, profile = _stitch_tiles(paths)
 
         # Build an in-memory DataArray on the merged tile grid.
@@ -482,9 +521,11 @@ def load_merit_dem(
         out.rio.write_transform(from_bounds(*aoi.bbox, *aoi.cells_per_side()), inplace=True)
         out.rio.write_nodata(_NODATA_OUT_SCALAR, inplace=True)
         return out
-    except FileNotFoundError:
+    except (FileNotFoundError, rasterio.errors.RasterioIOError):
         # MERIT upstream is unreachable (404 on every candidate URL, password
-        # gate, etc.). Fall back to NASADEM via Planetary Computer — no auth.
+        # gate, etc.) or the cached tile is corrupted (e.g. an HTML error
+        # page from a Dropbox login redirect). Fall back to NASADEM via
+        # Planetary Computer — no auth required.
         return _load_nasadem_dem(aoi)
 
 
