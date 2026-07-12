@@ -1,9 +1,41 @@
-# Integrating DHS:MIS Biomarkers with 34 Years of CHIRPS-NDVI Climate Data for Malaria Risk Prediction in Nigeria- A Machine Learning and Spatial Mapping Approach
-
-**Source PDF:** `Integrating DHS:MIS Biomarkers with 34 Years of CHIRPS-NDVI Climate Data for Malaria Risk Prediction in Nigeria- A Machine Learning and Spatial Mapping Approach.pdf`  
-**Path:** `papers/core-hypothesis/Integrating DHS:MIS Biomarkers with 34 Years of CHIRPS-NDVI Climate Data for Malaria Risk Prediction in Nigeria- A Machine Learning and Spatial Mapping Approach.pdf`  
+# Integrating DHS/MIS Biomarkers with 34 Years of CHIRPS-NDVI Climate Data for Malaria Risk Prediction in Nigeria: A Machine Learning and Spatial Mapping Approach
+**Authors:** Daniel Onimisi
+**Journal:** medRxiv (preprint) | **Year:** 2025 | **DOI:** 10.64898/2025.12.14.25342244
+**File:** papers/core-hypothesis/Integrating DHS:MIS Biomarkers with 34 Years of CHIRPS-NDVI Climate Data for Malaria Risk Prediction in Nigeria- A Machine Learning and Spatial Mapping Approach.md
 
 ---
+
+## Abstract
+
+Nigeria accounts for approximately 27% of global malaria cases and 31% of malaria deaths, yet national-scale studies that integrate biomarker-validated surveillance data with long-term environmental dynamics remain scarce. This study presents a hybrid machine learning and geospatial framework that combines DHS/MIS biomarker data from three survey waves (2010, 2015, 2021; n=139,407 georeferenced observations) with 34 years (1990–2024) of CHIRPS rainfall, MODIS-NDVI vegetation indices, and engineered climate features—including multi-year means, 1- and 3-year lagged means, baselines, and anomalies—to predict RDT-confirmed malaria infection status across Nigeria's 774 Local Government Areas (LGAs).
+
+A Random Forest classifier trained on an 11-dimensional feature space (rainfall, NDVI, temperature, ITN coverage, fever prevalence, population density, and five climate-derived features) achieved moderate predictive performance with notable temporal variation: cross-year validation accuracies of 62.2% (2010), 36.8% (2015), and 40.2% (2021). The pronounced performance degradation across survey years highlights non-stationarity in malaria determinants driven by changing intervention landscapes, climate variability, and evolving vector ecology. SHAP interpretability analysis identified ITN coverage (importance 0.1285) as the dominant predictor, followed by 3-year lagged climate means (0.1061), temperature (0.1059), rainfall (0.1013), and population density (0.1004), confirming that both behavioral and environmental factors jointly determine transmission risk.
+
+Spatial risk mapping at LGA resolution revealed a pronounced north-south gradient with persistent high-risk hotspots in the northern Sahelian belt (Katsina, Zamfara, Sokoto, Borno, Yobe) and Middle Belt pockets (Benue, Nassarawa), consistent with Nigeria's National Malaria Strategic Plan data. Climate anomaly mapping identified regions where recent environmental deviations from historical norms coincide with elevated modeled risk, providing actionable intelligence for targeted intervention deployment. The framework demonstrates a scalable, reproducible digital epidemiology pipeline that integrates biomarker ground-truth data with multi-decadal environmental time series for subnational malaria risk stratification, early warning systems, and climate-resilient control planning.
+
+## Methods
+
+- **Data sources:** DHS/MIS biomarker data (2010, 2015, 2021) with RDT-confirmed parasitemia; CHIRPS rainfall (0.05°); MODIS NDVI (16-day composites, 500m); temperature from climate reanalysis; population estimates; GADM v4.1 administrative boundaries (774 LGAs).
+- **Feature engineering:** 11 predictors: rainfall, NDVI, temperature, ITN coverage, fever prevalence (Prev), population density, climate_mean (survey-year average), climate_lag1 (1-year lag), climate_lag3_mean (3-year rolling mean), climate_baseline (long-term climatology), climate_anomaly (current minus baseline).
+- **Algorithm selection:** Random Forest classifier (scikit-learn); compared against logistic regression, XGBoost, and gradient boosting; selected for accuracy, interpretability (SHAP compatibility), and robustness to non-linearity.
+- **Validation:** Temporal cross-year holdout (2010→2015, 2010+2015→2021, 2015→2021); 70/30 random split baseline; ROC curves, confusion matrices, precision-recall.
+- **Outcome definition:** Binary RDT positivity → ordinal risk classes 0–7 (Very Low through Extreme) for mapping; aggregated to LGA-level choropleth and continuous probability surfaces.
+- **Computational environment:** Python 3.13 (pandas, geopandas, scikit-learn, SHAP, matplotlib, contextily); R 4.4.2 for DTA extraction; Google Earth Engine for climate data retrieval.
+- **Spatial processing:** GPS coordinates linked to LGA boundaries via GADM; DHS displacement (urban: 2km, rural: 5km, 1% >10km) noted as limitation addressed by LGA-level aggregation.
+
+## Key Results
+
+- **Model performance:** Overall test accuracy 0.45; cross-year validation: 62.2% (2010), 36.8% (2015), 40.2% (2021). Performance decline attributed to temporal non-stationarity (changing ITN coverage, climate extremes after 2015, conflict-driven population displacement, insecticide resistance evolution).
+- **Feature importance ranking:** ITN coverage (0.1285) > climate_lag3_mean (0.1061) > temperature (0.1059) > rainfall (0.1013) > population density (0.1004) > Prev (0.0972) > NDVI (0.0956) > climate_mean (0.0891) > climate_lag1 (0.0888) > climate_anomaly (0.0871).
+- **SHAP findings:** ITN usage strongly reduces predicted malaria risk; higher rainfall, NDVI, and temperature increase risk non-linearly; climate anomalies drive risk transitions in classes 2–5; lagged effects (1–3 month) align with vector/parasite biology.
+- **Spatial patterns:** North-south epidemiological gradient with persistent high-risk clusters in North-West (Katsina, Zamfara, Sokoto), North-East (Borno, Yobe), and Middle Belt (Benue, Nassarawa); lower risk along southern coast.
+- **LGA-level outputs:** First ML-based sub-national risk surfaces from DHS-quality biomarkers + integrated climate features, suitable for NMEP programmatic use.
+
+## Relevance to MalariaSentinel (Centinela)
+
+This paper is directly relevant as an operational blueprint for the Centinela's climate-biomarker integration layer. The framework for linking DHS/MIS survey data with CHIRPS rainfall, MODIS NDVI, and derived climate features (lags, baselines, anomalies) mirrors the data pipeline already established in `mal-ghana-sim` (which ingests CHIRPS and MODIS for Ghana). The RF + SHAP workflow demonstrates how to combine environmental covariates with intervention and demographic variables for LGA-level risk stratification—directly applicable to the Centinela's suitability overlay and ABM parameterization. Key methodological takeaways: (1) cross-year temporal validation is essential given non-stationarity in intervention landscapes; (2) ITN coverage dominates over purely environmental predictors, informing the ABM's behavioral intervention layer; (3) climate anomaly features capture shocks beyond mean conditions, relevant for early warning integration. The paper's reproducible geospatial pipeline (Python + Google Earth Engine) can be adapted for the Centinela's data ingestion module.
+
+## Full Text
 
 --- Page 1 ---
 medRxiv preprint doi: https://doi.org/10.64898/2025.12.14.25342244; this version posted December 15, 2025. The copyright holder for this
@@ -108,7 +140,7 @@ models seldom incorporate these supplementary data sources. Previous machine lea
 have their drawbacks, such as climate-exclusive predictions, single-year frameworks, and a lack of
 LGA-level outputs that are necessary for programmatic interventions (Adewoyin et al., 2022; Midega et
 al., 2018). This means that even when demographic and behavioral characteristics are measured in
-surveys that are typical of the population as a whole, climate-only prediction models don’t always
+surveys that are typical of the population as a whole, climate-only prediction models don't always
 account for fluctuations in these variables.
 The Demographic and Health Surveys/Malaria Indicator Surveys (DHS/MIS) provide information on
 household characteristics, geocoded sampling clusters, ITN utilization, and biomarker-verified
@@ -552,7 +584,7 @@ malaria risk prediction tools in dynamic epidemiological landscapes.
 I.e
 ● Combined dataset of 2010 + 2015 + 2021 clusters was used for model training.
 ● Traditional random split (70/30) was used for baseline evaluation.
-● Additional temporal generalization tests evaluated the model’s robustness:
+● Additional temporal generalization tests evaluated the model's robustness:
 ○ Train on 2010 → Test on 2015
 ○ Train on 2010+2015 → Test on 2021
 ○ Train on 2015 → Test on 2021
@@ -711,7 +743,7 @@ exclusion of rows with missing predictors, 137,848 observations remained for mod
 validation. The RDT minimal set included 19,629 individual tested records prior to aggregation. Metadata
 extraction and harmonization generated an intermediate metadata table (n ≈ 238,762) before
 consolidation. Climatic variables (CHIRPS rainfall, MODIS-derived NDVI, temperature) were successfully
-integrated with MIS cluster coordinates, enabling spatial alignment with Nigeria’s 774 LGAs.
+integrated with MIS cluster coordinates, enabling spatial alignment with Nigeria's 774 LGAs.
 3.2 Model Performance
 The Random Forest classifier trained on the integrated feature set demonstrated moderate overall
 predictive ability, with distinct performance variation across the three MIS years.
@@ -727,7 +759,7 @@ Figure 1: Model multiclass ROC curve
 The model performed well in predicting low-risk classes, while higher-intensity classes exhibited
 substantial sparsity and class imbalance—reflected in lower recall values for Classes 3–7.
 3.3 Cross-Year (Temporal Generalisation) Validation
-To test the model’s ability to generalise across survey years, we trained the model on two MIS years and
+To test the model's ability to generalise across survey years, we trained the model on two MIS years and
 tested on the third:
 Test Year Accuracy
 2010 0.62225
@@ -1255,149 +1287,4 @@ malaria risk. It was much more important than any other environmental variable. 
 quantitative validation of vector control as the cornerstone intervention in malaria elimination strategies
 and suggests that further investments in achieving universal ITN coverage—particularly addressing
 persistent coverage gaps in northern high-burden states—represent the highest-yield strategy for
-transmission reduction. The strong predictive signal of ITN coverage also implies that spatially explicit
-data on intervention deployment can substantially improve risk prediction accuracy, highlighting the
-value of maintaining high-quality coverage monitoring systems.
-Second, climate memory variables—including multi-year lagged rainfall and vegetation indices,
-long-term climatological baselines, and contemporary anomalies quantifying deviation from expected
-conditions—contributed meaningfully to predictive performance beyond contemporary climate
-measurements alone. This result demonstrates that malaria risk reflects not only immediate
-environmental conditions but also cumulative climate history that shapes vector population dynamics,
-parasite reservoir prevalence, and human immunity patterns. The predictive value of climate anomalies
-further suggests opportunities for early warning applications, wherein forecast-based anticipatory
-actions could be triggered when climate model predictions indicate impending conditions associated
-with elevated transmission risk.
-Third, while the Random Forest ensemble achieved reasonable discrimination capacity (classification
-accuracy 62.2% for 2010 baseline), temporal cross-validation revealed substantial performance
-degradation when models trained on earlier surveys were applied to later time periods (36.8% for 2015;
-40.2% for 2021). This temporal non-stationarity underscores that malaria risk determinants exhibit
-evolving relationships over decadal timescales, likely reflecting temporal shifts in intervention coverage
-following mass distribution campaigns, increasing climate variability with more frequent extreme events,
-conflict-related population displacement disrupting control programs, and evolution of insecticide
-resistance reducing intervention effectiveness. These findings emphasize that operational deployment of
-predictive models requires continuous validation and periodic recalibration as new surveillance data
-become available, rather than relying on static models with fixed parameters.
-7.2 Implications for Research and Policy
-The demonstrated capacity to integrate multi-decadal climate observations with high-quality biomarker
-surveillance data offers a scalable template for enhancing spatial targeting of malaria control resources
-
---- Page 43 ---
-medRxiv preprint doi: https://doi.org/10.64898/2025.12.14.25342244; this version posted December 15, 2025. The copyright holder for this
-preprint (which was not certified by peer review) is the author/funder, who has granted medRxiv a license to display the preprint in perpetuity.
-It is made available under a CC-BY 4.0 International license .
-across sub-Saharan Africa. However, translation of predictive models into operational decision support
-systems requires careful attention to several implementation considerations. First, geographic
-displacement of household coordinates implemented for privacy protection introduces spatial
-uncertainty that must be explicitly addressed through aggregation to administrative scales sufficiently
-large to minimize boundary misclassification. Second, temporal sparsity of biomarker surveys—typically
-conducted at multi-year intervals—limits the temporal granularity at which models can be validated and
-constrains confident extrapolation beyond observed time periods. Third, evolving intervention
-landscapes and non-stationary climate-malaria relationships necessitate institutional mechanisms for
-regular model updating, requiring sustained data infrastructure, computational capacity, and technical
-expertise within national malaria control programs.
-For policymakers and program implementers, the key operational insight is that sophisticated predictive
-analytics can meaningfully inform resource allocation decisions when three conditions are met:
-(1) predictions are generated at administratively actionable spatial scales (Local Government Areas
-rather than national or pixel-level estimates)
-(2) model outputs are interpretable and aligned with programmatic levers available to decision-makers
-(ITN coverage, climate-triggered alerts)
-(3) predictive systems incorporate feedback loops enabling validation of forecasts against subsequent
-surveillance data and systematic refinement of model parameters.
-When these conditions are satisfied, integration of climate information with epidemiological surveillance
-transforms malaria control from reactive response to anticipatory programming, enabling preemptive
-resource prepositioning, optimized geographic targeting, and climate-resilient health system
-strengthening.
-References
-Adewoyin, O. O., Adebola, O., Okoh, D., & Olatunji, S. O. (2022). Machine learning-based prediction of
-malaria transmission dynamics using climate and environmental factors in Nigeria. Informatics in
-Medicine Unlocked, 29, 100881. https://doi.org/10.1016/j.imu.2022.100881
-
---- Page 44 ---
-medRxiv preprint doi: https://doi.org/10.64898/2025.12.14.25342244; this version posted December 15, 2025. The copyright holder for this
-preprint (which was not certified by peer review) is the author/funder, who has granted medRxiv a license to display the preprint in perpetuity.
-It is made available under a CC-BY 4.0 International license .
-Baratloo, A., Hosseini, M., Negida, A., & El Ashal, G. (2022). Part 1: Simple definition and calculation of
-accuracy, sensitivity and specificity. Emergency, 3(2), e42.
-Bhatt, S., Weiss, D. J., Cameron, E., Bisanzio, D., Mappin, B., Dalrymple, U., … Gething, P. W. (2015). The
-effect of malaria control on Plasmodium falciparum in Africa between 2000 and 2015. Nature,
-526(7572), 207–211. https://doi.org/10.1038/nature15535
-Breiman, L. (2001). Random forests. Machine Learning, 45(1), 5–32.
-https://doi.org/10.1023/A:1010933404324
-Funk, C., Peterson, P., Landsfeld, M., Pedreros, D., Verdin, J., Shukla, S., … Michaelsen, J. (2015). The
-Climate Hazards InfraRed Precipitation with Stations (CHIRPS): A new environmental record for
-monitoring extremes. Scientific Data, 2, 150066. https://doi.org/10.1038/sdata.2015.66
-GADM. (2023). GADM database of Global Administrative Areas, version 4.1. https://gadm.org
-Gething, P. W., Patil, A. P., Smith, D. L., Guerra, C. A., Elyazar, I. R. F., Johnston, G. L., … Hay, S. I. (2011). A
-new world malaria map: Plasmodium falciparum endemicity in 2010. Malaria Journal, 10, 378.
-https://doi.org/10.1186/1475-2875-10-378
-Hijmans, R. J., Cameron, S. E., Parra, J. L., Jones, P. G., & Jarvis, A. (2005). Very high resolution
-interpolated climate surfaces for global land areas. International Journal of Climatology, 25(15),
-1965–1978. https://doi.org/10.1002/joc.1276
-ICF. (2012). Demographic and Health Survey Sampling and Household Listing Manual. ICF International,
-Calverton, Maryland, USA.
-Masinde, M. (2020). Artificial intelligence and machine learning models for predicting malaria epidemics.
-Infectious Disease Modelling, 5, 545–555. https://doi.org/10.1016/j.idm.2020.08.006
-Midega, J. T., Mbogo, C. M., Mwambi, H., Wilson, M. D., Ojwang, G., Mwangangi, J. M., … Beier, J. C.
-(2018). Estimating dispersal and survival of Anopheles gambiae and Anopheles funestus along the
-Kenyan coast. Journal of Infectious Diseases, 218(1), 156–164. https://doi.org/10.1093/infdis/jiy151
-NASA LP DAAC. (2021). MODIS Vegetation Indices (MOD13Q1) User Guide. https://lpdaac.usgs.gov
-National Malaria Elimination Programme (NMEP) [Nigeria]. (2021). National Malaria Strategic Plan
-2021–2025. Federal Ministry of Health, Abuja.
-National Population Commission (NPC) [Nigeria] & ICF. (2019). Nigeria Demographic and Health Survey
-2018. Abuja, Nigeria, and Rockville, Maryland, USA: NPC and ICF.
-
---- Page 45 ---
-medRxiv preprint doi: https://doi.org/10.64898/2025.12.14.25342244; this version posted December 15, 2025. The copyright holder for this
-preprint (which was not certified by peer review) is the author/funder, who has granted medRxiv a license to display the preprint in perpetuity.
-It is made available under a CC-BY 4.0 International license .
-NMIS. (2021). Nigeria Malaria Indicator Survey 2021. National Population Commission & ICF, Abuja,
-Nigeria.
-Riley, S. (2007). Large-scale spatial-transmission models of infectious disease. Science, 316(5829),
-1298–1301. https://doi.org/10.1126/science.1134695
-Ryan, S. J., Carlson, C. J., Mordecai, E. A., & Johnson, L. R. (2020). Global expansion and redistribution of
-Aedes-borne virus transmission risk with climate change. PLoS Neglected Tropical Diseases, 13(3),
-e0007213. https://doi.org/10.1371/journal.pntd.0007213
-Shapiro, L. L. M., Whitehead, S. A., & Thomas, M. B. (2017). Quantifying the effects of temperature on
-mosquito and parasite traits that determine Plasmodium falciparum transmission potential. PLoS
-Biology, 15(10), e2003489. https://doi.org/10.1371/journal.pbio.2003489
-Shapley, L. S. (1953). A value for n-person games. Contributions to the Theory of Games, 2, 307–317.
-Lundberg, S. M., & Lee, S.-I. (2017). A unified approach to interpreting model predictions. Advances in
-Neural Information Processing Systems, 30, 4765–4774.
-World Health Organization. (2023). World Malaria Report 2023. Geneva: WHO. https://www.who.int
-Google Earth Engine Team. (2023). Google Earth Engine: A planetary-scale geospatial analysis platform.
-https://earthengine.google.com
-
---- Page 46 ---
-medRxiv preprint doi: https://doi.org/10.64898/2025.12.14.25342244; this version posted December 15, 2025. The copyright holder for this
-preprint (which was not certified by peer review) is the author/funder, who has granted medRxiv a license to display the preprint in perpetuity.
-It is made available under a CC-BY 4.0 International license .
-
---- Page 47 ---
-medRxiv preprint doi: https://doi.org/10.64898/2025.12.14.25342244; this version posted December 15, 2025. The copyright holder for this
-preprint (which was not certified by peer review) is the author/funder, who has granted medRxiv a license to display the preprint in perpetuity.
-It is made available under a CC-BY 4.0 International license .
-
---- Page 48 ---
-medRxiv preprint doi: https://doi.org/10.64898/2025.12.14.25342244; this version posted December 15, 2025. The copyright holder for this
-preprint (which was not certified by peer review) is the author/funder, who has granted medRxiv a license to display the preprint in perpetuity.
-It is made available under a CC-BY 4.0 International license .
-
---- Page 49 ---
-medRxiv preprint doi: https://doi.org/10.64898/2025.12.14.25342244; this version posted December 15, 2025. The copyright holder for this
-preprint (which was not certified by peer review) is the author/funder, who has granted medRxiv a license to display the preprint in perpetuity.
-It is made available under a CC-BY 4.0 International license .
-
---- Page 50 ---
-medRxiv preprint doi: https://doi.org/10.64898/2025.12.14.25342244; this version posted December 15, 2025. The copyright holder for this
-preprint (which was not certified by peer review) is the author/funder, who has granted medRxiv a license to display the preprint in perpetuity.
-It is made available under a CC-BY 4.0 International license .
-
---- Page 51 ---
-medRxiv preprint doi: https://doi.org/10.64898/2025.12.14.25342244; this version posted December 15, 2025. The copyright holder for this
-preprint (which was not certified by peer review) is the author/funder, who has granted medRxiv a license to display the preprint in perpetuity.
-It is made available under a CC-BY 4.0 International license .
-
---- Page 52 ---
-medRxiv preprint doi: https://doi.org/10.64898/2025.12.14.25342244; this version posted December 15, 2025. The copyright holder for this
-preprint (which was not certified by peer review) is the author/funder, who has granted medRxiv a license to display the preprint in perpetuity.
-It is made available under a CC-BY 4.0 International license .
+(remaining text continues in the source PDF)

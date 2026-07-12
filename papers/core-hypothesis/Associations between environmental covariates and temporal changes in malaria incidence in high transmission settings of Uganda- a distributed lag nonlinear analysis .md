@@ -1,9 +1,41 @@
-# Associations between environmental covariates and temporal changes in malaria incidence in high transmission settings of Uganda- a distributed lag nonlinear analysis 
-
-**Source PDF:** `Associations between environmental covariates and temporal changes in malaria incidence in high transmission settings of Uganda- a distributed lag nonlinear analysis .pdf`  
-**Path:** `papers/core-hypothesis/Associations between environmental covariates and temporal changes in malaria incidence in high transmission settings of Uganda- a distributed lag nonlinear analysis .pdf`  
+# Associations between environmental covariates and temporal changes in malaria incidence in high transmission settings of Uganda: a distributed lag nonlinear analysis
+**Authors:** Jaffer Okiring, Isobel Routledge, Adrienne Epstein, Jane F. Namuganga, Emmanuel V. Kamya, Gloria Odei Obeng-Amoako, Catherine Maiteki Sebuguzi, Damian Rutazaana, Joan N. Kalyango, Moses R. Kamya, Grant Dorsey, Ronald Wesonga, Steven M. Kiwuwa, Joaniter I. Nankabirwa
+**Journal:** BMC Public Health | **Year:** 2021 | **DOI:** 10.1186/s12889-021-11949-5
+**File:** papers/core-hypothesis/Associations between environmental covariates and temporal changes in malaria incidence in high transmission settings of Uganda- a distributed lag nonlinear analysis .md
 
 ---
+
+## Abstract
+
+Environmental covariates such as temperature, rainfall, and vegetation cover are critical drivers of malaria transmission, yet their quantitative relationships with disease burden remain poorly characterized—especially in high-transmission sub-Saharan African settings. This study leverages data from seven Malaria Reference Centres (MRCs) in Uganda over a 24-month period (January 2019–December 2020) to quantify exposure-lag-response effects of environmental covariates on monthly malaria incidence. Remote-sensing environmental data (MODIS land surface temperature, CHIRPS rainfall, MODIS NDVI) were linked to health facility catchment-area incidence estimates, and a distributed lag nonlinear model (DLNM) was used to capture non-linear and temporally delayed associations.
+
+The median monthly malaria incidence across sites was 790 per 1000 person-years, with substantial spatial heterogeneity (range 73–3973). Temperature of 35°C (vs. the median 30°C) was significantly associated with increased incidence at lag 2 months (IRR 2.00, 95% CI 1.42–2.83), with the cumulative IRR peaking at lag 4 months (IRR 8.16, 95% CI 3.41–20.26). Rainfall of 200mm (vs. median 133mm) increased incidence at lag 0 (IRR 1.24, 95% CI 1.01–1.52), with cumulative IRR peaking at lag 4 (IRR 1.99, 95% CI 1.22–2.27). High NDVI (0.72 vs. median 0.66) increased cumulative IRR at lags 2–4, peaking at lag 4 (IRR 1.57, 95% CI 1.09–2.25). Granger causality tests confirmed that all three covariates significantly affect the temporal distribution of malaria incidence across sites combined.
+
+The study demonstrates that in high-transmission Ugandan settings, elevated temperature, rainfall, and NDVI are associated with increased malaria incidence at characteristic lag times. These quantified exposure-lag-response relationships provide an evidence base for designing early warning systems, targeting preventive interventions, and planning seasonal malaria control strategies. The DLNM framework proved effective for capturing the complex, nonlinear, and delayed nature of environment-malaria associations.
+
+## Methods
+
+- **Study design:** Ecological time-series analysis using health facility surveillance data from 7 MRCs in high-transmission Ugandan districts (Aduku, Lobule, Awach, Lalogi, Patongo, Padibe, Namokora) where indoor residual spraying was not implemented.
+- **Outcome:** Monthly malaria incidence per 1000 person-years, derived from catchment-area population estimates (AfriPop database with 0.0029/unit population growth).
+- **Environmental covariates:** Daytime land surface temperature (°C) from MODIS (1km, monthly), CHIRPS rainfall (0.05° resolution, monthly), NDVI from MODIS (1km, monthly, gap-filled for cloud cover using random forest).
+- **Statistical analysis:** Cross-correlation to determine optimal lags; Granger causality Wald tests; Distributed Lag Nonlinear Model (DLNM) with second-order natural cubic splines for non-linear and lag effects; health facility random effects; seasonality controlled via 4 degrees of freedom per year; QAIC-based model selection.
+- **Software:** R 3.6.0 with `dlnm` and `lme4` packages; QGIS for raster extraction.
+- **Sensitivity analysis:** 1000 simulations (Barrera-Gomez & Basagana method) to rule out multi-collinearity confound.
+
+## Key Results
+
+- **Incidence:** Median 790/1000 PY (range 73–3973); highest at Patongo HC (1272/1000 PY), lowest at Namokora HC (337.5/1000 PY).
+- **Temperature:** High temperature (35°C) increased IRR at lag 2 (IRR 2.00, 95% CI 1.42–2.83); cumulative IRR peaked at lag 4 (IRR 8.16, 95% CI 3.41–20.26). Low temperature (26°C) showed no significant effect at any lag.
+- **Rainfall:** High rainfall (200mm) increased IRR at lag 0 (IRR 1.24, 95% CI 1.01–1.52); cumulative IRR peaked at lag 4 (IRR 1.99, 95% CI 1.22–2.27). Low rainfall (3mm) showed extreme cumulative effect at lag 4 (IRR 26.70, 95% CI 1.82–397.0) but with wide CIs.
+- **NDVI:** High NDVI (0.72) increased IRR at lag 2 (IRR 1.31, 95% CI 1.04–1.65); cumulative IRR peaked at lag 4 (IRR 1.57, 95% CI 1.09–2.25).
+- **Granger causality:** All-sites combined showed strong causal effects for temperature (F=8.00, p<0.0001), rainfall (F=8.96, p=0.003), and NDVI (F=8.42, p<0.0001).
+- **Saturation effect:** Cumulative IRR increased more rapidly in lags 1–2 than lags 3–4 for all covariates, suggesting diminishing marginal impact once conditions are sufficient for mosquito cycle completion.
+
+## Relevance to MalariaSentinel (Centinela)
+
+This paper provides critical parameterization data for the Centinela's environmental covariate layer. The DLNM-derived lag-response relationships (temperature→IRR at lag 2, rainfall→IRR at lag 0, NDVI→IRR at lag 2) can directly inform the suitability overlay in the ABM/SDSS pipeline—quantifying how antecedent environmental conditions modulate transmission risk. The use of CHIRPS and MODIS data sources aligns with the project's existing data pipeline (already used in `mal-ghana-sim`). The finding that cumulative effects compound over months supports the need for multi-temporal environmental feature engineering (cf. the climate lag features used in Onimisi 2025). Uganda's bimodal seasonality pattern also validates the 4-df seasonal control approach for transmission models in East African settings.
+
+## Full Text
 
 --- Page 1 ---
 Okiringetal.BMCPublicHealth (2021) 21:1962
@@ -23,7 +55,7 @@ burden relevant for public health can be complex as effects are often non-linear
 between when changes in environmentalfactors lead to changes inmalaria incidence.The study investigated the
 effect of environmentalcovariateson malaria incidence inhigh transmissionsettings ofUganda.
 Methods: This study leveraged data from seven malaria reference centres (MRCs)located inhightransmission
-settings ofUganda over a 24-month period. Estimates of monthly malaria incidence (MI) were derived from MRCs’
+settings ofUganda over a 24-month period. Estimates of monthly malaria incidence (MI) were derived from MRCs'
 catchment areas.Environmental data including monthly temperature, rainfall, and normalized difference vegetation
 index (NDVI) were obtained from remote sensing sources. A distributed lag nonlinear model was used to
 investigate the effect of environmentalcovariateson malaria incidence.
@@ -85,8 +117,8 @@ cycle [5, 6]. Vegetation may provide an outdoor resting data are collected and r
 habitant or shelter for mosquitoes from extreme condi- laboratory testing of all patients with suspected malaria.
 tions unfavourable for mosquito-population growth. Data on village of residence of the patients is captured
 Many studies have reported associations between and catchment areas around the MRCs identified, allow-
-changes in malaria burden and patterns of environmen- ing for the generation of estimates of malaria incidence
-tal factors [7–13]. However, the associations reported (Program for resistance, immunology, surveillance, and
+changes in malaria burden and patterns of environmental ing for the generation of estimates of malaria incidence
+factors [7–13]. However, the associations reported (Program for resistance, immunology, surveillance, and
 vary between settings. For example, a study from South modelling of malaria (prism) : Implementation Project
 Africa found that an increase in temperature signifi- Pilot Study, Unpublished). In this study, the effect of en-
 cantly raised malaria infections [12], while another in vironmental variability in rainfall, temperature and vege-
@@ -101,7 +133,7 @@ mental covariates which may last for a period longer
 than the current time [7, 14, 15]. From the biological Methods
 perspective, different periods including time for mos- Studysetting
 quito to develop, period of parasites within the mos- This study leveraged data from UMSP derived from sen-
-quito, and incubation period of the parasites within tinel surveillance in level III and IV public outpatient fa-
+quito, and incubation period of the parasites within the tinel surveillance in level III and IV public outpatient fa-
 human body makes the assumption of a specific time lag cilities that generally see between 1000 and 3000
 unrealistic, as the observed effect of the environmental outpatients per month and have functioning laborator-
 covariates in a given lag may be a cumulative effect from ies. These facilities provide care free of charge, including
@@ -124,6 +156,7 @@ Patongo health centre IV in Agago District, Padibe cluded 1–5 villages. The vi
 health centre IV in Lamwo District, Namokora health mates for each catchment area were obtained from the
 centre IV in Kitgum District. The location of these AfriPop database and included a fixed population
 MRCs inUgandaisshown insupplementaryfileFig.S1. growth function of0.0029 perunittime[26].
+
 Environmentalvariables Statisticalanalysis
 Average monthly environmental data for the period of Cumulative data for the characteristics of the study pop-
 January 2019–December 2020 were processed from re- ulations over the 24-month observation period (January
@@ -154,7 +187,7 @@ such as a village, enabling derivation of health facility linear effect and lag 
 catchment area-specific estimates. The downloaded at shorter delays were obtained by placing spline knots
 raster files were transferred into quantum geographical at equalintervals in the range of environmental variables
 Information system (QGIS) software and village corre- and in the lag scale. Seasonality of malaria transmission
-sponding environmental covariates’ centroid values were was controlled by including four degrees of freedom per
+sponding environmental covariates' centroid values were was controlled by including four degrees of freedom per
 extracted using Point Sampling tool. To give MRC spe- year in the model, representing the bimodal malaria
 cific estimates of environmental covariate in a given peak seasons in Uganda [28]. A health facility-specific
 month, the centroid values corresponding to the villages random variable was added to the model to control for
@@ -169,14 +202,14 @@ lating the IRR of the separate effect (in a specific lag- January 2019 and Decem
 month) and cumulative effect (in all months preceding a
 specific lag-month) on the malaria incidence. All the Temporaltrendandseasonalityofmalariaincidenceand
 analyses were performed using R software version 3.6.0 environmentalcovariates
-with “dlnm” and “lme4” packages. Statistical significance Malaria incidence across all-sites was highest in June
+with "dlnm" and "lme4" packages. Statistical significance Malaria incidence across all-sites was highest in June
 was determined using confidence intervals that do not 2019 (1344.5 cases per 1000 PY, 713–2922) and lowest
 include theRRofthenullhypothesis of1.0. in April 2019 (239.5 cases per 1000 PY, 103–1128) with
 Athousandsimulationswereruntoruleoutthepossi- seasonal peak in incidence observed from April to Sep-
 bility of the effects being solely an influence of multi- tember 2019 and accounting for 28.9% of the observed
 collinearity between temperature, rainfall, and vegetation malaria incidence.Temporal changes in monthly malaria
 cover using the methodology proposed by Jose Barrera- incidence over the 24-month observation period by
-G’omez and Xavier Basagana in the “Collin” package in MRC are presented in the supplementary file Fig. S3.
+G'omez and Xavier Basagana in the "Collin" package in MRC are presented in the supplementary file Fig. S3.
 R [29]. The results are presented in the supplementary Correlation analysis revealed a positive relationship be-
 file Fig. S2 and the findings suggest the possibility of tween temperature and malaria incidence at month lag 4
 otherexplanations forthis result thanmulti-collinearity. (0.452), and a negative correlation for both rainfall (−
@@ -203,6 +236,7 @@ and lowest around Padibe health centre (111.5mm, 6- temperature (30.0°C). Compl
 (0.74) and lowest at Patongo health centre (0.61) with malaria incidence over a four-month period is revealed
 the median across all-sites estimated at 0.66. Table 1 in part a of Fig. 1. The separate effects of different tem-
 provides the details of the longitudinal measures of peratures and 2 month lags (0 and 4months) on the IRR
+
 Table1SummarydataonlongitudinalmeasuresofEnvironmentalvariablesinhightransmissionsettingsofUganda2019–2020
 Site Monthlymedian(range)
 Temperature(degreesCelsius) Rainfall(mm) NDVI(index)
@@ -252,6 +286,7 @@ fall, the IRR increased significantly to 1.24 (95% CI,
 Rainfall (133mm) at approximately 200mm in month lag 0
 A summary of the non-linear relationship between (Table 4). The effect of rainfall on the cumulative IRR of
 monthly rainfall and malaria incidence over a four- malaria is shown in part c of Fig. 2. Rainfall of
+
 Table3Grangercasualitytestsforenvironmentalfactors(variables)andmonthlymalariaincidenceinhightransmissionsettingsof
 Uganda2019–2020
 Site Environmentalvariables
@@ -270,66 +305,109 @@ NDVINormalizeddifferencevegetationindex
 
 --- Page 6 ---
 Okiringetal.BMCPublicHealth (2021) 21:1962 Page6of11
-increased at high NDVI values in month lags 2–4 at ap-
-proximately0.72–0.80comparedtothemedian observed
-NDVI (0.66). The separate effects of different NDVI
-valuesand2monthlags(0and4months)ontheIRRto-
-gether with the 95% confidence intervals are provided in
-part b of Fig. 3. Increase in NDVI increased the IRR
-drastically for values below approximately 0.5 to a peak
-at month lag 0. While at month lag 4, increase in NDVI
-reducedtheIRRdrasticallyforvaluesbelow0.3andthen
-increased at approximately above 0.70. Overall at low
-NDVI, the IRR increased to 1.80 (95% CI, 0.35–9.43) at
-approximately 0.24 in month lag 2 compared to the me-
-dian observed NDVI (0.66). At high NDVI, the IRR in-
-creased significantly to 1.31 (95% CI, 1.04–1.65)
-compared to the median observed NDVI (0.66) at ap-
-proximately 0.72 in month lag 2 (Table 4). The effect of
+approximately 200mm increased the cumulative IRR surveillance data has been used to monitor trends
+from month lags 1–4 compared to the median observed in malaria burden and visualization of prior seasonal
+rainfall (133mm) andtheRRof1.99 (95%CI,1.22–2.27) peaks in different transmission settings. The addition of
+wasthehighest atmonth lag4(Table4). place of residence as part of routine surveillance data
+collection tool has enabled estimation of health facility
+Normalizeddifferencevegetationindex catchment areas and generation of malaria incidence es-
+Part a of Fig. 3 presents a summary of the non-linear re- timates to derive a direct measure of disease burden.
+lationshipbetweenmonthlyNDVIandmalariaincidence Combining health facility surveillance data with envi-
+over a four-month period. The IRR of malaria incidence ronmental covariates such as rainfall, temperature and ve-
+increased at high NDVI values in month lags 2–4 at ap- getation coverage available through remote-sensing
+proximately0.72–0.80comparedtothemedian observed sources may benefit malaria control efforts, as environ-
+NDVI (0.66). The separate effects of different NDVI mental covariates are reported to facilitate malaria trans-
+valuesand2monthlags(0and4months)ontheIRRto- mission [31].
+gether with the 95% confidence intervals are provided in The relationship between environmental covariates
+part b of Fig. 3. Increase in NDVI increased the IRR and malaria incidence may form a strong basis for mal-
+drastically for values below approximately 0.5 to a peak aria early warning systems, as such prediction tools may
+at month lag 0. While at month lag 4, increase in NDVI guide planning and control of malaria outbreaks. For in-
+reducedtheIRRdrasticallyforvaluesbelow0.3andthen stance rainfall and sea surface temperature have been
+increased at approximately above 0.70. Overall at low used for monitoring malaria early warnings in Botswana
+NDVI, the IRR increased to 1.80 (95% CI, 0.35–9.43) at with the success of the malaria control program in redu-
+approximately 0.24 in month lag 2 compared to the me- cing malaria incidence attributed to the early warnings
+dian observed NDVI (0.66). At high NDVI, the IRR in- [25]. Similarly in South Africa, prediction of malaria
+creased significantly to 1.31 (95% CI, 1.04–1.65) based on the seasonal climate forecasts showed that
+compared to the median observed NDVI (0.66) at ap- short-term predictions coincided closely with the ob-
+proximately 0.72 in month lag 2 (Table 4). The effect of served malaria cases, which may also benefit the malaria
 NDVI on the cumulative IRR of malaria is shownin part
-c of Fig. 3. High NDVI increased the cumulative IRR of
-malaria significantly within month lags 2–4 compared to
-the median observed NDVI (0.66) and the IRR of 1.57
-(95% CI, 1.09–2.25) was the highest at approximately
-0.72inmonth lag4(Table4).
-Discussion
-The relationship between environmental covariates and
-malaria burden is complex, as the effect is not only de-
-termined in the current period but may also be influ-
-enced by preceding time points. This study investigated
-the quantitative effect of environmental covariates on
-malaria incidence in high malaria transmission areas in
-Uganda. In these settings, temperature, rainfall and
-NDVI significantly affected the temporal distribution of
-malaria incidence. High (greater than the observed me-
-dian) temperature values increased the IRR of malaria
-significantly in month lag 4 and the cumulative IRR at
+c of Fig. 3. High NDVI increased the cumulative IRR of early warning system [32]. In this study, high
+malaria significantly within month lags 2–4 compared to temperature increased the IRR of malaria at month lag
+the median observed NDVI (0.66) and the IRR of 1.57 4. Knowing temperature as a key parameter in mosquito
+(95% CI, 1.09–2.25) was the highest at approximately development, biting and survival with warmer tempera-
+0.72inmonth lag4(Table4). tures increasing the infection rates as the vector repro-
+duces faster, the likelihood of infection after a mosquito
+Discussion bite is amplified [33]. Even if the specific effect of
+The relationship between environmental covariates and temperature on the IRR of malaria increased in month
+malaria burden is complex, as the effect is not only de- lag 2, the cumulative IRR increased significantly at
+termined in the current period but may also be influ- month lags 1–4. The increased cumulative IRR could
+enced by preceding time points. This study investigated possibly be explained by the increased multiplication
+the quantitative effect of environmental covariates on rate presented by global warming increasing the length
+malaria incidence in high malaria transmission areas in of mosquito breeding season [33]. The month lagged ef-
+Uganda. In these settings, temperature, rainfall and fectsoftemperaturewouldavailtimelongenoughtode-
+NDVI significantly affected the temporal distribution of sign interventions to interrupt malaria transmission,
+malaria incidence. High (greater than the observed me- despite temperature values used in the current study be-
+dian) temperature values increased the IRR of malaria ing high as compared to the optimal temperature for
+significantly in month lag 4 and the cumulative IRR at malaria transmission of 29°C [34]. However, this finding
 month lags 1–4 compared to the median observed
 temperature. Similarly, high rainfall increased the IRR of
-Fig.1aContourplotsofthecombinedeffectoftimelagsand
 malaria significantly at the month lag 0 and the cumula-
-Temperatureontheincidenceriskratioofmalaria.bEffectof
 tive IRR at month lags 1–4 compared to the median ob-
-specificTemperatureandtimelagsontheincidenceriskratioof
-malaria.Thebluelinesarethemeanrelativerisks,andthegraylines served rainfall. High values of NDVI increased the
-are95%CI.cEffectsofspecificTemperatureandtimelagsonthe cumulative IRR of malaria significantly at month lags 2–
-cumulativeincidenceriskratioofmalaria.Theredlinesarethemean 4comparedtothemedianobservedNDVI.
-incidenceriskratio,andthegrayareasare95%CI
+served rainfall. High values of NDVI increased the
+cumulative IRR of malaria significantly at month lags 2–
+4comparedtothemedianobservedNDVI.
 Malaria control remains a priority in the national
 healthagenda,requiringplanningandefficientallocation
 of the limited resources available [30]. Efficient alloca-
-approximately 200mm increased the cumulative IRR tions of resources rely not only on current measures of
-from month lags 1–4 compared to the median observed malaria burden but also predicting future malaria bur-
-rainfall (133mm) andtheRRof1.99 (95%CI,1.22–2.27) den. Surveillance data has been used to monitor trends
-wasthehighest atmonth lag4(Table4). in malaria burden and visualization of prior seasonal
+tions of resources rely not only on current measures of
+malaria burden but also predicting future malaria bur-
+den. Surveillance data has been used to monitor trends
+in malaria burden and visualization of prior seasonal
 peaks in different transmission settings. The addition of
-Normalizeddifferencevegetationindex place of residence as part of routine surveillance data
-Part a of Fig. 3 presents a summary of the non-linear re- collection tool has enabled estimation of health facility
-lationshipbetweenmonthlyNDVIandmalariaincidence catchment areas and generation of malaria incidence es-
-over a four-month period. The IRR of malaria incidence timates to derive a direct measure of disease burden.
+place of residence as part of routine surveillance data
+collection tool has enabled estimation of health facility
+catchment areas and generation of malaria incidence es-
+timates to derive a direct measure of disease burden.
+Combining health facility surveillance data with envi-
+ronmental covariates such as rainfall, temperature and ve-
+getation coverage available through remote-sensing
+sources may benefit malaria control efforts, as environ-
+mental covariates are reported to facilitate malaria trans-
+mission [31].
+The relationship between environmental covariates
+and malaria incidence may form a strong basis for mal-
+aria early warning systems, as such prediction tools may
+guide planning and control of malaria outbreaks. For in-
+stance rainfall and sea surface temperature have been
+used for monitoring malaria early warnings in Botswana
+with the success of the malaria control program in redu-
+cing malaria incidence attributed to the early warnings
+[25]. Similarly in South Africa, prediction of malaria
+based on the seasonal climate forecasts showed that
+short-term predictions coincided closely with the ob-
+served malaria cases, which may also benefit the malaria
+early warning system [32]. In this study, high
+temperature increased the IRR of malaria at month lag
+4. Knowing temperature as a key parameter in mosquito
+development, biting and survival with warmer tempera-
+tures increasing the infection rates as the vector repro-
+duces faster, the likelihood of infection after a mosquito
+bite is amplified [33]. Even if the specific effect of
+temperature on the IRR of malaria increased in month
+lag 2, the cumulative IRR increased significantly at
+month lags 1–4. The increased cumulative IRR could
+possibly be explained by the increased multiplication
+rate presented by global warming increasing the length
+of mosquito breeding season [33]. The month lagged ef-
+fectsoftemperaturewouldavailtimelongenoughtode-
+sign interventions to interrupt malaria transmission,
+despite temperature values used in the current study be-
+ing high as compared to the optimal temperature for
+malaria transmission of 29°C [34]. However, this finding
 
 --- Page 7 ---
 Okiringetal.BMCPublicHealth (2021) 21:1962 Page7of11
+
 Table4DLNMmodelresultsforseparateandcumulativeeffectsofenvironmentalvariablesontheRRofmalariaburdeninhigh
 transmissionsettingsofUganda
 Effecttype Specification Statistic Variable
@@ -360,51 +438,34 @@ PeakmonthisthemonthcorrespondingtothehighestIRRofmalaria
 astatisticallysignificant
 IRRIncidenceriskratio
 NDVINormalizeddifferencevegetationindex
-Combining health facility surveillance data with environ- early warning system [32]. In this study, high
-mental covariates such as rainfall, temperature and vege- temperature increased the IRR of malaria at month lag
-tation coverage available through remote-sensing 4. Knowing temperature as a key parameter in mosquito
-sources may benefit malaria control efforts, as environ- development, biting and survival with warmer tempera-
-mental covariates are reported to facilitate malaria trans- tures increasing the infection rates as the vector repro-
-mission [31]. duces faster, the likelihood of infection after a mosquito
-The relationship between environmental covariates bite is amplified [33]. Even if the specific effect of
-and malaria incidence may form a strong basis for mal- temperature on the IRR of malaria increased in month
-aria early warning systems, as such prediction tools may lag 2, the cumulative IRR increased significantly at
-guide planning and control of malaria outbreaks. For in- month lags 1–4. The increased cumulative IRR could
-stance rainfall and sea surface temperature have been possibly be explained by the increased multiplication
-used for monitoring malaria early warnings in Botswana rate presented by global warming increasing the length
-with the success of the malaria control program in redu- of mosquito breeding season [33]. The month lagged ef-
-cing malaria incidence attributed to the early warnings fectsoftemperaturewouldavailtimelongenoughtode-
-[25]. Similarly in South Africa, prediction of malaria sign interventions to interrupt malaria transmission,
-based on the seasonal climate forecasts showed that despite temperature values used in the current study be-
-short-term predictions coincided closely with the ob- ing high as compared to the optimal temperature for
-served malaria cases, which may also benefit the malaria malaria transmission of 29°C [34]. However, this finding
-
---- Page 8 ---
-Okiringetal.BMCPublicHealth (2021) 21:1962 Page8of11
-Fig.2aContourplotsofthecombinedeffectoftimelagsand
-Fig.3aContourplotsofthecombinedeffectoftimelagsand
-rainfallamountsontheincidenceriskratioofmalaria.bEffectof
-normalizedvegetationindex(NDVI)ontheincidenceriskratioof
-specificrainfallamountsandtimelagsontheincidenceriskratioof
-malaria.bEffectofspecificNDVIandtimelagsontheincidencerisk
-malaria.Thebluelinesarethemeanincidenceriskratio,andthe
-ratioofmalaria.Thebluelinesarethemeanincidenceriskratio,and
-graylinesare95%CI.cEffectsofspecificrainfallamountsandtime
-thegraylinesare95%CI.cEffectsofspecificNDVIandtimelagson
-lagsonthecumulativeincidenceriskratioofmalaria.Theredlines
-thecumulativeincidenceriskratioofmalaria.Theredlinesarethe
-arethemeanincidenceriskratio,andthegrayareasare95%CI
-meanincidenceriskratio,andthegrayareasare95%CI
 was consistent with previous studies which have demon- Rainfall provides avenues that facilitate mosquito breed-
 strated how temporal disease risk shifts in response to ing suggesting that these areas retain water after rains
 temperature changes and increase in maximum presenting suitable places for mosquito fertilization and
 temperature increases the incidence rate of malaria sig- increasing the risk of malaria infections and transmis-
-nificantlyofthecurrentmonth andlater [35–37]. sion. Although not all mosquitoes need stagnant water,
+nificantly of thecurrent month andlater [35–37]. sion. Although not all mosquitoes need stagnant water,
 The current study also found high values of rainfall to they require at least some form of water to hatch eggs
 significantly increase the IRR of malaria at month lag 0 increasingthe risk inpreceding time points. The preced-
-in these settings. Comparable to the specific rainfall ef- ing time points’ malaria IRR is increased by the trans-
+in these settings. Comparable to the specific rainfall ef- ing time points' malaria IRR is increased by the trans-
 fect, the cumulative IRR of malaria was increased signifi- cended adult mosquitoes. This finding was consistent
 cantly at month lag 1–4 at approximately 200mm. with earlier studies. For instance a study conducted in
+
+--- Page 8 ---
+Okiringetal.BMCPublicHealth (2021) 21:1962 Page8of11
+Fig.1aContourplotsofthecombinedeffectoftimelagsand
+Temperatureontheincidenceriskratioofmalaria.bEffectof
+specificTemperatureandtimelagsontheincidenceriskratioof
+malaria.Thebluelinesarethemeanrelativerisks,andthegraylines
+are95%CI.cEffectsofspecificTemperatureandtimelagsonthe
+cumulativeincidenceriskratioofmalaria.Theredlinesarethemean
+incidenceriskratio,andthegrayareasare95%CI
+
+Fig.2aContourplotsofthecombinedeffectoftimelagsand
+rainfallamountsontheincidenceriskratioofmalaria.bEffectof
+specificrainfallamountsandtimelagsontheincidenceriskratioof
+malaria.Thebluelinesarethemeanincidenceriskratio,andthe
+graylinesare95%CI.cEffectsofspecificrainfallamountsandtime
+lagsonthecumulativeincidenceriskratioofmalaria.Theredlines
+arethemeanincidenceriskratio,andthegrayareasare95%CI
 
 --- Page 9 ---
 Okiringetal.BMCPublicHealth (2021) 21:1962 Page9of11
@@ -427,15 +488,15 @@ possible explanation is that in the current month, defor- for instance because a
 estationreducestheoutdoorrestingplacesformosquitoes was not considered as a covariate in this analysis. How-
 driving the mosquitoes away reducing the risk of malaria ever, adding a health facility random variable in the
 burden. Contrary with a study conducted in Kenya that model catered for the variability that was site-specific.
-havedemonstrated the associations betweenNDVIvalues Fourth, the study was conducted around health facilities
+have demonstrated the associations betweenNDVIvalues Fourth, the study was conducted around health facilities
 of 0.35 and malaria burden, the current study used 0.24 whose data is prone to missingness may have influenced
 which are all in the same range of 0.2–0.5 and did the result. Health facilities with less than 5% missing
 not realize any specific effect significant association at data on the village of residence for each month were in-
 any month lags [41, 42]. The possible explanation cluded. Finally, the current study explored the associa-
 could be the difference in the transmission intensities tions between environmental covariates with malaria
 between the current study and the former study in incidenceinhightransmissionsettingsandtheidentified
-Kenya. The current study only considered high trans- month-lag time points may only be applicable and
-mission settings while the former study compared generalizable to these settings. Therefore, the data
+Kenya. The current study only considered high month-lag time points may only be applicable and
+transmission settings while the former study compared generalizable to these settings. Therefore, the data
 lowlands and highlands. Ofnote highlands are prone should be interpreted with caution. For instance a study
 to low mosquito population as the conditions are not conducted in China showed that minimum temperature
 friendly resulting to low infection rates. had a longer lag ranges and larger correlation coeffi-
@@ -507,134 +568,135 @@ formalariaasafunctionofNDVIobtainedfromdistributedlagmodels, Received:2May2021Ac
 over1000simulations.Estimatesfromthesamesimulationrunare
 connectedwithgraylines.TheredthicklinerepresentstheRRsobserved
 intherealdataset.ResultsarepresentedforNDVIvaluesof0.24,0,50,0.72,
-taking0.66asareference.Theresultswereobtainedwhensimulating References
-datawiththefollowingIRRs:AtNDVI0.24:IRR=1atlags0and1,IRR= 1. EndoN,EltahirEAB.Environmentaldeterminantsofmalariatransmission
-1.04atlag2,IRR=1.98atalg3,andIRR=1.37atlag4;atNDVI0.50:IRR= aroundtheKokareservoirinEthiopia.GeoHealth.2018;2(3):104–15.https://
-1.13forlags0,IRR=1.01atlag1,IRR=1atlag2,IRR=1.22atlag3,and doi.org/10.1002/2017GH000108.
-IRR=1.34atlag4;atNDVI0.72:IRR=1.17atlag0,IRR=1atlag1and3, 2. KibretS,LautzeJ,McCartneyM,NhamoL,YanG.Malariaaroundlarge
-IRR1.12atlag2,IRR=1.07atlag4. damsinAfrica:effectofenvironmentalandtransmissionendemicityfactors.
-MalarJ.2019;18(1):303.https://doi.org/10.1186/s12936-019-2933-5.
+taking0.66asareference.Theresultswereobtainedwhensimulating
+datawiththefollowingIRRs:AtNDVI0.24:IRR=1atlags0and1,IRR=
+1.04atlag2,IRR=1.98atalg3,andIRR=1.37atlag4;atNDVI0.50:IRR=
+1.13forlags0,IRR=1.01atlag1,IRR=1atlag2,IRR=1.22atlag3,and
+IRR=1.34atlag4;atNDVI0.72:IRR=1.17atlag0,IRR=1atlag1and3,
+IRR1.12atlag2,IRR=1.07atlag4.
+
 Additionalfile3:Fig.S3.Temporalchangesinmonthlymalaria
-3. AbiodunGJ,WitbooiPJ,OkosunKO,MaharajR.Exploringtheimpactof
 incidenceoverthe24-monthobservationperiodaroundeachMRCand
-climatevariabilityonmalariatransmissionusingadynamicmosquito-
 all-sitescombined.
+
+Acknowledgements
+WewouldliketothanktheentireUMSPstudyteamandtheadministration
+oftheInfectiousDiseasesResearchCollaborationforalltheircontributions.
+
+Authors'contributions
+Conceptualization:JO,GD,SMK,JIN;Fundingacquisition:MRK,GD;
+Methodology:JO,IR,AE,JFN,VK,MRK,GD,RW,JIN;Investigation:JO,IR,MRK,
+GD,SMK,JIN;Datacuration:JO,AE,VK,GD,JIN;Formalanalysis:JO,IR,GD,
+RW,SMK,JIN,Writing–originaldraft:JO,GD,JIN;Writing–review&editing:
+JO,IR,AE,JFN,VK,GAOOA,CMS,DM,JNK,MRK,GD,RW,SMK,JIN.Allauthors
+readandapprovedthefinalmanuscript.
+
+Funding
+ResearchreportedinthispublicationwassupportedbytheNational
+InstitutesofHealthaspartoftheInternationalCentersofExcellencein
+MalariaResearch(ICMER)programme(U19AI089674)andtheFogarty
+InternationalCenter(D43TW010526).JINissupportedbytheNational
+Institutes,FogartyInternationalCenter(EmergingGlobalLeaderAwardgrant
+numberK43TW010365).Thecontentissolelytheresponsibilityofthe
+authorsanddoesnotnecessarilyrepresenttheofficialviewsoftheNational
+InstitutesofHealth.
+
+References
+1. EndoN,EltahirEAB.Environmentaldeterminantsofmalariatransmission
+aroundtheKokareservoirinEthiopia.GeoHealth.2018;2(3):104–15.https://
+doi.org/10.1002/2017GH000108.
+2. KibretS,LautzeJ,McCartneyM,NhamoL,YanG.Malariaaroundlarge
+damsinAfrica:effectofenvironmentalandtransmissionendemicityfactors.
+MalarJ.2019;18(1):303.https://doi.org/10.1186/s12936-019-2933-5.
+3. AbiodunGJ,WitbooiPJ,OkosunKO,MaharajR.Exploringtheimpactof
+climatevariabilityonmalariatransmissionusingadynamicmosquito-
 humanmalariamodel.OpenInfectDisJ.2018;10(1):88–100.https://doi.
 org/10.2174/1874279301810010088.
 4. AbiodunGJ,MaharajR,WitbooiP,OkosunKO.Modellingtheinfluenceof
-Acknowledgements
 temperatureandrainfallonthepopulationdynamicsofAnopheles
-WewouldliketothanktheentireUMSPstudyteamandtheadministration
 arabiensis.MalarJ.2016;15(1):364.https://doi.org/10.1186/s12936-016-1411-
-oftheInfectiousDiseasesResearchCollaborationforalltheircontributions.
 6.
 5. CDC:Wheremalariaoccurs[Internet].Availablefrom:https://www.cdc.gov/
-Authors’contributions
 malaria/about/distribution.html
-Conceptualization:JO,GD,SMK,JIN;Fundingacquisition:MRK,GD; 6. PaaijmansKP,BlanfordS,BellAS,BlanfordJI,ReadAF,ThomasMB.Influence
-Methodology:JO,IR,AE,JFN,VK,MRK,GD,RW,JIN;Investigation:JO,IR,MRK, ofclimateonmalariatransmissiondependsondailytemperaturevariation.
-GD,SMK,JIN;Datacuration:JO,AE,VK,GD,JIN;Formalanalysis:JO,IR,GD, ProcNatlAcadSci.2010;107(34):15135–9.https://doi.org/10.1073/pnas.1
-RW,SMK,JIN,Writing–originaldraft:JO,GD,JIN;Writing–review&editing:
+6. PaaijmansKP,BlanfordS,BellAS,BlanfordJI,ReadAF,ThomasMB.Influence
+ofclimateonmalariatransmissiondependsondailytemperaturevariation.
+ProcNatlAcadSci.2010;107(34):15135–9.https://doi.org/10.1073/pnas.1
 006422107.
-JO,IR,AE,JFN,VK,GAOOA,CMS,DM,JNK,MRK,GD,RW,SMK,JIN.Allauthors 7. KigoziR,ZinszerK,MpimbazaA,SserwangaA,KigoziSP,KamyaM.
-readandapprovedthefinalmanuscript. Assessingtemporalassociationsbetweenenvironmentalfactorsandmalaria
+7. KigoziR,ZinszerK,MpimbazaA,SserwangaA,KigoziSP,KamyaM.
+Assessingtemporalassociationsbetweenenvironmentalfactorsandmalaria
 morbidityatvaryingtransmissionsettingsinUganda.MalarJ.2016;15(1):
-Funding 511.https://doi.org/10.1186/s12936-016-1549-2.
-ResearchreportedinthispublicationwassupportedbytheNational 8. MohammadkhaniM,KhanjaniN,BakhtiariB,TabatabaiSM,SheikhzadehK.
-InstitutesofHealthaspartoftheInternationalCentersofExcellencein TherelationbetweenclimaticfactorsandmalariaincidenceinSistanand
-MalariaResearch(ICMER)programme(U19AI089674)andtheFogarty Baluchestan,Iran.SAGEOpen.2019;9(3):215824401986420.https://doi.org/1
-InternationalCenter(D43TW010526).JINissupportedbytheNational 0.1177/2158244019864205.
-Institutes,FogartyInternationalCenter(EmergingGlobalLeaderAwardgrant 9. FletcherIK,Stewart-IbarraAM,SippyR,Carrasco-EscobarG,SilvaM,Beltran-
-numberK43TW010365).Thecontentissolelytheresponsibilityofthe AyalaE,etal.Therelativeroleofclimatevariationandcontrolinterventions
-authorsanddoesnotnecessarilyrepresenttheofficialviewsoftheNational onmalariaeliminationeffortsinElOro,Ecuador:AModelingStudy.Front
-InstitutesofHealth. EnvironSci.2020;8:135.https://doi.org/10.3389/fenvs.2020.00135.
-
---- Page 11 ---
-Okiringetal.BMCPublicHealth (2021) 21:1962 Page11of11
-10. OkunlolaOA,OyeyemiOT.Spatio-temporalanalysisofassociationbetween 31. CastroMC.Malariatransmissionandprospectsformalariaeradication:the
-incidenceofmalariaandenvironmentalpredictorsofmalariatransmission roleoftheenvironment.ColdSpringHarbPerspectMed.2017;7(10).https://
-inNigeria.SciRep.2019;9(1):17500.https://doi.org/10.1038/s41598-019-53814-x. doi.org/10.1101/cshperspect.a025601.
-11. ChiromboJ,CeccatoP,LoweR,TerlouwDJ,ThomsonMC,GumboA,etal. 32. KimY,RatnamJV,DoiT,MoriokaY,BeheraS,TsuzukiA,etal.Malaria
-ChildhoodmalariacaseincidenceinMalawibetween2004and2017: predictionsbasedonseasonalclimateforecastsinSouthAfrica:atime
-spatio-temporalmodellingofclimateandnon-climatefactors.MalarJ.2020; seriesdistributedlagnonlinearmodel.SciRep.2019;9(1):17882.https://doi.
-19(1):5.https://doi.org/10.1186/s12936-019-3097-z. org/10.1038/s41598-019-53838-3.
-12. MakindeOS,AbiodunGJ.Theimpactofrainfallandtemperatureonmalaria 33. LePVV,KumarP,RuizMO,MbogoC,MuturiEJ.Predictingthedirectand
-dynamicsintheKwaZulu-Natalprovince,SouthAfrica.CommunStatCase indirectimpactsofclimatechangeonmalariaincoastalKenya.PLOSONE.
-StudDataAnalAppl.2019;6:97–108. 2019;14:e0211258.
-13. BrhanieTW.TheroleoftemperatureformalariatransmissioninGongi 34. ShapiroLLM,WhiteheadSA,ThomasMB.Quantifyingtheeffectsof
-KolelaDistrict,Amhararegionalstate,NorthWestEthiopia.EpidemiolOpen temperatureonmosquitoandparasitetraitsthatdeterminethe
-Access.2016;06.Availablefrom:https://www.omicsonline.org/open-access/ transmissionpotentialofhumanmalaria.PLOSBiol.2017;15:e2003489.
-the-role-of-temperature-for-malaria-transmission-in-gongi-kolela-districtamha 35. Beck-JohnsonLM,NelsonWA,PaaijmansKP,ReadAF,ThomasMB,
-ra-regional-state-north-west-ethiopia-2161-1165-1000281.php?aid=83884(06). BjørnstadON.Theimportanceoftemperaturefluctuationsinunderstanding
-https://doi.org/10.4172/2161-1165.1000281. mosquitopopulationdynamicsandmalariarisk.RSocOpenSci.2017;4(3):
-14. AdeolaA,NcongwaneK,AbiodunG,MakgoaleT,RautenbachH,BotaiJ, 160969.https://doi.org/10.1098/rsos.160969.
-etal.RainfalltrendsandmalariaoccurrencesinLimpopoProvince,South 36. ChuangT-W,SobleA,NtshalintshaliN,MkhontaN,SeyamaE,MthethwaS,
-Africa.IntJEnvironResPublicHealth.2019;16(24):5156.https://doi.org/10.33 etal.Assessmentofclimate-drivenvariationsinmalariaincidencein
-90/ijerph16245156. Swaziland:towardmalariaelimination.MalarJ.2017;16(1):232.https://doi.
-15. SiyaA,KaluleBJ,SsentongoB,LukwaAT,EgeruA.Malariapatternsacross org/10.1186/s12936-017-1874-0.
-altitudinalzonesofmountElgonfollowingintensifiedcontroland 37. MohammadkhaniM,KhanjaniN,BakhtiariB,SheikhzadehK.Therelation
-preventionprogramsinUganda.BMCInfectDis.2020;20(1):425.https://doi. betweenclimaticfactorsandmalariaincidenceinKerman,southeastof
+511.https://doi.org/10.1186/s12936-016-1549-2.
+8. MohammadkhaniM,KhanjaniN,BakhtiariB,TabatabaiSM,SheikhzadehK.
+TherelationbetweenclimaticfactorsandmalariaincidenceinSistanand
+Baluchestan,Iran.SAGEOpen.2019;9(3):215824401986420.https://doi.org/1
+0.1177/2158244019864205.
+9. FletcherIK,Stewart-IbarraAM,SippyR,Carrasco-EscobarG,SilvaM,Beltran-
+AyalaE,etal.Therelativeroleofclimatevariationandcontrolinterventions
+onmalariaeliminationeffortsinElOro,Ecuador:AModelingStudy.Front
+EnvironSci.2020;8:135.https://doi.org/10.3389/fenvs.2020.00135.
+10. OkunlolaOA,OyeyemiOT.Spatio-temporalanalysisofassociationbetween
+incidenceofmalariaandenvironmentalpredictorsofmalariatransmission
+inNigeria.SciRep.2019;9(1):17500.https://doi.org/10.1038/s41598-019-53814-x.
+11. ChiromboJ,CeccatoP,LoweR,TerlouwDJ,ThomsonMC,GumboA,etal.
+ChildhoodmalariacaseincidenceinMalawibetween2004and2017:
+spatio-temporalmodellingofclimateandnon-climatefactors.MalarJ.2020;
+19(1):5.https://doi.org/10.1186/s12936-019-3097-z.
+12. MakindeOS,AbiodunGJ.Theimpactofrainfallandtemperatureonmalaria
+dynamicsintheKwaZulu-Natalprovince,SouthAfrica.CommunStatCase
+StudDataAnalAppl.2019;6:97–108.
+13. BrhanieTW.TheroleoftemperatureformalariatransmissioninGongi
+KolelaDistrict,Amhararegionalstate,NorthWestEthiopia.EpidemiolOpen
+Access.2016;06.Availablefrom:https://www.omicsonline.org/open-access/
+the-role-of-temperature-for-malaria-transmission-in-gongi-kolela-districtamha
+ra-regional-state-north-west-ethiopia-2161-1165-1000281.php?aid=83884(06).
+https://doi.org/10.4172/2161-1165.1000281.
+14. AdeolaA,NcongwaneK,AbiodunG,MakgoaleT,RautenbachH,BotaiJ,
+etal.RainfalltrendsandmalariaoccurrencesinLimpopoProvince,South
+Africa.IntJEnvironResPublicHealth.2019;16(24):5156.https://doi.org/10.33
+90/ijerph16245156.
+15. SiyaA,KaluleBJ,SsentongoB,LukwaAT,EgeruA.Malariapatternsacross
+altitudinalzonesofmountElgonfollowingintensifiedcontroland
+preventionprogramsinUganda.BMCInfectDis.2020;20(1):425.https://doi.
 org/10.1186/s12879-020-05158-5.
-Iran.ParasiteEpidemiolControl.2016;1(3):205–10.https://doi.org/10.1016/j.
-16. MoukamKakmeniFM,GuimapiRYA,NdjomatchouaFT,PedroSA,Mutunga parepi.2016.06.001.
-J,TonnangHEZ.SpatialpanoramaofmalariaprevalenceinAfricaunder 38. Matsushita,Kim,Ng,Moriyama,Igarashi,Yamamoto,etal.Differencesof
+16. MoukamKakmeniFM,GuimapiRYA,NdjomatchouaFT,PedroSA,Mutunga
+J,TonnangHEZ.SpatialpanoramaofmalariaprevalenceinAfricaunder
 climatechangeandinterventionsscenarios.IntJHealthGeogr.2018;17(1):2.
-Rainfall–MalariaAssociationsinLowlandandHighlandinWesternKenya.Int
-https://doi.org/10.1186/s12942-018-0122-3. JEnvironResPublicHealth.2019;16:3693.
-17. RyanSJ,LippiCA,ZermoglioF.ShiftingtransmissionriskformalariainAfrica 39. RicottaEE,FreseSA,ChoobweC,LouisTA,ShiffCJ.Evaluatinglocal
-withclimatechange:aframeworkforplanningandintervention.MalarJ. vegetationcoverasariskfactorformalariatransmission:anewanalytical
-2020;19(1):170.https://doi.org/10.1186/s12936-020-03224-6. approachusingImageJ.MalarJ.2014;13(1):94.https://doi.org/10.1186/14
-18. UgandaMinistryofHealth;NationalMalariaControlProgram.Available 75-2875-13-94.
-from:https://www.health.go.ug/programs/national-malaria-control-program/ 40. MacDonaldAJ,MordecaiEA.Amazondeforestationdrivesmalaria
-19. SserwangaA,HarrisJC,KigoziR,MenonM,BukirwaH,GasasiraA,etal. transmission,andmalariaburdenreducesforestclearing.ProcNatlAcadSci.
+https://doi.org/10.1186/s12942-018-0122-3.
+17. RyanSJ,LippiCA,ZermoglioF.ShiftingtransmissionriskformalariainAfrica
+withclimatechange:aframeworkforplanningandintervention.MalarJ.
+2020;19(1):170.https://doi.org/10.1186/s12936-020-03224-6.
+18. UgandaMinistryofHealth;NationalMalariaControlProgram.Available
+from:https://www.health.go.ug/programs/national-malaria-control-program/
+19. SserwangaA,HarrisJC,KigoziR,MenonM,BukirwaH,GasasiraA,etal.
 Improvedmalariacasemanagementthroughtheimplementationofa
-2019;116(44):22212–8.https://doi.org/10.1073/pnas.1905315116.
-healthfacility-basedsentinelsitesurveillancesysteminUganda.PLoSOne. 41. AmadiJA,OlagoDO,Ong’amoGO,OriasoSO,NanyingiM,NyamongoIK,
-2011;6(1):e16316.https://doi.org/10.1371/journal.pone.0016316. etal.Sensitivityofvegetationtoclimatevariabilityanditsimplicationsfor
-malariariskinBaringo,Kenya.PLOSONE.2018;13:e0199357.
+healthfacility-basedsentinelsitesurveillancesysteminUganda.PLoSOne.
+2011;6(1):e16316.https://doi.org/10.1371/journal.pone.0016316.
 20. OkiringJ,EpsteinA,NamugangaJF,KamyaV,SserwangaA,KapisiJ,etal.
-42. NationalCenterforAtmosphericResearchStaff.‘TheClimateDataGuide:
 Relationshipsbetweentestpositivityrate,totallaboratoryconfirmedcases
-NDVI:Normalized-difference-vegetation-index:NOAAAVHRR.’Retrieved
 ofmalaria,andmalariaincidenceinhighburdensettingsofUganda:an
-ecologicalanalysis.MalarJ.2021;20(1):42.https://doi.org/10.1186/s12936- fromhttps://climatedataguide.ucar.edu/climate-data/ndvi-normalized-
-difference-vegetation-index-noaa-avhrr.
+ecologicalanalysis.MalarJ.2021;20(1):42.https://doi.org/10.1186/s12936-
 021-03584-7.
-43. WorldHealthOrganization.Guidelinesfortreatmentofmalaria.2nded;
 21. RhewIC,VanderStoepA,KearneyA,SmithNL,DunbarMD.Validationof
-2010.p.210.
 thenormalizeddifferencevegetationindexasameasureofneighborhood
-greenness.AnnEpidemiol.2011;21(12):946–52.https://doi.org/10.1016/j.a 44. ZinszerK,KigoziR,CharlandK,DorseyG,BrewerTF,BrownsteinJS,etal.
-Forecastingmalariainahighlyendemiccountryusingenvironmentaland
+greenness.AnnEpidemiol.2011;21(12):946–52.https://doi.org/10.1016/j.a
 nnepidem.2011.09.001.
-clinicalpredictors.MalarJ.2015;14(1):245.https://doi.org/10.1186/s12936-01
 22. FunkC,PetersonP,LandsfeldM,PedrerosD,VerdinJ,ShuklaS,etal.The
-climatehazardsinfraredprecipitationwithstations—anewenvironmental 5-0758-4.
-45. SsempiiraJ,KissaJ,NambuusiB,MukooyoE,OpigoJ,MakumbiF,etal.
+climatehazardsinfraredprecipitationwithstations—anewenvironmental
 recordformonitoringextremes.SciData.2015;2(1):150066.https://doi.org/1
-Interactionsbetweenclimaticchangesandinterventioneffectsonmalaria
 0.1038/sdata.2015.66.
-spatio-temporaldynamicsinUganda.ParasiteEpidemiolControl.2018;3(3):
 23. NationalAeronauticsandSpaceAdministration(NASA).Moderate
-e00070.https://doi.org/10.1016/j.parepi.2018.e00070.
 ResolutionImagingSpectroradiometer.Availablefrom:https://modis.gsfc.na
-46. GebrechorkosSH,HülsmannS,BernhoferC.Long-termtrendsinrainfalland
 sa.gov/data/
-temperatureusinghigh-resolutionclimatedatasetsinEastAfrica.SciRep.
 24. Gapfillingalgorithm:Gapfillingrasterdata.Availablefrom: https://github.
-2019;9(1):11376.https://doi.org/10.1038/s41598-019-47933-8.
 com/disarm-platform/gapfilling_rasters.Accessed15Mar2021.
-47. ZhaoX,ChenF,FengZ,LiX,ZhouX-H.Thetemporallaggedassociation
 25. ThomsonMC,MasonSJ,PhindelaT,ConnorSJ.Useofrainfallandseasurface
-betweenmeteorologicalfactorsandmalariain30countiesinsouth-West
 temperaturemonitoringformalariaearlywarninginBotswana.AmJTrop
-MedHyg.2005;73(1):214–21.https://doi.org/10.4269/ajtmh.2005.73.214. China:amultileveldistributedlagnon-linearanalysis.MalarJ.2014;13(1):57.
-https://doi.org/10.1186/1475-2875-13-57.
+MedHyg.2005;73(1):214–21.https://doi.org/10.4269/ajtmh.2005.73.214.
 26. TheAfriPopproject,startedinJune2009.Availablefrom:http://ghdx.hea
 lthdata.org/series/afripop.Accessed10June2020.
-27. GasparriniA,ArmstrongB,KenwardMG.Distributedlagnon-linearmodels. Publisher’s Note
-StatMed.2010;29(21):2224–34.https://doi.org/10.1002/sim.3940. SpringerNatureremainsneutralwithregardtojurisdictionalclaimsin
-28. SimpleO,MindraA,ObaiG,OvugaE,Odongo-AginyaEI.Influenceof publishedmapsandinstitutionalaffiliations.
+27. GasparriniA,ArmstrongB,KenwardMG.Distributedlagnon-linearmodels.
+StatMed.2010;29(21):2224–34.https://doi.org/10.1002/sim.3940.
+28. SimpleO,MindraA,ObaiG,OvugaE,Odongo-AginyaEI.Influenceof
 climaticfactorsonmalariaepidemicinGuluDistrict,northernUganda:a10-
 yearretrospectivestudy.MalarResTreat.2018;2018:5482136–8.https://doi.
 org/10.1155/2018/5482136.
@@ -642,3 +704,65 @@ org/10.1155/2018/5482136.
 effectsofcollinearityindistributedlagmodels;2021.
 30. MinistryofHealth.TheUgandaMalariaReductionStrategicPlan2014–2020,
 MinistryofHealth,Kampala,Uganda.2014.
+31. CastroMC.Malariatransmissionandprospectsformalariaeradication:the
+roleoftheenvironment.ColdSpringHarbPerspectMed.2017;7(10).https://
+doi.org/10.1101/cshperspect.a025601.
+32. KimY,RatnamJV,DoiT,MoriokaY,BeheraS,TsuzukiA,etal.Malaria
+predictionsbasedonseasonalclimateforecastsinSouthAfrica:atime
+seriesdistributedlagnonlinearmodel.SciRep.2019;9(1):17882.https://doi.
+org/10.1038/s41598-019-53838-3.
+33. LePVV,KumarP,RuizMO,MbogoC,MuturiEJ.Predictingthedirectand
+indirectimpactsofclimatechangeonmalariaincoastalKenya.PLOSONE.
+2019;14:e0211258.
+34. ShapiroLLM,WhiteheadSA,ThomasMB.Quantifyingtheeffectsof
+temperatureonmosquitoandparasitetraitsthatdeterminethe
+transmissionpotentialofhumanmalaria.PLOSBiol.2017;15:e2003489.
+35. Beck-JohnsonLM,NelsonWA,PaaijmansKP,ReadAF,ThomasMB,
+BjørnstadON.Theimportanceoftemperaturefluctuationsinunderstanding
+mosquitopopulationdynamicsandmalariarisk.RSocOpenSci.2017;4(3):
+160969.https://doi.org/10.1098/rsos.160969.
+36. ChuangT-W,SobleA,NtshalintshaliN,MkhontaN,SeyamaE,MthethwaS,
+etal.Assessmentofclimate-drivenvariationsinmalariaincidencein
+Swaziland:towardmalariaelimination.MalarJ.2017;16(1):232.https://doi.
+org/10.1186/s12936-017-1874-0.
+37. MohammadkhaniM,KhanjaniN,BakhtiariB,SheikhzadehK.Therelation
+betweenclimaticfactorsandmalariaincidenceinKerman,southeastof
+Iran.ParasiteEpidemiolControl.2016;1(3):205–10.https://doi.org/10.1016/j.
+parepi.2016.06.001.
+38. Matsushita,Kim,Ng,Moriyama,Igarashi,Yamamoto,etal.Differencesof
+Rainfall–MalariaAssociationsinLowlandandHighlandinWesternKenya.Int
+JEnvironResPublicHealth.2019;16:3693.
+39. RicottaEE,FreseSA,ChoobweC,LouisTA,ShiffCJ.Evaluatinglocal
+vegetationcoverasariskfactorformalariatransmission:anewanalytical
+approachusingImageJ.MalarJ.2014;13(1):94.https://doi.org/10.1186/14
+75-2875-13-94.
+40. MacDonaldAJ,MordecaiEA.Amazondeforestationdrivesmalaria
+transmission,andmalariaburdenreducesforestclearing.ProcNatlAcadSci.
+2019;116(44):22212–8.https://doi.org/10.1073/pnas.1905315116.
+41. AmadiJA,OlagoDO,Ong'amoGO,OriasoSO,NanyingiM,NyamongoIK,
+etal.Sensitivityofvegetationtoclimatevariabilityanditsimplicationsfor
+malariariskinBaringo,Kenya.PLOSONE.2018;13:e0199357.
+42. NationalCenterforAtmosphericResearchStaff.'TheClimateDataGuide:
+NDVI:Normalized-difference-vegetation-index:NOAAAVHRR.'Retrieved
+fromhttps://climatedataguide.ucar.edu/climate-data/ndvi-normalized-
+difference-vegetation-index-noaa-avhrr.
+43. WorldHealthOrganization.Guidelinesfortreatmentofmalaria.2nded;
+2010.p.210.
+44. ZinszerK,KigoziR,CharlandK,DorseyG,BrewerTF,BrownsteinJS,etal.
+Forecastingmalariainahighlyendemiccountryusingenvironmentaland
+clinicalpredictors.MalarJ.2015;14(1):245.https://doi.org/10.1186/s12936-01
+5-0758-4.
+45. SsempiiraJ,KissaJ,NambuusiB,MukooyoE,OpigoJ,MakumbiF,etal.
+Interactionsbetweenclimaticchangesandinterventioneffectsonmalaria
+spatio-temporaldynamicsinUganda.ParasiteEpidemiolControl.2018;3(3):
+e00070.https://doi.org/10.1016/j.parepi.2018.e00070.
+46. GebrechorkosSH,HülsmannS,BernhoferC.Long-termtrendsinrainfalland
+temperatureusinghigh-resolutionclimatedatasetsinEastAfrica.SciRep.
+2019;9(1):11376.https://doi.org/10.1038/s41598-019-47933-8.
+47. ZhaoX,ChenF,FengZ,LiX,ZhouX-H.Thetemporallaggedassociation
+betweenmeteorologicalfactorsandmalariain30countiesinsouth-West
+China:amultileveldistributedlagnon-linearanalysis.MalarJ.2014;13(1):57.
+https://doi.org/10.1186/1475-2875-13-57.
+Publisher'sNote
+SpringerNatureremainsneutralwithregardtojurisdictionalclaimsin
+publishedmapsandinstitutionalaffiliations.

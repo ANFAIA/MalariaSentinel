@@ -1,11 +1,42 @@
-# MalariaEliminationWithSpatialDecisionSupportSystems
+# Malaria elimination: moving forward with spatial decision support systems
 
-**Source PDF:** `MalariaEliminationWithSpatialDecisionSupportSystems.pdf`  
-**Path:** `papers/spatial-analysis/MalariaEliminationWithSpatialDecisionSupportSystems.pdf`  
+**Authors:** Gerard C. Kelly, Marcel Tanner, Andrew Vallely and Archie Clements
+**Journal:** Trends in Parasitology | **Year:** 2012 | **DOI:** 10.1016/j.pt.2012.04.002
+**File:** papers/spatial-analysis/MalariaEliminationWithSpatialDecisionSupportSystems.md
 
 ---
 
---- Page 1 ---
+## Abstract
+
+This review argues that the operational challenges facing contemporary malaria elimination have distinct geospatial elements that can be addressed through integrated spatial decision support systems (SDSS). As malaria programmes progress from control to elimination, the need for high-resolution location-based surveillance, targeted prevention, and effective service delivery at optimum coverage levels becomes critical. While mapping and geographical reconnaissance (GR) have traditionally played important roles in malaria control, their full potential as applied health systems tools has not been realised. The paper provides an overview of GIS and mapping as operational tools for malaria management, highlighting the expanded role of GIS-based SDSS in meeting the scaled-up demands of elimination programmes.
+
+The authors document contemporary malaria mapping approaches including incidence/prevalence mapping, geostatistical modelling of *Plasmodium falciparum* endemicity at global to local scales, and integration of remote sensing data for breeding habitat identification. They trace the history of GR from paper-based methods during the Global Malaria Eradication Programme (GMEP) of the 1950s–60s to modern handheld digital approaches using PDAs, GPS, and smartphones. Drawing on implementation experience in the Solomon Islands and Vanuatu, the paper presents a conceptual SDSS framework that integrates routine health information system data, field surveys, baseline GIS layers, and expert knowledge to produce automated map-based and tabular outputs supporting vector control, surveillance-response, and monitoring and evaluation activities. The authors conclude that SDSS approaches merit urgent further development, validation, and larger-scale application as malaria programmes progress toward elimination.
+
+## Methods
+
+- Literature review synthesising mapping approaches in malaria control and elimination contexts
+- Conceptual SDSS framework design with four key elements: (i) multi-source data inputs (routine HIS data, GR, baseline GIS layers); (ii) automated outputs (tabular reports, statistical/spatial analysis, graphical maps); (iii) cyclical re-entry of intervention outcomes; (iv) expert knowledge integrated throughout all stages
+- Case study presentation from operational SDSS implementation in Temotu and Isabel Provinces (Solomon Islands) and Tafea Province (Vanuatu), covering 20,485 households and 90,292 people
+- Field-based GR using handheld PDA and GPS technology for household-level data collection
+- SDSS platform built on Microsoft Access and MapInfo Professional
+
+## Key Results
+
+- GR operations recorded an average of 42.5 households and population of 180 per PDA/GPS unit per day
+- SDSS-generated LLIN coverage maps enabled monitoring of universal coverage and focal IRS targeting at household level
+- SDSS framework supported operational priorities including: routine reporting and M&E, vector control and prevention interventions (focal IRS, LLIN distribution), case management and surveillance-response, and drug supply management
+- Existing SDSS applications documented for malaria in South Africa (Mpumalanga case surveillance, KwaZulu-Natal spray monitoring), India (Dindigul urban malaria), and Mozambique (vector control management), plus dengue SDSS in Thailand, Singapore, and Mexico
+- Key limitations identified: limited research quantifying SDSS benefits, IT challenges (hardware, software, training), availability of reliable GIS data, and need for sustained operational capacity
+
+## Relevance to MalariaSentinel (Centinela)
+
+This paper is the **reference framework** for the Centinela project. The conceptual SDSS framework (Figure 2) directly informs the system architecture: integrating routine data, field surveys, baseline GIS layers, and expert knowledge into automated analytical outputs that support targeted interventions. The Solomon Islands/Vanuatu implementation demonstrates the feasibility of operational SDSS in resource-poor settings. The Centinela extends this framework by incorporating modern ML/AI methods (U-Net surrogates, ABM simulation) and a modern tech stack (Python, Neo4j), applying it to the Ghana context.
+
+---
+
+## Full Text
+
+### --- Page 1 ---
 Malaria elimination: moving forward
 with spatial decision support systems
 Gerard C. Kelly1, Marcel Tanner1,2,3, Andrew Vallely4 and Archie Clements1
@@ -79,7 +110,7 @@ ment and stress the relevance of incorporating a spatial
 component into any accompanying HIS.
 The significance of mapping as a powerful epidemiologi-
 cal tool has been recognised right from the foundations of
-epidemiology, when John Snow’s famous maps were pub-
+epidemiology, when John Snow's famous maps were pub-
 lished relating the location of cholera cases to the Broad
 Street water pump [15]. Current mapping approaches have
 largely focused on illustrating, modelling and predicting
@@ -109,7 +140,7 @@ Keywords: malaria elimination; spatial decision support system; geographic
 information systems; surveillance; monitoring and evaluation.
 1471-4922/$ – see front matter (cid:2) 2012 Elsevier Ltd. All rights reserved. http://dx.doi.org/10.1016/j.pt.2012.04.002 Trends in Parasitology, July 2012, Vol. 28, No. 7 297
 
---- Page 2 ---
+### --- Page 2 ---
 distribution of malaria over defined geographical areas
 [16,17]. Mapping and geostatistical applications are used
 to identify relationships between the spatial distribution of
@@ -239,7 +270,7 @@ scaled-up
 in Parasitology July 2012, Vol. 28, No. 7
 298
 
---- Page 3 ---
+### --- Page 3 ---
 malaria elimination interventions in the Solomon Islands.
 As the intensive control and progressive elimination pro-
 grammes in the Solomon Islands and Vanuatu continue to
@@ -316,7 +347,7 @@ Programme.
 in Parasitology July 2012, Vol. 28, No. 7
 299
 
---- Page 4 ---
+### --- Page 4 ---
 the ability to effectively measure and assess progress to
 support the strategic transition between phases. A stan-
 dardised approach to stratifying both malaria risk and
@@ -358,13 +389,11 @@ Automated summary reports (e.g. vector prediction and mapping of malaria inci- a
 control interventions, case reporting, etc.) dence, risk, and relationships strengthened malaria information
 systems (MIS) and elimination database
 Graphical maps
-e.g. Positive case distribution maps; Applications
+e.g. Positive case distribution maps;
 Household / GR spot maps;
 Intervention coverage maps
 TRENDS in Parasitology
-Figure
-within
-2. A conceptual SDSS framework for malaria elimination. This schematic illustrates a conceptual SDSS design framework highlighting the inputs, outputs,
+Figure 2. A conceptual SDSS framework for malaria elimination. This schematic illustrates a conceptual SDSS design framework highlighting the inputs, outputs,
 applications and relationships of key elements of a SDSS in the context of supporting the operational priorities and increased demands of malaria elimination and
 intensified control.
 Box 1. Example of SDSS applications in malaria and vector-borne disease management
@@ -414,7 +443,7 @@ borne disease control programmes, such as for dengue. In Thailand,
 vector populations and dengue cases have been mapped within a
 SDSS framework and used to monitor dengue outbreaks [69].
 Similarly, a SDSS has been implemented in Singapore to identify,
-map and monitor dengue ‘hotspots’ [70]. Dengue vector surveillance
+map and monitor dengue 'hotspots' [70]. Dengue vector surveillance
 in Singapore is also carried out using GIS, integrating data from an
 island-wide monitoring network of 2000 ovitraps [71]. Vector breeding
 data collected using the ovitraps are analysed weekly to identify
@@ -430,7 +459,7 @@ Trends
 in Parasitology July 2012, Vol. 28, No. 7
 300
 
---- Page 5 ---
+### --- Page 5 ---
 these areas throughout all phases of intensified malaria
 control and elimination.
 To support intensified control (and the future identifi-
@@ -565,7 +594,7 @@ issues.
 in Parasitology July 2012, Vol. 28, No. 7
 301
 
---- Page 6 ---
+### --- Page 6 ---
 and software in place. Access to GIS software has been a
 significant obstacle in the past, with the cost of proprietary
 software often a limiting factor for health programmes
@@ -622,12 +651,10 @@ in place suggests a need for further research and broader
 application of SDSS to validate the integrity and robust-
 ness of these systems, particularly in resource-
 TRENDS in Parasitology
-Figure
-and
-3. Screenshot of Isabel Province, Solomon Islands SDSS. (a) Customised drop-down menu to access SDSS applications developed to support priority interventions
-throughout all phases of the Isabel Province Elimination Programme including: the identification of target area and collection of baseline spatial data – ‘Isabel Household Map’
-and ‘Geographical Reconnaissance’; intervention management: ‘LLIN Distribution’, ‘IRS’ and ‘Entomology’; and case management and prevention of reintroduction: ‘Malaria
-Case Surveillance’. (b) Example of a SDSS dialog box illustrating key components of the IRS intervention management application. (c) Example of map-based graphical user
+Figure 3. Screenshot of Isabel Province, Solomon Islands SDSS. (a) Customised drop-down menu to access SDSS applications developed to support priority interventions
+throughout all phases of the Isabel Province Elimination Programme including: the identification of target area and collection of baseline spatial data – 'Isabel Household Map'
+and 'Geographical Reconnaissance'; intervention management: 'LLIN Distribution', 'IRS' and 'Entomology'; and case management and prevention of reintroduction: 'Malaria
+Case Surveillance'. (b) Example of a SDSS dialog box illustrating key components of the IRS intervention management application. (c) Example of map-based graphical user
 interface component of the SDSS to spatially monitor and access relevant data. (d) Example of the tabular component of the SDSS used to extract, analyse and export
 Review
 Trends
@@ -635,7 +662,7 @@ data.
 in Parasitology July 2012, Vol. 28, No. 7
 302
 
---- Page 7 ---
+### --- Page 7 ---
 capacity-limited settings. A significant challenge for the
 successful implementation of SDSS will be to ensure
 operational capacity at the programme implementation
@@ -649,8 +676,8 @@ SDSS tool to support the increased operational demands of
 intensified control and elimination versus traditional
 approaches to malaria intervention management.
 Concluding remarks
-Malaria risk is characterised by spatial variability, man-
-ifested by clustered patterns of malaria cases. As such, the
+Malaria risk is characterised by spatial variability, mani-
+fested by clustered patterns of malaria cases. As such, the
 effective management of malaria requires a spatial per-
 spective and the inclusion of a geographical component to
 any malaria elimination information system. Maps provide
@@ -697,8 +724,7 @@ Support Centre (PacMISC), School of Population Health, University of
 Queensland. A.C.A.C. is supported by a Career Development Award from
 the Australian National Health and Medical Research Council
 References
-1
-(#631619).
+1 (#631619).
 Tanner, M. and de Savigny, D. (2008) Malaria eradication back on the
 table. Bull. World Health Organ. 86, 82
 2 WHO (2008) World Malaria Report 2008, WHO
@@ -777,7 +803,7 @@ Trends
 in Parasitology July 2012, Vol. 28, No. 7
 303
 
---- Page 8 ---
+### --- Page 8 ---
 30 Hay, S.I. et al. (2000) Earth observation, geographic information
 systems and Plasmodium falciparum malaria in sub-Saharan
 Africa. Adv. Parasitol. 47, 173–215
@@ -835,8 +861,7 @@ Reconnaissance and Spraying Operations, Malaria Control
 Programme, Department of Public Health, (Papua New Guinea)
 52 Pull, J.H. (1972) Malaria surveillance methods, their uses and
 limitations. Am. J. Trop. Med. Hyg. 21,
-53
-651–657
+53 651–657
 Shirima, K. et al. (2007) The use of personal digital assistants for data
 entry at the point of collection in a large household survey in southern
 Tanzania. Emerg. Themes Epidemiol. 4, 5
