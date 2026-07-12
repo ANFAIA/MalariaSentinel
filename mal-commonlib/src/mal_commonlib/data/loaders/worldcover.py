@@ -2,7 +2,11 @@
 
 Public surface
 --------------
-``load_worldcover_water_frac(aoi, year=2021, *, cache_dir=None, water_classes=None) -> xr.DataArray``
+``load_worldcover_water_frac(aoi, year=2021, month=None, *, cache_dir=None, water_classes=None) -> xr.DataArray``
+
+The ``month`` parameter is accepted for signature uniformity with the other
+M1.3a loaders (``build_env`` calls every loader as ``loader(aoi, year, month)``)
+but is ignored: ESA WorldCover 10 m is an annual product, not monthly.
 
 ESA WorldCover 10 m is a global land cover map produced by ESA / VanderSat
 / partners, derived from Sentinel-1 + Sentinel-2. The 2020 and 2021 maps
@@ -204,6 +208,7 @@ def _make_reference_grid(aoi: AOI) -> xr.DataArray:
 def load_worldcover_water_frac(
     aoi: AOI,
     year: int = 2021,
+    month: int | None = None,
     *,
     cache_dir: pathlib.Path | None = None,
     water_classes: tuple[int, ...] | None = None,
@@ -217,6 +222,8 @@ def load_worldcover_water_frac(
     Args:
         aoi: the AOI.
         year: WorldCover product year (2020 or 2021 are the public versions).
+        month: accepted for ``build_env`` signature uniformity; ignored.
+            WorldCover 10 m is an annual product, not monthly.
         cache_dir: optional local cache.
         water_classes: override the set of class codes considered "water". By
             default, ``DEFAULT_WATER_CLASSES = (80, 90, 95)`` — permanent water
