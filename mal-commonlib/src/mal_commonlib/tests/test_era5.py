@@ -27,6 +27,7 @@ from mal_commonlib.data.loaders.era5 import (
     ERA5_NODATA,
     T_HALF_WIDTH,
     T_OPT,
+    _monthly_mean_K_to_C,
     load_era5_temp_suitability,
     sharpe_demichele_growth,
 )
@@ -204,3 +205,42 @@ def test_era5_invalid_month_rejected(ghana_aoi: AOI) -> None:
     # surface as RuntimeError (see ``test_era5_requires_cds_auth``).
     with pytest.raises(ValueError, match="month"):
         load_era5_temp_suitability(ghana_aoi, 2024, 13)
+
+
+def test_monthly_mean_reduces_valid_time() -> None:
+    """``_monthly_mean_K_to_C`` must reduce over the ``valid_time`` dim.
+
+    The CDS ``derived-era5-land-daily-statistics`` dataset uses
+    ``valid_time`` (not ``time``) for the daily-timestamps axis. Before the
+    dim-name fix the function only reduced when ``"time" in da_K.dims``,
+    so a (5, 4, 3) input came out (5, 4, 3) — the loader then failed the
+    AOI-shape assertion downstream.
+    """
+    h, w = 4, 3
+    n_days = 5
+    # Constant K grid (300.15 K = 27.0 °C) broadcast over a time axis;
+    # expected result is a (h, w) DataArray of 27.0 °C.
+    t2m_K = np.full((n_days, h, w), 300.15, dtype=np.float32)
+    da = xr.DataArray(t2m_K, dims=("valid_time", "y", "x"))
+    out = _monthly_mean_K_to_C(da, 2024, 6)
+    assert out.dims == ("y", "x")
+    assert out.shape == (h, w)
+    np.testing.assert_allclose(out.values, 27.0, atol=1e-4)
+    assert out.dtype == np.float32
+
+
+def test_monthly_mean_reduces_no_time_dim() -> None:
+    """Regression: with no time-like dim, the function is a pure K→C cast.
+
+    The per-month NetCDFs some ERA5 products ship have no leading time
+    axis at all. The helper should convert and return the 2-D array
+    unchanged in shape, not crash on the missing-dim path.
+    """
+    h, w = 4, 3
+    t2m_K = np.full((h, w), 298.15, dtype=np.float32)
+    da = xr.DataArray(t2m_K, dims=("y", "x"))
+    out = _monthly_mean_K_to_C(da, 2024, 6)
+    assert out.dims == ("y", "x")
+    assert out.shape == (h, w)
+    np.testing.assert_allclose(out.values, 25.0, atol=1e-4)
+    assert out.dtype == np.float32

@@ -132,13 +132,27 @@ def _reproject_to_aoi_grid(
 def _monthly_mean_K_to_C(da_K: xr.DataArray, year: int, month: int) -> xr.DataArray:
     """Aggregate a daily (or any) ``2m_temperature`` DataArray to a monthly
     mean in degrees Celsius. The input is expected in Kelvin; this function
-    converts to °C and reduces over the leading time axis."""
-    # Some ERA5 products ship per-month files with a single time stamp; in that
-    # case we still reduce so the caller's logic is uniform.
-    if "time" in da_K.dims:
-        monthly = da_K.mean(dim="time", skipna=True)
+    converts to °C and reduces over the leading time axis.
+
+    CDS products use a few different time-axis names — ``time`` for the
+    classic ERA5/ERA5-Land monthly products, ``valid_time`` for the
+    ``derived-era5-land-daily-statistics`` dataset, and (in forecast
+    products) ``date``/``datetime``/``forecast_hour``/``lead_time``. We
+    accept any of those; if none is present we fall back to reducing over
+    any single non-spatial dim, which covers per-month files that ship
+    with a singleton leading axis.
+    """
+    SPATIAL_DIMS = {"y", "x", "latitude", "longitude", "lat", "lon", "rlat", "rlon"}
+    TIME_LIKE = {"time", "valid_time", "date", "datetime", "lead_time", "forecast_hour"}
+    time_dim = next((d for d in da_K.dims if d in TIME_LIKE), None)
+    if time_dim is not None:
+        monthly = da_K.mean(dim=time_dim, skipna=True)
     else:
-        monthly = da_K
+        non_spatial = [d for d in da_K.dims if d not in SPATIAL_DIMS]
+        if len(non_spatial) == 1:
+            monthly = da_K.mean(dim=non_spatial[0], skipna=True)
+        else:
+            monthly = da_K
     return (monthly - 273.15).astype(np.float32)
 
 
