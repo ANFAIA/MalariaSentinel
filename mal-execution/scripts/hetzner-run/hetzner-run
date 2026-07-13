@@ -1,0 +1,404 @@
+#!/usr/bin/env bash
+# hetzner-run — ephemeral Hetzner Cloud VM runner for MalariaSentinel jobs.
+#
+# Subcommands: start | stop | destroy | status | exec | push | pull |
+#             sim-run | train | cost | --help
+# Global flag: --dry-run (prints hcloud / rsync / ssh invocations; no real
+#                       API or network calls).
+
+set -euo pipefail
+
+HETZNER_RUN_DEBUG="${HETZNER_RUN_DEBUG:-0}"
+
+# Locate the package root (handles symlinks, absolute invocations, etc.).
+_hetzner_run_self_dir() {
+  local src="${BASH_SOURCE[0]}"
+  while [[ -h "$src" ]]; do
+    local dir
+    dir="$(cd -P "$(dirname "$src")" && pwd)"
+    src="$(readlink "$src")"
+    [[ "$src" != /* ]] && src="$dir/$src"
+  done
+  local sdir
+  sdir="$(cd -P "$(dirname "$src")" && pwd)"
+  (cd "$sdir" && pwd)
+}
+HETZNER_RUN_ROOT="$(_hetzner_run_self_dir)"
+HETZNER_RUN_LIB="$HETZNER_RUN_ROOT/lib"
+export HETZNER_RUN_ROOT HETZNER_RUN_LIB
+
+# shellcheck source=lib/common.sh
+source "$HETZNER_RUN_LIB/common.sh"
+# shellcheck source=lib/vm.sh
+source "$HETZNER_RUN_LIB/vm.sh"
+# shellcheck source=lib/sync.sh
+source "$HETZNER_RUN_LIB/sync.sh"
+# shellcheck source=lib/jobs.sh
+source "$HETZNER_RUN_LIB/jobs.sh"
+
+# --- help text -------------------------------------------------------------
+
+print_main_help() {
+  cat <<'EOF'
+hetzner-run — start, use, and tear down ephemeral Hetzner Cloud VMs
+
+USAGE
+  hetzner-run [--dry-run] <subcommand> [flags] [args]
+
+GLOBAL FLAGS
+  --dry-run        Print the hcloud / rsync / ssh commands that would run.
+                   No API calls, no network calls.
+  --debug          Verbose logging.
+  -h, --help       Show this help.
+
+SUBCOMMANDS
+  start            Create a new VM and wait for SSH.
+  stop             Gracefully shut down an existing VM.
+  destroy          Delete a VM and remove its local cache.
+  status [<name>]  Show one VM's status, or list all VMs with prefix ms-*.
+  exec <name> <c>  Run a command on the VM (stream output, preserve exit code).
+  push <name> <l> <r>   rsync a local path to a remote path on the VM.
+  pull <name> <r> <l>   rsync a remote path on the VM to a local path.
+  sim-run          Boot a ccx33, push repo+data, run a sim, pull results, destroy.
+  train            Boot a ccx33, push repo+data+config, train, pull results, destroy.
+  cost             Cost calculator (--type X --hours Y or --list).
+
+EXAMPLES
+  hetzner-run --dry-run start --type ccx33 --name ms-test
+  hetzner-run start --type ccx33 --name ms-1
+  hetzner-run exec ms-1 'df -h /'
+  hetzner-run push ms-1 ./mal-ghana-sim /work/code/mal-ghana-sim
+  hetzner-run pull ms-1 /work/runs ./runs/2026-07-13
+  hetzner-run destroy ms-1
+
+See `hetzner-run <subcommand> --help` for subcommand-specific flags.
+EOF
+}
+
+print_start_help() {
+  cat <<'EOF'
+hetzner-run start — create a new VM and wait for SSH
+
+USAGE
+  hetzner-run start [--type T] [--name N] [--location L] [--image I]
+                    [--ssh-key K] [--dry-run]
+
+FLAGS
+  --type T         Server type (default: ccx33).
+  --name N         Server name (default: ms-<unix-ts>-<pid>). Must match
+                   ^[A-Za-z0-9][A-Za-z0-9._-]{0,62}$.
+  --location L     Hetzner location (default: fsn1).
+  --image I        Cloud image (default: ubuntu-24.04).
+  --ssh-key K      Hetzner SSH key name (default: davidflorezmazuera@gmail.com).
+  --dry-run        Print the hcloud command and exit 0.
+EOF
+}
+
+print_stop_help() {
+  cat <<'EOF'
+hetzner-run stop — gracefully shut down a VM
+
+USAGE
+  hetzner-run stop <name> [--dry-run]
+EOF
+}
+
+print_destroy_help() {
+  cat <<'EOF'
+hetzner-run destroy — delete a VM and remove local metadata
+
+USAGE
+  hetzner-run destroy <name> [--dry-run]
+EOF
+}
+
+print_status_help() {
+  cat <<'EOF'
+hetzner-run status — show one VM's status, or list all ms-* VMs
+
+USAGE
+  hetzner-run status [<name>] [--dry-run]
+EOF
+}
+
+print_exec_help() {
+  cat <<'EOF'
+hetzner-run exec — run a command on a VM
+
+USAGE
+  hetzner-run exec <name> <cmd...> [--dry-run]
+EOF
+}
+
+print_push_help() {
+  cat <<'EOF'
+hetzner-run push — rsync a local path to a VM
+
+USAGE
+  hetzner-run push <name> <local-path> <remote-path> [--dry-run]
+EOF
+}
+
+print_pull_help() {
+  cat <<'EOF'
+hetzner-run pull — rsync a remote path on a VM to a local path
+
+USAGE
+  hetzner-run pull <name> <remote-path> <local-path> [--dry-run]
+EOF
+}
+
+print_sim_run_help() {
+  cat <<'EOF'
+hetzner-run sim-run — boot a ccx33, push repo+data, run a sim, pull results
+
+USAGE
+  hetzner-run sim-run [--name N] [--repo R] [--data D] [--cmd C]
+                      [--pull-to P] [--keep-vm] [--yes] [--dry-run]
+
+DEFAULTS
+  --name       ms-<unix-ts>-<pid>
+  --repo       mal-ghana-sim
+  --data       ./data/ghana
+  --cmd        cd /work/code/mal-ghana-sim && uv sync &&
+               uv run python scripts/03_simulate.py
+  --pull-to    ./runs/<timestamp>
+
+ENV
+  HETZNER_RUN_ESTIMATE_HOURS  Worst-case hours used in the cost estimate.
+                              Default: 1.
+  HETZNER_RUN_ASSUME_YES=1    Skip the confirmation prompt.
+EOF
+}
+
+print_train_help() {
+  cat <<'EOF'
+hetzner-run train — boot a ccx33, push repo+data+config, train, pull results
+
+USAGE
+  hetzner-run train [--name N] [--repo R] [--data D] [--config Cfg]
+                    [--pull-to P] [--keep-vm] [--dry-run]
+
+DEFAULTS
+  --name       ms-<unix-ts>-<pid>
+  --repo       mal-ghana-sim
+  --data       ./data/ghana
+  --config     (none; if unset, train.py is called without --config)
+  --pull-to    ./runs/<timestamp>
+EOF
+}
+
+print_cost_help() {
+  cat <<'EOF'
+hetzner-run cost — compute or list Hetzner per-hour prices
+
+USAGE
+  hetzner-run cost --type T --hours H
+  hetzner-run cost --list
+
+EXAMPLES
+  hetzner-run cost --type ccx33 --hours 2   # -> €0.060
+  hetzner-run cost --list                   # full price table
+EOF
+}
+
+# --- arg parsing -----------------------------------------------------------
+
+# Global flag parsing happens inline in main() (see below). The
+# HETZNER_RUN_DRY_RUN / HETZNER_RUN_DEBUG variables are set there and read
+# by every subcommand + helper.
+
+# --- subcommand dispatch ---------------------------------------------------
+
+cmd_start() {
+  local type="ccx33" name="" location="fsn1" image="ubuntu-24.04" ssh_key=""
+  while (( $# )); do
+    case "$1" in
+      --type)      type="$2"; shift 2 ;;
+      --name)      name="$2"; shift 2 ;;
+      --location)  location="$2"; shift 2 ;;
+      --image)     image="$2"; shift 2 ;;
+      --ssh-key)   ssh_key="$2"; shift 2 ;;
+      -h|--help)   print_start_help; return 0 ;;
+      *) die "start: unknown flag: $1" ;;
+    esac
+  done
+  if [[ -z "$name" ]]; then
+    name="ms-$(date +%s)-$$"
+  fi
+  ssh_key="$(resolve_ssh_key_name "$ssh_key")"
+  start_vm "$name" "$type" "$image" "$location" "$ssh_key"
+}
+
+cmd_stop() {
+  if (( $# == 0 )); then die "stop: missing <name>"; fi
+  if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+    print_stop_help; return 0
+  fi
+  stop_vm "$1"
+}
+
+cmd_destroy() {
+  if (( $# == 0 )); then die "destroy: missing <name>"; fi
+  if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+    print_destroy_help; return 0
+  fi
+  destroy_vm "$1"
+}
+
+cmd_status() {
+  if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+    print_status_help; return 0
+  fi
+  if (( $# == 0 )); then
+    list_vms
+  else
+    status_vm "$1"
+  fi
+}
+
+cmd_exec() {
+  if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+    print_exec_help; return 0
+  fi
+  (( $# >= 2 )) || die "exec: usage: hetzner-run exec <name> <cmd...>"
+  local name="$1"; shift
+  exec_remote "$name" "$@"
+}
+
+cmd_push() {
+  if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+    print_push_help; return 0
+  fi
+  (( $# == 3 )) || die "push: usage: hetzner-run push <name> <local> <remote>"
+  push_path "$1" "$2" "$3"
+}
+
+cmd_pull() {
+  if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+    print_pull_help; return 0
+  fi
+  (( $# == 3 )) || die "pull: usage: hetzner-run pull <name> <remote> <local>"
+  pull_path "$1" "$2" "$3"
+}
+
+cmd_sim_run() {
+  local name="" repo="mal-ghana-sim" data="./data/ghana" cmd=""
+  local pull_to="" keep_vm=0
+  while (( $# )); do
+    case "$1" in
+      --name)     name="$2"; shift 2 ;;
+      --repo)     repo="$2"; shift 2 ;;
+      --data)     data="$2"; shift 2 ;;
+      --cmd)      cmd="$2"; shift 2 ;;
+      --pull-to)  pull_to="$2"; shift 2 ;;
+      --keep-vm)  keep_vm=1; shift ;;
+      --yes)      HETZNER_RUN_ASSUME_YES=1; shift ;;
+      -h|--help)  print_sim_run_help; return 0 ;;
+      *) die "sim-run: unknown flag: $1" ;;
+    esac
+  done
+  if [[ -z "$name" ]]; then
+    name="ms-$(date +%s)-$$"
+  fi
+  if [[ -z "$pull_to" ]]; then
+    pull_to="./runs/$(date +%Y-%m-%dT%H-%M-%S)"
+  fi
+  if [[ -z "$cmd" ]]; then
+    cmd="cd /work/code/mal-ghana-sim && uv sync && uv run python scripts/03_simulate.py"
+  fi
+  sim_run "$name" "$repo" "$data" "$cmd" "$pull_to" "$keep_vm"
+}
+
+cmd_train() {
+  local name="" repo="mal-ghana-sim" data="./data/ghana" config=""
+  local pull_to="" keep_vm=0
+  while (( $# )); do
+    case "$1" in
+      --name)     name="$2"; shift 2 ;;
+      --repo)     repo="$2"; shift 2 ;;
+      --data)     data="$2"; shift 2 ;;
+      --config)   config="$2"; shift 2 ;;
+      --pull-to)  pull_to="$2"; shift 2 ;;
+      --keep-vm)  keep_vm=1; shift ;;
+      -h|--help)  print_train_help; return 0 ;;
+      *) die "train: unknown flag: $1" ;;
+    esac
+  done
+  if [[ -z "$name" ]]; then
+    name="ms-$(date +%s)-$$"
+  fi
+  if [[ -z "$pull_to" ]]; then
+    pull_to="./runs/$(date +%Y-%m-%dT%H-%M-%S)"
+  fi
+  train_run "$name" "$repo" "$data" "$config" "$pull_to" "$keep_vm"
+}
+
+cmd_cost() {
+  local type="" hours="" do_list=0
+  while (( $# )); do
+    case "$1" in
+      --type)  type="$2"; shift 2 ;;
+      --hours) hours="$2"; shift 2 ;;
+      --list)  do_list=1; shift ;;
+      -h|--help) print_cost_help; return 0 ;;
+      *) die "cost: unknown flag: $1" ;;
+    esac
+  done
+
+  if (( do_list )); then
+    printf '%s' "$PRICE_TABLE_EUR_PER_HOUR" | jq -r 'to_entries | sort_by(.key) | .[] | "\(.key | . + ("        " | .[0:8])) €\(.value)"'
+    return 0
+  fi
+
+  [[ -n "$type" ]] || die "cost: --type required (or pass --list)"
+  [[ -n "$hours" ]] || die "cost: --hours required (or pass --list)"
+  local c
+  c="$(calc_cost "$type" "$hours")" || die "cost: cannot compute for type='$type'"
+  printf '€%s\n' "$c"
+}
+
+# --- main dispatch ---------------------------------------------------------
+
+main() {
+  if (( $# == 0 )); then
+    print_main_help
+    exit 0
+  fi
+
+  # Strip global flags (--dry-run / --debug) from the front. We do this
+  # inline (not via a command substitution) so the side-effect of setting
+  # HETZNER_RUN_DRY_RUN/HETZNER_RUN_DEBUG is visible in the rest of main().
+  local -a remaining=()
+  while (( $# )); do
+    case "$1" in
+      --dry-run) HETZNER_RUN_DRY_RUN=1; shift ;;
+      --debug)   HETZNER_RUN_DEBUG=1; shift ;;
+      *)         remaining+=("$1"); shift ;;
+    esac
+  done
+  set -- "${remaining[@]}"
+
+  if (( $# == 0 )); then
+    print_main_help
+    exit 0
+  fi
+
+  local sub="$1"; shift
+  case "$sub" in
+    -h|--help|help) print_main_help ;;
+    start)          cmd_start "$@" ;;
+    stop)           cmd_stop "$@" ;;
+    destroy)        cmd_destroy "$@" ;;
+    status)         cmd_status "$@" ;;
+    exec)           cmd_exec "$@" ;;
+    push)           cmd_push "$@" ;;
+    pull)           cmd_pull "$@" ;;
+    sim-run)        cmd_sim_run "$@" ;;
+    train)          cmd_train "$@" ;;
+    cost)           cmd_cost "$@" ;;
+    *) die "unknown subcommand: $sub (try: hetzner-run --help)" ;;
+  esac
+}
+
+main "$@"

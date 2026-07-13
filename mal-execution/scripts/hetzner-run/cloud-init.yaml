@@ -1,0 +1,61 @@
+#cloud-config
+# hetzner-run — baseline cloud-init for ephemeral MalariaSentinel VMs.
+#
+# First boot only. Idempotent if rerun (apt-get install is a no-op for the
+# already-installed packages). Designed to leave a clean, reproducible
+# machine in ~3 minutes.
+
+write_files:
+  - path: /etc/profile.d/uv.sh
+    permissions: '0644'
+    owner: root:root
+    content: |
+      # Added by hetzner-run cloud-init. uv lives under /usr/local/bin.
+      export PATH="/usr/local/bin:${PATH}"
+
+apt:
+  preserve_sources_list: true
+  conf: |
+    APT {
+      Get {
+        Assume-Yes "true";
+        Fix-Broken "true";
+      };
+    };
+
+package_update: true
+package_upgrade: false
+packages:
+  - python3.12
+  - python3.12-venv
+  - python3.12-dev
+  - python3-pip
+  - rsync
+  - jq
+  - ca-certificates
+  - curl
+
+runcmd:
+  # Disable unattended-upgrades to avoid surprise reboots mid-job.
+  - systemctl stop unattended-upgrades.service || true
+  - systemctl disable unattended-upgrades.service || true
+  - systemctl mask unattended-upgrades.service || true
+  - |
+    # Install uv (https://docs.astral.sh/uv/) into /usr/local/bin so it's on
+    # the default PATH for all users. Pin a recent stable version.
+    UV_VERSION="0.4.18"
+    curl -fsSL "https://astral.sh/uv/${UV_VERSION}/install.sh" | sh -s -- --system
+    ln -sf /usr/local/bin/uv /usr/bin/uv || true
+  - mkdir -p /work/code /work/data /work/runs
+  - chmod 755 /work /work/code /work/data /work/runs
+  - chown -R root:root /work
+  # Drop a tiny motd so anyone SSHing in can see what this box is for.
+  - |
+    cat > /etc/motd <<'MOTD'
+    MalariaSentinel ephemeral runner (hetzner-run)
+      /work/code   source repos
+      /work/data   input datasets
+      /work/runs   output artifacts
+    Destroy this VM with: hetzner-run destroy <name>
+    MOTD
+  - echo "hetzner-run cloud-init: complete at $(date -u +%Y-%m-%dT%H:%M:%SZ)" > /var/log/hetzner-run-cloud-init.log
