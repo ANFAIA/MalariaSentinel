@@ -1,8 +1,15 @@
-"""Smoke tests for the M1 Mesa-Geo ABM thin slice.
+"""Smoke tests for the M1.5 Mesa-Geo + Polars ABM thin slice.
 
 All tests run offline — the env inputs are synthetic dicts / small
 GeoTIFFs, not the real data loaders. The e2e test builds a 10x10
 synthetic env + 1-row habitat gpkg and runs 30 days of simulation.
+
+M1.5 changes from M1.4:
+  * ``MosquitoAgent`` (Mesa-Geo) is gone. The mosquito population is a
+    ``polars.DataFrame`` on ``AnophelesABM.submodel.df``.
+  * ``AnophelesABM.schedule`` still exists (delegated to the
+    coordinator's Mesa-Geo scheduler shim) so the HabitatPatch
+    ``step()`` contract is honoured.
 """
 from __future__ import annotations
 
@@ -21,8 +28,17 @@ from shapely.geometry import Point
 
 from mal_commonlib.aoi import AOI, Scale
 
-from mal_ghana_sim.abm import agents, climate, habitat, habitat_engine, model, scheduler
-from mal_ghana_sim.abm.agents import MosquitoAgent
+from mal_ghana_sim.abm import (
+    AnophelesABM,
+    CoordinatorModel,
+    MosquitoSubmodel,
+    PatchState,
+    climate,
+    habitat,
+    habitat_engine,
+    model,
+    scheduler,
+)
 from mal_ghana_sim.abm.eip import (
     EIP_BASE_TEMP_C,
     EIP_THRESHOLD_GD,
@@ -31,7 +47,6 @@ from mal_ghana_sim.abm.eip import (
 )
 from mal_ghana_sim.abm.habitat import HabitatPatch, HabitatType
 from mal_ghana_sim.abm.habitat_engine import HabitatEngine
-from mal_ghana_sim.abm.model import AnophelesABM
 from mal_ghana_sim.abm.run import app as run_app
 from mal_ghana_sim.abm.scheduler import RandomActivationByTypeShim
 
@@ -106,22 +121,30 @@ def test_eip_accumulation() -> None:
     assert accumulate_eip(200.0, EIP_BASE_TEMP_C) == 200.0
 
 
-# -- mosquito agent construction -------------------------------------------
+# -- mosquito population construction (M1.5: Polars DataFrame) ------------
 
 
-def test_mosquito_agent_construction(small_aoi: AOI, one_patch_gpkg: gpd.GeoDataFrame) -> None:
-    """A MosquitoAgent built in a minimal AnophelesABM has the right defaults."""
+def test_mosquito_population_construction(small_aoi: AOI, one_patch_gpkg: gpd.GeoDataFrame) -> None:
+    """The M1.5 AnophelesABM seeds the mosquito population as a Polars DataFrame.
+
+    The M1.4 ``MosquitoAgent`` (per-agent Python object) is gone; the
+    population now lives in ``AnophelesABM.submodel.df``. The
+    ``K_MAX * init_frac`` seeding rule is unchanged.
+    """
     env = _synthetic_env(small_aoi)
     m = AnophelesABM(small_aoi, env, one_patch_gpkg, seed=1, start_date=date(2024, 6, 1))
-    # Pull any one larva.
-    bucket = m.schedule.agents_by_type.get(model._LARVA_KEY, [])
-    assert len(bucket) > 0, "model should seed at least one larva"
-    agent = bucket[0]
-    assert agent.stage == "larva"
-    assert agent.hbi == 0.95
-    assert agent.eip_progress == 0.0
-    assert agent.sex == "female"
-    assert agent.sugar_energy == 1.0
+    df = m.submodel.df
+    expected_n = int(round(m.K_MAX * 0.3))  # init_frac=0.3, 1 patch
+    assert len(df) == expected_n, (
+        f"submodel must seed K_MAX*init_frac larvae; "
+        f"got {len(df)}, expected {expected_n}"
+    )
+    assert df["stage"].to_list() == ["larva"] * expected_n
+    # Patch_id is the index of the only patch (0).
+    assert df["patch_id"].to_list() == [0] * expected_n
+    # eip_progress and stage_age are zero on the seeded frame.
+    assert df["eip_progress"].sum() == 0.0
+    assert df["stage_age"].sum() == 0
 
 
 # -- habitat activation + mortality ----------------------------------------

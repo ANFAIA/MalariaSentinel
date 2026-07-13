@@ -8,12 +8,23 @@ Activation: a ``PLUVIAL_POOL`` is activated when ``rain_24h`` exceeds
 ``RAIN_THRESHOLD_MM`` (15 mm in v1). Production is the Beverton-Holt-like
 density-dependent survival curve carried over from the M1 casablanca:
 ``survival = 0.95 * K / (K + 0.05 * max(0, N - K))``.
+
+M1.5: the patch also exposes a ``to_patch_state(...)`` method that
+returns a ``PatchState`` record — the per-day contract exchanged with
+the Polars-backed submodel. The patch is still a Mesa-Geo
+``GeoAgent`` (so the coordinator's ``mesa_geo.GeoSpace`` continues to
+host it), but it now also serves as a typed data source for the
+submodel.
 """
 from __future__ import annotations
 
 from enum import Enum
+from typing import TYPE_CHECKING
 
 from mesa_geo.geoagent import GeoAgent
+
+if TYPE_CHECKING:
+    from .patch_state import PatchState
 
 
 class HabitatType(str, Enum):
@@ -44,7 +55,11 @@ class HabitatPatch(GeoAgent):
         # Mesa-Geo v0.9.3 GeoAgent is (model, geometry, crs) — no unique_id.
         super().__init__(model, geometry, crs)
         self.hab_type: HabitatType = HabitatType.PLUVIAL_POOL
-        self.K: int = min(int(K), int(model.K_MAX))
+        # K_MAX is enforced by the facade for the M1.5 thin slice. We
+        # still keep the attribute on the patch for backward-compat
+        # with the M1.4 mortality / production API.
+        k_max = getattr(model, "K_MAX", 1000)
+        self.K: int = min(int(K), int(k_max))
         self.activated: bool = False
         self.rain_24h: float = 0.0
         self.water_temp_c: float = 25.0
@@ -68,6 +83,36 @@ class HabitatPatch(GeoAgent):
         self.rain_24h = float(rain_24h)
         self.water_temp_c = float(water_temp_c)
         self.activated = bool(rain_24h > self.RAIN_THRESHOLD_MM)
+
+    def to_patch_state(
+        self,
+        patch_id: int,
+        row: int,
+        col: int,
+        *,
+        rain_d: float | None = None,
+        temp_d: float | None = None,
+        water_frac: float | None = None,
+    ) -> "PatchState":
+        """Return a ``PatchState`` record for this patch (M1.5).
+
+        The optional ``rain_d`` / ``temp_d`` / ``water_frac`` kwargs let
+        the caller override the patch's own attributes (useful when the
+        coordinator has already read a vectorised grid and wants to skip
+        the per-patch Python attribute read). If omitted, the patch's
+        own attributes are used.
+        """
+        from .patch_state import PatchState
+
+        return PatchState(
+            patch_id=int(patch_id),
+            row=int(row),
+            col=int(col),
+            activated=bool(self.activated),
+            rain_d=float(self.rain_24h if rain_d is None else rain_d),
+            temp_d=float(self.water_temp_c if temp_d is None else temp_d),
+            water_frac=float(0.5 if water_frac is None else water_frac),
+        )
 
     def mortality(self, N: int, *, density_dep: bool = True) -> int:
         """Return the number of larvae that die this step.
