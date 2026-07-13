@@ -39,7 +39,7 @@ This systematic review provides a comprehensive catalogue of spatial and spatio-
 
 ## Full Text
 
-**Note:** The original OCR conversion of this PDF produced highly fragmented character-level output. The abstract, key findings, and bibliographic information have been preserved accurately from the PDF header and metadata. For the complete original text, please refer to the PDF directly at `papers/spatial-analysis/Spatial&SpatioTemporalMethodsForMappingMalariaRisk.pdf`.
+**Note:** The original OCR conversion of this PDF produced highly fragmented character-level output. The abstract, key findings, and bibliographic information have been preserved accurately from the PDF header and metadata. The PDF has been removed since the markdown summary is now the canonical reference. For the published version, see BMJ Global Health (2020) 5:e002919 at https://doi.org/10.1136/bmjgh-2020-002919.
 
 ### --- Page 1 ---
 Original research
