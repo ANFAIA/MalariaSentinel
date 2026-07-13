@@ -50,4 +50,8 @@ services:
 
 volumes:
   neo4j_data:
+    name: memory_neo4j_data
+    external: true
   neo4j_logs:
+    name: memory_neo4j_logs
+    external: true
