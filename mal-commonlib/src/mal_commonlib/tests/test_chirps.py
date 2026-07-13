@@ -6,7 +6,8 @@ Three tests:
       network is unavailable.
     * ``test_chirps_dry_run_no_network`` — monkeypatches the daily fetch
       to return a synthetic Gaussian-bump raster; asserts the function
-      still produces a normalized [0, 1] result of the right shape.
+      still produces a well-formed result in raw mm (NOT [0, 1] P95-
+      normalized) of the right shape.
     * ``test_chirps_no_auth_required`` — CHIRPS is public; the loader
       must not consult any auth state.
 """
@@ -96,7 +97,11 @@ def test_chirps_ghana_smoke(
     ghana_aoi: AOI, tmp_path: pathlib.Path
 ) -> None:
     """End-to-end: download a single month of CHIRPS daily GeoTIFFs and
-    assert the result is well-formed. Skipped on network failure."""
+    assert the result is well-formed. Skipped on network failure.
+
+    The env band is raw mm (monthly total). For Ghana in June 2024 the
+    wet-season monthly totals are typically 50-300 mm, not [0, 1].
+    """
     try:
         out = load_chirps_rainfall(
             ghana_aoi, 2024, 6, cache_dir=tmp_path / "chirps-cache"
@@ -110,23 +115,31 @@ def test_chirps_ghana_smoke(
     # CRS should be EPSG:4326.
     assert out.rio.crs is not None
     assert out.rio.crs.to_epsg() == 4326
-    # All real values (not -9999) in [0, 1].
+    # Real values are in mm/month (raw monthly total), NOT [0, 1].
     valid = out.values != CHIRPS_NODATA
     if valid.any():
         v = out.values[valid]
         assert v.min() >= 0.0
-        assert v.max() <= 1.0
-    # Cap (P95) recorded in the attrs.
+        # June in Ghana is mid-wet-season; monthly totals are well above 1 mm.
+        assert v.max() > 1.0, (
+            f"expected raw mm, got max={float(v.max()):.4f} (looks normalized)"
+        )
+    # Units + cap attrs.
+    assert out.attrs.get("units") == "mm/month"
     assert "aoi_slug" in out.attrs
     assert out.attrs["aoi_slug"] == "ghana"
     assert out.attrs["year"] == 2024
     assert out.attrs["month"] == 6
     assert out.attrs["nodata"] == CHIRPS_NODATA
+    assert "rainfall_cap_mm" in out.attrs
+    assert out.attrs["rainfall_cap_mm"] >= 0.0
 
 
 def test_chirps_dry_run_no_network(ghana_aoi: AOI) -> None:
     """With a monkeypatched daily fetch, the loader still produces a
-    well-formed (H, W) normalized rainfall in [0, 1]."""
+    well-formed (H, W) raw-mm rainfall field. The peak daily rate in the
+    synthetic fetch is 25 mm/day, so a 30-day month sums to ~25 mm at
+    the bump centre and ~0 mm at the edges; the band is NOT [0, 1]."""
     fetch = _synthetic_chirps_daily(ghana_aoi)
     out = load_chirps_rainfall(ghana_aoi, 2024, 6, _fetch_daily=fetch)
 
@@ -136,11 +149,17 @@ def test_chirps_dry_run_no_network(ghana_aoi: AOI) -> None:
     arr = out.values
     # No NaN in the dry-run (all synthetic data is finite).
     assert np.isfinite(arr).all()
-    # Bump is non-trivial so we should see some values near 0 and some near 1.
+    # The band is raw mm/month, not [0, 1] P95-normalized.
     assert arr.min() >= 0.0
-    assert arr.max() <= 1.0
-    # The P95 cap normalizes the maximum of the synthesized field to 1.0.
-    assert arr.max() == pytest.approx(1.0, rel=1e-3)
+    # The synthetic peak is 25 mm/day; summed over 30 days with sin
+    # modulation, the bump centre is well above 100 mm/month.
+    assert arr.max() > 1.0, (
+        f"expected raw mm, got max={float(arr.max()):.4f} (looks normalized)"
+    )
+    # Units + cap attrs.
+    assert out.attrs.get("units") == "mm/month"
+    assert "rainfall_cap_mm" in out.attrs
+    assert out.attrs["rainfall_cap_mm"] >= 0.0
     # Bump structure: at least 1 cell strictly above the median.
     assert arr.max() > arr.min()
 

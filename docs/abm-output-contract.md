@@ -38,13 +38,13 @@ The env tensor is the static context, one per `(aoi_slug, scale, year, month)`. 
 | Shape | `(C_env=4, H, W)` |
 | `dtype` | `float32` |
 | Channel 0 | `water_frac` — ∈ [0, 1] by construction (fraction of cell covered by open water) |
-| Channel 1 | `rainfall` — min-max normalized over the AOI's wet-season P95, clipped at the cap (mm/month) |
+| Channel 1 | `rainfall` — raw monthly total in mm (the suitability overlay applies its own min-max normalization at consumption time) |
 | Channel 2 | `temp_suitability` — ∈ [0, 1] by construction (Sharpe-DeMichele-style growth response) |
 | Channel 3 | `ndvi` — rescaled to [0, 1] from the raw NDVI ∈ [−1, 1] |
 | File naming | `{aoi_slug}_{scale}_{year}_{month:02d}_env.tif` (no seed — deterministic) |
 | Sidecar | same name + `.json` (see §3) |
 
-`water_frac` and `temp_suitability` are already in [0, 1] by construction — the writer does not rescale. `rainfall` and `ndvi` need explicit normalization; the writer is the only place that does it, and it writes the normalized values directly. Readers never re-normalize. The cap value for `rainfall` (the AOI's wet-season P95) lives in the sidecar (`rainfall_cap_mm`) so a reader can reconstruct the un-normalized value if needed.
+`water_frac` and `temp_suitability` are already in [0, 1] by construction — the writer does not rescale. `ndvi` is rescaled at write time and the writer is the only place that does it. `rainfall` is the **raw** monthly total in mm (e.g. 50–300 mm for Ghana's wet season); the ABM compares the band against `RAIN_THRESHOLD_MM = 15` to activate habitat patches, so a P95-normalized band would never cross the threshold and break the activation rule. The suitability overlay (`suitability_from_stack`) re-normalizes rainfall on consumption via its own min-max — the env band must therefore be raw mm, not [0, 1]. The P95 cap used by the (now-removed) writer-side normalization is still computed and lives in the sidecar as `rainfall_cap_mm` for documentation.
 
 ---
 

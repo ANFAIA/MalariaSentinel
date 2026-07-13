@@ -13,11 +13,17 @@ Notes:
       but reading those requires ``netCDF4`` or ``h5netcdf``, neither of which
       is a project dependency. v1 therefore uses the daily GeoTIFFs, which
       are readable with the already-installed ``rasterio`` / ``rioxarray``.
-    * Wet-season P95 normalization: per docs/abm-output-contract.md §2 the
-      rainfall channel is ``min-max normalized over the AOI's wet-season P95,
-      clipped at the cap (mm/month)``. v1 uses the AOI-internal P95 of the
-      monthly-total field as a proxy for the wet-season P95. M1.3b replaces
-      this with a multi-year climatology.
+    * Returns raw mm (monthly total precipitation), NOT a P95-normalized
+      value. The ABM compares the env band against
+      ``RAIN_THRESHOLD_MM = 15`` to activate habitat patches, so the band
+      must be in mm. The suitability overlay in
+      ``mal-ghana-sim/src/mal_ghana_sim/suitability.py`` applies its own
+      min-max normalization at consumption time — a previous version of
+      this loader normalized the band in [0, 1] here, which both broke the
+      ABM's threshold check and was redundant with the overlay's
+      normalization. The helper ``_normalize_rainfall`` is retained (and
+      still used to compute the wet-season P95 cap for the sidecar /
+      ``rainfall_cap_mm`` attr) but is no longer applied to the band.
     * This loader only emits a single channel (``rainfall``); the M1.3b CLI
       assembles it into the (C_env=4, H, W) env tensor.
 """
@@ -188,6 +194,14 @@ def _normalize_rainfall(rain_mm: np.ndarray) -> tuple[np.ndarray, float]:
     ``cap_mm`` is the P95 value used as the cap. Both NaN and ``-9999.0`` are
     treated as NoData and re-emitted as ``-9999.0`` so the env writer can
     hand the result to rasterio without surprises.
+
+    .. note::
+        Retained as a helper for tests and downstream normalization (e.g.
+        if a future loader wants a pre-normalized [0, 1] band). The public
+        ``load_chirps_rainfall`` does **not** apply this function: it
+        returns the raw mm field and exposes the cap via the
+        ``rainfall_cap_mm`` attribute on the returned DataArray for
+        documentation / sidecar use only.
     """
     nodata_mask = (~np.isfinite(rain_mm)) | (rain_mm == CHIRPS_NODATA)
     finite = rain_mm[~nodata_mask]
@@ -218,8 +232,16 @@ def load_chirps_rainfall(
     """Load CHIRPS v2.0 daily precipitation for the given AOI and month.
 
     Aggregates daily 0.05° (~5 km) to monthly total mm for the AOI's bbox,
-    reprojected to the AOI's grid, then min-max normalized over the AOI's
-    wet-season P95 (clipped at the cap).
+    reprojected to the AOI's grid. Returns the **raw monthly total in mm**
+    (no P95 normalization). The suitability overlay
+    (``mal_ghana_sim.suitability.suitability_from_stack``) re-normalizes
+    its inputs via its own min-max, so the loader's normalization is
+    redundant — and harmful to the ABM, which compares the env band
+    against ``RAIN_THRESHOLD_MM = 15`` to activate habitat patches.
+
+    The AOI-internal P95 of the monthly-total field is still computed and
+    exposed via the ``rainfall_cap_mm`` attribute for documentation /
+    sidecar use.
 
     Args:
         aoi: the AOI (bbox, CRS, resolution_m, slug).
@@ -233,8 +255,9 @@ def load_chirps_rainfall(
 
     Returns:
         xr.DataArray with dims (y, x), dtype float32, CRS = aoi.crs.
-        Values in [0, 1] (normalized). ``-9999.0`` for cells outside the
-        AOI bbox or where the source has no data.
+        Values in mm/month (raw monthly total, typically 0–500 for Ghana's
+        wet season). ``-9999.0`` for cells outside the AOI bbox or where
+        the source has no data.
 
     Raises:
         FileNotFoundError: if a daily file is missing (HTTP 404) and no
@@ -266,23 +289,33 @@ def load_chirps_rainfall(
     daily_rasters = [fetch(year, month, d) for d in _days_in_month(year, month)]
     monthly = _monthly_total_from_rasters(daily_rasters, aoi)
     rain_mm = _reproject_to_aoi_grid(monthly, aoi)
-    normalized, _cap = _normalize_rainfall(rain_mm)
+    # Compute the P95 cap for documentation / sidecar, but do NOT apply
+    # the normalization: the env band is raw mm so the ABM's RAIN_THRESHOLD_MM
+    # check (15 mm) is meaningful, and suitability re-normalizes anyway.
+    _normalized, cap_mm = _normalize_rainfall(rain_mm)
+    # Preserve the original NoData semantics: every cell is either a raw
+    # mm value or CHIRPS_NODATA (-9999.0). NaN would break a downstream
+    # comparison like ``rain_24h > 15`` in the ABM and is not a valid
+    # GeoTIFF float32 value.
+    nodata_mask = (~np.isfinite(rain_mm)) | (rain_mm == CHIRPS_NODATA)
+    rain_mm = np.where(nodata_mask, np.float32(CHIRPS_NODATA), rain_mm.astype(np.float32))
 
     h, w = aoi.cells_per_side()
-    assert normalized.shape == (h, w), (
-        f"normalized shape {normalized.shape} != AOI grid {(h, w)}"
+    assert rain_mm.shape == (h, w), (
+        f"rain_mm shape {rain_mm.shape} != AOI grid {(h, w)}"
     )
     da = xr.DataArray(
-        normalized.astype(np.float32),
+        rain_mm.astype(np.float32),
         dims=("y", "x"),
         attrs={
-            "long_name": "rainfall (min-max normalized over wet-season P95)",
-            "units": "normalized (cap = AOI P95, mm/month)",
+            "long_name": "CHIRPS v2.0 monthly total precipitation",
+            "units": "mm/month",
             "source": "CHIRPS v2.0 daily 0.05°",
             "aoi_slug": aoi.slug,
             "year": year,
             "month": month,
             "nodata": CHIRPS_NODATA,
+            "rainfall_cap_mm": float(cap_mm),
         },
     )
     da.rio.write_crs(aoi.crs_obj, inplace=True)
