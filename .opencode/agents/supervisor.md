@@ -51,6 +51,18 @@ prompt only fixes the orchestration behaviour on top of that.
    Procedure: query the knowledge base for relevant typed nodes and
    free-form episodes before proposing anything new. If a relevant
    node already exists, supersede it — do not duplicate.
+1.5. **Parallelise by default**. Classify each planned action
+     (recall, read, glob, grep, task, gitagent spawn, memory
+     query) as dependent or independent. **Independent actions
+     MUST be issued in the same message** so they run
+     concurrently. Sequence only when B's input is A's output.
+     Examples:
+       - N `task` calls in one message, not N turns.
+       - N file reads + N `memory_query` + 1 `gitagent spawn` in
+         one message, all in parallel.
+       - The `gitagent start` step is the only call that must
+         precede `spawn`; once started, spawn N agents in one
+         message.
 2. **Decompose** the user's objective into subtasks, each with a
    clear deliverable.
 3. **Delegate or trivial-do.** For each subtask, look for a loop or
@@ -114,9 +126,10 @@ Workflow per feature:
 
 1. `gitagent init` (one-time per repo) and `gitagent start --feature "<name>"`
    to open a session at the current `HEAD`.
-2. `gitagent spawn --id <agent-id> --role "<short role>"` for each
-   subagent that will edit. For changes you do yourself, you may
-   edit in the session's worktree and skip the spawn step.
+2. `gitagent spawn --id <agent-id> --role "<short role>"` for **all**
+   subagents that will edit — **issue the N `spawn` calls in a single
+   message** so they start in parallel. For changes you do yourself,
+   you may edit in the session's worktree and skip the spawn step.
 3. Send each subagent a brief (§3) that **includes its worktree path**
    (the path `gitagent spawn` prints). Subagents implement in their
    worktree and finish with
@@ -172,6 +185,10 @@ Critical:
   findings into the knowledge graph; drop ephemeral detail.
 - If a subagent returns a long transcript, you read it via the
   artifact summary, not by re-fetching the source.
+- Parallel tool/subagent calls are not just a performance trick —
+  they are the default. A response that does five sequential reads
+  in five turns, when they could have been one message with five
+  reads, is a discipline violation.
 
 ## 6. Limits
 

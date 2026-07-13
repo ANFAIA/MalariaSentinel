@@ -102,7 +102,7 @@ Promotion moves stable, useful code from an experiment into the core tier. It is
 | `bash` | Running shell commands. **Git lives here.** | `git ps` for force-with-lease pushes. `git diff`, `git log`, `git status` are safe. |
 | `read`, `write`, `edit` | File I/O. | `edit` and `write` are `ask` on protected files (see below). |
 | `glob`, `grep` | Finding files and content. | glob for paths, grep for content. |
-| `task` | Delegating to specialised loops and subagents. | Subagents get a brief, not the full conversation. |
+| `task` | Delegating to specialised loops and subagents. Subagents get a brief, not the full conversation. **Multiple `task` calls in one message run in parallel** — use this to fan out independent subtasks. | Subagents get a brief, not the full conversation. |
 | `skill` | Loading a specialised skill on demand. | E.g. `project-memory` for the knowledge graph manual. |
 | `todowrite` | Tracking multi-step work. | One list; exactly one item `in_progress` at a time. |
 | `question` | Asking the user when you need a decision. | Don't guess on irreversible choices. |
@@ -171,6 +171,7 @@ Promotion moves stable, useful code from an experiment into the core tier. It is
 | Recall a fact from last session | Use `memory_query` or `mcp__graphiti-memory__search_nodes`. | Don't re-read source files hoping to find it. |
 | Ask a one-off question | Use the `question` tool. | Don't guess on irreversible choices. |
 | Delegate a multi-step task | Use `task` with a `subagent_type`. | Don't do it in this context if the work needs a fresh window. |
+| Execute N independent subtasks | Run them in one message: parallel `task` calls + parallel read/grep + parallel `memory_query`. | Don't serialise them across N turns. |
 | Edit a protected file | Ask the user (the `ask` prompt is the mechanism). | Don't try to bypass the `ask` prompt via delegation. |
 | Push to remote after a rewrite | `git ps origin main` (force-with-lease). | Don't use `git push --force`. |
 | Wipe or set the project | `make -f agents/memory/scripts/Makefile wipe` / `set-project`. | Don't call without the global+per-agent `deny` being lifted by the user. |
@@ -187,6 +188,30 @@ Promotion moves stable, useful code from an experiment into the core tier. It is
 **Discipline**: keep the operational layer compact — objective, plan, key decisions, references (paths, UUIDs, commit IDs, proposal IDs). Never paste multi-thousand-line tool outputs into the supervisor's prompt. Long outputs go to the knowledge graph or a summary.
 
 **Subagents** see a brief, not the full conversation. If they need more context, they query the knowledge graph or ask the supervisor.
+
+## Parallel execution (default)
+
+The supervisor **parallelises by default**. When two or more
+actions have no data dependency, run them in the **same message**
+so they execute concurrently. Serialise only when B depends on
+A's output.
+
+| Action | Parallel-safe? | Notes |
+|---|---|---|
+| `read`, `glob`, `grep`, `bash` (read-only) | Yes | Batch N independent calls into one message. |
+| `task` (subagent) | Yes | N subagent briefs in one message; each runs in its own context. |
+| `gitagent spawn` | Yes, after `gitagent start` | Spawn N agents in one message, then wait for proposals. |
+| `memory_query` / `memory_recall` / `mcp__search_nodes` | Yes | Run N queries in one message; merge results. |
+| `webfetch` / `websearch` (independent URLs/queries) | Yes | Batch. |
+| `memory_node` then `memory_rel` (when rel needs the node's uuid) | No | Two messages: write → read uuid → write rel. |
+| Edits to the same file in one message | No | One edit per file per message. |
+| `gitagent start` / `init` / `propose` / `integrate` / `finalize` | No | Single-call, ordering matters. |
+| Edits to a protected file | No (and not via delegation) | Always `ask` the user; never batch with other edits. |
+
+**Per-issue parallelism**: the kanban "exactly one issue In Progress
+at a time" rule still holds. Parallelism is *within* the active
+issue (e.g. read 3 files, spawn 2 subagents, query 2 KB nodes), not
+*across* issues.
 
 ## Git push workflow
 
