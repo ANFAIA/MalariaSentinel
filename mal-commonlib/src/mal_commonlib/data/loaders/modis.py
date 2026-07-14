@@ -147,10 +147,19 @@ def _sinusoidal_to_lonlat(x_m: float, y_m: float) -> tuple[float, float]:
     """Inverse GCTP_SNSOID (sinusoidal) for the standard parallel = 0.
 
     With ``R = 6371007.181 m`` (MODIS sphere), the forward mapping is
-    ``x = R * lon``, ``y = R * lat``. The inverse is therefore trivial.
-    Returns ``(lon_rad, lat_rad)``.
+    ``x = R * lon_rad``, ``y = R * lat_rad``. The inverse is therefore
+    trivial. Returns ``(lon_deg, lat_deg)`` — the WGS-84 degrees that the
+    MODIS sinusoidal metres correspond to.
+
+    Note: this used to return radians by mistake (loader bug discovered
+    2026-07-14 via ``test_modis_ghana_smoke``); rasterio's ``from_bounds``
+    and the downstream ``reproject_match`` both expect degrees, so a
+    radians return value mapped MODIS pixels to ~(0, 0)° and produced
+    an all-NaN grid for the Ghana AOI.
     """
-    return (x_m / _MODIS_SPHERE_RADIUS_M, y_m / _MODIS_SPHERE_RADIUS_M)
+    lon_rad = x_m / _MODIS_SPHERE_RADIUS_M
+    lat_rad = y_m / _MODIS_SPHERE_RADIUS_M
+    return (float(np.degrees(lon_rad)), float(np.degrees(lat_rad)))
 
 
 def _ndvi_band_from_hdf(hdf_path: pathlib.Path) -> xr.DataArray:
@@ -329,6 +338,13 @@ def load_modis_ndvi(
     Uses earthaccess to authenticate via the ``EARTHDATA_TOKEN`` env var and
     download the MOD13A3 tile(s) that intersect the AOI. The 1 km NDVI is
     rescaled from the raw [-1, 1] to [0, 1] for the env tensor.
+
+    The MODIS Sinusoidal grid extent is converted to WGS-84 lon/lat (in
+    **degrees**) via ``_sinusoidal_to_lonlat`` before being fed to
+    ``rasterio.transform.from_bounds`` and the AOI ``reproject_match``.
+    The helper previously returned radians by mistake — see
+    ``_sinusoidal_to_lonlat`` for the bug note (fixed 2026-07-14,
+    GitHub issue #13).
 
     Args:
         aoi: the AOI.

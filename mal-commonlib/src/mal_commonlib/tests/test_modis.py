@@ -24,7 +24,11 @@ import xarray as xr
 from rasterio.transform import from_bounds
 
 from mal_commonlib.aoi import AOI, Scale
-from mal_commonlib.data.loaders.modis import NODATA_OUT, load_modis_ndvi
+from mal_commonlib.data.loaders.modis import (
+    NODATA_OUT,
+    _sinusoidal_to_lonlat,
+    load_modis_ndvi,
+)
 
 
 GHANA_W, GHANA_S, GHANA_E, GHANA_N = -3.5, 4.5, 1.5, 11.5
@@ -90,15 +94,20 @@ def _write_synthetic_modis_hdf(path: pathlib.Path, arr: np.ndarray) -> None:
 
     h, w = arr.shape
     # 1 km × N pixels × M pixels = extent in metres. Place the synthetic
-    # tile's NW corner at (-1, 7) in lon/lat and SE corner at (0, 6) so the
-    # tile covers the same AOI as the test's _small_aoi() helper.
+    # tile's NW corner at (-1, 7) in lon/lat (degrees) and SE corner at
+    # (0, 6) so the tile covers the same AOI as the test's _small_aoi()
+    # helper. The MODIS Sinusoidal projection stores metres as
+    # ``R * lon_rad`` / ``R * lat_rad``, so we must convert from WGS-84
+    # degrees to radians *before* multiplying by R — otherwise the
+    # reader's ``_sinusoidal_to_lonlat`` will return wildly wrong
+    # coordinates after the degrees fix.
     R = 6371007.181
     west, north = -1.0, 7.0
     east, south = 0.0, 6.0
-    x_ul = west * R
-    y_ul = north * R
-    x_lr = east * R
-    y_lr = south * R
+    x_ul = R * np.radians(west)
+    y_ul = R * np.radians(north)
+    x_lr = R * np.radians(east)
+    y_lr = R * np.radians(south)
 
     # Map a [-0.2, 1.0] float array back to MOD13A3 int16 raw values so the
     # loader's rescale is exercised exactly as it is on real data.
@@ -209,6 +218,34 @@ def test_modis_dry_run_rescales_raw_to_unit_interval(
     assert 0.9 <= valid.max() <= 1.0  # rightmost input is 1.0 → 1.0
     # Median is around 0.5 (the middle input is 0 → 0.5).
     assert 0.3 < float(np.median(valid)) < 0.8
+
+
+# -- helper regression test ---------------------------------------------------
+
+
+def test_sinusoidal_to_lonlat_returns_degrees_not_radians() -> None:
+    """The Sinusoidal→WGS-84 helper must return degrees, not radians.
+
+    Pin against a known tile: MODIS sinusoidal tile ``h17v08`` has its
+    upper-left corner at approximately ``(-10°, 10°)`` in WGS-84. In
+    Sinusoidal projection (sphere ``R = 6371007.181 m``) that corner is
+    ``(R * radians(-10°), R * radians(10°)) ≈ (-1,111,950, 1,111,950)``
+    metres. The helper must return **degrees** (~(-10, 10)), not radians
+    (~(-0.175, 0.175)). Regression test for the radians/degrees bug
+    discovered 2026-07-14 via ``test_modis_ghana_smoke``.
+    """
+    lon, lat = _sinusoidal_to_lonlat(
+        6371007.181 * np.radians(-10.0), 6371007.181 * np.radians(10.0)
+    )
+    # Must be in degrees: |.| > 1.0; radians would be ~0.175.
+    assert abs(lon) > 1.0, f"expected degrees, got {lon} (looks like radians)"
+    assert abs(lat) > 1.0, f"expected degrees, got {lat} (looks like radians)"
+    # And close to the known upper-left of h17v08.
+    assert -12.0 < lon < -8.0, f"expected ~-10° for h17v08 UL, got {lon}"
+    assert 8.0 < lat < 12.0, f"expected ~10° for h17v08 UL, got {lat}"
+    # And the type should be plain floats (the helper uses float()).
+    assert isinstance(lon, float)
+    assert isinstance(lat, float)
 
 
 # -- integration tests --------------------------------------------------------
