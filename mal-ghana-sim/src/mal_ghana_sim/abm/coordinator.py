@@ -73,7 +73,7 @@ from rasterio.transform import from_bounds
 
 from .climate import ClimateEngine
 from .habitat_engine import HabitatEngine
-from .patch_state import PatchState, patch_states_to_dataframe
+from .patch_state import PATCH_STATE_SCHEMA
 from .scheduler import RandomActivationByTypeShim
 
 if TYPE_CHECKING:
@@ -221,6 +221,28 @@ class CoordinatorModel(mesa.Model):
         in the registry (site fidelity); a cell that drops out of the
         active set is not removed (so a future activation reuses the
         same ``patch_id``).
+
+        M3 perf: this method is **vectorised** — the three climate
+        grids (``rain_daily``, ``water_temp_c``, ``water_frac``) are
+        fetched once at ``(H, W)`` resolution and then indexed by
+        ``(row, col)`` to produce the per-cell columns. The previous
+        implementation called ``climate.get_*`` (and
+        ``rasterio.transform.xy``) per cell; for 30k cells × 30 days
+        × 3 grid-mean calls that was ~38B operations per rollout and
+        dominated per-day cost (64% of ABM time on a synthetic 5-patch
+        case, 100% in the 30k real case). The vectorised version is
+        ``O(N_active)`` instead of ``O(N_active * H * W)``.
+
+        **Behaviour change (M3, intentional — not a bug fix)**: for
+        ``xr.DataArray`` env (the real case), the old per-cell path
+        returned the **mean of the full (H, W) array** for every cell
+        (per the docstring at ``climate.py``: *M1 just returns the
+        mean — the thin slice does not need pixel-precise answers*).
+        The new path returns the **actual value at each cell**
+        (pixel-precise). This is the M2+ behaviour the original
+        docstring anticipated. For callable env (synthetic) the
+        behaviour is unchanged because the callables return
+        constants.
         """
         if self.current_date is None:
             day = _date(2000, 1, 1)
@@ -228,43 +250,54 @@ class CoordinatorModel(mesa.Model):
             day = self.current_date
         self._refresh_dynamic_patch_registry(day)
         cells = self.dynamic_patches_today(day)
-        states: list[PatchState] = []
-        for cell in cells:
-            row, col = cell
-            pid = self._dynamic_patch_registry.get(cell, -1)
-            if pid < 0:
-                continue
-            # Build the per-cell climate values. Pre-existing patches
-            # use the patch's own (cx, cy); dynamic patches derive
-            # lon/lat from the cell coordinates via the AOI
-            # transform.
-            from rasterio.transform import xy as transform_xy
-            if pid < len(self.habitat_engine.patches):
-                patch = self.habitat_engine.patches[pid]
-                cx = patch.geometry.x if patch.geometry is not None else 0.0
-                cy = patch.geometry.y if patch.geometry is not None else 0.0
-                water_frac = float(self.climate.get_water_frac(cx, cy))
-            else:
-                # Dynamic patch — derive (cx, cy) from cell coords.
-                transform = from_bounds(
-                    *self.aoi.bbox, *self.aoi.cells_per_side(),
-                )
-                cx, cy = transform_xy(transform, row, col)
-                water_frac = float(self.climate.get_water_frac(cx, cy))
-            rain = float(self.climate.get_rain_daily(day, cx, cy))
-            water_temp = float(self.climate.get_water_temp_c(day, cx, cy))
-            # Build a PatchState with activated=True (we already
-            # filtered by the rule) and the assigned patch_id.
-            states.append(PatchState(
-                patch_id=int(pid),
-                row=int(row),
-                col=int(col),
-                activated=True,
-                rain_d=float(rain),
-                temp_d=float(water_temp),
-                water_frac=float(water_frac),
-            ))
-        return patch_states_to_dataframe(states)
+        if not cells:
+            return pl.DataFrame(schema=PATCH_STATE_SCHEMA)
+        # Build the (row, col, pid) vectors. The ``pid < 0`` filter
+        # keeps only cells that are in the registry (pre-existing or
+        # dynamic). ``cells`` is a sorted list of ``(row, col)``
+        # tuples returned by ``dynamic_patches_today``.
+        cell_arr = np.asarray(cells, dtype=np.int64)
+        rows_all = cell_arr[:, 0]
+        cols_all = cell_arr[:, 1]
+        pids_all = np.fromiter(
+            (self._dynamic_patch_registry.get(cell, -1) for cell in cells),
+            dtype=np.int64,
+            count=len(cells),
+        )
+        keep = pids_all >= 0
+        if not keep.any():
+            return pl.DataFrame(schema=PATCH_STATE_SCHEMA)
+        rows = rows_all[keep].astype(np.int32, copy=False)
+        cols = cols_all[keep].astype(np.int32, copy=False)
+        pids = pids_all[keep]
+        # Fetch the three full climate grids ONCE. Each call is
+        # O(H*W) at most; doing it once per day (vs. once per cell)
+        # is the entire point of the vectorisation.
+        h, w = self.aoi.cells_per_side()
+        rain_grid = self.climate.rain_daily_grid(day, h, w)
+        water_frac_grid = self.climate.water_frac_grid(h, w)
+        # ``temp_suitability_grid`` is misnamed — it actually returns
+        # the ``water_temp_c`` grid (see ``climate.py``). The
+        # ``temp_d`` column of the patch-state schema is degrees C,
+        # not a [0, 1] suitability.
+        temp_grid = self.climate.temp_suitability_grid(day, h, w)
+        # Fancy-index into the grids (one O(1) lookup per active
+        # cell, no Python loop over the grid).
+        rain_d = rain_grid[rows, cols].astype(np.float32, copy=False)
+        water_frac = water_frac_grid[rows, cols].astype(np.float32, copy=False)
+        temp_d = temp_grid[rows, cols].astype(np.float32, copy=False)
+        return pl.DataFrame(
+            {
+                "patch_id": pids,
+                "row": rows,
+                "col": cols,
+                "activated": np.ones(pids.size, dtype=bool),
+                "rain_d": rain_d,
+                "temp_d": temp_d,
+                "water_frac": water_frac,
+            },
+            schema=PATCH_STATE_SCHEMA,
+        )
 
     def dynamic_patches_today(self, day) -> list[tuple[int, int]]:
         """Return the (row, col) of every cell that is a habitat patch today.
