@@ -43,6 +43,8 @@ from typing import TYPE_CHECKING
 import mesa
 import numpy as np
 import polars as pl
+import rasterio
+from rasterio.transform import from_bounds
 
 if TYPE_CHECKING:
     from datetime import date
@@ -379,8 +381,21 @@ class MosquitoSubmodel(mesa.Model):
         ~150k new agents per step (binomial(30k * 1000, 0.005) ≈ 150k),
         so the population grows to ~13M after 30 days — within the
         perf budget for the target Hetzner machine.
+
+        M2 combined, C1: the new larvae's ``lon/lat`` is set to the
+        patch's own ``(cx, cy)`` (read from the patch-state DataFrame
+        via the env callable) so that ``adult_density_by_cell`` (which
+        uses each adult's post-dispersal ``lon/lat`` snapped to the
+        AOI grid) reports the adults at the **patch cell**, not at
+        ``(0, 0)`` (the placeholder used in the M1.5 thin slice).
+        Without this, adults that emerged from a water cell but did
+        not disperse would still snap to ``(0, 0)`` and the M2
+        suitability band would not see the cell of the dynamic
+        patch.
         """
-        active = patch_state_df.filter(pl.col("activated")).select("patch_id")
+        active = patch_state_df.filter(pl.col("activated")).select(
+            ["patch_id", "row", "col"]
+        )
         if active.is_empty():
             return
         n_active = int(active.height)
@@ -397,15 +412,46 @@ class MosquitoSubmodel(mesa.Model):
         new_uids = self._next_uid_range(total_birth)
         active_ids = active["patch_id"].to_numpy()
         new_patch_ids = np.repeat(active_ids, n_per_patch)
+        # Repeat the per-patch (row, col) for each newborn larva.
+        new_rows = np.repeat(active["row"].to_numpy(), n_per_patch)
+        new_cols = np.repeat(active["col"].to_numpy(), n_per_patch)
+        # Look up the (lon, lat) for each active patch from the
+        # model's env via the model's own AOI transform. We use a
+        # model reference if available; otherwise fall back to (0, 0)
+        # — the M1.5 placeholder, which is what ``_seed_population``
+        # also uses when no AOI is provided.
+        from rasterio.transform import xy as transform_xy
+        aoi = getattr(getattr(self, "model", None), "aoi", None)
+        coord_transform = None
+        if aoi is not None:
+            try:
+                h, w = aoi.cells_per_side()
+                coord_transform = from_bounds(*aoi.bbox, w, h)
+            except Exception:
+                coord_transform = None
+        # The active patch's lon/lat is the centre of its (row, col)
+        # cell on the AOI grid.
+        lons = np.zeros(total_birth, dtype=np.float32)
+        lats = np.zeros(total_birth, dtype=np.float32)
+        if coord_transform is not None:
+            for i in range(n_active):
+                if n_per_patch[i] == 0:
+                    continue
+                lon_i, lat_i = transform_xy(
+                    coord_transform, int(new_rows[i]), int(new_cols[i]),
+                )
+                start = int(np.concatenate([[0], n_per_patch[:i]]).sum())
+                lons[start:start + int(n_per_patch[i])] = float(lon_i)
+                lats[start:start + int(n_per_patch[i])] = float(lat_i)
         new_df = pl.DataFrame(
             {
                 "unique_id": new_uids,
                 "patch_id": new_patch_ids,
-                "row": np.zeros(total_birth, dtype=np.int32),
-                "col": np.zeros(total_birth, dtype=np.int32),
+                "row": new_rows.astype(np.int32),
+                "col": new_cols.astype(np.int32),
                 "stage": pl.Series(["larva"] * total_birth, dtype=pl.Categorical),
-                "lon": np.zeros(total_birth, dtype=np.float32),
-                "lat": np.zeros(total_birth, dtype=np.float32),
+                "lon": lons,
+                "lat": lats,
                 "eip_progress": np.zeros(total_birth, dtype=np.float32),
                 "stage_age": np.zeros(total_birth, dtype=np.int32),
             },
@@ -449,6 +495,95 @@ class MosquitoSubmodel(mesa.Model):
             .rename({"len": "count"})
             .with_columns(pl.col("count").cast(pl.UInt32))
             .sort("patch_id")
+        )
+
+    def adult_density_by_patch(self) -> pl.DataFrame:
+        """Return a DataFrame with one row per patch and an ``n_adults`` column.
+
+        Patches with zero adults are absent. The coordinator's
+        ``suitability_grid`` calls this and joins the result onto
+        ``_cell_lookup`` to build the per-cell adult-density band of
+        the state COG (the M2 suitability band: ``n_adults / K_MAX``).
+
+        Why this exists
+        ---------------
+        The M1.4 suitability band was ``1.0 for cells with an active
+        patch, else 0.0``. That misses female adults that dispersed
+        from a water cell into a dry cell — and the 20 larval sites in
+        ``data/ghana_idit/occurrence.txt`` are dry cells within
+        dispersal range of water. Reporting adult density per cell
+        means dry cells with a non-zero suitability from dispersed
+        adults are picked up, restoring the M2 validation's ability
+        to produce a non-NaN AUC.
+        """
+        if self.df.is_empty():
+            return pl.DataFrame(
+                {"patch_id": [], "n_adults": []},
+                schema={"patch_id": pl.Int64, "n_adults": pl.UInt32},
+            )
+        return (
+            self.df.filter(pl.col("stage") == "adult")
+            .group_by("patch_id")
+            .len()
+            .rename({"len": "n_adults"})
+            .with_columns(pl.col("n_adults").cast(pl.UInt32))
+            .sort("patch_id")
+        )
+
+    def adult_density_by_cell(self, aoi) -> pl.DataFrame:
+        """Return a DataFrame with one row per occupied cell and an ``n_adults`` column.
+
+        Uses each adult's **current** ``lon/lat`` (i.e. after today's
+        ``_adult_dispersal`` step) and snaps it onto the AOI grid via
+        ``rasterio.transform.rowcol`` + ``from_bounds``. Pairs of
+        ``(row, col)`` with zero adults are absent. The coordinator's
+        ``suitability_grid`` calls this (instead of
+        ``adult_density_by_patch``) so the suitability band reflects
+        where the adult is *after* dispersal, not where it was born.
+
+        The 20 larval sites in ``data/ghana_idit/occurrence.txt`` sit
+        in dry cells within dispersal range of water — adults that
+        emerged from a water cell and dispersed into a dry site cell
+        are picked up by this method, but were missed by the v1
+        ``adult_density_by_patch`` (which grouped by ``patch_id`` and
+        so counted them in the water cell instead).
+
+        Args:
+            aoi: the AOI used to build the grid transform.
+
+        Returns:
+            ``pl.DataFrame`` with columns ``row`` (Int32), ``col``
+            (Int32), ``n_adults`` (UInt32). Sorted by ``(row, col)``.
+        """
+        h, w = aoi.cells_per_side()
+        transform = from_bounds(*aoi.bbox, w, h)
+        if self.df.is_empty():
+            return pl.DataFrame(
+                {"row": [], "col": [], "n_adults": []},
+                schema={"row": pl.Int32, "col": pl.Int32, "n_adults": pl.UInt32},
+            )
+        adults = self.df.filter(pl.col("stage") == "adult")
+        if adults.is_empty():
+            return pl.DataFrame(
+                {"row": [], "col": [], "n_adults": []},
+                schema={"row": pl.Int32, "col": pl.Int32, "n_adults": pl.UInt32},
+            )
+        lon = adults["lon"].to_numpy()
+        lat = adults["lat"].to_numpy()
+        # Snap lon/lat → (row, col) using the AOI transform. ``rowcol``
+        # returns generator-like tuples; we materialise and clamp to
+        # the grid bounds (an adult can disperse slightly outside the
+        # AOI).
+        rows, cols = rasterio.transform.rowcol(transform, lon, lat)
+        rows_arr = np.clip(np.asarray(list(rows), dtype=np.int64), 0, int(h) - 1)
+        cols_arr = np.clip(np.asarray(list(cols), dtype=np.int64), 0, int(w) - 1)
+        return (
+            pl.DataFrame({"row": rows_arr, "col": cols_arr})
+            .group_by(["row", "col"])
+            .len()
+            .rename({"len": "n_adults"})
+            .with_columns(pl.col("n_adults").cast(pl.UInt32))
+            .sort(["row", "col"])
         )
 
     def total_agents(self) -> int:

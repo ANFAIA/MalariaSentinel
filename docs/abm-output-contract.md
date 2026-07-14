@@ -5,6 +5,23 @@
 
 The thin-slice ABM (Mesa-Geo, M1) writes per-tick rasters and tensors. The U-Net surrogate (PyTorch, M3-M4) and the SDSS shell (M5-M6) read what the ABM writes. If the writer and reader disagree on shape, dtype, band order, normalization, CRS, or naming, the pipeline re-architectures. The contract pins every one of those values.
 
+> **M2 patch (2026-07-13, channel 1 semantics only):** v1 of this contract
+> defined channel 1 (`suitability`) as "1.0 for cells with an active
+> patch, else 0.0". The M2 real-data validation ran on the 20 larval
+> sites in `data/ghana_idit/occurrence.txt` and observed that those
+> sites sit in dry cells within dispersal range of water — the
+> active-patch semantics gave them `suitability = 0`, so the AUC was
+> NaN. The M2 fix (commits in the `m2-combined` branch) keeps the
+> **same** contract version, dtype, shape, CRS, and `band_names` array
+> but switches channel 1 to the **adult mosquito density per cell**
+> (`n_adults / K_max`, ∈ [0, 1]). The U-Net reader in M3-M4 reads by
+> band name (not by index), so the reader does not need to know which
+> "version" produced a given file — the band description is the
+> contract. Shape, dtype, CRS, NoData, and naming are unchanged; only
+> the *meaning* of the value in band 1 changed. Future contract
+> changes that touch any of the values in §1, §2, §3, or §4 still
+> require a new major version.
+
 ---
 
 ## §1 — State tensor
@@ -15,8 +32,8 @@ The state tensor is what the ABM produces per tick. One file per ABM tick.
 |---|---|
 | Shape | `(C=2, T, H, W)` |
 | `dtype` | `float32` |
-| Channel 0 | `density` — mosquitoes per cell, normalized `density / K_max` ∈ [0, 1] |
-| Channel 1 | `suitability` — float32, ∈ [0, 1] |
+| Channel 0 | `density` — mosquitoes per cell, normalized `density / K_max` ∈ [0, 1] (larvae + adults; v1+v2) |
+| Channel 1 | `suitability` — float32, ∈ [0, 1]. v1: 1.0 for cells with an active patch, else 0.0. **v2 (M2 fix):** `n_adults / K_max` per cell (adult density only, not larvae). **v2.1 (M2 combined, C1):** the cell is computed from each adult's current `lon/lat` (post-dispersal), snapped to the AOI grid via `rasterio.transform.rowcol`; adults outside the AOI clamp to the nearest edge cell. |
 | `K_max` (v1) | `1000` mosquitoes/cell (carried from the casablanca design; M2 calibrates against the 24 larval sites) |
 | `T` (snapshot count) | Monthly snapshots — horizon is **monthly** for v1, matching the ABM's 30-day larval-cycle cadence (M1 decision; not per-experiment) |
 | `H, W` | `H = W = 128` (see §4) |
@@ -25,7 +42,48 @@ The state tensor is what the ABM produces per tick. One file per ABM tick.
 | File naming | `{aoi_slug}_{scale}_{year}_{month:02d}_seed{seed:04d}.tif` |
 | Sidecar | same name + `.json` (see §3) |
 
-`density` is written as the normalized channel (`density / K_max`). The denormalization is a scalar multiply at read time — the writer never stores raw counts in channel 0. `suitability` is the time-varying suitability field produced by the ABM at this tick; it is not the static env layer (see §2).
+`density` is written as the normalized channel (`density / K_max`). The denormalization is a scalar multiply at read time — the writer never stores raw counts in channel 0.
+
+**Channel 1 (`suitability`) — v1 vs v2 (M2 fix):** v1 was the binary
+"active-patch" map (1.0 at cells where the climate engine activated a
+habitat patch on this day, 0.0 elsewhere). v2 is the per-cell adult
+density (`n_adults / K_max` ∈ [0, 1]). The biology says a female adult
+at a site (after dispersal from a water cell) seeks nearby water to
+lay eggs, so the suitability for *occupancy* is best modelled by
+adult presence, not by whether the cell itself is a habitat patch.
+The v2 switch lets the 20 M2 larval sites (which sit in dry cells
+near water) report non-zero suitability from the adults that
+dispersed there. The M1.5 ``coordinator.suitability_grid`` keeps the
+v1 path as a backward-compat fallback when called with no
+``mosquito_df`` argument; the M2 facade always passes the submodel's
+``df`` and therefore always writes the v2 band.
+
+**Channel 1 (`suitability`) — v2.1 (M2 combined, C1, post-dispersal):**
+v2 grouped adults by their `patch_id` (the patch they were born
+into). But ``_adult_dispersal`` moves adults' ``lon/lat`` by a clipped
+Gaussian kernel; their `patch_id` (and `row`, `col`) is **not** updated.
+The v1 ``adult_density_by_patch`` therefore reports the adult at its
+origin patch's cell, even after the adult has moved to a different
+cell. The 20 M2 larval sites in `data/ghana_idit/occurrence.txt` are
+dry cells within ``An. gambiae`` s.s. dispersal range of water — the
+adults that emerged from a water cell and dispersed into a dry site
+cell are missed by `adult_density_by_patch`. v2.1 introduces
+``MosquitoSubmodel.adult_density_by_cell(aoi)``, which uses each
+adult's **current** ``lon/lat`` (post-dispersal) and snaps it onto the
+AOI grid via ``rasterio.transform.rowcol``. The
+``coordinator.suitability_grid`` v2 path calls this method when both
+``mosquito_df`` and ``submodel`` are passed. The v1 binary map and
+the v2 ``patch_id``-grouped path are kept as backward-compat
+fallbacks; the M2 facade always writes the v2.1 band.
+
+**C2 (M2 combined, dynamic patches):** the per-patch state exchanged
+with the submodel is now the **union** of pre-existing patches
+(loaded from the gpkg) and dynamic patches (cells where the
+PLUVIAL_POOL rule holds today: `TWI > 8 AND water_frac > 0 AND
+rain_24h > 15mm`). Dynamic patches are assigned stable `patch_id`s
+on first emergence and retained in the registry (site fidelity);
+they reappear in the patch-state DataFrame automatically if the rule
+holds again on a later day. The contract version stays `1.0`.
 
 ---
 

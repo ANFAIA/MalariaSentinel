@@ -119,7 +119,7 @@ def _patch_loaders(
         lambda aoi, year, month, **kw: outputs["ndvi"],
     )
     monkeypatch.setattr(
-        build_env, "load_worldcover_water_frac",
+        build_env, "load_jrc_gsw_water_frac",
         lambda aoi, year, month, **kw: outputs["water_frac"],
     )
     monkeypatch.setattr(
@@ -209,7 +209,7 @@ def test_build_env_handles_era5_auth_missing(
         lambda aoi, year, month, **kw: outputs["ndvi"],
     )
     monkeypatch.setattr(
-        build_env, "load_worldcover_water_frac",
+        build_env, "load_jrc_gsw_water_frac",
         lambda aoi, year, month, **kw: outputs["water_frac"],
     )
     monkeypatch.setattr(
@@ -250,24 +250,24 @@ def test_build_env_validates_month(
     )
 
 
-def test_build_env_handles_worldcover_skip(
+def test_build_env_handles_jrc_gsw_skip(
     patch_ghana_registry: None,
     small_ghana_aoi: AOI,
     tmp_path: pathlib.Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """`--skip-worldcover` fills the water_frac band with NoData (-9999.0) and
-    does not call the WorldCover loader at all."""
+    """`--skip-jrc-gsw` fills the water_frac band with NoData (-9999.0) and
+    does not call the JRC GSW loader at all."""
     outputs = _make_synthetic_loader_outputs(small_ghana_aoi)
     _patch_loaders(monkeypatch, outputs)
 
-    worldcover_called = {"n": 0}
+    jrc_called = {"n": 0}
 
-    def _tracking_worldcover(*args, **kwargs):
-        worldcover_called["n"] += 1
+    def _tracking_jrc(*args, **kwargs):
+        jrc_called["n"] += 1
         return outputs["water_frac"]
     monkeypatch.setattr(
-        build_env, "load_worldcover_water_frac", _tracking_worldcover,
+        build_env, "load_jrc_gsw_water_frac", _tracking_jrc,
     )
 
     result = runner.invoke(
@@ -275,20 +275,20 @@ def test_build_env_handles_worldcover_skip(
         [
             "--aoi", "ghana", "--year", "2024", "--month", "6",
             "--output-dir", str(tmp_path),
-            "--skip-worldcover",
+            "--skip-jrc-gsw",
         ],
     )
     assert result.exit_code == 0, (
-        f"CLI must exit 0 with --skip-worldcover; got {result.exit_code}, "
+        f"CLI must exit 0 with --skip-jrc-gsw; got {result.exit_code}, "
         f"output:\n{result.stdout}"
     )
     out = (result.stdout or "") + (result.stderr or "")
-    assert "skip-worldcover" in out, (
+    assert "skip-jrc-gsw" in out, (
         f"CLI must announce the skip; got:\n{out}"
     )
-    assert worldcover_called["n"] == 0, (
-        f"WorldCover loader must not be called when --skip-worldcover is set; "
-        f"was called {worldcover_called['n']} times"
+    assert jrc_called["n"] == 0, (
+        f"JRC GSW loader must not be called when --skip-jrc-gsw is set; "
+        f"was called {jrc_called['n']} times"
     )
 
     env_path = tmp_path / "ghana_regional_2024_06_env.tif"
@@ -300,6 +300,53 @@ def test_build_env_handles_worldcover_skip(
         )
         water_band = src.read(1)  # band 1 = water_frac
         assert np.all(water_band == -9999.0), (
-            f"water_frac band must be -9999.0 when --skip-worldcover is set; "
+            f"water_frac band must be -9999.0 when --skip-jrc-gsw is set; "
+            f"got unique values: {np.unique(water_band)[:5]}"
+        )
+
+
+def test_build_env_skip_worldcover_alias(
+    patch_ghana_registry: None,
+    small_ghana_aoi: AOI,
+    tmp_path: pathlib.Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """`--skip-worldcover` is kept as a deprecated alias for `--skip-jrc-gsw`
+    so M1.4 callers (e.g. validate_m2) still work without changes."""
+    outputs = _make_synthetic_loader_outputs(small_ghana_aoi)
+    _patch_loaders(monkeypatch, outputs)
+
+    jrc_called = {"n": 0}
+
+    def _tracking_jrc(*args, **kwargs):
+        jrc_called["n"] += 1
+        return outputs["water_frac"]
+    monkeypatch.setattr(
+        build_env, "load_jrc_gsw_water_frac", _tracking_jrc,
+    )
+
+    result = runner.invoke(
+        build_env.app,
+        [
+            "--aoi", "ghana", "--year", "2024", "--month", "6",
+            "--output-dir", str(tmp_path),
+            "--skip-worldcover",
+        ],
+    )
+    assert result.exit_code == 0, (
+        f"CLI must accept --skip-worldcover as a deprecated alias; "
+        f"got exit {result.exit_code}, output:\n{result.stdout}"
+    )
+    assert jrc_called["n"] == 0, (
+        f"JRC GSW loader must not be called when --skip-worldcover alias is set; "
+        f"was called {jrc_called['n']} times"
+    )
+
+    env_path = tmp_path / "ghana_regional_2024_06_env.tif"
+    assert env_path.exists()
+    with rasterio.open(env_path) as src:
+        water_band = src.read(1)
+        assert np.all(water_band == -9999.0), (
+            f"water_frac band must be -9999.0 when --skip-worldcover alias is set; "
             f"got unique values: {np.unique(water_band)[:5]}"
         )

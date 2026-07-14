@@ -14,13 +14,27 @@ Output:
 
 Auth policy
 -----------
-CHIRPS, MERIT-DEM, and WorldCover do not require any credentials and are
-always attempted. ERA5 (CDS) and MODIS (EARTHDATA_TOKEN) require auth. By
-default the CLI prefers forward progress: if a loader raises on missing auth
-or a transient network error, the CLI prints a clear warning to stderr and
-fills the channel with the NoData sentinel (-9999.0). The --skip-era5 and
---skip-modis flags force-skip the corresponding channel even when auth is
-present, which is useful for unit tests and offline dry-runs.
+CHIRPS, MERIT-DEM, and JRC GSW (Planetary Computer) do not require any
+credentials and are always attempted. ERA5 (CDS) and MODIS (EARTHDATA_TOKEN)
+require auth. By default the CLI prefers forward progress: if a loader
+raises on missing auth or a transient network error, the CLI prints a
+clear warning to stderr and fills the channel with the NoData sentinel
+(-9999.0). The --skip-era5 and --skip-modis flags force-skip the
+corresponding channel even when auth is present, which is useful for unit
+tests and offline dry-runs.
+
+Water layer (M2 fix)
+--------------------
+The ``water_frac`` channel is loaded from the **JRC Global Surface Water
+(GSW) 30 m** ``occurrence`` band via the Planetary Computer STAC catalog
+(collection ``jrc-gsw``), binarised at ``threshold_pct=80`` (the JRC GSW
+standard "permanent water" cut-off, Pekel et al., 2016). This replaces
+the M1.4 ESA WorldCover 10 m loader, which missed small water bodies
+(pools, streams) on the Ghana AOI and produced a 7 % water_frac with
+all 20 larval sites sitting in ``water_frac = 0`` cells. The 30 m JRC
+GSW occurrence band picks up the small features the 10 m annual
+WorldCover product misses without changing the env tensor's per-cell
+contract (same shape, dtype, CRS, [0, 1] / -9999 domain).
 
 The output contract is documented in docs/abm-output-contract.md (v1.0).
 """
@@ -43,8 +57,8 @@ from mal_commonlib.aoi import AOI, Scale
 from mal_commonlib.data.loaders.chirps import load_chirps_rainfall
 from mal_commonlib.data.loaders.dem import load_merit_dem
 from mal_commonlib.data.loaders.era5 import load_era5_temp_suitability
+from mal_commonlib.data.loaders.jrc_gsw import load_jrc_gsw_water_frac
 from mal_commonlib.data.loaders.modis import load_modis_ndvi
-from mal_commonlib.data.loaders.worldcover import load_worldcover_water_frac
 from mal_commonlib.terrain.twi import compute_twi
 
 
@@ -70,7 +84,7 @@ app = typer.Typer(
     add_completion=False,
     help=(
         "Build the M1 env tensor (C_env=4, H, W) and habitat patches for an "
-        "AOI + month. CHIRPS / MERIT / WorldCover work without auth. "
+        "AOI + month. CHIRPS / MERIT / JRC GSW work without auth. "
         "ERA5 (CDS) and MODIS (EARTHDATA_TOKEN) are auto-skipped with a "
         "warning if their credentials are missing (channel becomes NoData)."
     ),
@@ -359,14 +373,26 @@ def main(
         False, "--skip-modis",
         help="Skip the MODIS download (channel becomes NoData regardless of EARTHDATA_TOKEN).",
     ),
+    skip_jrc_gsw: bool = typer.Option(
+        False, "--skip-jrc-gsw",
+        help="Skip JRC GSW download (use NoData -9999.0 for the water_frac channel).",
+    ),
     skip_worldcover: bool = typer.Option(
         False, "--skip-worldcover",
-        help="Skip WorldCover download (use NoData -9999.0 for the water_frac channel).",
+        help=(
+            "[deprecated] Alias for --skip-jrc-gsw. The water_frac channel "
+            "is now sourced from JRC GSW 30 m, not ESA WorldCover 10 m. "
+            "Kept for CLI compatibility with M1.4 callers."
+        ),
     ),
 ) -> None:
     """Build the M1 env tensor + habitat patches for an AOI + month."""
     if not (1 <= month <= 12):
         raise typer.BadParameter(f"month must be 1..12; got {month}")
+
+    # Treat the deprecated --skip-worldcover as an alias for --skip-jrc-gsw.
+    # If both are set, skip; if only one is set, skip.
+    skip_water = bool(skip_jrc_gsw or skip_worldcover)
 
     aoi_obj = _resolve_aoi(aoi, bbox, crs, resolution_m, scale, name)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -381,12 +407,12 @@ def main(
     )
 
     water_frac: xr.DataArray
-    if skip_worldcover:
-        typer.echo("skip-worldcover set: filling water_frac with NoData (-9999.0).", err=True)
+    if skip_water:
+        typer.echo("skip-jrc-gsw set: filling water_frac with NoData (-9999.0).", err=True)
         water_frac = _empty_channel(aoi_obj, value=NODATA_SENTINEL, band_name="water_frac")
     else:
         water_frac = _load_with_fallback(
-            load_worldcover_water_frac, aoi_obj, 2021, month, "water_frac",
+            load_jrc_gsw_water_frac, aoi_obj, 2021, month, "water_frac",
         )
     rainfall = _load_with_fallback(
         load_chirps_rainfall, aoi_obj, year, month, "rainfall",

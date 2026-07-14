@@ -11,6 +11,26 @@ The coordinator is the only piece that knows about ``mesa_geo``,
 shapely, rasterio, and the AOI grid. The submodel only knows about
 Polars, numpy, and the patch_id join key.
 
+M2 combined (JRC GSW + adult density by cell + dynamic patches):
+* **JRC GSW** is now the water layer (``build_env`` calls
+  ``load_jrc_gsw_water_frac`` instead of WorldCover); the habitat
+  patches gpkg is unchanged in shape.
+* **C1**: ``coordinator.suitability_grid`` accepts an optional
+  ``submodel`` kwarg; if both ``mosquito_df`` and ``submodel`` are
+  passed, the suitability band is the per-cell adult density computed
+  from each adult's **post-dispersal** ``lon/lat`` (snapped via
+  ``rasterio.transform.rowcol``). This replaces the v1 path that
+  grouped by ``patch_id`` and so missed adults that dispersed into
+  dry cells.
+* **C2**: ``coordinator.to_dataframe`` and
+  ``coordinator.aggregate_density`` operate on the **union** of
+  pre-existing patches (loaded from the gpkg) and dynamic patches
+  (cells where ``TWI > 8 AND water_frac > 0 AND rain_24h > 15mm``
+  today). Dynamic patches are assigned stable ``patch_id``s on first
+  emergence and retained in the registry (site fidelity); they
+  reappear in the per-day patch-state DataFrame automatically if
+  the rule holds again on a later day.
+
 Public API
 ----------
 ``CoordinatorModel(aoi, env, habitat_gdf, *, seed, start_date)``
@@ -20,13 +40,18 @@ Public API
     Update ``patch.activated`` from climate for ``day``.
 ``coordinator.to_dataframe() -> pl.DataFrame``
     Return the current per-patch state as a Polars DataFrame (the
-    join key the submodel expects).
+    join key the submodel expects). Includes dynamic patches
+    (cells where the PLUVIAL_POOL rule holds today).
 ``coordinator.aggregate_density(mosquito_df, k_max) -> np.ndarray``
-    Group ``mosquito_df`` by ``patch_id``, join the cell lookup, and
-    return the (H, W) density grid normalised by ``k_max``.
-``coordinator.suitability_grid() -> np.ndarray``
-    Return the (H, W) suitability grid (1.0 for cells with an active
-    patch, else 0.0).
+    Group ``mosquito_df`` by ``patch_id``, join the cell lookup
+    (covering pre-existing + dynamic patches), and return the (H, W)
+    density grid normalised by ``k_max``.
+``coordinator.suitability_grid(mosquito_df=None, k_max=None, submodel=None) -> np.ndarray``
+    Return the (H, W) suitability grid. v1 (no ``mosquito_df``/no
+    ``submodel``): 1.0 for cells with an active patch, else 0.0
+    (backward-compat fallback). v2 (M2 combined, C1): per-cell adult
+    density from each adult's post-dispersal ``lon/lat``, normalised
+    by ``k_max``.
 ``coordinator.write_state_cog(path, density, suitability, *, year, month, seed)``
     Write the 2-band state COG and its JSON sidecar (per
     ``docs/abm-output-contract.md`` §1). The density / suitability
@@ -53,6 +78,8 @@ from .scheduler import RandomActivationByTypeShim
 
 if TYPE_CHECKING:
     import geopandas as gpd
+
+    from .mosquito_submodel import MosquitoSubmodel
 
 
 CONTRACT_VERSION: str = "1.0"
@@ -116,6 +143,16 @@ class CoordinatorModel(mesa.Model):
         # per-day ``to_dataframe()`` reuses it.
         self._cell_lookup: dict[int, tuple[int, int]] = {}
         self._build_cell_lookup()
+        # M2 combined, C2: dynamic patch emergence. The per-day
+        # patch-state DataFrame is the **union** of pre-existing
+        # patches (loaded from the gpkg) and cells where the
+        # PLUVIAL_POOL rule holds today. Dynamic patches are
+        # assigned stable ``patch_id``s on first emergence and kept
+        # in the registry (site fidelity); a cell that drops out of
+        # the active set is not removed (so a future activation
+        # reuses the same ``patch_id``).
+        self._dynamic_patch_registry: dict[tuple[int, int], int] = {}
+        self._next_dynamic_patch_id: int = len(self.habitat_engine.patches)
 
     # -- cell-index helpers --------------------------------------------------
 
@@ -171,37 +208,128 @@ class CoordinatorModel(mesa.Model):
     def to_dataframe(self) -> pl.DataFrame:
         """Return the current per-patch state as a Polars DataFrame.
 
-        One row per patch, columns match :data:`patch_state.PATCH_STATE_SCHEMA`.
-        The submodel joins on ``patch_id`` to compute per-patch
-        mortality, growth, EIP, etc.
+        One row per active cell today (pre-existing + dynamic), columns
+        match :data:`patch_state.PATCH_STATE_SCHEMA`. The submodel
+        joins on ``patch_id`` to compute per-patch mortality, growth,
+        EIP, etc.
+
+        M2 combined, C2: the per-day patch-state DataFrame is the
+        **union** of pre-existing patches (loaded from the gpkg) and
+        cells where the PLUVIAL_POOL rule holds today (``TWI > 8 AND
+        water_frac > 0 AND rain_24h > 15mm``). Dynamic patches are
+        assigned stable ``patch_id``s on first emergence and retained
+        in the registry (site fidelity); a cell that drops out of the
+        active set is not removed (so a future activation reuses the
+        same ``patch_id``).
         """
+        if self.current_date is None:
+            day = _date(2000, 1, 1)
+        else:
+            day = self.current_date
+        self._refresh_dynamic_patch_registry(day)
+        cells = self.dynamic_patches_today(day)
         states: list[PatchState] = []
-        for idx, patch in enumerate(self.habitat_engine.patches):
-            cell = self._cell_lookup.get(idx)
-            if cell is None:
-                # Skip patches whose cell is not in the AOI grid.
-                # The cell lookup is built in ``__init__`` and falls
-                # back to None if the patch geometry is empty or
-                # outside the AOI; the M1.4 model would still seed
-                # larvae at those patches. We follow the M1.4 rule:
-                # default to (0, 0) so the agent gets a cell.
-                cell = (0, 0)
+        for cell in cells:
             row, col = cell
-            # water_frac is read per patch from the static grid; the
-            # grid accessor returns 0.5 for unknown keys, which is
-            # the same default the M1.4 climate facade uses.
-            water_frac = float(
-                self.climate.get_water_frac(
-                    patch.geometry.x if patch.geometry is not None else 0.0,
-                    patch.geometry.y if patch.geometry is not None else 0.0,
+            pid = self._dynamic_patch_registry.get(cell, -1)
+            if pid < 0:
+                continue
+            # Build the per-cell climate values. Pre-existing patches
+            # use the patch's own (cx, cy); dynamic patches derive
+            # lon/lat from the cell coordinates via the AOI
+            # transform.
+            from rasterio.transform import xy as transform_xy
+            if pid < len(self.habitat_engine.patches):
+                patch = self.habitat_engine.patches[pid]
+                cx = patch.geometry.x if patch.geometry is not None else 0.0
+                cy = patch.geometry.y if patch.geometry is not None else 0.0
+                water_frac = float(self.climate.get_water_frac(cx, cy))
+            else:
+                # Dynamic patch — derive (cx, cy) from cell coords.
+                transform = from_bounds(
+                    *self.aoi.bbox, *self.aoi.cells_per_side(),
                 )
-            )
-            states.append(
-                patch.to_patch_state(
-                    idx, row, col, water_frac=water_frac,
-                )
-            )
+                cx, cy = transform_xy(transform, row, col)
+                water_frac = float(self.climate.get_water_frac(cx, cy))
+            rain = float(self.climate.get_rain_daily(day, cx, cy))
+            water_temp = float(self.climate.get_water_temp_c(day, cx, cy))
+            # Build a PatchState with activated=True (we already
+            # filtered by the rule) and the assigned patch_id.
+            states.append(PatchState(
+                patch_id=int(pid),
+                row=int(row),
+                col=int(col),
+                activated=True,
+                rain_d=float(rain),
+                temp_d=float(water_temp),
+                water_frac=float(water_frac),
+            ))
         return patch_states_to_dataframe(states)
+
+    def dynamic_patches_today(self, day) -> list[tuple[int, int]]:
+        """Return the (row, col) of every cell that is a habitat patch today.
+
+        Combines two sources:
+          (a) Pre-existing patches from ``self.habitat_engine.patches``
+              that are ``activated`` by today's climate.
+          (b) Cells in the AOI grid where the PLUVIAL_POOL rule holds
+              today: ``TWI > 8 AND water_frac > 0 AND rain_24h > 15mm``.
+
+        The union is returned as a sorted list. Pre-existing patches
+        are kept in the registry even if they stop satisfying the rule
+        (site fidelity); the submodel only sees the cells that satisfy
+        the rule *today* (so an inactive pre-existing patch produces
+        no larvae until it reactivates).
+        """
+        h, w = self.aoi.cells_per_side()
+        rain_grid = self.climate.rain_daily_grid(day, h, w)
+        water_frac_grid = self.climate.water_frac_grid(h, w)
+        twi_grid = self.env.get("twi")
+        if twi_grid is None:
+            twi_grid = np.zeros((h, w), dtype=np.float32)
+        else:
+            twi_grid = np.asarray(twi_grid, dtype=np.float32)
+            if twi_grid.shape != (h, w):
+                if twi_grid.shape == (h * w,):
+                    twi_grid = twi_grid.reshape(h, w)
+                else:
+                    twi_grid = np.broadcast_to(
+                        twi_grid.mean(), (h, w),
+                    ).astype(np.float32)
+        active_mask = (twi_grid > 8.0) & (water_frac_grid > 0.0) & (rain_grid > 15.0)
+        dynamic_rows, dynamic_cols = np.where(active_mask)
+        dynamic_cells = list(zip(dynamic_rows.tolist(), dynamic_cols.tolist()))
+        preexisting = [
+            self._cell_lookup[idx]
+            for idx, patch in enumerate(self.habitat_engine.patches)
+            if patch.activated and idx in self._cell_lookup
+        ]
+        all_cells = set(preexisting) | set(dynamic_cells)
+        return sorted(all_cells)
+
+    def _refresh_dynamic_patch_registry(self, day) -> None:
+        """Assign a stable patch_id to every (row, col) that becomes active today.
+
+        Pre-existing cells keep their original ``patch_id`` from
+        ``_cell_lookup``. New cells get a fresh ``patch_id`` starting
+        from ``len(self.habitat_engine.patches)``. Cells that drop out
+        of today's active set are NOT removed from the registry (site
+        fidelity) — they simply don't appear in the per-day patch-state
+        DataFrame and thus don't produce larvae, but they reappear
+        automatically if the rule holds again on a later day.
+        """
+        cells = self.dynamic_patches_today(day)
+        for cell in cells:
+            if cell in self._cell_lookup.values():
+                # Pre-existing patch — find its patch_id.
+                for pid, c in self._cell_lookup.items():
+                    if c == cell:
+                        self._dynamic_patch_registry[cell] = pid
+                        break
+            elif cell not in self._dynamic_patch_registry:
+                # New dynamic cell.
+                self._dynamic_patch_registry[cell] = int(self._next_dynamic_patch_id)
+                self._next_dynamic_patch_id += 1
 
     # -- density aggregation ------------------------------------------------
 
@@ -214,23 +342,35 @@ class CoordinatorModel(mesa.Model):
 
         Steps (all Polars, no Python loop over agents):
           1. ``mosquito_df.group_by('patch_id').len()`` → per-patch count.
-          2. Left-join with ``self._cell_lookup`` keyed on ``patch_id``
-             (materialised as a Polars DataFrame once per call).
+          2. Left-join with the cell lookup keyed on ``patch_id``
+             (covering pre-existing + dynamic patches via
+             ``self._dynamic_patch_registry``).
           3. ``np.bincount`` over the linear cell index → grid.
           4. Clip to [0, 1] after dividing by ``k_max``.
         """
         h, w = self.aoi.cells_per_side()
         if k_max is None:
             k_max = int(self.K_MAX)
-        # Materialise the cell lookup as a Polars DataFrame. The
-        # per-patch id is the index in ``self.habitat_engine.patches``.
-        if not self._cell_lookup:
+        # Build a (patch_id, row, col) lookup covering both pre-existing
+        # and dynamic patches. M2 combined, C2: dynamic patches have
+        # ``patch_id >= len(self.habitat_engine.patches)`` and are kept
+        # in ``_dynamic_patch_registry`` for site fidelity.
+        rows_map: dict[int, int] = {
+            pid: r for pid, (r, _) in self._cell_lookup.items()
+        }
+        cols_map: dict[int, int] = {
+            pid: c for pid, (_, c) in self._cell_lookup.items()
+        }
+        for (r, c), pid in self._dynamic_patch_registry.items():
+            rows_map[pid] = r
+            cols_map[pid] = c
+        if not rows_map:
             return np.zeros((h, w), dtype=np.float32)
         cell_df = pl.DataFrame(
             {
-                "patch_id": list(self._cell_lookup.keys()),
-                "row": [v[0] for v in self._cell_lookup.values()],
-                "col": [v[1] for v in self._cell_lookup.values()],
+                "patch_id": list(rows_map.keys()),
+                "row": list(rows_map.values()),
+                "col": list(cols_map.values()),
             },
             schema={"patch_id": pl.Int64, "row": pl.Int32, "col": pl.Int32},
         )
@@ -257,19 +397,85 @@ class CoordinatorModel(mesa.Model):
             grid = np.clip(grid / float(k_max), 0.0, 1.0)
         return grid
 
-    def suitability_grid(self) -> np.ndarray:
-        """Build the (H, W) suitability grid (1.0 for cells with an active patch)."""
+    def suitability_grid(
+        self,
+        mosquito_df: pl.DataFrame | None = None,
+        k_max: int | None = None,
+        submodel: "MosquitoSubmodel | None" = None,
+    ) -> np.ndarray:
+        """Build the (H, W) suitability grid.
+
+        **M2 semantics (default, used by the facade ``AnophelesABM.snapshot``):**
+        the suitability band is the **adult mosquito density per cell** —
+        the number of adult agents at the cell, divided by ``k_max`` and
+        clipped to [0, 1]. The M2 fix uses each adult's **post-dispersal**
+        ``lon/lat`` (snapped to the AOI grid via
+        ``rasterio.transform.rowcol``) so the band reflects where the
+        adult is *after* today's ``_adult_dispersal`` step, not its
+        origin patch. This is critical: a female adult that emerged
+        from a water cell and dispersed into a dry cell (the 20 larval
+        sites in ``data/ghana_idit/occurrence.txt`` are dry cells
+        within ``An. gambiae`` s.s. dispersal range of water) must
+        show up as ``suitability > 0`` at the **site cell**, not at
+        the origin patch cell.
+
+        Two code paths:
+
+        * **v1 (backward-compat, ``mosquito_df is None``)**: 1.0 for
+          cells with an active patch, else 0.0. Used by tests that
+          inspect the activation diagnostic. The M2 facade never
+          reaches this path — ``AnophelesABM.snapshot`` always passes
+          both ``mosquito_df`` and ``submodel``.
+        * **v2 (M2 combined, C1, ``mosquito_df is not None and
+          submodel is not None``)**: adult density by cell from
+          ``submodel.adult_density_by_cell(self.aoi)``, rasterised via
+          ``np.bincount`` on the linear cell index, normalised by
+          ``k_max``, clipped to [0, 1].
+
+        Args:
+            mosquito_df: the submodel's per-day mosquito DataFrame. If
+                None, the v1 binary map is returned (backward compat).
+            k_max: normalisation constant for the density grid. Defaults
+                to ``self.K_MAX``. Must be > 0 if ``mosquito_df`` and
+                ``submodel`` are provided.
+            submodel: the M2 submodel instance. If provided together
+                with ``mosquito_df``, the per-cell adult density is
+                computed from the adult's post-dispersal ``lon/lat``
+                (the M2 semantics). Required to enable the v2 path.
+
+        Returns:
+            A ``(H, W)`` float32 array with values in [0, 1].
+        """
         h, w = self.aoi.cells_per_side()
+        if mosquito_df is None or submodel is None:
+            # v1 path: 1.0 for cells with an active patch.
+            grid = np.zeros((h, w), dtype=np.float32)
+            for idx, patch in enumerate(self.habitat_engine.patches):
+                if not patch.activated:
+                    continue
+                cell = self._cell_lookup.get(idx)
+                if cell is None:
+                    continue
+                row, col = cell
+                if 0 <= row < h and 0 <= col < w:
+                    grid[row, col] = 1.0
+            return grid
+        # v2 path (M2 combined, C1): adult density by cell (lon/lat
+        # post-dispersal), normalised by k_max, clipped to [0, 1].
+        if k_max is None:
+            k_max = int(self.K_MAX)
+        adult_cell_df = submodel.adult_density_by_cell(self.aoi)
         grid = np.zeros((h, w), dtype=np.float32)
-        for idx, patch in enumerate(self.habitat_engine.patches):
-            if not patch.activated:
-                continue
-            cell = self._cell_lookup.get(idx)
-            if cell is None:
-                continue
-            row, col = cell
-            if 0 <= row < h and 0 <= col < w:
-                grid[row, col] = 1.0
+        if adult_cell_df.is_empty():
+            return grid
+        rows = adult_cell_df["row"].to_numpy().astype(np.int64)
+        cols = adult_cell_df["col"].to_numpy().astype(np.int64)
+        cnts = adult_cell_df["n_adults"].to_numpy().astype(np.float64)
+        linear = rows * int(w) + cols
+        flat = np.bincount(linear, weights=cnts, minlength=h * w)
+        grid = flat[: h * w].reshape(h, w).astype(np.float32)
+        if k_max > 0:
+            grid = np.clip(grid / float(k_max), 0.0, 1.0)
         return grid
 
     # -- snapshot ------------------------------------------------------------

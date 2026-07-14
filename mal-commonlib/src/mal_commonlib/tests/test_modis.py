@@ -220,13 +220,13 @@ def test_modis_dry_run_rescales_raw_to_unit_interval(
     reason="EARTHDATA_TOKEN not set; integration test skipped",
 )
 def test_modis_ghana_smoke() -> None:
-    """Real Earthdata download for Ghana, one month.
-
-    Skips cleanly if the download fails (network/permissions).
+    """Real Earthdata download for Ghana, 2022-07. 2024-07 is currently
+    empty upstream (NASA MOD13A3 v061 lag). Skips cleanly if the download
+    fails (network/permissions).
     """
     aoi = AOI.from_bbox(GHANA_W, GHANA_S, GHANA_E, GHANA_N, "EPSG:4326", "ghana", 1000)
     try:
-        out = load_modis_ndvi(aoi, year=2024, month=7)
+        out = load_modis_ndvi(aoi, year=2022, month=7)
     except Exception as e:
         pytest.skip(f"MOD13A3 download failed: {e}")
     assert out.dtype == np.float32

@@ -247,8 +247,17 @@ def test_e2e_rollout_synthetic(
     assert density.min() >= 0.0 and density.max() <= 1.0, (
         f"density must be in [0, 1]; got min={density.min()}, max={density.max()}"
     )
-    # With rain=20 (above threshold) the patch must be active.
-    assert suitability.sum() >= 1.0, "suitability must mark the active patch cell"
+    # M2 fix: band 1 (suitability) is per-cell adult density / K_MAX,
+    # not the v1 "1.0 for active patch" binary map. With rain=20
+    # (above threshold) the patch is active and after 30 days adults
+    # have emerged at the patch cell. The suitability at that cell
+    # should be > 0; it does not need to be 1.0 (a single cell with
+    # a few hundred adults at K_MAX=1000 is < 1.0).
+    assert suitability.max() > 0.0, (
+        "suitability band must have at least one cell > 0 (active "
+        "patch with emerged adults); got all-zero"
+    )
+    assert suitability.max() <= 1.0, "suitability must be in [0, 1]"
 
     # Sidecar must exist and have the right keys.
     sidecar_path = output.with_suffix(".json")

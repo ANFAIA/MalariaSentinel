@@ -142,9 +142,21 @@ def test_facade_30_day_rollout_writes_cog(
     h, w = aoid.cells_per_side()
     assert density.shape == (h, w)
     assert density.min() >= 0.0 and density.max() <= 1.0
-    # With rain=20 the patches are all active; the suitability band
-    # should have 100 cells at 1.0.
-    assert int((suitability == 1.0).sum()) == 100
+    # M2 fix: band 1 (suitability) is per-cell adult density / K_MAX,
+    # not the v1 "1.0 for cells with active patch" binary map. With
+    # rain=20 the patches are all active and after 30 days adults
+    # have emerged; we expect at least the 100 patch cells to be
+    # non-zero (some adults will have dispersed into adjacent cells,
+    # which is exactly the M2 behaviour the new band is meant to
+    # surface).
+    assert int((suitability > 0.0).sum()) >= 100, (
+        f"expected >= 100 cells with adult density > 0; got "
+        f"{int((suitability > 0.0).sum())}"
+    )
+    assert suitability.min() >= 0.0 and suitability.max() <= 1.0
+    # The mean suitability across the AOI should be small (adults
+    # are mostly clustered at the patches, not spread uniformly).
+    assert float(suitability.mean()) < 0.5
     # And the sidecar must exist with the right shape.
     sidecar = json.loads(out.with_suffix(".json").read_text())
     assert sidecar["contract_version"] == "1.0"

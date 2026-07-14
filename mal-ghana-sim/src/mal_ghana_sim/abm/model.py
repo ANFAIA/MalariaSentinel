@@ -106,11 +106,14 @@ class AnophelesABM(mesa.Model):
             seed=int(seed), start_date=start_date,
         )
         n_patches = len(self.coordinator.habitat_engine.patches)
-        if n_patches <= 0:
-            raise ValueError(
-                "AnophelesABM needs at least one HabitatPatch in the gpkg; "
-                "got 0 patches after materialise()."
-            )
+        # M2 combined, C2: an empty gpkg is now allowed. Patches
+        # emerge dynamically as cells that satisfy the PLUVIAL_POOL
+        # rule today (``TWI > 8 AND water_frac > 0 AND rain_24h >
+        # 15mm``); the submodel's population is then driven by those
+        # dynamic patches' births. The M1.5 thin slice required >= 1
+        # pre-existing patch to seed the submodel; that constraint is
+        # relaxed here so the C2 e2e test (no pre-existing patches,
+        # one dynamic cell after 15 days) can run.
         self.submodel = MosquitoSubmodel(
             model=self,
             n_patches=n_patches,
@@ -182,12 +185,39 @@ class AnophelesABM(mesa.Model):
     # -- snapshot ------------------------------------------------------------
 
     def snapshot(self, path: str, *, year: int, month: int, seed: int) -> str:
-        """Write the state COG (M1.4 contract, unchanged)."""
+        """Write the state COG (M1.4 contract, updated to M2 semantics).
+
+        **M2 change:** band 1 (suitability) is now the per-cell adult
+        density (``n_adults / K_MAX``), not the legacy
+        "1.0 for cells with an active patch" binary map. The new
+        semantics are what the M2 validation needs to produce a
+        non-NaN AUC against the 20 larval sites in
+        ``data/ghana_idit/occurrence.txt`` — those sites sit in dry
+        cells that are within dispersal range of water cells, so
+        the adults that dispersed there must show up as
+        ``suitability > 0`` at the site cell.
+
+        The per-cell adult density uses each adult's **post-dispersal**
+        ``lon/lat`` (snapped to the AOI grid via
+        ``rasterio.transform.rowcol``). This is the M2 combined, C1
+        fix: the v1 path (``adult_density_by_patch``) grouped by
+        ``patch_id`` and so counted an adult at its origin patch's
+        cell even after it had dispersed. The v2 path
+        (``adult_density_by_cell``) is invoked by
+        ``coordinator.suitability_grid`` when both ``mosquito_df`` and
+        ``submodel`` are passed.
+        """
         # Build the density grid from the submodel's DataFrame.
         density = self.coordinator.aggregate_density(
             self.submodel.df, k_max=int(self.K_MAX),
         )
-        suitability = self.coordinator.suitability_grid()
+        # Suitability grid: per-cell adult density / K_MAX, computed
+        # from each adult's post-dispersal lon/lat (C1). The submodel
+        # kwarg switches the v2 path on in
+        # ``coordinator.suitability_grid``.
+        suitability = self.coordinator.suitability_grid(
+            self.submodel.df, k_max=int(self.K_MAX), submodel=self.submodel,
+        )
         return self.coordinator.write_state_cog(
             path, density, suitability,
             year=int(year), month=int(month), seed=int(seed),
