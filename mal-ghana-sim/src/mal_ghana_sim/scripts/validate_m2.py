@@ -12,7 +12,15 @@ Usage:
         --n-rollouts 100 --bootstrap 1000
     uv run python -m mal_ghana_sim.scripts.validate_m2 --help
 
-Output:
+All output paths are resolved to an absolute path before any subprocess is
+spawned, so the env COG, habitat gpkg, rollouts, and aggregated suitability
+mean always land at the resolved ``<output-dir>`` regardless of the cwd the
+subprocesses run in. The build_env and abm_run subprocesses run with
+``cwd=mal-ghana-sim/``; if we passed a relative ``--output-dir`` they
+would otherwise write to ``<REPO_ROOT>/mal-ghana-sim/<output-dir>/...``
+while the parent reads from ``<REPO_ROOT>/<output-dir>/...``.
+
+Output (all under the resolved absolute ``<output-dir>``):
     <output-dir>/<aoi>_<scale>_<YYYY>_<MM>_env.tif                  COG, 4 bands
     <output-dir>/<aoi>_<scale>_<YYYY>_<MM>_env.json                 sidecar
     <output-dir>/<aoi>_<scale>_<YYYY>_<MM>_habitat_patches.gpkg
@@ -532,6 +540,14 @@ def main(
     """Run the M2 validation pipeline."""
     t0 = time.time()
     aoi_obj = _resolve_aoi_obj(aoi)
+    # Resolve output_dir to an absolute path before any path math. The
+    # build_env and abm_run subprocesses run with cwd=mal-ghana-sim/; if
+    # --output-dir is relative, those subprocesses would resolve it under
+    # their own cwd and write to <REPO_ROOT>/mal-ghana-sim/<output_dir>/...
+    # while the parent reads from <REPO_ROOT>/<output_dir>/... Resolving
+    # here means parent and subprocesses see the same absolute path and
+    # write to the same place.
+    output_dir = output_dir.resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
     env_path = _env_path(output_dir, aoi_obj, year, month)
     habitat_path = _habitat_path(output_dir, aoi_obj, year, month)

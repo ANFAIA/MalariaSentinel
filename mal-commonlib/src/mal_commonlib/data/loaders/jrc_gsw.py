@@ -159,7 +159,11 @@ def _load_jrc_gsw_pc(
         [0, 1] (per-AOI-cell water fraction = mean of binary water mask
         over all tiles that covered the cell), and ``-9999.0`` for cells
         that no tile covered. ``profile`` is a dict with ``crs``,
-        ``transform``, ``height``, ``width``.
+        ``transform``, ``height``, ``width``, and ``jrc_gsw_year`` (the
+        year actually fetched — equals the requested year if available,
+        else 2020, since the PC ``jrc-gsw`` collection is tagged with
+        2020 only; the loader transparently falls back to 2020 when the
+        requested year has no STAC items).
     """
     import planetary_computer
     import pystac_client
@@ -174,10 +178,27 @@ def _load_jrc_gsw_pc(
         datetime=f"{year}-01-01T00:00:00Z/{year}-12-31T23:59:59Z",
     )
     items = list(search.items())
+    actual_year = int(year)
     if not items:
-        raise FileNotFoundError(
-            f"No JRC GSW tiles in Planetary Computer for bbox={bbox} year={year}"
+        # The JRC GSW collection on Planetary Computer is tagged with
+        # 2020 only (504 items, all dated 2020 — the static product was
+        # published with a single datetime). Fall back to 2020 when the
+        # requested year is unavailable so callers like ``build_env``
+        # (which asks for year=2021) still get a real raster. If the
+        # 2020 fallback also returns 0 items, the bbox is uncovered and
+        # we raise. See ``test_jrc_gsw_falls_back_to_2020_when_requested_year_missing``.
+        fallback_search = catalog.search(
+            collections=[_PC_COLLECTION],
+            bbox=list(bbox),
+            datetime="2020-01-01T00:00:00Z/2020-12-31T23:59:59Z",
         )
+        items = list(fallback_search.items())
+        actual_year = 2020
+        if not items:
+            raise FileNotFoundError(
+                f"No JRC GSW tiles in Planetary Computer for bbox={bbox} "
+                f"year={year} (and 2020 fallback)"
+            )
     signed_items = [planetary_computer.sign(item) for item in items]
 
     H, W = aoi.cells_per_side()
@@ -243,6 +264,7 @@ def _load_jrc_gsw_pc(
         "transform": ref_transform,
         "height": H,
         "width": W,
+        "jrc_gsw_year": int(actual_year),
     }
     return out, profile
 

@@ -338,3 +338,179 @@ def test_validate_m2_non_strict_always_exits_zero_on_fail(
     )
     report = (tmp_path / "M2_REPORT.md").read_text()
     assert "FAIL" in report
+
+
+def test_validate_m2_relative_output_dir_resolves_to_absolute(
+    patch_ghana_registry: None,
+    small_ghana_aoi: AOI,
+    tmp_path: pathlib.Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Regression test: a *relative* --output-dir must be resolved to an
+    absolute path so the build_env and abm_run subprocesses (which run with
+    cwd=mal-ghana-sim/) write to the same place the parent reads from.
+
+    Before the fix, passing ``--output-dir m2_rel`` from a cwd of ``tmp_path``
+    would make the subprocesses write the env COG, habitat gpkg, and rollout
+    COGs to ``<tmp_path>/mal-ghana-sim/m2_rel/...`` while the parent glob
+    looked at ``<tmp_path>/m2_rel/...`` and found nothing — the aggregation
+    step then crashed with ``ValueError: no rollout paths to aggregate``.
+
+    After the fix, ``output_dir.resolve()`` in ``main()`` means both parent
+    and subprocesses see the same absolute path (``<tmp_path>/m2_rel``).
+    """
+    # chdir to tmp_path so a bare "m2_rel" is genuinely relative to it.
+    monkeypatch.chdir(tmp_path)
+    rel_out = pathlib.Path("m2_rel")
+    abs_out = (tmp_path / "m2_rel").resolve()
+    abs_out.mkdir(parents=True, exist_ok=True)
+
+    # Pre-write the env + habitat at the absolute resolved path so the
+    # parent's _read_env_meta can open them after the (mocked) subprocesses.
+    _write_fake_env(abs_out / "ghana_regional_2024_06_env.tif", small_ghana_aoi)
+    _write_fake_habitat(
+        abs_out / "ghana_regional_2024_06_habitat_patches.gpkg", small_ghana_aoi,
+    )
+
+    calls = _mock_subprocess(monkeypatch)
+
+    def fake_aggregate(rollout_paths, output_path):
+        h, w = small_ghana_aoi.cells_per_side()
+        transform = from_bounds(*small_ghana_aoi.bbox, w, h)
+        suit = np.full((h, w), 0.3, dtype=np.float32)
+        with rasterio.open(
+            output_path, "w",
+            driver="GTiff", dtype="float32", count=1, height=h, width=w,
+            crs=small_ghana_aoi.crs, transform=transform, nodata=-9999.0,
+            tiled=True, compress="deflate", blockxsize=128, blockysize=128,
+        ) as dst:
+            dst.write(suit, 1)
+            dst.set_band_description(1, "suitability_mean")
+        return {
+            "min": 0.3, "mean": 0.3, "max": 0.3,
+            "frac_gt_0_1": 1.0, "frac_gt_0_5": 0.0,
+            "n_cells": int(h * w),
+        }
+    monkeypatch.setattr(validate_m2, "_aggregate_suitability", fake_aggregate)
+
+    n_sites = 20
+    site_lats = np.linspace(-0.04, 0.04, n_sites)
+    site_lons = np.linspace(-0.04, 0.04, n_sites)
+
+    def fake_validate(suit_path, occurrence_path, *, bootstrap, seed=42, n_background=10_000):
+        return {
+            "auc": 0.85, "ci_low": 0.72, "ci_high": 0.91,
+            "n_sites": n_sites, "n_backgrounds": n_background,
+            "suit_array": np.zeros((4, 4), dtype=np.float32),
+            "affine": from_bounds(*small_ghana_aoi.bbox, 4, 4),
+            "site_lats": site_lats, "site_lons": site_lons,
+            "site_values": np.full(n_sites, 0.5, dtype=np.float32),
+            "bg_values": np.full(n_background, 0.3, dtype=np.float32),
+        }
+    monkeypatch.setattr(validate_m2, "_validate_suitability", fake_validate)
+
+    result = runner.invoke(
+        validate_m2.app,
+        [
+            "--aoi", "ghana", "--year", "2024", "--month", "6",
+            "--output-dir", str(rel_out),  # <-- relative
+            "--n-rollouts", "1", "--bootstrap", "10",
+        ],
+    )
+    assert result.exit_code == 0, (
+        f"CLI must exit 0; got {result.exit_code}, output:\n{result.stdout}"
+    )
+
+    # 1. The output dir was created at the absolute resolved path.
+    assert abs_out.exists(), f"output_dir was not created at {abs_out}"
+    # 2. The rolled-up artifacts live under the absolute path, not nested
+    #    under a mal-ghana-sim/ subtree.
+    assert (abs_out / "suitability_mean_2024_06.tif").exists()
+    assert (abs_out / "M2_REPORT.md").exists()
+    nested_mal_ghana_sim = tmp_path / "mal-ghana-sim"
+    assert not nested_mal_ghana_sim.exists(), (
+        f"output_dir was wrongly created under {nested_mal_ghana_sim}; "
+        "the relative path was not resolved to absolute before subprocesses ran"
+    )
+
+    # 3. The subprocesses received the absolute --output-dir (not the
+    #    relative one), so they would have written to the same place.
+    assert len(calls) == 2, f"expected 2 subprocess calls; got {len(calls)}"
+    for cmd in calls:
+        # Find the --output-dir / --env / --habitat / --output argument.
+        argv = " ".join(cmd)
+        assert str(abs_out) in argv, (
+            f"subprocess was called with a path that does not include the "
+            f"resolved absolute output_dir {abs_out}; cmd={cmd}"
+        )
+        # The relative form must not appear anywhere in the command.
+        assert "m2_rel/" not in argv or str(abs_out) in argv, (
+            f"subprocess was called with the unresolved relative path; cmd={cmd}"
+        )
+
+
+def test_validate_m2_absolute_output_dir_unchanged(
+    patch_ghana_registry: None,
+    small_ghana_aoi: AOI,
+    tmp_path: pathlib.Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An already-absolute --output-dir is passed through unchanged (no
+    double-resolution surprises)."""
+    abs_out = (tmp_path / "m2_abs").resolve()
+    abs_out.mkdir(parents=True, exist_ok=True)
+    _write_fake_env(abs_out / "ghana_regional_2024_06_env.tif", small_ghana_aoi)
+    _write_fake_habitat(
+        abs_out / "ghana_regional_2024_06_habitat_patches.gpkg", small_ghana_aoi,
+    )
+
+    _mock_subprocess(monkeypatch)
+
+    def fake_aggregate(rollout_paths, output_path):
+        h, w = small_ghana_aoi.cells_per_side()
+        transform = from_bounds(*small_ghana_aoi.bbox, w, h)
+        suit = np.full((h, w), 0.3, dtype=np.float32)
+        with rasterio.open(
+            output_path, "w",
+            driver="GTiff", dtype="float32", count=1, height=h, width=w,
+            crs=small_ghana_aoi.crs, transform=transform, nodata=-9999.0,
+            tiled=True, compress="deflate", blockxsize=128, blockysize=128,
+        ) as dst:
+            dst.write(suit, 1)
+            dst.set_band_description(1, "suitability_mean")
+        return {
+            "min": 0.3, "mean": 0.3, "max": 0.3,
+            "frac_gt_0_1": 1.0, "frac_gt_0_5": 0.0,
+            "n_cells": int(h * w),
+        }
+    monkeypatch.setattr(validate_m2, "_aggregate_suitability", fake_aggregate)
+
+    n_sites = 20
+    site_lats = np.linspace(-0.04, 0.04, n_sites)
+    site_lons = np.linspace(-0.04, 0.04, n_sites)
+
+    def fake_validate(suit_path, occurrence_path, *, bootstrap, seed=42, n_background=10_000):
+        return {
+            "auc": 0.85, "ci_low": 0.72, "ci_high": 0.91,
+            "n_sites": n_sites, "n_backgrounds": n_background,
+            "suit_array": np.zeros((4, 4), dtype=np.float32),
+            "affine": from_bounds(*small_ghana_aoi.bbox, 4, 4),
+            "site_lats": site_lats, "site_lons": site_lons,
+            "site_values": np.full(n_sites, 0.5, dtype=np.float32),
+            "bg_values": np.full(n_background, 0.3, dtype=np.float32),
+        }
+    monkeypatch.setattr(validate_m2, "_validate_suitability", fake_validate)
+
+    result = runner.invoke(
+        validate_m2.app,
+        [
+            "--aoi", "ghana", "--year", "2024", "--month", "6",
+            "--output-dir", str(abs_out),  # <-- already absolute
+            "--n-rollouts", "1", "--bootstrap", "10",
+        ],
+    )
+    assert result.exit_code == 0, (
+        f"CLI must exit 0; got {result.exit_code}, output:\n{result.stdout}"
+    )
+    assert abs_out.exists()
+    assert (abs_out / "M2_REPORT.md").exists()

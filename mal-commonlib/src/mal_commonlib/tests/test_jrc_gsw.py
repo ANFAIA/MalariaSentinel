@@ -31,6 +31,7 @@ from mal_commonlib.data.loaders import jrc_gsw as jrc_mod
 from mal_commonlib.data.loaders.jrc_gsw import (
     DEFAULT_THRESHOLD_PCT,
     NODATA_OUT,
+    _load_jrc_gsw_pc,
     load_jrc_gsw_water_frac,
 )
 
@@ -327,6 +328,127 @@ def test_jrc_gsw_pc_streams_without_full_merge(
     # permanent water, so the mean should be ~1.
     assert not np.any(arr == NODATA_OUT)
     assert float(arr.mean()) > 0.9
+
+
+def test_jrc_gsw_falls_back_to_2020_when_requested_year_missing(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path,
+) -> None:
+    """If the requested year has no PC STAC items, fall back to 2020.
+
+    The JRC GSW collection on Planetary Computer has 504 items, all
+    dated 2020 (the static product was tagged with 2020). Earlier
+    versions of the loader raised FileNotFoundError when the
+    requested year wasn't 2020, which broke M2 because build_env
+    calls load_jrc_gsw_water_frac(aoi, year=2021). After this fix,
+    year=2021 requests fall back to year=2020 transparently, and
+    profile["jrc_gsw_year"] reports the actual year fetched (2020).
+    """
+    from unittest.mock import MagicMock
+
+    # A tiny AOI: 4x4 cells at 1000m. Bbox spans ~0.035° so the AOI grid
+    # is exactly 4x4.
+    aoi = AOI.from_bbox(0.0, 0.0, 0.035, 0.035, "EPSG:4326", "test-fallback", 1000)
+    H, W = int(aoi.cells_per_side()[0]), int(aoi.cells_per_side()[1])
+    assert H == 4 and W == 4, f"AOI grid should be 4x4, got {H}x{W}"
+
+    # Build a synthetic 4x4 occurrence COG (all pixels = 100, above threshold)
+    # covering the AOI bbox.
+    transform = from_bounds(*aoi.bbox, 4, 4)
+    cog_profile = {
+        "driver": "GTiff", "dtype": "uint8", "count": 1, "height": 4, "width": 4,
+        "crs": "EPSG:4326", "transform": transform, "nodata": 255,
+    }
+    with MemoryFile() as memfile:
+        with memfile.open(**cog_profile) as src:
+            src.write(np.full((1, 4, 4), 100, dtype=np.uint8))
+        cog_bytes = memfile.read()
+    cog_path = tmp_path / "occurrence.tif"
+    cog_path.write_bytes(cog_bytes)
+
+    # Build a stub STAC item that points at the synthetic COG.
+    stub_item = MagicMock()
+    stub_item.assets = {"occurrence": MagicMock(href=str(cog_path))}
+    stub_item.bbox = list(aoi.bbox)
+    stub_item.datetime = None
+
+    # Stub the catalog: first search (year=2021) returns [], second
+    # (year=2020 fallback) returns [stub_item].
+    search_calls: list[tuple] = []
+
+    def _search_side_effect(*, collections, bbox, datetime, **_):
+        search_calls.append((tuple(collections), tuple(bbox), str(datetime)))
+        dt = str(datetime)
+        if dt.startswith("2020-01-01"):
+            return _FakeSearch([stub_item])
+        return _FakeSearch([])
+
+    class _FakeSearch:
+        def __init__(self, items):
+            self._items = items
+
+        def items(self):
+            return iter(self._items)
+
+    class _FakeCatalog:
+        def __init__(self):
+            self.search = _search_side_effect
+
+    class _FakeSTACClient:
+        @staticmethod
+        def open(url):
+            return _FakeCatalog()
+
+    monkeypatch.setattr(pystac_client, "Client", _FakeSTACClient)
+    monkeypatch.setattr(planetary_computer, "sign", lambda x: x)
+
+    # Call the loader with year=2021.
+    arr, returned_profile = _load_jrc_gsw_pc(aoi, year=2021, threshold_pct=80)
+
+    # The loader must have done two searches (one for 2021, one for 2020 fallback).
+    assert len(search_calls) >= 2
+    assert any(c[2].startswith("2021") for c in search_calls)
+    assert any(c[2].startswith("2020") for c in search_calls)
+    # The synthetic COG had all pixels = 100, so the binary water mask is
+    # 1.0 everywhere, and the AOI mean is 1.0.
+    assert arr.shape == (4, 4)
+    assert arr.dtype == np.float32
+    assert float(arr.mean()) > 0.99
+    # The profile reports the actual year fetched (the 2020 fallback).
+    assert returned_profile["jrc_gsw_year"] == 2020
+    assert returned_profile["height"] == 4
+    assert returned_profile["width"] == 4
+
+
+def test_jrc_gsw_raises_when_even_2020_fallback_has_no_items(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """When both the requested year AND the 2020 fallback return 0 STAC
+    items, the loader raises FileNotFoundError (the original behaviour
+    for uncovered bboxes)."""
+    from unittest.mock import MagicMock
+
+    class _FakeSearch:
+        def __init__(self, items):
+            self._items = items
+
+        def items(self):
+            return iter(self._items)
+
+    class _FakeCatalog:
+        def search(self, **kwargs):
+            return _FakeSearch([])
+
+    class _FakeSTACClient:
+        @staticmethod
+        def open(url):
+            return _FakeCatalog()
+
+    monkeypatch.setattr(pystac_client, "Client", _FakeSTACClient)
+    monkeypatch.setattr(planetary_computer, "sign", lambda x: x)
+
+    aoi = AOI.from_bbox(0.0, 0.0, 0.035, 0.035, "EPSG:4326", "test-empty", 1000)
+    with pytest.raises(FileNotFoundError):
+        _load_jrc_gsw_pc(aoi, year=2021, threshold_pct=80)
 
 
 # -- integration test --------------------------------------------------------
