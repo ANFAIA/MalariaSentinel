@@ -16,6 +16,7 @@ Usage:
 from __future__ import annotations
 
 import json
+import math
 import pathlib
 from datetime import date, timedelta
 
@@ -70,12 +71,42 @@ def _resolve_aoi(
     )
 
 
+def _suit_to_c(s: float) -> float:
+    """Invert the Mordecai parabolic suitability back to deg C.
+
+    The env COG stores ``temp_suitability`` in [0, 1] (Mordecai et al.
+    2013: ``s = clip(1 - ((T - 25) / 8) ** 2, 0, 1)``, peak at 25 deg C,
+    zero outside 17-33 deg C). The ABM code (mosquito_submodel.
+    _larva_growth) treats ``water_temp_c`` as **deg C** and computes
+    daily GD as ``max(0, T - 16)``, so passing the raw [0, 1] value
+    makes that formula always 0 and the EIP never accumulates.
+
+    We invert the *lower* branch (``T <= 25``), which is the
+    biologically relevant range for Anopheles gambiae s.s. (the species
+    goes dormant below ~17 deg C). Maps:
+
+        s = 1.00 -> 25.00 deg C (peak)
+        s = 0.75 -> 21.00 deg C
+        s = 0.50 -> 19.34 deg C
+        s = 0.00 -> 17.00 deg C
+    """
+    s = max(0.0, min(1.0, float(s)))
+    return 25.0 - 8.0 * math.sqrt(1.0 - s)
+
+
 def _load_env_dict(env_path: pathlib.Path) -> dict:
     """Read the env COG and pack it into the dict shape ClimateEngine expects.
 
     For the thin slice we read the 4 bands as numpy arrays and return
     callable shims (constant per day) — daily CHIRPS interpolation is
     M7+. The shim reads from in-memory arrays to avoid round-trips.
+
+    Temperature mapping
+    -------------------
+    The ``temp_suitability`` band (Mordecai parabolic, [0, 1]) is
+    inverted to deg C via :func:`_suit_to_c` before being returned as
+    ``water_temp_c`` (the ABM EIP code expects deg C, not the raw
+    normalised suitability).
     """
     with rasterio.open(env_path) as src:
         bands = src.read().astype(np.float32)
@@ -90,6 +121,18 @@ def _load_env_dict(env_path: pathlib.Path) -> dict:
         arr = by_name.get(name)
         if arr is None:
             return lambda date, lon, lat: 0.0
+        if name == "temp_suitability":
+            # The suitability band is normalised [0, 1] — convert back
+            # to deg C (lower branch of the Mordecai parabolic) so the
+            # ABM's EIP formula max(0, T - 16) produces positive values.
+            def _lookup(date, lon, lat):
+                from rasterio.transform import rowcol
+                r, c = rowcol(transform, float(lon), float(lat))
+                r = int(r); c = int(c)
+                if not (0 <= r < h and 0 <= c < w):
+                    return 25.0  # safe default (peak)
+                return _suit_to_c(arr[r, c])
+            return _lookup
         # Constant-per-cell lookup keyed by lon/lat.
         def _lookup(date, lon, lat):
             from rasterio.transform import rowcol
@@ -102,6 +145,8 @@ def _load_env_dict(env_path: pathlib.Path) -> dict:
 
     return {
         "rain_daily": _value("rainfall"),
+        # Suitability [0, 1] is converted to deg C inside _value() so
+        # the ABM EIP code (max(0, T - 16)) sees a real temperature.
         "water_temp_c": _value("temp_suitability"),
         "water_frac": _value("water_frac"),
         "ndvi": _value("ndvi"),
