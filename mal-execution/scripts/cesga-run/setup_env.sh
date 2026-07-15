@@ -23,7 +23,13 @@ else
 fi
 export PATH="$HOME/.local/bin:$PATH"
 
-# --- 2. Create venv inside the repo ------------------------------------------
+# --- 2. Move uv cache out of $HOME (quota is only 10GB) ---------------------
+UV_CACHE_DIR="${PROJECT_ROOT}/.uv-cache"
+mkdir -p "$UV_CACHE_DIR"
+export UV_CACHE_DIR
+log "uv cache dir: $UV_CACHE_DIR"
+
+# --- 3. Create venv inside the repo ------------------------------------------
 if [[ ! -d "$VENV_DIR" ]]; then
   log "Creating venv at $VENV_DIR …"
   uv venv "$VENV_DIR"
@@ -31,12 +37,12 @@ else
   log "Venv already exists at $VENV_DIR"
 fi
 
-# --- 3. Sync project dependencies -------------------------------------------
+# --- 4. Sync project dependencies -------------------------------------------
 log "Syncing project from $PROJECT_ROOT …"
 uv sync --all-packages --directory "$PROJECT_ROOT"
 log "Sync complete."
 
-# --- 4. Verify installation -------------------------------------------------
+# --- 5. Verify installation -------------------------------------------------
 log "Verifying imports …"
 "$VENV_DIR/bin/python" -c "
 import mal_commonlib, mal_ghana_sim
