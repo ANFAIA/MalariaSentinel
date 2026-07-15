@@ -18,6 +18,14 @@ RUNS_DIR="${RUNS_DIR:-$PROJECT_ROOT/runs}"
 LOGS_DIR="${LOGS_DIR:-$PROJECT_ROOT/runs/logs}"
 VENV_DIR="${VENV_DIR:-$PROJECT_ROOT/.venv}"
 
+# --- uv cache (must be outside $HOME — quota is only 10GB) -------------------
+UV_CACHE_DIR="${UV_CACHE_DIR:-$PROJECT_ROOT/.uv-cache}"
+
+# --- XDG cache for CHIRPS/ERA5 downloads (use $STORE, 500GB quota) ----------
+# On CESGA, $STORE = /mnt/netapp2/Store_uni (500GB, plenty of space)
+STORE="${STORE:-/mnt/netapp2/Store_uni/$CESGA_USER}"
+XDG_CACHE_HOME="${XDG_CACHE_HOME:-$STORE/.cache}"
+
 # --- SLURM resource defaults ------------------------------------------------
 SLURM_PARTITION="medium"         # 3-day max
 SLURM_CORES=32                  # of 64 available on ILK nodes
@@ -32,10 +40,7 @@ ABM_START_YEAR=2024
 ABM_START_MONTH=1
 ABM_NUM_MONTHS=24               # 2 years
 
-# --- uv cache (must be outside $HOME — quota is only 10GB) -------------------
-UV_CACHE_DIR="${UV_CACHE_DIR:-$PROJECT_ROOT/.uv-cache}"
-
 # --- Derived (do not edit below) -------------------------------------------
-export CESGA_USER PROJECT_ROOT DATA_DIR RUNS_DIR LOGS_DIR VENV_DIR UV_CACHE_DIR
+export CESGA_USER PROJECT_ROOT DATA_DIR RUNS_DIR LOGS_DIR VENV_DIR UV_CACHE_DIR XDG_CACHE_HOME STORE
 export SLURM_PARTITION SLURM_CORES SLURM_MEM SLURM_TIME
 export ABM_AOI ABM_SEED_START ABM_DAYS_PER_MONTH ABM_START_YEAR ABM_START_MONTH ABM_NUM_MONTHS
