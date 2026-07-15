@@ -1,13 +1,20 @@
 // SPDX-License-Identifier: MIT
-// eip.cpp — extrinsic incubation period (stub; F1.c implements)
+// eip.cpp — F1.c keeps this translation unit minimal.
+//
+// The `accumulate_eip` and `is_infective` helpers are `inline` in
+// `eip.hpp` and are the canonical implementation. The .cpp is compiled
+// so the build system has a translation unit to link; we add a single
+// `extern` anchor to prevent the linker from stripping the inline defs
+// if a future optimisation pass decides they're unused at the call
+// site (this is defensive — currently `tests/test_eip.cpp` and the
+// `EipAccumulate` smoke test reference them directly).
 #include "eip.hpp"
 
 namespace mal_abm_fast {
 
-double accumulate_eip(double eip_progress, double daily_mean_temp_c) {
-    if (daily_mean_temp_c != daily_mean_temp_c) return eip_progress;  // NaN-safe
-    double gd = (daily_mean_temp_c > EIP_BASE_C) ? (daily_mean_temp_c - EIP_BASE_C) : 0.0;
-    return eip_progress + gd;
-}
+// Anchor: forces the linker to keep the inline defs available. The
+// address is never taken; this is purely a presence signal.
+extern "C" const volatile void* eip_inline_anchor =
+    reinterpret_cast<const volatile void*>(&accumulate_eip);
 
 }  // namespace mal_abm_fast

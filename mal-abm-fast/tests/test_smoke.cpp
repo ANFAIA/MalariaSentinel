@@ -16,8 +16,25 @@ TEST(MalAbmFastSmoke, VersionConstant) {
 TEST(MalAbmFastSmoke, PrngStub) {
     mal_abm_fast::xoshiro256pp rng;
     rng.seed_from(42);
-    // F1.a: stub returns 0. F1.c will replace with a real xoshiro256**.
-    EXPECT_EQ(rng.next(), 0u);
+    // F1.c: real xoshiro256** (replaces the F1.a stub that returned 0).
+    // Property check: the stream is deterministic and non-degenerate.
+    // The exact value is implementation-defined (Vigna's reference
+    // produces 64-bit outputs that depend on the splitmix64 expansion);
+    // the F1.e parity test pins the value byte-for-byte against a
+    // saved reference. Here we only assert the F1.a→F1.c transition:
+    // same seed -> same sequence, non-zero, and different seeds ->
+    // different sequences.
+    const uint64_t a1 = rng.next();
+    const uint64_t a2 = rng.next();
+    EXPECT_NE(a1, 0u);
+    EXPECT_NE(a1, a2);
+    mal_abm_fast::xoshiro256pp rng2;
+    rng2.seed_from(42);
+    EXPECT_EQ(rng2.next(), a1);
+    EXPECT_EQ(rng2.next(), a2);
+    mal_abm_fast::xoshiro256pp rng3;
+    rng3.seed_from(43);
+    EXPECT_NE(rng3.next(), a1);
 }
 
 TEST(MalAbmFastSmoke, EipAccumulate) {
