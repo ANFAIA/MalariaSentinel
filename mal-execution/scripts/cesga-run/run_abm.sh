@@ -4,8 +4,6 @@
 #SBATCH -c 32
 #SBATCH --mem=64G
 #SBATCH -t 6-00:00:00
-#SBATCH -o /mnt/lustre/scratch/%u/malaria-sentinel/logs/%x-%j.o
-#SBATCH -e /mnt/lustre/scratch/%u/malaria-sentinel/logs/%x-%j.e
 
 # run_abm.sh — SLURM batch script for MalariaSentinel ABM on CESGA
 # Runs 24 months (2 years) sequentially on an ILK node.
@@ -13,6 +11,9 @@
 # Usage (interactive or from manage_jobs.sh):
 #   sbatch run_abm.sh
 #   sbatch --export=ABM_SEED=5,ABM_START_MONTH=7 run_abm.sh
+#
+# SLURM output goes to $PROJECT_ROOT/runs/logs/ (auto-detected from repo layout).
+# Pass --output / --error to sbatch to override, or let the script handle it.
 
 set -euo pipefail
 
@@ -20,6 +21,20 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=cesga_config.sh
 source "$SCRIPT_DIR/cesga_config.sh"
+
+# --- SLURM output (auto-detect path, set before sbatch reads) ----------------
+# Note: #SBATCH directives above use defaults. The actual log dir is resolved
+# from config after PROJECT_ROOT is auto-detected. We create it here so any
+# script-level log output also lands in the right place.
+mkdir -p "$LOGS_DIR"
+
+# Override SLURM output paths if not set by sbatch flags
+if [[ -z "${SLURM_JOB_ID:-}" ]]; then
+  # Not running under SLURM — local test
+  LOG_PREFIX="$LOGS_DIR/local"
+else
+  LOG_PREFIX="$LOGS_DIR/${SLURM_JOB_NAME:-malaria-abm}-${SLURM_JOB_ID}"
+fi
 
 # Override defaults via --export=VAR=VAL on sbatch command line
 YEAR="${ABM_START_YEAR:-2024}"
@@ -35,22 +50,7 @@ export MKL_NUM_THREADS="${SLURM_CPUS_PER_TASK:-32}"
 export OPENBLAS_NUM_THREADS="${SLURM_CPUS_PER_TASK:-32}"
 
 # --- Directories -------------------------------------------------------------
-export PATH="$HOME/.local/bin:$PATH"
-DATA_DIR="${DATA_DIR:-${LUSTRE}/malaria-sentinel/data}"
-RUNS_DIR="${RUNS_DIR:-${STORE}/malaria-sentinel/runs}"
-LOGS_DIR="${LOGS_DIR:-${STORE}/malaria-sentinel/logs}"
-VENV_DIR="${VENV_DIR:-${STORE}/.venv}"
-
 mkdir -p "$RUNS_DIR" "$LOGS_DIR"
-
-# --- Activate venv -----------------------------------------------------------
-if [[ -f "$VENV_DIR/bin/activate" ]]; then
-  # shellcheck disable=SC1091
-  source "$VENV_DIR/bin/activate"
-else
-  echo "ERROR: venv not found at $VENV_DIR — run setup_env.sh first" >&2
-  exit 1
-fi
 
 # --- Timing ------------------------------------------------------------------
 JOB_START=$(date +%s)
@@ -65,6 +65,7 @@ echo "Seed:       $SEED"
 echo "Days/month: $DAYS"
 echo "Data dir:   $DATA_DIR"
 echo "Runs dir:   $RUNS_DIR"
+echo "Logs dir:   $LOGS_DIR"
 echo "==========================="
 echo ""
 
@@ -96,7 +97,7 @@ for (( i=0; i<NUM_MONTHS; i++ )); do
 
   MONTH_START=$(date +%s)
 
-  python -m mal_ghana_sim.abm.run \
+  uv run python -m mal_ghana_sim.abm.run \
     --aoi "$AOI" \
     --year "$Y" \
     --month "$M" \

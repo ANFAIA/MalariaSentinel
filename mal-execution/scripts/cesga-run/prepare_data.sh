@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 # prepare_data.sh — build env COGs + habitat patches for ABM months
 # Run on a login node (data loaders hit Planetary Computer / GCS).
+#
+# On CESGA, data already exists at $DATA_DIR (repo is on LUSTRE).
+# This script checks for existing files and skips them by default.
+# Use --force to rebuild even if files exist.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -15,13 +19,16 @@ usage() {
 Usage: $(basename "$0") [OPTIONS]
 
 Prepare env COGs + habitat patches for the ABM on CESGA.
+Data already exists in the repo on LUSTRE — this script validates
+and optionally rebuilds.
 
 Options:
   --year  START_YEAR   First year  (default: $ABM_START_YEAR)
   --month START_MONTH  First month (default: $ABM_START_MONTH)
   --num   NUM_MONTHS   Total months (default: $ABM_NUM_MONTHS)
-  --dry-run             Print commands without executing
-  -h, --help            Show this help
+  --force              Rebuild even if files already exist
+  --dry-run            Print commands without executing
+  -h, --help           Show this help
 EOF
   exit 0
 }
@@ -29,6 +36,7 @@ EOF
 YEAR=$ABM_START_YEAR
 MONTH=$ABM_START_MONTH
 NUM=$ABM_NUM_MONTHS
+FORCE=0
 DRY_RUN=0
 
 while [[ $# -gt 0 ]]; do
@@ -36,6 +44,7 @@ while [[ $# -gt 0 ]]; do
     --year)   YEAR="$2";  shift 2;;
     --month)  MONTH="$2"; shift 2;;
     --num)    NUM="$2";   shift 2;;
+    --force)  FORCE=1;    shift;;
     --dry-run) DRY_RUN=1; shift;;
     -h|--help) usage;;
     *) echo "Unknown option: $1"; usage;;
@@ -66,13 +75,18 @@ for (( i=0; i<NUM; i++ )); do
   ENV_TIF="${DATA_DIR}/${ABM_AOI}_regional_$(printf '%04d_%02d' "$Y" "$M")_env.tif"
   HAB_GPKG="${DATA_DIR}/${ABM_AOI}_regional_$(printf '%04d_%02d' "$Y" "$M")_habitat_patches.gpkg"
 
-  if [[ -f "$ENV_TIF" && -f "$HAB_GPKG" ]]; then
+  if [[ "$FORCE" -eq 0 && -f "$ENV_TIF" && -f "$HAB_GPKG" ]]; then
     log "[SKIP] $Y-$(printf '%02d' "$M") — files exist"
     SKIPPED=$((SKIPPED + 1))
     continue
   fi
 
-  log "[BUILD] $Y-$(printf '%02d' "$M") — running build_env …"
+  if [[ "$FORCE" -eq 1 && -f "$ENV_TIF" && -f "$HAB_GPKG" ]]; then
+    log "[REBUILD] $Y-$(printf '%02d' "$M") — --force set, rebuilding"
+  else
+    log "[BUILD] $Y-$(printf '%02d' "$M") — missing files, building …"
+  fi
+
   CMD=(
     uv run python -m mal_ghana_sim.scripts.build_env
     --aoi "$ABM_AOI"

@@ -16,9 +16,12 @@ cmd_submit() {
   local start_year="${ABM_START_YEAR:-2024}"
   local num_months="${ABM_NUM_MONTHS:-24}"
 
+  mkdir -p "$LOGS_DIR"
   log "Submitting ABM run: seed=$seed months=$num_months from $start_year-$start_month"
   sbatch \
     --job-name="malaria-abm-s${seed}" \
+    --output="$LOGS_DIR/malaria-abm-s${seed}-%j.o" \
+    --error="$LOGS_DIR/malaria-abm-s${seed}-%j.e" \
     --export="ABM_SEED=${seed},ABM_START_MONTH=${start_month},ABM_START_YEAR=${start_year},ABM_NUM_MONTHS=${num_months}" \
     "$SCRIPT_DIR/run_abm.sh"
 }
@@ -82,7 +85,7 @@ cmd_logs() {
     log "Usage: $(basename "$0") logs <JOB_ID>"
     exit 1
   fi
-  local log_dir="${LOGS_DIR:-${STORE}/malaria-sentinel/logs}"
+  local log_dir="${LOGS_DIR:-$PROJECT_ROOT/runs/logs}"
   echo "--- stdout ---"
   cat "${log_dir}/malaria-abm-${job_id}.o" 2>/dev/null || echo "(not found)"
   echo ""

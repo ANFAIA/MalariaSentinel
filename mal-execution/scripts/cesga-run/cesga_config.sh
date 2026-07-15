@@ -1,24 +1,21 @@
 #!/usr/bin/env bash
 # CESGA FinisTerrae III — configuration for MalariaSentinel ABM runs
 # Source this file; do not execute directly.
-
-# --- CESGA user -------------------------------------------------------------
-CESGA_USER="${CESGA_USER:-$USER}"
+#
+# The repo lives on LUSTRE-backed home at:
+#   /mnt/lustre/scratch/nlsas/home/ulc/cursos/curso309/MalariaSentinel
+# Data and runs are within the repo tree — no separate STORE/LUSTRE needed.
 
 # --- Paths ------------------------------------------------------------------
-# $STORE is persistent across jobs (scratch Lustre, 30-day purge on some
-# allocations).  $LUSTRE is the fast parallel filesystem for I/O-heavy work.
-STORE="${STORE:-/mnt/lustre/scratch/${CESGA_USER}}"
-LUSTRE="${LUSTRE:-/mnt/lustre/scratch/${CESGA_USER}}"
+# Detect project root from this script's location (scripts/cesga-run/ → repo root)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 
-# Project root on CESGA (after rsync / git clone)
-PROJECT_ROOT="${PROJECT_ROOT:-${LUSTRE}/MalariaSentinel}"
-
-# Data lives on LUSTRE for fast I/O; results persist on $STORE.
-DATA_DIR="${LUSTRE}/malaria-sentinel/data"
-RUNS_DIR="${STORE}/malaria-sentinel/runs"
-LOGS_DIR="${STORE}/malaria-sentinel/logs"
-VENV_DIR="${STORE}/.venv"
+# Data already lives in the repo
+DATA_DIR="${DATA_DIR:-$PROJECT_ROOT/data/runs/ghana/m2}"
+RUNS_DIR="${RUNS_DIR:-$PROJECT_ROOT/runs}"
+LOGS_DIR="${LOGS_DIR:-$PROJECT_ROOT/runs/logs}"
+VENV_DIR="${VENV_DIR:-$PROJECT_ROOT/.venv}"
 
 # --- SLURM resource defaults ------------------------------------------------
 SLURM_PARTITION="long"          # 7-day max
@@ -35,6 +32,6 @@ ABM_START_MONTH=1
 ABM_NUM_MONTHS=24               # 2 years
 
 # --- Derived (do not edit below) -------------------------------------------
-export CESGA_USER STORE LUSTRE PROJECT_ROOT DATA_DIR RUNS_DIR LOGS_DIR VENV_DIR
+export PROJECT_ROOT DATA_DIR RUNS_DIR LOGS_DIR VENV_DIR
 export SLURM_PARTITION SLURM_CORES SLURM_MEM SLURM_TIME
 export ABM_AOI ABM_SEED_START ABM_DAYS_PER_MONTH ABM_START_YEAR ABM_START_MONTH ABM_NUM_MONTHS

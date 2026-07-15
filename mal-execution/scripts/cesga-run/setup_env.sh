@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 # setup_env.sh — install uv + project venv on CESGA FinisTerrae III
 # Run interactively on a login node:  bash setup_env.sh
+#
+# Creates the venv INSIDE the repo at $PROJECT_ROOT/.venv.
+# Uses 'uv run' from the project root — no separate venv activation needed.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -20,7 +23,7 @@ else
 fi
 export PATH="$HOME/.local/bin:$PATH"
 
-# --- 2. Create venv in $STORE -----------------------------------------------
+# --- 2. Create venv inside the repo ------------------------------------------
 if [[ ! -d "$VENV_DIR" ]]; then
   log "Creating venv at $VENV_DIR …"
   uv venv "$VENV_DIR"
@@ -30,7 +33,7 @@ fi
 
 # --- 3. Sync project dependencies -------------------------------------------
 log "Syncing project from $PROJECT_ROOT …"
-uv sync --all-packages --python "$VENV_DIR/bin/python" --directory "$PROJECT_ROOT"
+uv sync --all-packages --directory "$PROJECT_ROOT"
 log "Sync complete."
 
 # --- 4. Verify installation -------------------------------------------------
@@ -40,4 +43,4 @@ import mal_commonlib, mal_ghana_sim
 print('mal_commonlib:', mal_commonlib.__file__)
 print('mal_ghana_sim:', mal_ghana_sim.__file__)
 "
-log "Environment ready.  Activate with:  source $VENV_DIR/bin/activate"
+log "Environment ready.  Run jobs with:  uv run python -m mal_ghana_sim.abm.run"
