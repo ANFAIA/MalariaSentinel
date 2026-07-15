@@ -7,9 +7,10 @@
 # Data and runs are within the repo tree — no separate STORE/LUSTRE needed.
 
 # --- Paths ------------------------------------------------------------------
+CESGA_USER="${CESGA_USER:-$USER}"
 # Detect project root from this script's location (scripts/cesga-run/ → repo root)
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
+_CONFIG_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$_CONFIG_DIR/../../.." && pwd)"
 
 # Data already lives in the repo
 DATA_DIR="${DATA_DIR:-$PROJECT_ROOT/data/runs/ghana/m2}"
@@ -17,11 +18,19 @@ RUNS_DIR="${RUNS_DIR:-$PROJECT_ROOT/runs}"
 LOGS_DIR="${LOGS_DIR:-$PROJECT_ROOT/runs/logs}"
 VENV_DIR="${VENV_DIR:-$PROJECT_ROOT/.venv}"
 
+# --- uv cache (must be outside $HOME — quota is only 10GB) -------------------
+UV_CACHE_DIR="${UV_CACHE_DIR:-$PROJECT_ROOT/.uv-cache}"
+
+# --- XDG cache for CHIRPS/ERA5 downloads (use $STORE, 500GB quota) ----------
+# On CESGA, $STORE = /mnt/netapp2/Store_uni (500GB, plenty of space)
+STORE="${STORE:-/mnt/netapp2/Store_uni/$CESGA_USER}"
+XDG_CACHE_HOME="${XDG_CACHE_HOME:-$STORE/.cache}"
+
 # --- SLURM resource defaults ------------------------------------------------
-SLURM_PARTITION="long"          # 7-day max
+SLURM_PARTITION="medium"         # 3-day max
 SLURM_CORES=32                  # of 64 available on ILK nodes
 SLURM_MEM="64G"                 # of 256GB available
-SLURM_TIME="6-00:00:00"         # 6 days (safe under 7-day limit)
+SLURM_TIME="2-23:59:00"         # Just under 3-day limit
 
 # --- ABM parameters ---------------------------------------------------------
 ABM_AOI="ghana"
@@ -32,6 +41,6 @@ ABM_START_MONTH=1
 ABM_NUM_MONTHS=24               # 2 years
 
 # --- Derived (do not edit below) -------------------------------------------
-export PROJECT_ROOT DATA_DIR RUNS_DIR LOGS_DIR VENV_DIR
+export CESGA_USER PROJECT_ROOT DATA_DIR RUNS_DIR LOGS_DIR VENV_DIR UV_CACHE_DIR XDG_CACHE_HOME STORE
 export SLURM_PARTITION SLURM_CORES SLURM_MEM SLURM_TIME
 export ABM_AOI ABM_SEED_START ABM_DAYS_PER_MONTH ABM_START_YEAR ABM_START_MONTH ABM_NUM_MONTHS
