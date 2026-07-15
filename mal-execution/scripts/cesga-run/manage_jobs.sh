@@ -2,7 +2,9 @@
 # manage_jobs.sh — submit, monitor, and manage MalariaSentinel ABM jobs on CESGA
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Hardcode repo root (constant on this CESGA allocation)
+REPO_ROOT="/mnt/lustre/scratch/nlsas/home/ulc/cursos/curso309/MalariaSentinel"
+SCRIPT_DIR="$REPO_ROOT/mal-execution/scripts/cesga-run"
 # shellcheck source=cesga_config.sh
 source "$SCRIPT_DIR/cesga_config.sh"
 

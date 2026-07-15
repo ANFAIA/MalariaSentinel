@@ -18,15 +18,10 @@
 set -euo pipefail
 
 # --- Source config -----------------------------------------------------------
-# When SLURM runs this, it copies the script to /var/spool/slurmd/.
-# $SLURM_SUBMIT_DIR is the original directory where sbatch was invoked.
-if [[ -n "${SLURM_SUBMIT_DIR:-}" ]]; then
-  SCRIPT_DIR="$SLURM_SUBMIT_DIR"
-else
-  SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-fi
-# shellcheck source=cesga_config.sh
-source "$SCRIPT_DIR/cesga_config.sh"
+# SLURM copies this script to /var/spool/slurmd/, so relative paths break.
+# Hardcode the repo root (constant on this CESGA allocation).
+_REPO_ROOT="/mnt/lustre/scratch/nlsas/home/ulc/cursos/curso309/MalariaSentinel"
+source "$_REPO_ROOT/mal-execution/scripts/cesga-run/cesga_config.sh"
 
 # --- SLURM output (auto-detect path, set before sbatch reads) ----------------
 # Note: #SBATCH directives above use defaults. The actual log dir is resolved
