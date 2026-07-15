@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 #SBATCH -J malaria-abm
-#SBATCH -p long
+#SBATCH -p medium
 #SBATCH -c 32
 #SBATCH --mem=64G
-#SBATCH -t 6-00:00:00
+#SBATCH -t 2-23:59:00
 
 # run_abm.sh — SLURM batch script for MalariaSentinel ABM on CESGA
 # Runs 24 months (2 years) sequentially on an ILK node.

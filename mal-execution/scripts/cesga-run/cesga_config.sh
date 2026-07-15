@@ -18,10 +18,10 @@ LOGS_DIR="${LOGS_DIR:-$PROJECT_ROOT/runs/logs}"
 VENV_DIR="${VENV_DIR:-$PROJECT_ROOT/.venv}"
 
 # --- SLURM resource defaults ------------------------------------------------
-SLURM_PARTITION="long"          # 7-day max
+SLURM_PARTITION="medium"         # 3-day max
 SLURM_CORES=32                  # of 64 available on ILK nodes
 SLURM_MEM="64G"                 # of 256GB available
-SLURM_TIME="6-00:00:00"         # 6 days (safe under 7-day limit)
+SLURM_TIME="2-23:59:00"         # Just under 3-day limit
 
 # --- ABM parameters ---------------------------------------------------------
 ABM_AOI="ghana"
