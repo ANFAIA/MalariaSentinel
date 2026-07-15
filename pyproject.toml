@@ -5,7 +5,34 @@ description = "MalariaSentinel — AI-driven predictive malaria surveillance (mo
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "cartopy>=0.24",
+    "cdsapi>=0.7",
+    "contextily>=1.6",
+    "earthaccess>=0.12",
+    "fastapi>=0.115",
+    "geopandas>=1.0",
+    "h5py>=3.10",
+    "matplotlib>=3.11.0",
+    "mesa-geo>=0.9.3,<0.10",
+    "netcdf4>=1.7.4",
+    "numpy>=2.5.0",
+    "pandas>=3.0.3",
+    "planetary-computer>=1.0",
+    "polars>=1.30.0",
+    "pydantic>=2.7",
     "pyhdf>=0.11.7",
+    "pystac-client>=0.8",
+    "pyproj>=3.6",
+    "rasterio>=1.5.0",
+    "requests>=2.32",
+    "rioxarray>=0.22.0",
+    "scikit-learn>=1.9.0",
+    "scipy>=1.18.0",
+    "shapely>=2.0",
+    "torch>=2.12.1",
+    "typer>=0.12",
+    "uvicorn>=0.30",
+    "xarray>=2024.7",
 ]
 
 [tool.uv]
