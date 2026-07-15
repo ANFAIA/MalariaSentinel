@@ -1,9 +1,91 @@
 // SPDX-License-Identifier: MIT
+// climate.cpp — ClimateEngine implementation (env COG -> 4 flat bands).
+//
+// The ClimateEngine is a thin wrapper over the env_reader helper: it
+// delegates the actual file IO to `env_reader::read_env_tif` and
+// stores the resulting flat bands in row-major float32 vectors.
+// The per-day rainfall lookup is constant across the simulation
+// (the env COG is monthly; daily CHIRPS interpolation is [M7+]).
+//
+// `*_at(row, col)` accessors are bounds-checked; out-of-bounds returns
+// 0 (rain/water) or 25 deg C (temp — a safe default that keeps the
+// EIP formula max(0, T - 16) positive).
 #include "climate.hpp"
 
+#include <cstdint>
+#include <stdexcept>
+#include <string>
+#include <utility>
+
+#include "env_reader.hpp"
+
 namespace mal_abm_fast {
-ClimateGrid load_climate_grid(const std::string& env_tif_path) {
-    (void)env_tif_path;
-    return ClimateGrid{};
+
+// -- internal helpers ---------------------------------------------------------
+
+namespace {
+
+// Per-cell index in a row-major (H, W) buffer. Caller must ensure
+// (row, col) is in range — use from the bounds-checked public accessors.
+inline size_t Idx(int32_t row, int32_t col, int32_t w) noexcept {
+    return static_cast<size_t>(row) * static_cast<size_t>(w)
+         + static_cast<size_t>(col);
 }
+
+}  // namespace
+
+// -- public API ---------------------------------------------------------------
+
+void ClimateEngine::load_from_env_tif(const std::string& path,
+                                      const AOI& aoi) {
+    (void)aoi;  // The engine's h_/w_ are taken from the COG itself;
+                // the AOI is reserved for a future validation pass
+                // (e.g. assert the COG's transform matches the AOI
+                // bbox). The thin slice trusts the COG producer.
+
+    env_reader::EnvBands bands = env_reader::read_env_tif(path);
+
+    h_ = bands.h;
+    w_ = bands.w;
+    rain_  = std::move(bands.rainfall);
+    temp_  = std::move(bands.temp_suitability);  // already Mordecai-inverted
+    water_ = std::move(bands.water_frac);
+    ndvi_  = std::move(bands.ndvi);
+    if (!bands.twi.empty()) {
+        twi_ = std::move(bands.twi);
+    } else {
+        twi_.clear();
+    }
+
+    if (h_ <= 0 || w_ <= 0) {
+        throw std::runtime_error(
+            "ClimateEngine::load_from_env_tif: env COG has no rasters");
+    }
+    if (static_cast<int32_t>(rain_.size()) != h_ * w_
+        || static_cast<int32_t>(temp_.size()) != h_ * w_
+        || static_cast<int32_t>(water_.size()) != h_ * w_
+        || static_cast<int32_t>(ndvi_.size())  != h_ * w_) {
+        throw std::runtime_error(
+            "ClimateEngine::load_from_env_tif: band size mismatch");
+    }
+}
+
+float ClimateEngine::rain_at(int32_t row, int32_t col) const {
+    if (h_ <= 0 || w_ <= 0) return 0.0f;
+    if (row < 0 || row >= h_ || col < 0 || col >= w_) return 0.0f;
+    return rain_[Idx(row, col, w_)];
+}
+
+float ClimateEngine::temp_at(int32_t row, int32_t col) const {
+    if (h_ <= 0 || w_ <= 0) return 25.0f;
+    if (row < 0 || row >= h_ || col < 0 || col >= w_) return 25.0f;
+    return temp_[Idx(row, col, w_)];
+}
+
+float ClimateEngine::water_frac_at(int32_t row, int32_t col) const {
+    if (h_ <= 0 || w_ <= 0) return 0.0f;
+    if (row < 0 || row >= h_ || col < 0 || col >= w_) return 0.0f;
+    return water_[Idx(row, col, w_)];
+}
+
 }  // namespace mal_abm_fast
