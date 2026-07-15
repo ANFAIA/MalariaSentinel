@@ -25,6 +25,13 @@ namespace mal_abm_fast {
 // The metadata blob written into the sidecar JSON. Every field is
 // required; the writer must emit them in this exact order (the
 // `k_max` and `band_names` are pinned by the parity test).
+//
+// F1.c `n_rollouts` and `rollout_index` (default 1 / 0): added in
+// the F1.c `--n-rollouts` change. The single-rollout case
+// (n_rollouts=1, rollout_index=0) is the legacy behaviour: the
+// fields are written but always read as 1 / 0, so the v1.0 sidecars
+// from F1.b are bit-compatible with v1.1 *except* for the two
+// added keys and the `contract_version` bump (1.0 -> 1.1).
 struct StateCogMetadata {
     std::string                 crs;                // EPSG string ("EPSG:4326")
     std::array<double, 6>       transform;          // GDAL affine 6-tuple
@@ -33,6 +40,8 @@ struct StateCogMetadata {
     int32_t                     year  = 0;
     int32_t                     month = 0;
     int32_t                     seed  = 0;
+    int32_t                     n_rollouts     = 1;  // F1.c
+    int32_t                     rollout_index  = 0;  // F1.c (0-indexed)
     std::string                 generator_version = GENERATOR_VERSION;
     std::string                 abm_params_hash   = "sha256:pending";
     std::string                 contract_version  = CONTRACT_VERSION;

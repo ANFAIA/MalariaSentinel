@@ -22,8 +22,6 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
-#include <unordered_map>
-#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -148,12 +146,37 @@ void MosquitoSubmodel::larva_mortality_inactive(
     const std::vector<PatchState>& patch_states) {
     if (soa_.n_alive <= 0) return;
 
-    std::unordered_set<int64_t> inactive;
-    inactive.reserve(patch_states.size());
+    // F1.c perf: replace std::unordered_set<int64_t> with a flat
+    // std::vector<uint8_t> indexed by patch_id. The inner loop
+    // becomes a single array index (cache-friendly) instead of a
+    // hash-map find per agent. The vector is sized by the max
+    // patch_id we may need to look up across both today's
+    // patch_states and any agent's birth-patch (an agent can carry
+    // a pid from a now-inactive dynamic patch — see coordinator.cpp's
+    // `dynamic_patch_registry_`). Pre-existing pids are dense 0..N-1
+    // and dynamic pids are monotonically assigned by
+    // `next_dynamic_patch_id_`, so pids start at 0 and are bounded
+    // by the next-dynamic counter.
+    int64_t max_pid = -1;
     for (const auto& ps : patch_states) {
-        if (!ps.activated) inactive.insert(ps.patch_id);
+        if (ps.patch_id > max_pid) max_pid = ps.patch_id;
     }
-    if (inactive.empty()) return;
+    for (int64_t i = 0; i < soa_.n_alive; ++i) {
+        const int64_t pid = soa_.patch_id[static_cast<size_t>(i)];
+        if (pid > max_pid) max_pid = pid;
+    }
+    if (max_pid < 0) return;
+
+    std::vector<uint8_t> active_by_id(static_cast<size_t>(max_pid) + 1, 0);
+    bool any_inactive = false;
+    for (const auto& ps : patch_states) {
+        if (ps.activated) {
+            active_by_id[static_cast<size_t>(ps.patch_id)] = 1;
+        } else {
+            any_inactive = true;
+        }
+    }
+    if (!any_inactive) return;
 
     // Reverse swap-with-last: walk the live range from the tail down
     // to 0; for each larva at an inactive patch, swap with the
@@ -164,7 +187,7 @@ void MosquitoSubmodel::larva_mortality_inactive(
     while (i >= 0) {
         const size_t si = static_cast<size_t>(i);
         if (soa_.stage[si] == 0 &&
-            inactive.find(soa_.patch_id[si]) != inactive.end()) {
+            !active_by_id[soa_.patch_id[si]]) {
             swap_with_last(soa_, i, soa_.n_alive);
             --soa_.n_alive;
         }
@@ -181,20 +204,45 @@ void MosquitoSubmodel::larva_mortality_inactive(
 void MosquitoSubmodel::larva_growth(const std::vector<PatchState>& patch_states) {
     if (soa_.n_alive <= 0) return;
 
-    std::unordered_map<int64_t, float> active_temp;
-    active_temp.reserve(patch_states.size());
+    // F1.c perf: replace std::unordered_map<int64_t, float> with a
+    // flat std::vector<float> indexed by patch_id. We keep a parallel
+    // std::vector<uint8_t> `active_by_id` to distinguish "inactive
+    // patch (skip EIP update)" from "active patch with T == 0"
+    // (accumulate_eip would add 0 to eip_progress, so the EIP is
+    // unchanged in that case — but stage_age MUST still increment
+    // only for active patches, matching the original
+    // `active_temp.find() == end` skip). Sized by max_pid across
+    // both patch_states and the SoA (see op 1 for the rationale).
+    int64_t max_pid = -1;
     for (const auto& ps : patch_states) {
-        if (ps.activated) active_temp[ps.patch_id] = ps.temp_d;
+        if (ps.patch_id > max_pid) max_pid = ps.patch_id;
     }
-    if (active_temp.empty()) return;
+    for (int64_t i = 0; i < soa_.n_alive; ++i) {
+        const int64_t pid = soa_.patch_id[static_cast<size_t>(i)];
+        if (pid > max_pid) max_pid = pid;
+    }
+    if (max_pid < 0) return;
+
+    std::vector<uint8_t> active_by_id(static_cast<size_t>(max_pid) + 1, 0);
+    std::vector<float>  temp_by_id (static_cast<size_t>(max_pid) + 1, 0.0f);
+    bool any_active = false;
+    for (const auto& ps : patch_states) {
+        if (ps.activated) {
+            active_by_id[static_cast<size_t>(ps.patch_id)] = 1;
+            temp_by_id [static_cast<size_t>(ps.patch_id)] = ps.temp_d;
+            any_active = true;
+        }
+    }
+    if (!any_active) return;
 
     for (int64_t i = 0; i < soa_.n_alive; ++i) {
         const size_t si = static_cast<size_t>(i);
         if (soa_.stage[si] != 0) continue;
-        const auto it = active_temp.find(soa_.patch_id[si]);
-        if (it == active_temp.end()) continue;
+        const int64_t pid = soa_.patch_id[si];
+        if (!active_by_id[pid]) continue;
         ++soa_.stage_age[si];
-        soa_.eip_progress[si] = accumulate_eip(soa_.eip_progress[si], it->second);
+        soa_.eip_progress[si] = accumulate_eip(soa_.eip_progress[si],
+                                                temp_by_id[pid]);
     }
 }
 
@@ -213,12 +261,31 @@ void MosquitoSubmodel::larva_to_adult(const AOI& aoi,
     // at the (col=0, row=H-1) corner). Mirrors Python's
     // _larva_to_adult + birth() cell-centre placement.
     //
-    // Build a patch_id -> (row, col) lookup from the per-day patch state.
-    std::unordered_map<int64_t, std::pair<int32_t, int32_t>> patch_cell;
-    patch_cell.reserve(patch_states.size());
+    // F1.c perf: replace std::unordered_map<int64_t, pair<int32_t,int32_t>>
+    // with two flat vectors indexed by patch_id. The presence flag
+    // preserves the original `it == end() → skip lon/lat update`
+    // behaviour for agents whose birth-patch is not in today's
+    // patch_states (e.g. a now-inactive dynamic patch from a
+    // previous day). Sized by max_pid across both patch_states and
+    // the SoA.
+    int64_t max_pid = -1;
     for (const auto& ps : patch_states) {
-        patch_cell[ps.patch_id] = {ps.row, ps.col};
+        if (ps.patch_id > max_pid) max_pid = ps.patch_id;
     }
+    for (int64_t i = 0; i < soa_.n_alive; ++i) {
+        const int64_t pid = soa_.patch_id[static_cast<size_t>(i)];
+        if (pid > max_pid) max_pid = pid;
+    }
+    if (max_pid < 0) return;
+
+    std::vector<uint8_t> cell_present_by_id(static_cast<size_t>(max_pid) + 1, 0);
+    std::vector<std::pair<int32_t, int32_t>> cell_by_id(
+        static_cast<size_t>(max_pid) + 1, {0, 0});
+    for (const auto& ps : patch_states) {
+        cell_by_id[static_cast<size_t>(ps.patch_id)] = {ps.row, ps.col};
+        cell_present_by_id[static_cast<size_t>(ps.patch_id)] = 1;
+    }
+
     // Cell-centre math (matches from_bounds(*aoi.bbox, w, h) inverse).
     const int32_t W = (aoi.east > aoi.west)
         ? static_cast<int32_t>(aoi.cells_per_side()) : 1;
@@ -238,11 +305,14 @@ void MosquitoSubmodel::larva_to_adult(const AOI& aoi,
             soa_.eip_progress[si] = 0.0f;
             // Write lon/lat to the patch cell centre. The patch_id
             // comes from the agent's own column; the (row, col) comes
-            // from the per-day patch state cache.
-            auto it = patch_cell.find(soa_.patch_id[si]);
-            if (it != patch_cell.end()) {
-                const int32_t r = it->second.first;
-                const int32_t c = it->second.second;
+            // from the per-day patch state cache. The presence flag
+            // preserves the original skip-if-not-found behaviour for
+            // agents whose birth-patch dropped out of patch_states.
+            const int64_t pid = soa_.patch_id[si];
+            if (cell_present_by_id[pid]) {
+                const auto& rc = cell_by_id[pid];
+                const int32_t r = rc.first;
+                const int32_t c = rc.second;
                 soa_.lon[si] = static_cast<float>(
                     aoi.west + (static_cast<double>(c) + 0.5) * cell_w);
                 soa_.lat[si] = static_cast<float>(
@@ -346,20 +416,34 @@ void MosquitoSubmodel::birth(const AOI& aoi,
 
 std::vector<std::pair<int64_t, int64_t>>
 MosquitoSubmodel::density_by_patch() const {
-    std::unordered_map<int64_t, int64_t> counts;
-    counts.reserve(static_cast<size_t>(soa_.n_alive));
+    // F1.c perf: replace std::unordered_map<int64_t, int64_t> with a
+    // flat std::vector<int64_t> indexed by patch_id. The single
+    // pass over the SoA is now a tight ++counts[pid] (cache-
+    // friendly). The result is collected by scanning the vector
+    // for non-zero entries; for sparse pids (which is the common
+    // case) this is cheaper than iterating a hash table. Sized
+    // by the max pid in the SoA (an agent's birth-patch may be a
+    // now-inactive dynamic patch).
+    if (soa_.n_alive <= 0) return {};
+    int64_t max_pid = -1;
+    for (int64_t i = 0; i < soa_.n_alive; ++i) {
+        const int64_t pid = soa_.patch_id[static_cast<size_t>(i)];
+        if (pid > max_pid) max_pid = pid;
+    }
+    if (max_pid < 0) return {};
+
+    std::vector<int64_t> counts(static_cast<size_t>(max_pid) + 1, 0);
     for (int64_t i = 0; i < soa_.n_alive; ++i) {
         const size_t si = static_cast<size_t>(i);
         ++counts[soa_.patch_id[si]];
     }
     std::vector<std::pair<int64_t, int64_t>> result;
-    result.reserve(counts.size());
-    for (const auto& kv : counts) result.emplace_back(kv.first, kv.second);
-    std::sort(result.begin(), result.end(),
-              [](const std::pair<int64_t, int64_t>& a,
-                 const std::pair<int64_t, int64_t>& b) {
-                  return a.first < b.first;
-              });
+    result.reserve(static_cast<size_t>(max_pid) + 1);
+    for (int64_t pid = 0; pid <= max_pid; ++pid) {
+        const int64_t c = counts[static_cast<size_t>(pid)];
+        if (c > 0) result.emplace_back(pid, c);
+    }
+    // result is already in ascending pid order (we iterated pid 0..max_pid).
     return result;
 }
 
@@ -372,23 +456,15 @@ MosquitoSubmodel::adult_density_by_cell(const AOI& aoi) const {
     const double cellW = (aoi.east - aoi.west) / static_cast<double>(w);
     const double cellH = (aoi.north - aoi.south) / static_cast<double>(h);
 
-    // Composite key (row, col) -> int64: row in the high 32 bits,
-    // col in the low 32 bits (both unsigned, so the sign bit never
-    // interferes with the shift).
-    auto pack = [](int32_t r, int32_t c) -> int64_t {
-        return (static_cast<int64_t>(static_cast<uint32_t>(r)) << 32) |
-               static_cast<int64_t>(static_cast<uint32_t>(c));
-    };
-    auto unpack_r = [](int64_t k) -> int32_t {
-        return static_cast<int32_t>(static_cast<uint32_t>(
-            static_cast<int64_t>(k) >> 32));
-    };
-    auto unpack_c = [](int64_t k) -> int32_t {
-        return static_cast<int32_t>(static_cast<uint32_t>(k & 0xFFFFFFFFLL));
-    };
-
-    std::unordered_map<int64_t, int64_t> counts;
-    counts.reserve(static_cast<size_t>(soa_.n_alive));
+    // F1.c perf: replace std::unordered_map<int64_t, int64_t> (with
+    // packed (row, col) composite key) with a flat
+    // std::vector<int64_t> indexed by `row * w + col`. The SoA
+    // inner loop is now a tight ++counts[idx] (cache-friendly).
+    // The result is collected by scanning the vector in (row, col)
+    // order — no final sort needed since we iterate in the same
+    // order we want to emit.
+    const size_t n_cells = static_cast<size_t>(w) * static_cast<size_t>(h);
+    std::vector<int64_t> counts(n_cells, 0);
 
     for (int64_t i = 0; i < soa_.n_alive; ++i) {
         const size_t si = static_cast<size_t>(i);
@@ -401,20 +477,24 @@ MosquitoSubmodel::adult_density_by_cell(const AOI& aoi) const {
         if (col >= w)     col = w - 1;
         if (row < 0)      row = 0;
         if (row >= h)     row = h - 1;
-        ++counts[pack(row, col)];
+        const size_t idx = static_cast<size_t>(row) *
+                               static_cast<size_t>(w) +
+                           static_cast<size_t>(col);
+        ++counts[idx];
     }
 
     std::vector<std::tuple<int32_t, int32_t, int64_t>> result;
-    result.reserve(counts.size());
-    for (const auto& kv : counts) {
-        result.emplace_back(unpack_r(kv.first), unpack_c(kv.first), kv.second);
+    result.reserve(n_cells);
+    for (int32_t row = 0; row < h; ++row) {
+        for (int32_t col = 0; col < w; ++col) {
+            const size_t idx = static_cast<size_t>(row) *
+                                   static_cast<size_t>(w) +
+                               static_cast<size_t>(col);
+            const int64_t c = counts[idx];
+            if (c > 0) result.emplace_back(row, col, c);
+        }
     }
-    std::sort(result.begin(), result.end(),
-              [](const std::tuple<int32_t, int32_t, int64_t>& a,
-                 const std::tuple<int32_t, int32_t, int64_t>& b) {
-                  if (std::get<0>(a) != std::get<0>(b)) return std::get<0>(a) < std::get<0>(b);
-                  return std::get<1>(a) < std::get<1>(b);
-              });
+    // result is already in (row, col) ascending order.
     return result;
 }
 

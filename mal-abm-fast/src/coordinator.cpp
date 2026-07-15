@@ -217,7 +217,9 @@ std::string CoordinatorModel::write_state_cog(const std::string& path,
                                                const DensityGrid& density,
                                                const SuitabilityGrid& suit,
                                                int32_t year, int32_t month,
-                                               int32_t seed) const {
+                                               int32_t seed,
+                                               int32_t n_rollouts,
+                                               int32_t rollout_index) const {
     StateCogMetadata meta;
     meta.crs = aoi_.crs;
     meta.aoi_slug = aoi_.slug;
@@ -225,6 +227,9 @@ std::string CoordinatorModel::write_state_cog(const std::string& path,
     meta.year = year;
     meta.month = month;
     meta.seed = seed;
+    // F1.c: propagate the per-rollout metadata to the sidecar.
+    meta.n_rollouts    = n_rollouts;
+    meta.rollout_index = rollout_index;
     meta.h = density.h;
     meta.w = density.w;
 

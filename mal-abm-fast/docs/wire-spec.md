@@ -1,4 +1,4 @@
-# mal-abm-fast — Wire Spec (F1.b)
+# mal-abm-fast — Wire Spec (F1.b / F1.c)
 
 **Audience**: the 4 implementation subagents (`io`, `math`,
 `coord+submodel`, `engine+output`) and the F1.e parity test harness.
@@ -38,6 +38,32 @@ mal_abm_fast run \
     --output data/runs/ghana/ghana_regional_2024_06_seed0001.tif
 ```
 
+F1.c adds `--n-rollouts N` (default 1). With `N > 1`, the engine
+is rebuilt N times in the same process — each iteration gets a
+fresh `Prng` instance seeded at `seed_rollout = --seed + i` — and
+each rollout writes to its own `<stem>_seed{NNNN}.tif` + sidecar
+JSON, where NNNN is the 0-indexed rollout id zero-padded to 4
+digits. The legacy single-rollout invocation (no `--n-rollouts`
+flag) is byte-compatible: the output is written verbatim to
+`--output` (e.g. `state.tif`), and the v1.1 sidecar carries
+`n_rollouts=1` and `rollout_index=0` so downstream consumers can
+detect the new fields.
+
+```
+# F1.c: 3 rollouts, base --seed=1, runs rollouts 1, 2, 3
+mal_abm_fast run --n-rollouts 3 \
+    --aoi ghana --year 2024 --month 6 --seed 1 --days 30 \
+    --env    data/runs/ghana/ghana_regional_2024_06_env.tif \
+    --habitat data/runs/ghana/ghana_regional_2024_06_habitat_patches.gpkg \
+    --output /tmp/rollout/state.tif
+# -> /tmp/rollout/state_seed0000.tif  (Prng seed = 1, rollout_index=0)
+#    /tmp/rollout/state_seed0000.json
+#    /tmp/rollout/state_seed0001.tif  (Prng seed = 2, rollout_index=1)
+#    /tmp/rollout/state_seed0001.json
+#    /tmp/rollout/state_seed0002.tif  (Prng seed = 3, rollout_index=2)
+#    /tmp/rollout/state_seed0002.json
+```
+
 * The CLI is implemented in `mal-abm-fast/src/main.cpp` (F1.d). The
   flag surface mirrors `mal_ghana_sim.abm.run`.
 * `--aoi` resolves to a registered slug (e.g. `ghana`) and yields the
@@ -45,6 +71,9 @@ mal_abm_fast run \
   exclusive.
 * `--crs` defaults to `EPSG:4326`. `--resolution-m` to 1000.
   `--scale` to `regional`.
+* `--n-rollouts` is validated with `CLI::PositiveNumber` (must be
+  `>= 1`). The default is 1. F2 will OpenMP-parallel the per-rollout
+  loop; F1.c is sequential.
 
 ### Inputs
 
@@ -94,10 +123,12 @@ mal_abm_fast run \
   | `scale`             | `"regional"` / `"national"` / `"continental"`  |
   | `year`              | int                                            |
   | `month`             | int                                            |
-  | `seed`              | int                                            |
+  | `seed`              | int (`--seed + rollout_index` for multi-rollout) |
+  | `n_rollouts`        | int (F1.c, default 1)                          |
+  | `rollout_index`     | int (F1.c, 0-indexed, default 0)               |
   | `generator_version` | pinned `"m1.5-mesa-frames+polars"`             |
   | `abm_params_hash`   | `"sha256:..."` (or `"sha256:pending"` in F1.b) |
-  | `contract_version`  | pinned `"1.0"`                                 |
+  | `contract_version`  | pinned `"1.1"` (F1.c; was `"1.0"` in F1.b)     |
   | `band_names`        | `["density", "suitability"]`                   |
   | `nodata`            | `-9999.0`                                      |
   | `shape`             | `[2, H, W]`                                    |
@@ -120,7 +151,7 @@ mal_abm_fast run \
 | `PLUVIAL_POOL_TWI_THRESHOLD`    | 8.0    | dynamic patch rule (TWI)                 |
 | `PLUVIAL_POOL_WATER_FRAC_MIN`   | 0.0    | dynamic patch rule (water; strictly > 0) |
 | `NODATA_SENTINEL`               | -9999.0| state COG nodata                         |
-| `CONTRACT_VERSION`              | "1.0"  | sidecar                                  |
+| `CONTRACT_VERSION`              | "1.1"  | sidecar (bumped F1.c)                    |
 | `GENERATOR_VERSION`             | "m1.5-mesa-frames+polars" | sidecar                  |
 
 ## 3. Module map
@@ -201,6 +232,19 @@ inline float accumulate_eip(float eip_progress, float daily_mean_temp_c) {
 The F1.a smoke test (`tests/test_smoke.cpp::EipAccumulate`) pins
 the below-base, above-base, and NaN cases.
 
+## 4.1 F1.c indexing (perf)
+
+The 5 per-day ops in `mosquito_submodel.cpp` use
+**contiguous, dense-indexed `std::vector` lookups keyed by `patch_id`**
+(or `(row * w + col)` for the per-cell queries) instead of
+`std::unordered_map` / `std::unordered_set`. Patches are assigned
+dense, monotonically-increasing pids by `coordinator.cpp`
+(pre-existing 0..N-1, then `next_dynamic_patch_id_++` for dynamic
+cells), so a per-call `std::vector<uint8_t>`/`std::vector<float>` of
+size `max_pid + 1` is bounded, cache-friendly, and replaces the
+hash-lookup in the inner loops. This matches the SoA pattern and
+removes the hash overhead from the hot per-agent loops.
+
 ## 5. Spatial model
 
 ### AOI
@@ -261,17 +305,38 @@ implementation, public domain) as the canonical PRNG. The
 `Prng` class wraps a 4-word state and exposes `uniform_double`,
 `normal`, `binomial`, and `peek_state` (test helper).
 
-The CLI seeds the `CoordinatorModel.rng_` with `--seed`. Each
-module that needs a sub-stream derives it via `splitmix64` so
-the per-module streams are independent. Two runs with the same
-`--seed` produce **byte-equal** state COG bytes (within float32
+The CLI seeds the per-rollout `Prng` with `--seed + i` (where
+`i` is the 0-indexed rollout id). The `Engine` constructor
+takes this `Prng&`, derives two independent sub-stream seeds
+(coord + submodel) via `peek_state()` (with one
+`uniform_double()` advance in between), and constructs the
+`CoordinatorModel` and `MosquitoSubmodel` with the derived
+seeds. The master Prng is **not** cached as an Engine member —
+each rollout rebuilds the Engine from a fresh `Prng` instance,
+so no Prng state leaks across rollouts.
+
+Two runs with the same `(seed, i, days, AOI, env, habitat)`
+inputs produce **byte-equal** state COG bytes (within float32
 precision; the F1.e parity test allows 1e-5 relative error per
-pixel).
+pixel). Two rollouts with different seeds (different `i`) in
+the same process produce **byte-different** state COGs — this
+is the F1.c determinism property that `--n-rollouts N` relies
+on, validated by `tests/test_state_cog.cpp::TwoRolloutsDifferentSeedsProduceDifferentCogs`
+and `tests/test_engine.cpp::TwoRolloutsWithDifferentSeedsProduceDifferentCogs`.
 
 `peek_state()` returns the raw `s[0]` state word. The F1.e parity
 test uses it to assert the stream is reproducible at the
 xoshiro256** level — if `peek_state()` ever differs from a saved
 reference, the F1.e test fails fast.
+
+The F1.c `Prng` class holds its 4-word state inline (`s_[0..3]`) on
+the class — the previous file-scope `unordered_map<const void*, ...>`
+workaround is gone. `Prng::binomial` uses the **BTPE** algorithm
+(Kachitvichyanukul & Schmeiser, 1988, "Binomial Random Variate
+Generation") for `n*p >= 30` (truncated-normal outer draw + Knuth
+Poisson inner + squeeze) and **BINV** (inverse-CDF) for `n*p < 30`.
+Both are O(1) per draw regardless of `n`, replacing the previous
+O(n) sum-of-Bernoulli loop and the coarse normal approximation.
 
 ## 7. Wave 1 stub tests (F1.a)
 

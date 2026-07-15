@@ -192,6 +192,10 @@ void write_state_sidecar(const std::string& tif_path,
     nlohmann::json j;
     // The key order here matches docs/wire-spec.md §2 (the parity
     // test relies on a stable ordering for the JSON object).
+    //
+    // F1.c: `n_rollouts` and `rollout_index` are inserted between
+    // `seed` and `generator_version` (after the F1.b keys, before
+    // the F1.d keys). The v1.1 contract adds these two fields.
     j["crs"]               = meta.crs;
     j["transform"]         = nlohmann::json::array();
     for (int i = 0; i < 6; ++i) {
@@ -202,6 +206,8 @@ void write_state_sidecar(const std::string& tif_path,
     j["year"]              = meta.year;
     j["month"]             = meta.month;
     j["seed"]              = meta.seed;
+    j["n_rollouts"]        = meta.n_rollouts;
+    j["rollout_index"]     = meta.rollout_index;
     j["generator_version"] = meta.generator_version;
     j["abm_params_hash"]   = meta.abm_params_hash;
     j["contract_version"]  = meta.contract_version;

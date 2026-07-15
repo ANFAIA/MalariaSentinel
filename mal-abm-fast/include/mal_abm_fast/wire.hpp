@@ -76,7 +76,12 @@ inline constexpr const char* STATE_BAND_NAMES[2]     = {"density", "suitability"
 
 // Contract and generator version strings — written into the sidecar JSON
 // and used by the Python parity test (F1.e) to verify engine equivalence.
-inline constexpr const char* CONTRACT_VERSION        = "1.0";
+//
+// CONTRACT_VERSION bumped to "1.1" in F1.c with the addition of
+// `n_rollouts` and `rollout_index` to the sidecar JSON (see
+// output_contract.hpp). F1.e's parity test will need to special-case
+// the new keys (it compares everything except the F1.c additions).
+inline constexpr const char* CONTRACT_VERSION        = "1.1";
 inline constexpr const char* GENERATOR_VERSION       = "m1.5-mesa-frames+polars";
 
 // ---------------------------------------------------------------------------

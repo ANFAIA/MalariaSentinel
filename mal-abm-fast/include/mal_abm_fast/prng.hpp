@@ -25,6 +25,7 @@
 // produce byte-equal state COGs.
 #pragma once
 
+#include <array>
 #include <cstdint>
 
 namespace mal_abm_fast {
@@ -73,16 +74,35 @@ public:
     double normal(double mu = 0.0, double sigma = 1.0);
 
     // Binomial draw (n trials, probability p).
-    //   * For n <= 1000: sum of n Bernoulli draws via uniform_double().
-    //   * For n >  1000: numpy-compatible normal approximation
-    //                   (round(max(0, mu + sigma * normal())), clipped to [0, n]).
+    //   * For n * min(p, 1-p) < 30: BINV (inverse-CDF in log space)
+    //     algorithm. Bounded O(n) where n is the per-patch draw count
+    //     in [30/min(p, 1-p)]; for the canonical mosquito birth case
+    //     (n=1000, p=0.005) this means O(6000) iterations max.
+    //   * For n * min(p, 1-p) >= 30: BTPE-lite (truncated normal via
+    //     Box-Muller + lround + clamp). O(1) per call.
+    // The threshold `n * min(p, 1-p)` (not just `n * p`) matches
+    // numpy.random.Generator.binomial so the F1.e parity test
+    // produces identical outputs for both `p` and `1 - p` regimes.
     // The stream goes through this->uniform_double() / this->normal()
     // so the parity test can replay the full sequence.
     int binomial(int n, double p);
 
-    // Test helper: return the raw xoshiro256** s[0] state word. Used
-    // by the F1.e parity test to assert the stream is reproducible.
-    uint64_t peek_state() const;
+    // Test helper: return the 4 raw xoshiro256** state words as an
+    // array. Used by the F1.e parity test to assert the stream is
+    // reproducible; comparing the full 4-word state catches any
+    // re-ordering bug that s[0]-only checks would miss.
+    std::array<uint64_t, 4> peek_state() const { return {s_[0], s_[1], s_[2], s_[3]}; }
+
+private:
+    // One xoshiro256** step. Mutates `s_` in place and returns the
+    // output word. Defined in prng.cpp.
+    uint64_t xoshiro_step_() noexcept;
+
+    // The 4-word xoshiro256** state. Held inline on the class so the
+    // F1.b engine's per-day `binomial` and `normal` calls don't pay
+    // the cost of a hash-map lookup (see prng.cpp for the historical
+    // file-scope-map workaround that this replaces).
+    uint64_t s_[4] = {0, 0, 0, 0};
 };
 
 }  // namespace mal_abm_fast

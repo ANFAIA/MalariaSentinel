@@ -147,11 +147,17 @@ public:
     // .tif path. The implementation subagent uses GDAL to write a
     // COG (tiled, deflate, 128x128 blocks, nodata = NODATA_SENTINEL)
     // and nlohmann::json for the sidecar.
+    //
+    // F1.c: `n_rollouts` and `rollout_index` are written into the
+    // sidecar (defaults: 1, 0 — single-rollout case, unchanged from
+    // F1.b).
     std::string write_state_cog(const std::string& path,
                                 const DensityGrid& density,
                                 const SuitabilityGrid& suit,
                                 int32_t year, int32_t month,
-                                int32_t seed) const;
+                                int32_t seed,
+                                int32_t n_rollouts    = 1,
+                                int32_t rollout_index = 0) const;
 
 private:
     AOI                                       aoi_;

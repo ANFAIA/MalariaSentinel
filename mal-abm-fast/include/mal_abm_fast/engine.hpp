@@ -20,6 +20,7 @@
 #include "coordinator.hpp"
 #include "habitat_engine.hpp"
 #include "mosquito_submodel.hpp"
+#include "prng.hpp"
 #include "wire.hpp"
 
 namespace mal_abm_fast {
@@ -28,16 +29,28 @@ class Engine {
 public:
     Engine() = default;
 
-    // Build the engine for (AOI, env COG path, habitat gpkg path, seed,
-    // start_date). Loads the env via `ClimateEngine::load_from_env_tif`
-    // and the habitat via `HabitatEngine::load_from_gpkg`, then
-    // constructs the `CoordinatorModel` and `MosquitoSubmodel`.
+    // Build the engine for (AOI, env COG path, habitat gpkg path,
+    // master Prng, start_date). Loads the env via
+    // `ClimateEngine::load_from_env_tif` and the habitat via
+    // `HabitatEngine::load_from_gpkg`, then derives independent
+    // sub-stream seeds for the `CoordinatorModel` and
+    // `MosquitoSubmodel` from `rng` and constructs them.
+    //
+    // The Prng is consumed during construction: two `peek_state()`
+    // draws (with one intermediate `uniform_double()` to advance the
+    // state) yield the coord + submodel seeds. The master Prng is
+    // NOT cached as a member — the caller owns it. This is what
+    // makes per-rollout Prng isolation work: the CLI in `main.cpp`
+    // creates a fresh `Prng(seed_rollout)` per rollout, builds a new
+    // Engine, runs `days` steps, and snapshots; each rollout's
+    // Engine is destroyed at the end of the iteration so no Prng
+    // state leaks across rollouts.
     //
     // Throws `std::runtime_error` if either IO load fails.
     Engine(AOI aoi,
            const std::string& env_path,
            const std::string& habitat_path,
-           uint64_t seed,
+           Prng& rng,
            std::chrono::sys_days start_date);
 
     // Advance the model by one day. Mirrors `AnophelesABM.step()`:
@@ -51,10 +64,18 @@ public:
     // `AnophelesABM.snapshot()`: builds the density and suitability
     // grids from the submodel via the coordinator, then writes the
     // COG (band 1 = density, band 2 = suitability) and the sidecar.
+    //
+    // F1.c: `n_rollouts` and `rollout_index` are written into the
+    // sidecar so downstream consumers can disambiguate which
+    // rollout produced which COG in a multi-rollout batch. The
+    // single-rollout case (n_rollouts=1, rollout_index=0) is the
+    // default — the F1.b callers are unchanged.
     void snapshot(const std::string& path,
                   int32_t year,
                   int32_t month,
-                  int32_t seed);
+                  int32_t seed,
+                  int32_t n_rollouts    = 1,
+                  int32_t rollout_index = 0);
 
     // Accessors for tests and the CLI.
     const AOI&             aoi()          const { return aoi_; }

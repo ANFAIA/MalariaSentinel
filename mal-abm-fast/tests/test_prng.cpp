@@ -189,16 +189,17 @@ TEST(MalAbmFastPrng, BinomialEdgeCases) {
 }
 
 TEST(MalAbmFastPrng, PeekStateAdvances) {
-    // `peek_state()` returns s[0]; it should change as the state steps.
+    // `peek_state()` returns the full 4-word xoshiro256** state; it
+    // should change as the state steps.
     mal_abm_fast::Prng p(kSeed);
-    const uint64_t s0 = p.peek_state();
+    const auto s0 = p.peek_state();
     (void)p.uniform_double();
-    const uint64_t s1 = p.peek_state();
+    const auto s1 = p.peek_state();
     EXPECT_NE(s0, s1);
 }
 
 TEST(MalAbmFastPrng, PeekStateDeterministic) {
-    // Same seed -> same initial s[0] before any draws.
+    // Same seed -> same initial 4-word state before any draws.
     mal_abm_fast::Prng a(kSeed);
     mal_abm_fast::Prng b(kSeed);
     EXPECT_EQ(a.peek_state(), b.peek_state());
@@ -255,4 +256,80 @@ TEST(MalAbmFastPrng, UniformDoubleFirstTenArePinned) {
     // With 53-bit mantissa, collisions in 10 draws are essentially
     // impossible. EXPECT_GT is a sanity check, not a strict guarantee.
     EXPECT_GT(seen.size(), 5u);
+}
+
+// ---------------------------------------------------------------------------
+// BTPE / BINV binomial tests (added with the F1.c refactor).
+// ---------------------------------------------------------------------------
+
+TEST(MalAbmFastPrng, BinomialCoinFlip) {
+    // n=1, p=0.5: every draw is a fair coin flip. The sample mean of
+    // 10000 trials should be within 0.05 of 0.5.
+    mal_abm_fast::Prng p(kSeed);
+    constexpr int N = 10000;
+    double sum = 0.0;
+    for (int i = 0; i < N; ++i) sum += p.binomial(1, 0.5);
+    const double mean = sum / static_cast<double>(N);
+    EXPECT_NEAR(mean, 0.5, 0.05);
+}
+
+TEST(MalAbmFastPrng, BinomialZeroCount) {
+    // p <= 0 -> 0; p >= 1 -> n. Boundary cases must hold for any n.
+    mal_abm_fast::Prng p(kSeed);
+    EXPECT_EQ(p.binomial(10, 0.0), 0);
+    EXPECT_EQ(p.binomial(10, 1.0), 10);
+    EXPECT_EQ(p.binomial(0,  0.5), 0);
+    EXPECT_EQ(p.binomial(-3, 0.5), 0);
+}
+
+TEST(MalAbmFastPrng, BinomialIsDeterministic) {
+    // Same seed -> 10 identical `binomial(1000, 0.005)` draws. The
+    // BTPE outer loop is deterministic given the same xoshiro256**
+    // stream, so two seeded Prngs must agree exactly.
+    mal_abm_fast::Prng a(kSeed);
+    mal_abm_fast::Prng b(kSeed);
+    for (int i = 0; i < 10; ++i) {
+        EXPECT_EQ(a.binomial(1000, 0.005), b.binomial(1000, 0.005))
+            << "diverged at i=" << i;
+    }
+}
+
+TEST(MalAbmFastPrng, BinomialMeanMatchesNp) {
+    // binomial(1000, 0.005) has mean 5.0. The standard deviation of
+    // the sample mean over 10000 trials is sqrt(5*0.995/10000) ≈ 0.022;
+    // the 0.1 tolerance is 4-5 σ — comfortably above Monte-Carlo noise
+    // and well below any systematic bias from a broken BTPE.
+    mal_abm_fast::Prng p(kSeed);
+    constexpr int N = 10000;
+    double sum = 0.0;
+    for (int i = 0; i < N; ++i) sum += p.binomial(1000, 0.005);
+    const double mean = sum / static_cast<double>(N);
+    EXPECT_NEAR(mean, 5.0, 0.1);
+}
+
+TEST(MalAbmFastPrng, BinomialHighP) {
+    // n=10, p=0.99: BINV branch (n*min(p,q) = 10*0.01 = 0.1 < 30).
+    // Mean = 9.9, stddev = sqrt(10*0.99*0.01) ≈ 0.315. 1000 trials
+    // should agree to within 0.1 of 9.9.
+    mal_abm_fast::Prng p(kSeed);
+    constexpr int N = 1000;
+    double sum = 0.0;
+    for (int i = 0; i < N; ++i) sum += p.binomial(10, 0.99);
+    const double mean = sum / static_cast<double>(N);
+    EXPECT_NEAR(mean, 9.9, 0.1);
+}
+
+TEST(MalAbmFastPrng, BinomialLowPLargeN) {
+    // n=10000, p=0.001: BTPE-lite branch (n*min(p,q) = 10 ≥ 30 is
+    // false, so BINV; the 1000-trial mean should be within 0.5 of
+    // 10.0, well within the 1e-5 parity-test tolerance band).
+    // The point of this test is to exercise the BINV path with
+    // large n + small p, which is the regime the F1.e parity test
+    // uses for the (n=1000, p=0.005) birth step scaled up.
+    mal_abm_fast::Prng p(kSeed);
+    constexpr int N = 1000;
+    double sum = 0.0;
+    for (int i = 0; i < N; ++i) sum += p.binomial(10000, 0.001);
+    const double mean = sum / static_cast<double>(N);
+    EXPECT_NEAR(mean, 10.0, 0.5);
 }
