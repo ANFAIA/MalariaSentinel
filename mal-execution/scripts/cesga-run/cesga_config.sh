@@ -9,8 +9,8 @@
 # --- Paths ------------------------------------------------------------------
 CESGA_USER="${CESGA_USER:-$USER}"
 # Detect project root from this script's location (scripts/cesga-run/ → repo root)
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
+_CONFIG_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$_CONFIG_DIR/../../.." && pwd)"
 
 # Data already lives in the repo
 DATA_DIR="${DATA_DIR:-$PROJECT_ROOT/data/runs/ghana/m2}"

@@ -18,7 +18,13 @@
 set -euo pipefail
 
 # --- Source config -----------------------------------------------------------
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# When SLURM runs this, it copies the script to /var/spool/slurmd/.
+# $SLURM_SUBMIT_DIR is the original directory where sbatch was invoked.
+if [[ -n "${SLURM_SUBMIT_DIR:-}" ]]; then
+  SCRIPT_DIR="$SLURM_SUBMIT_DIR"
+else
+  SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+fi
 # shellcheck source=cesga_config.sh
 source "$SCRIPT_DIR/cesga_config.sh"
 
