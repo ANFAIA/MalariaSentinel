@@ -54,6 +54,11 @@ done
 # --- Preflight ---------------------------------------------------------------
 mkdir -p "$DATA_DIR" "$LOGS_DIR"
 
+# Move all caches out of $HOME (quota is only 10GB)
+export XDG_CACHE_DIR="${PROJECT_ROOT}/.cache"
+export XDG_CACHE_HOME="${PROJECT_ROOT}/.cache"
+mkdir -p "$XDG_CACHE_HOME"
+
 export PATH="$HOME/.local/bin:$PATH"
 if ! command -v uv &>/dev/null; then
   log "ERROR: uv not found. Run setup_env.sh first."

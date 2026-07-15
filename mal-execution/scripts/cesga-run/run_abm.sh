@@ -50,6 +50,10 @@ export OMP_NUM_THREADS="${SLURM_CPUS_PER_TASK:-32}"
 export MKL_NUM_THREADS="${SLURM_CPUS_PER_TASK:-32}"
 export OPENBLAS_NUM_THREADS="${SLURM_CPUS_PER_TASK:-32}"
 
+# Move caches out of $HOME (quota is only 10GB)
+export XDG_CACHE_DIR="${PROJECT_ROOT}/.cache"
+export XDG_CACHE_HOME="${PROJECT_ROOT}/.cache"
+
 # --- Directories -------------------------------------------------------------
 mkdir -p "$RUNS_DIR" "$LOGS_DIR"
 
