@@ -1,0 +1,12 @@
+{
+  "name": "mal-abm-fast",
+  "version-string": "0.1.0",
+  "description": "Fast C++ ABM engine for MalariaSentinel Centinela (M-perf).",
+  "dependencies": [
+    "eigen3",
+    "gdal",
+    "cli11",
+    "nlohmann-json",
+    "googletest"
+  ]
+}
