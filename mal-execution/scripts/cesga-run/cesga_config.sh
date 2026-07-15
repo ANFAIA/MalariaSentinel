@@ -7,6 +7,7 @@
 # Data and runs are within the repo tree — no separate STORE/LUSTRE needed.
 
 # --- Paths ------------------------------------------------------------------
+CESGA_USER="${CESGA_USER:-$USER}"
 # Detect project root from this script's location (scripts/cesga-run/ → repo root)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
@@ -35,6 +36,6 @@ ABM_NUM_MONTHS=24               # 2 years
 UV_CACHE_DIR="${UV_CACHE_DIR:-$PROJECT_ROOT/.uv-cache}"
 
 # --- Derived (do not edit below) -------------------------------------------
-export PROJECT_ROOT DATA_DIR RUNS_DIR LOGS_DIR VENV_DIR UV_CACHE_DIR
+export CESGA_USER PROJECT_ROOT DATA_DIR RUNS_DIR LOGS_DIR VENV_DIR UV_CACHE_DIR
 export SLURM_PARTITION SLURM_CORES SLURM_MEM SLURM_TIME
 export ABM_AOI ABM_SEED_START ABM_DAYS_PER_MONTH ABM_START_YEAR ABM_START_MONTH ABM_NUM_MONTHS
