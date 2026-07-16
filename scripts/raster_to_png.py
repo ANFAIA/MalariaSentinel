@@ -46,11 +46,34 @@ def _cmap(name: str):
 
 
 def _parse_filename(name: str):
-    """Return (year, month, seed) from 'abm_YYYY_MM_seedSSSS.tif'."""
+    """Return (year, month, seed) or (day, 0, 0) from various filename formats.
+    
+    Supported formats:
+    - 'abm_YYYY_MM_seedSSSS' → (year, month, seed) for monthly snapshots
+    - 'abm_YYYY_MM_seedSSSS_dayNNN' → (year, month, seed, day) for daily snapshots
+    - 'state_dayNNN' → (day, 0, 0) for daily snapshots
+    - 'state' → (0, 0, 0) for final snapshot
+    """
+    # Format: abm_YYYY_MM_seedSSSS_dayNNN (daily snapshot within monthly run)
+    m = re.match(r"abm_(\d{4})_(\d{2})_seed(\d+)_day(\d+)", name)
+    if m:
+        return int(m.group(1)), int(m.group(2)), int(m.group(3)), int(m.group(4))
+    
+    # Format: abm_YYYY_MM_seedSSSS (monthly snapshot)
     m = re.match(r"abm_(\d{4})_(\d{2})_seed(\d+)", name)
-    if not m:
-        return None
-    return int(m.group(1)), int(m.group(2)), int(m.group(3))
+    if m:
+        return int(m.group(1)), int(m.group(2)), int(m.group(3)), 0
+    
+    # Format: state_dayNNN
+    m = re.match(r"state_day(\d+)", name)
+    if m:
+        return int(m.group(1)), 0, 0, 0
+    
+    # Format: state (final snapshot)
+    if name == "state":
+        return 0, 0, 0, 0
+    
+    return None
 
 
 def _masked(arr: np.ndarray, nodata) -> np.ma.MaskedArray:
@@ -220,9 +243,17 @@ def main():
         if info is None:
             print(f"skipping (can't parse): {tif.name}")
             continue
-        year, month, seed = info
-        parsed.append((tif, year, month, seed))
-    parsed.sort(key=lambda x: (x[1], x[2], x[3]))
+        year, month, seed, day = info
+        parsed.append((tif, year, month, seed, day))
+    
+    # Detect if this is a daily snapshot run (has day numbers > 0)
+    has_daily = any(p[4] > 0 for p in parsed)
+    
+    # Sort: daily snapshots by year/month/seed/day, monthly by year/month/seed
+    if has_daily:
+        parsed.sort(key=lambda x: (x[1], x[2], x[3], x[4]))
+    else:
+        parsed.sort(key=lambda x: (x[1], x[2], x[3]))
 
     # band names from first file
     first_meta = json.loads(parsed[0][0].with_suffix(".json").read_text())
@@ -234,14 +265,18 @@ def main():
     n_frames = len(parsed)
     n_bands = len(band_names)
 
-    for idx, (tif, year, month, seed) in enumerate(parsed):
+    for idx, (tif, year, month, seed, day) in enumerate(parsed):
         meta = json.loads(tif.with_suffix(".json").read_text())
         with rasterio.open(tif) as src:
             arr = src.read()
         for i, bname in enumerate(band_names):
             recipe = RECIPES.get(bname, dict(cmap="viridis", stretch="linear",
                                               vmin=None, vmax=None))
-            tag = f"{year}-{month:02d}"
+            # Generate title based on filename format
+            if day > 0:
+                tag = f"{year}-{month:02d} Day {day}"
+            else:
+                tag = f"{year}-{month:02d}"
             out = out_dir / bname / f"{tif.stem}_{bname}.png"
             pil_img = _render_band(arr[i], recipe, nodata,
                                     title=f"{tag}  ·  {bname}", out_path=out)
