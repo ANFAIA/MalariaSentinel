@@ -137,6 +137,25 @@ std::string rollout_output_path(const std::string& output_path,
     return (parent / name.str()).string();
 }
 
+// Build the per-day intermediate snapshot path.
+// Given output_path = "/tmp/rollout/state.tif" and day=5,
+// returns "/tmp/rollout/state_day005.tif"
+//
+// If the output path doesn't end in .tif, append ".tif".
+std::string rollout_day_path(const std::string& output_path, int day) {
+    if (output_path.empty()) {
+        throw std::runtime_error("rollout_day_path: output path is empty");
+    }
+    const std::filesystem::path p(output_path);
+    const std::filesystem::path parent = p.has_parent_path()
+        ? p.parent_path() : std::filesystem::path{};
+    std::string stem = p.stem().string();
+    std::string ext = p.has_extension() ? p.extension().string() : ".tif";
+    std::ostringstream name;
+    name << stem << "_day" << std::setw(3) << std::setfill('0') << day << ext;
+    return (parent / name.str()).string();
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -158,6 +177,7 @@ int main(int argc, char** argv) {
     int         seed        = 1;
     int         days        = 30;
     int         n_rollouts  = 1;
+    int         snapshot_every = 0;
     std::string env_path;
     std::string habitat_path;
     std::string output_path;
@@ -204,6 +224,12 @@ int main(int argc, char** argv) {
                     "<output>_seed{NNNN}.tif alongside the sidecar JSON.")
         ->default_val(1)
         ->check(CLI::PositiveNumber);
+    run->add_option("--snapshot-every", snapshot_every,
+                    "Take intermediate snapshots every N days (0 = "
+                    "only final snapshot, backward compatible). "
+                    "Intermediate files are named <stem>_dayNNN.tif.")
+        ->default_val(0)
+        ->check(CLI::NonNegativeNumber);
 
     CLI11_PARSE(app, argc, argv);
 
@@ -262,10 +288,31 @@ int main(int argc, char** argv) {
         }
         auto& engine = *engine_ptr;
 
+        // -- Rollout output path --------------------------------------
+        const std::string rollout_path =
+            rollout_output_path(output_path, i, n_rollouts);
+
         // -- Step ----------------------------------------------------
         try {
             for (int d = 0; d < days; ++d) {
                 engine.step();
+
+                // Intermediate snapshot every N days
+                if (snapshot_every > 0 && (d + 1) % snapshot_every == 0) {
+                    const std::string day_path = rollout_day_path(rollout_path, d + 1);
+                    // Ensure parent directory exists
+                    const std::filesystem::path day_out(day_path);
+                    if (day_out.has_parent_path()) {
+                        std::error_code ec;
+                        std::filesystem::create_directories(day_out.parent_path(), ec);
+                    }
+                    engine.snapshot(day_path, year, month,
+                                    static_cast<int32_t>(seed_rollout),
+                                    n_rollouts, i);
+                    std::cout << "abm_run: rollout " << i << "/" << n_rollouts
+                              << " day=" << (d + 1) << "/" << days
+                              << " -> " << day_path << std::endl;
+                }
             }
         } catch (const std::exception& e) {
             std::cerr << "abm_run: rollout " << i
@@ -275,8 +322,6 @@ int main(int argc, char** argv) {
         }
 
         // -- Snapshot ------------------------------------------------
-        const std::string rollout_path =
-            rollout_output_path(output_path, i, n_rollouts);
         try {
             // Ensure the output parent directory exists.
             const std::filesystem::path out_path(rollout_path);

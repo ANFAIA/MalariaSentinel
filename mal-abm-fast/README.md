@@ -83,6 +83,27 @@ Outputs `state.tif` (2-band COG: density + suitability) + `state.json` (sidecar)
 Outputs `state_seed0000.tif` … `state_seed0099.tif` + corresponding `.json` sidecars.
 Each rollout gets a fresh PRNG instance (per-rollout isolation for F2 OpenMP).
 
+### Daily snapshots (time-series generation)
+
+```bash
+./mal-abm-fast/build/mal_abm_fast run --snapshot-every 1 --n-rollouts 10 \
+    --aoi ghana --year 2024 --month 6 --seed 1 --days 30 \
+    --env    data/runs/ghana/ghana_regional_2024_06_env.tif \
+    --habitat data/runs/ghana/ghana_regional_2024_06_habitat_patches.gpkg \
+    --output /tmp/rollout/state.tif
+```
+
+With `--snapshot-every 1`, a snapshot is taken every day (30 files per rollout). Files are named `state_day001.tif` … `state_day030.tif` alongside the final `state.tif`. This produces time-series data for U-Net training.
+
+### Output structure
+
+| File | Description |
+|---|---|
+| `state.tif` | Final snapshot (backward compatible) |
+| `state.json` | Sidecar JSON for final snapshot |
+| `state_dayNNN.tif` | Intermediate snapshot at day N (when `--snapshot-every` > 0) |
+| `state_dayNNN.json` | Sidecar JSON for intermediate snapshot |
+
 ### CLI flags
 
 | Flag | Default | Description |
@@ -97,6 +118,7 @@ Each rollout gets a fresh PRNG instance (per-rollout isolation for F2 OpenMP).
 | `--seed` | 1 | PRNG seed |
 | `--days` | 30 | Simulation days (1–366) |
 | `--n-rollouts` | 1 | Number of rollouts (≥1) |
+| `--snapshot-every` | 0 | Intermediate snapshot frequency in days (0 = only final). Files named `<stem>_dayNNN.tif` |
 
 ## Tests
 
