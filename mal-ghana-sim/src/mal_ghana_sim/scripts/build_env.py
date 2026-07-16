@@ -54,9 +54,9 @@ from rasterio.transform import from_bounds
 from shapely.geometry import Point
 
 from mal_commonlib.aoi import AOI, Scale
-from mal_commonlib.data.loaders.chirps import load_chirps_rainfall
+from mal_commonlib.data.loaders.chirps import load_chirps_rainfall, load_chirps_rainfall_daily
 from mal_commonlib.data.loaders.dem import load_merit_dem
-from mal_commonlib.data.loaders.era5 import load_era5_temp_suitability
+from mal_commonlib.data.loaders.era5 import load_era5_temp_suitability, load_era5_water_temp
 from mal_commonlib.data.loaders.jrc_gsw import load_jrc_gsw_water_frac
 from mal_commonlib.data.loaders.modis import load_modis_ndvi
 from mal_commonlib.terrain.twi import compute_twi
@@ -256,6 +256,119 @@ def _write_env_cog(
     return path
 
 
+def _write_env_nc(
+    path: pathlib.Path,
+    rainfall_daily: xr.DataArray,
+    water_temp_c_daily: xr.DataArray,
+    water_frac: xr.DataArray,
+    ndvi: xr.DataArray,
+    aoi: AOI,
+    year: int,
+    month: int,
+) -> pathlib.Path:
+    """Write the env data as a CF-1.8 daily NetCDF-4 file.
+
+    Variables:
+        rainfall      (time, y, x)  mm/day
+        water_temp_c  (time, y, x)  deg C
+        water_frac    (time, y, x)  [0, 1] — broadcast from monthly static
+        ndvi          (time, y, x)  [0, 1] — broadcast from monthly static
+    """
+    import calendar
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    h, w = aoi.cells_per_side()
+    n_days = calendar.monthrange(year, month)[1]
+
+    # Ensure time dimension matches n_days
+    if "time" in rainfall_daily.dims:
+        rainfall_arr = np.asarray(rainfall_daily.values, dtype=np.float32)
+    else:
+        rainfall_arr = np.broadcast_to(
+            np.asarray(rainfall_daily.values, dtype=np.float32),
+            (n_days, h, w),
+        )
+
+    if "time" in water_temp_c_daily.dims:
+        water_temp_arr = np.asarray(water_temp_c_daily.values, dtype=np.float32)
+    else:
+        water_temp_arr = np.broadcast_to(
+            np.asarray(water_temp_c_daily.values, dtype=np.float32),
+            (n_days, h, w),
+        )
+
+    # water_frac and ndvi are static monthly — broadcast to each day
+    wf_2d = np.asarray(water_frac.values, dtype=np.float32)
+    ndvi_2d = np.asarray(ndvi.values, dtype=np.float32)
+    water_frac_arr = np.broadcast_to(wf_2d, (n_days, h, w)).copy()
+    ndvi_arr = np.broadcast_to(ndvi_2d, (n_days, h, w)).copy()
+
+    # Time coordinates
+    time_coords = np.array([
+        np.datetime64(f"{year:04d}-{month:02d}-{d:02d}")
+        for d in range(1, n_days + 1)
+    ])
+
+    # Lat/lon coordinates from AOI bbox
+    w_s, s_s, e_s, n_s = aoi.bbox
+    lats = np.linspace(n_s, s_s, h, dtype=np.float32)
+    lons = np.linspace(w_s, e_s, w, dtype=np.float32)
+
+    ds = xr.Dataset(
+        {
+            "rainfall": (["time", "y", "x"], rainfall_arr,
+                         {"long_name": "CHIRPS v2.0 daily precipitation",
+                          "units": "mm/day", "_FillValue": np.float32(NODATA_SENTINEL)}),
+            "water_temp_c": (["time", "y", "x"], water_temp_arr,
+                             {"long_name": "ERA5-Land 2m temperature (daily mean)",
+                              "units": "degC", "_FillValue": np.float32(NODATA_SENTINEL)}),
+            "water_frac": (["time", "y", "x"], water_frac_arr,
+                           {"long_name": "JRC GSW open water fraction",
+                            "units": "1", "_FillValue": np.float32(NODATA_SENTINEL)}),
+            "ndvi": (["time", "y", "x"], ndvi_arr,
+                     {"long_name": "MODIS NDVI",
+                      "units": "1", "_FillValue": np.float32(NODATA_SENTINEL)}),
+        },
+        coords={
+            "time": time_coords,
+            "y": lats,
+            "x": lons,
+        },
+        attrs={
+            "Conventions": "CF-1.8",
+            "title": f"MalariaSentinel daily env tensor — {aoi.slug} {year}-{month:02d}",
+            "aoi_slug": aoi.slug,
+            "scale": aoi.scale.value,
+            "year": int(year),
+            "month": int(month),
+            "contract_version": "2.0",
+            "generator_version": "m2-daily-0.1.0",
+            "crs": aoi.crs,
+            "source_url": "https://github.com/davidflorezmazuera/MalariaSentinel",
+        },
+    )
+
+    # CF grid mapping (simple latitude-longitude)
+    ds["latitude"] = xr.DataArray(lats, dims="y",
+                                  attrs={"units": "degrees_north", "axis": "Y"})
+    ds["longitude"] = xr.DataArray(lons, dims="x",
+                                   attrs={"units": "degrees_east", "axis": "X"})
+    ds["time"].attrs.update({
+        "axis": "T",
+        "long_name": "time",
+        "standard_name": "time",
+    })
+
+    encoding = {
+        "rainfall": {"dtype": "float32", "zlib": True, "complevel": 4},
+        "water_temp_c": {"dtype": "float32", "zlib": True, "complevel": 4},
+        "water_frac": {"dtype": "float32", "zlib": True, "complevel": 4},
+        "ndvi": {"dtype": "float32", "zlib": True, "complevel": 4},
+    }
+    ds.to_netcdf(path, encoding=encoding)
+    return path
+
+
 def _write_habitat_patches_gpkg(
     path: pathlib.Path,
     dem: xr.DataArray,
@@ -385,10 +498,16 @@ def main(
             "Kept for CLI compatibility with M1.4 callers."
         ),
     ),
+    output_format: str = typer.Option(
+        "tif", "--format",
+        help="Output format: 'tif' (COG GeoTIFF, default) or 'nc' (daily NetCDF-4).",
+    ),
 ) -> None:
     """Build the M1 env tensor + habitat patches for an AOI + month."""
     if not (1 <= month <= 12):
         raise typer.BadParameter(f"month must be 1..12; got {month}")
+    if output_format not in ("tif", "nc"):
+        raise typer.BadParameter(f"--format must be 'tif' or 'nc'; got {output_format!r}")
 
     # Treat the deprecated --skip-worldcover as an alias for --skip-jrc-gsw.
     # If both are set, skip; if only one is set, skip.
@@ -398,12 +517,13 @@ def main(
     output_dir.mkdir(parents=True, exist_ok=True)
     h, w = aoi_obj.cells_per_side()
     suffix = f"{aoi_obj.slug}_{aoi_obj.scale.value}_{year:04d}_{month:02d}"
-    env_path = output_dir / f"{suffix}_env.tif"
+    ext = "nc" if output_format == "nc" else "tif"
+    env_path = output_dir / f"{suffix}_env.{ext}"
     habitat_path = output_dir / f"{suffix}_habitat_patches.gpkg"
 
     typer.echo(
         f"build_env: AOI={aoi_obj.slug} scale={aoi_obj.scale.value} "
-        f"grid={h}x{w} year={year} month={month:02d}"
+        f"grid={h}x{w} year={year} month={month:02d} format={output_format}"
     )
 
     water_frac: xr.DataArray
@@ -414,47 +534,85 @@ def main(
         water_frac = _load_with_fallback(
             load_jrc_gsw_water_frac, aoi_obj, 2021, month, "water_frac",
         )
-    rainfall = _load_with_fallback(
-        load_chirps_rainfall, aoi_obj, year, month, "rainfall",
-    )
 
-    if skip_era5:
-        typer.echo("skip-era5 set: filling temp_suitability with NoData (-9999.0).", err=True)
-        temp_suitability = _empty_channel(aoi_obj, value=NODATA_SENTINEL, band_name="temp_suitability")
-    else:
-        temp_suitability = _load_with_fallback(
-            load_era5_temp_suitability, aoi_obj, year, month, "temp_suitability",
+    if output_format == "nc":
+        # Daily NetCDF: use daily loaders
+        if skip_era5:
+            typer.echo("skip-era5 set: filling water_temp_c with NoData (-9999.0).", err=True)
+            h_, w_ = aoi_obj.cells_per_side()
+            import calendar as _cal
+            n_days = _cal.monthrange(year, month)[1]
+            water_temp_c = xr.DataArray(
+                np.full((n_days, h_, w_), NODATA_SENTINEL, dtype=np.float32),
+                dims=("time", "y", "x"),
+                attrs={"units": "degC", "nodata": NODATA_SENTINEL},
+            )
+        else:
+            water_temp_c = _load_with_fallback(
+                load_era5_water_temp, aoi_obj, year, month, "water_temp_c",
+            )
+
+        rainfall = _load_with_fallback(
+            load_chirps_rainfall_daily, aoi_obj, year, month, "rainfall",
         )
 
-    if skip_modis:
-        typer.echo("skip-modis set: filling ndvi with NoData (-9999.0).", err=True)
-        ndvi = _empty_channel(aoi_obj, value=NODATA_SENTINEL, band_name="ndvi")
-    else:
-        ndvi = _load_with_fallback(
-            load_modis_ndvi, aoi_obj, year, month, "ndvi",
+        if skip_modis:
+            typer.echo("skip-modis set: filling ndvi with NoData (-9999.0).", err=True)
+            ndvi = _empty_channel(aoi_obj, value=NODATA_SENTINEL, band_name="ndvi")
+        else:
+            ndvi = _load_with_fallback(
+                load_modis_ndvi, aoi_obj, year, month, "ndvi",
+            )
+
+        _write_env_nc(
+            env_path, rainfall, water_temp_c, water_frac, ndvi,
+            aoi_obj, year, month,
         )
+        typer.echo(f"wrote env NC    -> {env_path}")
+    else:
+        # COG/TIF: existing behavior
+        if skip_era5:
+            typer.echo("skip-era5 set: filling temp_suitability with NoData (-9999.0).", err=True)
+            temp_suitability = _empty_channel(aoi_obj, value=NODATA_SENTINEL, band_name="temp_suitability")
+        else:
+            temp_suitability = _load_with_fallback(
+                load_era5_temp_suitability, aoi_obj, year, month, "temp_suitability",
+            )
+
+        rainfall = _load_with_fallback(
+            load_chirps_rainfall, aoi_obj, year, month, "rainfall",
+        )
+
+        if skip_modis:
+            typer.echo("skip-modis set: filling ndvi with NoData (-9999.0).", err=True)
+            ndvi = _empty_channel(aoi_obj, value=NODATA_SENTINEL, band_name="ndvi")
+        else:
+            ndvi = _load_with_fallback(
+                load_modis_ndvi, aoi_obj, year, month, "ndvi",
+            )
+
+        env = _stack_env_channels(
+            {
+                "water_frac": water_frac,
+                "rainfall": rainfall,
+                "temp_suitability": temp_suitability,
+                "ndvi": ndvi,
+            },
+            aoi_obj,
+        )
+        _write_env_cog(env_path, env, aoi_obj, year, month)
+        typer.echo(f"wrote env COG   -> {env_path}  ({(4 * h * w * 4) / (1024 ** 2):.2f} MB)")
 
     dem = _load_with_fallback(load_merit_dem, aoi_obj, year, month, "elevation")
-
-    env = _stack_env_channels(
-        {
-            "water_frac": water_frac,
-            "rainfall": rainfall,
-            "temp_suitability": temp_suitability,
-            "ndvi": ndvi,
-        },
-        aoi_obj,
-    )
-    _write_env_cog(env_path, env, aoi_obj, year, month)
-    typer.echo(f"wrote env COG   -> {env_path}  ({(4 * h * w * 4) / (1024 ** 2):.2f} MB)")
 
     _write_habitat_patches_gpkg(
         habitat_path, dem, water_frac, aoi_obj, twi_threshold=twi_threshold,
     )
     typer.echo(f"wrote habitat   -> {habitat_path}")
 
-    sidecar = env_path.with_suffix(".json")
-    typer.echo(f"wrote sidecar   -> {sidecar}")
+    if output_format == "tif":
+        sidecar = env_path.with_suffix(".json")
+        typer.echo(f"wrote sidecar   -> {sidecar}")
 
 
 if __name__ == "__main__":
