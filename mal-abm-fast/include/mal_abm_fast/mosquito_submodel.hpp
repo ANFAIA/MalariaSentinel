@@ -4,7 +4,7 @@
 // The submodel owns the entire mosquito population as a `MosquitoSoA`.
 // The constructor seeds `round(n_patches * k_per_patch * init_frac)`
 // larvae with round-robin patch assignment. `advance_day` is the
-// per-day orchestrator; the 5 operations it calls are listed below in
+// per-day orchestrator; the 7 operations it calls are listed below in
 // the exact order they execute (matching the Python
 // `mosquito_submodel.advance_day`).
 //
@@ -48,22 +48,27 @@ public:
     // Total live agent count (= soa().n_alive).
     int64_t total_agents() const { return soa_.n_alive; }
 
-    // Per-day orchestrator. Calls the 5 ops in order:
+    // Per-day orchestrator. Calls the 7 ops in order:
     //   1. larva_mortality_inactive(patch_states)
+    //   2.5. larva_mortality_density(patch_states)
     //   2. larva_growth(patch_states)
     //   3. larva_to_adult()
     //   4. adult_dispersal()
+    //   6. adult_mortality(patch_states)
     //   5. birth(aoi, patch_states)
     void advance_day(const AOI& aoi,
                      const std::vector<PatchState>& patch_states);
 
-    // -- 5 per-day operations -----------------------------------------------
+    // -- 7 per-day operations -----------------------------------------------
 
     // 1. Remove larvae at patches that are activated=false.
     //    Adults are unaffected (they dispersed away from the patch
     //    on a previous day, so the per-patch mortality rule only
     //    applies to the in-patch larvae pool).
     void larva_mortality_inactive(const std::vector<PatchState>& patch_states);
+
+    // 2.5. Density-dependent larva mortality (Beverton-Holt) at active patches.
+    void larva_mortality_density(const std::vector<PatchState>& patch_states);
 
     // 2. At active patches: stage_age += 1, eip_progress += max(0, T - EIP_BASE_C).
     //    EIP uses the post Mordecai-inverse deg C from PatchState.temp_d.
@@ -84,7 +89,10 @@ public:
 
     // 4. 20% of adults move by clipped Gaussian (2 km cap). Uses
     //    the submodel's Prng so the stream is reproducible.
-    void adult_dispersal();
+    void adult_dispersal(const AOI& aoi);
+
+    // 6. Adult mortality — Lardeux thermo-dependent daily survival.
+    void adult_mortality(const std::vector<PatchState>& patch_states);
 
     // 5. binomial(K, BIRTH_RATE) per active patch; new lon/lat =
     //    patch cell centre. New agents start as larvae with

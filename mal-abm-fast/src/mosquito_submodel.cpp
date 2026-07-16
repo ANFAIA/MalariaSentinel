@@ -5,9 +5,11 @@
 // Per-day order (mirrors `mal_ghana_sim.abm.mosquito_submodel.
 // MosquitoSubmodel.advance_day` exactly):
 //   1. larva_mortality_inactive(patch_states)
+//   2.5. larva_mortality_density(patch_states)
 //   2. larva_growth(patch_states)
 //   3. larva_to_adult()
 //   4. adult_dispersal()
+//   6. adult_mortality(patch_states)
 //   5. birth(aoi, patch_states)
 //
 // Determinism: every stochastic draw goes through `rng_` (the
@@ -47,6 +49,7 @@ inline void swap_with_last(MosquitoSoA& soa, int64_t i, int64_t n) {
     std::swap(soa.lat[i],          soa.lat[n - 1]);
     std::swap(soa.eip_progress[i], soa.eip_progress[n - 1]);
     std::swap(soa.stage_age[i],    soa.stage_age[n - 1]);
+    std::swap(soa.days_since_active[i], soa.days_since_active[n - 1]);
 }
 
 // Trim every SoA vector to `new_size` (the new live range after a
@@ -62,9 +65,27 @@ inline void trim_soa(MosquitoSoA& soa, size_t new_size) {
     soa.lat.resize(new_size);
     soa.eip_progress.resize(new_size);
     soa.stage_age.resize(new_size);
+    soa.days_since_active.resize(new_size);
 }
 
 }  // namespace
+
+// ---------------------------------------------------------------------------
+// Cell-centre helpers
+// ---------------------------------------------------------------------------
+
+static inline std::pair<int32_t, int32_t> LonLatToCell(
+    double lon, double lat, const AOI& aoi) {
+    const int32_t w = aoi.cells_per_side();
+    const int32_t h = cells_per_side_h(aoi);
+    const double cellW = (aoi.east - aoi.west) / static_cast<double>(w);
+    const double cellH = (aoi.north - aoi.south) / static_cast<double>(h);
+    int32_t col = static_cast<int32_t>((lon - aoi.west) / cellW);
+    int32_t row = static_cast<int32_t>((aoi.north - lat) / cellH);
+    if (col < 0) col = 0; if (col >= w) col = w - 1;
+    if (row < 0) row = 0; if (row >= h) row = h - 1;
+    return {row, col};
+}
 
 // ---------------------------------------------------------------------------
 // Construction
@@ -106,6 +127,7 @@ MosquitoSubmodel::MosquitoSubmodel(int32_t n_patches, int32_t k_per_patch,
     soa_.lat.reserve(cap);
     soa_.eip_progress.reserve(cap);
     soa_.stage_age.reserve(cap);
+    soa_.days_since_active.reserve(cap);
 
     for (int64_t p = 0; p < np; ++p) {
         const int64_t k = per_patch[static_cast<size_t>(p)];
@@ -119,6 +141,7 @@ MosquitoSubmodel::MosquitoSubmodel(int32_t n_patches, int32_t k_per_patch,
             soa_.lat.push_back(0.0f);
             soa_.eip_progress.push_back(0.0f);
             soa_.stage_age.push_back(0);
+            soa_.days_since_active.push_back(0);
         }
     }
     soa_.n_alive  = n;
@@ -131,32 +154,24 @@ MosquitoSubmodel::MosquitoSubmodel(int32_t n_patches, int32_t k_per_patch,
 
 void MosquitoSubmodel::advance_day(const AOI& aoi,
                                    const std::vector<PatchState>& patch_states) {
-    larva_mortality_inactive(patch_states);
-    larva_growth(patch_states);
-    larva_to_adult(aoi, patch_states);
-    adult_dispersal();
-    birth(aoi, patch_states);
+    larva_mortality_inactive(patch_states);   // Op 1
+    larva_mortality_density(patch_states);    // Op 2.5 (Beverton-Holt)
+    larva_growth(patch_states);               // Op 2
+    larva_to_adult(aoi, patch_states);        // Op 3
+    adult_dispersal(aoi);                     // Op 4
+    adult_mortality(patch_states);            // Op 6 (Lardeux)
+    birth(aoi, patch_states);                 // Op 5
 }
 
 // ---------------------------------------------------------------------------
-// Op 1: larva mortality at inactive patches
+// Op 1: larva mortality at inactive patches (desiccation, Depinay 2004)
 // ---------------------------------------------------------------------------
 
 void MosquitoSubmodel::larva_mortality_inactive(
     const std::vector<PatchState>& patch_states) {
     if (soa_.n_alive <= 0) return;
 
-    // F1.c perf: replace std::unordered_set<int64_t> with a flat
-    // std::vector<uint8_t> indexed by patch_id. The inner loop
-    // becomes a single array index (cache-friendly) instead of a
-    // hash-map find per agent. The vector is sized by the max
-    // patch_id we may need to look up across both today's
-    // patch_states and any agent's birth-patch (an agent can carry
-    // a pid from a now-inactive dynamic patch — see coordinator.cpp's
-    // `dynamic_patch_registry_`). Pre-existing pids are dense 0..N-1
-    // and dynamic pids are monotonically assigned by
-    // `next_dynamic_patch_id_`, so pids start at 0 and are bounded
-    // by the next-dynamic counter.
+    // Build active set from patch_states.
     int64_t max_pid = -1;
     for (const auto& ps : patch_states) {
         if (ps.patch_id > max_pid) max_pid = ps.patch_id;
@@ -168,28 +183,88 @@ void MosquitoSubmodel::larva_mortality_inactive(
     if (max_pid < 0) return;
 
     std::vector<uint8_t> active_by_id(static_cast<size_t>(max_pid) + 1, 0);
-    bool any_inactive = false;
     for (const auto& ps : patch_states) {
         if (ps.activated) {
             active_by_id[static_cast<size_t>(ps.patch_id)] = 1;
-        } else {
-            any_inactive = true;
         }
     }
-    if (!any_inactive) return;
 
-    // Reverse swap-with-last: walk the live range from the tail down
-    // to 0; for each larva at an inactive patch, swap with the
-    // current last and decrement n_alive. The swapped-in element was
-    // already processed in a previous (higher-i) iteration, so it
-    // never needs to be re-checked.
+    // Phase 1: for each larva, update days_since_active.
+    //   - Active patch: reset counter to 0.
+    //   - Inactive patch: increment counter. If > grace period, kill
+    //     with probability LARVA_DESICCATION_DAILY_RATE.
+    // Use reverse swap-with-last for compaction.
     int64_t i = soa_.n_alive - 1;
     while (i >= 0) {
         const size_t si = static_cast<size_t>(i);
-        if (soa_.stage[si] == 0 &&
-            !active_by_id[soa_.patch_id[si]]) {
-            swap_with_last(soa_, i, soa_.n_alive);
-            --soa_.n_alive;
+        if (soa_.stage[si] == 0) {  // larvae only
+            const int64_t pid = soa_.patch_id[si];
+            if (active_by_id[pid]) {
+                soa_.days_since_active[si] = 0;
+            } else {
+                ++soa_.days_since_active[si];
+                if (soa_.days_since_active[si] > LARVA_DESICCATION_GRACE_DAYS) {
+                    if (rng_.uniform_double() < LARVA_DESICCATION_DAILY_RATE) {
+                        swap_with_last(soa_, i, soa_.n_alive);
+                        --soa_.n_alive;
+                    }
+                }
+            }
+        }
+        --i;
+    }
+
+    trim_soa(soa_, static_cast<size_t>(soa_.n_alive));
+}
+
+// ---------------------------------------------------------------------------
+// Op 2.5: density-dependent larva mortality (Beverton-Holt)
+// ---------------------------------------------------------------------------
+
+void MosquitoSubmodel::larva_mortality_density(
+    const std::vector<PatchState>& patch_states) {
+    if (soa_.n_alive <= 0) return;
+
+    // Build active set and larva count per patch.
+    int64_t max_pid = -1;
+    for (const auto& ps : patch_states) {
+        if (ps.patch_id > max_pid) max_pid = ps.patch_id;
+    }
+    for (int64_t i = 0; i < soa_.n_alive; ++i) {
+        const int64_t pid = soa_.patch_id[static_cast<size_t>(i)];
+        if (pid > max_pid) max_pid = pid;
+    }
+    if (max_pid < 0) return;
+
+    std::vector<uint8_t> active_by_id(static_cast<size_t>(max_pid) + 1, 0);
+    for (const auto& ps : patch_states) {
+        if (ps.activated) {
+            active_by_id[static_cast<size_t>(ps.patch_id)] = 1;
+        }
+    }
+
+    // Count larvae per active patch.
+    std::vector<int64_t> larva_count(static_cast<size_t>(max_pid) + 1, 0);
+    for (int64_t i = 0; i < soa_.n_alive; ++i) {
+        const size_t si = static_cast<size_t>(i);
+        if (soa_.stage[si] == 0 && active_by_id[soa_.patch_id[si]]) {
+            ++larva_count[soa_.patch_id[si]];
+        }
+    }
+
+    // Beverton-Holt survival: p = S0 * K / (K + alpha * N_larvae).
+    const double K = static_cast<double>(K_MAX);
+    int64_t i = soa_.n_alive - 1;
+    while (i >= 0) {
+        const size_t si = static_cast<size_t>(i);
+        if (soa_.stage[si] == 0 && active_by_id[soa_.patch_id[si]]) {
+            const int64_t N = larva_count[soa_.patch_id[si]];
+            const double p = static_cast<double>(LARVA_BH_S0) * K /
+                (K + static_cast<double>(LARVA_BH_ALPHA) * static_cast<double>(N));
+            if (rng_.uniform_double() >= p) {
+                swap_with_last(soa_, i, soa_.n_alive);
+                --soa_.n_alive;
+            }
         }
         --i;
     }
@@ -317,6 +392,15 @@ void MosquitoSubmodel::larva_to_adult(const AOI& aoi,
                     aoi.west + (static_cast<double>(c) + 0.5) * cell_w);
                 soa_.lat[si] = static_cast<float>(
                     aoi.north - (static_cast<double>(r) + 0.5) * cell_h);
+            } else {
+                // Patch inactive today — snap existing lon/lat to enclosing cell.
+                auto [r, c] = LonLatToCell(
+                    static_cast<double>(soa_.lon[si]),
+                    static_cast<double>(soa_.lat[si]), aoi);
+                soa_.lon[si] = static_cast<float>(
+                    aoi.west + (static_cast<double>(c) + 0.5) * cell_w);
+                soa_.lat[si] = static_cast<float>(
+                    aoi.north - (static_cast<double>(r) + 0.5) * cell_h);
             }
         }
     }
@@ -326,7 +410,7 @@ void MosquitoSubmodel::larva_to_adult(const AOI& aoi,
 // Op 4: adult dispersal
 // ---------------------------------------------------------------------------
 
-void MosquitoSubmodel::adult_dispersal() {
+void MosquitoSubmodel::adult_dispersal(const AOI& aoi) {
     for (int64_t i = 0; i < soa_.n_alive; ++i) {
         const size_t si = static_cast<size_t>(i);
         if (soa_.stage[si] != 1) continue;
@@ -340,7 +424,68 @@ void MosquitoSubmodel::adult_dispersal() {
             static_cast<double>(ADULT_DISPERSE_MAX_M));
         soa_.lon[si] = static_cast<float>(static_cast<double>(soa_.lon[si]) + off.dlon);
         soa_.lat[si] = static_cast<float>(static_cast<double>(soa_.lat[si]) + off.dlat);
+        auto [r, c] = LonLatToCell(static_cast<double>(soa_.lon[si]),
+                                    static_cast<double>(soa_.lat[si]), aoi);
+        soa_.row[si] = r;
+        soa_.col[si] = c;
     }
+}
+
+// ---------------------------------------------------------------------------
+// Op 6: adult mortality (Lardeux thermo-dependent daily survival)
+// ---------------------------------------------------------------------------
+
+void MosquitoSubmodel::adult_mortality(
+    const std::vector<PatchState>& patch_states) {
+    if (soa_.n_alive <= 0) return;
+
+    // Build temperature lookup by patch_id.
+    int64_t max_pid = -1;
+    for (const auto& ps : patch_states) {
+        if (ps.patch_id > max_pid) max_pid = ps.patch_id;
+    }
+    for (int64_t i = 0; i < soa_.n_alive; ++i) {
+        const int64_t pid = soa_.patch_id[static_cast<size_t>(i)];
+        if (pid > max_pid) max_pid = pid;
+    }
+    if (max_pid < 0) return;
+
+    std::vector<uint8_t>  has_temp(static_cast<size_t>(max_pid) + 1, 0);
+    std::vector<float>    temp_by_id(static_cast<size_t>(max_pid) + 1, 0.0f);
+    for (const auto& ps : patch_states) {
+        has_temp[static_cast<size_t>(ps.patch_id)] = 1;
+        temp_by_id[static_cast<size_t>(ps.patch_id)] = ps.temp_d;
+    }
+
+    // Lardeux survival: p_d = exp(-((T - OPT_C)^2) / (2 * SIGMA^2)).
+    const double opt_c = static_cast<double>(ADULT_OPT_C);
+    const double sigma = static_cast<double>(ADULT_SIGMA);
+    const double two_sigma_sq = 2.0 * sigma * sigma;
+
+    int64_t i = soa_.n_alive - 1;
+    while (i >= 0) {
+        const size_t si = static_cast<size_t>(i);
+        if (soa_.stage[si] == 1) {  // adults only
+            const int64_t pid = soa_.patch_id[si];
+            double p_d;
+            if (has_temp[pid]) {
+                const double T = static_cast<double>(temp_by_id[pid]);
+                p_d = std::exp(-((T - opt_c) * (T - opt_c)) / two_sigma_sq);
+            } else {
+                p_d = static_cast<double>(ADULT_DAILY_MORT_BASE);
+            }
+            // Clamp to [0.80, 1.0].
+            if (p_d < 0.80) p_d = 0.80;
+            if (p_d > 1.0)  p_d = 1.0;
+            if (rng_.uniform_double() >= p_d) {
+                swap_with_last(soa_, i, soa_.n_alive);
+                --soa_.n_alive;
+            }
+        }
+        --i;
+    }
+
+    trim_soa(soa_, static_cast<size_t>(soa_.n_alive));
 }
 
 // ---------------------------------------------------------------------------
@@ -389,6 +534,7 @@ void MosquitoSubmodel::birth(const AOI& aoi,
     soa_.lat.reserve(new_cap);
     soa_.eip_progress.reserve(new_cap);
     soa_.stage_age.reserve(new_cap);
+    soa_.days_since_active.reserve(new_cap);
 
     int64_t uid_counter = soa_.next_uid;
     for (const auto& d : draws) {
@@ -404,6 +550,7 @@ void MosquitoSubmodel::birth(const AOI& aoi,
             soa_.lat.push_back(static_cast<float>(lat));
             soa_.eip_progress.push_back(0.0f);
             soa_.stage_age.push_back(0);
+            soa_.days_since_active.push_back(0);
         }
     }
     soa_.n_alive  += total_birth;

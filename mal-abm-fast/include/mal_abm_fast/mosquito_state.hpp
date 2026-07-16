@@ -33,6 +33,7 @@ struct MosquitoSoA {
     std::vector<float>    lat;          // EPSG:4326 deg (0 = not yet set)
     std::vector<float>    eip_progress; // growing-degree-days accumulated
     std::vector<int32_t>  stage_age;    // days in the current stage
+    std::vector<int32_t>  days_since_active; // days since patch was active (desiccation)
 
     int64_t n_alive  = 0;   // valid prefix length of all SoA vectors
     int64_t next_uid = 0;   // next unique_id to allocate

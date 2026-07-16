@@ -55,6 +55,20 @@ inline constexpr float  ADULT_DISPERSE_MAX_M        = 2000.0f;
 // 30k-patch, 30-day M1.5 perf budget.
 inline constexpr float  BIRTH_RATE                  = 0.005f;
 
+// Larva density-dependent mortality (Beverton-Holt, docs/abm-status.md:79).
+inline constexpr float  LARVA_BH_S0    = 0.95f;   // baseline daily survival
+inline constexpr float  LARVA_BH_ALPHA = 0.05f;   // competition coefficient
+
+// Adult daily mortality — Lardeux thermo-dependent (Lardeux 2009).
+// p_d = exp(-((T - OPT_C)^2) / (2 * SIGMA^2))
+inline constexpr float  ADULT_DAILY_MORT_BASE = 0.90f;  // fallback if T unavailable
+inline constexpr float  ADULT_OPT_C           = 26.0f;  // optimal temperature
+inline constexpr float  ADULT_SIGMA           = 7.0f;   // width of thermal response
+
+// Larva desiccation mortality (Depinay 2004 §3.1).
+inline constexpr int    LARVA_DESICCATION_GRACE_DAYS = 2;
+inline constexpr float  LARVA_DESICCATION_DAILY_RATE = 0.30f;
+
 // PLUVIAL_POOL dynamic-patch rule (M2 combined, C2):
 //   cell (r, c) is a habitat patch today iff
 //       TWI(r, c) >  PLUVIAL_POOL_TWI_THRESHOLD
