@@ -40,7 +40,8 @@ def call_opencode(prompt: str, model: str | None = None, timeout: int | None = N
     logger.info("Calling OpenCode CLI (model=%s, timeout=%ds)", resolved_model, timeout)
 
     try:
-        cmd = ["opencode", "--model", resolved_model, "--print", prompt]
+        # OpenCode CLI: opencode run [message..] with optional --model
+        cmd = ["opencode", "run", "--model", resolved_model, prompt]
         result = subprocess.run(
             cmd,
             capture_output=True,

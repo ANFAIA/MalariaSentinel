@@ -17,6 +17,6 @@ DEFAULT_TOPICS = [
 
 # Model configuration — MIMO V2.5 is the default and only model
 # Override via OPENCODE_MODEL env var or --model CLI flag
-DEFAULT_MODEL = "opencode-go/mimo-v2-5"
+DEFAULT_MODEL = "opencode-go/mimo-v2.5"
 OPENCODE_MODEL = None  # Resolved at runtime: env var > CLI flag > DEFAULT_MODEL
 OPENCODE_TIMEOUT = 300  # seconds per call
