@@ -19,9 +19,11 @@
 
 #include <gdal.h>
 #include <gdal_priv.h>
+#include <cpl_string.h>
 #include <ogr_api.h>
 #include <ogr_srs_api.h>
 #include <ogrsf_frmts.h>
+#include <netcdf.h>
 
 #include "aoi.hpp"
 #include "climate.hpp"
@@ -251,4 +253,133 @@ TEST(MalAbmFastCoordinator, WriteStateCogReturnsPathAndCreatesSidecar) {
     EXPECT_EQ(body.front(), '{');
 
     std::filesystem::remove_all(out_dir);
+}
+
+// -- Daily NetCDF coordinator test (daily-env-netcdf feature) -----------------
+
+namespace {
+
+std::filesystem::path MakeTmpEnvNC() {
+    const char* base = std::getenv("TMPDIR");
+    std::filesystem::path dir =
+        (base && *base) ? std::filesystem::path(base)
+                        : std::filesystem::temp_directory_path();
+    return dir / "mal_abm_fast_test_coordinator.nc";
+}
+
+void WriteSyntheticEnvNC(const std::filesystem::path& path, int n_days,
+                         int h = 4, int w = 4) {
+    int ncid, dimids[3], vid[4];
+    int dimid_time, dimid_y, dimid_x;
+
+    ASSERT_EQ(nc_create(path.string().c_str(),
+                        NC_CLOBBER | NC_NETCDF4, &ncid), NC_NOERR);
+    ASSERT_EQ(nc_def_dim(ncid, "time", NC_UNLIMITED, &dimid_time), NC_NOERR);
+    ASSERT_EQ(nc_def_dim(ncid, "y", h, &dimid_y), NC_NOERR);
+    ASSERT_EQ(nc_def_dim(ncid, "x", w, &dimid_x), NC_NOERR);
+    dimids[0] = dimid_time; dimids[1] = dimid_y; dimids[2] = dimid_x;
+
+    ASSERT_EQ(nc_def_var(ncid, "rainfall", NC_FLOAT, 3, dimids, &vid[0]), NC_NOERR);
+    ASSERT_EQ(nc_def_var(ncid, "water_temp_c", NC_FLOAT, 3, dimids, &vid[1]), NC_NOERR);
+    ASSERT_EQ(nc_def_var(ncid, "water_frac", NC_FLOAT, 3, dimids, &vid[2]), NC_NOERR);
+    ASSERT_EQ(nc_def_var(ncid, "ndvi", NC_FLOAT, 3, dimids, &vid[3]), NC_NOERR);
+    ASSERT_EQ(nc_put_att_text(ncid, NC_GLOBAL, "Conventions", 6, "CF-1.8"), NC_NOERR);
+    ASSERT_EQ(nc_enddef(ncid), NC_NOERR);
+
+    // Day 0: rain=20 (>15 threshold), Day 1: rain=5 (<15)
+    const float rain_vals[] = {20.0f, 5.0f};
+    const float temp_vals[] = {25.0f, 20.0f};
+    std::vector<float> buf(h * w);
+    size_t start[3] = {0, 0, 0};
+    size_t count[3] = {1, static_cast<size_t>(h), static_cast<size_t>(w)};
+
+    for (int d = 0; d < n_days; ++d) {
+        start[0] = d;
+        std::fill(buf.begin(), buf.end(), rain_vals[d % 2]);
+        ASSERT_EQ(nc_put_vara_float(ncid, vid[0], start, count, buf.data()), NC_NOERR);
+        std::fill(buf.begin(), buf.end(), temp_vals[d % 2]);
+        ASSERT_EQ(nc_put_vara_float(ncid, vid[1], start, count, buf.data()), NC_NOERR);
+        std::fill(buf.begin(), buf.end(), 0.5f);
+        ASSERT_EQ(nc_put_vara_float(ncid, vid[2], start, count, buf.data()), NC_NOERR);
+        std::fill(buf.begin(), buf.end(), 0.4f);
+        ASSERT_EQ(nc_put_vara_float(ncid, vid[3], start, count, buf.data()), NC_NOERR);
+    }
+    ASSERT_EQ(nc_close(ncid), NC_NOERR);
+}
+
+}  // namespace
+
+TEST(CoordinatorModel, PatchActivationTogglesDaily) {
+    using namespace mal_abm_fast;
+    GDALAllRegister();
+
+    const auto nc_path = MakeTmpEnvNC();
+    if (std::filesystem::exists(nc_path)) std::filesystem::remove(nc_path);
+    WriteSyntheticEnvNC(nc_path, 2);
+
+    AOI aoi = make_aoi_4x4();
+    ClimateEngine climate;
+    climate.load_from_env_nc(nc_path.string(), aoi);
+    ASSERT_EQ(climate.n_days(), 2);
+
+    // Write a synthetic habitat gpkg at (row=2, col=2)
+    const std::string hab_path = temp_dir("coordinator_daily_hab") + "/hab.gpkg";
+    {
+        std::filesystem::create_directories(
+            std::filesystem::path(hab_path).parent_path());
+        GDALDriver* drv = GetGDALDriverManager()->GetDriverByName("GPKG");
+        ASSERT_NE(drv, nullptr);
+        GDALDataset* ds = drv->Create(hab_path.c_str(), 0, 0, 0, GDT_Unknown, nullptr);
+        ASSERT_NE(ds, nullptr);
+        OGRLayer* lyr = ds->CreateLayer("habitat", ds->GetSpatialRef(), wkbPoint, nullptr);
+        ASSERT_NE(lyr, nullptr);
+        OGRFieldDefn hab_type("hab_type", OFTString);
+        lyr->CreateField(&hab_type);
+        OGRFieldDefn k("K", OFTInteger);
+        lyr->CreateField(&k);
+        OGRFieldDefn twi("twi_value", OFTReal);
+        lyr->CreateField(&twi);
+        OGRFieldDefn row("row", OFTInteger);
+        lyr->CreateField(&row);
+        OGRFieldDefn col("col", OFTInteger);
+        lyr->CreateField(&col);
+        OGRFeature* f = OGRFeature::CreateFeature(lyr->GetLayerDefn());
+        f->SetField("hab_type", "pluvial_pool");
+        f->SetField("K", 1000);
+        f->SetField("twi_value", 9.0);
+        f->SetField("row", 2);
+        f->SetField("col", 2);
+        OGRPoint pt(0.02, 0.02);
+        f->SetGeometry(&pt);
+        lyr->CreateFeature(f);
+        OGRFeature::DestroyFeature(f);
+        GDALClose(ds);
+    }
+    HabitatEngine habitat;
+    habitat.load_from_gpkg(hab_path, aoi);
+    ASSERT_EQ(habitat.patches().size(), 1u);
+
+    MosquitoSubmodel sub(
+        /*n_patches=*/1,
+        /*k_per_patch=*/K_PER_PATCH_DEFAULT,
+        /*init_frac=*/INIT_FRAC,
+        /*seed=*/uint64_t{42});
+
+    // Day 0: rain=20 (>15 threshold) -> patches should be active
+    climate.set_day(0);
+    CoordinatorModel coord0(
+        std::move(aoi), std::move(climate), std::move(habitat),
+        /*seed=*/int32_t{1}, make_date(2024, 1, 1));
+
+    coord0.activate_patches();
+    auto states0 = coord0.to_dataframe();
+    EXPECT_FALSE(states0.empty()) << "Day 0: patches should be active (rain=20)";
+
+    // Verify patch has rain > threshold
+    for (const auto& s : states0) {
+        EXPECT_GT(s.rain_d, PLUVIAL_POOL_RAIN_THRESHOLD_MM);
+    }
+
+    std::filesystem::remove(nc_path);
+    std::filesystem::remove_all(temp_dir("coordinator_daily_hab"));
 }

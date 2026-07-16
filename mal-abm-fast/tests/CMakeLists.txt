@@ -3,6 +3,9 @@
 
 include(GoogleTest)
 
+# Find netCDF for the daily env NC tests
+find_package(netCDF REQUIRED)
+
 # F1.a: 3 smoke tests (VersionConstant, PrngStub, EipAccumulate).
 add_executable(test_smoke test_smoke.cpp)
 target_link_libraries(test_smoke
@@ -13,7 +16,7 @@ gtest_discover_tests(test_smoke)
 # F1.b: IO layer tests (env_reader, climate, habitat_engine).
 add_executable(test_env_reader test_env_reader.cpp)
 target_link_libraries(test_env_reader
-    PRIVATE mal_abm_fast_core GTest::gtest GTest::gtest_main mal_abm_fast::warnings
+    PRIVATE mal_abm_fast_core GTest::gtest GTest::gtest_main mal_abm_fast::warnings netCDF::netcdf
 )
 gtest_discover_tests(test_env_reader)
 
@@ -25,7 +28,7 @@ gtest_discover_tests(test_habitat_engine)
 
 add_executable(test_climate test_climate.cpp)
 target_link_libraries(test_climate
-    PRIVATE mal_abm_fast_core GTest::gtest GTest::gtest_main mal_abm_fast::warnings
+    PRIVATE mal_abm_fast_core GTest::gtest GTest::gtest_main mal_abm_fast::warnings netCDF::netcdf
 )
 gtest_discover_tests(test_climate)
 
@@ -51,7 +54,7 @@ gtest_discover_tests(test_dispersal)
 # F1.b: per-day orchestrator.
 add_executable(test_coordinator test_coordinator.cpp)
 target_link_libraries(test_coordinator
-    PRIVATE mal_abm_fast_core GTest::gtest GTest::gtest_main mal_abm_fast::warnings
+    PRIVATE mal_abm_fast_core GTest::gtest GTest::gtest_main mal_abm_fast::warnings netCDF::netcdf
 )
 gtest_discover_tests(test_coordinator)
 

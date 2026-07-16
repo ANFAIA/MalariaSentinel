@@ -68,11 +68,27 @@ public:
     float water_frac_at(int32_t row, int32_t col) const;
 
     // TWI grid (per-cell, static). Setter is for the habitat engine
-    // (it loads TWI from the gpkg) or the F1.b loader (it reads a
+    // (it loads TWI from the gpkg) or the loader (it reads a
     // 5th band). Default value is an empty vector (= TWI = 0
     // everywhere).
     std::vector<float> twi_grid() const { return twi_; }
     void set_twi_grid(std::vector<float> t) { twi_ = std::move(t); }
+
+    // -- Daily NetCDF support (daily-env-netcdf feature) ----------------------
+
+    // Read a NetCDF daily env file and populate multi-day bands. The NC
+    // file must contain variables `rainfall`, `water_temp_c`, `water_frac`,
+    // `ndvi` with a UNLIMITED time dimension. No Mordecai inverse is
+    // applied (water_temp_c is already in deg C).
+    void load_from_env_nc(const std::string& path, const AOI& aoi);
+
+    // Switch the active day slice (0-based). Clamps to [0, n_days-1].
+    // After set_day(), the *_at() accessors return values for that day.
+    void set_day(int32_t day);
+
+    // Number of time steps loaded by load_from_env_nc. Returns 1 if
+    // only a static (single-day) COG was loaded via load_from_env_tif.
+    int32_t n_days() const { return n_days_; }
 
 private:
     int32_t              h_ = 0, w_ = 0;
@@ -81,6 +97,13 @@ private:
     std::vector<float>   water_;
     std::vector<float>   ndvi_;
     std::vector<float>   twi_;      // optional 5th band; empty = zeros
+    // Daily NC state
+    std::vector<float>   rain_nc_;      // n_days * h * w
+    std::vector<float>   water_temp_nc_;// n_days * h * w (deg C, no inverse)
+    std::vector<float>   water_frac_nc_;// n_days * h * w
+    std::vector<float>   ndvi_nc_;      // n_days * h * w
+    int32_t              n_days_ = 1;
+    int32_t              cur_day_ = 0;
 };
 
 }  // namespace mal_abm_fast
