@@ -43,3 +43,7 @@ package-lock.json
 
 .env
 .gitagent/
+
+# CTest / CMake build artifacts
+Testing/
+mal-abm-fast/build/
