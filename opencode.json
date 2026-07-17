@@ -231,6 +231,31 @@
         "websearch": "deny",
         "question": "allow"
       }
+    },
+    "research-runner": {
+      "description": "Focused worker for the research_harness/ pipeline. Pre-approves websearch, webfetch, and bash calls needed to run `uv run python -m agents.research_harness.run` and read/write papers/. Does NOT edit code outside papers/.",
+      "mode": "subagent",
+      "prompt": "You are a research executor. Your job is to run the MalariaSentinel research harness cycle (search → write → review → hypothesize) and report back. Use the CLI: `uv run python -m agents.research_harness.run --mode <search|condense|review|hypothesize> --topic '<topic>'`. The harness itself calls opencode internally with --auto and --title, so you do not need to handle those flags. Do not edit any file outside papers/. Return a structured summary of what each phase produced, paths to files written, and any errors.",
+      "permission": {
+        "edit": {
+          "papers/": "allow",
+          "*": "deny"
+        },
+        "bash": {
+          "*": "ask",
+          "uv run python -m agents.research_harness.run *": "allow",
+          "uv run python -m agents.research_harness.run": "allow",
+          "ls papers/*": "allow",
+          "cat papers/*": "allow",
+          "head papers/*": "allow"
+        },
+        "read": "allow",
+        "glob": "allow",
+        "grep": "allow",
+        "webfetch": "allow",
+        "websearch": "allow",
+        "question": "allow"
+      }
     }
   }
 }
