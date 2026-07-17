@@ -19,4 +19,6 @@ DEFAULT_TOPICS = [
 # Override via OPENCODE_MODEL env var or --model CLI flag
 DEFAULT_MODEL = "opencode-go/mimo-v2.5"
 OPENCODE_MODEL = None  # Resolved at runtime: env var > CLI flag > DEFAULT_MODEL
-OPENCODE_TIMEOUT = 300  # seconds per call
+OPENCODE_TIMEOUT = 1800  # seconds per call (30 min)
+# A single phase can take 10-20 min (websearch + write) — 300s killed calls
+# mid-phase. 30 min gives a 1.5-3x safety margin over the longest observed run.

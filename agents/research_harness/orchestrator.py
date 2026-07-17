@@ -6,6 +6,7 @@ OpenCode has Exa built-in via the websearch tool — no custom search needed.
 
 import subprocess
 import logging
+from datetime import date
 from pathlib import Path
 
 from .config import PROJECT_ROOT, PAPERS_DIR, OPENCODE_TIMEOUT, DEFAULT_MODEL
@@ -18,6 +19,23 @@ from .prompts import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _prefixed_prompt(phase_label: str, body: str) -> str:
+    """Prepend a descriptive session header to the prompt body.
+
+    The header is what OpenCode surfaces as the session name in its TUI
+    (otherwise the session shows up as "New session — <timestamp>").
+
+    Args:
+        phase_label: e.g. "Phase 1/4: Search | Topic: malaria ABM"
+        body: The original prompt.
+
+    Returns:
+        header + blank line + body
+    """
+    header = f"[Session: MalariaSentinel Research — {phase_label} | Date: {date.today().isoformat()}]"
+    return f"{header}\n\n{body}"
 
 
 def call_opencode(prompt: str, model: str | None = None, timeout: int | None = None) -> str:
@@ -61,24 +79,24 @@ def call_opencode(prompt: str, model: str | None = None, timeout: int | None = N
 
 def run_research_phase(topic: str) -> str:
     """Phase 1: Research — search for papers using OpenCode with Exa."""
-    prompt = f"{RESEARCHER_PROMPT}\n\nTopic: {topic}"
-    return call_opencode(prompt)
+    body = f"{RESEARCHER_PROMPT}\n\nTopic: {topic}"
+    return call_opencode(_prefixed_prompt(f"Phase 1/4: Search | Topic: {topic}", body))
 
 
 def run_writing_phase(research_results: str) -> str:
     """Phase 2: Writing — condense findings into papers/."""
-    prompt = f"{WRITER_PROMPT}\n\nResearch findings to summarize:\n{research_results}"
-    return call_opencode(prompt)
+    body = f"{WRITER_PROMPT}\n\nResearch findings to summarize:\n{research_results}"
+    return call_opencode(_prefixed_prompt("Phase 2/4: Write", body))
 
 
 def run_review_phase() -> str:
     """Phase 3: Review — check papers for quality."""
-    return call_opencode(REVIEWER_PROMPT)
+    return call_opencode(_prefixed_prompt("Phase 3/4: Review", REVIEWER_PROMPT))
 
 
 def run_hypothesis_phase() -> str:
     """Phase 4: Hypothesize — generate new research directions."""
-    return call_opencode(HYPOTHESIS_PROMPT)
+    return call_opencode(_prefixed_prompt("Phase 4/4: Hypothesize", HYPOTHESIS_PROMPT))
 
 
 def run_research_cycle(topic: str | None = None) -> str:
