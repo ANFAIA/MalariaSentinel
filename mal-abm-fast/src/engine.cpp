@@ -110,6 +110,42 @@ Engine::Engine(AOI aoi,
         n_patches, K_PER_PATCH_DEFAULT, INIT_FRAC, sub_seed);
 }
 
+// Optimized constructor: accepts a pre-loaded shared ClimateEngine
+Engine::Engine(AOI aoi,
+               std::shared_ptr<ClimateEngine> shared_climate,
+               const std::string& habitat_path,
+               Prng& rng,
+               std::chrono::sys_days start_date)
+    : aoi_(std::move(aoi)),
+      climate_(std::move(shared_climate)),
+      current_date_(start_date),
+      start_date_(start_date) {
+    // Skip climate loading - use the shared one
+    
+    auto habitat = std::make_unique<HabitatEngine>();
+    try {
+        habitat->load_from_gpkg(habitat_path, aoi_);
+    } catch (const std::exception& e) {
+        throw std::runtime_error(
+            "Engine: HabitatEngine::load_from_gpkg failed for '" +
+            habitat_path + "': " + e.what());
+    }
+    habitat_ = std::move(habitat);
+
+    // Derive two independent sub-stream seeds from the master Prng.
+    const uint64_t coord_seed = rng.peek_state()[0];
+    (void)rng.uniform_double();
+    const uint64_t sub_seed   = rng.peek_state()[0];
+
+    const int32_t coord_seed32 = static_cast<int32_t>(coord_seed);
+    coord_ = std::make_unique<CoordinatorModel>(
+        aoi_, climate_, *habitat_, coord_seed32, current_date_);
+
+    const int32_t n_patches = static_cast<int32_t>(habitat_->patches().size());
+    sub_ = std::make_unique<MosquitoSubmodel>(
+        n_patches, K_PER_PATCH_DEFAULT, INIT_FRAC, sub_seed);
+}
+
 void Engine::step() {
     const int32_t day_index = static_cast<int32_t>(
         (current_date_ - start_date_).count());

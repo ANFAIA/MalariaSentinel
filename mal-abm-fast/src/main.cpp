@@ -269,6 +269,31 @@ int main(int argc, char** argv) {
         return EXIT_FAILURE;
     }
 
+    // -- Shared ClimateEngine (memory optimization) ----------------------
+    // Load climate data once and share across all rollouts.
+    // This reduces memory from O(n_rollouts * n_days * grid_size) to O(n_days * grid_size).
+    auto shared_climate = std::make_shared<mal_abm_fast::ClimateEngine>();
+    try {
+        const bool is_nc = env_path.size() >= 3
+            && env_path.substr(env_path.size() - 3) == ".nc";
+        if (is_nc) {
+            shared_climate->load_from_env_nc(env_path, aoi, days);
+            if (days > 0 && shared_climate->n_days() < days) {
+                throw std::runtime_error(
+                    "env NC file has " + std::to_string(shared_climate->n_days())
+                    + " days but simulation requests " + std::to_string(days) + " days");
+            }
+        } else {
+            shared_climate->load_from_env_tif(env_path, aoi);
+        }
+        std::cout << "abm_run: loaded climate data (" << shared_climate->n_days() 
+                  << " days, " << shared_climate->h() << "x" << shared_climate->w() 
+                  << " grid)\n";
+    } catch (const std::exception& e) {
+        std::cerr << "abm_run: ClimateEngine load failed: " << e.what() << "\n";
+        return EXIT_FAILURE;
+    }
+
     // -- Rollouts loop (F1.c) -------------------------------------------
     // Each rollout gets a fresh `Prng` instance seeded at
     // `seed_rollout = seed + i`. A new `Engine` is built per rollout
@@ -285,11 +310,15 @@ int main(int argc, char** argv) {
             static_cast<uint64_t>(seed) + static_cast<uint64_t>(i);
         mal_abm_fast::Prng rng(seed_rollout);
 
+        // Clone the shared climate engine for this thread (shares multi-day
+        // buffers but has independent single-day accessor arrays)
+        auto thread_climate = shared_climate->clone_for_thread();
+
         // -- Build the engine -----------------------------------------
         std::unique_ptr<mal_abm_fast::Engine> engine_ptr;
         try {
             engine_ptr = std::make_unique<mal_abm_fast::Engine>(
-                aoi, env_path, habitat_path, rng, start_date, days);
+                aoi, thread_climate, habitat_path, rng, start_date);
         } catch (const std::exception& e) {
             std::cerr << "abm_run: rollout " << i
                       << " failed to build engine: " << e.what() << "\n";
