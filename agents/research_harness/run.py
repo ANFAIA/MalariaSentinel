@@ -13,6 +13,9 @@ from .config import DEFAULT_MODEL
 
 
 def main():
+    """CLI entrypoint. Sessions run with --auto and --title, so they
+    self-approve non-denied permissions and show up under the given title
+    in the TUI."""
     parser = argparse.ArgumentParser(
         description="MalariaSentinel Research Harness — orchestrates OpenCode for malaria research"
     )
