@@ -55,6 +55,17 @@ public:
            std::chrono::sys_days start_date,
            int32_t max_days = 0);
 
+    // Optimized constructor: accepts a pre-loaded shared ClimateEngine.
+    // Used by multi-rollout simulations to share climate data across
+    // threads, reducing memory from O(n_rollouts * n_days * grid_size)
+    // to O(n_days * grid_size). The shared_climate should be created
+    // once and cloned via clone_for_thread() for each rollout.
+    Engine(AOI aoi,
+           std::shared_ptr<ClimateEngine> shared_climate,
+           const std::string& habitat_path,
+           Prng& rng,
+           std::chrono::sys_days start_date);
+
     // Advance the model by one day. Mirrors `AnophelesABM.step()`:
     //   1. coord_->activate_patches()
     //   2. coord_->to_dataframe()

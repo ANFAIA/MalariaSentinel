@@ -101,10 +101,11 @@ void ClimateEngine::load_from_env_nc(const std::string& path,
     n_days_ = bands.n_days;
     cur_day_ = 0;
 
-    rain_nc_       = std::move(bands.rainfall);
-    water_temp_nc_ = std::move(bands.water_temp_c);
-    water_frac_nc_ = std::move(bands.water_frac);
-    ndvi_nc_       = std::move(bands.ndvi);
+    // Wrap multi-day buffers in shared_ptr for thread-safe sharing
+    rain_nc_       = std::make_shared<std::vector<float>>(std::move(bands.rainfall));
+    water_temp_nc_ = std::make_shared<std::vector<float>>(std::move(bands.water_temp_c));
+    water_frac_nc_ = std::make_shared<std::vector<float>>(std::move(bands.water_frac));
+    ndvi_nc_       = std::make_shared<std::vector<float>>(std::move(bands.ndvi));
 
     // Populate single-day accessors for day 0 (backwards compat).
     rain_.assign(h_ * w_, 0.0f);
@@ -114,10 +115,10 @@ void ClimateEngine::load_from_env_nc(const std::string& path,
 
     const size_t slice = static_cast<size_t>(h_) * static_cast<size_t>(w_);
     for (size_t i = 0; i < slice; ++i) {
-        rain_[i]  = rain_nc_[i];
-        temp_[i]  = water_temp_nc_[i];
-        water_[i] = water_frac_nc_[i];
-        ndvi_[i]  = ndvi_nc_[i];
+        rain_[i]  = (*rain_nc_)[i];
+        temp_[i]  = (*water_temp_nc_)[i];
+        water_[i] = (*water_frac_nc_)[i];
+        ndvi_[i]  = (*ndvi_nc_)[i];
     }
 }
 
@@ -130,11 +131,44 @@ void ClimateEngine::set_day(int32_t day) {
     const size_t slice = static_cast<size_t>(h_) * static_cast<size_t>(w_);
     const size_t offset = static_cast<size_t>(cur_day_) * slice;
     for (size_t i = 0; i < slice; ++i) {
-        rain_[i]  = rain_nc_[offset + i];
-        temp_[i]  = water_temp_nc_[offset + i];
-        water_[i] = water_frac_nc_[offset + i];
-        ndvi_[i]  = ndvi_nc_[offset + i];
+        rain_[i]  = (*rain_nc_)[offset + i];
+        temp_[i]  = (*water_temp_nc_)[offset + i];
+        water_[i] = (*water_frac_nc_)[offset + i];
+        ndvi_[i]  = (*ndvi_nc_)[offset + i];
     }
+}
+
+std::shared_ptr<ClimateEngine> ClimateEngine::clone_for_thread() const {
+    auto clone = std::make_shared<ClimateEngine>();
+    clone->h_ = h_;
+    clone->w_ = w_;
+    clone->n_days_ = n_days_;
+    clone->cur_day_ = 0;
+    
+    // Share the multi-day data (read-only, thread-safe)
+    clone->rain_nc_ = rain_nc_;
+    clone->water_temp_nc_ = water_temp_nc_;
+    clone->water_frac_nc_ = water_frac_nc_;
+    clone->ndvi_nc_ = ndvi_nc_;
+    
+    // Independent single-day arrays (thread-local)
+    clone->rain_.assign(h_ * w_, 0.0f);
+    clone->temp_.assign(h_ * w_, 25.0f);
+    clone->water_.assign(h_ * w_, 0.0f);
+    clone->ndvi_.assign(h_ * w_, 0.0f);
+    
+    // Initialize day 0
+    if (n_days_ > 0 && rain_nc_) {
+        const size_t slice = static_cast<size_t>(h_) * static_cast<size_t>(w_);
+        for (size_t i = 0; i < slice; ++i) {
+            clone->rain_[i]  = (*rain_nc_)[i];
+            clone->temp_[i]  = (*water_temp_nc_)[i];
+            clone->water_[i] = (*water_frac_nc_)[i];
+            clone->ndvi_[i]  = (*ndvi_nc_)[i];
+        }
+    }
+    
+    return clone;
 }
 
 }  // namespace mal_abm_fast

@@ -30,6 +30,7 @@
 #pragma once
 
 #include <cstdint>
+#include <memory>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -91,6 +92,13 @@ public:
     // only a static (single-day) COG was loaded via load_from_env_tif.
     int32_t n_days() const { return n_days_; }
 
+    // Create a thread-safe clone for parallel rollouts. The multi-day
+    // NetCDF buffers (rain_nc_, water_temp_nc_, etc.) are shared via
+    // shared_ptr to avoid duplicating ~47 GB for 10 rollouts. Each
+    // clone gets independent single-day accessor arrays (rain_, temp_,
+    // water_, ndvi_) and cur_day_ to allow thread-safe set_day() calls.
+    std::shared_ptr<ClimateEngine> clone_for_thread() const;
+
 private:
     int32_t              h_ = 0, w_ = 0;
     std::vector<float>   rain_;
@@ -98,11 +106,11 @@ private:
     std::vector<float>   water_;
     std::vector<float>   ndvi_;
     std::vector<float>   twi_;      // optional 5th band; empty = zeros
-    // Daily NC state
-    std::vector<float>   rain_nc_;      // n_days * h * w
-    std::vector<float>   water_temp_nc_;// n_days * h * w (deg C, no inverse)
-    std::vector<float>   water_frac_nc_;// n_days * h * w
-    std::vector<float>   ndvi_nc_;      // n_days * h * w
+    // Daily NC state - shared across threads via shared_ptr
+    std::shared_ptr<std::vector<float>>   rain_nc_;      // n_days * h * w
+    std::shared_ptr<std::vector<float>>   water_temp_nc_;// n_days * h * w (deg C, no inverse)
+    std::shared_ptr<std::vector<float>>   water_frac_nc_;// n_days * h * w
+    std::shared_ptr<std::vector<float>>   ndvi_nc_;      // n_days * h * w
     int32_t              n_days_ = 1;
     int32_t              cur_day_ = 0;
 };
