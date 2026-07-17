@@ -213,9 +213,9 @@ int main(int argc, char** argv) {
                     "<stem>_seed{NNNN}.tif where NNNN is the 0-indexed "
                     "rollout id zero-padded to 4 digits.")
         ->required();
-    run->add_option("--days", days, "Days to run (1..366).")
+    run->add_option("--days", days, "Days to run (1..730).")
         ->default_val(30)
-        ->check(CLI::Range(1, 366));
+        ->check(CLI::Range(1, 730));
     run->add_option("--n-rollouts", n_rollouts,
                     "Number of rollouts to run in this process (1+). "
                     "Default 1. Each rollout gets a fresh `Prng` instance "
