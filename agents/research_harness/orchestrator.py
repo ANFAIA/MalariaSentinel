@@ -16,6 +16,8 @@ from .prompts import (
     REVIEWER_PROMPT,
     HYPOTHESIS_PROMPT,
     FULL_CYCLE_PROMPT,
+    MEMORY_EVAL_PROMPT,
+    IMPROVEMENT_PROMPT,
 )
 
 logger = logging.getLogger(__name__)
@@ -43,6 +45,7 @@ def call_opencode(
     body: str,
     model: str | None = None,
     timeout: int | None = None,
+    agent: str = "research-runner",
 ) -> str:
     """Call OpenCode CLI with a prompt in non-interactive mode.
 
@@ -57,6 +60,7 @@ def call_opencode(
         body: The prompt body (without the session header).
         model: Model override (format: provider/model). Defaults to config.DEFAULT_MODEL
         timeout: Seconds before timeout (default: config value)
+        agent: OpenCode agent to use (default: "research-runner")
 
     Returns:
         OpenCode's stdout output
@@ -67,18 +71,15 @@ def call_opencode(
     resolved_model = model or os.environ.get("OPENCODE_MODEL") or DEFAULT_MODEL
     title = f"MalariaSentinel Research — {phase_label}"
     prompt = _prefixed_prompt(phase_label, body)
-    logger.info("Calling OpenCode CLI (model=%s, timeout=%ds)", resolved_model, timeout)
+    logger.info("Calling OpenCode CLI (agent=%s, model=%s, timeout=%ds)", agent, resolved_model, timeout)
     logger.info("Session title: %s", title)
 
     try:
-        # OpenCode CLI: opencode run [message..] with --model/--auto/--title.
-        # --auto: auto-approve non-denied permissions (e.g. websearch) so the
-        # session doesn't die on a permission prompt. --title: shown in TUI.
         cmd = [
             "opencode", "run",
             "--model", resolved_model,
             "--auto",
-            "--agent", "research-runner",
+            "--agent", agent,
             "--title", title,
             prompt,
         ]
@@ -121,8 +122,22 @@ def run_hypothesis_phase() -> str:
     return call_opencode("Phase 4/4: Hypothesize", HYPOTHESIS_PROMPT)
 
 
+def run_memory_eval(phase_label: str, phase_output: str) -> str:
+    """Evaluate phase output and persist relevant findings to memory."""
+    body = f"{MEMORY_EVAL_PROMPT}\n\nPhase: {phase_label}\n\n{phase_output}"
+    return call_opencode(f"Memory Eval: {phase_label}", body, timeout=300)
+
+
+def run_improvement(all_outputs: str) -> str:
+    """Review the complete cycle and auto-apply improvements."""
+    body = f"{IMPROVEMENT_PROMPT}\n\nComplete cycle output:\n{all_outputs}"
+    return call_opencode("Improvement", body, agent="improvement-agent", timeout=600)
+
+
 def run_research_cycle(topic: str | None = None) -> str:
-    """Run a complete research cycle: research → write → review → hypothesize.
+    """Run a complete research cycle with memory evaluation and improvement.
+
+    Flow: Search → [Memory] → Write → [Memory] → Review → [Memory] → Hypothesis → [Memory] → Improve
 
     Args:
         topic: Research topic. If None, uses default topics from config.
@@ -142,20 +157,38 @@ def run_research_cycle(topic: str | None = None) -> str:
     research = run_research_phase(topic)
     results.append(f"=== RESEARCH ===\n{research}")
 
+    logger.info("Memory eval: Research")
+    run_memory_eval("Research", research)
+
     # Phase 2: Writing
     logger.info("Phase 2: Writing")
     writing = run_writing_phase(research)
     results.append(f"=== WRITING ===\n{writing}")
+
+    logger.info("Memory eval: Writing")
+    run_memory_eval("Writing", writing)
 
     # Phase 3: Review
     logger.info("Phase 3: Review")
     review = run_review_phase()
     results.append(f"=== REVIEW ===\n{review}")
 
+    logger.info("Memory eval: Review")
+    run_memory_eval("Review", review)
+
     # Phase 4: Hypothesis
     logger.info("Phase 4: Hypothesis")
     hypothesis = run_hypothesis_phase()
     results.append(f"=== HYPOTHESIS ===\n{hypothesis}")
+
+    logger.info("Memory eval: Hypothesis")
+    run_memory_eval("Hypothesis", hypothesis)
+
+    # Improvement phase
+    logger.info("Improvement phase")
+    all_outputs = "\n\n".join(results)
+    improvement = run_improvement(all_outputs)
+    results.append(f"=== IMPROVEMENT ===\n{improvement}")
 
     summary = f"Research cycle complete for: {topic}\n\n" + "\n\n".join(results)
     logger.info("Research cycle finished")

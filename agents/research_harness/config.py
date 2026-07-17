@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 PAPERS_DIR = PROJECT_ROOT / "papers"
 SKILLS_DIR = Path(__file__).parent / "skills"
 MEMORY_FILE = Path(__file__).parent / "AGENTS.md"

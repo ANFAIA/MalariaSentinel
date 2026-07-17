@@ -15,6 +15,7 @@ import json
 import re
 import sys
 from argparse import ArgumentParser
+from itertools import groupby
 from pathlib import Path
 
 import numpy as np
@@ -274,39 +275,48 @@ def main():
     band_names: list[str] = first_meta["band_names"]
     nodata = first_meta.get("nodata")
 
-    # collect frames per (seed, band) for animation
-    band_anim: dict[tuple[int, str], list[Image.Image]] = {}
+    # group by seed for memory-efficient processing
+    seeds_grouped = {}
+    for seed_val, group in groupby(parsed, key=lambda x: x[3]):
+        seeds_grouped[seed_val] = list(group)
+    
     n_frames = len(parsed)
-    n_bands = len(band_names)
+    n_seeds = len(seeds_grouped)
+    total_gifs = 0
+    seeds_list = sorted(seeds_grouped.keys())
 
-    for idx, (tif, year, month, seed, day) in enumerate(parsed):
-        meta = json.loads(tif.with_suffix(".json").read_text())
-        with rasterio.open(tif) as src:
-            arr = src.read()
-        for i, bname in enumerate(band_names):
-            recipe = RECIPES.get(bname, dict(cmap="viridis", stretch="linear",
-                                              vmin=None, vmax=None))
-            # Generate title based on filename format
-            if day > 0:
-                tag = f"{year}-{month:02d} Day {day}"
-            else:
-                tag = f"{year}-{month:02d}"
-            pil_img = _render_band(arr[i], recipe, nodata,
-                                    title=f"{tag}  ·  {bname}", out_path=None)
-            key = (seed, bname)
-            if key not in band_anim:
-                band_anim[key] = []
-            band_anim[key].append(pil_img)
-            print(f"  [{idx+1}/{n_frames}] seed={seed:04d} {bname}")
-
-    # animated GIFs per (seed, band)
-    for (seed, bname), frames in sorted(band_anim.items()):
-        gif_path = out_dir / f"anim_seed{seed:04d}_{bname}.gif"
-        _render_animation(frames, gif_path, fps=args.fps)
-        print(f"  GIF: {gif_path.name}  ({len(frames)} frames, {args.fps} fps)")
+    for seed_idx, seed in enumerate(seeds_list, 1):
+        seed_files = seeds_grouped[seed]
+        print(f"\n[{seed_idx}/{n_seeds}] Processing seed {seed:04d} ({len(seed_files)} frames)...")
+        
+        band_frames: dict[str, list[Image.Image]] = {bname: [] for bname in band_names}
+        
+        for idx, (tif, year, month, s, day) in enumerate(seed_files, 1):
+            meta = json.loads(tif.with_suffix(".json").read_text())
+            with rasterio.open(tif) as src:
+                arr = src.read()
+            for i, bname in enumerate(band_names):
+                recipe = RECIPES.get(bname, dict(cmap="viridis", stretch="linear",
+                                                  vmin=None, vmax=None))
+                if day > 0:
+                    tag = f"{year}-{month:02d} Day {day}"
+                else:
+                    tag = f"{year}-{month:02d}"
+                pil_img = _render_band(arr[i], recipe, nodata,
+                                        title=f"{tag}  ·  {bname}", out_path=None)
+                band_frames[bname].append(pil_img)
+            print(f"  [{idx}/{len(seed_files)}] {tif.name}")
+        
+        for bname, frames in band_frames.items():
+            gif_path = out_dir / f"anim_seed{seed:04d}_{bname}.gif"
+            _render_animation(frames, gif_path, fps=args.fps)
+            print(f"  GIF: {gif_path.name}  ({len(frames)} frames, {args.fps} fps)")
+            total_gifs += 1
+        
+        del band_frames
 
     # README
-    seeds = sorted(set(p[3] for p in parsed))
+    seeds = seeds_list
     readme = out_dir / "README.txt"
     readme.write_text(
         "MalariaSentinel ABM raster previews\n"
@@ -318,7 +328,7 @@ def main():
         "  anim_seed{seed:04d}_{band}.gif   animated time-series per rollout (configurable fps)\n\n"
         f"Seeds: {', '.join(f'{s:04d}' for s in seeds)}\n"
         f"Bands: {', '.join(band_names)}\n"
-        f"Total GIFs: {len(band_anim)}\n\n"
+        f"Total GIFs: {total_gifs}\n\n"
         "Stretch:\n"
         "  density     : log (magma), clipped at p99.5\n"
         "  suitability : linear 0..1 (viridis)\n\n"
@@ -326,7 +336,7 @@ def main():
         f"  uv run python scripts/raster_to_png.py {run_dir.relative_to(Path.cwd())}\n"
         f"  uv run python scripts/raster_to_png.py {run_dir.relative_to(Path.cwd())} --fps 0.5\n"
     )
-    print(f"\nDone: {len(band_anim)} GIFs → {out_dir}")
+    print(f"\nDone: {total_gifs} GIFs → {out_dir}")
     return 0
 
 

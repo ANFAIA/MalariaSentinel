@@ -233,8 +233,8 @@
       }
     },
     "research-runner": {
-      "description": "Focused worker for the research_harness/ pipeline. Pre-approves websearch, webfetch, and bash calls needed to run `uv run python -m agents.research_harness.run` and read/write papers/. Does NOT edit code outside papers/.",
-      "mode": "subagent",
+      "description": "Focused worker for the research_harness/ pipeline. Pre-approves websearch, webfetch, and bash calls needed to run `uv run python -m agents.research_harness.run` and read/write papers/. Does NOT edit any file outside papers/. Used as primary agent via `opencode run --agent research-runner`. Also handles memory evaluation after each phase.",
+      "mode": "primary",
       "prompt": "You are a research executor. Your job is to run the MalariaSentinel research harness cycle (search → write → review → hypothesize) and report back. Use the CLI: `uv run python -m agents.research_harness.run --mode <search|condense|review|hypothesize> --topic '<topic>'`. The harness itself calls opencode internally with --auto and --title, so you do not need to handle those flags. Do not edit any file outside papers/. Return a structured summary of what each phase produced, paths to files written, and any errors.",
       "permission": {
         "edit": {
@@ -254,6 +254,47 @@
         "grep": "allow",
         "webfetch": "allow",
         "websearch": "allow",
+        "memory_node": "allow",
+        "memory_rel": "allow",
+        "memory_query": "allow",
+        "memory_recall": "allow",
+        "memory_audit": "allow",
+        "memory_status": "allow",
+        "question": "allow"
+      }
+    },
+    "improvement-agent": {
+      "description": "Reviews the output of a complete research cycle and auto-applies improvements to prompts, tools, skills, and papers. Records improvements in the knowledge graph. Can edit agents/research_harness/, papers/, and opencode.json (for skill/agent config only).",
+      "mode": "primary",
+      "prompt": "{file:agents/loops/improvement-agent.md}",
+      "permission": {
+        "edit": {
+          "agents/research_harness/": "allow",
+          "papers/": "allow",
+          "opencode.json": "ask",
+          "*": "deny"
+        },
+        "bash": {
+          "*": "ask",
+          "bash agents/research_harness/scripts/install_skills.sh": "allow",
+          "uv run python -m agents.research_harness.*": "allow",
+          "git diff *": "allow",
+          "git status *": "allow",
+          "ls agents/research_harness/*": "allow",
+          "ls papers/*": "allow"
+        },
+        "read": "allow",
+        "glob": "allow",
+        "grep": "allow",
+        "websearch": "allow",
+        "webfetch": "allow",
+        "memory_node": "allow",
+        "memory_rel": "allow",
+        "memory_query": "allow",
+        "memory_recall": "allow",
+        "memory_audit": "allow",
+        "memory_status": "allow",
+        "skill": "allow",
         "question": "allow"
       }
     }
