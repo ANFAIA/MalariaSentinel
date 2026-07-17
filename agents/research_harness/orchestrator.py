@@ -78,6 +78,7 @@ def call_opencode(
             "opencode", "run",
             "--model", resolved_model,
             "--auto",
+            "--agent", "research-runner",
             "--title", title,
             prompt,
         ]
