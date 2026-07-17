@@ -1,4 +1,4 @@
-"""Render ABM simulation rasters to PNG + animated GIF.
+"""Render ABM simulation rasters to animated GIF (per rollout).
 
 Usage:
     uv run python scripts/raster_to_png.py runs/fast-2year
@@ -6,7 +6,7 @@ Usage:
 
 Reads only from the run directory.  Writes only to --out (default: <run_dir>/images/).
 
-Per-band PNGs (aspect-corrected) + animated GIF per band (configurable fps).
+Animated GIF per seed+band combination (configurable fps).
 """
 from __future__ import annotations
 
@@ -150,8 +150,8 @@ def _figsize_for(data_h: int, data_w: int, dpi: int) -> tuple[float, float]:
 # ── single-panel renderer ────────────────────────────────────────────────────
 
 def _render_band(band: np.ndarray, recipe: dict, nodata,
-                  title: str, out_path: Path, dpi: int = 130) -> Image.Image:
-    """Render one band to a PNG.  Returns the PIL Image (for reuse in animations)."""
+                  title: str, out_path: Path | None = None, dpi: int = 130) -> Image.Image:
+    """Render one band to a PIL Image.  If out_path is provided, also save as PNG."""
     a = _masked(band, nodata)
     valid = a.compressed()
     norm, all_nodata, all_zero = _compute_norm(valid, recipe)
@@ -195,8 +195,9 @@ def _render_band(band: np.ndarray, recipe: dict, nodata,
              bbox=dict(facecolor="#ffe" if col != "#a00000" else "#fdd",
                        edgecolor=col, boxstyle="round,pad=0.2", alpha=0.9))
 
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(out_path, dpi=dpi)
+    if out_path is not None:
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        fig.savefig(out_path, dpi=dpi)
 
     # also return as PIL Image for animation reuse
     buf = io.BytesIO()
@@ -228,7 +229,7 @@ def _render_animation(frames: list[Image.Image], out_path: Path, fps: float):
 # ── main ─────────────────────────────────────────────────────────────────────
 
 def main():
-    ap = ArgumentParser(description="Render ABM rasters to PNG + animated GIF.")
+    ap = ArgumentParser(description="Render ABM rasters to animated GIF (per rollout).")
     ap.add_argument("run_dir", type=Path,
                     help="Path to run directory (contains .tif + .json)")
     ap.add_argument("--out", type=Path, default=None,
@@ -273,8 +274,8 @@ def main():
     band_names: list[str] = first_meta["band_names"]
     nodata = first_meta.get("nodata")
 
-    # collect frames per band for animation
-    band_anim: dict[str, list[Image.Image]] = {b: [] for b in band_names}
+    # collect frames per (seed, band) for animation
+    band_anim: dict[tuple[int, str], list[Image.Image]] = {}
     n_frames = len(parsed)
     n_bands = len(band_names)
 
@@ -290,29 +291,34 @@ def main():
                 tag = f"{year}-{month:02d} Day {day}"
             else:
                 tag = f"{year}-{month:02d}"
-            out = out_dir / bname / f"{tif.stem}_{bname}.png"
             pil_img = _render_band(arr[i], recipe, nodata,
-                                    title=f"{tag}  ·  {bname}", out_path=out)
-            band_anim[bname].append(pil_img)
-            print(f"  [{idx+1}/{n_frames}] {out.name}")
+                                    title=f"{tag}  ·  {bname}", out_path=None)
+            key = (seed, bname)
+            if key not in band_anim:
+                band_anim[key] = []
+            band_anim[key].append(pil_img)
+            print(f"  [{idx+1}/{n_frames}] seed={seed:04d} {bname}")
 
-    # animated GIFs
-    for bname in band_names:
-        gif_path = out_dir / f"anim_{bname}.gif"
-        _render_animation(band_anim[bname], gif_path, fps=args.fps)
-        print(f"  GIF: {gif_path.name}  ({len(band_anim[bname])} frames, {args.fps} fps)")
+    # animated GIFs per (seed, band)
+    for (seed, bname), frames in sorted(band_anim.items()):
+        gif_path = out_dir / f"anim_seed{seed:04d}_{bname}.gif"
+        _render_animation(frames, gif_path, fps=args.fps)
+        print(f"  GIF: {gif_path.name}  ({len(frames)} frames, {args.fps} fps)")
 
     # README
+    seeds = sorted(set(p[3] for p in parsed))
     readme = out_dir / "README.txt"
     readme.write_text(
         "MalariaSentinel ABM raster previews\n"
         f"Run:  {run_dir.name}\n"
         f"Months: {parsed[0][1]}-{parsed[0][2]:02d} → {parsed[-1][1]}-{parsed[-1][2]:02d}  "
-        f"({n_frames} frames, {len(set(p[3] for p in parsed))} seed(s))\n"
+        f"({n_frames} frames, {len(seeds)} seed(s))\n"
         f"FPS: {args.fps}\n\n"
         "Layout:\n"
-        "  <band>/abm_YYYY_MM_seedSSSS_<band>.png   per-frame PNG (aspect-corrected)\n"
-        "  anim_<band>.gif                           animated time-series (configurable fps)\n\n"
+        "  anim_seed{seed:04d}_{band}.gif   animated time-series per rollout (configurable fps)\n\n"
+        f"Seeds: {', '.join(f'{s:04d}' for s in seeds)}\n"
+        f"Bands: {', '.join(band_names)}\n"
+        f"Total GIFs: {len(band_anim)}\n\n"
         "Stretch:\n"
         "  density     : log (magma), clipped at p99.5\n"
         "  suitability : linear 0..1 (viridis)\n\n"
@@ -320,7 +326,7 @@ def main():
         f"  uv run python scripts/raster_to_png.py {run_dir.relative_to(Path.cwd())}\n"
         f"  uv run python scripts/raster_to_png.py {run_dir.relative_to(Path.cwd())} --fps 0.5\n"
     )
-    print(f"\nDone: {n_frames * n_bands} PNGs + {n_bands} GIFs → {out_dir}")
+    print(f"\nDone: {len(band_anim)} GIFs → {out_dir}")
     return 0
 
 
