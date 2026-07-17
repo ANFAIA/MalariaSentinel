@@ -54,6 +54,9 @@ void CoordinatorModel::activate_patches() {
 }
 
 std::vector<PatchState> CoordinatorModel::to_dataframe() {
+    // Use the current day for daily climate lookups.
+    // climate_.set_day() is called by the engine step loop before
+    // to_dataframe(); the accessors below read the daily band slice.
     const int32_t H = climate_.h();
     const int32_t W = climate_.w();
     const size_t hw = static_cast<size_t>(H) * static_cast<size_t>(W);

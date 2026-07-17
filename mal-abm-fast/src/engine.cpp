@@ -17,10 +17,12 @@
 // synthetic env COG + habitat gpkg inputs.
 #include "engine.hpp"
 
+#include <algorithm>
 #include <chrono>
 #include <cstdint>
 #include <memory>
 #include <stdexcept>
+#include <string>
 #include <utility>
 
 #include "prng.hpp"
@@ -37,12 +39,19 @@ Engine::Engine(AOI aoi,
       current_date_(start_date) {
     // Build the IO engines first. Either IO failure throws here, so
     // we surface the path that failed in the message.
+    // Detect file extension: .nc -> daily NetCDF loader, else -> COG/TIF loader.
     auto climate = std::make_unique<ClimateEngine>();
     try {
-        climate->load_from_env_tif(env_path, aoi_);
+        const bool is_nc = env_path.size() >= 3
+            && env_path.substr(env_path.size() - 3) == ".nc";
+        if (is_nc) {
+            climate->load_from_env_nc(env_path, aoi_);
+        } else {
+            climate->load_from_env_tif(env_path, aoi_);
+        }
     } catch (const std::exception& e) {
         throw std::runtime_error(
-            "Engine: ClimateEngine::load_from_env_tif failed for '" +
+            "Engine: ClimateEngine load failed for '" +
             env_path + "': " + e.what());
     }
     climate_ = std::move(climate);

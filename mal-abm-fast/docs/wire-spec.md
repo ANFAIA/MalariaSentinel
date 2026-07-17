@@ -15,7 +15,7 @@ M1.5 thin-slice ABM in C++20, designed to run on a single CESGA FT3
 ilk compute node. The engine is **black-box equivalent** to the
 reference Python ABM in `mal_ghana_sim.abm`:
 
-* given the **same** (env COG, habitat gpkg, seed, start_date, days)
+* given the **same** (env NetCDF, habitat gpkg, seed, start_date, days)
   inputs, the C++ engine produces the **same** 2-band state COG
   + sidecar JSON bytes as the Python engine.
 * the per-day formulas, constants, and PRNG stream are pinned to
@@ -33,7 +33,7 @@ reference, C++ candidate, byte-compare the COGs and sidecars).
 mal_abm_fast run \
     --aoi ghana | --bbox W,S,E,N \
     --year 2024 --month 6 --seed 1 --days 30 \
-    --env    data/runs/ghana/ghana_regional_2024_06_env.tif \
+    --env    data/runs/ghana/ghana_regional_2024_06_env.nc \
     --habitat data/runs/ghana/ghana_regional_2024_06_habitat_patches.gpkg \
     --output data/runs/ghana/ghana_regional_2024_06_seed0001.tif
 ```
@@ -45,7 +45,7 @@ each rollout writes to its own `<stem>_seed{NNNN}.tif` + sidecar
 JSON, where NNNN is the 0-indexed rollout id zero-padded to 4
 digits. The legacy single-rollout invocation (no `--n-rollouts`
 flag) is byte-compatible: the output is written verbatim to
-`--output` (e.g. `state.tif`), and the v1.1 sidecar carries
+`--output` (e.g. `state.tif`), and the v2.0 sidecar carries
 `n_rollouts=1` and `rollout_index=0` so downstream consumers can
 detect the new fields.
 
@@ -53,7 +53,7 @@ detect the new fields.
 # F1.c: 3 rollouts, base --seed=1, runs rollouts 1, 2, 3
 mal_abm_fast run --n-rollouts 3 \
     --aoi ghana --year 2024 --month 6 --seed 1 --days 30 \
-    --env    data/runs/ghana/ghana_regional_2024_06_env.tif \
+    --env    data/runs/ghana/ghana_regional_2024_06_env.nc \
     --habitat data/runs/ghana/ghana_regional_2024_06_habitat_patches.gpkg \
     --output /tmp/rollout/state.tif
 # -> /tmp/rollout/state_seed0000.tif  (Prng seed = 1, rollout_index=0)
@@ -77,20 +77,24 @@ mal_abm_fast run --n-rollouts 3 \
 
 ### Inputs
 
-* **Env COG** (`--env`): a single GeoTIFF with 4 (or 5) bands. Band
-  descriptions are looked up by name:
+* **Env NetCDF** (`--env`): a NetCDF4 file with CF-1.8 metadata. Dimensions and variables:
 
-  | Band | Description          | dtype    | Range / units        |
-  |------|----------------------|----------|----------------------|
-  | 1    | `rainfall`           | float32  | mm / day             |
-  | 2    | `temp_suitability`   | float32  | [0, 1] Mordecai      |
-  | 3    | `water_frac`         | float32  | [0, 1] open water    |
-  | 4    | `ndvi`               | float32  | [0, 1] vegetation    |
-  | 5    | `twi` (optional)     | float32  | static TWI grid      |
+  | Variable           | Dims        | dtype    | Units    | Notes                        |
+  |--------------------|-------------|----------|----------|------------------------------|
+  | `rainfall`         | (time,y,x)  | float32  | mm/day   | CHIRPS daily precipitation   |
+  | `water_temp_c`     | (time,y,x)  | float32  | °C       | ERA5-Land 2m temperature     |
+  | `water_frac`       | (time,y,x)  | float32  | [0,1]    | JRC GSW (broadcast per day)  |
+  | `ndvi`             | (time,y,x)  | float32  | [0,1]    | MODIS NDVI (broadcast)       |
+  | `twi` (optional)   | (y,x)       | float32  | —        | Static TWI grid              |
 
-  The temp_suitability band is Mordecai-inverted on read:
-  `T = 25 - 8 * sqrt(1 - s)` (the lower branch, relevant for
-  *An. gambiae* s.s.).
+  **Time dimension**: `time` is in "days since YYYY-MM-01" with `calendar = "noleap"`.
+  One index per day of the month (28–31). The climate engine reads the current day's
+  slice via `set_day(day_index)`.
+
+  **Temperature**: stored in **°C directly** (not temp_suitability). The Mordecai inverse
+  is NOT applied on read — the engine receives deg C and computes EIP as `max(0, T - 16)`.
+
+  **Contract version**: `2.0` (breaking change from v1.0 COG format).
 
 * **Habitat patches gpkg** (`--habitat`): a single-layer OGR
   datasource with one Point feature per patch. M1.5 honours
@@ -128,7 +132,7 @@ mal_abm_fast run --n-rollouts 3 \
   | `rollout_index`     | int (F1.c, 0-indexed, default 0)               |
   | `generator_version` | pinned `"m1.5-mesa-frames+polars"`             |
   | `abm_params_hash`   | `"sha256:..."` (or `"sha256:pending"` in F1.b) |
-  | `contract_version`  | pinned `"1.1"` (F1.c; was `"1.0"` in F1.b)     |
+  | `contract_version`  | pinned `"2.0"` (breaking change from v1.x COG)   |
   | `band_names`        | `["density", "suitability"]`                   |
   | `nodata`            | `-9999.0`                                      |
   | `shape`             | `[2, H, W]`                                    |
@@ -151,7 +155,7 @@ mal_abm_fast run --n-rollouts 3 \
 | `PLUVIAL_POOL_TWI_THRESHOLD`    | 8.0    | dynamic patch rule (TWI)                 |
 | `PLUVIAL_POOL_WATER_FRAC_MIN`   | 0.0    | dynamic patch rule (water; strictly > 0) |
 | `NODATA_SENTINEL`               | -9999.0| state COG nodata                         |
-| `CONTRACT_VERSION`              | "1.1"  | sidecar (bumped F1.c)                    |
+| `CONTRACT_VERSION`              | "2.0"  | sidecar (breaking change from v1.x COG)         |
 | `GENERATOR_VERSION`             | "m1.5-mesa-frames+polars" | sidecar                  |
 
 ## 3. Module map
@@ -173,9 +177,9 @@ mal_abm_fast run --n-rollouts 3 \
               +-------+   +---+---+   +----------------+
               |       |   |       |   |                |
        ClimateEngine  |  Habitat- |   |  MosquitoSubmodel
-       (env COG       |  Engine   |   |  (SoA, PRNG,
+       (env NetCDF    |  Engine   |   |  (SoA, PRNG,
         reader +      |  (gpkg    |   |   5 per-day ops)
-        Mordecai inv) |  reader)  |   |                |
+        set_day())    |  reader)  |   |                |
               |       |   |       |   |                |
               v       v   v       v   v                |
               +-------+---+-------+---+----------------+
@@ -218,7 +222,7 @@ submodel.advance_day(aoi, patch_states):
 | 5    | `binomial(K, BIRTH_RATE)` new larvae per active patch; `lon/lat = patch cell centre` | `BIRTH_RATE = 0.005`            |
 
 `accumulate_eip` is NaN-safe: when `daily_mean_temp_c` is NaN (e.g.
-the env COG's nodata pixel after the Mordecai inverse), the
+the env NetCDF's nodata pixel), the
 function returns `eip_progress` unchanged. The C++ header is:
 
 ```cpp
@@ -324,6 +328,12 @@ is the F1.c determinism property that `--n-rollouts N` relies
 on, validated by `tests/test_state_cog.cpp::TwoRolloutsDifferentSeedsProduceDifferentCogs`
 and `tests/test_engine.cpp::TwoRolloutsWithDifferentSeedsProduceDifferentCogs`.
 
+Per-day climate lookups from the NetCDF file are deterministic:
+the same `(env_nc_path, day_index)` pair always yields the same
+`(rainfall, water_temp_c, water_frac, ndvi)` slice. The NetCDF
+reader is stateless between calls — `set_day(day_index)` selects
+the slice; no interpolation or caching mutates the result.
+
 `peek_state()` returns the raw `s[0]` state word. The F1.e parity
 test uses it to assert the stream is reproducible at the
 xoshiro256** level — if `peek_state()` ever differs from a saved
@@ -356,6 +366,9 @@ value (see F1.c plan).
 
 ## 8. Out of scope for F1.b–F1.f
 
+* **Daily CHIRPS interpolation** — now implemented. The NetCDF env
+  file contains daily `rainfall` slices (CHIRPS mm/day), eliminating
+  the need for separate interpolation.
 * **pybind11 binding** (F4). The C++ engine is wrapped in a
   Python module so `mal_ghana_sim.abm` can call into it.
 * **MPI** (F4). Multi-node parallel ABM rollouts. The F1 thin
@@ -385,6 +398,7 @@ mal-abm-fast/
 │   ├── eip.hpp                     # inline accumulate_eip / is_infective
 │   ├── dispersal.hpp               # DispOffset + offset_m
 │   ├── climate.hpp                 # ClimateEngine class
+│   ├── env_reader.hpp              # EnvReader: read_env_nc() for NetCDF4 env
 │   ├── habitat_engine.hpp          # HabitatEngine class
 │   ├── coordinator.hpp             # CoordinatorModel class
 │   ├── mosquito_state.hpp          # MosquitoSoA struct
@@ -396,6 +410,7 @@ mal-abm-fast/
 │   ├── prng.cpp                    # xoshiro256pp + Prng stubs (F1.c replaces)
 │   ├── dispersal.cpp               # offset_m stub (F1.c replaces)
 │   ├── climate.cpp                 # ClimateEngine stubs (F1.b replaces)
+│   ├── env_reader.cpp              # NetCDF4 env reader (read_env_nc, set_day)
 │   ├── habitat_engine.cpp          # HabitatEngine stubs (F1.b replaces)
 │   ├── coordinator.cpp             # CoordinatorModel stubs (F1.b/c replaces)
 │   ├── mosquito_state.cpp          # empty (no logic in the header struct)
@@ -410,7 +425,7 @@ mal-abm-fast/
 ## 10. Cross-references
 
 * `mal_ghana_sim.abm.run` (Python CLI) — the ground truth for
-  flag names, defaults, and the env COG band naming convention.
+  flag names, defaults, and the env NetCDF variable naming convention.
 * `mal_ghana_sim.abm.coordinator.CoordinatorModel` — the Python
   counterpart of `mal_abm_fast::CoordinatorModel`.
 * `mal_ghana_sim.abm.mosquito_submodel.MosquitoSubmodel` — the

@@ -1,21 +1,27 @@
 // SPDX-License-Identifier: MIT
-// test_env_reader.cpp — GoogleTest for env_reader::read_env_tif.
+// test_env_reader.cpp — GoogleTest for env_reader::read_env_tif and
+// read_env_nc.
 //
 // Writes a 4-band 4x4 synthetic env COG (water_frac=0.1, rainfall=0.5,
 // temp_suitability=0.7, ndvi=0.4) to a tmp file, calls read_env_tif,
 // and asserts the shape, the band values, and the Mordecai inverse on
 // temp_suitability (0.7 -> 25 - 8*sqrt(0.3) ≈ 21.099).
+//
+// Also writes a multi-day synthetic NetCDF and exercises read_env_nc.
 
 #include <gtest/gtest.h>
 
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <filesystem>
 #include <string>
 #include <vector>
 
 #include "gdal.h"
+#include "cpl_string.h"
+#include <netcdf.h>
 
 #include "env_reader.hpp"
 
@@ -31,6 +37,12 @@ fs::path MakeTmpEnv() {
     const char* base = std::getenv("TMPDIR");
     fs::path dir = (base && *base) ? fs::path(base) : fs::temp_directory_path();
     return dir / "mal_abm_fast_test_env_reader.tif";
+}
+
+fs::path MakeTmpEnvNC() {
+    const char* base = std::getenv("TMPDIR");
+    fs::path dir = (base && *base) ? fs::path(base) : fs::temp_directory_path();
+    return dir / "mal_abm_fast_test_env_reader.nc";
 }
 
 // Write a 4-band 4x4 GTiff. Each band is a constant float32 value,
@@ -99,6 +111,65 @@ void WriteSyntheticEnv(const fs::path& path) {
     EXPECT_EQ(e4, CE_None);
 
     GDALClose(ds);
+}
+
+// Write a synthetic multi-day NetCDF file using the netCDF-C API.
+// Creates a CF-compliant file with 4 variables (rainfall, water_temp_c,
+// water_frac, ndvi), each with UNLIMITED time dimension.
+//
+// Per-day constant values:
+//   day 0: rain=20.0, temp=25.0
+//   day 1: rain=5.0,  temp=20.0
+//   day 2: rain=25.0, temp=30.0
+//   water_frac=0.5, ndvi=0.4 (constant across all days)
+void WriteSyntheticEnvNC(const fs::path& path, int n_days) {
+    int ncid, dimids[3], vid[4];
+    int dimid_time, dimid_y, dimid_x;
+
+    ASSERT_EQ(nc_create(path.string().c_str(),
+                        NC_CLOBBER | NC_NETCDF4, &ncid), NC_NOERR);
+
+    ASSERT_EQ(nc_def_dim(ncid, "time", NC_UNLIMITED, &dimid_time), NC_NOERR);
+    ASSERT_EQ(nc_def_dim(ncid, "y", kH, &dimid_y), NC_NOERR);
+    ASSERT_EQ(nc_def_dim(ncid, "x", kW, &dimid_x), NC_NOERR);
+    dimids[0] = dimid_time;
+    dimids[1] = dimid_y;
+    dimids[2] = dimid_x;
+
+    ASSERT_EQ(nc_def_var(ncid, "rainfall", NC_FLOAT, 3, dimids, &vid[0]), NC_NOERR);
+    ASSERT_EQ(nc_def_var(ncid, "water_temp_c", NC_FLOAT, 3, dimids, &vid[1]), NC_NOERR);
+    ASSERT_EQ(nc_def_var(ncid, "water_frac", NC_FLOAT, 3, dimids, &vid[2]), NC_NOERR);
+    ASSERT_EQ(nc_def_var(ncid, "ndvi", NC_FLOAT, 3, dimids, &vid[3]), NC_NOERR);
+
+    ASSERT_EQ(nc_put_att_text(ncid, NC_GLOBAL, "Conventions", 6, "CF-1.8"), NC_NOERR);
+    ASSERT_EQ(nc_enddef(ncid), NC_NOERR);
+
+    const float rain_vals[] = {20.0f, 5.0f, 25.0f};
+    const float temp_vals[] = {25.0f, 20.0f, 30.0f};
+    float buf[kH * kW];
+
+    size_t start[3] = {0, 0, 0};
+    size_t count[3] = {1, static_cast<size_t>(kH), static_cast<size_t>(kW)};
+
+    for (int d = 0; d < n_days; ++d) {
+        start[0] = d;
+        const float rain = rain_vals[d % 3];
+        const float temp = temp_vals[d % 3];
+
+        std::fill(buf, buf + kH * kW, rain);
+        ASSERT_EQ(nc_put_vara_float(ncid, vid[0], start, count, buf), NC_NOERR);
+
+        std::fill(buf, buf + kH * kW, temp);
+        ASSERT_EQ(nc_put_vara_float(ncid, vid[1], start, count, buf), NC_NOERR);
+
+        std::fill(buf, buf + kH * kW, 0.5f);
+        ASSERT_EQ(nc_put_vara_float(ncid, vid[2], start, count, buf), NC_NOERR);
+
+        std::fill(buf, buf + kH * kW, 0.4f);
+        ASSERT_EQ(nc_put_vara_float(ncid, vid[3], start, count, buf), NC_NOERR);
+    }
+
+    ASSERT_EQ(nc_close(ncid), NC_NOERR);
 }
 
 }  // namespace
@@ -175,6 +246,106 @@ TEST(EnvReader, MissingRequiredBandThrows) {
     EXPECT_THROW(
         mal_abm_fast::env_reader::read_env_tif(path.string()),
         std::runtime_error);
+
+    fs::remove(path);
+}
+
+// -- NetCDF tests (daily-env-netcdf feature) ---------------------------------
+
+TEST(EnvReader, ReadsDailyNetCDF) {
+    const fs::path path = MakeTmpEnvNC();
+    if (fs::exists(path)) fs::remove(path);
+    WriteSyntheticEnvNC(path, 3);
+    ASSERT_TRUE(fs::exists(path));
+
+    mal_abm_fast::env_reader::DailyEnvBands b =
+        mal_abm_fast::env_reader::read_env_nc(path.string());
+
+    EXPECT_EQ(b.n_days, 3);
+    EXPECT_EQ(b.h, kH);
+    EXPECT_EQ(b.w, kW);
+    EXPECT_EQ(b.rainfall.size(),     static_cast<size_t>(3 * kH * kW));
+    EXPECT_EQ(b.water_temp_c.size(), static_cast<size_t>(3 * kH * kW));
+    EXPECT_EQ(b.water_frac.size(),   static_cast<size_t>(3 * kH * kW));
+    EXPECT_EQ(b.ndvi.size(),         static_cast<size_t>(3 * kH * kW));
+
+    // Day 0: rain=20.0 everywhere
+    for (int i = 0; i < kH * kW; ++i)
+        EXPECT_FLOAT_EQ(b.rainfall[0 * kH * kW + i], 20.0f);
+    // Day 1: rain=5.0 everywhere
+    for (int i = 0; i < kH * kW; ++i)
+        EXPECT_FLOAT_EQ(b.rainfall[1 * kH * kW + i], 5.0f);
+    // Day 2: rain=25.0 everywhere
+    for (int i = 0; i < kH * kW; ++i)
+        EXPECT_FLOAT_EQ(b.rainfall[2 * kH * kW + i], 25.0f);
+
+    // Water temp in °C (NO Mordecai inverse applied)
+    // Day 0: 25.0, Day 1: 20.0, Day 2: 30.0
+    for (int i = 0; i < kH * kW; ++i)
+        EXPECT_FLOAT_EQ(b.water_temp_c[0 * kH * kW + i], 25.0f);
+    for (int i = 0; i < kH * kW; ++i)
+        EXPECT_FLOAT_EQ(b.water_temp_c[1 * kH * kW + i], 20.0f);
+    for (int i = 0; i < kH * kW; ++i)
+        EXPECT_FLOAT_EQ(b.water_temp_c[2 * kH * kW + i], 30.0f);
+
+    // water_frac constant across all days
+    for (int d = 0; d < 3; ++d)
+        for (int i = 0; i < kH * kW; ++i)
+            EXPECT_FLOAT_EQ(b.water_frac[d * kH * kW + i], 0.5f);
+
+    // ndvi constant across all days
+    for (int d = 0; d < 3; ++d)
+        for (int i = 0; i < kH * kW; ++i)
+            EXPECT_FLOAT_EQ(b.ndvi[d * kH * kW + i], 0.4f);
+
+    fs::remove(path);
+}
+
+TEST(EnvReader, MissingRequiredVariableThrows) {
+    const fs::path path = MakeTmpEnvNC();
+    if (fs::exists(path)) fs::remove(path);
+
+    // Write a netCDF with only rainfall (missing water_frac, etc.)
+    int ncid, dimids[3], vid;
+    int dimid_time, dimid_y, dimid_x;
+    ASSERT_EQ(nc_create(path.string().c_str(),
+                        NC_CLOBBER | NC_NETCDF4, &ncid), NC_NOERR);
+    ASSERT_EQ(nc_def_dim(ncid, "time", NC_UNLIMITED, &dimid_time), NC_NOERR);
+    ASSERT_EQ(nc_def_dim(ncid, "y", kW, &dimid_y), NC_NOERR);
+    ASSERT_EQ(nc_def_dim(ncid, "x", kW, &dimid_x), NC_NOERR);
+    dimids[0] = dimid_time; dimids[1] = dimid_y; dimids[2] = dimid_x;
+    ASSERT_EQ(nc_def_var(ncid, "rainfall", NC_FLOAT, 3, dimids, &vid), NC_NOERR);
+    ASSERT_EQ(nc_put_att_text(ncid, NC_GLOBAL, "Conventions", 6, "CF-1.8"), NC_NOERR);
+    ASSERT_EQ(nc_enddef(ncid), NC_NOERR);
+    float buf[16] = {0};
+    size_t start[3] = {0, 0, 0};
+    size_t count[3] = {1, 4, 4};
+    ASSERT_EQ(nc_put_vara_float(ncid, vid, start, count, buf), NC_NOERR);
+    ASSERT_EQ(nc_close(ncid), NC_NOERR);
+
+    EXPECT_THROW(
+        mal_abm_fast::env_reader::read_env_nc(path.string()),
+        std::runtime_error);
+
+    fs::remove(path);
+}
+
+TEST(EnvReader, NetCDFSingleDay) {
+    const fs::path path = MakeTmpEnvNC();
+    if (fs::exists(path)) fs::remove(path);
+    WriteSyntheticEnvNC(path, 1);
+    ASSERT_TRUE(fs::exists(path));
+
+    mal_abm_fast::env_reader::DailyEnvBands b =
+        mal_abm_fast::env_reader::read_env_nc(path.string());
+
+    EXPECT_EQ(b.n_days, 1);
+    EXPECT_EQ(b.h, kH);
+    EXPECT_EQ(b.w, kW);
+    EXPECT_EQ(b.rainfall.size(), static_cast<size_t>(kH * kW));
+    // Day 0: rain=20.0
+    for (int i = 0; i < kH * kW; ++i)
+        EXPECT_FLOAT_EQ(b.rainfall[i], 20.0f);
 
     fs::remove(path);
 }

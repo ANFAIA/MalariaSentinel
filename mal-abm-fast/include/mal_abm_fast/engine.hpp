@@ -29,9 +29,10 @@ class Engine {
 public:
     Engine() = default;
 
-    // Build the engine for (AOI, env COG path, habitat gpkg path,
+    // Build the engine for (AOI, env path, habitat gpkg path,
     // master Prng, start_date). Loads the env via
-    // `ClimateEngine::load_from_env_tif` and the habitat via
+    // `ClimateEngine::load_from_env_tif` (for .tif) or
+    // `ClimateEngine::load_from_env_nc` (for .nc), and the habitat via
     // `HabitatEngine::load_from_gpkg`, then derives independent
     // sub-stream seeds for the `CoordinatorModel` and
     // `MosquitoSubmodel` from `rng` and constructs them.

@@ -201,9 +201,8 @@ int main(int argc, char** argv) {
     run->add_option("--seed", seed, "RNG seed (default 1).")
         ->default_val(1);
     run->add_option("--env", env_path,
-                    "Path to the 4-band env COG (build_env output).")
-        ->required()
-        ->check(CLI::ExistingFile);
+                    "Path to the env COG (.tif) or daily NetCDF (.nc) file.")
+        ->required();
     run->add_option("--habitat", habitat_path,
                     "Path to the habitat patches gpkg.")
         ->required()

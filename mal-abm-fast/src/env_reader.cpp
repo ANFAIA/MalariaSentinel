@@ -29,6 +29,7 @@
 #include <cstring>
 #include <stdexcept>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include "gdal.h"
@@ -222,6 +223,107 @@ EnvBands read_env_tif(const std::string& path) {
     if (out.h <= 0 || out.w <= 0) {
         throw std::runtime_error(
             "env_reader::read_env_tif: dataset has no rasters");
+    }
+    return out;
+}
+
+// -- NetCDF reader (daily-env-netcdf feature) --------------------------------
+
+DailyEnvBands read_env_nc(const std::string& path) {
+    EnsureGdalRegistered();
+
+    // GDAL's netCDF driver exposes multi-variable files as subdatasets
+    // (NETCDF:"path":varname). Each subdataset contains bands = time
+    // steps for that variable. We open the root to find subdatasets,
+    // then open each required variable's subdataset to read bands.
+    GDALDatasetH root = GDALOpen(path.c_str(), GA_ReadOnly);
+    if (root == nullptr) {
+        throw std::runtime_error(
+            std::string("env_reader::read_env_nc: GDALOpen failed for ")
+            + path + ": " + CPLGetLastErrorMsg());
+    }
+
+    // Collect subdataset names from the root's SUBDATASETS metadata domain.
+    const char* const* md = GDALGetMetadata(root, "SUBDATASETS");
+    std::unordered_map<std::string, std::string> subdatasets;
+    for (int i = 0; md && md[i]; ++i) {
+        const std::string key(md[i]);
+        if (key.find("_NAME=") != std::string::npos) {
+            // Format: SUBDATASET_1_NAME=NETCDF:"path":varname
+            auto eq = key.find('=');
+            auto val = key.substr(eq + 1);
+            auto colon = val.rfind(':');
+            if (colon != std::string::npos) {
+                std::string varname = val.substr(colon + 1);
+                // Strip trailing quotes if any
+                if (!varname.empty() && varname.back() == '"')
+                    varname.pop_back();
+                subdatasets[varname] = val;
+            }
+        }
+    }
+    GDALClose(root);
+
+    DailyEnvBands out;
+    out.transform.fill(0.0);
+
+    auto read_variable = [&](const char* varname) -> std::vector<float> {
+        auto it = subdatasets.find(varname);
+        if (it == subdatasets.end()) {
+            throw std::runtime_error(
+                std::string("env_reader::read_env_nc: missing required variable '")
+                + varname + "' in " + path);
+        }
+        GDALDatasetH ds = GDALOpen(it->second.c_str(), GA_ReadOnly);
+        if (ds == nullptr) {
+            throw std::runtime_error(
+                std::string("env_reader::read_env_nc: failed to open subdataset for '")
+                + varname + "': " + CPLGetLastErrorMsg());
+        }
+        DatasetCloser closer(ds);
+
+        const int nbands = GDALGetRasterCount(ds);
+        if (nbands <= 0) {
+            throw std::runtime_error(
+                std::string("env_reader::read_env_nc: variable '")
+                + varname + "' has no bands");
+        }
+
+        std::vector<float> result;
+        for (int i = 1; i <= nbands; ++i) {
+            BandRead br = ReadBand(GDALGetRasterBand(ds, i));
+            if (out.h == 0) { out.h = br.h; out.w = br.w; }
+            else if (out.h != br.h || out.w != br.w) {
+                throw std::runtime_error(
+                    std::string("env_reader::read_env_nc: variable '")
+                    + varname + "' has inconsistent band shape");
+            }
+            result.insert(result.end(), br.data.begin(), br.data.end());
+        }
+
+        if (out.n_days == 0) {
+            out.n_days = nbands;
+        } else if (out.n_days != nbands) {
+            throw std::runtime_error(
+                std::string("env_reader::read_env_nc: variable '")
+                + varname + "' has " + std::to_string(nbands)
+                + " time steps, expected " + std::to_string(out.n_days));
+        }
+        return result;
+    };
+
+    out.rainfall     = read_variable("rainfall");
+    out.water_temp_c = read_variable("water_temp_c");
+    out.water_frac   = read_variable("water_frac");
+    out.ndvi         = read_variable("ndvi");
+
+    if (out.h <= 0 || out.w <= 0) {
+        throw std::runtime_error(
+            "env_reader::read_env_nc: dataset has no rasters");
+    }
+    if (static_cast<int32_t>(out.rainfall.size()) != out.n_days * out.h * out.w) {
+        throw std::runtime_error(
+            "env_reader::read_env_nc: rainfall size mismatch");
     }
     return out;
 }

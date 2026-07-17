@@ -287,8 +287,143 @@ def load_era5_temp_suitability(
     return da
 
 
+def load_era5_water_temp(
+    aoi: AOI,
+    year: int,
+    month: int,
+    *,
+    cache_dir: pathlib.Path | None = None,
+) -> xr.DataArray:
+    """Load ERA5-Land daily ``2m_temperature`` as a 3-D (time, y, x) array in °C.
+
+    Unlike :func:`load_era5_temp_suitability` which aggregates to a
+    monthly mean and applies Sharpe-DeMichele, this function preserves
+    per-day values in degrees Celsius for writing into a daily NetCDF
+    env file.
+
+    Args:
+        aoi: the AOI.
+        year, month: 1-indexed month.
+        cache_dir: optional local cache for downloaded NetCDFs.
+
+    Returns:
+        xr.DataArray with dims (time, y, x), dtype float32, CRS = aoi.crs.
+        Values in degrees Celsius. ``-9999.0`` for NoData.
+
+    Raises:
+        RuntimeError: if CDS auth is missing.
+    """
+    if not (1 <= month <= 12):
+        raise ValueError(f"month must be in 1..12; got {month}")
+    if year < 1950:
+        raise ValueError(f"ERA5 starts in 1950; got year={year}")
+
+    import cdsapi
+
+    try:
+        client = cdsapi.Client()
+    except Exception as e:
+        raise RuntimeError(
+            "ERA5-Land requires CDS auth. Configure ~/.cdsapirc or "
+            "CDSAPI_URL/KEY env vars. See op-m1-3a-data-layer-auth for "
+            f"details. (cdsapi raised: {e})"
+        ) from e
+
+    cdir = cache_dir if cache_dir is not None else _default_cache_dir()
+    cdir.mkdir(parents=True, exist_ok=True)
+    target = cdir / f"era5_{ERA5_VARIABLE}_{year:04d}_{month:02d}.nc"
+
+    if not target.exists():
+        request = _cds_request(year, month, aoi.bbox)
+        result = client.retrieve(ERA5_DATASET, request, target=str(target))
+        if not target.exists():
+            result.download(str(target))
+
+    ds = xr.open_dataset(str(target))
+    if ERA5_VARIABLE in ds.data_vars or ERA5_VARIABLE in ds:
+        var_name = ERA5_VARIABLE
+    elif ERA5_VARIABLE in ERA5_VARIABLE_NETCDF_ALIAS and (
+        ERA5_VARIABLE_NETCDF_ALIAS[ERA5_VARIABLE] in ds.data_vars
+        or ERA5_VARIABLE_NETCDF_ALIAS[ERA5_VARIABLE] in ds
+    ):
+        var_name = ERA5_VARIABLE_NETCDF_ALIAS[ERA5_VARIABLE]
+    else:
+        candidates = [v for v in ds.data_vars if "temper" in v.lower() and "2m" in v.lower()]
+        if not candidates:
+            raise KeyError(
+                f"ERA5 dataset {target} has no '{ERA5_VARIABLE}' or alias found; "
+                f"available: {list(ds.data_vars)}"
+            )
+        var_name = candidates[0]
+    da_K = ds[var_name]
+    if "expver" in da_K.dims:
+        da_K = da_K.sel(expver=da_K.coords["expver"].max())
+
+    # Convert K -> °C and keep per-day (do NOT aggregate to monthly mean).
+    SPATIAL_DIMS = {"y", "x", "latitude", "longitude", "lat", "lon", "rlat", "rlon"}
+    TIME_LIKE = {"time", "valid_time", "date", "datetime", "lead_time", "forecast_hour"}
+    time_dim = next((d for d in da_K.dims if d in TIME_LIKE), None)
+    if time_dim is None:
+        non_spatial = [d for d in da_K.dims if d not in SPATIAL_DIMS]
+        time_dim = non_spatial[0] if non_spatial else None
+
+    da_C = (da_K - 273.15).astype(np.float32)
+    if time_dim is not None:
+        da_C = da_C.rename({time_dim: "time"})
+
+    # Drop non-spatial non-time dims.
+    drop_dims = [d for d in da_C.dims if d not in ("time", "y", "x", "latitude", "longitude")]
+    if drop_dims:
+        da_C = da_C.squeeze(drop_dims, drop=True)
+
+    # Reproject per-day to the AOI grid.
+    ref = _ref_grid_for_aoi(aoi)
+    daily_arrays: list[np.ndarray] = []
+    if "time" in da_C.dims:
+        for t in range(da_C.sizes["time"]):
+            slice_2d = da_C.isel(time=t).squeeze(drop=True)
+            if slice_2d.rio.crs is None:
+                slice_2d.rio.write_crs("EPSG:4326", inplace=True)
+            arr = _reproject_to_aoi_grid(slice_2d, aoi)
+            daily_arrays.append(arr)
+        time_coords = da_C.coords["time"].values
+    else:
+        if da_C.rio.crs is None:
+            da_C.rio.write_crs("EPSG:4326", inplace=True)
+        arr = _reproject_to_aoi_grid(da_C.squeeze(drop=True), aoi)
+        daily_arrays.append(arr)
+        time_coords = [np.datetime64(f"{year:04d}-{month:02d}-01")]
+
+    stacked = np.stack(daily_arrays, axis=0)  # (n_days, H, W)
+    nan_mask = ~np.isfinite(stacked)
+    stacked[nan_mask] = ERA5_NODATA
+
+    h, w = aoi.cells_per_side()
+    assert stacked.shape[1:] == (h, w), (
+        f"stacked shape {stacked.shape[1:]} != AOI grid {(h, w)}"
+    )
+
+    out_da = xr.DataArray(
+        stacked.astype(np.float32),
+        dims=("time", "y", "x"),
+        coords={"time": time_coords},
+        attrs={
+            "long_name": "ERA5-Land 2m temperature (daily mean)",
+            "units": "degC",
+            "source": f"ERA5-Land daily stats {ERA5_VARIABLE} {ERA5_DAILY_STATISTIC}",
+            "aoi_slug": aoi.slug,
+            "year": year,
+            "month": month,
+            "nodata": ERA5_NODATA,
+        },
+    )
+    out_da.rio.write_crs(aoi.crs_obj, inplace=True)
+    return out_da
+
+
 __all__ = [
     "load_era5_temp_suitability",
+    "load_era5_water_temp",
     "sharpe_demichele_growth",
     "T_OPT",
     "T_HALF_WIDTH",

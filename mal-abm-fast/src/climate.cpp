@@ -88,4 +88,52 @@ float ClimateEngine::water_frac_at(int32_t row, int32_t col) const {
     return water_[Idx(row, col, w_)];
 }
 
+// -- Daily NetCDF support ----------------------------------------------------
+
+void ClimateEngine::load_from_env_nc(const std::string& path,
+                                     const AOI& aoi) {
+    (void)aoi;
+    env_reader::DailyEnvBands bands = env_reader::read_env_nc(path);
+
+    h_      = bands.h;
+    w_      = bands.w;
+    n_days_ = bands.n_days;
+    cur_day_ = 0;
+
+    rain_nc_       = std::move(bands.rainfall);
+    water_temp_nc_ = std::move(bands.water_temp_c);
+    water_frac_nc_ = std::move(bands.water_frac);
+    ndvi_nc_       = std::move(bands.ndvi);
+
+    // Populate single-day accessors for day 0 (backwards compat).
+    rain_.assign(h_ * w_, 0.0f);
+    temp_.assign(h_ * w_, 25.0f);
+    water_.assign(h_ * w_, 0.0f);
+    ndvi_.assign(h_ * w_, 0.0f);
+
+    const size_t slice = static_cast<size_t>(h_) * static_cast<size_t>(w_);
+    for (size_t i = 0; i < slice; ++i) {
+        rain_[i]  = rain_nc_[i];
+        temp_[i]  = water_temp_nc_[i];
+        water_[i] = water_frac_nc_[i];
+        ndvi_[i]  = ndvi_nc_[i];
+    }
+}
+
+void ClimateEngine::set_day(int32_t day) {
+    if (n_days_ <= 1) return;  // static COG: no daily switching
+    if (day < 0) day = 0;
+    if (day >= n_days_) day = n_days_ - 1;
+    cur_day_ = day;
+
+    const size_t slice = static_cast<size_t>(h_) * static_cast<size_t>(w_);
+    const size_t offset = static_cast<size_t>(cur_day_) * slice;
+    for (size_t i = 0; i < slice; ++i) {
+        rain_[i]  = rain_nc_[offset + i];
+        temp_[i]  = water_temp_nc_[offset + i];
+        water_[i] = water_frac_nc_[offset + i];
+        ndvi_[i]  = ndvi_nc_[offset + i];
+    }
+}
+
 }  // namespace mal_abm_fast
