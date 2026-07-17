@@ -63,9 +63,15 @@ if [[ ! -x "$PROJECT_ROOT/mal-abm-fast/build/mal_abm_fast" ]]; then
 fi
 
 # --- Run --------------------------------------------------------------------
-# F1.a: smoke test (the binary just prints version + PRNG uniform).
-# F2 will replace this with: mal_abm_fast run --env … --habitat … --n-rollouts "$N_ROLLOUTS"
-"$PROJECT_ROOT/mal-abm-fast/build/mal_abm_fast" --version
-"$PROJECT_ROOT/mal-abm-fast/build/mal_abm_fast"
+srun "$PROJECT_ROOT/mal-abm-fast/build/mal_abm_fast" run \
+    --aoi "$AOI" \
+    --env "$ENV_TIF" \
+    --habitat "$HAB_GPKG" \
+    --output "$OUT_DIR/state.tif" \
+    --days 365 \
+    --n-rollouts "$N_ROLLOUTS" \
+    --year "$YEAR" \
+    --month "$MONTH" \
+    --seed "$SEED_BASE"
 
-echo "[short.sh] done. (F1.a: scaffold smoke; F2 will run the ABM here.)"
+echo "[short.sh] done."

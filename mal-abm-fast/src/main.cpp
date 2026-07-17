@@ -44,6 +44,7 @@
 #include <string>
 
 #include <CLI/CLI.hpp>
+#include <omp.h>
 
 #include "engine.hpp"
 #include "prng.hpp"
@@ -178,6 +179,7 @@ int main(int argc, char** argv) {
     int         days        = 30;
     int         n_rollouts  = 1;
     int         snapshot_every = 0;
+    int         threads = 0;
     std::string env_path;
     std::string habitat_path;
     std::string output_path;
@@ -229,6 +231,10 @@ int main(int argc, char** argv) {
                     "Intermediate files are named <stem>_dayNNN.tif.")
         ->default_val(0)
         ->check(CLI::NonNegativeNumber);
+    run->add_option("--threads", threads,
+                    "OpenMP threads for parallel rollouts (0=auto).")
+        ->default_val(0)
+        ->check(CLI::NonNegativeNumber);
 
     CLI11_PARSE(app, argc, argv);
 
@@ -270,6 +276,10 @@ int main(int argc, char** argv) {
     // Prng, then discards it). The Engine and the master Prng go
     // out of scope at the end of each iteration, so no Prng state
     // leaks across rollouts.
+    if (threads > 0) {
+        omp_set_num_threads(threads);
+    }
+#pragma omp parallel for schedule(dynamic, 1)
     for (int i = 0; i < n_rollouts; ++i) {
         const uint64_t seed_rollout =
             static_cast<uint64_t>(seed) + static_cast<uint64_t>(i);
@@ -279,11 +289,11 @@ int main(int argc, char** argv) {
         std::unique_ptr<mal_abm_fast::Engine> engine_ptr;
         try {
             engine_ptr = std::make_unique<mal_abm_fast::Engine>(
-                aoi, env_path, habitat_path, rng, start_date);
+                aoi, env_path, habitat_path, rng, start_date, days);
         } catch (const std::exception& e) {
             std::cerr << "abm_run: rollout " << i
                       << " failed to build engine: " << e.what() << "\n";
-            return EXIT_FAILURE;
+            std::exit(EXIT_FAILURE);
         }
         auto& engine = *engine_ptr;
 
@@ -317,7 +327,7 @@ int main(int argc, char** argv) {
             std::cerr << "abm_run: rollout " << i
                       << " step() failed on day " << days << ": "
                       << e.what() << "\n";
-            return EXIT_FAILURE;
+            std::exit(EXIT_FAILURE);
         }
 
         // -- Snapshot ------------------------------------------------
@@ -338,7 +348,7 @@ int main(int argc, char** argv) {
         } catch (const std::exception& e) {
             std::cerr << "abm_run: rollout " << i
                       << " snapshot failed: " << e.what() << "\n";
-            return EXIT_FAILURE;
+            std::exit(EXIT_FAILURE);
         }
 
         std::cout << "abm_run: rollout " << i << "/" << n_rollouts

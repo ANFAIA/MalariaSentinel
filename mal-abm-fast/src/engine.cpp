@@ -34,18 +34,22 @@ Engine::Engine(AOI aoi,
                const std::string& env_path,
                const std::string& habitat_path,
                Prng& rng,
-               std::chrono::sys_days start_date)
+               std::chrono::sys_days start_date,
+               int32_t max_days)
     : aoi_(std::move(aoi)),
-      current_date_(start_date) {
-    // Build the IO engines first. Either IO failure throws here, so
-    // we surface the path that failed in the message.
-    // Detect file extension: .nc -> daily NetCDF loader, else -> COG/TIF loader.
-    auto climate = std::make_unique<ClimateEngine>();
+      current_date_(start_date),
+      start_date_(start_date) {
+    auto climate = std::make_shared<ClimateEngine>();
     try {
         const bool is_nc = env_path.size() >= 3
             && env_path.substr(env_path.size() - 3) == ".nc";
         if (is_nc) {
             climate->load_from_env_nc(env_path, aoi_);
+            if (max_days > 0 && climate->n_days() < max_days) {
+                throw std::runtime_error(
+                    "Engine: env NC file has " + std::to_string(climate->n_days())
+                    + " days but simulation requests " + std::to_string(max_days) + " days");
+            }
         } else {
             climate->load_from_env_tif(env_path, aoi_);
         }
@@ -92,7 +96,7 @@ Engine::Engine(AOI aoi,
     // is held as a per-module sub-stream (see prng.hpp).
     const int32_t coord_seed32 = static_cast<int32_t>(coord_seed);
     coord_ = std::make_unique<CoordinatorModel>(
-        aoi_, *climate_, *habitat_, coord_seed32, current_date_);
+        aoi_, climate_, *habitat_, coord_seed32, current_date_);
 
     // The submodel is seeded with the derived sub_seed and the
     // count of pre-existing patches. An empty gpkg is allowed (M2
@@ -107,15 +111,12 @@ Engine::Engine(AOI aoi,
 }
 
 void Engine::step() {
-    // 1. Coordinator updates patch.activated from the current
-    //    climate. The implementation subagent decides whether to
-    //    consume current_date_ (for M1 the env is monthly, so
-    //    activate_patches is a no-op for the daily call).
+    const int32_t day_index = static_cast<int32_t>(
+        (current_date_ - start_date_).count());
+    coord_->set_climate_day(day_index);
+
     coord_->activate_patches();
 
-    // 2. Build the per-patch state vector for today. The coordinator
-    //    caches it in cached_states_; the engine reads it back via
-    //    patch_states_today() on the next call.
     coord_->to_dataframe();
 
     // 3. Submodel advances one day using the cached per-patch

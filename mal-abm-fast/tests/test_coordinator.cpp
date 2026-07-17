@@ -129,8 +129,8 @@ TEST(MalAbmFastCoordinator, FullDayOrchestrator) {
         ds->SetSpatialRef(&srs);
         GDALClose(ds);
     }
-    ClimateEngine climate;
-    climate.load_from_env_tif(env_path, aoi);
+    auto climate = std::make_shared<ClimateEngine>();
+    climate->load_from_env_tif(env_path, aoi);
 
     // Write a synthetic 1-row habitat gpkg at (row=2, col=2) and load it.
     const std::string hab_path = temp_dir("coordinator_hab") + "/hab.gpkg";
@@ -177,7 +177,7 @@ TEST(MalAbmFastCoordinator, FullDayOrchestrator) {
     ASSERT_EQ(sub.total_agents(), 300);
 
     CoordinatorModel coord(
-        std::move(aoi), std::move(climate), std::move(habitat),
+        std::move(aoi), climate, std::move(habitat),
         /*seed=*/int32_t{1}, make_date(2024, 1, 1));
 
     coord.activate_patches();
@@ -221,10 +221,10 @@ TEST(MalAbmFastCoordinator, WriteStateCogReturnsPathAndCreatesSidecar) {
     GDALAllRegister();  // needed for write_state_cog (GDAL GTiff driver)
 
     AOI aoi = make_aoi_4x4();
-    ClimateEngine climate;
+    auto climate = std::make_shared<ClimateEngine>();
     HabitatEngine habitat;
     CoordinatorModel coord(
-        std::move(aoi), std::move(climate), std::move(habitat),
+        std::move(aoi), climate, std::move(habitat),
         /*seed=*/int32_t{7}, make_date(2024, 1, 1));
 
     DensityGrid density;
@@ -318,9 +318,9 @@ TEST(CoordinatorModel, PatchActivationTogglesDaily) {
     WriteSyntheticEnvNC(nc_path, 2);
 
     AOI aoi = make_aoi_4x4();
-    ClimateEngine climate;
-    climate.load_from_env_nc(nc_path.string(), aoi);
-    ASSERT_EQ(climate.n_days(), 2);
+    auto climate = std::make_shared<ClimateEngine>();
+    climate->load_from_env_nc(nc_path.string(), aoi);
+    ASSERT_EQ(climate->n_days(), 2);
 
     // Write a synthetic habitat gpkg at (row=2, col=2)
     const std::string hab_path = temp_dir("coordinator_daily_hab") + "/hab.gpkg";
@@ -366,9 +366,9 @@ TEST(CoordinatorModel, PatchActivationTogglesDaily) {
         /*seed=*/uint64_t{42});
 
     // Day 0: rain=20 (>15 threshold) -> patches should be active
-    climate.set_day(0);
+    climate->set_day(0);
     CoordinatorModel coord0(
-        std::move(aoi), std::move(climate), std::move(habitat),
+        std::move(aoi), climate, std::move(habitat),
         /*seed=*/int32_t{1}, make_date(2024, 1, 1));
 
     coord0.activate_patches();

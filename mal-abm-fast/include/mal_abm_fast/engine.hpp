@@ -52,7 +52,8 @@ public:
            const std::string& env_path,
            const std::string& habitat_path,
            Prng& rng,
-           std::chrono::sys_days start_date);
+           std::chrono::sys_days start_date,
+           int32_t max_days = 0);
 
     // Advance the model by one day. Mirrors `AnophelesABM.step()`:
     //   1. coord_->activate_patches()
@@ -89,11 +90,12 @@ public:
 
 private:
     AOI                                     aoi_;
-    std::unique_ptr<ClimateEngine>          climate_;
+    std::shared_ptr<ClimateEngine>          climate_;
     std::unique_ptr<HabitatEngine>          habitat_;
     std::unique_ptr<CoordinatorModel>       coord_;
     std::unique_ptr<MosquitoSubmodel>       sub_;
     std::chrono::sys_days                   current_date_;
+    std::chrono::sys_days                   start_date_;
 };
 
 }  // namespace mal_abm_fast

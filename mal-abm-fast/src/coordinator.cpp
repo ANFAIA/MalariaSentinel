@@ -29,7 +29,7 @@
 
 namespace mal_abm_fast {
 
-CoordinatorModel::CoordinatorModel(AOI aoi, ClimateEngine climate,
+CoordinatorModel::CoordinatorModel(AOI aoi, std::shared_ptr<ClimateEngine> climate,
                                    HabitatEngine habitat, int32_t seed,
                                    std::chrono::sys_days start_date)
     : aoi_(std::move(aoi)),
@@ -39,6 +39,10 @@ CoordinatorModel::CoordinatorModel(AOI aoi, ClimateEngine climate,
       current_date_(start_date),
       next_dynamic_patch_id_(
           static_cast<int64_t>(habitat_.patches().size())) {}
+
+void CoordinatorModel::set_climate_day(int32_t day_index) {
+    climate_->set_day(day_index);
+}
 
 void CoordinatorModel::activate_patches() {
     // F1.b note: the activation check is re-done in to_dataframe()
@@ -55,10 +59,10 @@ void CoordinatorModel::activate_patches() {
 
 std::vector<PatchState> CoordinatorModel::to_dataframe() {
     // Use the current day for daily climate lookups.
-    // climate_.set_day() is called by the engine step loop before
+    // climate_->set_day() is called by the engine step loop before
     // to_dataframe(); the accessors below read the daily band slice.
-    const int32_t H = climate_.h();
-    const int32_t W = climate_.w();
+    const int32_t H = climate_->h();
+    const int32_t W = climate_->w();
     const size_t hw = static_cast<size_t>(H) * static_cast<size_t>(W);
 
     std::vector<PatchState> states;
@@ -77,13 +81,13 @@ std::vector<PatchState> CoordinatorModel::to_dataframe() {
     union_cells.reserve(pre_rowcol_to_pid.size() + hw);
 
     for (const auto& patch : habitat_.patches()) {
-        if (climate_.rain_at(patch.row, patch.col) >
+        if (climate_->rain_at(patch.row, patch.col) >
             PLUVIAL_POOL_RAIN_THRESHOLD_MM) {
             union_cells.insert({patch.row, patch.col});
         }
     }
 
-    const std::vector<float> twi = climate_.twi_grid();
+    const std::vector<float> twi = climate_->twi_grid();
     const bool has_twi = (twi.size() == hw);
     for (int32_t r = 0; r < H; ++r) {
         for (int32_t c = 0; c < W; ++c) {
@@ -91,8 +95,8 @@ std::vector<PatchState> CoordinatorModel::to_dataframe() {
                                    static_cast<size_t>(W) +
                                static_cast<size_t>(c);
             const float twi_val = has_twi ? twi[idx] : 0.0f;
-            const float water_frac_val = climate_.water_frac_at(r, c);
-            const float rain_val = climate_.rain_at(r, c);
+            const float water_frac_val = climate_->water_frac_at(r, c);
+            const float rain_val = climate_->rain_at(r, c);
             if (twi_val > PLUVIAL_POOL_TWI_THRESHOLD &&
                 water_frac_val > PLUVIAL_POOL_WATER_FRAC_MIN &&
                 rain_val > PLUVIAL_POOL_RAIN_THRESHOLD_MM) {
@@ -121,9 +125,9 @@ std::vector<PatchState> CoordinatorModel::to_dataframe() {
         ps.row = cell.first;
         ps.col = cell.second;
         ps.activated = true;
-        ps.rain_d = climate_.rain_at(cell.first, cell.second);
-        ps.temp_d = climate_.temp_at(cell.first, cell.second);
-        ps.water_frac = climate_.water_frac_at(cell.first, cell.second);
+        ps.rain_d = climate_->rain_at(cell.first, cell.second);
+        ps.temp_d = climate_->temp_at(cell.first, cell.second);
+        ps.water_frac = climate_->water_frac_at(cell.first, cell.second);
         states.push_back(ps);
     }
 
@@ -140,8 +144,8 @@ std::vector<PatchState> CoordinatorModel::to_dataframe() {
 
 DensityGrid CoordinatorModel::aggregate_density(const MosquitoSubmodel& sub,
                                                 int32_t k_max) const {
-    const int32_t H = climate_.h();
-    const int32_t W = climate_.w();
+    const int32_t H = climate_->h();
+    const int32_t W = climate_->w();
     DensityGrid grid;
     grid.h = H;
     grid.w = W;
@@ -186,8 +190,8 @@ DensityGrid CoordinatorModel::aggregate_density(const MosquitoSubmodel& sub,
 
 SuitabilityGrid CoordinatorModel::suitability_grid(
     const MosquitoSubmodel& sub, int32_t k_max) const {
-    const int32_t H = climate_.h();
-    const int32_t W = climate_.w();
+    const int32_t H = climate_->h();
+    const int32_t W = climate_->w();
     SuitabilityGrid grid;
     grid.h = H;
     grid.w = W;

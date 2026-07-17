@@ -53,6 +53,7 @@
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <unordered_map>
 #include <utility>
@@ -87,13 +88,14 @@ public:
     // Construct a coordinator for (AOI, climate, habitat, seed, start
     // date). The Prng is seeded with `seed`; per-module sub-streams
     // are derived by the implementation subagent.
-    CoordinatorModel(AOI aoi, ClimateEngine climate, HabitatEngine habitat,
+    CoordinatorModel(AOI aoi, std::shared_ptr<ClimateEngine> climate,
+                     HabitatEngine habitat,
                      int32_t seed, std::chrono::sys_days start_date);
 
     // Accessors. The Prng is mutable (submodel.advance_day advances
     // it) so `rng()` is non-const.
     const AOI&            aoi()        const { return aoi_; }
-    const ClimateEngine&  climate()    const { return climate_; }
+    const ClimateEngine&  climate()    const { return *climate_; }
     const HabitatEngine&  habitat()    const { return habitat_; }
     std::chrono::sys_days current_date() const { return current_date_; }
     // Mutable accessor for the per-day date advance. The Engine
@@ -112,6 +114,8 @@ public:
     }
 
     // -- per-day: activation -------------------------------------------------
+
+    void set_climate_day(int32_t day_index);
 
     // Update patch.activated from climate. For M1 with monthly env,
     // day is constant per month and may be ignored. The
@@ -161,7 +165,7 @@ public:
 
 private:
     AOI                                       aoi_;
-    ClimateEngine                             climate_;
+    std::shared_ptr<ClimateEngine>            climate_;
     HabitatEngine                             habitat_;
     Prng                                      rng_;
     std::chrono::sys_days                     current_date_;

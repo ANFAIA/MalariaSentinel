@@ -48,7 +48,26 @@ if [[ ! -x "$PROJECT_ROOT/mal-abm-fast/build/mal_abm_fast" ]]; then
   cmake --build "$PROJECT_ROOT/mal-abm-fast/build" -j
 fi
 
-# F1.a scaffold smoke; F2/F3 will replace with the full ABM loop.
-"$PROJECT_ROOT/mal-abm-fast/build/mal_abm_fast" --version
+MONTH="${MONTH:-6}"
+YEAR="${YEAR:-2024}"
+SEED_BASE="${SEED_BASE:-1}"
 
-echo "[long.sh] done. (F1.a: scaffold smoke; F2/F3 will run the ABM.)"
+ENV_TIF="${PROJECT_ROOT}/data/runs/${AOI}/m2/${AOI}_regional_${YEAR}_$(printf '%02d' "$MONTH")_env.tif"
+HAB_GPKG="${PROJECT_ROOT}/data/runs/${AOI}/m2/${AOI}_regional_${YEAR}_$(printf '%02d' "$MONTH")_habitat_patches.gpkg"
+
+# F2: run the full ABM loop with OpenMP parallelism.
+DAYS_PER_MONTH=30
+TOTAL_DAYS=$((NUM_MONTHS * DAYS_PER_MONTH))
+
+srun "$PROJECT_ROOT/mal-abm-fast/build/mal_abm_fast" run \
+    --aoi "$AOI" \
+    --env "$ENV_TIF" \
+    --habitat "$HAB_GPKG" \
+    --output "$OUT_DIR/state.tif" \
+    --days "$TOTAL_DAYS" \
+    --n-rollouts "$N_ROLLOUTS" \
+    --year "$YEAR" \
+    --month "$MONTH" \
+    --seed "$SEED_BASE"
+
+echo "[long.sh] done."

@@ -415,15 +415,16 @@ void MosquitoSubmodel::adult_dispersal(const AOI& aoi) {
         const size_t si = static_cast<size_t>(i);
         if (soa_.stage[si] != 1) continue;
         const double u = rng_.uniform_double();
-        if (!(u < static_cast<double>(ADULT_DISPERSE_PROB))) continue;
-        const DispOffset off = offset_m(
-            rng_,
-            static_cast<double>(soa_.lon[si]),
-            static_cast<double>(soa_.lat[si]),
-            static_cast<double>(ADULT_DISPERSE_SIGMA_M),
-            static_cast<double>(ADULT_DISPERSE_MAX_M));
-        soa_.lon[si] = static_cast<float>(static_cast<double>(soa_.lon[si]) + off.dlon);
-        soa_.lat[si] = static_cast<float>(static_cast<double>(soa_.lat[si]) + off.dlat);
+        if (u < static_cast<double>(ADULT_DISPERSE_PROB)) {
+            const DispOffset off = offset_m(
+                rng_,
+                static_cast<double>(soa_.lon[si]),
+                static_cast<double>(soa_.lat[si]),
+                static_cast<double>(ADULT_DISPERSE_SIGMA_M),
+                static_cast<double>(ADULT_DISPERSE_MAX_M));
+            soa_.lon[si] = static_cast<float>(static_cast<double>(soa_.lon[si]) + off.dlon);
+            soa_.lat[si] = static_cast<float>(static_cast<double>(soa_.lat[si]) + off.dlat);
+        }
         auto [r, c] = LonLatToCell(static_cast<double>(soa_.lon[si]),
                                     static_cast<double>(soa_.lat[si]), aoi);
         soa_.row[si] = r;
@@ -439,25 +440,32 @@ void MosquitoSubmodel::adult_mortality(
     const std::vector<PatchState>& patch_states) {
     if (soa_.n_alive <= 0) return;
 
-    // Build temperature lookup by patch_id.
-    int64_t max_pid = -1;
+    int32_t max_row = 0;
+    int32_t max_col = 0;
     for (const auto& ps : patch_states) {
-        if (ps.patch_id > max_pid) max_pid = ps.patch_id;
+        if (ps.row > max_row) max_row = ps.row;
+        if (ps.col > max_col) max_col = ps.col;
     }
     for (int64_t i = 0; i < soa_.n_alive; ++i) {
-        const int64_t pid = soa_.patch_id[static_cast<size_t>(i)];
-        if (pid > max_pid) max_pid = pid;
+        const size_t si = static_cast<size_t>(i);
+        if (soa_.stage[si] != 1) continue;
+        if (soa_.row[si] > max_row) max_row = soa_.row[si];
+        if (soa_.col[si] > max_col) max_col = soa_.col[si];
     }
-    if (max_pid < 0) return;
 
-    std::vector<uint8_t>  has_temp(static_cast<size_t>(max_pid) + 1, 0);
-    std::vector<float>    temp_by_id(static_cast<size_t>(max_pid) + 1, 0.0f);
+    const int32_t grid_w = max_col + 1;
+    const int32_t grid_h = max_row + 1;
+    const size_t grid_size = static_cast<size_t>(grid_h) * static_cast<size_t>(grid_w);
+
+    std::vector<uint8_t> has_temp(grid_size, 0);
+    std::vector<float>   temp_grid(grid_size, 0.0f);
     for (const auto& ps : patch_states) {
-        has_temp[static_cast<size_t>(ps.patch_id)] = 1;
-        temp_by_id[static_cast<size_t>(ps.patch_id)] = ps.temp_d;
+        const size_t idx = static_cast<size_t>(ps.row) * static_cast<size_t>(grid_w)
+                         + static_cast<size_t>(ps.col);
+        has_temp[idx] = 1;
+        temp_grid[idx] = ps.temp_d;
     }
 
-    // Lardeux survival: p_d = exp(-((T - OPT_C)^2) / (2 * SIGMA^2)).
     const double opt_c = static_cast<double>(ADULT_OPT_C);
     const double sigma = static_cast<double>(ADULT_SIGMA);
     const double two_sigma_sq = 2.0 * sigma * sigma;
@@ -465,16 +473,18 @@ void MosquitoSubmodel::adult_mortality(
     int64_t i = soa_.n_alive - 1;
     while (i >= 0) {
         const size_t si = static_cast<size_t>(i);
-        if (soa_.stage[si] == 1) {  // adults only
-            const int64_t pid = soa_.patch_id[si];
+        if (soa_.stage[si] == 1) {
+            const int32_t r = soa_.row[si];
+            const int32_t c = soa_.col[si];
+            const size_t idx = static_cast<size_t>(r) * static_cast<size_t>(grid_w)
+                             + static_cast<size_t>(c);
             double p_d;
-            if (has_temp[pid]) {
-                const double T = static_cast<double>(temp_by_id[pid]);
+            if (idx < grid_size && has_temp[idx]) {
+                const double T = static_cast<double>(temp_grid[idx]);
                 p_d = std::exp(-((T - opt_c) * (T - opt_c)) / two_sigma_sq);
             } else {
                 p_d = static_cast<double>(ADULT_DAILY_MORT_BASE);
             }
-            // Clamp to [0.80, 1.0].
             if (p_d < 0.80) p_d = 0.80;
             if (p_d > 1.0)  p_d = 1.0;
             if (rng_.uniform_double() >= p_d) {

@@ -12,14 +12,9 @@ find_package(Eigen3 REQUIRED CONFIG)
 find_package(GDAL   REQUIRED)
 find_package(CLI11  REQUIRED CONFIG)
 find_package(nlohmann_json REQUIRED)
-# OpenMP is optional in F1.b (single-thread + SIMD). Required from F2.
-# On macOS with Apple Clang, OpenMP requires libomp; F1.b builds and
-# tests without it. F2 will add the link + runtime flags.
-find_package(OpenMP)
+find_package(OpenMP REQUIRED)
 if(OpenMP_CXX_FOUND)
     message(STATUS "OpenMP found: ${OpenMP_CXX_FLAGS}")
-else()
-    message(STATUS "OpenMP not found; F1.b builds without it (F2 will add)")
 endif()
 find_package(GTest REQUIRED)
 
