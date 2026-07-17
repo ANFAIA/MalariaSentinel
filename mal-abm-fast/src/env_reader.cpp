@@ -229,7 +229,7 @@ EnvBands read_env_tif(const std::string& path) {
 
 // -- NetCDF reader (daily-env-netcdf feature) --------------------------------
 
-DailyEnvBands read_env_nc(const std::string& path) {
+DailyEnvBands read_env_nc(const std::string& path, int32_t max_days) {
     EnsureGdalRegistered();
 
     // GDAL's netCDF driver exposes multi-variable files as subdatasets
@@ -289,8 +289,11 @@ DailyEnvBands read_env_nc(const std::string& path) {
                 + varname + "' has no bands");
         }
 
+        // Determine how many bands to read
+        const int bands_to_read = (max_days > 0 && max_days < nbands) ? max_days : nbands;
+
         std::vector<float> result;
-        for (int i = 1; i <= nbands; ++i) {
+        for (int i = 1; i <= bands_to_read; ++i) {
             BandRead br = ReadBand(GDALGetRasterBand(ds, i));
             if (out.h == 0) { out.h = br.h; out.w = br.w; }
             else if (out.h != br.h || out.w != br.w) {
@@ -302,11 +305,11 @@ DailyEnvBands read_env_nc(const std::string& path) {
         }
 
         if (out.n_days == 0) {
-            out.n_days = nbands;
-        } else if (out.n_days != nbands) {
+            out.n_days = bands_to_read;
+        } else if (out.n_days != bands_to_read) {
             throw std::runtime_error(
                 std::string("env_reader::read_env_nc: variable '")
-                + varname + "' has " + std::to_string(nbands)
+                + varname + "' has " + std::to_string(bands_to_read)
                 + " time steps, expected " + std::to_string(out.n_days));
         }
         return result;

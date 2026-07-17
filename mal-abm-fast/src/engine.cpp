@@ -44,7 +44,7 @@ Engine::Engine(AOI aoi,
         const bool is_nc = env_path.size() >= 3
             && env_path.substr(env_path.size() - 3) == ".nc";
         if (is_nc) {
-            climate->load_from_env_nc(env_path, aoi_);
+            climate->load_from_env_nc(env_path, aoi_, max_days);
             if (max_days > 0 && climate->n_days() < max_days) {
                 throw std::runtime_error(
                     "Engine: env NC file has " + std::to_string(climate->n_days())

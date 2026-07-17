@@ -46,13 +46,16 @@ def _cmap(name: str):
 
 
 def _parse_filename(name: str):
-    """Return (year, month, seed) or (day, 0, 0) from various filename formats.
+    """Return (year, month, seed, day) from various filename formats.
     
     Supported formats:
-    - 'abm_YYYY_MM_seedSSSS' → (year, month, seed) for monthly snapshots
+    - 'abm_YYYY_MM_seedSSSS' → (year, month, seed, 0) for monthly snapshots
     - 'abm_YYYY_MM_seedSSSS_dayNNN' → (year, month, seed, day) for daily snapshots
-    - 'state_dayNNN' → (day, 0, 0) for daily snapshots
-    - 'state' → (0, 0, 0) for final snapshot
+    - 'abm_YYYY_MM_dayNNN' → (year, month, 0, day) for daily snapshots without seed
+    - 'state_seedSSSS' → (0, 0, seed, 0) for final snapshot with seed
+    - 'state_seedSSSS_dayNNN' → (0, 0, seed, day) for daily snapshot with seed
+    - 'state_dayNNN' → (0, 0, 0, day) for daily snapshots
+    - 'state' → (0, 0, 0, 0) for final snapshot
     """
     # Format: abm_YYYY_MM_seedSSSS_dayNNN (daily snapshot within monthly run)
     m = re.match(r"abm_(\d{4})_(\d{2})_seed(\d+)_day(\d+)", name)
@@ -63,6 +66,16 @@ def _parse_filename(name: str):
     m = re.match(r"abm_(\d{4})_(\d{2})_seed(\d+)", name)
     if m:
         return int(m.group(1)), int(m.group(2)), int(m.group(3)), 0
+    
+    # Format: state_seedSSSS_dayNNN (daily snapshot with seed)
+    m = re.match(r"state_seed(\d+)_day(\d+)", name)
+    if m:
+        return 0, 0, int(m.group(1)), int(m.group(2))
+    
+    # Format: state_seedSSSS (final snapshot with seed)
+    m = re.match(r"state_seed(\d+)", name)
+    if m:
+        return 0, 0, int(m.group(1)), 0
     
     # Format: state_dayNNN
     m = re.match(r"state_day(\d+)", name)

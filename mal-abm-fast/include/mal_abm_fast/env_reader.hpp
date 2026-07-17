@@ -77,13 +77,14 @@ struct DailyEnvBands {
 };
 
 // Open `path` (a NetCDF file with CF-1.8 daily env variables) with GDAL
-// and read all required variables (`rainfall`, `water_temp_c`,
-// `water_frac`, `ndvi`) across all time steps. The time dimension is
-// UNLIMITED. Each variable is written as a multi-band raster by GDAL
-// where bands map to time steps. No Mordecai inverse is applied —
+// and read required variables (`rainfall`, `water_temp_c`, `water_frac`,
+// `ndvi`) across time steps. If `max_days > 0`, only the first `max_days`
+// time steps are loaded (useful for large multi-year files). The time
+// dimension is UNLIMITED. Each variable is written as a multi-band raster
+// by GDAL where bands map to time steps. No Mordecai inverse is applied —
 // `water_temp_c` is already in deg C. Throws std::runtime_error on any
 // IO error or if a required variable is missing.
-DailyEnvBands read_env_nc(const std::string& path);
+DailyEnvBands read_env_nc(const std::string& path, int32_t max_days = 0);
 
 }  // namespace env_reader
 }  // namespace mal_abm_fast

@@ -79,8 +79,9 @@ public:
     // Read a NetCDF daily env file and populate multi-day bands. The NC
     // file must contain variables `rainfall`, `water_temp_c`, `water_frac`,
     // `ndvi` with a UNLIMITED time dimension. No Mordecai inverse is
-    // applied (water_temp_c is already in deg C).
-    void load_from_env_nc(const std::string& path, const AOI& aoi);
+    // applied (water_temp_c is already in deg C). If `max_days > 0`,
+    // only the first `max_days` time steps are loaded.
+    void load_from_env_nc(const std::string& path, const AOI& aoi, int32_t max_days = 0);
 
     // Switch the active day slice (0-based). Clamps to [0, n_days-1].
     // After set_day(), the *_at() accessors return values for that day.

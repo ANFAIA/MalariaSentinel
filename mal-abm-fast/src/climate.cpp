@@ -91,9 +91,10 @@ float ClimateEngine::water_frac_at(int32_t row, int32_t col) const {
 // -- Daily NetCDF support ----------------------------------------------------
 
 void ClimateEngine::load_from_env_nc(const std::string& path,
-                                     const AOI& aoi) {
+                                     const AOI& aoi,
+                                     int32_t max_days) {
     (void)aoi;
-    env_reader::DailyEnvBands bands = env_reader::read_env_nc(path);
+    env_reader::DailyEnvBands bands = env_reader::read_env_nc(path, max_days);
 
     h_      = bands.h;
     w_      = bands.w;
