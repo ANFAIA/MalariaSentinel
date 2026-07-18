@@ -24,8 +24,10 @@
 #include <stdexcept>
 #include <string>
 #include <utility>
+#include <vector>
 
 #include "prng.hpp"
+#include "seeding.hpp"
 #include "wire.hpp"
 
 namespace mal_abm_fast {
@@ -35,7 +37,8 @@ Engine::Engine(AOI aoi,
                const std::string& habitat_path,
                Prng& rng,
                std::chrono::sys_days start_date,
-               int32_t max_days)
+               int32_t max_days,
+               SeedingConfig seeding_config)
     : aoi_(std::move(aoi)),
       current_date_(start_date),
       start_date_(start_date) {
@@ -106,8 +109,21 @@ Engine::Engine(AOI aoi,
     // n_patches == 0 so the CLI output surfaces the case for the
     // test harness.
     const int32_t n_patches = static_cast<int32_t>(habitat_->patches().size());
-    sub_ = std::make_unique<MosquitoSubmodel>(
-        n_patches, K_PER_PATCH_DEFAULT, INIT_FRAC, sub_seed);
+
+    if (seeding_config.mode == SeedingMode::UNIFORM) {
+        // Legacy path: init_frac of K in every patch.
+        sub_ = std::make_unique<MosquitoSubmodel>(
+            n_patches, K_PER_PATCH_DEFAULT, INIT_FRAC, sub_seed);
+    } else {
+        // Detection-based path: ask the coordinator to filter
+        // habitat patches by viability (water_frac / TWI) and
+        // build the per-patch seed instructions, then construct
+        // the submodel from the explicit list.
+        const std::vector<SeedInstruction> instructions =
+            coord_->build_seed_instructions(seeding_config);
+        sub_ = std::make_unique<MosquitoSubmodel>(
+            n_patches, K_PER_PATCH_DEFAULT, instructions, sub_seed);
+    }
 }
 
 // Optimized constructor: accepts a pre-loaded shared ClimateEngine
@@ -115,13 +131,14 @@ Engine::Engine(AOI aoi,
                std::shared_ptr<ClimateEngine> shared_climate,
                const std::string& habitat_path,
                Prng& rng,
-               std::chrono::sys_days start_date)
+               std::chrono::sys_days start_date,
+               SeedingConfig seeding_config)
     : aoi_(std::move(aoi)),
       climate_(std::move(shared_climate)),
       current_date_(start_date),
       start_date_(start_date) {
     // Skip climate loading - use the shared one
-    
+
     auto habitat = std::make_unique<HabitatEngine>();
     try {
         habitat->load_from_gpkg(habitat_path, aoi_);
@@ -142,8 +159,16 @@ Engine::Engine(AOI aoi,
         aoi_, climate_, *habitat_, coord_seed32, current_date_);
 
     const int32_t n_patches = static_cast<int32_t>(habitat_->patches().size());
-    sub_ = std::make_unique<MosquitoSubmodel>(
-        n_patches, K_PER_PATCH_DEFAULT, INIT_FRAC, sub_seed);
+
+    if (seeding_config.mode == SeedingMode::UNIFORM) {
+        sub_ = std::make_unique<MosquitoSubmodel>(
+            n_patches, K_PER_PATCH_DEFAULT, INIT_FRAC, sub_seed);
+    } else {
+        const std::vector<SeedInstruction> instructions =
+            coord_->build_seed_instructions(seeding_config);
+        sub_ = std::make_unique<MosquitoSubmodel>(
+            n_patches, K_PER_PATCH_DEFAULT, instructions, sub_seed);
+    }
 }
 
 void Engine::step() {

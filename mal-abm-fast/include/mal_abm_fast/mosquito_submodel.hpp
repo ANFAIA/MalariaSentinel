@@ -24,6 +24,7 @@
 
 #include "aoi.hpp"
 #include "prng.hpp"
+#include "seeding.hpp"
 #include "wire.hpp"
 #include "mosquito_state.hpp"
 
@@ -33,13 +34,25 @@ class MosquitoSubmodel {
 public:
     MosquitoSubmodel() = default;
 
-    // Seed `round(n_patches * k_per_patch * init_frac)` larvae, with
+    // Legacy / backward-compat constructor: seed
+    // `round(n_patches * k_per_patch * init_frac)` larvae, with
     // round-robin patch assignment. `lon`/`lat` start at 0 (a
     // placeholder — the coord subagent's `aggregate_density` only
     // reads `patch_id`, not lon/lat; the first dispersal step
     // overwrites them).
     MosquitoSubmodel(int32_t n_patches, int32_t k_per_patch,
                      float init_frac, uint64_t seed);
+
+    // Detection-based constructor: seed a mix of adults and
+    // larvae at specific patches via the supplied SeedInstruction
+    // list. Adults start with `eip_progress = EIP_THRESHOLD_GD` so
+    // they are ready to disperse on day 1; larvae start with
+    // `eip_progress = 0` and must accumulate growing-degree-days
+    // before promotion. The `k_per_patch` is still required for
+    // the per-day `birth()` step (binomial draw per active patch).
+    MosquitoSubmodel(int32_t n_patches, int32_t k_per_patch,
+                     const std::vector<SeedInstruction>& instructions,
+                     uint64_t seed);
 
     // Read-only access to the SoA (the submodel owns it; the
     // coordinator reads it for density aggregation).

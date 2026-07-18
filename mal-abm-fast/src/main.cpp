@@ -48,6 +48,7 @@
 
 #include "engine.hpp"
 #include "prng.hpp"
+#include "seeding.hpp"
 #include "wire.hpp"
 
 namespace {
@@ -157,6 +158,39 @@ std::string rollout_day_path(const std::string& output_path, int day) {
     return (parent / name.str()).string();
 }
 
+// Parse a "lat1,lon1;lat2,lon2;..." string into a list of
+// DetectionPoint. The default per-point adult / larva counts are
+// taken from the supplied SeedingConfig so the user can override
+// them on a per-point basis in a future version (today the
+// per-point fields are ignored — see the implementation).
+std::vector<mal_abm_fast::DetectionPoint> parse_detection_points(
+    const std::string& csv_str) {
+    std::vector<mal_abm_fast::DetectionPoint> out;
+    if (csv_str.empty()) return out;
+    std::stringstream ss(csv_str);
+    std::string pair_str;
+    while (std::getline(ss, pair_str, ';')) {
+        if (pair_str.empty()) continue;
+        // Allow either "lat,lon" or "lon,lat" via the
+        // --detection-points-fmt flag (default: "lat,lon").
+        // For now we only support the documented "lat,lon" form.
+        double lat = 0.0, lon = 0.0;
+        const int n = std::sscanf(pair_str.c_str(), "%lf,%lf", &lat, &lon);
+        if (n != 2) {
+            throw CLI::ValidationError(
+                "--detection-points: each point must be 'lat,lon' "
+                "(got '" + pair_str + "')");
+        }
+        mal_abm_fast::DetectionPoint dp;
+        dp.lat = lat;
+        dp.lon = lon;
+        dp.n_adults = 50;  // overwritten by SeedingConfig defaults below
+        dp.n_larvae = 30;
+        out.push_back(dp);
+    }
+    return out;
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -183,6 +217,14 @@ int main(int argc, char** argv) {
     std::string env_path;
     std::string habitat_path;
     std::string output_path;
+
+    // Detection-based seeding (default: UNIFORM, legacy behaviour).
+    std::string seeding_mode = "uniform";
+    double      detection_radius_km = 5.0;
+    int         n_detections = 3;
+    int         n_adults_per_detection = 50;
+    int         n_larvae_per_detection = 30;
+    std::string detection_points_str;
 
     run->add_option("--aoi", aoi_slug,
                     "AOI slug (default 'ghana'). Use --bbox for custom.");
@@ -235,6 +277,39 @@ int main(int argc, char** argv) {
                     "OpenMP threads for parallel rollouts (0=auto).")
         ->default_val(0)
         ->check(CLI::NonNegativeNumber);
+    run->add_option("--seeding-mode", seeding_mode,
+                    "Seeding mode: 'uniform' (default; init_frac of K "
+                    "in every patch), 'random-viable' (N random "
+                    "patches from the viable set, each seeded with "
+                    "adults + larvae), or 'explicit' (user-provided "
+                    "lat/lon points snapped to the nearest patch "
+                    "within --detection-radius-km).")
+        ->default_val("uniform");
+    run->add_option("--detection-radius-km", detection_radius_km,
+                    "Radius in km for snapping an explicit detection "
+                    "point to its nearest habitat patch (EXPLICIT mode).")
+        ->default_val(5.0)
+        ->check(CLI::PositiveNumber);
+    run->add_option("--n-detections", n_detections,
+                    "Number of detection points in RANDOM_VIABLE mode.")
+        ->default_val(3)
+        ->check(CLI::NonNegativeNumber);
+    run->add_option("--n-adults-per-detection", n_adults_per_detection,
+                    "Adult mosquitoes per detection point "
+                    "(RANDOM_VIABLE / EXPLICIT).")
+        ->default_val(50)
+        ->check(CLI::NonNegativeNumber);
+    run->add_option("--n-larvae-per-detection", n_larvae_per_detection,
+                    "Larvae per detection point "
+                    "(RANDOM_VIABLE / EXPLICIT).")
+        ->default_val(30)
+        ->check(CLI::NonNegativeNumber);
+    run->add_option("--detection-points", detection_points_str,
+                    "Comma-separated 'lat,lon' pairs separated by ';' "
+                    "for EXPLICIT mode "
+                    "(e.g. '5.6,-0.2;9.4,-0.8'). Each point is snapped "
+                    "to the nearest viable patch within "
+                    "--detection-radius-km.");
 
     CLI11_PARSE(app, argc, argv);
 
@@ -243,6 +318,37 @@ int main(int argc, char** argv) {
         std::cout << app.help();
         return EXIT_SUCCESS;
     }
+
+    // -- Seeding config: parse --seeding-mode into a SeedingConfig ---
+    mal_abm_fast::SeedingConfig seeding_config;
+    if (seeding_mode == "uniform") {
+        seeding_config.mode = mal_abm_fast::SeedingMode::UNIFORM;
+    } else if (seeding_mode == "random-viable") {
+        seeding_config.mode = mal_abm_fast::SeedingMode::RANDOM_VIABLE;
+    } else if (seeding_mode == "explicit") {
+        seeding_config.mode = mal_abm_fast::SeedingMode::EXPLICIT;
+        try {
+            seeding_config.detections =
+                parse_detection_points(detection_points_str);
+        } catch (const CLI::ValidationError& e) {
+            std::cerr << "abm_run: " << e.what() << "\n";
+            return EXIT_FAILURE;
+        }
+        if (seeding_config.detections.empty()) {
+            std::cerr << "abm_run: --seeding-mode=explicit requires "
+                         "at least one point in --detection-points\n";
+            return EXIT_FAILURE;
+        }
+    } else {
+        std::cerr << "abm_run: unknown --seeding-mode '" << seeding_mode
+                  << "' (expected 'uniform', 'random-viable', or "
+                     "'explicit')\n";
+        return EXIT_FAILURE;
+    }
+    seeding_config.detection_radius_km  = detection_radius_km;
+    seeding_config.n_detections         = n_detections;
+    seeding_config.n_adults_per_detection = n_adults_per_detection;
+    seeding_config.n_larvae_per_detection = n_larvae_per_detection;
 
     // -- AOI resolution ------------------------------------------------
     mal_abm_fast::AOI aoi;
@@ -318,7 +424,8 @@ int main(int argc, char** argv) {
         std::unique_ptr<mal_abm_fast::Engine> engine_ptr;
         try {
             engine_ptr = std::make_unique<mal_abm_fast::Engine>(
-                aoi, thread_climate, habitat_path, rng, start_date);
+                aoi, thread_climate, habitat_path, rng, start_date,
+                seeding_config);
         } catch (const std::exception& e) {
             std::cerr << "abm_run: rollout " << i
                       << " failed to build engine: " << e.what() << "\n";

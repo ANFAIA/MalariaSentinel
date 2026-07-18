@@ -63,6 +63,7 @@
 #include "climate.hpp"
 #include "habitat_engine.hpp"
 #include "prng.hpp"
+#include "seeding.hpp"
 #include "wire.hpp"
 
 namespace mal_abm_fast {
@@ -131,6 +132,16 @@ public:
     // patch_ids starting at `patches().size()`; the registry records
     // them for site fidelity.
     std::vector<PatchState> to_dataframe();
+
+    // Identify viable patches from the habitat (water_frac >
+    // `config.min_water_frac` AND twi > `config.min_twi`) and build
+    // the per-patch seed instructions for the submodel. Used by
+    // the Engine during construction to wire the detection-based
+    // seeding modes (RANDOM_VIABLE, EXPLICIT). Returns an empty
+    // vector in UNIFORM mode (the submodel uses init_frac for
+    // every patch — the legacy path).
+    std::vector<SeedInstruction> build_seed_instructions(
+        const SeedingConfig& config);
 
     // -- density aggregation ------------------------------------------------
 

@@ -30,6 +30,7 @@
 #include "mal_abm_fast/aoi.hpp"
 #include "mal_abm_fast/dispersal.hpp"
 #include "mal_abm_fast/eip.hpp"
+#include "mal_abm_fast/seeding.hpp"
 
 namespace mal_abm_fast {
 
@@ -146,6 +147,91 @@ MosquitoSubmodel::MosquitoSubmodel(int32_t n_patches, int32_t k_per_patch,
     }
     soa_.n_alive  = n;
     soa_.next_uid = n;
+}
+
+// ---------------------------------------------------------------------------
+// Detection-based constructor
+// ---------------------------------------------------------------------------
+//
+// For each `SeedInstruction`:
+//   * `n_adults` agents are added with `stage = 1` (adult) and
+//     `eip_progress = EIP_THRESHOLD_GD` so the first `larva_to_adult`
+//     pass does NOT re-promote them — they are already adult, ready
+//     to disperse on day 1.
+//   * `n_larvae` agents are added with `stage = 0` (larva) and
+//     `eip_progress = 0`. They must accumulate growing-degree-days
+//     before promotion (matches the legacy "seed K*init_frac larvae"
+//     path).
+// Adults get the instruction's lon/lat (the cell centre) so the
+// first `adult_dispersal` pass has a valid origin; larvae are placed
+// at the same (lon, lat) so subsequent cell snapping is consistent.
+MosquitoSubmodel::MosquitoSubmodel(int32_t n_patches, int32_t k_per_patch,
+                                   const std::vector<SeedInstruction>& instructions,
+                                   uint64_t seed)
+    : rng_(seed), k_per_patch_(k_per_patch) {
+    (void)n_patches;  // not needed; instructions are explicit
+    if (instructions.empty()) {
+        soa_.n_alive  = 0;
+        soa_.next_uid = 0;
+        return;
+    }
+
+    int64_t total = 0;
+    for (const auto& inst : instructions) {
+        if (inst.n_adults < 0 || inst.n_larvae < 0) continue;
+        total += static_cast<int64_t>(inst.n_adults);
+        total += static_cast<int64_t>(inst.n_larvae);
+    }
+    if (total <= 0) {
+        soa_.n_alive  = 0;
+        soa_.next_uid = 0;
+        return;
+    }
+
+    const size_t cap = static_cast<size_t>(total);
+    soa_.uid.reserve(cap);
+    soa_.patch_id.reserve(cap);
+    soa_.row.reserve(cap);
+    soa_.col.reserve(cap);
+    soa_.stage.reserve(cap);
+    soa_.lon.reserve(cap);
+    soa_.lat.reserve(cap);
+    soa_.eip_progress.reserve(cap);
+    soa_.stage_age.reserve(cap);
+    soa_.days_since_active.reserve(cap);
+
+    for (const auto& inst : instructions) {
+        // Adults: ready to disperse immediately. eip_progress is
+        // irrelevant for adults but we write EIP_THRESHOLD_GD so a
+        // later code path that reads it sees a sensible value.
+        for (int32_t j = 0; j < inst.n_adults; ++j) {
+            soa_.uid.push_back(static_cast<int64_t>(soa_.uid.size()));
+            soa_.patch_id.push_back(inst.patch_id);
+            soa_.row.push_back(inst.row);
+            soa_.col.push_back(inst.col);
+            soa_.stage.push_back(1);  // adult
+            soa_.lon.push_back(static_cast<float>(inst.lon));
+            soa_.lat.push_back(static_cast<float>(inst.lat));
+            soa_.eip_progress.push_back(EIP_THRESHOLD_GD);
+            soa_.stage_age.push_back(0);
+            soa_.days_since_active.push_back(0);
+        }
+        // Larvae: need to complete EIP before becoming adults.
+        for (int32_t j = 0; j < inst.n_larvae; ++j) {
+            soa_.uid.push_back(static_cast<int64_t>(soa_.uid.size()));
+            soa_.patch_id.push_back(inst.patch_id);
+            soa_.row.push_back(inst.row);
+            soa_.col.push_back(inst.col);
+            soa_.stage.push_back(0);  // larva
+            soa_.lon.push_back(static_cast<float>(inst.lon));
+            soa_.lat.push_back(static_cast<float>(inst.lat));
+            soa_.eip_progress.push_back(0.0f);
+            soa_.stage_age.push_back(0);
+            soa_.days_since_active.push_back(0);
+        }
+    }
+    soa_.n_alive  = total;
+    soa_.next_uid = total;
 }
 
 // ---------------------------------------------------------------------------

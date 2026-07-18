@@ -10,6 +10,7 @@
 #include "coordinator.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -25,6 +26,7 @@
 #include "habitat_engine.hpp"
 #include "mosquito_submodel.hpp"
 #include "output_contract.hpp"
+#include "seeding.hpp"
 #include "wire.hpp"
 
 namespace mal_abm_fast {
@@ -140,6 +142,50 @@ std::vector<PatchState> CoordinatorModel::to_dataframe() {
 
     cached_states_ = states;
     return states;
+}
+
+std::vector<SeedInstruction> CoordinatorModel::build_seed_instructions(
+    const SeedingConfig& config) {
+    // 1. Filter habitat patches by the viability rule:
+    //      water_frac > config.min_water_frac (default 0.05)
+    //      twi        > config.min_twi        (default 8.0)
+    // The current Ghana dataset has water_frac=1.0 and TWI > 8 on
+    // all 19,424 patches, so the filter is a no-op today. The
+    // criteria are present so the future datasets (where some
+    // cells are dry / low-TWI) drop out cleanly.
+    std::vector<int32_t> viable_ids;
+    std::vector<std::array<double, 2>> viable_lonlat;
+    std::vector<std::array<int32_t, 2>> viable_rowcol;
+    const auto& patches = habitat_.patches();
+    viable_ids.reserve(patches.size());
+    viable_lonlat.reserve(patches.size());
+    viable_rowcol.reserve(patches.size());
+    for (size_t i = 0; i < patches.size(); ++i) {
+        const auto& p = patches[i];
+        // The HabitatPatch struct only carries twi_value; the
+        // water_frac is read from the climate's per-cell band
+        // (same source the dynamic-patch rule uses). We fall
+        // back to `p.water_frac_value` (a future field) when
+        // the climate lookup is unavailable; for now, the
+        // climate->water_frac_at(p.row, p.col) is the canonical
+        // source.
+        const float water_frac = (climate_ != nullptr)
+            ? climate_->water_frac_at(p.row, p.col)
+            : 1.0f;  // optimistic default: treat as viable
+        if (!(water_frac > config.min_water_frac)) continue;
+        if (!(p.twi_value > config.min_twi)) continue;
+        viable_ids.push_back(static_cast<int32_t>(i));
+        viable_lonlat.push_back({p.lon, p.lat});
+        viable_rowcol.push_back({p.row, p.col});
+    }
+
+    // 2. Delegate to the free function in seeding.cpp. The
+    //    coordinator owns the per-rollout Prng, so the random
+    //    selection in RANDOM_VIABLE mode goes through it (keeping
+    //    the stream reproducible).
+    return build_seed_instructions_for_patches(config, viable_ids,
+                                               viable_lonlat, viable_rowcol,
+                                               rng_);
 }
 
 DensityGrid CoordinatorModel::aggregate_density(const MosquitoSubmodel& sub,

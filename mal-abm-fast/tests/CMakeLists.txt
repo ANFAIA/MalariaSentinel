@@ -78,3 +78,10 @@ target_link_libraries(test_engine
     PRIVATE mal_abm_fast_core GTest::gtest GTest::gtest_main mal_abm_fast::warnings
 )
 gtest_discover_tests(test_engine)
+
+# Detection-based seeding tests (RANDOM_VIABLE, EXPLICIT, UNIFORM).
+add_executable(test_seeding test_seeding.cpp)
+target_link_libraries(test_seeding
+    PRIVATE mal_abm_fast_core GTest::gtest GTest::gtest_main mal_abm_fast::warnings
+)
+gtest_discover_tests(test_seeding)

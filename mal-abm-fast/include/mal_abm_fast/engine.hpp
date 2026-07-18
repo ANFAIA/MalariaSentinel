@@ -21,6 +21,7 @@
 #include "habitat_engine.hpp"
 #include "mosquito_submodel.hpp"
 #include "prng.hpp"
+#include "seeding.hpp"
 #include "wire.hpp"
 
 namespace mal_abm_fast {
@@ -47,13 +48,20 @@ public:
     // Engine is destroyed at the end of the iteration so no Prng
     // state leaks across rollouts.
     //
+    // The `seeding_config` (default = UNIFORM mode) controls how
+    // the submodel is initialised. UNIFORM preserves the legacy
+    // behaviour (`init_frac` of K in every patch). RANDOM_VIABLE
+    // and EXPLICIT use detection-based seeding via the
+    // `CoordinatorModel::build_seed_instructions` helper.
+    //
     // Throws `std::runtime_error` if either IO load fails.
     Engine(AOI aoi,
            const std::string& env_path,
            const std::string& habitat_path,
            Prng& rng,
            std::chrono::sys_days start_date,
-           int32_t max_days = 0);
+           int32_t max_days = 0,
+           SeedingConfig seeding_config = SeedingConfig{});
 
     // Optimized constructor: accepts a pre-loaded shared ClimateEngine.
     // Used by multi-rollout simulations to share climate data across
@@ -64,7 +72,8 @@ public:
            std::shared_ptr<ClimateEngine> shared_climate,
            const std::string& habitat_path,
            Prng& rng,
-           std::chrono::sys_days start_date);
+           std::chrono::sys_days start_date,
+           SeedingConfig seeding_config = SeedingConfig{});
 
     // Advance the model by one day. Mirrors `AnophelesABM.step()`:
     //   1. coord_->activate_patches()
