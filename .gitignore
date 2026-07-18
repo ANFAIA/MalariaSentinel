@@ -16,6 +16,9 @@ terrain/**/*.tif
 runs/layers/*.tif
 runs/layers/*.zip
 
+#   Large env NetCDF files (regenerable via scripts/build_2year_nc.py)
+data/ghana/
+
 # Experiment artifacts (regenerable from the pipeline)
 runs/
 *.pt

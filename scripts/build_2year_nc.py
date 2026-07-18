@@ -17,7 +17,7 @@ import xarray as xr
 
 # Configuration
 DATA_DIR = pathlib.Path("data/runs/ghana/m2")
-OUTPUT_DIR = pathlib.Path("data/runs/ghana/two_year")
+OUTPUT_DIR = pathlib.Path("data/ghana")
 OUTPUT_FILE = OUTPUT_DIR / "ghana_regional_2024_2025_env.nc"
 
 # Band names (must match the COG order)
