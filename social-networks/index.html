@@ -1,0 +1,1089 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <title>MalariaSentinel — LinkedIn</title>
+  <style>
+    /* ------------------------------------------------------------------
+       MalariaSentinel — LinkedIn Presentation
+       Vertical 4:5 (1080x1350), 6 scenes, ~45s
+       design.md: scientific teal, dark, Space Grotesk + JetBrains Mono
+       ------------------------------------------------------------------ */
+
+    @font-face {
+      font-family: "Space Grotesk";
+      font-style: normal;
+      font-weight: 300 700;
+      font-display: block;
+      src: url("fonts/space-grotesk-latin.woff2") format("woff2");
+      unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+2000-206F, U+20AC, U+2122, U+FFFD;
+    }
+
+    :root {
+      --bg: #0A1419;
+      --surface: #0F1C25;
+      --surface-2: #131F28;
+      --fg: #E8F1F4;
+      --fg-muted: #8A9AA3;
+      --fg-dim: #7A8B93;
+      --accent: #14B8A6;
+      --accent-bright: #2DD4BF;
+      --accent-glow: rgba(20, 184, 166, 0.18);
+      --accent-glow-soft: rgba(20, 184, 166, 0.10);
+      --rule: rgba(232, 241, 244, 0.10);
+      --rule-strong: rgba(232, 241, 244, 0.18);
+      --warn: #F59E0B;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      background: var(--bg);
+      color: var(--fg);
+      font-family: "Space Grotesk", sans-serif;
+      font-weight: 400;
+      -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
+    }
+
+    body { width: 1080px; height: 1350px; overflow: hidden; }
+
+    /* The root composition fills the body. */
+    [data-composition-id="root"] {
+      position: relative;
+      width: 1080px;
+      height: 1350px;
+      background: var(--bg);
+      overflow: hidden;
+    }
+
+    /* ---------- running header (persistent) ---------- */
+    .running-header {
+      position: absolute;
+      top: 60px; left: 80px; right: 80px;
+      display: flex; align-items: center; justify-content: space-between;
+      z-index: 1000;
+      pointer-events: none;
+    }
+    .running-header .label {
+      font-family: "JetBrains Mono", monospace;
+      font-size: 18px;
+      color: var(--fg-dim);
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+    }
+    .running-header .label .dot {
+      display: inline-block;
+      width: 6px; height: 6px;
+      background: var(--accent);
+      border-radius: 50%;
+      margin: 0 10px 3px 10px;
+      vertical-align: middle;
+    }
+    .running-header .scene-num {
+      font-family: "JetBrains Mono", monospace;
+      font-size: 18px;
+      color: var(--fg-dim);
+      letter-spacing: 0.18em;
+    }
+    .running-header .scene-num .accent { color: var(--accent); }
+
+    .running-rule {
+      position: absolute;
+      top: 100px; left: 80px; right: 80px;
+      height: 1px;
+      background: var(--rule);
+      z-index: 1000;
+    }
+
+    /* ---------- scene system ---------- */
+    .scene {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      opacity: 0;
+      will-change: transform, opacity, filter;
+    }
+
+    /* scene-content fills the scene, padding positions content */
+    .scene-content {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      padding: 160px 120px 140px 120px;
+      display: flex;
+      flex-direction: column;
+      gap: 28px;
+    }
+
+    /* ---------- background decoratives ---------- */
+    .bg-glow {
+      position: absolute;
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 0;
+    }
+    .bg-grid {
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(to right, rgba(232, 241, 244, 0.025) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(232, 241, 244, 0.025) 1px, transparent 1px);
+      background-size: 80px 80px;
+      z-index: 0;
+      pointer-events: none;
+    }
+    .ghost {
+      position: absolute;
+      font-family: "Space Grotesk", sans-serif;
+      font-weight: 700;
+      color: var(--fg);
+      opacity: 0.05;
+      letter-spacing: -0.04em;
+      line-height: 0.85;
+      pointer-events: none;
+      z-index: 0;
+      white-space: nowrap;
+    }
+    .ghost-italic {
+      font-family: "Space Grotesk", sans-serif;
+      font-style: italic;
+      font-weight: 600;
+    }
+
+    /* ---------- top + bottom hairlines (scene 1) ---------- */
+    .top-rule, .bottom-rule {
+      position: absolute;
+      left: 80px; right: 80px;
+      height: 1px;
+      background: var(--rule);
+      z-index: 2;
+    }
+    .top-rule { top: 100px; }
+    .bottom-rule { bottom: 100px; height: 1px; }
+
+    /* ---------- section label + heading primitives ---------- */
+    .section-label {
+      font-family: "JetBrains Mono", monospace;
+      font-size: 20px;
+      color: var(--accent);
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      font-weight: 500;
+    }
+    .heading {
+      font-family: "Space Grotesk", sans-serif;
+      font-weight: 700;
+      color: var(--fg);
+      letter-spacing: -0.025em;
+      line-height: 1.05;
+    }
+    .heading.h-1 { font-size: 120px; line-height: 0.95; }
+    .heading.h-2 { font-size: 64px; }
+    .heading.h-3 { font-size: 56px; }
+    .heading.h-4 { font-size: 48px; }
+    .body {
+      font-family: "Space Grotesk", sans-serif;
+      font-weight: 400;
+      color: var(--fg-muted);
+      font-size: 32px;
+      line-height: 1.3;
+    }
+    .body.muted { color: var(--fg-dim); }
+    .italic-serif {
+      font-family: "Space Grotesk", sans-serif;
+      font-style: italic;
+      font-weight: 600;
+    }
+    .mono {
+      font-family: "JetBrains Mono", monospace;
+      font-weight: 500;
+      color: var(--fg-muted);
+      letter-spacing: 0.04em;
+    }
+    .mono.dim { color: var(--fg-dim); }
+    .mono.uppercase { text-transform: uppercase; letter-spacing: 0.14em; }
+
+    /* ---------- scene 1 (title) ---------- */
+    #scene-1 .title-wrap {
+      margin-top: 120px;
+      position: relative;
+    }
+    #scene-1 .title-main {
+      font-family: "Space Grotesk", sans-serif;
+      font-weight: 700;
+      font-size: 110px;
+      color: var(--fg);
+      line-height: 0.95;
+      letter-spacing: -0.045em;
+    }
+    #scene-1 .title-serif {
+      font-family: "Space Grotesk", sans-serif;
+      font-style: italic;
+      font-weight: 600;
+      font-size: 72px;
+      color: var(--accent-bright);
+      margin-top: 18px;
+      letter-spacing: -0.015em;
+    }
+    #scene-1 .title-tagline {
+      font-family: "Space Grotesk", sans-serif;
+      font-weight: 500;
+      font-size: 30px;
+      color: var(--fg-muted);
+      margin-top: 60px;
+      max-width: 760px;
+      line-height: 1.3;
+    }
+    #scene-1 .title-meta-right {
+      position: absolute;
+      right: 0; top: 30px;
+      writing-mode: vertical-rl;
+      transform: rotate(180deg);
+      font-family: "JetBrains Mono", monospace;
+      font-size: 18px;
+      color: var(--fg-dim);
+      letter-spacing: 0.2em;
+    }
+    #scene-1 .title-section {
+      position: absolute;
+      top: -20px; right: 0;
+      font-family: "JetBrains Mono", monospace;
+      font-size: 18px;
+      color: var(--fg-muted);
+      letter-spacing: 0.2em;
+    }
+
+    /* ---------- scene 2 (hook) ---------- */
+    #scene-2 .hook-stack {
+      margin-top: 80px;
+      display: flex; flex-direction: column;
+      gap: 18px;
+    }
+    #scene-2 .hook-line {
+      font-family: "Space Grotesk", sans-serif;
+      font-weight: 500;
+      font-size: 52px;
+      color: var(--fg);
+      line-height: 1.15;
+      letter-spacing: -0.015em;
+    }
+    #scene-2 .hook-line.lead { font-size: 56px; }
+    #scene-2 .hook-word {
+      font-family: "Space Grotesk", sans-serif;
+      font-style: italic;
+      font-weight: 600;
+      font-size: 72px;
+      letter-spacing: -0.015em;
+      position: relative;
+      display: inline-block;
+      padding: 0 4px 8px 4px;
+    }
+    #scene-2 .hook-word.reactiva { color: var(--warn); }
+    #scene-2 .hook-word.predictiva { color: var(--accent-bright); }
+    #scene-2 .hook-underline {
+      position: absolute;
+      left: 0; right: 0; bottom: 0;
+      height: 3px;
+      transform-origin: left center;
+    }
+    #scene-2 .reactiva-line .hook-underline { background: var(--warn); }
+    #scene-2 .predictiva-line .hook-underline { background: var(--accent); }
+
+    #scene-2 .data-callout {
+      position: absolute;
+      left: 120px; bottom: 220px;
+      display: flex; flex-direction: column;
+      gap: 6px;
+    }
+    #scene-2 .data-callout .mono { font-size: 18px; }
+
+    /* ---------- scene 3 (objetivos) ---------- */
+    #scene-3 .objetivos-head {
+      display: flex; flex-direction: column;
+      gap: 16px;
+    }
+    #scene-3 .objetivos-rule {
+      position: absolute;
+      left: 620px; top: 200px; bottom: 200px;
+      width: 1px;
+      background: var(--rule);
+      z-index: 1;
+    }
+    #scene-3 .chips {
+      display: flex; flex-direction: column;
+      gap: 16px;
+      margin-top: 8px;
+    }
+    #scene-3 .chip {
+      display: flex; align-items: center;
+      gap: 22px;
+      padding: 18px 24px;
+      background: var(--surface);
+      border: 1px solid var(--rule);
+      border-radius: 4px;
+    }
+    #scene-3 .chip .code {
+      font-family: "JetBrains Mono", monospace;
+      font-size: 20px;
+      color: var(--accent);
+      font-weight: 600;
+      min-width: 52px;
+    }
+    #scene-3 .chip .label {
+      font-family: "Space Grotesk", sans-serif;
+      font-weight: 500;
+      font-size: 28px;
+      color: var(--fg);
+    }
+    #scene-3 .meta-corner {
+      position: absolute;
+      right: 120px; bottom: 140px;
+      font-family: "JetBrains Mono", monospace;
+      font-size: 18px;
+      color: var(--fg-dim);
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+    }
+
+    /* ---------- scene 4 (impacto) ---------- */
+    #scene-4 .impacto-stack {
+      margin-top: 60px;
+      display: flex; flex-direction: column;
+      gap: 36px;
+    }
+    #scene-4 .stat {
+      display: flex; flex-direction: column;
+      gap: 12px;
+      padding: 22px 0;
+      border-top: 1px solid var(--rule);
+    }
+    #scene-4 .stat:last-child { border-bottom: 1px solid var(--rule); }
+    #scene-4 .stat-top {
+      display: flex; align-items: baseline; gap: 18px;
+      min-height: 36px;
+    }
+    #scene-4 .stat-arrow {
+      font-family: "JetBrains Mono", monospace;
+      font-size: 22px;
+      color: var(--fg-muted);
+      letter-spacing: 0.05em;
+    }
+    #scene-4 .stat-label {
+      font-family: "Space Grotesk", sans-serif;
+      font-weight: 500;
+      font-size: 28px;
+      color: var(--fg-muted);
+      text-transform: lowercase;
+    }
+    #scene-4 .stat-num {
+      font-family: "Space Grotesk", sans-serif;
+      font-weight: 700;
+      font-size: 88px;
+      color: var(--fg);
+      line-height: 0.95;
+      letter-spacing: -0.045em;
+      min-height: 84px;
+    }
+    #scene-4 .stat-num.accent { color: var(--accent); }
+    #scene-4 .stat-num .unit {
+      font-size: 48px;
+      color: var(--fg-muted);
+      font-weight: 500;
+      letter-spacing: 0;
+      margin-left: 4px;
+    }
+    #scene-4 .stat-gloss {
+      font-family: "Space Grotesk", sans-serif;
+      font-weight: 400;
+      font-size: 24px;
+      color: var(--fg-muted);
+      max-width: 720px;
+      line-height: 1.25;
+      margin-top: 2px;
+    }
+    #scene-4 .footnote {
+      position: absolute;
+      left: 120px; bottom: 120px;
+      max-width: 600px;
+      font-family: "Space Grotesk", sans-serif;
+      font-style: italic;
+      font-weight: 400;
+      font-size: 16px;
+      color: var(--fg-dim);
+      line-height: 1.4;
+    }
+    #scene-4 .meta-corner {
+      position: absolute;
+      right: 120px; bottom: 125px;
+      font-family: "JetBrains Mono", monospace;
+      font-size: 18px;
+      color: var(--fg-dim);
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+    }
+
+    /* ---------- scene 5 (fases) ---------- */
+    #scene-5 .s5-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      gap: 40px;
+    }
+    #scene-5 .fases-head { display: flex; flex-direction: column; gap: 16px; max-width: 540px; flex: 1; }
+    #scene-5 .status-callout {
+      display: flex; flex-direction: column;
+      align-items: flex-end;
+      gap: 6px;
+      padding-bottom: 12px;
+      flex-shrink: 0;
+    }
+    #scene-5 .status-callout .label {
+      font-family: "JetBrains Mono", monospace;
+      font-size: 14px;
+      color: var(--fg-dim);
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+    }
+    #scene-5 .status-callout .value {
+      font-family: "Space Grotesk", sans-serif;
+      font-weight: 600;
+      font-size: 22px;
+      color: var(--fg);
+    }
+    #scene-5 .status-callout .value .mono {
+      color: var(--accent);
+      font-size: 22px;
+      font-weight: 600;
+    }
+    #scene-5 .timeline {
+      margin-top: 80px;
+      display: flex; flex-direction: column;
+      gap: 14px;
+    }
+    #scene-5 .phase-row {
+      display: grid;
+      grid-template-columns: 72px 1fr;
+      gap: 22px;
+      align-items: center;
+      min-height: 84px;
+    }
+    #scene-5 .phase-code {
+      font-family: "JetBrains Mono", monospace;
+      font-size: 22px;
+      font-weight: 600;
+      color: var(--fg);
+      padding: 6px 12px;
+      background: var(--surface);
+      border: 1px solid var(--rule);
+      border-radius: 4px;
+      text-align: center;
+    }
+    #scene-5 .phase-code.current {
+      color: var(--accent);
+      border-color: var(--accent);
+    }
+    #scene-5 .phase-code.done {
+      color: var(--accent);
+      border-color: rgba(20, 184, 166, 0.4);
+    }
+    #scene-5 .phase-right {
+      display: flex; flex-direction: column;
+      gap: 8px;
+    }
+    #scene-5 .phase-bar {
+      position: relative;
+      width: 100%;
+      height: 8px;
+      background: transparent;
+      border: 1px solid var(--rule);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    #scene-5 .phase-fill {
+      position: absolute;
+      top: 0; left: 0; bottom: 0;
+      background: var(--accent);
+      transform-origin: left center;
+    }
+    #scene-5 .phase-fill.live { background: var(--accent-bright); }
+    #scene-5 .phase-label {
+      display: flex; align-items: center; gap: 12px;
+      font-family: "Space Grotesk", sans-serif;
+      font-weight: 500;
+      font-size: 24px;
+      color: var(--fg-dim);
+    }
+    #scene-5 .phase-label.current { color: var(--fg); font-weight: 700; }
+    #scene-5 .phase-label.done { color: var(--fg); font-weight: 600; }
+    #scene-5 .phase-label .check {
+      font-family: "JetBrains Mono", monospace;
+      font-size: 16px;
+      color: var(--accent);
+      margin-left: auto;
+    }
+    #scene-5 .phase-label .live-tag {
+      font-family: "JetBrains Mono", monospace;
+      font-size: 14px;
+      color: var(--accent-bright);
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      padding: 4px 10px;
+      border: 1px solid var(--accent-bright);
+      border-radius: 4px;
+      margin-left: auto;
+    }
+    #scene-5 .phase-pulse {
+      display: inline-block;
+      width: 10px; height: 10px;
+      background: var(--accent-bright);
+      border-radius: 50%;
+      box-shadow: 0 0 0 0 var(--accent-bright);
+      margin-right: 8px;
+    }
+    #scene-5 .connect-line {
+      position: absolute;
+      left: 192px;
+      width: 0; height: 2px;
+      background: var(--accent);
+      z-index: 5;
+    }
+    #scene-5 .timeline-legend {
+      position: absolute;
+      left: 120px; bottom: 130px;
+      display: flex; gap: 28px;
+      font-family: "JetBrains Mono", monospace;
+      font-size: 16px;
+      color: var(--fg-dim);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+    #scene-5 .timeline-legend .swatch {
+      display: inline-block;
+      width: 18px; height: 4px;
+      background: var(--accent);
+      vertical-align: middle;
+      margin-right: 8px;
+    }
+    #scene-5 .timeline-legend .swatch.live { background: var(--accent-bright); }
+    #scene-5 .timeline-legend .swatch.empty { background: transparent; border: 1px solid var(--rule); }
+
+    /* ---------- scene 6 (ANFAIA) ---------- */
+    #scene-6 .closing-wrap {
+      flex: 1;
+      display: flex; flex-direction: column;
+      justify-content: center; align-items: center;
+      text-align: center;
+      gap: 22px;
+    }
+    #scene-6 .closing-section {
+      font-family: "JetBrains Mono", monospace;
+      font-size: 20px;
+      color: var(--accent);
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      font-weight: 500;
+    }
+    #scene-6 .closing-lead {
+      font-family: "Space Grotesk", sans-serif;
+      font-weight: 500;
+      font-size: 30px;
+      color: var(--fg-muted);
+      max-width: 720px;
+      line-height: 1.3;
+    }
+    #scene-6 .closing-anfaia {
+      font-family: "Space Grotesk", sans-serif;
+      font-weight: 700;
+      font-size: 180px;
+      color: var(--accent);
+      letter-spacing: -0.045em;
+      line-height: 1;
+    }
+    #scene-6 .closing-divider {
+      width: 60%;
+      max-width: 640px;
+      height: 2px;
+      background: var(--accent);
+      transform-origin: center;
+    }
+    #scene-6 .closing-tagline {
+      font-family: "Space Grotesk", sans-serif;
+      font-style: italic;
+      font-weight: 500;
+      font-size: 30px;
+      color: var(--fg-muted);
+      max-width: 760px;
+      line-height: 1.3;
+    }
+    #scene-6 .closing-foot {
+      position: absolute;
+      left: 0; right: 0; bottom: 130px;
+      display: flex; flex-direction: column;
+      align-items: center; gap: 10px;
+    }
+    #scene-6 .closing-foot .gh {
+      font-family: "JetBrains Mono", monospace;
+      font-size: 20px;
+      color: var(--fg);
+      letter-spacing: 0.04em;
+    }
+    #scene-6 .closing-foot .gh-prefix {
+      color: var(--fg-dim);
+    }
+    #scene-6 .closing-foot .small {
+      font-family: "JetBrains Mono", monospace;
+      font-size: 16px;
+      color: var(--fg-dim);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    /* ---------- transition overlay (blur crossfade) ---------- */
+    .transition-blur {
+      position: absolute;
+      inset: 0;
+      background: var(--bg);
+      z-index: 500;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    /* ---------- final dip to black ---------- */
+    .final-dip {
+      position: absolute;
+      inset: 0;
+      background: #000;
+      z-index: 800;
+      opacity: 0;
+      pointer-events: none;
+    }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+</head>
+<body>
+  <div data-composition-id="root" data-width="1080" data-height="1350" data-start="0" data-duration="45">
+
+    <!-- ============== RUNNING HEADER (persistent) ============== -->
+    <div class="running-header">
+      <div class="label">MALARIA<span class="dot"></span>SENTINEL</div>
+      <div class="scene-num"><span class="accent" id="scene-counter">01</span>/06</div>
+    </div>
+    <div class="running-rule"></div>
+
+    <!-- ============== SCENE 1 — TITLE ============== -->
+    <div class="scene" id="scene-1">
+      <div class="bg-grid"></div>
+      <div class="bg-glow" style="width:1000px;height:1000px;right:-300px;bottom:-300px;background:radial-gradient(circle, var(--accent-glow) 0%, transparent 65%);"></div>
+      <div class="ghost" style="right:-60px;bottom:-80px;font-size:340px;" id="ghost-sentinel">SENTINEL</div>
+      <div class="top-rule" id="title-top-rule"></div>
+      <div class="bottom-rule" id="title-bot-rule"></div>
+
+      <div class="scene-content" style="padding-top:200px;">
+        <div style="position:relative;flex:1;display:flex;flex-direction:column;justify-content:flex-start;">
+          <div class="title-section" id="title-section">PROYECTO · 2026</div>
+
+          <div class="title-wrap">
+            <div class="title-main" id="title-main">MalariaSentinel</div>
+            <div class="title-serif" id="title-serif">para la</div>
+            <div class="title-tagline" id="title-tagline">eliminación de la malaria</div>
+          </div>
+
+          <div class="title-meta-right" id="title-meta-right">SDSS · 2026 · GHANA</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============== SCENE 2 — HOOK ============== -->
+    <div class="scene" id="scene-2">
+      <div class="bg-grid"></div>
+      <div class="bg-glow" style="width:900px;height:900px;left:-250px;bottom:-200px;background:radial-gradient(circle, var(--accent-glow) 0%, transparent 65%);"></div>
+      <div class="ghost ghost-italic" style="right:-40px;bottom:80px;font-size:280px;" id="ghost-predict">PREDICT</div>
+
+      <div class="scene-content">
+        <div class="section-label" id="s2-label">01 · EL PROBLEMA</div>
+
+        <div class="hook-stack">
+          <div class="hook-line lead" id="s2-line1">La vigilancia de malaria es</div>
+          <div class="hook-line reactiva-line" id="s2-line2">
+            <span class="hook-word reactiva">reactiva.<span class="hook-underline" id="s2-underline1"></span></span>
+          </div>
+          <div class="hook-line" id="s2-line3" style="margin-top:30px;">Nosotros la hacemos</div>
+          <div class="hook-line predictiva-line" id="s2-line4">
+            <span class="hook-word predictiva">predictiva.<span class="hook-underline" id="s2-underline2"></span></span>
+          </div>
+        </div>
+
+        <div class="data-callout" id="s2-callout">
+          <div class="mono uppercase">24 sitios larvales · Ghana</div>
+          <div class="mono uppercase dim">1 región piloto · AOI 417×566 km</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============== SCENE 3 — OBJETIVOS ============== -->
+    <div class="scene" id="scene-3">
+      <div class="bg-grid"></div>
+      <div class="bg-glow" style="width:800px;height:800px;right:-200px;top:-100px;background:radial-gradient(circle, var(--accent-glow) 0%, transparent 65%);"></div>
+      <div class="ghost" style="left:-60px;top:80px;font-size:240px;" id="ghost-meta">M1–M6</div>
+
+      <div class="objetivos-rule" id="s3-rule"></div>
+
+      <div class="scene-content">
+        <div class="objetivos-head" style="max-width:540px;">
+          <div class="section-label" id="s3-label">02 · OBJETIVOS</div>
+          <div class="heading h-3" id="s3-headline">Cuatro metas para el primer año.</div>
+        </div>
+
+        <div class="chips" id="s3-chips" style="max-width:840px;">
+          <div class="chip" id="chip-1">
+            <span class="code">01</span>
+            <span class="label">Predecir focos antes del brote clínico</span>
+          </div>
+          <div class="chip" id="chip-2">
+            <span class="code">02</span>
+            <span class="label">Mapear idoneidad del hábitat del vector</span>
+          </div>
+          <div class="chip" id="chip-3">
+            <span class="code">03</span>
+            <span class="label">Simular la propagación del mosquito</span>
+          </div>
+          <div class="chip" id="chip-4">
+            <span class="code">04</span>
+            <span class="label">Entrenar una U-Net como sustituta del simulador</span>
+          </div>
+        </div>
+
+        <div class="meta-corner" id="s3-meta">M1–M6 · 6 fases</div>
+      </div>
+    </div>
+
+    <!-- ============== SCENE 4 — IMPACTO ============== -->
+    <div class="scene" id="scene-4">
+      <div class="bg-grid"></div>
+      <div class="bg-glow" style="width:1000px;height:1000px;left:-300px;top:200px;background:radial-gradient(circle, var(--accent-glow) 0%, transparent 65%);"></div>
+      <div class="ghost ghost-italic" style="left:-40px;top:-40px;font-size:300px;" id="ghost-impact">idóneo</div>
+
+      <div class="scene-content">
+        <div style="display:flex;flex-direction:column;gap:16px;" id="s4-head">
+          <div class="section-label" id="s4-label">03 · IMPACTO</div>
+          <div class="heading h-3" id="s4-headline">Lo que perseguimos medir.</div>
+        </div>
+
+        <div class="impacto-stack">
+          <div class="stat" id="stat-1">
+            <div class="stat-top">
+              <span class="stat-arrow">↓</span>
+              <span class="stat-label">anticipación</span>
+            </div>
+            <div class="stat-num"><span id="stat-1-num">30</span><span class="unit">días</span></div>
+            <div class="stat-gloss">de aviso antes del primer caso clínico, sobre el modelo de idoneidad + propagación.</div>
+          </div>
+
+          <div class="stat" id="stat-2">
+            <div class="stat-top">
+              <span class="stat-arrow">↓</span>
+              <span class="stat-label">rociado innecesario</span>
+            </div>
+            <div class="stat-num accent"><span id="stat-2-num">40</span><span class="unit">%</span></div>
+            <div class="stat-gloss">menos rociado fuera de zonas de alto riesgo, mediante zonificación espacial.</div>
+          </div>
+
+          <div class="stat" id="stat-3">
+            <div class="stat-top">
+              <span class="stat-arrow">↑</span>
+              <span class="stat-label">cobertura ambiental</span>
+            </div>
+            <div class="stat-num"><span id="stat-3-num">4</span><span class="unit">capas</span></div>
+            <div class="stat-gloss">ambientales en el modelo: agua, lluvia, temperatura, NDVI.</div>
+          </div>
+        </div>
+
+        <div class="footnote" id="s4-footnote">cifras objetivo del proyecto, sujetas a validación con datos de incidencia.</div>
+        <div class="meta-corner" id="s4-meta">Sentinel · SDSS</div>
+      </div>
+    </div>
+
+    <!-- ============== SCENE 5 — FASES ============== -->
+    <div class="scene" id="scene-5">
+      <div class="bg-grid"></div>
+      <div class="bg-glow" style="width:1100px;height:1100px;left:-100px;bottom:-400px;background:radial-gradient(circle, var(--accent-glow) 0%, transparent 65%);"></div>
+      <div class="ghost" style="right:-30px;top:60px;font-size:200px;" id="ghost-m3">M3</div>
+
+      <div class="scene-content">
+        <div class="s5-top">
+          <div class="fases-head" id="s5-head">
+            <div class="section-label" id="s5-label">04 · FASES</div>
+            <div class="heading h-3" id="s5-headline">Seis hitos, doce meses.</div>
+          </div>
+
+          <div class="status-callout" id="s5-status">
+            <div class="label">Estado</div>
+            <div class="value"><span class="mono">M2</span> completa · <span class="mono">M3</span> en curso</div>
+          </div>
+        </div>
+
+        <div class="connect-line" id="s5-connect"></div>
+
+        <div class="timeline" id="s5-timeline">
+          <div class="phase-row" id="row-1">
+            <div class="phase-code">M1</div>
+            <div class="phase-right">
+              <div class="phase-bar"><div class="phase-fill" id="fill-1" style="width:40%;"></div></div>
+              <div class="phase-label done">Scaffolding <span class="check">✓</span></div>
+            </div>
+          </div>
+          <div class="phase-row" id="row-2">
+            <div class="phase-code done">M2</div>
+            <div class="phase-right">
+              <div class="phase-bar"><div class="phase-fill" id="fill-2" style="width:100%;"></div></div>
+              <div class="phase-label done">Ingesta de datos <span class="check">✓</span></div>
+            </div>
+          </div>
+          <div class="phase-row" id="row-3">
+            <div class="phase-code current">M3</div>
+            <div class="phase-right">
+              <div class="phase-bar"><div class="phase-fill live" id="fill-3" style="width:60%;"></div></div>
+              <div class="phase-label current"><span class="phase-pulse" id="pulse-3"></span>Modelo de idoneidad<span class="live-tag">En curso</span></div>
+            </div>
+          </div>
+          <div class="phase-row" id="row-4">
+            <div class="phase-code">M4</div>
+            <div class="phase-right">
+              <div class="phase-bar" style="background:transparent;border:1px solid var(--rule);"></div>
+              <div class="phase-label">Simulador de propagación</div>
+            </div>
+          </div>
+          <div class="phase-row" id="row-5">
+            <div class="phase-code">M5</div>
+            <div class="phase-right">
+              <div class="phase-bar" style="background:transparent;border:1px solid var(--rule);"></div>
+              <div class="phase-label">Entrenamiento U-Net</div>
+            </div>
+          </div>
+          <div class="phase-row" id="row-6">
+            <div class="phase-code">M6</div>
+            <div class="phase-right">
+              <div class="phase-bar" style="background:transparent;border:1px solid var(--rule);"></div>
+              <div class="phase-label">Predicción y mapa de riesgo</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="timeline-legend" id="s5-legend">
+          <span><span class="swatch"></span>Hecho</span>
+          <span><span class="swatch live"></span>En curso</span>
+          <span><span class="swatch empty"></span>Pendiente</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============== SCENE 6 — ANFAIA / CLOSING ============== -->
+    <div class="scene" id="scene-6">
+      <div class="bg-grid"></div>
+      <div class="bg-glow" style="width:1200px;height:1200px;left:-60px;top:-200px;background:radial-gradient(circle, var(--accent-glow) 0%, transparent 65%);"></div>
+      <div class="ghost ghost-italic" style="left:-40px;bottom:-60px;font-size:340px;" id="ghost-gracias">gracias</div>
+
+      <div class="scene-content" style="padding-top:140px;padding-bottom:140px;">
+        <div class="closing-wrap">
+          <div class="closing-section" id="s6-section">05 · APOYO</div>
+          <div class="closing-lead" id="s6-lead">Este proyecto es posible gracias a</div>
+          <div class="closing-anfaia" id="s6-anfaia">ANFAIA</div>
+          <div class="closing-divider" id="s6-divider"></div>
+          <div class="closing-tagline" id="s6-tagline">Ciencia abierta para la eliminación de la malaria.</div>
+        </div>
+
+        <div class="closing-foot" id="s6-foot">
+          <div class="gh"><span class="gh-prefix">github.com/</span>davidflorezmazuera/MalariaSentinel</div>
+          <div class="small">SDSS · Open Source · 2026</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============== TRANSITION + FINAL OVERLAYS ============== -->
+    <div class="transition-blur" id="t-blur"></div>
+    <div class="final-dip" id="t-final"></div>
+
+    <script>
+      (function () {
+        "use strict";
+
+        const tl = gsap.timeline({ paused: true });
+
+        // Set initial state for scenes — all hidden, first one shown
+        tl.set("#scene-1", { opacity: 1, y: 0 }, 0);
+
+        // === Top hairline draw-in (scene 1 only) ===
+        tl.fromTo("#title-top-rule", { scaleX: 0, transformOrigin: "left center" }, { scaleX: 1, duration: 0.6, ease: "power3.out" }, 0.1);
+        tl.fromTo("#title-bot-rule", { scaleX: 0, transformOrigin: "right center" }, { scaleX: 1, duration: 0.6, ease: "power3.out" }, 1.9);
+
+        // === Scene 1 — Title ===
+        tl.fromTo("#title-section", { opacity: 0, y: -10 }, { opacity: 1, y: 0, duration: 0.4, ease: "power2.out" }, 0.3);
+        tl.fromTo("#title-main", { opacity: 0, y: 80 }, { opacity: 1, y: 0, duration: 0.7, ease: "expo.out" }, 0.5);
+        tl.fromTo("#title-serif", { opacity: 0, x: -30 }, { opacity: 1, x: 0, duration: 0.5, ease: "power3.out" }, 1.2);
+        tl.fromTo("#title-tagline", { opacity: 0, x: -20 }, { opacity: 1, x: 0, duration: 0.6, ease: "power2.out" }, 1.7);
+        tl.fromTo("#title-meta-right", { opacity: 0 }, { opacity: 1, duration: 0.4, ease: "power2.out" }, 2.1);
+
+        // Ambient: ghost drift (skip — too short a scene for the 8s cycle)
+        // Ambient: bg glow breathe — 1 cycle fits in 6s scene
+        tl.to("#scene-1 .bg-glow", { scale: 1.06, transformOrigin: "center center", duration: 4, ease: "sine.inOut", yoyo: true, repeat: Math.max(0, Math.floor(6 / 4) - 1) }, 0);
+
+        // ====== PUSH-UP TRANSITION (scene 1 → scene 2) at t=6.0, 0.5s ======
+        tl.set("#scene-2", { opacity: 1, y: 1350 }, 6.0);
+        tl.to("#scene-1", { y: -1350, duration: 0.5, ease: "power3.inOut" }, 6.0);
+        tl.to("#scene-2", { y: 0, duration: 0.5, ease: "power3.inOut" }, 6.0);
+        // Blur during the transition peak
+        tl.to("#scene-1", { filter: "blur(8px)", duration: 0.25, ease: "power2.in", yoyo: true, repeat: 1 }, 6.0);
+        tl.to("#scene-2", { filter: "blur(8px)", duration: 0.25, ease: "power2.in", yoyo: true, repeat: 1 }, 6.0);
+        // After the transition, hide scene 1 via set (not exit tween)
+        tl.set("#scene-1", { opacity: 0, y: 0, filter: "none" }, 6.5);
+
+        // === Scene 2 — Hook ===
+        tl.fromTo("#s2-label", { opacity: 0, x: -20 }, { opacity: 1, x: 0, duration: 0.4, ease: "power2.out" }, 6.6);
+        tl.fromTo("#s2-line1", { opacity: 0 }, { opacity: 1, duration: 0.5, ease: "power2.out" }, 6.9);
+        tl.fromTo("#s2-line2", { opacity: 0, x: 60 }, { opacity: 1, x: 0, duration: 0.5, ease: "power3.out" }, 7.4);
+        tl.fromTo("#s2-underline1", { scaleX: 0, transformOrigin: "left center" }, { scaleX: 1, duration: 0.4, ease: "power2.out" }, 7.7);
+        tl.fromTo("#s2-line3", { opacity: 0 }, { opacity: 1, duration: 0.4, ease: "power2.out" }, 7.9);
+        tl.fromTo("#s2-line4", { opacity: 0, x: 60 }, { opacity: 1, x: 0, duration: 0.5, ease: "power3.out" }, 8.3);
+        tl.fromTo("#s2-underline2", { scaleX: 0, transformOrigin: "left center" }, { scaleX: 1, duration: 0.4, ease: "power2.out" }, 8.6);
+        tl.fromTo("#s2-callout", { opacity: 0 }, { opacity: 1, duration: 0.4, ease: "power2.out" }, 9.0);
+
+        // Ambient
+        tl.to("#scene-2 .bg-glow", { scale: 1.06, transformOrigin: "center center", duration: 4, ease: "sine.inOut", yoyo: true, repeat: Math.max(0, Math.floor(6.5 / 4) - 1) }, 6.5);
+
+        // ====== BLUR CROSSFADE (scene 2 → scene 3) at t=13.0, 0.4s ======
+        // Briefly raise a dark overlay to peak, with both scenes briefly blurred
+        tl.set("#scene-3", { opacity: 1 }, 13.0);
+        tl.to("#scene-2", { filter: "blur(14px)", duration: 0.2, ease: "power2.in" }, 13.0);
+        tl.to("#scene-2", { opacity: 0.0, duration: 0.2, ease: "power2.in" }, 13.0);
+        tl.fromTo("#t-blur", { opacity: 0 }, { opacity: 0.55, duration: 0.2, ease: "power2.in" }, 13.0);
+        tl.to("#scene-3", { filter: "blur(0px)", duration: 0.4, ease: "power2.out" }, 13.2);
+        tl.to("#t-blur", { opacity: 0, duration: 0.2, ease: "power2.out" }, 13.2);
+        tl.set("#scene-2", { filter: "none", opacity: 0 }, 13.4);
+        tl.set("#t-blur", { opacity: 0 }, 13.4);
+
+        // === Scene 3 — Objetivos ===
+        tl.fromTo("#s3-label", { opacity: 0, x: -20 }, { opacity: 1, x: 0, duration: 0.4, ease: "power2.out" }, 13.5);
+        tl.fromTo("#s3-headline", { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.5, ease: "power2.out" }, 13.8);
+        tl.fromTo("#s3-rule", { scaleY: 0, transformOrigin: "top center" }, { scaleY: 1, duration: 0.5, ease: "power3.out" }, 14.2);
+        tl.fromTo("#chip-1", { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.5, ease: "back.out(1.1)" }, 14.5);
+        tl.fromTo("#chip-2", { opacity: 0, x: -40 }, { opacity: 1, x: 0, duration: 0.5, ease: "power3.out" }, 14.8);
+        tl.fromTo("#chip-3", { opacity: 0, scale: 0.92, transformOrigin: "left center" }, { opacity: 1, scale: 1, duration: 0.5, ease: "expo.out" }, 15.1);
+        tl.fromTo("#chip-4", { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.5, ease: "power2.out" }, 15.4);
+        tl.fromTo("#s3-meta", { opacity: 0 }, { opacity: 1, duration: 0.4, ease: "power2.out" }, 15.9);
+
+        // Ambient
+        tl.to("#scene-3 .bg-glow", { scale: 1.06, transformOrigin: "center center", duration: 4, ease: "sine.inOut", yoyo: true, repeat: Math.max(0, Math.floor(7.5 / 4) - 1) }, 13.5);
+
+        // ====== BLUR CROSSFADE (scene 3 → scene 4) at t=21.0, 0.4s ======
+        tl.set("#scene-4", { opacity: 1 }, 21.0);
+        tl.to("#scene-3", { filter: "blur(14px)", duration: 0.2, ease: "power2.in" }, 21.0);
+        tl.to("#scene-3", { opacity: 0.0, duration: 0.2, ease: "power2.in" }, 21.0);
+        tl.fromTo("#t-blur", { opacity: 0 }, { opacity: 0.55, duration: 0.2, ease: "power2.in" }, 21.0);
+        tl.to("#scene-4", { filter: "blur(0px)", duration: 0.4, ease: "power2.out" }, 21.2);
+        tl.to("#t-blur", { opacity: 0, duration: 0.2, ease: "power2.out" }, 21.2);
+        tl.set("#scene-3", { filter: "none", opacity: 0 }, 21.4);
+        tl.set("#t-blur", { opacity: 0 }, 21.4);
+
+        // === Scene 4 — Impacto ===
+        tl.fromTo("#s4-label", { opacity: 0, x: -20 }, { opacity: 1, x: 0, duration: 0.4, ease: "power2.out" }, 21.5);
+        tl.fromTo("#s4-headline", { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.5, ease: "power2.out" }, 21.8);
+        // stat 1: count up 0 → 30
+        tl.fromTo("#stat-1", { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.4, ease: "power2.out" }, 22.3);
+        const s1 = { v: 0 };
+        tl.to(s1, { v: 30, duration: 0.8, ease: "power2.out", onUpdate: function () { document.getElementById("stat-1-num").textContent = Math.round(s1.v); } }, 22.5);
+        // stat 2: 40% slam in
+        tl.fromTo("#stat-2", { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.4, ease: "power2.out" }, 23.4);
+        const s2 = { v: 0 };
+        tl.to(s2, { v: 40, duration: 0.7, ease: "power2.out", onUpdate: function () { document.getElementById("stat-2-num").textContent = Math.round(s2.v); } }, 23.6);
+        // stat 3: 4 capas scale in
+        tl.fromTo("#stat-3", { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.4, ease: "power2.out" }, 24.5);
+        const s3 = { v: 0 };
+        tl.to(s3, { v: 4, duration: 0.5, ease: "power2.out", onUpdate: function () { document.getElementById("stat-3-num").textContent = Math.round(s3.v); } }, 24.7);
+        tl.fromTo("#s4-footnote", { opacity: 0 }, { opacity: 1, duration: 0.4, ease: "power2.out" }, 25.8);
+        tl.fromTo("#s4-meta", { opacity: 0 }, { opacity: 1, duration: 0.4, ease: "power2.out" }, 26.0);
+
+        // Ambient
+        tl.to("#scene-4 .bg-glow", { scale: 1.06, transformOrigin: "center center", duration: 4, ease: "sine.inOut", yoyo: true, repeat: Math.max(0, Math.floor(8.5 / 4) - 1) }, 21.5);
+
+        // ====== BLUR CROSSFADE (scene 4 → scene 5) at t=29.5, 0.4s ======
+        tl.set("#scene-5", { opacity: 1 }, 29.5);
+        tl.to("#scene-4", { filter: "blur(14px)", duration: 0.2, ease: "power2.in" }, 29.5);
+        tl.to("#scene-4", { opacity: 0.0, duration: 0.2, ease: "power2.in" }, 29.5);
+        tl.fromTo("#t-blur", { opacity: 0 }, { opacity: 0.55, duration: 0.2, ease: "power2.in" }, 29.5);
+        tl.to("#scene-5", { filter: "blur(0px)", duration: 0.4, ease: "power2.out" }, 29.7);
+        tl.to("#t-blur", { opacity: 0, duration: 0.2, ease: "power2.out" }, 29.7);
+        tl.set("#scene-4", { filter: "none", opacity: 0 }, 29.9);
+        tl.set("#t-blur", { opacity: 0 }, 29.9);
+
+        // === Scene 5 — Fases (HERO) ===
+        tl.fromTo("#s5-label", { opacity: 0, x: -20 }, { opacity: 1, x: 0, duration: 0.4, ease: "power2.out" }, 30.0);
+        tl.fromTo("#s5-headline", { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.5, ease: "power2.out" }, 30.3);
+        tl.fromTo("#s5-status", { opacity: 0, y: -10 }, { opacity: 1, y: 0, duration: 0.4, ease: "power2.out" }, 30.6);
+
+        // M1 row
+        tl.fromTo("#row-1", { opacity: 0, x: -30 }, { opacity: 1, x: 0, duration: 0.4, ease: "power2.out" }, 30.8);
+        // M2 row
+        tl.fromTo("#row-2", { opacity: 0, x: -30 }, { opacity: 1, x: 0, duration: 0.4, ease: "power2.out" }, 31.0);
+        // M3 row (current)
+        tl.fromTo("#row-3", { opacity: 0, x: -30 }, { opacity: 1, x: 0, duration: 0.4, ease: "power2.out" }, 31.2);
+        // M4–M6
+        tl.fromTo("#row-4", { opacity: 0, x: -30 }, { opacity: 1, x: 0, duration: 0.4, ease: "power2.out" }, 31.4);
+        tl.fromTo("#row-5", { opacity: 0, x: -30 }, { opacity: 1, x: 0, duration: 0.4, ease: "power2.out" }, 31.55);
+        tl.fromTo("#row-6", { opacity: 0, x: -30 }, { opacity: 1, x: 0, duration: 0.4, ease: "power2.out" }, 31.7);
+        // M3 pulse: ambient, repeats
+        tl.to("#pulse-3", { scale: 1.4, transformOrigin: "center center", duration: 1.5, ease: "sine.inOut", yoyo: true, repeat: Math.max(0, Math.floor(8.5 / 1.5) - 1) }, 32.0);
+        // Legend
+        tl.fromTo("#s5-legend", { opacity: 0 }, { opacity: 1, duration: 0.4, ease: "power2.out" }, 32.0);
+
+        // Ambient
+        tl.to("#scene-5 .bg-glow", { scale: 1.08, transformOrigin: "center center", duration: 4, ease: "sine.inOut", yoyo: true, repeat: Math.max(0, Math.floor(8.5 / 4) - 1) }, 30.0);
+
+        // ====== BLUR CROSSFADE (scene 5 → scene 6) at t=38.5, 0.4s ======
+        tl.set("#scene-6", { opacity: 1 }, 38.5);
+        tl.to("#scene-5", { filter: "blur(14px)", duration: 0.2, ease: "power2.in" }, 38.5);
+        tl.to("#scene-5", { opacity: 0.0, duration: 0.2, ease: "power2.in" }, 38.5);
+        tl.fromTo("#t-blur", { opacity: 0 }, { opacity: 0.55, duration: 0.2, ease: "power2.in" }, 38.5);
+        tl.to("#scene-6", { filter: "blur(0px)", duration: 0.4, ease: "power2.out" }, 38.7);
+        tl.to("#t-blur", { opacity: 0, duration: 0.2, ease: "power2.out" }, 38.7);
+        tl.set("#scene-5", { filter: "none", opacity: 0 }, 38.9);
+        tl.set("#t-blur", { opacity: 0 }, 38.9);
+
+        // === Scene 6 — ANFAIA closing ===
+        tl.fromTo("#s6-section", { opacity: 0, y: -10 }, { opacity: 1, y: 0, duration: 0.4, ease: "power2.out" }, 39.0);
+        tl.fromTo("#s6-lead", { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.4, ease: "power2.out" }, 39.3);
+        tl.fromTo("#s6-anfaia", { opacity: 0, scale: 0.85, transformOrigin: "center center" }, { opacity: 1, scale: 1, duration: 0.7, ease: "expo.out" }, 39.7);
+        tl.fromTo("#s6-divider", { scaleX: 0, transformOrigin: "center center" }, { scaleX: 1, duration: 0.5, ease: "power3.out" }, 40.4);
+        tl.fromTo("#s6-tagline", { opacity: 0, x: -10 }, { opacity: 1, x: 0, duration: 0.5, ease: "power2.out" }, 40.8);
+        tl.fromTo("#s6-foot", { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.4, ease: "power2.out" }, 41.4);
+
+        // Ambient
+        tl.to("#scene-6 .bg-glow", { scale: 1.06, transformOrigin: "center center", duration: 4, ease: "sine.inOut", yoyo: true, repeat: Math.max(0, Math.floor(5.5 / 4) - 1) }, 39.0);
+
+        // ====== FINAL DIP TO BLACK (scene 6 only — exit allowed) ======
+        tl.to("#scene-6", { opacity: 0, duration: 0.7, ease: "power2.inOut" }, 43.8);
+        tl.set("#scene-6", { opacity: 0 }, 44.5);
+
+        // === Scene counter (running header) updates ===
+        const counter = document.getElementById("scene-counter");
+        const stages = [
+          { t: 0.0, v: "01" },
+          { t: 6.5, v: "02" },
+          { t: 13.5, v: "03" },
+          { t: 21.5, v: "04" },
+          { t: 30.0, v: "05" },
+          { t: 39.0, v: "06" },
+        ];
+        stages.forEach(function (s) {
+          tl.call(function () { counter.textContent = s.v; }, [], s.t);
+        });
+
+        // === Register the timeline ===
+        window.__timelines = window.__timelines || {};
+        window.__timelines["root"] = tl;
+      })();
+    </script>
+  </div>
+</body>
+</html>
