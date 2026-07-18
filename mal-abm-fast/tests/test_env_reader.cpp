@@ -202,21 +202,22 @@ TEST(EnvReader, ReadsFourBandsAndInvertsTempSuitability) {
         EXPECT_FLOAT_EQ(b.ndvi[i],       0.4f);
     }
 
-    // Mordecai inverse: s = 0.7 -> T = 25 - 8*sqrt(1 - 0.7)
-    //                                = 25 - 8*sqrt(0.3)
-    //                                ≈ 20.618
-    // (The brief quotes "≈ 21.099 for s = 0.7" but the formula
-    //  25 - 8*sqrt(1 - 0.7) actually evaluates to ~20.618. The 21.0
-    //  figure corresponds to s = 0.75 — see the Python `_suit_to_c`
-    //  docstring. We assert the actual formula value here.)
-    const float expected = 25.0f - 8.0f * std::sqrt(1.0f - 0.7f);
+    // Mordecai inverse: s = 0.7 -> upper branch (s > 0.5)
+    //   T = 25 + 8*sqrt(1 - 0.7)
+    //     = 25 + 8*sqrt(0.3)
+    //     ≈ 29.382
+    // (The earlier single-branch formula T = 25 - 8*sqrt(1-s) produced
+    //  ~20.618 at s=0.7, which underestimates tropical temperatures
+    //  when s > 0.5. env_reader now uses the upper branch for s > 0.5
+    //  to recover the correct T in [25, 33]°C.)
+    const float expected = 25.0f + 8.0f * std::sqrt(1.0f - 0.7f);
     for (int i = 0; i < kH * kW; ++i) {
         EXPECT_NEAR(b.temp_suitability[i], expected, 1e-4);
     }
 
-    // Cross-check: the docstring value 21.0 corresponds to s = 0.75.
-    const float peak = 25.0f - 8.0f * std::sqrt(1.0f - 0.75f);
-    EXPECT_NEAR(peak, 21.0f, 1e-4);
+    // Cross-check: the upper-branch peak at s = 0.75 is T = 29.0.
+    const float peak = 25.0f + 8.0f * std::sqrt(1.0f - 0.75f);
+    EXPECT_NEAR(peak, 29.0f, 1e-4);
 
     fs::remove(path);
 }

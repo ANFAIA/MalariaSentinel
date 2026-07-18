@@ -53,7 +53,7 @@ inline constexpr float  ADULT_DISPERSE_MAX_M        = 2000.0f;
 // Per-patch per-day birth rate (binomial(K, BIRTH_RATE) new larvae).
 // Tuned so the population stays near the initial seeded count on the
 // 30k-patch, 30-day M1.5 perf budget.
-inline constexpr float  BIRTH_RATE                  = 0.005f;
+inline constexpr float  BIRTH_RATE                  = 0.02f;
 
 // Larva density-dependent mortality (Beverton-Holt, docs/abm-status.md:79).
 inline constexpr float  LARVA_BH_S0    = 0.95f;   // baseline daily survival
@@ -74,7 +74,7 @@ inline constexpr float  LARVA_DESICCATION_DAILY_RATE = 0.30f;
 //       TWI(r, c) >  PLUVIAL_POOL_TWI_THRESHOLD
 //       water_frac(r, c) > PLUVIAL_POOL_WATER_FRAC_MIN  (strictly > 0)
 //       rain_d(r, c) >  PLUVIAL_POOL_RAIN_THRESHOLD_MM
-inline constexpr float  PLUVIAL_POOL_RAIN_THRESHOLD_MM = 15.0f;
+inline constexpr float  PLUVIAL_POOL_RAIN_THRESHOLD_MM = 50.0f;
 inline constexpr float  PLUVIAL_POOL_TWI_THRESHOLD  = 8.0f;
 inline constexpr float  PLUVIAL_POOL_WATER_FRAC_MIN = 0.0f;  // strictly > 0
 

@@ -103,7 +103,7 @@ void WriteSyntheticEnvNC(const fs::path& path, int n_days) {
     ASSERT_EQ(nc_put_att_text(ncid, NC_GLOBAL, "Conventions", 6, "CF-1.8"), NC_NOERR);
     ASSERT_EQ(nc_enddef(ncid), NC_NOERR);
 
-    const float rain_vals[] = {20.0f, 5.0f, 25.0f};
+    const float rain_vals[] = {60.0f, 40.0f, 55.0f};
     const float temp_vals[] = {25.0f, 20.0f, 30.0f};
     float buf[kH * kW];
     size_t start[3] = {0, 0, 0};
@@ -152,7 +152,8 @@ TEST(ClimateEngine, LoadFromEnvTifPopulatesBands) {
     // Sample point lookups at (0, 0).
     EXPECT_FLOAT_EQ(eng.rain_at(0, 0), 0.5f);
     EXPECT_FLOAT_EQ(eng.water_frac_at(0, 0), 0.1f);
-    const float expected_temp = 25.0f - 8.0f * std::sqrt(1.0f - 0.7f);
+    // Mordecai upper branch for s > 0.5: T = 25 + 8*sqrt(1 - 0.7) ≈ 29.382
+    const float expected_temp = 25.0f + 8.0f * std::sqrt(1.0f - 0.7f);
     EXPECT_NEAR(eng.temp_at(0, 0), expected_temp, 1e-4);
 
     // Sample at (3, 3).
@@ -195,19 +196,19 @@ TEST(ClimateEngine, LoadFromEnvNcPopulatesDailyBands) {
     EXPECT_EQ(eng.h(), kH);
     EXPECT_EQ(eng.w(), kW);
 
-    // Day 0: rain=20.0 at (0,0)
+    // Day 0: rain=60.0 at (0,0)
     eng.set_day(0);
-    EXPECT_FLOAT_EQ(eng.rain_at(0, 0), 20.0f);
+    EXPECT_FLOAT_EQ(eng.rain_at(0, 0), 60.0f);
     EXPECT_FLOAT_EQ(eng.temp_at(0, 0), 25.0f);
 
-    // Day 1: rain=5.0 at (0,0)
+    // Day 1: rain=40.0 at (0,0)
     eng.set_day(1);
-    EXPECT_FLOAT_EQ(eng.rain_at(0, 0), 5.0f);
+    EXPECT_FLOAT_EQ(eng.rain_at(0, 0), 40.0f);
     EXPECT_FLOAT_EQ(eng.temp_at(0, 0), 20.0f);
 
-    // Day 2: rain=25.0 at (0,0)
+    // Day 2: rain=55.0 at (0,0)
     eng.set_day(2);
-    EXPECT_FLOAT_EQ(eng.rain_at(0, 0), 25.0f);
+    EXPECT_FLOAT_EQ(eng.rain_at(0, 0), 55.0f);
     EXPECT_FLOAT_EQ(eng.temp_at(0, 0), 30.0f);
 
     // water_frac constant across all days
@@ -228,17 +229,17 @@ TEST(ClimateEngine, DailyRainfallTogglesAtThreshold) {
     mal_abm_fast::ClimateEngine eng;
     eng.load_from_env_nc(path.string(), MakeAoi());
 
-    // Day 0: rain=20 (>15, PLUVIAL_POOL_RAIN_THRESHOLD_MM)
+    // Day 0: rain=60 (>50, PLUVIAL_POOL_RAIN_THRESHOLD_MM)
     eng.set_day(0);
     EXPECT_GT(eng.rain_at(0, 0),
               mal_abm_fast::PLUVIAL_POOL_RAIN_THRESHOLD_MM);
 
-    // Day 1: rain=5 (<15, inactive)
+    // Day 1: rain=40 (<50, inactive)
     eng.set_day(1);
     EXPECT_LT(eng.rain_at(0, 0),
               mal_abm_fast::PLUVIAL_POOL_RAIN_THRESHOLD_MM);
 
-    // Day 2: rain=25 (>15, active again)
+    // Day 2: rain=55 (>50, active again)
     eng.set_day(2);
     EXPECT_GT(eng.rain_at(0, 0),
               mal_abm_fast::PLUVIAL_POOL_RAIN_THRESHOLD_MM);
@@ -257,15 +258,15 @@ TEST(ClimateEngine, SetDayClampsToValidRange) {
 
     // set_day(999) should clamp to n_days-1 (day 2)
     eng.set_day(999);
-    EXPECT_FLOAT_EQ(eng.rain_at(0, 0), 25.0f);  // day 2 value
+    EXPECT_FLOAT_EQ(eng.rain_at(0, 0), 55.0f);  // day 2 value
 
     // set_day(-1) should clamp to 0
     eng.set_day(-1);
-    EXPECT_FLOAT_EQ(eng.rain_at(0, 0), 20.0f);  // day 0 value
+    EXPECT_FLOAT_EQ(eng.rain_at(0, 0), 60.0f);  // day 0 value
 
     // set_day(1) should work normally
     eng.set_day(1);
-    EXPECT_FLOAT_EQ(eng.rain_at(0, 0), 5.0f);   // day 1 value
+    EXPECT_FLOAT_EQ(eng.rain_at(0, 0), 40.0f);  // day 1 value
 
     fs::remove(path);
 }

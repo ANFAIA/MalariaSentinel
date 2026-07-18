@@ -100,7 +100,7 @@ TEST(MalAbmFastCoordinator, FullDayOrchestrator) {
     EXPECT_EQ(aoi.cells_per_side(), 5);
     EXPECT_EQ(cells_per_side_h(aoi), 5);
 
-    // Write a synthetic 4x4 env COG (rain=20, temp_suitability=1.0 [→25C],
+    // Write a synthetic 4x4 env COG (rain=60, temp_suitability=1.0 [→25C],
     // water_frac=0.5, ndvi=0.5) and load it.
     const std::string env_path = temp_dir("coordinator_env") + "/env.tif";
     {
@@ -113,7 +113,7 @@ TEST(MalAbmFastCoordinator, FullDayOrchestrator) {
         std::fill(band.begin(), band.end(), 0.5f);  // water_frac + ndvi
         ds->GetRasterBand(1)->SetDescription("water_frac");
         ds->GetRasterBand(1)->RasterIO(GF_Write, 0, 0, 4, 4, band.data(), 4, 4, GDT_Float32, 0, 0);
-        std::fill(band.begin(), band.end(), 20.0f);  // rainfall
+        std::fill(band.begin(), band.end(), 60.0f);  // rainfall
         ds->GetRasterBand(2)->SetDescription("rainfall");
         ds->GetRasterBand(2)->RasterIO(GF_Write, 0, 0, 4, 4, band.data(), 4, 4, GDT_Float32, 0, 0);
         std::fill(band.begin(), band.end(), 1.0f);  // temp_suitability (peak Mordecai → 25C)
@@ -286,8 +286,8 @@ void WriteSyntheticEnvNC(const std::filesystem::path& path, int n_days,
     ASSERT_EQ(nc_put_att_text(ncid, NC_GLOBAL, "Conventions", 6, "CF-1.8"), NC_NOERR);
     ASSERT_EQ(nc_enddef(ncid), NC_NOERR);
 
-    // Day 0: rain=20 (>15 threshold), Day 1: rain=5 (<15)
-    const float rain_vals[] = {20.0f, 5.0f};
+    // Day 0: rain=60 (>50 threshold), Day 1: rain=40 (<50)
+    const float rain_vals[] = {60.0f, 40.0f};
     const float temp_vals[] = {25.0f, 20.0f};
     std::vector<float> buf(h * w);
     size_t start[3] = {0, 0, 0};
@@ -365,7 +365,7 @@ TEST(CoordinatorModel, PatchActivationTogglesDaily) {
         /*init_frac=*/INIT_FRAC,
         /*seed=*/uint64_t{42});
 
-    // Day 0: rain=20 (>15 threshold) -> patches should be active
+    // Day 0: rain=60 (>50 threshold) -> patches should be active
     climate->set_day(0);
     CoordinatorModel coord0(
         std::move(aoi), climate, std::move(habitat),
@@ -373,7 +373,7 @@ TEST(CoordinatorModel, PatchActivationTogglesDaily) {
 
     coord0.activate_patches();
     auto states0 = coord0.to_dataframe();
-    EXPECT_FALSE(states0.empty()) << "Day 0: patches should be active (rain=20)";
+    EXPECT_FALSE(states0.empty()) << "Day 0: patches should be active (rain=60)";
 
     // Verify patch has rain > threshold
     for (const auto& s : states0) {

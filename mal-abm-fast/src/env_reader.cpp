@@ -101,9 +101,15 @@ void ApplyMordecaiInverse(std::vector<float>& v) {
         if (std::isnan(s)) continue;             // propagate NaN (Python parity)
         if (s < 0.0f) s = 0.0f;
         else if (s > 1.0f) s = 1.0f;
+        // s = 1 - ((T - 25) / 8)^2 has two branches:
+        //   lower: T = 25 - 8*sqrt(1-s)  (T < 25)
+        //   upper: T = 25 + 8*sqrt(1-s)  (T > 25)
+        // When s > 0.5, the lower branch maps to T < 21°C, which
+        // underestimates tropical temperatures. Use the upper branch
+        // for s > 0.5 to recover the correct T in [25, 33]°C.
         const float one_minus_s = 1.0f - s;
         const float root = std::sqrt(one_minus_s > 0.0f ? one_minus_s : 0.0f);
-        s = 25.0f - 8.0f * root;
+        s = (s > 0.5f) ? (25.0f + 8.0f * root) : (25.0f - 8.0f * root);
     }
 }
 

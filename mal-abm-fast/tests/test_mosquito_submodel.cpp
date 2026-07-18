@@ -158,14 +158,19 @@ TEST(MalAbmFastMosquitoSubmodel, Determinism) {
 // --- Beverton-Holt density-dependent larva mortality tests ---
 
 TEST(MalAbmFastMosquitoSubmodel, BevertonHoltKillsLarvaeAtHighDensity) {
-    // Seed 100 patches × 1000 K × 0.3 = 30000 larvae. All active.
-    // Beverton-Holt should kill some larvae at high density.
-    mal_abm_fast::MosquitoSubmodel sub(100, 1000, 0.3f, 42);
+    // Seed 100 patches × 1000 K × 1.0 = 100000 larvae so the first
+    // 4 active patches each hold N=1000 larvae — well into the BH
+    // high-density regime (p = 0.95 * K / (K + alpha * N) ≈ 0.905
+    // for alpha=0.05). With the 4x birth rate (BIRTH_RATE=0.02), the
+    // old 0.3 init frac (300 larv/patch) let new births mask BH
+    // deaths, so we raise the initial population to keep BH
+    // deaths dominant over births.
+    mal_abm_fast::MosquitoSubmodel sub(100, 1000, 1.0f, 42);
     const auto aoi = make_test_aoi();
     auto ps = make_test_patch_states();
     const int64_t before = sub.total_agents();
     sub.advance_day(aoi, ps);
-    // With 300 larvae per active patch, BH should reduce count.
+    // With 1000 larvae per active patch, BH reduces count.
     EXPECT_LT(sub.total_agents(), before);
 }
 
