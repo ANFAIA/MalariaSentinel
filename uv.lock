@@ -1567,11 +1567,29 @@ name = "mal-core"
 version = "0.1.0"
 source = { editable = "mal-core" }
 dependencies = [
+    { name = "fastapi" },
     { name = "mal-commonlib" },
+    { name = "numpy" },
+    { name = "pydantic" },
+    { name = "pyyaml" },
+    { name = "rasterio" },
+    { name = "torch" },
+    { name = "typer" },
+    { name = "uvicorn" },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "mal-commonlib", editable = "mal-commonlib" }]
+requires-dist = [
+    { name = "fastapi", specifier = ">=0.115" },
+    { name = "mal-commonlib", editable = "mal-commonlib" },
+    { name = "numpy", specifier = ">=2.0" },
+    { name = "pydantic", specifier = ">=2.7" },
+    { name = "pyyaml", specifier = ">=6.0" },
+    { name = "rasterio", specifier = ">=1.5.0" },
+    { name = "torch", specifier = ">=2.0" },
+    { name = "typer", specifier = ">=0.12" },
+    { name = "uvicorn", specifier = ">=0.30" },
+]
 
 [[package]]
 name = "mal-data-explorer"
@@ -1603,7 +1621,7 @@ requires-dist = [
 [[package]]
 name = "mal-execution"
 version = "0.1.0"
-source = { editable = "mal-execution" }
+source = { virtual = "mal-execution" }
 dependencies = [
     { name = "mal-commonlib" },
     { name = "mal-core" },
