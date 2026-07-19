@@ -220,7 +220,7 @@ TEST(ClimateEngine, LoadFromEnvNcPopulatesDailyBands) {
     fs::remove(path);
 }
 
-TEST(ClimateEngine, DailyRainfallTogglesAtThreshold) {
+TEST(ClimateEngine, DailyRainfallReadCorrectly) {
     const fs::path path = MakeTmpEnvNC();
     if (fs::exists(path)) fs::remove(path);
     WriteSyntheticEnvNC(path, 3);
@@ -229,20 +229,24 @@ TEST(ClimateEngine, DailyRainfallTogglesAtThreshold) {
     mal_abm_fast::ClimateEngine eng;
     eng.load_from_env_nc(path.string(), MakeAoi());
 
-    // Day 0: rain=60 (>50, PLUVIAL_POOL_RAIN_THRESHOLD_MM)
+    // Verify the climate engine correctly reads the synthetic rain values.
+    // Note: activation logic is no longer gated by a rain threshold here —
+    // pre-existing habitat patches are always activated (see
+    // CoordinatorModel.PreExistingPatchAlwaysActivated in test_coordinator.cpp).
+    // The PLUVIAL_POOL_RAIN_THRESHOLD_MM constant is only consulted by the
+    // dynamic PLUVIAL_POOL rule, which is exercised elsewhere.
+
+    // Day 0: rain=60 at (0,0)
     eng.set_day(0);
-    EXPECT_GT(eng.rain_at(0, 0),
-              mal_abm_fast::PLUVIAL_POOL_RAIN_THRESHOLD_MM);
+    EXPECT_FLOAT_EQ(eng.rain_at(0, 0), 60.0f);
 
-    // Day 1: rain=40 (<50, inactive)
+    // Day 1: rain=40 at (0,0)
     eng.set_day(1);
-    EXPECT_LT(eng.rain_at(0, 0),
-              mal_abm_fast::PLUVIAL_POOL_RAIN_THRESHOLD_MM);
+    EXPECT_FLOAT_EQ(eng.rain_at(0, 0), 40.0f);
 
-    // Day 2: rain=55 (>50, active again)
+    // Day 2: rain=55 at (0,0)
     eng.set_day(2);
-    EXPECT_GT(eng.rain_at(0, 0),
-              mal_abm_fast::PLUVIAL_POOL_RAIN_THRESHOLD_MM);
+    EXPECT_FLOAT_EQ(eng.rain_at(0, 0), 55.0f);
 
     fs::remove(path);
 }
