@@ -72,6 +72,29 @@ public:
     void advance_day(const AOI& aoi,
                      const std::vector<PatchState>& patch_states);
 
+    // -- debug instrumentation (M7.0 population-crash investigation) -----
+    // When enabled, advance_day() writes one stderr line per day with
+    // the day's population counts, the Lardeux p_d at the seeding
+    // patch (a strong proxy for whether the calibrated mortality
+    // model is being applied vs. the 0.90 fallback), and the
+    // per-day births / deaths / larva-to-adult maturations. Rate-
+    // limited: every day for the first 10 days, then every 5 days.
+    // Default off — does not change the per-day RNG stream or the
+    // state COG output. Use for diagnosing crashes like M7.0's
+    // "500 adults → 20-24 in 30 days" without rerunning the ABM.
+    void set_debug_population(bool on) { debug_population_ = on; }
+
+    // Record the (patch_id, row, col) used for the most recent
+    // detection-based seeding pass. The advance_day() debug log
+    // reports the Lardeux p_d at this cell on each logged day, which
+    // pinpoints whether the seeding patch is hitting the mortality
+    // floor (T too low / NaN) or the calibrated Lardeux curve.
+    void set_debug_seeding_patch(int64_t patch_id, int32_t row, int32_t col) {
+        debug_seeding_pid_  = patch_id;
+        debug_seeding_row_  = row;
+        debug_seeding_col_  = col;
+    }
+
     // -- 7 per-day operations -----------------------------------------------
 
     // 1. Remove larvae at patches that are activated=false.
@@ -132,6 +155,13 @@ private:
     MosquitoSoA  soa_;
     Prng         rng_;
     int32_t      k_per_patch_ = K_PER_PATCH_DEFAULT;
+
+    // -- debug instrumentation state (see set_debug_population) -----
+    bool     debug_population_      = false;
+    int64_t  day_counter_           = 0;
+    int64_t  debug_seeding_pid_     = -1;
+    int32_t  debug_seeding_row_     = 0;
+    int32_t  debug_seeding_col_     = 0;
 };
 
 }  // namespace mal_abm_fast

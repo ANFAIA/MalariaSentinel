@@ -12,12 +12,14 @@
 // EIP formula max(0, T - 16) positive).
 #include "climate.hpp"
 
+#include <cmath>
 #include <cstdint>
 #include <stdexcept>
 #include <string>
 #include <utility>
 
 #include "env_reader.hpp"
+#include "wire.hpp"
 
 namespace mal_abm_fast {
 
@@ -77,9 +79,18 @@ float ClimateEngine::rain_at(int32_t row, int32_t col) const {
 }
 
 float ClimateEngine::temp_at(int32_t row, int32_t col) const {
-    if (h_ <= 0 || w_ <= 0) return 25.0f;
-    if (row < 0 || row >= h_ || col < 0 || col >= w_) return 25.0f;
-    return temp_[Idx(row, col, w_)];
+    if (h_ <= 0 || w_ <= 0) return ADULT_TEMP_FALLBACK_C;
+    if (row < 0 || row >= h_ || col < 0 || col >= w_) return ADULT_TEMP_FALLBACK_C;
+    const float T = temp_[Idx(row, col, w_)];
+    // Out-of-coverage / land-mask pixels are NaN in the env COG.
+    // The Lardeux mortality step falls back to ADULT_DAILY_MORT_BASE
+    // (= 0.90, a 10% survival rate) when it sees a NaN, and the EIP
+    // accumulator skips the daily GDD step (larvae never mature).
+    // Substituting a real temperature (25 deg C) keeps both
+    // submodels in their calibrated regime and avoids the
+    // population crash.
+    if (!std::isfinite(static_cast<double>(T))) return ADULT_TEMP_FALLBACK_C;
+    return T;
 }
 
 float ClimateEngine::water_frac_at(int32_t row, int32_t col) const {

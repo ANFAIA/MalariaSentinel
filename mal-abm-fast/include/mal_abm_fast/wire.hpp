@@ -65,6 +65,16 @@ inline constexpr float  ADULT_DAILY_MORT_BASE = 0.90f;  // fallback if T unavail
 inline constexpr float  ADULT_OPT_C           = 26.0f;  // optimal temperature
 inline constexpr float  ADULT_SIGMA           = 7.0f;   // width of thermal response
 
+// Fallback temperature (deg C) when the env COG returns NaN at a
+// cell (e.g. out-of-coverage pixels near the AOI edges, or
+// land/water mask that rasterized to NaN). 25 deg C gives a Lardeux
+// p_d = exp(-((25-26)^2) / (2*49)) ≈ 0.9898 — a strong survival
+// value well above the 0.60 mortality floor, and well above the
+// 0.90 fallback that the previous behaviour produced (which crashed
+// the population). EIP accumulation also resumes (T > EIP_BASE_C
+// so the daily GD is non-zero and larvae mature).
+inline constexpr float  ADULT_TEMP_FALLBACK_C  = 25.0f;
+
 // Larva desiccation mortality (Depinay 2004 §3.1).
 inline constexpr int    LARVA_DESICCATION_GRACE_DAYS = 5;
 inline constexpr float  LARVA_DESICCATION_DAILY_RATE = 0.10f;

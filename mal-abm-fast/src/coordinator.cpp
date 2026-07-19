@@ -83,10 +83,17 @@ std::vector<PatchState> CoordinatorModel::to_dataframe() {
     union_cells.reserve(pre_rowcol_to_pid.size() + hw);
 
     for (const auto& patch : habitat_.patches()) {
-        if (climate_->rain_at(patch.row, patch.col) >
-            PLUVIAL_POOL_RAIN_THRESHOLD_MM) {
-            union_cells.insert({patch.row, patch.col});
-        }
+        // Pre-existing habitat patches are always activated. They
+        // represent permanent water features (rivers, lakes, wetlands)
+        // identified at habitat-engine build time, NOT ephemeral
+        // pluvial pools that come and go with daily rain. The
+        // PLUVIAL_POOL_RAIN_THRESHOLD_MM rule below still gates the
+        // dynamic ephemeral-pool rule (cells satisfying
+        // twi > THRESHOLD AND water_frac > MIN AND rain > 50 mm/day).
+        // The viability filter in build_seed_instructions
+        // (water_frac > 0.05 AND twi > 8) is independent of daily rain.
+        (void)climate_->rain_at(patch.row, patch.col);
+        union_cells.insert({patch.row, patch.col});
     }
 
     const std::vector<float> twi = climate_->twi_grid();

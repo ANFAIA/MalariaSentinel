@@ -24,6 +24,8 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <cstdio>
+#include <limits>
 #include <utility>
 #include <vector>
 
@@ -238,15 +240,124 @@ MosquitoSubmodel::MosquitoSubmodel(int32_t n_patches, int32_t k_per_patch,
 // Per-day orchestrator
 // ---------------------------------------------------------------------------
 
+namespace {
+
+// Count the number of agents in stage `stage` (0=larva, 1=adult).
+// Used by the debug instrumentation to log per-day breakdowns
+// without re-walking the SoA twice in the hot path.
+inline int64_t count_stage(const MosquitoSoA& soa, uint8_t stage) {
+    int64_t n = 0;
+    for (int64_t i = 0; i < soa.n_alive; ++i) {
+        if (soa.stage[static_cast<size_t>(i)] == stage) ++n;
+    }
+    return n;
+}
+
+// Look up today's temperature at the seeding patch via
+// PatchState.temp_d (the canonical per-day temperature after the
+// NaN fallback in climate.cpp::temp_at). Returns NaN if the
+// seeding patch is not in today's patch_states (e.g. it was never
+// activated — should not happen post-fix, but we handle it
+// gracefully).
+inline float seeding_temp_d(const std::vector<PatchState>& ps,
+                            int32_t row, int32_t col) {
+    for (const auto& s : ps) {
+        if (s.row == row && s.col == col) return s.temp_d;
+    }
+    return std::numeric_limits<float>::quiet_NaN();
+}
+
+// Lardeux daily survival probability at temperature T. Mirrors the
+// formula in adult_mortality() so the debug log shows the same
+// value the mortality step uses.
+inline float lardeux_p_d(float T) {
+    if (!std::isfinite(static_cast<double>(T))) {
+        return static_cast<float>(ADULT_DAILY_MORT_BASE);
+    }
+    const double opt_c   = static_cast<double>(ADULT_OPT_C);
+    const double sigma   = static_cast<double>(ADULT_SIGMA);
+    const double two_ss  = 2.0 * sigma * sigma;
+    const double Td      = static_cast<double>(T);
+    double p = std::exp(-((Td - opt_c) * (Td - opt_c)) / two_ss);
+    if (p < 0.60) p = 0.60;
+    if (p > 1.0)  p = 1.0;
+    return static_cast<float>(p);
+}
+
+}  // namespace
+
 void MosquitoSubmodel::advance_day(const AOI& aoi,
                                    const std::vector<PatchState>& patch_states) {
+    // -- debug snapshot: pre-day counts (used to derive
+    // n_births/n_deaths/n_maturation at the end of the orchestrator
+    // without touching the SoA twice in the hot path). Skipped
+    // entirely when debug_population_ is off.
+    const int64_t day_idx = day_counter_++;
+    int64_t pre_n_alive  = 0;
+    int64_t pre_n_adults = 0;
+    int64_t pre_n_larvae = 0;
+    bool    want_log    = false;
+    if (debug_population_) {
+        pre_n_alive  = soa_.n_alive;
+        pre_n_adults = count_stage(soa_, 1);
+        pre_n_larvae = count_stage(soa_, 0);
+        // Rate-limited: every day for the first 10 days, then every
+        // 5 days. The first day (day_idx == 0) is always logged.
+        want_log = (day_idx < 10) || (day_idx % 5 == 0);
+    }
+
     larva_mortality_inactive(patch_states);   // Op 1
     larva_mortality_density(patch_states);    // Op 2.5 (Beverton-Holt)
     larva_growth(patch_states);               // Op 2
+    // -- debug snapshot: pre-maturation (just before larva_to_adult).
+    // n_maturation = post_mat_n_adults - pre_mat_n_adults.
+    const int64_t pre_mat_n_alive  = debug_population_ ? soa_.n_alive : 0;
+    const int64_t pre_mat_n_adults = debug_population_ ? count_stage(soa_, 1) : 0;
     larva_to_adult(aoi, patch_states);        // Op 3
+    // -- debug snapshot: post-maturation (just after larva_to_adult,
+    // before dispersal which only moves lon/lat not stage).
+    const int64_t post_mat_n_alive  = debug_population_ ? soa_.n_alive : 0;
+    const int64_t post_mat_n_adults = debug_population_ ? count_stage(soa_, 1) : 0;
     adult_dispersal(aoi);                     // Op 4
+    const int64_t pre_mort_n_alive = debug_population_ ? soa_.n_alive : 0;
     adult_mortality(patch_states);            // Op 6 (Lardeux)
+    const int64_t post_mort_n_alive = debug_population_ ? soa_.n_alive : 0;
     birth(aoi, patch_states);                 // Op 5
+    const int64_t post_birth_n_alive = debug_population_ ? soa_.n_alive : 0;
+
+    if (debug_population_ && want_log) {
+        const int64_t post_n_adults = count_stage(soa_, 1);
+        const int64_t post_n_larvae = count_stage(soa_, 0);
+        // n_maturation: new adults created by larva_to_adult. The
+        // delta is post_mat - pre_mat, both taken around the
+        // larva_to_adult call. pre_mat already includes any adult
+        // that died in ops 1-2 (adults are not affected by larva
+        // mortality, so adults are unchanged from pre_n_adults
+        // through the larva ops).
+        const int64_t n_maturation  = post_mat_n_adults - pre_mat_n_adults;
+        // n_deaths: agents lost during adult_mortality (positive).
+        const int64_t n_deaths      = pre_mort_n_alive - post_mort_n_alive;
+        // n_births: agents added during birth (positive).
+        const int64_t n_births      = post_birth_n_alive - post_mort_n_alive;
+        const float   temp_d        = seeding_temp_d(
+            patch_states, debug_seeding_row_, debug_seeding_col_);
+        const float   p_d           = lardeux_p_d(temp_d);
+        const bool    in_states     = !std::isnan(static_cast<double>(temp_d));
+        std::fprintf(stderr,
+            "abm_debug: day=%lld n_alive=%lld n_adults=%lld "
+            "n_larvae=%lld seeding_in_states=%s seeding_temp_d=%.2f "
+            "p_d=%.4f n_births=%lld n_deaths=%lld n_maturation=%lld\n",
+            static_cast<long long>(day_idx),
+            static_cast<long long>(post_birth_n_alive),
+            static_cast<long long>(post_n_adults),
+            static_cast<long long>(post_n_larvae),
+            in_states ? "yes" : "no",
+            static_cast<double>(temp_d),
+            static_cast<double>(p_d),
+            static_cast<long long>(n_births),
+            static_cast<long long>(n_deaths),
+            static_cast<long long>(n_maturation));
+    }
 }
 
 // ---------------------------------------------------------------------------

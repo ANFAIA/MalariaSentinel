@@ -121,6 +121,11 @@ Engine::Engine(AOI aoi,
         // the submodel from the explicit list.
         const std::vector<SeedInstruction> instructions =
             coord_->build_seed_instructions(seeding_config);
+        if (!instructions.empty()) {
+            seeding_patch_.patch_id = instructions.front().patch_id;
+            seeding_patch_.row      = instructions.front().row;
+            seeding_patch_.col      = instructions.front().col;
+        }
         sub_ = std::make_unique<MosquitoSubmodel>(
             n_patches, K_PER_PATCH_DEFAULT, instructions, sub_seed);
     }
@@ -166,6 +171,11 @@ Engine::Engine(AOI aoi,
     } else {
         const std::vector<SeedInstruction> instructions =
             coord_->build_seed_instructions(seeding_config);
+        if (!instructions.empty()) {
+            seeding_patch_.patch_id = instructions.front().patch_id;
+            seeding_patch_.row      = instructions.front().row;
+            seeding_patch_.col      = instructions.front().col;
+        }
         sub_ = std::make_unique<MosquitoSubmodel>(
             n_patches, K_PER_PATCH_DEFAULT, instructions, sub_seed);
     }

@@ -82,6 +82,17 @@ public:
     //   4. coord_->current_date() += 1 day
     void step();
 
+    // -- debug instrumentation forwarders (M7.0 population-crash
+    // investigation). Default off; the CLI's --debug-population flag
+    // toggles it. The forwarders let the CLI talk to the submodel
+    // through the Engine facade (the Engine owns the submodel).
+    void set_debug_population(bool on) {
+        if (sub_) sub_->set_debug_population(on);
+    }
+    void set_debug_seeding_patch(int64_t patch_id, int32_t row, int32_t col) {
+        if (sub_) sub_->set_debug_seeding_patch(patch_id, row, col);
+    }
+
     // Write the 2-band state COG + sidecar JSON to `path`. Mirrors
     // `AnophelesABM.snapshot()`: builds the density and suitability
     // grids from the submodel via the coordinator, then writes the
@@ -108,6 +119,19 @@ public:
     const CoordinatorModel& coordinator() const { return *coord_; }
     const MosquitoSubmodel& submodel()    const { return *sub_; }
 
+    // (patch_id, row, col) of the first detection-based seeding
+    // instruction produced by the constructor. Returns {-1, 0, 0}
+    // for UNIFORM mode (no detection-based seeding). Used by the
+    // --debug-population CLI flag to log the Lardeux p_d at the
+    // seeding patch, which is the most direct signal for whether
+    // the calibrated mortality model is being applied.
+    struct SeedingPatch {
+        int64_t patch_id = -1;
+        int32_t row      = 0;
+        int32_t col      = 0;
+    };
+    SeedingPatch seeding_patch() const { return seeding_patch_; }
+
 private:
     AOI                                     aoi_;
     std::shared_ptr<ClimateEngine>          climate_;
@@ -116,6 +140,7 @@ private:
     std::unique_ptr<MosquitoSubmodel>       sub_;
     std::chrono::sys_days                   current_date_;
     std::chrono::sys_days                   start_date_;
+    SeedingPatch                            seeding_patch_;
 };
 
 }  // namespace mal_abm_fast

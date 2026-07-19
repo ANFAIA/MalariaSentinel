@@ -311,6 +311,14 @@ int main(int argc, char** argv) {
                     "to the nearest viable patch within "
                     "--detection-radius-km.");
 
+    bool debug_population = false;
+    run->add_flag("--debug-population", debug_population,
+                  "Emit one stderr line per day with n_alive, n_adults, "
+                  "n_larvae, the Lardeux p_d at the seeding patch, and "
+                  "the per-day n_births / n_deaths / n_maturation. "
+                  "Rate-limited: every day for the first 10 days, then "
+                  "every 5 days. Default off.");
+
     CLI11_PARSE(app, argc, argv);
 
     // If no subcommand was given, print help and exit.
@@ -432,6 +440,20 @@ int main(int argc, char** argv) {
             std::exit(EXIT_FAILURE);
         }
         auto& engine = *engine_ptr;
+
+        // -- debug instrumentation (M7.0 population-crash investigation)
+        // When the user passes --debug-population, the submodel emits
+        // one stderr line per day with the population counts, the
+        // Lardeux p_d at the seeding patch, and the per-day
+        // births/deaths/maturation counts. Rate-limited: every day
+        // for the first 10 days, then every 5 days.
+        if (debug_population) {
+            engine.set_debug_population(true);
+            const auto sp = engine.seeding_patch();
+            if (sp.patch_id >= 0) {
+                engine.set_debug_seeding_patch(sp.patch_id, sp.row, sp.col);
+            }
+        }
 
         // -- Rollout output path --------------------------------------
         const std::string rollout_path =
