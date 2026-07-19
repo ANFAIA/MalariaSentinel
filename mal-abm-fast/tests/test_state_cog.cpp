@@ -408,7 +408,7 @@ TEST(MalAbmFastStateCog, TwoRolloutsDifferentSeedsProduceDifferentCogs) {
         try {
             mal_abm_fast::Engine engine(
                 aoi, env_path, habitat_path, rng, start_date);
-            for (int d = 0; d < 3; ++d) engine.step();
+            for (int d = 0; d < 30; ++d) engine.step();
             engine.snapshot(out_tif, 2024, 6,
                             static_cast<int32_t>(seed_value),
                             /*n_rollouts=*/1, /*rollout_index=*/0);

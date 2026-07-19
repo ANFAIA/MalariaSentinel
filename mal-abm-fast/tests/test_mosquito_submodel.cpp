@@ -161,7 +161,7 @@ TEST(MalAbmFastMosquitoSubmodel, BevertonHoltKillsLarvaeAtHighDensity) {
     // Seed 100 patches × 1000 K × 1.0 = 100000 larvae so the first
     // 4 active patches each hold N=1000 larvae — well into the BH
     // high-density regime (p = 0.95 * K / (K + alpha * N) ≈ 0.905
-    // for alpha=0.05). With the 4x birth rate (BIRTH_RATE=0.02), the
+    // for alpha=0.05). With per-adult birth (BIRTH_FECUNDITY=0.10), the
     // old 0.3 init frac (300 larv/patch) let new births mask BH
     // deaths, so we raise the initial population to keep BH
     // deaths dominant over births.
@@ -242,49 +242,44 @@ TEST(MalAbmFastMosquitoSubmodel, AdvanceDayCallOrder) {
 // --- Desiccation tests ---
 
 TEST(MalAbmFastMosquitoSubmodel, DesiccationKillsAfterGracePeriod) {
-    // Activate 1 patch, seed larvae, then deactivate for > grace period.
     mal_abm_fast::MosquitoSubmodel sub(1, 1000, 0.3f, 42);
     const auto aoi = make_test_aoi();
     auto ps = make_test_patch_states();
-    // Only patch 0 active.
     for (auto& p : ps) p.activated = false;
     ps[0].activated = true;
-    sub.advance_day(aoi, ps);  // day 0: active, counter reset
-    sub.advance_day(aoi, ps);  // day 1: active, counter reset
+    sub.advance_day(aoi, ps);
+    sub.advance_day(aoi, ps);
     const int64_t after_active = sub.total_agents();
-    // Deactivate patch 0.
     ps[0].activated = false;
-    sub.advance_day(aoi, ps);  // day 2: inactive, counter=1 (≤ grace)
+    for (int d = 0; d < 5; ++d) {
+        sub.advance_day(aoi, ps);
+    }
     const int64_t after_grace = sub.total_agents();
-    EXPECT_EQ(after_grace, after_active);  // no kills during grace
-    sub.advance_day(aoi, ps);  // day 3: inactive, counter=2 (> grace)
-    sub.advance_day(aoi, ps);  // day 4: inactive, counter=3, kills start
+    EXPECT_EQ(after_grace, after_active);
+    for (int d = 0; d < 3; ++d) {
+        sub.advance_day(aoi, ps);
+    }
     EXPECT_LT(sub.total_agents(), after_grace);
 }
 
 TEST(MalAbmFastMosquitoSubmodel, DesiccationResetsOnReactivation) {
-    // Verify counter resets on reactivation: deactivate patch 0 for 1 day
-    // (within grace), then reactivate. Subsequently deactivate again for
-    // the full grace period — larvae should survive the second grace
-    // window (counter restarted from 0), proving the reset.
     mal_abm_fast::MosquitoSubmodel sub(1, 1000, 0.3f, 42);
     const auto aoi = make_test_aoi();
     auto ps = make_test_patch_states();
     for (auto& p : ps) p.activated = false;
     ps[0].activated = true;
 
-    sub.advance_day(aoi, ps);  // day 0: active
-    sub.advance_day(aoi, ps);  // day 1: active
+    sub.advance_day(aoi, ps);
+    sub.advance_day(aoi, ps);
     ps[0].activated = false;
-    sub.advance_day(aoi, ps);  // day 2: inactive, counter=1 (≤ grace)
+    sub.advance_day(aoi, ps);
     ps[0].activated = true;
-    sub.advance_day(aoi, ps);  // day 3: active, counter=0 (reset)
+    sub.advance_day(aoi, ps);
 
-    // Now deactivate again. Counter starts from 0 (reset).
     ps[0].activated = false;
-    sub.advance_day(aoi, ps);  // day 4: counter=1 (≤ grace, no kills)
-    sub.advance_day(aoi, ps);  // day 5: counter=2 (≤ grace, no kills)
-    // Count larvae at patch 0 — should still be alive (within grace).
+    for (int d = 0; d < 5; ++d) {
+        sub.advance_day(aoi, ps);
+    }
     const auto& soa1 = sub.soa();
     int64_t larvae_after = 0;
     for (int64_t i = 0; i < soa1.n_alive; ++i) {
@@ -292,9 +287,9 @@ TEST(MalAbmFastMosquitoSubmodel, DesiccationResetsOnReactivation) {
         if (soa1.stage[si] == 0 && soa1.patch_id[si] == 0) ++larvae_after;
     }
     EXPECT_GT(larvae_after, 0);
-    // Continue past grace — desiccation kills should start.
-    sub.advance_day(aoi, ps);  // day 6: counter=3 (> grace, kills start)
-    sub.advance_day(aoi, ps);  // day 7: counter=4 (kills continue)
+    for (int d = 0; d < 3; ++d) {
+        sub.advance_day(aoi, ps);
+    }
     const auto& soa2 = sub.soa();
     int64_t larvae_later = 0;
     for (int64_t i = 0; i < soa2.n_alive; ++i) {

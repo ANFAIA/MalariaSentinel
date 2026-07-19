@@ -44,16 +44,16 @@ inline constexpr float  INIT_FRAC                   = 0.30f;
 inline constexpr float  EIP_BASE_C                  = 16.0f;
 inline constexpr float  EIP_THRESHOLD_GD            = 110.0f;
 
-// Adult dispersal kernel: isotropic Gaussian in metres, clipped at 2 km.
-// 20% of adults move per day (An. gambiae rural dispersal).
-inline constexpr float  ADULT_DISPERSE_PROB         = 0.20f;
-inline constexpr float  ADULT_DISPERSE_SIGMA_M      = 1000.0f;
-inline constexpr float  ADULT_DISPERSE_MAX_M        = 2000.0f;
+// Adult dispersal kernel: isotropic Gaussian in metres, clipped at 800 m.
+// 10% of adults move per day (An. gambiae rural dispersal).
+inline constexpr float  ADULT_DISPERSE_PROB         = 0.10f;
+inline constexpr float  ADULT_DISPERSE_SIGMA_M      = 300.0f;
+inline constexpr float  ADULT_DISPERSE_MAX_M        = 800.0f;
 
-// Per-patch per-day birth rate (binomial(K, BIRTH_RATE) new larvae).
+// Per-adult per-day fecundity: binomial(n_adults/2, BIRTH_FECUNDITY) new larvae.
 // Tuned so the population stays near the initial seeded count on the
 // 30k-patch, 30-day M1.5 perf budget.
-inline constexpr float  BIRTH_RATE                  = 0.02f;
+inline constexpr float  BIRTH_FECUNDITY              = 0.10f;
 
 // Larva density-dependent mortality (Beverton-Holt, docs/abm-status.md:79).
 inline constexpr float  LARVA_BH_S0    = 0.95f;   // baseline daily survival
@@ -66,8 +66,8 @@ inline constexpr float  ADULT_OPT_C           = 26.0f;  // optimal temperature
 inline constexpr float  ADULT_SIGMA           = 7.0f;   // width of thermal response
 
 // Larva desiccation mortality (Depinay 2004 §3.1).
-inline constexpr int    LARVA_DESICCATION_GRACE_DAYS = 2;
-inline constexpr float  LARVA_DESICCATION_DAILY_RATE = 0.30f;
+inline constexpr int    LARVA_DESICCATION_GRACE_DAYS = 5;
+inline constexpr float  LARVA_DESICCATION_DAILY_RATE = 0.10f;
 
 // PLUVIAL_POOL dynamic-patch rule (M2 combined, C2):
 //   cell (r, c) is a habitat patch today iff

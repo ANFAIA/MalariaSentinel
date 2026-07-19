@@ -48,8 +48,8 @@ enum class SeedingMode {
 struct DetectionPoint {
     double  lat       = 0.0;
     double  lon       = 0.0;
-    int32_t n_adults  = 50;
-    int32_t n_larvae  = 30;
+    int32_t n_adults  = 500;
+    int32_t n_larvae  = 200;
 };
 
 // Configuration for the detection-based seeding subsystem.
@@ -57,7 +57,7 @@ struct SeedingConfig {
     SeedingMode mode = SeedingMode::UNIFORM;
 
     // For RANDOM_VIABLE:
-    int32_t n_detections         = 3;
+    int32_t n_detections         = 1;
     double  detection_radius_km  = 5.0;   // also used as max snap distance for EXPLICIT
 
     // For EXPLICIT:
@@ -68,8 +68,8 @@ struct SeedingConfig {
 
     // Per-detection defaults (apply to RANDOM_VIABLE; EXPLICIT can
     // override per-point via DetectionPoint).
-    int32_t n_adults_per_detection = 50;
-    int32_t n_larvae_per_detection = 30;
+    int32_t n_adults_per_detection = 500;
+    int32_t n_larvae_per_detection = 200;
 
     // Viability filter (applies to RANDOM_VIABLE).
     float min_water_frac = 0.05f;

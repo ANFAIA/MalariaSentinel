@@ -571,7 +571,7 @@ void MosquitoSubmodel::adult_mortality(
             } else {
                 p_d = static_cast<double>(ADULT_DAILY_MORT_BASE);
             }
-            if (p_d < 0.80) p_d = 0.80;
+            if (p_d < 0.60) p_d = 0.60;
             if (p_d > 1.0)  p_d = 1.0;
             if (rng_.uniform_double() >= p_d) {
                 swap_with_last(soa_, i, soa_.n_alive);
@@ -595,6 +595,26 @@ void MosquitoSubmodel::birth(const AOI& aoi,
     const int32_t h = cells_per_side_h(aoi);
     if (w <= 0 || h <= 0) return;
 
+    int64_t max_pid = -1;
+    for (const auto& ps : patch_states) {
+        if (ps.patch_id > max_pid) max_pid = ps.patch_id;
+    }
+    if (max_pid < 0) return;
+
+    std::vector<uint8_t> active_by_id(static_cast<size_t>(max_pid) + 1, 0);
+    std::vector<int32_t> adult_count(static_cast<size_t>(max_pid) + 1, 0);
+    for (const auto& ps : patch_states) {
+        if (ps.activated) {
+            active_by_id[static_cast<size_t>(ps.patch_id)] = 1;
+        }
+    }
+    for (int64_t i = 0; i < soa_.n_alive; ++i) {
+        const size_t si = static_cast<size_t>(i);
+        if (soa_.stage[si] == 1 && active_by_id[soa_.patch_id[si]]) {
+            ++adult_count[soa_.patch_id[si]];
+        }
+    }
+
     struct PatchDraw {
         int64_t patch_id;
         int32_t row;
@@ -607,8 +627,10 @@ void MosquitoSubmodel::birth(const AOI& aoi,
     int64_t total_birth = 0;
     for (const auto& ps : patch_states) {
         if (!ps.activated) continue;
-        const int n = rng_.binomial(static_cast<int>(k_per_patch_),
-                                    static_cast<double>(BIRTH_RATE));
+        const int64_t n_females = static_cast<int64_t>(adult_count[static_cast<size_t>(ps.patch_id)]) / 2;
+        if (n_females <= 0) continue;
+        const int n = rng_.binomial(static_cast<int>(n_females),
+                                    static_cast<double>(BIRTH_FECUNDITY));
         const int64_t nb = static_cast<int64_t>(n);
         if (nb <= 0) continue;
         draws.push_back({ps.patch_id, ps.row, ps.col, nb});

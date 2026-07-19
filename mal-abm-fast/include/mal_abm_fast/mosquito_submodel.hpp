@@ -107,7 +107,7 @@ public:
     // 6. Adult mortality — Lardeux thermo-dependent daily survival.
     void adult_mortality(const std::vector<PatchState>& patch_states);
 
-    // 5. binomial(K, BIRTH_RATE) per active patch; new lon/lat =
+    // 5. binomial(n_adults/2, BIRTH_FECUNDITY) per active patch; new lon/lat =
     //    patch cell centre. New agents start as larvae with
     //    eip_progress = 0, stage_age = 0, uid = soa().next_uid++.
     void birth(const AOI& aoi, const std::vector<PatchState>& patch_states);

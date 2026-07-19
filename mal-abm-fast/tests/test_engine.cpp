@@ -344,7 +344,7 @@ TEST(MalAbmFastEngine, NRolloutsWritesPerRolloutOutputsAndSidecars) {
 
     // -- Run 3 rollouts, each with a fresh Prng + Engine --------------
     constexpr int kNRollouts = 3;
-    constexpr int kDays      = 3;
+    constexpr int kDays      = 30;
     constexpr int kBaseSeed  = 100;
 
     // Per-rollout COG byte sizes. We compare them to verify the
@@ -451,7 +451,7 @@ TEST(MalAbmFastEngine, TwoRolloutsWithDifferentSeedsProduceDifferentCogs) {
         try {
             mal_abm_fast::Engine engine(
                 aoi, env_path, habitat_path, rng, start_date);
-            for (int d = 0; d < 3; ++d) engine.step();
+            for (int d = 0; d < 30; ++d) engine.step();
             engine.snapshot(out_tif, 2024, 6,
                             static_cast<int32_t>(seed_value),
                             /*n_rollouts=*/1, /*rollout_index=*/0);
@@ -543,7 +543,7 @@ TEST(MalAbmFastEngine, TwoRolloutsWithSameSeedProduceIdenticalCogs) {
         try {
             mal_abm_fast::Engine engine(
                 aoi, env_path, habitat_path, rng, start_date);
-            for (int d = 0; d < 3; ++d) engine.step();
+            for (int d = 0; d < 30; ++d) engine.step();
             engine.snapshot(out_tif, 2024, 6,
                             static_cast<int32_t>(seed_value),
                             /*n_rollouts=*/1, /*rollout_index=*/0);
