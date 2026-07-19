@@ -20,13 +20,29 @@ from mal_commonlib.aoi import Scale
 from mal_commonlib.config import RUNS_DIR
 
 from .aoi import get_aggregator, grid_shape, make_aoi
+from .env import ENV_CHANNELS, load_env_stack
 from .registry import ModelRegistry
 from .scenario import ScenarioConfig, interventions_to_params
+from .state import load_abm_state
 
 
 def _generate_dummy_inputs(h: int, w: int) -> tuple[np.ndarray, np.ndarray]:
     state = np.zeros((2, h, w), dtype=np.float32)
-    env = np.zeros((4, h, w), dtype=np.float32)
+    env = np.zeros((ENV_CHANNELS, h, w), dtype=np.float32)
+    return state, env
+
+
+def _load_real_inputs(aoi, month: int) -> tuple[np.ndarray, np.ndarray]:
+    """Load real ABM state and env stack for the given AOI and month."""
+    try:
+        state = load_abm_state(aoi, month=month)
+    except FileNotFoundError:
+        state = np.zeros((2, aoi.cells_per_side()[0], aoi.cells_per_side()[1]), dtype=np.float32)
+    try:
+        env = load_env_stack(aoi)
+    except Exception:
+        h, w = aoi.cells_per_side()
+        env = np.zeros((ENV_CHANNELS, h, w), dtype=np.float32)
     return state, env
 
 
@@ -46,7 +62,8 @@ def run_prediction(
     registry = ModelRegistry()
     model = registry.load(model_name, model_version)
 
-    state, env = _generate_dummy_inputs(h, w)
+    # Use real ABM state + env stack; fall back to zeros if unavailable.
+    state, env = _load_real_inputs(aoi, month)
 
     if scenario is not None:
         params = interventions_to_params(scenario)

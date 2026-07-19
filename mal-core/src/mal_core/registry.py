@@ -82,7 +82,18 @@ class ModelRegistry:
         entry = self.get(name, version)
         if entry.model is not None:
             return entry.model
-        entry.model = DummyModel()
+
+        # If the manifest points to a checkpoint, load the U-Net wrapper.
+        if entry.manifest.checkpoint:
+            from .unet_wrapper import UNetWrapper
+            ckpt = entry.path / entry.manifest.checkpoint
+            if not ckpt.exists():
+                raise FileNotFoundError(
+                    f"Checkpoint not found: {ckpt} (model {name}@{entry.manifest.version})"
+                )
+            entry.model = UNetWrapper(ckpt)
+        else:
+            entry.model = DummyModel()
         return entry.model
 
     def list_models(self) -> list[dict[str, str]]:
