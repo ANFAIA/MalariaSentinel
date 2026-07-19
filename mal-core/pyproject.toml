@@ -1,9 +1,19 @@
 [project]
 name = "mal-core"
 version = "0.1.0"
-description = "MalariaSentinel — stable pipeline logic (empty, ready for promotion)"
+description = "MalariaSentinel — stable pipeline logic (M3-M4 U-Net + M5 SDSS shell)"
 requires-python = ">=3.12"
-dependencies = ["mal-commonlib"]
+dependencies = [
+    "mal-commonlib",
+    "torch>=2.0",
+    "numpy>=2.0",
+    "rasterio>=1.5.0",
+    "fastapi>=0.115",
+    "uvicorn>=0.30",
+    "typer>=0.12",
+    "pydantic>=2.7",
+    "pyyaml>=6.0",
+]
 
 [build-system]
 requires = ["hatchling"]
@@ -14,3 +24,6 @@ packages = ["src/mal_core"]
 
 [tool.uv.sources]
 mal-commonlib = { workspace = true }
+
+[project.scripts]
+malariasim = "mal_core:cli_main"
