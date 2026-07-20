@@ -44,11 +44,15 @@ inline constexpr float  INIT_FRAC                   = 0.30f;
 inline constexpr float  EIP_BASE_C                  = 16.0f;
 inline constexpr float  EIP_THRESHOLD_GD            = 110.0f;
 
-// Adult dispersal kernel: isotropic Gaussian in metres, clipped at 800 m.
+// Adult dispersal kernel: isotropic Gaussian in metres, clipped at 2000 m.
 // 10% of adults move per day (An. gambiae rural dispersal).
+// Sigma=450m: midpoint of Costantini et al. 1996 (350-650 m/day, Burkina
+//   Faso MRR) and Thomas et al. 2013 (median 386m, The Gambia).
+// Cap=2000m: Thomas et al. 2013 95th percentile (1.7-2.8 km); captures
+//   rare long-distance colonization events.
 inline constexpr float  ADULT_DISPERSE_PROB         = 0.10f;
-inline constexpr float  ADULT_DISPERSE_SIGMA_M      = 300.0f;
-inline constexpr float  ADULT_DISPERSE_MAX_M        = 800.0f;
+inline constexpr float  ADULT_DISPERSE_SIGMA_M      = 450.0f;
+inline constexpr float  ADULT_DISPERSE_MAX_M        = 2000.0f;
 
 // Per-adult per-day fecundity: binomial(n_adults/2, BIRTH_FECUNDITY) new larvae.
 // Tuned so the population stays near the initial seeded count on the
