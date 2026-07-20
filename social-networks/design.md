@@ -119,7 +119,7 @@ Every scene has 8–10 visual elements across 3 layers:
 - No exit animations before transitions. Transitions are the exit.
 - Never use `warn`/orange — the palette is calm. Use `sage` for "done" and `accent` for "current/highlight".
 
-## Scene content (source of truth: `docs/abm-status.md`)
+## Scene content (audience: LinkedIn — non-technical)
 
 ### Scene 1 — Title
 - `MalariaSentinel`
@@ -128,8 +128,8 @@ Every scene has 8–10 visual elements across 3 layers:
 - Meta: `v0.5.0 Python · F1 C++ · Open Source`
 
 ### Scene 2 — El pipeline SDSS
-Headline: `El pipeline: del satélite al mapa de riesgo.`
-Six-stage flow:
+Headline: `Del satélite al mapa de riesgo.`
+Six-stage flow (kept technical — this is the bridge to scenes 3-5):
 1. `INGESTA` — CHIRPS, ERA5, MERIT DEM, JRC GSW, MODIS, WorldCover
 2. `SUITABILIDAD` — TWI, modelo de idoneidad
 3. `ABM` — motor C++ (xoshiro256**, 7 ops/día)
@@ -137,37 +137,33 @@ Six-stage flow:
 5. `U-NET` — 32→64→128→256→512, MSE + soft-Dice
 6. `PREDICCIÓN` — risk maps mensuales, FastAPI
 
-### Scene 3 — Estado actual
-Headline: `Cuatro hitos cumplidos.`
-Stats:
-- `71/71` tests Python
-- `60/60` tests C++
-- `5/5` parity
-Milestones done: `M0 · M1 · M2 · M-perf F1`
-Milestones pending: `M3 · M4 · M5 · M6 · M7`
+### Scene 3 — El sistema en 3 capas
+Headline: `Tres piezas que trabajan juntas.`
+Three cards with connectors (no technical jargon):
+- **01 — El satélite mira.** Imágenes del espacio, clima, mapas de agua. Lo que ya sabemos del terreno.
+- **02 — La simulación piensa.** Un programa imagina cómo se mueven los mosquitos. Lento pero preciso.
+- **03 — El mapa avisa.** Un mapa mensual que dice dónde puede haber riesgo. En minutos.
+Connectors: `alimenta` (1→2), `enseña a` (2→3).
 
-### Scene 4 — El motor ABM
-Headline: `El motor ABM en C++ (mal-abm-fast).`
-Constants: `K_MAX = 1000` · `EIP 16°C` · `110 GD` · `σ 300m`
-Sub-model: 7 operaciones diarias
-- `larva_mortality_inactive`
-- `larva_mortality_density` (Beverton-Holt)
-- `larva_growth`
-- `larva_to_adult`
-- `adult_dispersal` (10%, Gaussiana)
-- `adult_mortality` (Lardeux)
-- `birth` (binomial)
+### Scene 4 — A dónde vamos
+Headline: `Le das una región. Te devuelve un mapa de riesgo.`
+Three points (the value proposition, no cifras):
+- Cualquier país, cualquier zona endémica. El sistema se adapta.
+- Cada mes, un mapa nuevo con la expansión probable del mosquito.
+- Listo para el personal de salud, antes de que llegue el brote.
 
-### Scene 5 — U-Net sustituta
-Headline: `U-Net: la sustituta 100× más rápida.`
-Architecture: `32 → 64 → 128 → 256 → 512`
-Loss: `MSE + 0.5 × soft-Dice`
-Input `(6, 128, 128)` → Output `(2, 128, 128)`
-Target: `100 rollouts en <5 min · nodo FT3`
+### Scene 5 — Dónde estamos
+Honest admission: `Hoy tenemos algo. Todavía no lo que queremos.`
+Two columns (HOY / AHORA) connected by an arrow:
+- **HOY**: Una primera versión que funciona con datos reales de Ghana. La simulación es básica — solo dos etapas de vida del mosquito. Las señales son simples: lluvia y agua. Solo sirve para una región.
+- **AHORA**: Mejorando la simulación para que el sistema funcione de verdad. Ciclo de vida completo del mosquito. El mosquito que busca comida, pone huevos, transmite. Para que sirva en cualquier sitio, no solo Ghana.
 
 ### Scene 6 — Cierre
 - Section: `05 · APOYO`
 - Lead: `Este proyecto es posible gracias a`
 - Wordmark: `ANFAIA`
 - Tagline: `Ciencia abierta para la eliminación de la malaria.`
-- Foot: `github.com/ANFAIA/MalariaSentinel` · `SDSS · Open Source · 2026`
+- Foot:
+  - `github.com/ANFAIA/MalariaSentinel`
+  - `SDSS · Open Source · 2026`
+  - `Sistema construido con ayuda de sistemas agénticos` (italic, fg-dim)

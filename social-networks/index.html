@@ -330,244 +330,81 @@
       margin-top: 4px;
     }
 
-    /* ---------- scene 3 (estado) ---------- */
-    #scene-3 .estado-stack {
-      margin-top: 30px;
+    /* ---------- scene 3 (3 capas) ---------- */
+    #scene-3 .s3-flow {
+      margin-top: 20px;
       display: flex;
       flex-direction: column;
-      gap: 24px;
+      gap: 0;
     }
-    #scene-3 .stat {
+    #scene-3 .s3-card {
       display: grid;
-      grid-template-columns: 280px 1fr;
-      gap: 32px;
-      align-items: baseline;
-      padding: 14px 0;
-      border-top: 1px solid var(--rule);
+      grid-template-columns: 110px 1fr;
+      gap: 22px;
+      align-items: start;
+      padding: 22px 26px;
+      background: var(--surface);
+      border: 1px solid var(--rule);
+      border-radius: 6px;
     }
-    #scene-3 .stat:last-child { border-bottom: 1px solid var(--rule); }
-    #scene-3 .stat-num {
-      font-family: "Space Grotesk", sans-serif;
-      font-weight: 700;
-      font-size: 96px;
-      color: var(--fg);
-      line-height: 0.95;
-      letter-spacing: -0.045em;
-    }
-    #scene-3 .stat-num.accent { color: var(--accent-bright); }
-    #scene-3 .stat-num .unit {
+    #scene-3 .s3-card .num {
       font-family: "JetBrains Mono", monospace;
       font-size: 22px;
-      color: var(--fg-muted);
-      font-weight: 500;
-      letter-spacing: 0.04em;
-      margin-left: 14px;
-    }
-    #scene-3 .stat-info { display: flex; flex-direction: column; gap: 6px; }
-    #scene-3 .stat-label {
-      font-family: "Space Grotesk", sans-serif;
-      font-weight: 500;
-      font-size: 26px;
-      color: var(--fg);
-    }
-    #scene-3 .stat-gloss {
-      font-family: "JetBrains Mono", monospace;
-      font-size: 16px;
-      color: var(--fg-dim);
-      letter-spacing: 0.04em;
-    }
-    #scene-3 .milestone-strip {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-      align-items: center;
-      margin-top: 18px;
-    }
-    #scene-3 .ms-chip {
-      font-family: "JetBrains Mono", monospace;
-      font-size: 16px;
       font-weight: 600;
-      padding: 8px 14px;
-      border-radius: 4px;
+      color: var(--sage);
       letter-spacing: 0.04em;
+      padding-top: 4px;
     }
-    #scene-3 .ms-chip.done {
-      color: var(--accent-bright);
-      background: rgba(199, 218, 211, 0.10);
-      border: 1px solid rgba(199, 218, 211, 0.35);
-    }
-    #scene-3 .ms-chip.pending {
-      color: var(--fg-dim);
-      background: transparent;
-      border: 1px solid var(--rule);
-    }
-    #scene-3 .ms-divider {
-      width: 1px;
-      height: 24px;
-      background: var(--rule);
-      margin: 0 8px;
-    }
-    #scene-3 .ms-legend {
-      font-family: "JetBrains Mono", monospace;
-      font-size: 13px;
-      color: var(--fg-dim);
-      letter-spacing: 0.18em;
-      text-transform: uppercase;
-      margin-top: 14px;
-    }
-    #scene-3 .estado-foot {
-      position: absolute;
-      left: 120px; right: 120px; bottom: 130px;
-      display: flex;
-      justify-content: space-between;
-      font-family: "JetBrains Mono", monospace;
-      font-size: 16px;
-      color: var(--fg-dim);
-      letter-spacing: 0.16em;
-      text-transform: uppercase;
-    }
-    #scene-3 .estado-foot .right { color: var(--accent-bright); }
-
-    /* ---------- scene 4 (motor ABM) ---------- */
-    #scene-4 .motor-grid {
-      margin-top: 30px;
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 40px;
-    }
-    #scene-4 .motor-col { display: flex; flex-direction: column; gap: 10px; }
-    #scene-4 .motor-col-title {
-      font-family: "JetBrains Mono", monospace;
-      font-size: 16px;
-      color: var(--accent-bright);
-      letter-spacing: 0.18em;
-      text-transform: uppercase;
-      margin-bottom: 10px;
-      padding-bottom: 10px;
-      border-bottom: 1px solid var(--rule);
-    }
-    #scene-4 .const-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: baseline;
-      padding: 8px 0;
-      border-bottom: 1px solid var(--rule);
-    }
-    #scene-4 .const-row .k {
-      font-family: "JetBrains Mono", monospace;
-      font-size: 16px;
-      color: var(--fg-muted);
-      letter-spacing: 0.02em;
-    }
-    #scene-4 .const-row .v {
-      font-family: "JetBrains Mono", monospace;
-      font-size: 18px;
-      color: var(--fg);
-      font-weight: 600;
-      font-variant-numeric: tabular-nums;
-    }
-    #scene-4 .op-row {
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-      padding: 8px 0;
-      border-bottom: 1px solid var(--rule);
-    }
-    #scene-4 .op-row .name {
-      font-family: "JetBrains Mono", monospace;
-      font-size: 17px;
-      color: var(--fg);
-      font-weight: 500;
-    }
-    #scene-4 .op-row .note {
+    #scene-3 .s3-card .body-col { display: flex; flex-direction: column; gap: 8px; }
+    #scene-3 .s3-card .verbo {
       font-family: "Space Grotesk", sans-serif;
+      font-weight: 600;
+      font-size: 30px;
+      color: var(--fg);
+      letter-spacing: -0.015em;
+      line-height: 1.15;
+    }
+    #scene-3 .s3-card .verbo .italic {
       font-style: italic;
+      font-weight: 600;
+      color: var(--accent-bright);
+    }
+    #scene-3 .s3-card .frase {
+      font-family: "Space Grotesk", sans-serif;
       font-weight: 400;
-      font-size: 15px;
-      color: var(--fg-dim);
-      margin-left: 12px;
-    }
-    #scene-4 .motor-foot {
-      position: absolute;
-      left: 120px; right: 120px; bottom: 130px;
-      display: flex;
-      justify-content: space-between;
-      font-family: "JetBrains Mono", monospace;
-      font-size: 16px;
-      color: var(--fg-dim);
-      letter-spacing: 0.16em;
-      text-transform: uppercase;
-    }
-    #scene-4 .motor-foot .right { color: var(--accent-bright); }
-
-    /* ---------- scene 5 (U-Net) ---------- */
-    #scene-5 .unet-grid {
-      margin-top: 30px;
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 40px;
-    }
-    #scene-5 .unet-col { display: flex; flex-direction: column; gap: 8px; }
-    #scene-5 .unet-col-title {
-      font-family: "JetBrains Mono", monospace;
-      font-size: 16px;
-      color: var(--accent-bright);
-      letter-spacing: 0.18em;
-      text-transform: uppercase;
-      margin-bottom: 10px;
-      padding-bottom: 10px;
-      border-bottom: 1px solid var(--rule);
-    }
-    #scene-5 .unet-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: baseline;
-      padding: 9px 0;
-      border-bottom: 1px solid var(--rule);
-    }
-    #scene-5 .unet-row .k {
-      font-family: "JetBrains Mono", monospace;
-      font-size: 15px;
+      font-size: 20px;
       color: var(--fg-muted);
-      letter-spacing: 0.02em;
+      line-height: 1.4;
+      max-width: 600px;
     }
-    #scene-5 .unet-row .v {
+    #scene-3 .s3-card .micro {
       font-family: "JetBrains Mono", monospace;
-      font-size: 17px;
-      color: var(--fg);
-      font-weight: 600;
-      font-variant-numeric: tabular-nums;
-    }
-    #scene-5 .unet-row .v.flow {
-      font-family: "Space Grotesk", sans-serif;
-      font-weight: 500;
-      font-size: 19px;
-      color: var(--fg);
-    }
-    #scene-5 .unet-row .v.flow .arrow { color: var(--accent-bright); margin: 0 6px; }
-    #scene-5 .unet-100x {
-      font-family: "Space Grotesk", sans-serif;
-      font-weight: 700;
-      font-size: 120px;
-      color: var(--accent-bright);
-      letter-spacing: -0.05em;
-      line-height: 0.95;
-      margin-top: 4px;
-    }
-    #scene-5 .unet-100x .x {
-      font-style: italic;
-      font-weight: 600;
-      font-size: 88px;
-    }
-    #scene-5 .unet-100x-label {
-      font-family: "JetBrains Mono", monospace;
-      font-size: 16px;
-      color: var(--accent-bright);
-      letter-spacing: 0.18em;
-      text-transform: uppercase;
+      font-size: 14px;
+      color: var(--fg-dim);
+      letter-spacing: 0.04em;
       margin-top: 2px;
     }
-    #scene-5 .unet-foot {
+    #scene-3 .s3-connector {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 12px 0 12px 50px;
+    }
+    #scene-3 .s3-connector .line {
+      width: 2px;
+      height: 28px;
+      background: var(--accent);
+      transform-origin: top center;
+    }
+    #scene-3 .s3-connector .lbl {
+      font-family: "JetBrains Mono", monospace;
+      font-size: 16px;
+      color: var(--accent-bright);
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      font-weight: 500;
+    }
+    #scene-3 .s3-foot {
       position: absolute;
       left: 120px; right: 120px; bottom: 130px;
       display: flex;
@@ -578,7 +415,179 @@
       letter-spacing: 0.16em;
       text-transform: uppercase;
     }
-    #scene-5 .unet-foot .right { color: var(--accent-bright); }
+    #scene-3 .s3-foot .right { color: var(--accent-bright); }
+
+    /* ---------- scene 4 (a dónde vamos) ---------- */
+    #scene-4 .s4-headline {
+      font-family: "Space Grotesk", sans-serif;
+      font-weight: 700;
+      font-size: 56px;
+      color: var(--fg);
+      letter-spacing: -0.025em;
+      line-height: 1.1;
+      max-width: 880px;
+      margin-top: 16px;
+    }
+    #scene-4 .s4-headline .italic {
+      font-style: italic;
+      font-weight: 600;
+      color: var(--accent-bright);
+    }
+    #scene-4 .s4-points {
+      margin-top: 50px;
+      display: flex;
+      flex-direction: column;
+      gap: 22px;
+    }
+    #scene-4 .s4-point {
+      display: grid;
+      grid-template-columns: 60px 1fr;
+      gap: 24px;
+      align-items: baseline;
+      padding: 18px 0;
+      border-top: 1px solid var(--rule);
+    }
+    #scene-4 .s4-point:last-child { border-bottom: 1px solid var(--rule); }
+    #scene-4 .s4-point .mark {
+      font-family: "JetBrains Mono", monospace;
+      font-size: 16px;
+      color: var(--accent-bright);
+      font-weight: 600;
+      letter-spacing: 0.04em;
+    }
+    #scene-4 .s4-point .txt {
+      font-family: "Space Grotesk", sans-serif;
+      font-weight: 500;
+      font-size: 28px;
+      color: var(--fg);
+      line-height: 1.25;
+      max-width: 760px;
+    }
+    #scene-4 .s4-point .txt .italic {
+      font-style: italic;
+      font-weight: 600;
+      color: var(--accent-bright);
+    }
+    #scene-4 .s4-foot {
+      position: absolute;
+      left: 120px; right: 120px; bottom: 130px;
+      display: flex;
+      justify-content: space-between;
+      font-family: "JetBrains Mono", monospace;
+      font-size: 16px;
+      color: var(--fg-dim);
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+    }
+    #scene-4 .s4-foot .right { color: var(--accent-bright); }
+
+    /* ---------- scene 5 (dónde estamos) ---------- */
+    #scene-5 .s5-honest {
+      font-family: "Space Grotesk", sans-serif;
+      font-style: italic;
+      font-weight: 500;
+      font-size: 28px;
+      color: var(--fg-muted);
+      max-width: 720px;
+      line-height: 1.3;
+      margin-top: 8px;
+    }
+    #scene-5 .s5-honest .accent {
+      color: var(--accent-bright);
+      font-weight: 600;
+    }
+    #scene-5 .s5-grid {
+      margin-top: 30px;
+      display: grid;
+      grid-template-columns: 1fr 80px 1fr;
+      gap: 0;
+      align-items: stretch;
+    }
+    #scene-5 .s5-col {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      padding: 28px 26px;
+      background: var(--surface);
+      border: 1px solid var(--rule);
+      border-radius: 6px;
+    }
+    #scene-5 .s5-col .col-label {
+      font-family: "JetBrains Mono", monospace;
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--accent-bright);
+      letter-spacing: 0.20em;
+      text-transform: uppercase;
+    }
+    #scene-5 .s5-col .col-lead {
+      font-family: "Space Grotesk", sans-serif;
+      font-weight: 500;
+      font-size: 22px;
+      color: var(--fg);
+      line-height: 1.3;
+      margin-bottom: 4px;
+    }
+    #scene-5 .s5-col .col-bullets {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      list-style: none;
+    }
+    #scene-5 .s5-col .col-bullets li {
+      font-family: "Space Grotesk", sans-serif;
+      font-weight: 400;
+      font-size: 19px;
+      color: var(--fg-muted);
+      line-height: 1.35;
+      padding-left: 18px;
+      position: relative;
+    }
+    #scene-5 .s5-col .col-bullets li::before {
+      content: "";
+      position: absolute;
+      left: 0; top: 12px;
+      width: 6px; height: 1px;
+      background: var(--fg-dim);
+    }
+    #scene-5 .s5-col.now .col-bullets li::before {
+      background: var(--sage);
+    }
+    #scene-5 .s5-col.next .col-bullets li::before {
+      background: var(--accent-bright);
+    }
+    #scene-5 .s5-arrow {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+    #scene-5 .s5-arrow .arrow-line {
+      width: 100%;
+      height: 2px;
+      background: var(--accent);
+      transform-origin: left center;
+    }
+    #scene-5 .s5-arrow .arrow-head {
+      position: absolute;
+      right: -2px;
+      width: 0; height: 0;
+      border-top: 8px solid transparent;
+      border-bottom: 8px solid transparent;
+      border-left: 14px solid var(--accent);
+    }
+    #scene-5 .s5-foot {
+      position: absolute;
+      left: 120px; right: 120px; bottom: 130px;
+      display: flex;
+      justify-content: space-between;
+      font-family: "JetBrains Mono", monospace;
+      font-size: 16px;
+      color: var(--fg-dim);
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+    }
+    #scene-5 .s5-foot .right { color: var(--accent-bright); }
 
     /* ---------- scene 6 (ANFAIA) ---------- */
     #scene-6 .closing-wrap {
@@ -630,9 +639,9 @@
     }
     #scene-6 .closing-foot {
       position: absolute;
-      left: 120px; right: 120px; bottom: 130px;
+      left: 120px; right: 120px; bottom: 110px;
       display: flex; flex-direction: column;
-      align-items: center; gap: 10px;
+      align-items: center; gap: 8px;
     }
     #scene-6 .closing-foot .gh {
       font-family: "JetBrains Mono", monospace;
@@ -649,6 +658,17 @@
       color: var(--fg-dim);
       letter-spacing: 0.12em;
       text-transform: uppercase;
+    }
+    #scene-6 .closing-foot .agents {
+      font-family: "Space Grotesk", sans-serif;
+      font-style: italic;
+      font-weight: 400;
+      font-size: 14px;
+      color: var(--fg-dim);
+      letter-spacing: 0.02em;
+      margin-top: 4px;
+      max-width: 540px;
+      text-align: center;
     }
 
     /* ---------- transition overlay (blur crossfade) ---------- */
@@ -765,211 +785,143 @@
       </div>
     </div>
 
-    <!-- ============== SCENE 3 — ESTADO ============== -->
+    <!-- ============== SCENE 3 — EL SISTEMA EN 3 CAPAS ============== -->
     <div class="scene" id="scene-3">
       <div class="bg-grid"></div>
       <div class="bg-glow" style="width:800px;height:800px;right:-200px;top:-100px;background:radial-gradient(circle, var(--accent-glow) 0%, transparent 65%);"></div>
-      <div class="ghost" data-layout-allow-overflow style="left:-40px;top:60px;font-size:260px;" id="ghost-71">71/71</div>
+      <div class="ghost" data-layout-allow-overflow style="left:-40px;top:60px;font-size:240px;" id="ghost-flow">FLUJO</div>
 
       <div class="scene-content">
-        <div style="display:flex;flex-direction:column;gap:14px;">
-          <div class="section-label" id="s3-label">02 · ESTADO</div>
-          <div class="heading h-3" id="s3-headline">Cuatro hitos cumplidos.</div>
+        <div style="display:flex;flex-direction:column;gap:10px;">
+          <div class="section-label" id="s3-label">02 · EL SISTEMA</div>
+          <div class="heading h-3" id="s3-headline">Tres piezas que trabajan juntas.</div>
         </div>
 
-        <div class="estado-stack" id="s3-stack">
-          <div class="stat" id="stat-1">
-            <div class="stat-num"><span id="stat-1-num">0</span><span class="unit">tests</span></div>
-            <div class="stat-info">
-              <div class="stat-label">Python · ABM v0.5.0</div>
-              <div class="stat-gloss">Polars/SoA · JRC GSW 30m · dynamic patches</div>
+        <div class="s3-flow" id="s3-flow">
+          <div class="s3-card" id="s3-card-1">
+            <div class="num">01</div>
+            <div class="body-col">
+              <div class="verbo">El satélite <span class="italic">mira.</span></div>
+              <div class="frase">Imágenes del espacio, clima, mapas de agua. Lo que ya sabemos del terreno.</div>
             </div>
           </div>
 
-          <div class="stat" id="stat-2">
-            <div class="stat-num"><span id="stat-2-num">0</span><span class="unit">tests</span></div>
-            <div class="stat-info">
-              <div class="stat-label">C++ · mal-abm-fast</div>
-              <div class="stat-gloss">Beverton-Holt · Lardeux · ctest</div>
+          <div class="s3-connector" id="s3-conn-1">
+            <div class="line" id="s3-conn-1-line"></div>
+            <div class="lbl" id="s3-conn-1-lbl">alimenta</div>
+          </div>
+
+          <div class="s3-card" id="s3-card-2">
+            <div class="num">02</div>
+            <div class="body-col">
+              <div class="verbo">La simulación <span class="italic">piensa.</span></div>
+              <div class="frase">Un programa imagina cómo se mueven los mosquitos. Lento pero preciso.</div>
             </div>
           </div>
 
-          <div class="stat" id="stat-3">
-            <div class="stat-num accent"><span id="stat-3-num">0</span><span class="unit">parity</span></div>
-            <div class="stat-info">
-              <div class="stat-label">Python ↔ C++ · black-box equivalente</div>
-              <div class="stat-gloss">mismo input → misma predicción · tol 2e-2 abs / 12% rel</div>
+          <div class="s3-connector" id="s3-conn-2">
+            <div class="line" id="s3-conn-2-line"></div>
+            <div class="lbl" id="s3-conn-2-lbl">enseña a</div>
+          </div>
+
+          <div class="s3-card" id="s3-card-3">
+            <div class="num">03</div>
+            <div class="body-col">
+              <div class="verbo">El mapa <span class="italic">avisa.</span></div>
+              <div class="frase">Un mapa mensual que dice dónde puede haber riesgo. En minutos.</div>
             </div>
           </div>
         </div>
 
-        <div class="milestone-strip" id="s3-strip">
-          <div class="ms-chip done" id="ms-m0">M0</div>
-          <div class="ms-chip done" id="ms-m1">M1</div>
-          <div class="ms-chip done" id="ms-m2">M2</div>
-          <div class="ms-chip done" id="ms-mp1">M-perf F1</div>
-          <div class="ms-divider"></div>
-          <div class="ms-chip pending" id="ms-m3">M3</div>
-          <div class="ms-chip pending" id="ms-m4">M4</div>
-          <div class="ms-chip pending" id="ms-m5">M5</div>
-          <div class="ms-chip pending" id="ms-m6">M6</div>
-          <div class="ms-chip pending" id="ms-m7">M7</div>
-        </div>
-
-        <div class="ms-legend" id="s3-legend">completado · pendiente</div>
-
-        <div class="estado-foot" id="s3-foot">
-          <span>ABM Python v0.5.0</span>
-          <span class="right">C++ F1 complete</span>
+        <div class="s3-foot" id="s3-foot">
+          <span>3 capas</span>
+          <span class="right">Una sola decisión</span>
         </div>
       </div>
     </div>
 
-    <!-- ============== SCENE 4 — MOTOR ABM ============== -->
+    <!-- ============== SCENE 4 — A DÓNDE VAMOS ============== -->
     <div class="scene" id="scene-4">
       <div class="bg-grid"></div>
       <div class="bg-glow" style="width:1000px;height:1000px;left:-300px;top:200px;background:radial-gradient(circle, var(--accent-glow) 0%, transparent 65%);"></div>
-      <div class="ghost" data-layout-allow-overflow style="left:-40px;bottom:60px;font-size:200px;" id="ghost-abm">mal-abm-fast</div>
+      <div class="ghost ghost-italic" data-layout-allow-overflow style="left:-40px;bottom:60px;font-size:220px;" id="ghost-region">REGIÓN</div>
 
       <div class="scene-content">
-        <div style="display:flex;flex-direction:column;gap:12px;">
-          <div class="section-label" id="s4-label">03 · MOTOR</div>
-          <div class="heading h-3" id="s4-headline">El motor ABM en C++.</div>
-          <div class="body" id="s4-subhead" style="font-size:24px;">mal-abm-fast · C++20 · black-box equivalente al ABM Python.</div>
+        <div style="display:flex;flex-direction:column;gap:10px;">
+          <div class="section-label" id="s4-label">03 · A DÓNDE VAMOS</div>
         </div>
 
-        <div class="motor-grid" id="s4-grid">
-          <div class="motor-col">
-            <div class="motor-col-title">CONSTANTES</div>
-            <div class="const-row" id="const-1">
-              <span class="k">K_MAX</span>
-              <span class="v">1000</span>
-            </div>
-            <div class="const-row" id="const-2">
-              <span class="k">EIP_BASE_C</span>
-              <span class="v">16.0</span>
-            </div>
-            <div class="const-row" id="const-3">
-              <span class="k">EIP_THRESHOLD_GD</span>
-              <span class="v">110.0</span>
-            </div>
-            <div class="const-row" id="const-4">
-              <span class="k">DISPERSE_SIGMA_M</span>
-              <span class="v">300.0</span>
-            </div>
-            <div class="const-row" id="const-5">
-              <span class="k">ADULT_MORT_BASE</span>
-              <span class="v">0.90</span>
-            </div>
+        <div class="s4-headline" id="s4-headline">
+          Le das una <span class="italic">región.</span><br/>
+          Te devuelve un mapa de riesgo.
+        </div>
+
+        <div class="s4-points" id="s4-points">
+          <div class="s4-point" id="s4-point-1">
+            <div class="mark">01</div>
+            <div class="txt">Cualquier <span class="italic">país,</span> cualquier zona endémica. El sistema se adapta.</div>
           </div>
 
-          <div class="motor-col">
-            <div class="motor-col-title">7 OPS / DÍA</div>
-            <div class="op-row" id="op-1">
-              <span class="name">larva_mortality_inactive</span>
-            </div>
-            <div class="op-row" id="op-2">
-              <span class="name">larva_mortality_density <span class="note">Beverton-Holt</span></span>
-            </div>
-            <div class="op-row" id="op-3">
-              <span class="name">larva_growth <span class="note">eip += max(0, T-16°C)</span></span>
-            </div>
-            <div class="op-row" id="op-4">
-              <span class="name">larva_to_adult <span class="note">eip ≥ 110 GD</span></span>
-            </div>
-            <div class="op-row" id="op-5">
-              <span class="name">adult_dispersal <span class="note">10% · Gaussiana σ=300m</span></span>
-            </div>
-            <div class="op-row" id="op-6">
-              <span class="name">adult_mortality <span class="note">Lardeux</span></span>
-            </div>
-            <div class="op-row" id="op-7">
-              <span class="name">birth <span class="note">binomial(n/2, 0.10)</span></span>
-            </div>
+          <div class="s4-point" id="s4-point-2">
+            <div class="mark">02</div>
+            <div class="txt">Cada mes, un mapa nuevo con la expansión probable del mosquito.</div>
+          </div>
+
+          <div class="s4-point" id="s4-point-3">
+            <div class="mark">03</div>
+            <div class="txt">Listo para el personal de salud, <span class="italic">antes</span> de que llegue el brote.</div>
           </div>
         </div>
 
-        <div class="motor-foot" id="s4-foot">
-          <span>PRNG xoshiro256**</span>
-          <span class="right">60/60 ctest · 5/5 parity</span>
+        <div class="s4-foot" id="s4-foot">
+          <span>Input · región</span>
+          <span class="right">Output · mapa de riesgo</span>
         </div>
       </div>
     </div>
 
-    <!-- ============== SCENE 5 — U-NET ============== -->
+    <!-- ============== SCENE 5 — DÓNDE ESTAMOS ============== -->
     <div class="scene" id="scene-5">
       <div class="bg-grid"></div>
       <div class="bg-glow" style="width:1100px;height:1100px;right:-100px;top:-300px;background:radial-gradient(circle, var(--accent-glow) 0%, transparent 65%);"></div>
-      <div class="ghost" data-layout-allow-overflow style="right:-30px;bottom:60px;font-size:240px;" id="ghost-unet">U-NET</div>
+      <div class="ghost" data-layout-allow-overflow style="right:-30px;bottom:60px;font-size:220px;" id="ghost-honest">HOY</div>
 
       <div class="scene-content">
-        <div style="display:flex;flex-direction:column;gap:12px;">
-          <div class="section-label" id="s5-label">04 · U-NET</div>
-          <div class="heading h-3" id="s5-headline">La sustituta <span class="italic-serif" style="color:var(--accent-bright);font-style:italic;font-weight:600;">100×</span> más rápida.</div>
-          <div class="body" id="s5-subhead" style="font-size:24px;">mal-core · malariasim CLI · FastAPI REST.</div>
+        <div style="display:flex;flex-direction:column;gap:10px;">
+          <div class="section-label" id="s5-label">04 · DÓNDE ESTAMOS</div>
+          <div class="s5-honest" id="s5-honest">Hoy tenemos algo. <span class="accent">Todavía no lo que queremos.</span></div>
         </div>
 
-        <div class="unet-grid" id="s5-grid">
-          <div class="unet-col">
-            <div class="unet-col-title">ARQUITECTURA</div>
-            <div class="unet-row" id="arch-1">
-              <span class="k">Input</span>
-              <span class="v">(state_t + env)</span>
-            </div>
-            <div class="unet-row" id="arch-2">
-              <span class="k">Shape</span>
-              <span class="v">(6, 128, 128)</span>
-            </div>
-            <div class="unet-row" id="arch-3">
-              <span class="k">Encoder</span>
-              <span class="v">32 → 64 → 128 → 256</span>
-            </div>
-            <div class="unet-row" id="arch-4">
-              <span class="k">Bottleneck</span>
-              <span class="v">512</span>
-            </div>
-            <div class="unet-row" id="arch-5">
-              <span class="k">Decoder</span>
-              <span class="v">256 → 128 → 64 → 32</span>
-            </div>
-            <div class="unet-row" id="arch-6">
-              <span class="k">Output</span>
-              <span class="v">state_{t+1} = (2, 128, 128)</span>
-            </div>
-            <div class="unet-row" id="arch-7">
-              <span class="k">Loss</span>
-              <span class="v">MSE + 0.5 × soft-Dice</span>
-            </div>
+        <div class="s5-grid" id="s5-grid">
+          <div class="s5-col now" id="s5-col-now">
+            <div class="col-label">HOY</div>
+            <div class="col-lead">Una primera versión que funciona con datos reales de Ghana.</div>
+            <ul class="col-bullets">
+              <li>La simulación es <em>básica</em> — solo dos etapas de vida del mosquito.</li>
+              <li>Las señales son simples: lluvia y agua.</li>
+              <li>Solo sirve para una región.</li>
+            </ul>
           </div>
 
-          <div class="unet-col">
-            <div class="unet-col-title">FLUJO DE DATOS</div>
-            <div class="unet-row" id="flow-1">
-              <span class="k">env 4-canales</span>
-              <span class="v">water_frac · rainfall · temp · ndvi</span>
-            </div>
-            <div class="unet-row" id="flow-2">
-              <span class="k">state COG</span>
-              <span class="v">density · suitability</span>
-            </div>
-            <div class="unet-row" id="flow-3">
-              <span class="k">U-Net</span>
-              <span class="v flow">env<span class="arrow">→</span>state<span class="arrow">→</span>risk</span>
-            </div>
-            <div class="unet-row" id="flow-4">
-              <span class="k">API</span>
-              <span class="v">/predict · /aoi/{name}/risk</span>
-            </div>
-            <div class="unet-row" id="flow-5">
-              <span class="k">M-perf</span>
-              <span class="v">100 rollouts · &lt;5 min · FT3</span>
-            </div>
+          <div class="s5-arrow" id="s5-arrow">
+            <div class="arrow-line" id="s5-arrow-line"></div>
+            <div class="arrow-head"></div>
+          </div>
+
+          <div class="s5-col next" id="s5-col-next">
+            <div class="col-label">AHORA</div>
+            <div class="col-lead">Mejorando la simulación para que el sistema funcione de verdad.</div>
+            <ul class="col-bullets">
+              <li>Ciclo de vida completo del mosquito.</li>
+              <li>El mosquito que busca comida, pone huevos, transmite.</li>
+              <li>Para que sirva en cualquier sitio, no solo Ghana.</li>
+            </ul>
           </div>
         </div>
 
-        <div class="unet-foot" id="s5-foot">
-          <span>mal-core · malariasim</span>
-          <span class="right">M3 → M4 → M5 → M6</span>
+        <div class="s5-foot" id="s5-foot">
+          <span>Avanzando</span>
+          <span class="right">Próximo paso · biología v2</span>
         </div>
       </div>
     </div>
@@ -992,6 +944,7 @@
         <div class="closing-foot" id="s6-foot">
           <div class="gh"><span class="gh-prefix">github.com/</span>ANFAIA/MalariaSentinel</div>
           <div class="small">SDSS · Open Source · 2026</div>
+          <div class="agents" id="s6-agents">Sistema construido con ayuda de sistemas agénticos</div>
         </div>
       </div>
     </div>
@@ -1057,112 +1010,97 @@
         tl.set("#scene-2", { filter: "none", opacity: 0 }, 13.9);
         tl.set("#t-blur", { opacity: 0 }, 13.9);
 
-        // === Scene 3 — Estado ===
+        // === Scene 3 — El sistema en 3 capas ===
         tl.fromTo("#s3-label", { opacity: 0, x: -20 }, { opacity: 1, x: 0, duration: 0.4, ease: "power2.out" }, 14.0);
         tl.fromTo("#s3-headline", { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.5, ease: "power2.out" }, 14.3);
 
-        // stat 1: count up 0 → 71
-        tl.fromTo("#stat-1", { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.4, ease: "power2.out" }, 14.8);
-        const s1 = { v: 0 };
-        tl.to(s1, { v: 71, duration: 0.8, ease: "power2.out", onUpdate: function () { document.getElementById("stat-1-num").textContent = Math.round(s1.v); } }, 15.0);
+        // card 1: satélite
+        tl.fromTo("#s3-card-1", { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.5, ease: "power3.out" }, 14.8);
+        // connector 1: alimenta
+        tl.fromTo("#s3-conn-1-line", { scaleY: 0, transformOrigin: "top center" }, { scaleY: 1, duration: 0.3, ease: "power2.out" }, 15.2);
+        tl.fromTo("#s3-conn-1-lbl", { opacity: 0 }, { opacity: 1, duration: 0.3, ease: "power2.out" }, 15.4);
+        // card 2: simulación
+        tl.fromTo("#s3-card-2", { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.5, ease: "power3.out" }, 15.7);
+        // connector 2: enseña a
+        tl.fromTo("#s3-conn-2-line", { scaleY: 0, transformOrigin: "top center" }, { scaleY: 1, duration: 0.3, ease: "power2.out" }, 16.1);
+        tl.fromTo("#s3-conn-2-lbl", { opacity: 0 }, { opacity: 1, duration: 0.3, ease: "power2.out" }, 16.3);
+        // card 3: mapa
+        tl.fromTo("#s3-card-3", { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.5, ease: "power3.out" }, 16.6);
+        tl.fromTo("#s3-foot", { opacity: 0 }, { opacity: 1, duration: 0.4, ease: "power2.out" }, 17.4);
 
-        // stat 2: 0 → 60
-        tl.fromTo("#stat-2", { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.4, ease: "power2.out" }, 15.9);
-        const s2 = { v: 0 };
-        tl.to(s2, { v: 60, duration: 0.7, ease: "power2.out", onUpdate: function () { document.getElementById("stat-2-num").textContent = Math.round(s2.v); } }, 16.1);
+        tl.to("#scene-3 .bg-glow", { scale: 1.06, transformOrigin: "center center", duration: 4, ease: "sine.inOut", yoyo: true, repeat: Math.max(0, Math.floor(6.5 / 4) - 1) }, 14.0);
 
-        // stat 3: 0 → 5
-        tl.fromTo("#stat-3", { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.4, ease: "power2.out" }, 16.9);
-        const s3 = { v: 0 };
-        tl.to(s3, { v: 5, duration: 0.5, ease: "power2.out", onUpdate: function () { document.getElementById("stat-3-num").textContent = Math.round(s3.v); } }, 17.1);
+        // ====== BLUR CROSSFADE (scene 3 → scene 4) at t=20.5, 0.4s ======
+        tl.set("#scene-4", { opacity: 1 }, 20.5);
+        tl.to("#scene-3", { filter: "blur(14px)", duration: 0.2, ease: "power2.in" }, 20.5);
+        tl.to("#scene-3", { opacity: 0.0, duration: 0.2, ease: "power2.in" }, 20.5);
+        tl.fromTo("#t-blur", { opacity: 0 }, { opacity: 0.55, duration: 0.2, ease: "power2.in" }, 20.5);
+        tl.to("#scene-4", { filter: "blur(0px)", duration: 0.4, ease: "power2.out" }, 20.7);
+        tl.to("#t-blur", { opacity: 0, duration: 0.2, ease: "power2.out" }, 20.7);
+        tl.set("#scene-3", { filter: "none", opacity: 0 }, 20.9);
+        tl.set("#t-blur", { opacity: 0 }, 20.9);
 
-        // milestone strip stagger
-        const msIds = ["ms-m0", "ms-m1", "ms-m2", "ms-mp1", "ms-m3", "ms-m4", "ms-m5", "ms-m6", "ms-m7"];
-        msIds.forEach(function (id, i) {
-          tl.fromTo("#" + id, { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: 0.3, ease: "power2.out" }, 17.7 + i * 0.06);
+        // === Scene 4 — A dónde vamos ===
+        tl.fromTo("#s4-label", { opacity: 0, x: -20 }, { opacity: 1, x: 0, duration: 0.4, ease: "power2.out" }, 21.0);
+        tl.fromTo("#s4-headline", { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.6, ease: "expo.out" }, 21.4);
+
+        const s4Points = ["s4-point-1", "s4-point-2", "s4-point-3"];
+        s4Points.forEach(function (id, i) {
+          tl.fromTo("#" + id, { opacity: 0, x: -20 }, { opacity: 1, x: 0, duration: 0.4, ease: "power2.out" }, 22.4 + i * 0.3);
         });
-        tl.fromTo("#s3-legend", { opacity: 0 }, { opacity: 1, duration: 0.3, ease: "power2.out" }, 18.4);
-        tl.fromTo("#s3-foot", { opacity: 0 }, { opacity: 1, duration: 0.4, ease: "power2.out" }, 18.6);
+        tl.fromTo("#s4-foot", { opacity: 0 }, { opacity: 1, duration: 0.4, ease: "power2.out" }, 23.6);
 
-        tl.to("#scene-3 .bg-glow", { scale: 1.06, transformOrigin: "center center", duration: 4, ease: "sine.inOut", yoyo: true, repeat: Math.max(0, Math.floor(7 / 4) - 1) }, 14.0);
+        tl.to("#scene-4 .bg-glow", { scale: 1.06, transformOrigin: "center center", duration: 4, ease: "sine.inOut", yoyo: true, repeat: Math.max(0, Math.floor(6.5 / 4) - 1) }, 21.0);
 
-        // ====== BLUR CROSSFADE (scene 3 → scene 4) at t=21.5, 0.4s ======
-        tl.set("#scene-4", { opacity: 1 }, 21.5);
-        tl.to("#scene-3", { filter: "blur(14px)", duration: 0.2, ease: "power2.in" }, 21.5);
-        tl.to("#scene-3", { opacity: 0.0, duration: 0.2, ease: "power2.in" }, 21.5);
-        tl.fromTo("#t-blur", { opacity: 0 }, { opacity: 0.55, duration: 0.2, ease: "power2.in" }, 21.5);
-        tl.to("#scene-4", { filter: "blur(0px)", duration: 0.4, ease: "power2.out" }, 21.7);
-        tl.to("#t-blur", { opacity: 0, duration: 0.2, ease: "power2.out" }, 21.7);
-        tl.set("#scene-3", { filter: "none", opacity: 0 }, 21.9);
-        tl.set("#t-blur", { opacity: 0 }, 21.9);
+        // ====== BLUR CROSSFADE (scene 4 → scene 5) at t=27.5, 0.4s ======
+        tl.set("#scene-5", { opacity: 1 }, 27.5);
+        tl.to("#scene-4", { filter: "blur(14px)", duration: 0.2, ease: "power2.in" }, 27.5);
+        tl.to("#scene-4", { opacity: 0.0, duration: 0.2, ease: "power2.in" }, 27.5);
+        tl.fromTo("#t-blur", { opacity: 0 }, { opacity: 0.55, duration: 0.2, ease: "power2.in" }, 27.5);
+        tl.to("#scene-5", { filter: "blur(0px)", duration: 0.4, ease: "power2.out" }, 27.7);
+        tl.to("#t-blur", { opacity: 0, duration: 0.2, ease: "power2.out" }, 27.7);
+        tl.set("#scene-4", { filter: "none", opacity: 0 }, 27.9);
+        tl.set("#t-blur", { opacity: 0 }, 27.9);
 
-        // === Scene 4 — Motor ABM ===
-        tl.fromTo("#s4-label", { opacity: 0, x: -20 }, { opacity: 1, x: 0, duration: 0.4, ease: "power2.out" }, 22.0);
-        tl.fromTo("#s4-headline", { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.5, ease: "power2.out" }, 22.3);
-        tl.fromTo("#s4-subhead", { opacity: 0 }, { opacity: 1, duration: 0.4, ease: "power2.out" }, 22.7);
+        // === Scene 5 — Dónde estamos ===
+        tl.fromTo("#s5-label", { opacity: 0, x: -20 }, { opacity: 1, x: 0, duration: 0.4, ease: "power2.out" }, 28.0);
+        tl.fromTo("#s5-honest", { opacity: 0, y: 12 }, { opacity: 1, y: 0, duration: 0.6, ease: "power2.out" }, 28.4);
 
-        const constIds = ["const-1", "const-2", "const-3", "const-4", "const-5"];
-        constIds.forEach(function (id, i) {
-          tl.fromTo("#" + id, { opacity: 0, x: -20 }, { opacity: 1, x: 0, duration: 0.3, ease: "power2.out" }, 23.1 + i * 0.15);
-        });
-        const opIds = ["op-1", "op-2", "op-3", "op-4", "op-5", "op-6", "op-7"];
-        opIds.forEach(function (id, i) {
-          tl.fromTo("#" + id, { opacity: 0, x: 20 }, { opacity: 1, x: 0, duration: 0.3, ease: "power2.out" }, 23.2 + i * 0.15);
-        });
-        tl.fromTo("#s4-foot", { opacity: 0 }, { opacity: 1, duration: 0.4, ease: "power2.out" }, 25.0);
+        // HOY column
+        tl.fromTo("#s5-col-now", { opacity: 0, x: -24 }, { opacity: 1, x: 0, duration: 0.5, ease: "power3.out" }, 29.2);
+        // arrow
+        tl.fromTo("#s5-arrow-line", { scaleX: 0, transformOrigin: "left center" }, { scaleX: 1, duration: 0.4, ease: "power2.out" }, 30.0);
+        tl.fromTo("#s5-arrow .arrow-head", { opacity: 0 }, { opacity: 1, duration: 0.2, ease: "power2.out" }, 30.3);
+        // AHORA column
+        tl.fromTo("#s5-col-next", { opacity: 0, x: 24 }, { opacity: 1, x: 0, duration: 0.5, ease: "power3.out" }, 30.5);
+        tl.fromTo("#s5-foot", { opacity: 0 }, { opacity: 1, duration: 0.4, ease: "power2.out" }, 31.6);
 
-        tl.to("#scene-4 .bg-glow", { scale: 1.06, transformOrigin: "center center", duration: 4, ease: "sine.inOut", yoyo: true, repeat: Math.max(0, Math.floor(7.5 / 4) - 1) }, 22.0);
+        tl.to("#scene-5 .bg-glow", { scale: 1.08, transformOrigin: "center center", duration: 4, ease: "sine.inOut", yoyo: true, repeat: Math.max(0, Math.floor(7.5 / 4) - 1) }, 28.0);
 
-        // ====== BLUR CROSSFADE (scene 4 → scene 5) at t=29.5, 0.4s ======
-        tl.set("#scene-5", { opacity: 1 }, 29.5);
-        tl.to("#scene-4", { filter: "blur(14px)", duration: 0.2, ease: "power2.in" }, 29.5);
-        tl.to("#scene-4", { opacity: 0.0, duration: 0.2, ease: "power2.in" }, 29.5);
-        tl.fromTo("#t-blur", { opacity: 0 }, { opacity: 0.55, duration: 0.2, ease: "power2.in" }, 29.5);
-        tl.to("#scene-5", { filter: "blur(0px)", duration: 0.4, ease: "power2.out" }, 29.7);
-        tl.to("#t-blur", { opacity: 0, duration: 0.2, ease: "power2.out" }, 29.7);
-        tl.set("#scene-4", { filter: "none", opacity: 0 }, 29.9);
-        tl.set("#t-blur", { opacity: 0 }, 29.9);
+        // ====== BLUR CROSSFADE (scene 5 → scene 6) at t=35.5, 0.4s ======
+        tl.set("#scene-6", { opacity: 1 }, 35.5);
+        tl.to("#scene-5", { filter: "blur(14px)", duration: 0.2, ease: "power2.in" }, 35.5);
+        tl.to("#scene-5", { opacity: 0.0, duration: 0.2, ease: "power2.in" }, 35.5);
+        tl.fromTo("#t-blur", { opacity: 0 }, { opacity: 0.55, duration: 0.2, ease: "power2.in" }, 35.5);
+        tl.to("#scene-6", { filter: "blur(0px)", duration: 0.4, ease: "power2.out" }, 35.7);
+        tl.to("#t-blur", { opacity: 0, duration: 0.2, ease: "power2.out" }, 35.7);
+        tl.set("#scene-5", { filter: "none", opacity: 0 }, 35.9);
+        tl.set("#t-blur", { opacity: 0 }, 35.9);
 
-        // === Scene 5 — U-Net ===
-        tl.fromTo("#s5-label", { opacity: 0, x: -20 }, { opacity: 1, x: 0, duration: 0.4, ease: "power2.out" }, 30.0);
-        tl.fromTo("#s5-headline", { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.5, ease: "power2.out" }, 30.3);
-        tl.fromTo("#s5-subhead", { opacity: 0 }, { opacity: 1, duration: 0.4, ease: "power2.out" }, 30.7);
+        // === Scene 6 — Cierre (con sistemas agénticos) ===
+        tl.fromTo("#s6-section", { opacity: 0, y: -10 }, { opacity: 1, y: 0, duration: 0.4, ease: "power2.out" }, 36.0);
+        tl.fromTo("#s6-lead", { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.4, ease: "power2.out" }, 36.3);
+        tl.fromTo("#s6-anfaia", { opacity: 0, scale: 0.85, transformOrigin: "center center" }, { opacity: 1, scale: 1, duration: 0.7, ease: "expo.out" }, 36.7);
+        tl.fromTo("#s6-divider", { scaleX: 0, transformOrigin: "center center" }, { scaleX: 1, duration: 0.5, ease: "power3.out" }, 37.4);
+        tl.fromTo("#s6-tagline", { opacity: 0, x: -10 }, { opacity: 1, x: 0, duration: 0.5, ease: "power2.out" }, 37.8);
+        tl.fromTo("#s6-foot", { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.4, ease: "power2.out" }, 38.4);
+        tl.fromTo("#s6-agents", { opacity: 0 }, { opacity: 1, duration: 0.4, ease: "power2.out" }, 38.7);
 
-        const archIds = ["arch-1", "arch-2", "arch-3", "arch-4", "arch-5", "arch-6", "arch-7"];
-        archIds.forEach(function (id, i) {
-          tl.fromTo("#" + id, { opacity: 0, x: -20 }, { opacity: 1, x: 0, duration: 0.3, ease: "power2.out" }, 31.1 + i * 0.12);
-        });
-        const flowIds = ["flow-1", "flow-2", "flow-3", "flow-4", "flow-5"];
-        flowIds.forEach(function (id, i) {
-          tl.fromTo("#" + id, { opacity: 0, x: 20 }, { opacity: 1, x: 0, duration: 0.3, ease: "power2.out" }, 31.2 + i * 0.12);
-        });
-        tl.fromTo("#s5-foot", { opacity: 0 }, { opacity: 1, duration: 0.4, ease: "power2.out" }, 33.2);
-
-        tl.to("#scene-5 .bg-glow", { scale: 1.08, transformOrigin: "center center", duration: 4, ease: "sine.inOut", yoyo: true, repeat: Math.max(0, Math.floor(8.5 / 4) - 1) }, 30.0);
-
-        // ====== BLUR CROSSFADE (scene 5 → scene 6) at t=38.5, 0.4s ======
-        tl.set("#scene-6", { opacity: 1 }, 38.5);
-        tl.to("#scene-5", { filter: "blur(14px)", duration: 0.2, ease: "power2.in" }, 38.5);
-        tl.to("#scene-5", { opacity: 0.0, duration: 0.2, ease: "power2.in" }, 38.5);
-        tl.fromTo("#t-blur", { opacity: 0 }, { opacity: 0.55, duration: 0.2, ease: "power2.in" }, 38.5);
-        tl.to("#scene-6", { filter: "blur(0px)", duration: 0.4, ease: "power2.out" }, 38.7);
-        tl.to("#t-blur", { opacity: 0, duration: 0.2, ease: "power2.out" }, 38.7);
-        tl.set("#scene-5", { filter: "none", opacity: 0 }, 38.9);
-        tl.set("#t-blur", { opacity: 0 }, 38.9);
-
-        // === Scene 6 — Cierre ===
-        tl.fromTo("#s6-section", { opacity: 0, y: -10 }, { opacity: 1, y: 0, duration: 0.4, ease: "power2.out" }, 39.0);
-        tl.fromTo("#s6-lead", { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.4, ease: "power2.out" }, 39.3);
-        tl.fromTo("#s6-anfaia", { opacity: 0, scale: 0.85, transformOrigin: "center center" }, { opacity: 1, scale: 1, duration: 0.7, ease: "expo.out" }, 39.7);
-        tl.fromTo("#s6-divider", { scaleX: 0, transformOrigin: "center center" }, { scaleX: 1, duration: 0.5, ease: "power3.out" }, 40.4);
-        tl.fromTo("#s6-tagline", { opacity: 0, x: -10 }, { opacity: 1, x: 0, duration: 0.5, ease: "power2.out" }, 40.8);
-        tl.fromTo("#s6-foot", { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.4, ease: "power2.out" }, 41.4);
-
-        tl.to("#scene-6 .bg-glow", { scale: 1.06, transformOrigin: "center center", duration: 4, ease: "sine.inOut", yoyo: true, repeat: Math.max(0, Math.floor(5.5 / 4) - 1) }, 39.0);
+        tl.to("#scene-6 .bg-glow", { scale: 1.06, transformOrigin: "center center", duration: 4, ease: "sine.inOut", yoyo: true, repeat: Math.max(0, Math.floor(5.5 / 4) - 1) }, 36.0);
 
         // ====== FINAL DIP TO BLACK ======
-        tl.to("#scene-6", { opacity: 0, duration: 0.7, ease: "power2.inOut" }, 43.8);
-        tl.set("#scene-6", { opacity: 0 }, 44.5);
+        tl.to("#scene-6", { opacity: 0, duration: 0.7, ease: "power2.inOut" }, 42.5);
+        tl.set("#scene-6", { opacity: 0 }, 43.5);
 
         // === Scene counter (running header) updates ===
         const counter = document.getElementById("scene-counter");
@@ -1170,9 +1108,9 @@
           { t: 0.0, v: "01" },
           { t: 6.5, v: "02" },
           { t: 14.0, v: "03" },
-          { t: 22.0, v: "04" },
-          { t: 30.0, v: "05" },
-          { t: 39.0, v: "06" },
+          { t: 21.0, v: "04" },
+          { t: 28.0, v: "05" },
+          { t: 36.0, v: "06" },
         ];
         stages.forEach(function (s) {
           tl.call(function () { counter.textContent = s.v; }, [], s.t);
