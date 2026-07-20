@@ -177,8 +177,20 @@ std::shared_ptr<ClimateEngine> ClimateEngine::clone_for_thread() const {
             clone->water_[i] = (*water_frac_nc_)[i];
             clone->ndvi_[i]  = (*ndvi_nc_)[i];
         }
+    } else {
+        // COG-loaded engine: no multi-day NetCDF data, so rain_nc_ is
+        // nullptr. Copy the static bands directly — otherwise the
+        // clone's water_/rain_/temp_/ndvi_ vectors stay at their
+        // zero/fallback defaults, and downstream code that reads them
+        // (e.g. build_seed_instructions's viability filter) sees
+        // water_frac=0 at every patch and produces 0 viable seeds.
+        clone->rain_  = rain_;
+        clone->temp_  = temp_;
+        clone->water_ = water_;
+        clone->ndvi_  = ndvi_;
+        clone->twi_   = twi_;
     }
-    
+
     return clone;
 }
 
