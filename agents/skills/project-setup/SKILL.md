@@ -187,4 +187,6 @@ Once setup is verified:
 - **Run the Ghana pipeline**: see `agents/skills/ghana-pipeline/SKILL.md`
 - **Explore datasets**: see `agents/skills/data-explorer/SKILL.md`
 - **Build the ABM engine**: see `agents/skills/abm-engine/SKILL.md`
+- **Deploy to CESGA HPC**: see `agents/skills/cesga/SKILL.md`
+- **Operate the knowledge graph**: see `.agents/skills/project-memory/SKILL.md`
 - **Check project conventions**: read `AGENTS.md`
