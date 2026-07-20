@@ -89,7 +89,7 @@ std::vector<PatchState> CoordinatorModel::to_dataframe() {
         // pluvial pools that come and go with daily rain. The
         // PLUVIAL_POOL_RAIN_THRESHOLD_MM rule below still gates the
         // dynamic ephemeral-pool rule (cells satisfying
-        // twi > THRESHOLD AND water_frac > MIN AND rain > 50 mm/day).
+        // water_frac > MIN AND rain > PLUVIAL_POOL_RAIN_THRESHOLD_MM).
         // The viability filter in build_seed_instructions
         // (water_frac > 0.05 AND twi > 8) is independent of daily rain.
         (void)climate_->rain_at(patch.row, patch.col);
@@ -100,14 +100,9 @@ std::vector<PatchState> CoordinatorModel::to_dataframe() {
     const bool has_twi = (twi.size() == hw);
     for (int32_t r = 0; r < H; ++r) {
         for (int32_t c = 0; c < W; ++c) {
-            const size_t idx = static_cast<size_t>(r) *
-                                   static_cast<size_t>(W) +
-                               static_cast<size_t>(c);
-            const float twi_val = has_twi ? twi[idx] : 0.0f;
             const float water_frac_val = climate_->water_frac_at(r, c);
             const float rain_val = climate_->rain_at(r, c);
-            if (twi_val > PLUVIAL_POOL_TWI_THRESHOLD &&
-                water_frac_val > PLUVIAL_POOL_WATER_FRAC_MIN &&
+            if (water_frac_val > PLUVIAL_POOL_WATER_FRAC_MIN &&
                 rain_val > PLUVIAL_POOL_RAIN_THRESHOLD_MM) {
                 union_cells.insert({r, c});
             }
