@@ -191,6 +191,8 @@ uv run python -m mal_ghana_sim.scripts.build_env --help
 uv run python scripts/01_ingest.py --download
 ```
 
+**Tip**: For a streamlined setup, use the automation scripts in `mal-execution/scripts/cesga-run/` instead of manual steps. See §8.1.
+
 ### Virtualenv location
 
 Set `UV_PROJECT_ENVIRONMENT` to keep the venv in `$STORE`:
@@ -237,6 +239,61 @@ uv run python -m mal_ghana_sim.abm.run \
 | Small (regional) | 8–16 | 32 GB | Single-month fast |
 | Medium (national) | 16–32 | 64–128 GB | Typical production |
 | Large (continental) | 32–64 | 128–256 GB | SMP nodes for extreme cases |
+
+## 8.1 Pre-built CESGA Automation
+
+The `mal-execution/scripts/cesga-run/` directory contains shell scripts that automate the full CESGA workflow:
+
+| Script | Purpose |
+|---|---|
+| `cesga_config.sh` | Configuration: CESGA paths, SLURM partition, resource defaults |
+| `setup_env.sh` | One-time: install uv in `$STORE`, clone/rsync project, sync workspace |
+| `prepare_data.sh` | Transfer data to CESGA: rsync `data/` and `terrain/` to `$STORE` |
+| `run_abm.sh` | Submit ABM rollouts as SLURM job arrays (configurable month/year/seeds) |
+| `manage_jobs.sh` | Monitor (`status`), cancel (`cancel`), or view efficiency (`eff`) of jobs |
+
+### Quick start with automation
+
+```bash
+ssh cesga
+cd $STORE/MalariaSentinel/mal-execution/scripts/cesga-run
+
+# 1. Edit configuration
+vi cesga_config.sh  # Set PROJECT_ROOT, STORE paths, partition, resources
+
+# 2. First-time setup (installs uv, syncs workspace)
+bash setup_env.sh
+
+# 3. Transfer data from local machine
+# (from your local terminal)
+rsync -avz --progress ./data/ cesga:$STORE/MalariaSentinel/data/
+rsync -avz --progress ./terrain/ cesga:$STORE/MalariaSentinel/terrain/
+# (or use prepare_data.sh if data is already partially on CESGA)
+bash prepare_data.sh
+
+# 4. Submit ABM rollouts
+bash run_abm.sh  # Uses defaults from cesga_config.sh
+# Or override: MONTH=6 YEAR=2024 N_ROLLOUTS=100 bash run_abm.sh
+
+# 5. Monitor
+bash manage_jobs.sh status
+bash manage_jobs.sh eff <jobid>
+```
+
+### Configuration (`cesga_config.sh`)
+
+Key variables:
+```bash
+PROJECT_ROOT="$STORE/MalariaSentinel"
+VENV_PATH="$STORE/MalariaSentinel/.venv"
+PARTITION="medium"          # short|medium|long|ondemand
+TIME="24:00:00"
+MEM="64G"
+CPUS=16
+N_ROLLOUTS=24
+MONTH=1
+YEAR=2024
+```
 
 ## 9. SLURM Templates
 

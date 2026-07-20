@@ -208,8 +208,42 @@ The project includes an agent-based model engine at `mal-ghana-sim/src/mal_ghana
 - Fine-grained movement behavior studies
 - Comparing individual-level vs population-level dynamics
 
-The ABM is designed for HPC execution (CESGA FinisTerrae III). See the `cesga` skill for SLURM batch job templates.
+The ABM is designed for HPC execution (CESGA FinisTerrae III). See the `cesga` skill for SLURM batch job templates, or use the pre-built automation in `mal-execution/scripts/cesga-run/` for a streamlined workflow.
 
 ### Running on HPC
 
 For large-scale parameter sweeps or production U-Net training, use CESGA's GPU nodes. See the `cesga` skill for connection, SLURM templates, and data transfer instructions.
+
+## 9. HPC & Cloud Automation
+
+The `mal-execution/scripts/` directory contains pre-built automation for running the pipeline on HPC and cloud infrastructure:
+
+### CESGA SLURM automation (`mal-execution/scripts/cesga-run/`)
+
+| Script | Purpose |
+|---|---|
+| `setup_env.sh` | Install uv, sync workspace, configure venv on CESGA |
+| `prepare_data.sh` | Transfer data to CESGA `$STORE`, restore datasets |
+| `run_abm.sh` | Submit ABM rollouts via SLURM job arrays |
+| `manage_jobs.sh` | Monitor, cancel, and query SLURM jobs |
+| `cesga_config.sh` | Configuration variables (paths, partitions, resources) |
+
+Quick start:
+```bash
+cd mal-execution/scripts/cesga-run
+# Edit cesga_config.sh with your CESGA paths
+bash setup_env.sh          # First-time setup
+bash prepare_data.sh       # Transfer data
+bash run_abm.sh            # Submit ABM jobs
+bash manage_jobs.sh status # Monitor jobs
+```
+
+### Hetzner cloud automation (`mal-execution/scripts/hetzner-run/`)
+
+| File | Purpose |
+|---|---|
+| `cloud-init.yaml` | Hetzner Cloud init script for provisioning |
+| `lib/` | Shared shell functions |
+| `tests/` | Integration tests for the automation |
+
+See `mal-execution/scripts/hetzner-run/README.md` for full setup instructions.

@@ -17,6 +17,7 @@ Complete setup guide for MalariaSentinel. An agent with only this skill and the 
 | CMake + Ninja (ABM engine only) | `cmake --version && ninja --version` | `brew install cmake ninja` |
 | GDAL (ABM engine only) | `gdal-config --version` | `brew install gdal` |
 | Eigen3, CLI11, nlohmann-json, googletest (ABM engine only) | `brew list eigen cli11 nlohmann-json googletest 2>/dev/null` | `brew install eigen cli11 nlohmann-json googletest` |
+| `OPENTOPO_API_KEY` (optional) | `echo $OPENTOPO_API_KEY` | Get a free key from https://opentopography.org/ — needed for SRTM terrain layers |
 
 The ABM engine dependencies (`mal-abm-fast`) are only needed if you plan to build and run the C++ agent-based model. The core Python pipeline works without them.
 
@@ -80,12 +81,16 @@ uv run python -c "
 from mal_commonlib import config as C
 from mal_ghana_sim import config as GC
 import mal_core, mal_cli
-print('All packages import OK')
+import mal_data_explorer
+import mal_abm_fast
+print('All 6 workspace packages import OK')
 print('  REPO_ROOT:', C.REPO_ROOT)
 print('  DATA_DIR:', C.DATA_DIR)
 print('  OCCURRENCE:', GC.OCCURRENCE)
 "
 ```
+
+`mal-core` contains promoted modules (aoi, cli, dataset, env, predict, registry, scenario, server, state, train, unet_wrapper, unet). `mal-execution` contains automation scripts (cesga-run, hetzner-run); its Python module is minimal.
 
 Or use the verify script (also runs `uv sync`):
 
@@ -98,16 +103,27 @@ Both should print `All packages import OK` and show the resolved paths.
 ## Running Tests
 
 ```bash
-# Run all package tests
+# Run all Python package tests
 tools/run_all_tests.sh
 
 # Run tests for a specific package
 cd mal-ghana-sim && uv run pytest
 cd mal-commonlib && uv run pytest
 cd mal-core && uv run pytest
+
+# C++ ABM engine tests (GoogleTest, requires cmake + build)
+cd mal-abm-fast && ctest --test-dir build --output-on-failure
 ```
 
 The `run_all_tests.sh` script iterates through each workspace package, runs `uv run pytest`, and reports which packages have tests vs. which have none yet.
+
+## Available Dev Tools
+
+```bash
+tools/verify.sh       # Verify workspace integrity (runs uv sync + import check)
+tools/run_all_tests.sh # Run all Python package tests
+tools/format.sh       # Format code
+```
 
 ## Troubleshooting
 

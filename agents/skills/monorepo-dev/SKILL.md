@@ -29,11 +29,13 @@ MalariaSentinel/
 ├── mal-data-explorer/          # Dataset visualization, mapping, bias analysis
 │   ├── pyproject.toml
 │   └── *.py                    # Standalone scripts (no src layout)
-├── mal-abm-fast/               # Fast C++ ABM engine
+├── mal-abm-fast/               # Fast C++ ABM engine (HPC production)
 │   ├── pyproject.toml
 │   ├── CMakeLists.txt
 │   ├── src/
-│   └── tests/
+│   ├── include/
+│   ├── tests/
+│   └── slurm/
 ├── agents/                     # Agent loops + memory module
 ├── data/                       # Datasets (gitignored)
 ├── papers/                     # Research papers
@@ -65,7 +67,7 @@ mal-commonlib          ← no workspace deps (foundation)
     ↑
 mal-core               ← depends on mal-commonlib
     ↑
-mal-execution          ← depends on mal-core + mal-commonlib (deprecated)
+mal-execution          ← depends on mal-core + mal-commonlib (HPC/cloud automation scripts)
 
 mal-ghana-sim          ← depends on mal-commonlib ONLY (NOT mal-core)
 mal-data-explorer      ← no workspace deps (standalone scripts)
@@ -75,7 +77,7 @@ mal-abm-fast           ← no workspace deps (C++ engine)
 **Rules:**
 - `mal-commonlib` is the foundation — no internal dependencies.
 - `mal-core` depends only on `mal-commonlib`.
-- `mal-execution` depends on `mal-core` + `mal-commonlib` (but is deprecated — prefer `mal-core` for new CLI work).
+- `mal-execution` depends on `mal-core` + `mal-commonlib`. Its Python module (`mal_cli`) is minimal, but `scripts/` contains HPC automation (CESGA SLURM, Hetzner cloud).
 - `mal-ghana-sim` depends only on `mal-commonlib` — **never** on `mal-core`.
 - `mal-data-explorer` and `mal-abm-fast` have no workspace dependencies.
 - **Nothing depends on research packages.** Research code promotes into core; it never flows downward.
@@ -232,6 +234,29 @@ Use prefixes that match the package tier:
 ### New experiments
 
 Follow the pattern: `mal-<topic>-sim/` or `mal-<topic>-explorer/`.
+
+## Current Package Contents
+
+### mal-commonlib
+Shared config, paths, data utilities. Modules: `config`, `aoi`, `data/`, `terrain/`.
+
+### mal-core
+Stable pipeline logic (promoted from experiments). Modules: `aoi`, `cli`, `dataset`, `env`, `predict`, `registry`, `scenario`, `server`, `state`, `train`, `unet_wrapper`, `unet`. Entry point: `malariasim` CLI.
+
+### mal-execution
+HPC and cloud automation. Python module is minimal (`mal_cli/__init__.py`). Key content:
+- `scripts/cesga-run/` — CESGA SLURM automation (setup_env.sh, prepare_data.sh, run_abm.sh, manage_jobs.sh, cesga_config.sh)
+- `scripts/hetzner-run/` — Hetzner cloud automation (cloud-init.yaml, lib/, tests/)
+- `scripts/train_unet.py`, `train_unet_subsample.py`, `validate_unet.py` — training scripts
+
+### mal-ghana-sim
+Ghana spread simulation + U-Net surrogate. Modules: `config`, `dataset`, `ingest`, `predict`, `simulator`, `suitability`, `train`, `unet`, `viz`, `abm/` (agent-based model).
+
+### mal-data-explorer
+Standalone visualization scripts (01-12). No src layout, no importable module.
+
+### mal-abm-fast
+C++ agent-based model engine. Built with CMake. 12 source files, 11 GoogleTest suites (60 tests). CLI via CLI11.
 
 ## Contribution Guidelines
 
