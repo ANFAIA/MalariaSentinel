@@ -375,7 +375,7 @@ TEST(MalAbmFastStateCog, TwoRolloutsDifferentSeedsProduceDifferentCogs) {
         (void)layer->CreateField(&hab_type_f);
         OGRFieldDefn k_f("K", OFTInteger);
         (void)layer->CreateField(&k_f);
-        OGRFieldDefn twi_f("twi", OFTReal);
+        OGRFieldDefn twi_f("twi_value", OFTReal);
         (void)layer->CreateField(&twi_f);
         OGRFieldDefn row_f("row", OFTInteger);
         (void)layer->CreateField(&row_f);
@@ -384,7 +384,7 @@ TEST(MalAbmFastStateCog, TwoRolloutsDifferentSeedsProduceDifferentCogs) {
         OGRFeature* feat = OGRFeature::CreateFeature(layer->GetLayerDefn());
         feat->SetField("hab_type", "pluvial_pool");
         feat->SetField("K", 1000);
-        feat->SetField("twi", 0.0);
+        feat->SetField("twi_value", 9.0);  // > HABITAT_MIN_TWI (8.0)
         feat->SetField("row", 0);
         feat->SetField("col", 0);
         OGRPoint pt(0.5, 0.5);

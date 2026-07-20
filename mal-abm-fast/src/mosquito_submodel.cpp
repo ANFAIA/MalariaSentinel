@@ -26,6 +26,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <limits>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -272,15 +273,16 @@ inline float seeding_temp_d(const std::vector<PatchState>& ps,
 // value the mortality step uses.
 inline float lardeux_p_d(float T) {
     if (!std::isfinite(static_cast<double>(T))) {
-        return static_cast<float>(ADULT_DAILY_MORT_BASE);
+        return static_cast<float>(ADULT_DAILY_MORT_BASAL);
     }
     const double opt_c   = static_cast<double>(ADULT_OPT_C);
     const double sigma   = static_cast<double>(ADULT_SIGMA);
+    const double basal   = static_cast<double>(ADULT_DAILY_MORT_BASAL);
     const double two_ss  = 2.0 * sigma * sigma;
     const double Td      = static_cast<double>(T);
-    double p = std::exp(-((Td - opt_c) * (Td - opt_c)) / two_ss);
-    if (p < 0.60) p = 0.60;
-    if (p > 1.0)  p = 1.0;
+    double p = basal * std::exp(-((Td - opt_c) * (Td - opt_c)) / two_ss);
+    if (p < static_cast<double>(ADULT_MORT_FLOOR)) p = static_cast<double>(ADULT_MORT_FLOOR);
+    if (p > static_cast<double>(ADULT_MORT_CAP))   p = static_cast<double>(ADULT_MORT_CAP);
     return static_cast<float>(p);
 }
 
@@ -663,9 +665,10 @@ void MosquitoSubmodel::adult_mortality(
         temp_grid[idx] = ps.temp_d;
     }
 
-    const double opt_c = static_cast<double>(ADULT_OPT_C);
-    const double sigma = static_cast<double>(ADULT_SIGMA);
+    const double opt_c       = static_cast<double>(ADULT_OPT_C);
+    const double sigma       = static_cast<double>(ADULT_SIGMA);
     const double two_sigma_sq = 2.0 * sigma * sigma;
+    const double basal       = static_cast<double>(ADULT_DAILY_MORT_BASAL);
 
     int64_t i = soa_.n_alive - 1;
     while (i >= 0) {
@@ -678,12 +681,12 @@ void MosquitoSubmodel::adult_mortality(
             double p_d;
             if (idx < grid_size && has_temp[idx]) {
                 const double T = static_cast<double>(temp_grid[idx]);
-                p_d = std::exp(-((T - opt_c) * (T - opt_c)) / two_sigma_sq);
+                p_d = basal * std::exp(-((T - opt_c) * (T - opt_c)) / two_sigma_sq);
             } else {
-                p_d = static_cast<double>(ADULT_DAILY_MORT_BASE);
+                p_d = static_cast<double>(ADULT_DAILY_MORT_BASAL);
             }
-            if (p_d < 0.60) p_d = 0.60;
-            if (p_d > 1.0)  p_d = 1.0;
+            if (p_d < ADULT_MORT_FLOOR) p_d = ADULT_MORT_FLOOR;
+            if (p_d > ADULT_MORT_CAP)   p_d = ADULT_MORT_CAP;
             if (rng_.uniform_double() >= p_d) {
                 swap_with_last(soa_, i, soa_.n_alive);
                 --soa_.n_alive;
@@ -706,24 +709,45 @@ void MosquitoSubmodel::birth(const AOI& aoi,
     const int32_t h = cells_per_side_h(aoi);
     if (w <= 0 || h <= 0) return;
 
-    int64_t max_pid = -1;
-    for (const auto& ps : patch_states) {
-        if (ps.patch_id > max_pid) max_pid = ps.patch_id;
-    }
-    if (max_pid < 0) return;
-
-    std::vector<uint8_t> active_by_id(static_cast<size_t>(max_pid) + 1, 0);
-    std::vector<int32_t> adult_count(static_cast<size_t>(max_pid) + 1, 0);
-    for (const auto& ps : patch_states) {
-        if (ps.activated) {
-            active_by_id[static_cast<size_t>(ps.patch_id)] = 1;
+    // Local hash for (row, col) keys. Defined here (instead of
+    // including coordinator.hpp) to avoid a circular include.
+    struct PairHash {
+        std::size_t operator()(const std::pair<int32_t, int32_t>& p) const noexcept {
+            const std::uint64_t packed =
+                (static_cast<std::uint64_t>(static_cast<std::uint32_t>(p.first)) << 32) |
+                 static_cast<std::uint32_t>(p.second);
+            return std::hash<std::uint64_t>{}(packed);
         }
+    };
+
+    // Build (row, col) -> PatchState index map for fast lookup.
+    // Adults lay eggs at their CURRENT (row, col) -- the cell they
+    // dispersed to. The PatchState for that cell becomes the parent
+    // of the new larvae; the cell's patch_id is inherited. This
+    // replaces the old per-patch_id indexing, which meant adults
+    // that dispersed 500m to a new cell still contributed births
+    // to their old birth patch (dispersal was decorative).
+    std::unordered_map<std::pair<int32_t, int32_t>, int32_t, PairHash>
+        cell_to_state_idx;
+    cell_to_state_idx.reserve(patch_states.size());
+    for (size_t i = 0; i < patch_states.size(); ++i) {
+        cell_to_state_idx[{patch_states[i].row, patch_states[i].col}] =
+            static_cast<int32_t>(i);
     }
+
+    // Count adults per CELL (not per patch_id). Adults at the same
+    // (row, col) as an active PatchState contribute to births there.
+    std::unordered_map<std::pair<int32_t, int32_t>, int32_t, PairHash>
+        adult_count_by_cell;
+    adult_count_by_cell.reserve(soa_.n_alive);
     for (int64_t i = 0; i < soa_.n_alive; ++i) {
         const size_t si = static_cast<size_t>(i);
-        if (soa_.stage[si] == 1 && active_by_id[soa_.patch_id[si]]) {
-            ++adult_count[soa_.patch_id[si]];
-        }
+        if (soa_.stage[si] != 1) continue;  // adults only
+        const auto key = std::make_pair(soa_.row[si], soa_.col[si]);
+        auto it = cell_to_state_idx.find(key);
+        if (it == cell_to_state_idx.end()) continue;  // cell not a patch today
+        if (!patch_states[static_cast<size_t>(it->second)].activated) continue;
+        ++adult_count_by_cell[key];
     }
 
     struct PatchDraw {
@@ -733,13 +757,13 @@ void MosquitoSubmodel::birth(const AOI& aoi,
         int64_t n_birth;
     };
     std::vector<PatchDraw> draws;
-    draws.reserve(patch_states.size());
+    draws.reserve(adult_count_by_cell.size());
 
     int64_t total_birth = 0;
-    for (const auto& ps : patch_states) {
-        if (!ps.activated) continue;
-        const int64_t n_females = static_cast<int64_t>(adult_count[static_cast<size_t>(ps.patch_id)]) / 2;
+    for (const auto& kv : adult_count_by_cell) {
+        const int64_t n_females = static_cast<int64_t>(kv.second) / 2;
         if (n_females <= 0) continue;
+        const auto& ps = patch_states[static_cast<size_t>(cell_to_state_idx.at(kv.first))];
         const int n = rng_.binomial(static_cast<int>(n_females),
                                     static_cast<double>(BIRTH_FECUNDITY));
         const int64_t nb = static_cast<int64_t>(n);

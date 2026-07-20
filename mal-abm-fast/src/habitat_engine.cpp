@@ -19,6 +19,7 @@
 #include "habitat_engine.hpp"
 
 #include <cstdint>
+#include <iostream>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -171,6 +172,9 @@ void HabitatEngine::load_from_gpkg(const std::string& path,
     patches_.clear();
     id_to_idx_.clear();
 
+    int64_t pluvial_pool_seen = 0;
+    int64_t twi_dropped       = 0;
+
     OGR_L_ResetReading(layer);
     for (OGRFeatureH raw_feat = OGR_L_GetNextFeature(layer);
          raw_feat != nullptr;
@@ -185,6 +189,7 @@ void HabitatEngine::load_from_gpkg(const std::string& path,
             const std::string ht = GetStringField(feat.f, hab_type_idx);
             if (ht != "pluvial_pool") continue;
         }
+        ++pluvial_pool_seen;
 
         // (lon, lat) from the Point geometry.
         double lon = 0.0, lat = 0.0;
@@ -207,6 +212,18 @@ void HabitatEngine::load_from_gpkg(const std::string& path,
         const float twi_value = static_cast<float>(
             GetDoubleField(feat.f, twi_idx, 0.0));
 
+        // Build-time filter: TWI is a STATIC terrain signal
+        // (Topographic Wetness Index, derived from the SRTM DEM). It
+        // does not change daily. Patches with TWI <= HABITAT_MIN_TWI
+        // are not viable Anopheles habitat (Kleinschmidt 2000) and
+        // are dropped here, once, at habitat-engine build time. Daily
+        // activation is governed separately by water_frac + rain
+        // (see coordinator.cpp:to_dataframe()).
+        if (twi_value <= HABITAT_MIN_TWI) {
+            ++twi_dropped;
+            continue;
+        }
+
         HabitatPatch patch;
         patch.patch_id        = static_cast<int64_t>(patches_.size());
         patch.row             = row;
@@ -221,6 +238,12 @@ void HabitatEngine::load_from_gpkg(const std::string& path,
         id_to_idx_.emplace(patch.patch_id, new_idx);
         patches_.push_back(std::move(patch));
     }
+
+    std::cerr << "habitat_engine: dropped " << twi_dropped
+              << "/" << pluvial_pool_seen
+              << " patches below TWI threshold "
+              << HABITAT_MIN_TWI
+              << " (loaded " << patches_.size() << ")\n";
 }
 
 const HabitatPatch& HabitatEngine::patch_by_id(int64_t pid) const {

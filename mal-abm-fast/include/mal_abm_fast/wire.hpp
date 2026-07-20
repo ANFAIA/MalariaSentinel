@@ -63,11 +63,30 @@ inline constexpr float  BIRTH_FECUNDITY              = 0.10f;
 inline constexpr float  LARVA_BH_S0    = 0.95f;   // baseline daily survival
 inline constexpr float  LARVA_BH_ALPHA = 0.05f;   // competition coefficient
 
-// Adult daily mortality — Lardeux thermo-dependent (Lardeux 2009).
-// p_d = exp(-((T - OPT_C)^2) / (2 * SIGMA^2))
-inline constexpr float  ADULT_DAILY_MORT_BASE = 0.90f;  // fallback if T unavailable
-inline constexpr float  ADULT_OPT_C           = 26.0f;  // optimal temperature
-inline constexpr float  ADULT_SIGMA           = 7.0f;   // width of thermal response
+// Adult daily mortality — Lardeux thermo-dependent with basal cap.
+//   p_d = ADULT_DAILY_MORT_BASAL * exp(-((T - ADULT_OPT_C)^2) / (2 * ADULT_SIGMA^2))
+//   clipped to [ADULT_MORT_FLOOR, ADULT_MORT_CAP]
+// ADULT_DAILY_MORT_BASAL (default 0.90) is the maximum daily survival at
+// the optimal temperature. It accounts for non-thermal mortality sources
+// (senescence, predation, accidents) that the Lardeux Gaussian does not
+// model. Calibrated to fall in the 0.80-0.94 range reported by West
+// African MRR studies (Costantini 1996, Thomas 2013, Saarman 2019).
+//   - Costantini 1996: 0.80-0.88 (Burkina Faso savanna)
+//   - Saarman 2019:    0.87 (West Africa, self-marking)
+//   - North 2018:      0.875 (model param)
+//   - Midega 2007:     0.83-0.95 (Kenya coast)
+// ADULT_OPT_C = 25°C: matches Mordecai 2013 + Lunde 2013 (Bayoh-Mordecai).
+// ADULT_SIGMA = 7: broader curve, matches Martens 1997 (West Africa MRR
+// at 30-35°C remains survivable).
+// ADULT_MORT_CAP = 0.95: empirical upper bound from Midega 2007.
+// ADULT_MORT_FLOOR = 0.60: emergency floor for extreme temps.
+inline constexpr float  ADULT_DAILY_MORT_BASAL  = 0.90f;
+inline constexpr float  ADULT_OPT_C             = 25.0f;
+inline constexpr float  ADULT_SIGMA             = 7.0f;
+inline constexpr float  ADULT_MORT_CAP          = 0.95f;
+inline constexpr float  ADULT_MORT_FLOOR        = 0.60f;
+// Backward-compat alias for existing code that reads ADULT_DAILY_MORT_BASE.
+inline constexpr float  ADULT_DAILY_MORT_BASE   = ADULT_DAILY_MORT_BASAL;
 
 // Fallback temperature (deg C) when the env COG returns NaN at a
 // cell (e.g. out-of-coverage pixels near the AOI edges, or
@@ -97,6 +116,15 @@ inline constexpr float  LARVA_DESICCATION_DAILY_RATE = 0.10f;
 inline constexpr float  PLUVIAL_POOL_RAIN_THRESHOLD_MM = 15.0f;
 inline constexpr float  PLUVIAL_POOL_TWI_THRESHOLD  = 8.0f;
 inline constexpr float  PLUVIAL_POOL_WATER_FRAC_MIN = 0.0f;  // strictly > 0
+
+// Habitat-engine build-time filter: a gpkg patch is loaded only if
+// its TWI exceeds this threshold. TWI is a static terrain signal
+// (Topographic Wetness Index, derived from the SRTM DEM) and should
+// NOT be a daily dynamic rule. Daily dynamics use water_frac + rain
+// (see PLUVIAL_POOL_RAIN_THRESHOLD_MM above).
+// Threshold 8.0: standard cut-off for terrain-driven Anopheles
+// habitat identification (Aduvukha 2026, Kleinschmidt 2000).
+inline constexpr float  HABITAT_MIN_TWI             = 8.0f;
 
 // No-data sentinel for the 2-band state COG.
 inline constexpr float  NODATA_SENTINEL             = -9999.0f;

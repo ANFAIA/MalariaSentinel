@@ -133,7 +133,8 @@ void write_synthetic_env_tif(const std::string& path) {
 
 // Write a tiny habitat patches gpkg with one Point feature at the
 // centre of the AOI. The point uses the 4326 CRS. The gpkg has
-// hab_type='pluvial_pool', K=1000, twi=0.0; the row/col fields are
+// hab_type='pluvial_pool', K=1000, twi_value=9.0 (passes the
+// HABITAT_MIN_TWI build-time filter); the row/col fields are
 // pre-computed for the engine's load_from_gpkg.
 void write_synthetic_habitat_gpkg(const std::string& path) {
     GDALDriver* drv = GetGDALDriverManager()->GetDriverByName("GPKG");
@@ -164,7 +165,7 @@ void write_synthetic_habitat_gpkg(const std::string& path) {
     (void)layer->CreateField(&hab_type_f);
     OGRFieldDefn k_f("K", OFTInteger);
     (void)layer->CreateField(&k_f);
-    OGRFieldDefn twi_f("twi", OFTReal);
+    OGRFieldDefn twi_f("twi_value", OFTReal);
     (void)layer->CreateField(&twi_f);
     OGRFieldDefn row_f("row", OFTInteger);
     (void)layer->CreateField(&row_f);
@@ -174,7 +175,7 @@ void write_synthetic_habitat_gpkg(const std::string& path) {
     OGRFeature* feat = OGRFeature::CreateFeature(layer->GetLayerDefn());
     feat->SetField("hab_type", "pluvial_pool");
     feat->SetField("K", 1000);
-    feat->SetField("twi", 0.0);
+    feat->SetField("twi_value", 9.0);  // > HABITAT_MIN_TWI (8.0)
     feat->SetField("row", 0);
     feat->SetField("col", 0);
 
