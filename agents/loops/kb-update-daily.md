@@ -2,7 +2,7 @@
 
 ## Objetivo
 
-Revisar los commits recientes y producir un plan estructurado de actualización de la base de conocimiento. **Modo plan: no ejecutar escrituras.** El output es un plan que el memory-curator ejecutará después.
+Revisar los commits recientes, producir un plan estructurado de actualización de la base de conocimiento, y delegar la ejecución al memory-curator. **Este agente NO escribe al KG directamente** — produce el plan y lo pasa al memory-curator como brief pre-aprobado.
 
 ## Protocolo
 
@@ -44,6 +44,20 @@ Para cada commit, determinar:
 
 ### Paso 6 — Producir el plan estructurado
 
+### Paso 7 — Delegar al memory-curator
+
+Una vez producido el plan, delegar la ejecución al memory-curator usando la herramienta `task`:
+
+```json
+{
+  "description": "Execute KB update plan",
+  "subagent_type": "memory-curator",
+  "prompt": "Eres el memory-curator para MalariaSentinel. Este es un batch pre-aprobado. Ejecuta todos los writes del plan adjunto.\n\n# Contexto\nEl plan fue producido por el plan agent tras revisar commits recientes y hacer recall del KG.\n\n# Plan a ejecutar\n\n## Updates\n| UUID | Tipo | Campos |\n|------|------|--------|\n| ... |\n\n## Creates\n| UUID | Tipo | Parent | Nombre | Summary |\n|------|------|--------|--------|---------|\n| ... |\n\n## Connections\n| Tipo | UUID origen | UUID destino |\n|------|-------------|--------------|\n| ... |\n\n## Episode\nNombre: session-YYYY-MM-DD: <resumen>\nCuerpo: <10-20 líneas>\n\n# Instrucciones\n1. Carga el skill project-memory primero.\n2. Confirma que el stack está arriba con memory_status.\n3. Ejecuta todos los writes en paralelo (memory_node y memory_rel).\n4. Al final, ejecuta memory_audit → espera 0/0/0.\n5. Retorna el artifact estructurado."
+}
+```
+
+**Importante**: el plan agent reemplaza las tablas `...` con los datos reales del plan producido en el Paso 6. El brief completo se pasa como el campo `prompt` del `task`.
+
 ## Formato de output
 
 El agente DEBE producir un plan en este formato exacto:
@@ -81,7 +95,7 @@ Ejecutar `memory_audit` después de la ejecución → esperar 0/0/0
 
 ## Reglas
 
-1. **Modo plan**: NO ejecutar writes. Solo producir el plan.
+1. **No escribir al KG**: este agente produce el plan y delega al memory-curator. NO ejecuta memory_node, memory_rel, ni mcp__add_memory.
 2. **Recall antes del plan**: siempre verificar qué existe antes de proponer nodos nuevos.
 3. **Schema estricto**: 8 labels solamente (Component, Investigation, Architecture, Pattern, Pitfall, Tool, Operational, Preference).
 4. **UUIDs en kebab-case**: `comp-m5-sdss-shell`, `op-m3-m4-unet`.
