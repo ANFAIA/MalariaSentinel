@@ -88,7 +88,13 @@ inline constexpr float  LARVA_DESICCATION_DAILY_RATE = 0.10f;
 //       TWI(r, c) >  PLUVIAL_POOL_TWI_THRESHOLD
 //       water_frac(r, c) > PLUVIAL_POOL_WATER_FRAC_MIN  (strictly > 0)
 //       rain_d(r, c) >  PLUVIAL_POOL_RAIN_THRESHOLD_MM
-inline constexpr float  PLUVIAL_POOL_RAIN_THRESHOLD_MM = 50.0f;
+//
+// Rationale for 15mm (was 50mm): Ghana's rainy season averages 5-15mm/day,
+// so 50mm was almost never reached and the rule rarely activated. 15mm is
+// the biological threshold for ephemeral pool formation. Also, daily rain
+// >40mm correlates NEGATIVELY with larval density (heavy rain washes larvae
+// out of pools), so 50mm was biologically counterproductive as well.
+inline constexpr float  PLUVIAL_POOL_RAIN_THRESHOLD_MM = 15.0f;
 inline constexpr float  PLUVIAL_POOL_TWI_THRESHOLD  = 8.0f;
 inline constexpr float  PLUVIAL_POOL_WATER_FRAC_MIN = 0.0f;  // strictly > 0
 
