@@ -19,7 +19,9 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <cstdint>
+#include <iostream>
 #include <memory>
 #include <stdexcept>
 #include <string>
@@ -195,6 +197,24 @@ void Engine::step() {
     //    mortality, growth, EIP, dispersal, birth).
     sub_->advance_day(aoi_, coord_->patch_states_today());
 
+    // Divergence checks
+    const int64_t n = sub_->total_agents();
+    if (n < 0) {
+        throw std::runtime_error(
+            "Engine::step: population is negative (" +
+            std::to_string(n) + ")");
+    }
+
+    const int64_t cap = max_population_ > 0
+        ? max_population_
+        : static_cast<int64_t>(aoi_.cells_per_side()) *
+          static_cast<int64_t>(aoi_.cells_per_side()) *
+          static_cast<int64_t>(K_MAX) * 10;
+    if (n > cap) {
+        std::cerr << "warning: population " << n
+                  << " exceeds safe threshold " << cap << "\n";
+    }
+
     // 4. Advance the simulation date by one day. Mirrors
     //    `AnophelesABM.step()` step 5 in the Python engine.
     coord_->current_date() += std::chrono::days{1};
@@ -220,6 +240,23 @@ void Engine::snapshot(const std::string& path,
         coord_->aggregate_density(*sub_, K_MAX);
     const SuitabilityGrid suit =
         coord_->suitability_grid(*sub_, K_MAX);
+
+    // NaN guards
+    for (size_t i = 0; i < density.data.size(); ++i) {
+        if (std::isnan(density.data[i])) {
+            throw std::runtime_error(
+                "Engine::snapshot: NaN in density grid at index " +
+                std::to_string(i));
+        }
+    }
+    for (size_t i = 0; i < suit.data.size(); ++i) {
+        if (std::isnan(suit.data[i])) {
+            throw std::runtime_error(
+                "Engine::snapshot: NaN in suitability grid at index " +
+                std::to_string(i));
+        }
+    }
+
     coord_->write_state_cog(path, density, suit, year, month, seed,
                             n_rollouts, rollout_index);
 }

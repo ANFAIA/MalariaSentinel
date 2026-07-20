@@ -58,6 +58,11 @@ def _parse_filename(name: str):
     - 'state_dayNNN' → (0, 0, 0, day) for daily snapshots
     - 'state' → (0, 0, 0, 0) for final snapshot
     """
+    # Format: abm_YYYY_MM_dayNNN (daily snapshot, no seed)
+    m = re.match(r"abm_(\d{4})_(\d{2})_day(\d+)", name)
+    if m:
+        return int(m.group(1)), int(m.group(2)), 0, int(m.group(3))
+
     # Format: abm_YYYY_MM_seedSSSS_dayNNN (daily snapshot within monthly run)
     m = re.match(r"abm_(\d{4})_(\d{2})_seed(\d+)_day(\d+)", name)
     if m:

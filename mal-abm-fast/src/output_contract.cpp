@@ -14,6 +14,7 @@
 #include "output_contract.hpp"
 
 #include <array>
+#include <cmath>
 #include <cstdint>
 #include <cstring>
 #include <fstream>
@@ -86,6 +87,22 @@ void write_state_cog(const std::string& path,
         static_cast<int64_t>(suit.h) * static_cast<int64_t>(suit.w)) {
         throw std::runtime_error(
             "write_state_cog: suit.data size does not match h*w");
+    }
+
+    // NaN guards
+    for (size_t i = 0; i < density.data.size(); ++i) {
+        if (std::isnan(density.data[i])) {
+            throw std::runtime_error(
+                "write_state_cog: NaN detected in density grid at index " +
+                std::to_string(i));
+        }
+    }
+    for (size_t i = 0; i < suit.data.size(); ++i) {
+        if (std::isnan(suit.data[i])) {
+            throw std::runtime_error(
+                "write_state_cog: NaN detected in suitability grid at index " +
+                std::to_string(i));
+        }
     }
 
     const int h = static_cast<int>(density.h);

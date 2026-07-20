@@ -132,6 +132,11 @@ public:
     };
     SeedingPatch seeding_patch() const { return seeding_patch_; }
 
+    // Override the population explosion threshold. 0 = auto
+    // (n_patches * K_MAX * 10). Set before calling step().
+    void set_max_population(int64_t v) { max_population_ = v; }
+    int64_t max_population() const { return max_population_; }
+
 private:
     AOI                                     aoi_;
     std::shared_ptr<ClimateEngine>          climate_;
@@ -141,6 +146,7 @@ private:
     std::chrono::sys_days                   current_date_;
     std::chrono::sys_days                   start_date_;
     SeedingPatch                            seeding_patch_;
+    int64_t                                 max_population_ = 0;
 };
 
 }  // namespace mal_abm_fast

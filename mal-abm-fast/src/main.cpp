@@ -213,6 +213,7 @@ int main(int argc, char** argv) {
     int         days        = 30;
     int         n_rollouts  = 1;
     int         snapshot_every = 0;
+    int64_t     max_population = 0;
     int         threads = 0;
     std::string env_path;
     std::string habitat_path;
@@ -271,6 +272,11 @@ int main(int argc, char** argv) {
                     "Take intermediate snapshots every N days (0 = "
                     "only final snapshot, backward compatible). "
                     "Intermediate files are named <stem>_dayNNN.tif.")
+        ->default_val(0)
+        ->check(CLI::NonNegativeNumber);
+    run->add_option("--max-population", max_population,
+                    "Max safe population before warning (0 = auto: "
+                    "n_patches * K_MAX * 10).")
         ->default_val(0)
         ->check(CLI::NonNegativeNumber);
     run->add_option("--threads", threads,
@@ -440,6 +446,7 @@ int main(int argc, char** argv) {
             std::exit(EXIT_FAILURE);
         }
         auto& engine = *engine_ptr;
+        engine.set_max_population(max_population);
 
         // -- debug instrumentation (M7.0 population-crash investigation)
         // When the user passes --debug-population, the submodel emits
@@ -462,7 +469,14 @@ int main(int argc, char** argv) {
         // -- Step ----------------------------------------------------
         try {
             for (int d = 0; d < days; ++d) {
-                engine.step();
+                try {
+                    engine.step();
+                } catch (const std::exception& e) {
+                    std::cerr << "abm_run: rollout " << i
+                              << " diverged on day " << (d + 1)
+                              << ": " << e.what() << "\n";
+                    std::exit(EXIT_FAILURE);
+                }
 
                 // Intermediate snapshot every N days
                 if (snapshot_every > 0 && (d + 1) % snapshot_every == 0) {
@@ -483,7 +497,7 @@ int main(int argc, char** argv) {
             }
         } catch (const std::exception& e) {
             std::cerr << "abm_run: rollout " << i
-                      << " step() failed on day " << days << ": "
+                      << " snapshot failed during stepping: "
                       << e.what() << "\n";
             std::exit(EXIT_FAILURE);
         }
