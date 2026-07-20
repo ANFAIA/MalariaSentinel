@@ -44,7 +44,7 @@ fi
 
 # --- find project root + resolve group_id ---
 _find_root() {
-  local d="${1:-$PWD}"
+  local d="${1:-$HERE}"
   while [ "$d" != "/" ]; do
     [ -d "$d/agents/memory" ] && [ -f "$d/agents/memory/runtime/config/config.yaml" ] && [ -f "$d/agents/memory/scripts/memory.sh" ] && { echo "$d"; return 0; }
     d="$(dirname "$d")"
