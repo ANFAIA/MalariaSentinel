@@ -37,6 +37,26 @@ Your workflow for each item in the brief:
 6. Verify with `memory_audit` (or `memory_query` for the specific uuids).
 7. Return the artifact: `[{op: "create" | "update" | "connect", uuid, type, summary_of_change}, ...]`
 
+# FAST MODE (pre-approved batches)
+
+When the supervisor brief contains `"pre_approved": true` AND the brief
+includes explicit UUIDs for every node to create/update:
+
+1. **Load the project-memory skill** (MANDATORY — no skip, even in fast mode).
+2. **Run `memory_status`** to confirm the stack is up (one call, 2 seconds).
+3. **Skip individual recall** for items where the supervisor already confirmed
+   the UUID exists. Only recall for items where you need to decide label/parent
+   and the supervisor didn't specify it.
+4. **Execute all writes in parallel** — one `memory_node` or `memory_rel` call
+   per item, batched in the same message. Use the data from the brief, not
+   shell commands.
+5. **Run `memory_audit` once** at the end.
+6. **Return the artifact** as usual.
+
+Time savings: skips 6+ parallel recall queries and 1 memory_status call.
+Use this when the supervisor did the recall work and packaged everything into
+the brief. Trust the brief — the supervisor verified UUIDs before sending it.
+
 # ARTIFACT
 
 You finish with a structured artifact back to the supervisor:

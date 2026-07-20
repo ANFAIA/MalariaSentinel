@@ -68,30 +68,29 @@ echo "$out"
 echo
 
 # --- parse results to determine pass/fail ---
-# We expect three numeric counts (unlabeled, orphans, out_of_schema) and a
-# final distribution dump. A label that is not in the schema is an automatic
-# failure.
-unlabeled="$(echo "$out" | grep -A1 '^rows' | grep -oE 'unlabeled[^,}]*' | head -1 || true)"
-orphans="$(echo "$out"   | grep -A1 '^rows' | grep -oE 'orphans[^,}]*'   | head -1 || true)"
-oos="$(echo "$out"       | grep -A1 '^rows' | grep -oE 'out_of_schema[^,}]*' | head -1 || true)"
-
-# A safer parse: extract the values associated with the three keys using
-# neo4j-cli's toon output. In toon, a row renders as `{key: value}` so we
-# pull the numeric value of each.
-_get() {
+# neo4j-cli --format toon renders multi-line output. Normalize to single
+# line before extracting values. The out_of_schema query returns DISTINCT
+# label names (not counts), so we count the number of matches instead.
+_get_count() {
   local key="$1"
-  echo "$out" | grep -oE "${key}:[[:space:]]*[0-9]+" | head -1 | grep -oE '[0-9]+' || echo 0
+  echo "$out" | tr '\n' ' ' | grep -oE "${key}:[[:space:]]*[0-9]+" | head -1 | grep -oE '[0-9]+' || echo 0
 }
 
-u="$(_get unlabeled)"
-o="$(_get orphans)"
-s="$(_get out_of_schema)"
+# Count distinct out_of_schema labels (each match is a label name, not a number)
+oos_count="$(echo "$out" | tr '\n' ' ' | grep -oE 'out_of_schema:[[:space:]]*[A-Za-z_]+' | wc -l | tr -d ' ')"
+
+u="$(_get_count unlabeled)"
+o="$(_get_count orphans)"
+s="$oos_count"
 
 echo "--- audit summary ---"
 printf 'group_id     = %s\n' "$GROUP_ID"
 printf 'unlabeled    = %s\n' "$u"
 printf 'orphans      = %s\n' "$o"
 printf 'out_of_schema= %s\n' "$s"
+if [ "$s" != "0" ]; then
+  echo "  labels: $(echo "$out" | tr '\n' ' ' | grep -oE 'out_of_schema:[[:space:]]*[A-Za-z_]+' | sed 's/out_of_schema:[[:space:]]*//' | tr '\n' ', ' | sed 's/, $//')"
+fi
 
 # A row labelled "out_of_schema" is only a failure if the count > 0 OR if
 # a non-empty label was returned. We treat any non-zero value as a fail.
