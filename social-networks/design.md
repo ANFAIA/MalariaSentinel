@@ -1,53 +1,76 @@
 # Design: MalariaSentinel — LinkedIn Presentation
 
 ## What this is
-6-scene LinkedIn video introducing the MalariaSentinel project (Spatial Decision Support System for malaria elimination, funded by ANFAIA). Format: vertical 4:5 (1080×1350), ~45s total. A linked PDF export reuses the same scene layouts for a LinkedIn carousel.
+
+6-scene LinkedIn video introducing the **MalariaSentinel** project — a Spatial Decision Support System (SDSS) for malaria elimination, funded by ANFAIA. Source of truth: `docs/abm-status.md` (ABM Python v0.5.0, ABM C++ mal-abm-fast F1 complete, 71+60+5 tests passing).
+
+Format: vertical 4:5 (1080×1350), ~45s total. A linked PDF export reuses the same scene layouts for a LinkedIn carousel.
 
 ## Brand source
-- **Repo identity:** `ANFAIA-MalariaSentinel` (the user is a research-engineer building an SDSS for malaria elimination, following Kelly et al. 2012).
-- **Tone:** serious-but-accessible. The viewer is a professional on LinkedIn — a researcher, recruiter, or funder. Not a malaria specialist.
-- **Voice:** Spanish (the user wrote the brief in Spanish; ANFAIA is the funder; LinkedIn audience likely LATAM + EU).
 
-## Palette — "Scientific teal" (dark, premium, research briefing)
+- **Repo identity:** `ANFAIA/MalariaSentinel` — a research-engineering project by David Flórez M., following the SDSS framework of Kelly et al. (2012).
+- **Tone:** serious, evidence-driven, technical but accessible. The viewer is a researcher, recruiter, funder, or program officer on LinkedIn — not necessarily a malaria specialist.
+- **Voice:** Spanish (the user brief is in Spanish; ANFAIA is the funder; LinkedIn audience LATAM + EU).
+- **Reference text** (verbatim from `docs/abm-status.md`):
+  - Project name: `MalariaSentinel`
+  - Tagline: `Sistema de Soporte de Decisiones Espacial`
+  - Subtitle: `para la eliminación de la malaria`
+  - Funder: `Con el apoyo de ANFAIA`
+  - Stack: `ABM Python v0.5.0` · `ABM C++ mal-abm-fast F1`
+  - Tests: `71/71 Python + 60/60 C++ + 5/5 parity`
+  - Pipeline: `INGESTA → SUITABILIDAD → ABM → DATASET → U-NET → PREDICCIÓN`
+
+## Palette — "Slate & sage" (cool, calm, evidence-led)
+
+A four-color palette from the user, expanded with derived shades for depth.
 
 | Token             | Hex        | Use                                            |
 |-------------------|------------|------------------------------------------------|
-| `bg`              | `#0A1419`  | Primary canvas. Very dark blue-charcoal, hint of teal in undertone (NOT pure black). |
-| `surface`         | `#0F1C25`  | Cards, panels, raised zones.                  |
-| `fg`              | `#E8F1F4`  | Primary text. Cool off-white, not pure white.  |
-| `fg-muted`        | `#8A9AA3`  | Secondary text, labels, captions.              |
-| `fg-dim`          | `#5A6B73`  | Tertiary, dividers, monospace metadata.       |
-| `accent`          | `#14B8A6`  | Brand accent — sophisticated teal. Hints at water / vector without malaria-red cliché. |
-| `accent-bright`   | `#2DD4BF`  | Highlighted elements, current-state markers.   |
-| `accent-glow`     | `rgba(20, 184, 166, 0.18)` | Atmospheric radial glows.        |
-| `rule`            | `rgba(232, 241, 244, 0.10)` | Hairline rules, borders.         |
-| `warn`            | `#F59E0B`  | Sparingly — "current" phase marker.            |
+| `bg`              | `#2F404F`  | Primary canvas. Deep slate, calm and grounded — not pure black. |
+| `surface`         | `#3A4D5C`  | Raised zones, cards, panels. ~5% lighter than bg. |
+| `surface-2`       | `#455A6A`  | Deeper raised (chips, callouts on top of surface). |
+| `fg`              | `#F0F1EE`  | Primary text. Warm off-white, no pure white. |
+| `fg-muted`        | `#C7DAD3`  | Secondary text, labels, captions. The pale sage is intentionally warm-leaning. |
+| `fg-dim`          | `#8FA0A8`  | Tertiary, dividers, monospace metadata. Blended fg + bg. |
+| `accent`          | `#3894A1`  | Brand accent — sophisticated teal. Used for headlines, current-state markers, the project mark. |
+| `accent-bright`   | `#4FB0BC`  | Highlighted elements, animated dots, current pulses. |
+| `accent-glow`     | `rgba(56, 148, 161, 0.20)` | Atmospheric radial glows. |
+| `accent-glow-soft`| `rgba(56, 148, 161, 0.10)` | Subtle washes. |
+| `sage`            | `#C7DAD3`  | "Done" state marker, secondary highlight, callouts. |
+| `rule`            | `rgba(240, 241, 238, 0.10)` | Hairline rules, borders. |
+| `rule-strong`     | `rgba(240, 241, 238, 0.20)` | Stronger dividers. |
 
-Tint rule: every neutral is pushed toward teal-cyan. Dead gray is forbidden — `fg-muted #8A9AA3` has a measurable cool tint, `fg-dim #5A6B73` has a slight blue-green cast.
+**Tint rule:** every neutral sits on the slate→sage spectrum. The palette is intentionally cool-but-warm: slate bg + teal accent + sage secondary + warm off-white fg. No red, no orange — that palette is for warnings, not for a calm research briefing.
+
+**Semantic mapping** (used in the timeline scene):
+- **Done** (M0, M1, M2, M-perf F1) → `sage` chip + `accent` check
+- **Current / live** (none in this presentation — M3 is the next target, not started) → `accent` chip + `accent-bright` dot
+- **Pending** (M3–M6) → `fg-dim` chip, empty bar
 
 ## Typography
 
-Two voices — sans for everything, mono for data/tech. No serif (renderer font list doesn't include one; a sans-italic accent is used for emphasis words instead).
+Two voices — sans for everything, mono for data/tech.
 
 | Role               | Family              | Weight       | Use                                              |
 |--------------------|---------------------|--------------|--------------------------------------------------|
-| **Display**        | `Space Grotesk`     | 600/700      | Headlines, scene titles, project name.           |
-| **Italic accent**  | `Space Grotesk`     | 600 italic   | One emphasis word per scene (e.g., "*antes*", "*M3*"). |
+| **Display**        | `Space Grotesk`     | 600/700      | Headlines, scene titles, project name, big numbers. |
+| **Italic accent**  | `Space Grotesk`     | 600 italic   | One emphasis word per scene (e.g., "*abierto*", "*100×*"). |
 | **Body**           | `Space Grotesk`     | 400/500      | Body, descriptions, supporting copy.             |
-| **Mono**           | `JetBrains Mono`    | 400/500      | Milestone codes (M1–M6), coordinates, technical labels, GitHub handle. |
+| **Mono**           | `JetBrains Mono`    | 400/500      | Milestone codes (M1–M6), constants, technical labels, version strings, GitHub handle. |
 
-Sizes (vertical 4:5, 1080×1350):
+**Sizes** (vertical 4:5, 1080×1350):
 
-| Element                  | Size  | Notes                                    |
-|--------------------------|-------|------------------------------------------|
-| Scene title (h1)         | 120px | Max 2 lines, weight 700                  |
-| Section heading (h2)     | 64px  |                                          |
-| Body                     | 32px  | line-height 1.3                          |
-| Label / caption          | 22px  | `fg-muted`                               |
-| Mono / metadata          | 18px  | uppercase, letter-spacing 0.18em        |
-| Italic emphasis          | 64–96px | One word, Space Grotesk italic       |
+| Element                  | Size    | Notes                                    |
+|--------------------------|---------|------------------------------------------|
+| Scene title (h1)         | 110–120px | Max 2 lines, weight 700                |
+| Section heading (h2)     | 56–64px |                                          |
+| Body                     | 28–32px | line-height 1.3                          |
+| Stat number (hero)       | 96–120px | The focal element of a stat scene      |
+| Label / caption          | 20–22px | `fg-muted`                               |
+| Mono / metadata          | 16–20px | uppercase, letter-spacing 0.16–0.20em   |
+| Italic emphasis          | 64–72px | One word, Space Grotesk italic          |
 
-Dark-background compensation: body uses weight 400 (not 350), `line-height` 1.3+, display headlines get `letter-spacing: -0.02em` to compensate for light halos.
+**Dark-bg compensation:** body uses weight 400 (not 350), `line-height` 1.3+, display headlines get `letter-spacing: -0.025em` to compensate for light halos. Since the bg is medium-dark (not deep black), fg weights can be a touch lighter.
 
 ## Layout primitives
 
@@ -61,45 +84,90 @@ Dark-background compensation: body uses weight 400 (not 350), `line-height` 1.3+
 
 Every scene has 8–10 visual elements across 3 layers:
 
-- **Background (2–5 decoratives):** radial teal glow (one per scene, varying position), faint oversized ghost-type word at 6% opacity, hairline rules, grid pattern (subtle, 60px cells at 4% opacity).
-- **Midground (3–5 elements):** the actual content — headlines, stat cards, milestone bars, lists.
+- **Background (2–5 decoratives):** radial teal glow (one per scene, varying position), faint oversized ghost-type word at 5–6% opacity, hairline rules, grid pattern (subtle, 80px cells at 3% opacity).
+- **Midground (3–5 elements):** the actual content — headlines, stat cards, milestone bars, pipeline chips, code blocks.
 - **Foreground (2–3 accents):** current-state markers, "M3" callout, project mark, ANFAIA wordmark.
 
 ## Motion signature
 
-- **Energy:** medium. Corporate research-briefing pacing. Not a hype reel.
-- **Default entrance:** 0.4–0.6s, `power3.out` (responsive, decisive). Exits 0.25–0.35s `power2.in`.
-- **Ambient decoratives:** one shared slow breathe (3–4s cycle, ±2% scale) on the radial glow per scene. Each scene also has one scene-specific ambient (drift, pulse, orbit).
+- **Energy:** medium. Research-briefing pacing. Not a hype reel.
+- **Default entrance:** 0.4–0.6s, `power3.out` (responsive, decisive). Stat number count-ups: 0.6–0.8s `power2.out`.
+- **Ambient decoratives:** one shared slow breathe (3–4s cycle, ±2% scale) on the radial glow per scene. Each scene also has one scene-specific ambient (drift, pulse).
 - **Stagger:** 80–120ms between siblings. Never more than 500ms total stagger.
-- **Transitions:** primary = blur crossfade (0.4s, `power2.inOut`). Accent = push-up slide at the title→scene-2 boundary (sets the visual language). Final scene = color dip to black.
+- **Transitions:**
+  - Scene 1 → 2: push-up slide (0.5s, `power3.inOut`) — sets the visual language.
+  - Scene 2 → 3 → 4 → 5: blur crossfade (0.4s, `power2.inOut`) with dark overlay peak at 55%.
+  - Scene 5 → 6: blur crossfade.
+  - Final scene 6: dip to black (0.7s) — exit animation allowed only here.
 
 ## Recurring motifs
 
-- **Top hairline bar** with the project mark `MALARIA·SENTINEL` (mono, 18px, `fg-dim`) on the left and scene number on the right. Present in every scene, never re-animated — it's the visual thread.
-- **Teal radial glow** anchored bottom-right, breathing at 4s cycle.
+- **Top hairline bar** with the project mark `MALARIA·SENTINEL` (mono, 18px, `fg-dim`) on the left and scene counter `01/06` on the right. Present in every scene, never re-animated — it's the visual thread.
+- **Teal radial glow** anchored bottom-right (or rotating position per scene), breathing at 4s cycle.
 - **Milestone code chip:** `font-family: JetBrains Mono; background: surface; border: 1px solid rule; padding: 4px 10px; border-radius: 4px;` — appears for every M1–M6 reference.
-- **Current marker:** filled teal dot with a 1px teal ring expanding from it (pulse, 1.5s cycle) on the M2/M3 phase scene.
+- **Stat number** is always Space Grotesk 700 with a unit in 48% size and `fg-muted` color, `letter-spacing: -0.045em`.
+- **Sage (`C7DAD3`) checkmark** for completed items — the only use of the pale sage in the timeline.
 
 ## Constraints / Don'ts
 
 - No malaria-red. No medical-cross iconography. No mosquito emoji.
 - No stock "AI brain" visuals.
-- No "innovation" / "synergy" / generic SaaS language. Speak the project's own words: SDSS, suitability, U-Net surrogate, M2, M3.
+- No "innovation" / "synergy" / generic SaaS language. Speak the project's own words: SDSS, suitability, U-Net surrogate, mal-abm-fast, xoshiro256**, M2, M-perf F1.
 - No Inter, Roboto, Open Sans, Poppins, Outfit, Sora, Playfair Display, Syne.
 - No full-screen linear gradients on dark (H.264 banding). Use radial glow + solid surface.
 - No `<br>` in body copy. Use `max-width` to wrap.
 - No exit animations before transitions. Transitions are the exit.
+- Never use `warn`/orange — the palette is calm. Use `sage` for "done" and `accent` for "current/highlight".
 
-## Reference text (used verbatim in scenes)
+## Scene content (source of truth: `docs/abm-status.md`)
 
-- Project name: `MalariaSentinel`
-- Tagline: `SDSS para la eliminación de la malaria`
-- Funder: `Con el apoyo de ANFAIA`
-- Milestones (verbatim from the project's design doc):
-  - M1 — Scaffolding
-  - M2 — Ingesta de datos
-  - M3 — Modelo de idoneidad
-  - M4 — Simulador de propagación
-  - M5 — Entrenamiento de la U-Net
-  - M6 — Predicción y mapa de riesgo
-- Status: `M2 completa · M3 en curso`
+### Scene 1 — Title
+- `MalariaSentinel`
+- `Sistema de Soporte de Decisiones Espacial`
+- `para la eliminación de la malaria`
+- Meta: `v0.5.0 Python · F1 C++ · Open Source`
+
+### Scene 2 — El pipeline SDSS
+Headline: `El pipeline: del satélite al mapa de riesgo.`
+Six-stage flow:
+1. `INGESTA` — CHIRPS, ERA5, MERIT DEM, JRC GSW, MODIS, WorldCover
+2. `SUITABILIDAD` — TWI, modelo de idoneidad
+3. `ABM` — motor C++ (xoshiro256**, 7 ops/día)
+4. `DATASET` — pares (state_t + env) → state_{t+1}
+5. `U-NET` — 32→64→128→256→512, MSE + soft-Dice
+6. `PREDICCIÓN` — risk maps mensuales, FastAPI
+
+### Scene 3 — Estado actual
+Headline: `Cuatro hitos cumplidos.`
+Stats:
+- `71/71` tests Python
+- `60/60` tests C++
+- `5/5` parity
+Milestones done: `M0 · M1 · M2 · M-perf F1`
+Milestones pending: `M3 · M4 · M5 · M6 · M7`
+
+### Scene 4 — El motor ABM
+Headline: `El motor ABM en C++ (mal-abm-fast).`
+Constants: `K_MAX = 1000` · `EIP 16°C` · `110 GD` · `σ 300m`
+Sub-model: 7 operaciones diarias
+- `larva_mortality_inactive`
+- `larva_mortality_density` (Beverton-Holt)
+- `larva_growth`
+- `larva_to_adult`
+- `adult_dispersal` (10%, Gaussiana)
+- `adult_mortality` (Lardeux)
+- `birth` (binomial)
+
+### Scene 5 — U-Net sustituta
+Headline: `U-Net: la sustituta 100× más rápida.`
+Architecture: `32 → 64 → 128 → 256 → 512`
+Loss: `MSE + 0.5 × soft-Dice`
+Input `(6, 128, 128)` → Output `(2, 128, 128)`
+Target: `100 rollouts en <5 min · nodo FT3`
+
+### Scene 6 — Cierre
+- Section: `05 · APOYO`
+- Lead: `Este proyecto es posible gracias a`
+- Wordmark: `ANFAIA`
+- Tagline: `Ciencia abierta para la eliminación de la malaria.`
+- Foot: `github.com/ANFAIA/MalariaSentinel` · `SDSS · Open Source · 2026`
