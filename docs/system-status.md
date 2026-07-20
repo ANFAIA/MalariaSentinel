@@ -8,18 +8,58 @@
 
 MalariaSentinel es un **Sistema de Soporte de Decisiones Espacial (SDSS)** para la eliminacion de malaria. El pipeline tiene 6 etapas:
 
-```
-INGESTA → SUITABILIDAD → ABM → DATASET → U-Net → PREDICCION
+```mermaid
+graph LR
+    subgraph ETAPA1["Etapa 1: Ingesta"]
+        I["DEM SRTM<br/>CHIRPS lluvia<br/>ERA5 temp<br/>JRC GSW agua<br/>MODIS NDVI"]
+    end
+
+    subgraph ETAPA2["Etapa 2: Suitability"]
+        S["Mapa de idoneidad<br/>+ capacidad K<br/>+ habitat gpkg"]
+    end
+
+    subgraph ETAPA3["Etapa 3: ABM"]
+        ABM["mal-abm-fast (C++)<br/>o mal-ghana-sim (Py)<br/>9M+ agentes<br/>30 dias/rollout"]
+    end
+
+    subgraph ETAPA4["Etapa 4: Dataset"]
+        D["state COG + env tensor<br/>→ pares t -> t+1<br/>128x128 patches"]
+    end
+
+    subgraph ETAPA5["Etapa 5: U-Net"]
+        UN["mal-core/unet.py<br/>32-64-128-256<br/>MSE + soft-Dice<br/>100+ rollouts"]
+    end
+
+    subgraph ETAPA6["Etapa 6: Prediccion"]
+        P["mal-core/predict.py<br/>risk maps mensuales<br/>+ FastAPI server"]
+    end
+
+    I --> S --> ABM
+    ABM -->|"state COG<br/>(2 bandas)"| D
+    D --> UN
+    UN --> P
 ```
 
 **Flujo de datos**: El ABM (etapa 3) genera state COGs mensuales → el dataset builder (etapa 4) los convierte en pares de entrenamiento → la U-Net (etapa 5) aprende a predecir el siguiente paso → la prediccion (etapa 6) produce risk maps para el programa de eliminacion.
 
 **Relacion ABM ↔ U-Net**: El ABM es el "profesor" (lento, preciso, agente-por-agente). La U-Net es el "estudiante" (rapido, aproximado, prediccion 100x mas veloz). La U-Net entrena con datos del ABM y luego reemplaza al ABM en produccion.
 
-```
-ABM (lento, preciso)  →  genera datos  →  U-Net entrena
-                                                  │
-U-Net (rapido, aproximado)  →  predice riesgo mensual  →  decisiones de intervencion
+```mermaid
+graph TB
+    subgraph ENTRENAMIENTO["Fase de entrenamiento"]
+        ABM["ABM<br/>(lento, preciso)<br/>genera datos"]
+        UN_TRAIN["U-Net<br/>entrena con<br/>datos del ABM"]
+    end
+
+    subgraph PRODUCCION["Fase de produccion"]
+        UN_PRED["U-Net<br/>(rapido, aproximado)<br/>predice riesgo mensual"]
+        DEC["Decisiones de<br/>intervencion<br/>(programa eliminacion)"]
+    end
+
+    ABM -->|100+ rollouts| UN_TRAIN
+    UN_TRAIN -.->|"pesos<br/>guardados"| UN_PRED
+    UN_PRED --> DEC
+    ABM -.->|"reemplazado<br/>en produccion"| UN_PRED
 ```
 
 ---
@@ -45,18 +85,35 @@ MalariaSentinel/
 
 ### Diagrama de dependencias
 
-```
-mal-commonlib  (sin dependencias — la base)
-    │
-    ├── mal-core  (depende de mal-commonlib)
-    │       │
-    │       └── mal-execution  (depende de mal-core + mal-commonlib)
-    │
-    └── mal-ghana-sim  [DEPRECATED] (dependia de mal-commonlib)
+```mermaid
+graph TB
+    CL["mal-commonlib<br/>(sin dependencias)<br/>loaders, config, paths"]
+    MC["mal-core<br/>U-Net, predict, server"]
+    ME["mal-execution<br/>scripts CESGA/Hetzner"]
+    GS["mal-ghana-sim<br/>[DEPRECATED]"]
+    DE["mal-data-explorer<br/>scripts sueltos"]
+    ABM["mal-abm-fast<br/>C++20 + CMake"]
 
-mal-data-explorer  (sin dependencias — scripts sueltos)
-mal-abm-fast       (sin dependencias Python — C++20 puro + CMake)
+    CL --> MC
+    MC --> ME
+    CL --> GS
+
+    DE -.->|"sin deps"| DE
+    ABM -.->|"sin deps Python"| ABM
+
+    style CL fill:#90EE90
+    style MC fill:#87CEEB
+    style ME fill:#87CEEB
+    style GS fill:#FFB6C1,stroke:#FF0000,stroke-width:2px
+    style DE fill:#FFD700
+    style ABM fill:#DDA0DD
 ```
+
+**Reglas de importacion**:
+- `mal-core` solo puede importar de `mal-commonlib`
+- `mal-execution` puede importar de `mal-core` y `mal-commonlib`
+- Los paquetes deprecated (`mal-ghana-sim`) no deben ser importados por paquetes activos
+- `mal-abm-fast` es independiente (C++ puro, sin imports Python)
 
 ---
 
@@ -92,6 +149,53 @@ mal-abm-fast       (sin dependencias Python — C++20 puro + CMake)
 **Dependencias**: mal-commonlib, torch, fastapi, typer, pydantic, pyyaml
 **CLI**: `malariasim` (entry point)
 
+### Arquitectura interna
+
+```mermaid
+graph TB
+    subgraph CLI["Entry points"]
+        CLI_T["cli.py<br/>Typer CLI<br/>predict, status, serve"]
+        SRV["server.py<br/>FastAPI REST"]
+    end
+
+    subgraph PREDICCION["Pipeline de prediccion"]
+        PRED["predict.py<br/>orchestrator"]
+        REG["registry.py<br/>ModelRegistry"]
+        ENV["env.py<br/>load_env_stack"]
+        ST["state.py<br/>load_abm_state"]
+        SCN["scenario.py<br/>interventions_to_params"]
+        AOI["aoi.py<br/>make_aoi, aggregators"]
+    end
+
+    subgraph ENTRENAMIENTO["Pipeline de entrenamiento"]
+        TR["train.py<br/>train_unet loop"]
+        DS["dataset.py<br/>RolloutDataset"]
+        UN["unet.py<br/>UNet model"]
+    end
+
+    subgraph INFERENCIA["Inferencia"]
+        UW["unet_wrapper.py<br/>UNetWrapper"]
+    end
+
+    CLI_T --> PRED
+    SRV --> PRED
+    PRED --> REG
+    PRED --> ENV
+    PRED --> ST
+    PRED --> SCN
+    PRED --> AOI
+    REG --> UW
+    UW --> UN
+
+    TR --> DS
+    TR --> UN
+
+    style CLI fill:#E6F3FF
+    style PREDICCION fill:#FFE6E6
+    style ENTRENAMIENTO fill:#E6FFE6
+    style INFERENCIA fill:#FFF5E6
+```
+
 ### Modulos
 
 | Modulo | Funcion | Estado |
@@ -110,6 +214,43 @@ mal-abm-fast       (sin dependencias Python — C++20 puro + CMake)
 | `aoi.py` | AOI + aggregators (promoted desde commonlib) | Implementado |
 
 ### U-Net Arquitectura
+
+```mermaid
+graph TB
+    IN["Input<br/>(state_t + env)<br/>(6, 128, 128)"]
+
+    subgraph ENCODER["Encoder (contraccion)"]
+        E1["DoubleConv<br/>6 → 32<br/>(128, 128)"]
+        E2["DoubleConv<br/>32 → 64<br/>(64, 64)"]
+        E3["DoubleConv<br/>64 → 128<br/>(32, 32)"]
+        E4["DoubleConv<br/>128 → 256<br/>(16, 16)"]
+    end
+
+    BOT["Bottleneck<br/>DoubleConv 512<br/>(8, 8)"]
+
+    subgraph DECODER["Decoder (expansion)"]
+        D4["UpConv + DoubleConv<br/>512 → 256<br/>(16, 16)"]
+        D3["UpConv + DoubleConv<br/>256 → 128<br/>(32, 32)"]
+        D2["UpConv + DoubleConv<br/>128 → 64<br/>(64, 64)"]
+        D1["UpConv + DoubleConv<br/>64 → 32<br/>(128, 128)"]
+    end
+
+    OUT["Output<br/>Conv 1x1<br/>(2, 128, 128)<br/>state_{t+1}"]
+
+    IN --> E1 -->|"MaxPool"| E2 -->|"MaxPool"| E3 -->|"MaxPool"| E4 -->|"MaxPool"| BOT
+    BOT --> D4
+    E4 -.->|"skip<br/>connection"| D4
+    D4 --> D3
+    E3 -.->|"skip"| D3
+    D3 --> D2
+    E2 -.->|"skip"| D2
+    D2 --> D1
+    E1 -.->|"skip"| D1
+    D1 --> OUT
+
+    style ENCODER fill:#FFE4B5
+    style DECODER fill:#B0E0E6
+```
 
 ```
 Input: (state_t + env) = (6, 128, 128)  →  Target: state_{t+1} = (2, 128, 128)
@@ -135,6 +276,27 @@ malariasim serve --host 127.0.0.1 --port 8000
 
 mal-core consume la salida del ABM (state COGs) para entrenar la U-Net y generar predicciones:
 
+```mermaid
+graph LR
+    ABM["ABM<br/>(C++ o Python)"]
+    COG["state COG<br/>(2 bandas)<br/>runs/*.tif"]
+    DS["dataset.py<br/>RolloutDataset"]
+    TR["train.py<br/>train_unet"]
+    PRED["predict.py<br/>run_prediction"]
+    API["server.py<br/>FastAPI"]
+    UN["U-Net<br/>entrenada"]
+
+    ABM -->|"produce"| COG
+    COG -->|"lee y tilea<br/>128x128"| DS
+    DS -->|"pares<br/>(t -> t+1)"| TR
+    TR -->|"guarda pesos"| UN
+    UN -->|"carga"| PRED
+    PRED -->|"risk map<br/>GeoTIFF"| OUT["runs/predictions/"]
+    PRED -->|"expone"| API
+    API -->|"HTTP /predict"| CLI["cliente"]
+```
+
+**Flujo paso a paso**:
 1. **ABM** (C++ o Python) produce state COGs mensuales en `runs/`
 2. **mal-core/dataset.py** lee los COGs y construye pares de entrenamiento (state_t → state_{t+1})
 3. **mal-core/train.py** entrena la U-Net con esos pares
@@ -182,6 +344,47 @@ mal-core consume la salida del ABM (state COGs) para entrenar la U-Net y generar
 
 mal-execution es la capa de orquestacion para ejecutar el ABM en escenarios reales (HPC o cloud):
 
+```mermaid
+graph LR
+    subgraph LOCAL["Local / Dev"]
+        L1["uv run python<br/>scripts/01-06"]
+    end
+
+    subgraph CESGA["CESGA FT3 (HPC)"]
+        SETUP["setup_env.sh"]
+        PREP["prepare_data.sh"]
+        CONFIG["cesga_config.sh"]
+        RUN["run_abm.sh<br/>sbatch mal-abm-fast"]
+        MANAGE["manage_jobs.sh<br/>squeue, scancel"]
+    end
+
+    subgraph HETZNER["Hetzner (Cloud VMs)"]
+        CI["cloud-init.yaml<br/>provisioning"]
+        HR["hetzner-run<br/>provision + sync"]
+        VM["lib/vm.sh<br/>create/destroy VMs"]
+        SYNC["lib/sync.sh<br/>rsync data"]
+    end
+
+    subgraph ENTRENAMIENTO["Scripts de entrenamiento"]
+        TR1["train_unet.py"]
+        TR2["train_unet_subsample.py"]
+        VAL["validate_unet.py"]
+    end
+
+    LOCAL -->|"mismo flujo"| ABM["mal-abm-fast (C++)<br/>o ABM Python"]
+    CESGA --> ABM
+    HETZNER --> ABM
+    ABM -->|"state COGs"| OUT["runs/"]
+    OUT -->|"alimenta"| TR1
+    OUT --> TR2
+    OUT --> VAL
+
+    style CESGA fill:#87CEEB
+    style HETZNER fill:#DDA0DD
+    style LOCAL fill:#90EE90
+```
+
+**Flujo en CESGA (HPC)**:
 1. `cesga-run/run_abm.sh` invoca `mal_abm_fast run` (C++) o el Python ABM
 2. `prepare_data.sh` descarga y prepara los env COGs y habitat gpkg
 3. `manage_jobs.sh` gestiona multiples jobs SLURM para rollouts paralelos
@@ -199,36 +402,67 @@ mal-execution es la capa de orquestacion para ejecutar el ABM en escenarios real
 
 Re-implementacion en C++20 del ABM Python reference (`mal-ghana-sim/abm/`). El motor es **black-box equivalente**: dados los mismos inputs (env, habitat, seed, days), produce los mismos state COGs que el Python.
 
-### Arquitectura
+### Diagrama de modulos y flujo de datos
 
-```
-                          main.cpp (CLI11)
-                               │
-                               ▼
-               ┌───────────────────────────────┐
-               │      CoordinatorModel         │
-               │   (AOI, current_date,         │
-               │    ClimateEngine,             │
-               │    HabitatEngine, Prng,       │
-               │    dynamic-patch registry)    │
-               └───────┬───────┬───────┬───────┘
-                       │       │       │
-                       ▼       ▼       ▼
-               ┌───────┐ ┌───┐───┐ ┌────────────────┐
-               │       │ │   │   │ │                │
-        ClimateEngine  │ │Habitat│ │ MosquitoSubmodel
-        (env reader +  │ │Engine │ │ (SoA, PRNG,
-         set_day())    │ │(gpkg  │ │  7 per-day ops)
-               │       │ │reader)│ │                │
-               ▼       ▼ │   │   ▼ ▼                │
-               └───────┴─┴───┴───┴────────────────┘
-                               │
-                               ▼
-               ┌───────────────────────────────┐
-               │  output_contract.{hpp,cpp}    │
-               │  write_state_cog (GDAL)       │
-               │  write_state_sidecar (json)   │
-               └───────────────────────────────┘
+```mermaid
+graph TB
+    subgraph INPUTS["Inputs"]
+        CLI["main.cpp<br/>CLI11<br/>--aoi, --seed,<br/>--days, --n-rollouts"]
+        ENV_FILE["env NetCDF/TIF<br/>(rainfall, temp,<br/>water_frac, ndvi)"]
+        HAB_FILE["habitat gpkg<br/>(patches, K, twi)"]
+    end
+
+    subgraph ENGINE["Engine facade"]
+        ENG["engine.hpp<br/>Engine class<br/>orchestrator"]
+        PRNG["prng.hpp<br/>xoshiro256**<br/>(per-rollout isolated)"]
+    end
+
+    subgraph COORD["Coordinator (espacial)"]
+        COORD_M["coordinator.hpp<br/>CoordinatorModel"]
+        CLIM["climate.hpp<br/>ClimateEngine"]
+        ENV_R["env_reader.hpp<br/>read_env_nc"]
+        HAB["habitat_engine.hpp<br/>HabitatEngine"]
+        AOI["aoi.hpp<br/>AOI bbox/cells"]
+    end
+
+    subgraph SUBMODEL["MosquitoSubmodel (poblacion)"]
+        SUB["mosquito_submodel.hpp<br/>7 ops/dia"]
+        SOA["mosquito_state.hpp<br/>MosquitoSoA<br/>(struct-of-arrays)"]
+        EIP["eip.hpp<br/>accumulate_eip"]
+        DISP["dispersal.hpp<br/>offset_m"]
+    end
+
+    subgraph OUTPUTS["Outputs"]
+        COG["output_contract.hpp<br/>write_state_cog (GDAL)"]
+        SIDE["sidecar JSON<br/>metadata"]
+    end
+
+    CLI --> ENG
+    ENG --> COORD_M
+    ENG --> SUB
+    ENG --> PRNG
+
+    COORD_M --> CLIM
+    COORD_M --> HAB
+    COORD_M --> AOI
+    COORD_M --> PRNG
+    CLIM --> ENV_R
+    ENV_R --> ENV_FILE
+    HAB --> HAB_FILE
+
+    COORD_M -->|"PatchState[]<br/>(per-day)"| SUB
+    SUB --> SOA
+    SUB --> EIP
+    SUB --> DISP
+    SUB --> PRNG
+
+    COORD_M -->|"density +<br/>suitability"| COG
+    COG --> SIDE
+
+    style ENGINE fill:#FFE4B5
+    style COORD fill:#B0E0E6
+    style SUBMODEL fill:#98FB98
+    style OUTPUTS fill:#FFB6C1
 ```
 
 ### Componentes C++
@@ -275,6 +509,28 @@ Re-implementacion en C++20 del ABM Python reference (`mal-ghana-sim/abm/`). El m
 
 ### Operaciones diarias del submodel (7 ops, Python tiene 5)
 
+```mermaid
+graph TB
+    START["advance_day(aoi, patch_states)"]
+
+    OP1["1. larva_mortality_inactive<br/>filter: patch.activated == false"]
+    OP25["2.5. larva_mortality_density<br/>Beverton-Holt: S = 0.95*K/(K+0.05*(N-K))"]
+    OP2["2. larva_growth<br/>stage_age += 1<br/>eip += max(0, T - 16C)"]
+    OP3["3. larva_to_adult<br/>eip >= 110 GD -> promote"]
+    OP4["4. adult_dispersal<br/>10% move, Gaussiana sigma=300m"]
+    OP6["6. adult_mortality<br/>Lardeux: p_d = exp(-((T-26)^2)/(2*49))"]
+    OP5["5. birth<br/>binomial(n_adults/2, 0.10) per active patch"]
+
+    END["updated SoA"]
+
+    START --> OP1 --> OP25 --> OP2 --> OP3 --> OP4 --> OP6 --> OP5 --> END
+
+    style OP25 fill:#FFD700
+    style OP6 fill:#FFD700
+    style START fill:#90EE90
+    style END fill:#FFB6C1
+```
+
 | # | Operacion | Descripcion |
 |---|---|---|
 | 1 | `larva_mortality_inactive` | Elimina larvas en parches inactivos |
@@ -288,6 +544,54 @@ Re-implementacion en C++20 del ABM Python reference (`mal-ghana-sim/abm/`). El m
 **Nuevas en C++**: `larva_mortality_density` y `adult_mortality`.
 
 ### Flujo por dia
+
+```mermaid
+sequenceDiagram
+    participant CLI as main.cpp
+    participant ENG as Engine
+    participant COORD as CoordinatorModel
+    participant CLIM as ClimateEngine
+    participant SUB as MosquitoSubmodel
+    participant SOA as MosquitoSoA
+    participant OUT as output_contract
+
+    CLI->>ENG: step()
+    ENG->>COORD: activate_patches()
+
+    loop Por cada parche
+        COORD->>CLIM: get_rain_daily(day, lon, lat)
+        CLIM-->>COORD: rain_mm
+        COORD->>CLIM: get_water_temp_c(day, lon, lat)
+        CLIM-->>COORD: temp_c
+    end
+
+    Note over COORD: Evalua PLUVIAL_POOL<br/>TWI>8 AND water>0 AND rain>50mm<br/>sobre toda la grilla
+
+    COORD->>COORD: to_dataframe()
+    Note over COORD: vector<PatchState><br/>(pre-existentes + dinamicos)
+
+    COORD-->>ENG: patch_states
+    ENG->>SUB: advance_day(aoi, patch_states)
+
+    Note over SUB: 7 operaciones en orden:<br/>1. larva_mortality_inactive<br/>2.5. larva_mortality_density (Beverton-Holt)<br/>2. larva_growth (+EIP)<br/>3. larva_to_adult (eip >= 110)<br/>4. adult_dispersal (10%, sigma=300m)<br/>6. adult_mortality (Lardeux)<br/>5. birth (binomial)
+
+    SUB->>SOA: mutar vectores (SoA)
+    SOA-->>SUB: estado actualizado
+    SUB-->>ENG: updated SoA
+
+    alt Fin de mes
+        ENG->>COORD: aggregate_density(sub)
+        COORD-->>ENG: DensityGrid
+        ENG->>COORD: suitability_grid(sub)
+        COORD-->>ENG: SuitabilityGrid
+        ENG->>OUT: write_state_cog(density, suit, ...)
+        OUT-->>CLI: state.tif + state.json
+    end
+
+    ENG->>ENG: current_date += 1 day
+```
+
+**Flujo por dia (texto)**:
 
 ```
 1. activate_patches(day)
@@ -412,6 +716,56 @@ ctest --test-dir mal-abm-fast/build --output-on-failure
 **Ubicacion**: `mal-data-explorer/`
 **Dependencias**: pandas, matplotlib, geopandas, shapely, cartopy, contextily, pypdf, scipy
 
+### Flujo de trabajo
+
+```mermaid
+graph LR
+    DATA["data/<br/>GBIF GUF<br/>IDIT Ghana<br/>VectorLink Colombia<br/>REACT Burkina/CI"]
+
+    subgraph METADATA["Metadata"]
+        S01["01_dataset_metadata.py"]
+    end
+
+    subgraph MAPAS["Mapas individuales"]
+        S02["02_map_anopheles_guf.py"]
+        S03["03_map_ghana.py"]
+        S04["04_map_colombia.py"]
+        S05["05_map_react.py"]
+    end
+
+    subgraph COMPARACIONES["Comparaciones"]
+        S06["06_compare_three_maps.py"]
+        S07["07_compare_datasets.py"]
+        S08["08_explore_react.py"]
+    end
+
+    subgraph ANALISIS["Analisis de patrones"]
+        S09["09_two_focus_analysis.py"]
+        S10["10_two_focus_plot.py"]
+    end
+
+    subgraph SESGO["Analisis de sesgo"]
+        S11["11_bias_analysis.py"]
+        S12["12_bias_plot.py"]
+    end
+
+    OUT["data/maps/<br/>figuras PNG"]
+
+    DATA --> S01
+    DATA --> S02 & S03 & S04 & S05
+    S02 & S03 & S05 --> S06
+    DATA --> S07
+    DATA --> S08 --> S09 --> S10
+    S02 --> S11 --> S12
+    S01 & S06 & S07 & S09 & S10 & S11 & S12 --> OUT
+
+    style METADATA fill:#E6F3FF
+    style MAPAS fill:#E6FFE6
+    style COMPARACIONES fill:#FFE6E6
+    style ANALISIS fill:#FFF5E6
+    style SESGO fill:#F0E6FF
+```
+
 ### Scripts
 
 | # | Script | Descripcion |
@@ -437,16 +791,62 @@ Independiente del ABM. Analiza datasets de ocurrencia de Anopheles para entender
 
 ## 8. agents/ — Infraestructura de agentes
 
+### Arquitectura de loops
+
+```mermaid
+graph TB
+    USER["Usuario"]
+    SUP["supervisor<br/>(agente principal)"]
+
+    subgraph LOOPS["Loops (subagentes)"]
+        TF["test-fixer<br/>auto: allow"]
+        CR["code-reviewer<br/>ask: read-only"]
+        DR["doc-researcher<br/>ask: KB + web"]
+        SA["security-auditor<br/>ask: OWASP"]
+        MC["memory-curator<br/>ask: unico writer"]
+        IA["improvement-agent<br/>ask: auto-aplica"]
+    end
+
+    subgraph MEMORIA["Memory module"]
+        MEM["agents/memory/<br/>Neo4j + Graphiti MCP<br/>8-label schema"]
+        TOOLS["8 herramientas custom<br/>memory_node, memory_rel,<br/>memory_query, etc."]
+    end
+
+    subgraph HARNESS["Research harness"]
+        RH["research-runner<br/>search -> write -><br/>review -> hypothesize"]
+        SK["malaria_research<br/>SKILL.md"]
+    end
+
+    USER --> SUP
+    SUP -->|"delega"| TF
+    SUP -->|"delega"| CR
+    SUP -->|"delega"| DR
+    SUP -->|"delega"| SA
+    SUP -->|"delega"| MC
+    SUP -->|"delega"| IA
+    SUP -->|"delega"| RH
+
+    MC -->|"escribe"| MEM
+    MEM <-->|"lee/escribe"| TOOLS
+    RH -->|"usa"| SK
+    RH -->|"registra hallazgos"| MEM
+
+    style SUP fill:#FFB6C1
+    style LOOPS fill:#E6F3FF
+    style MEMORIA fill:#E6FFE6
+    style HARNESS fill:#FFF5E6
+```
+
 ### Loops
 
-| Agente | Funcion |
-|---|---|
-| `test-fixer` | Itera verificacion hasta exit 0 |
-| `code-reviewer` | Revisa diffs (solo lectura) |
-| `doc-researcher` | Busca en KB, luego web |
-| `security-auditor` | Auditoria OWASP (solo lectura) |
-| `memory-curator` | Unico writer al knowledge graph |
-| `improvement-agent` | Revisa + aplica mejoras |
+| Agente | Funcion | Permisos |
+|---|---|---|
+| `test-fixer` | Itera verificacion hasta exit 0 | allow (auto) |
+| `code-reviewer` | Revisa diffs (solo lectura) | ask |
+| `doc-researcher` | Busca en KB, luego web | ask |
+| `security-auditor` | Auditoria OWASP (solo lectura) | ask |
+| `memory-curator` | Unico writer al knowledge graph | ask |
+| `improvement-agent` | Revisa + aplica mejoras | ask |
 
 ### Memory module
 
@@ -463,6 +863,35 @@ Pipeline para ciclos de investigacion: search → write → review → hypothesi
 ## 9. Ciclo de vida del mosquito (ABM)
 
 ### Estados y transiciones
+
+```mermaid
+stateDiagram-v2
+    [*] --> Larva: Seeding<br/>n_patches * K * 0.3<br/>(round-robin)
+
+    Larva --> Larva: Mortalidad inactive patches<br/>(filter por patch_id)
+    Larva --> Larva: Mortalidad density-dependent<br/>(Beverton-Holt) [C++]
+    Larva --> Larva: Crecimiento<br/>stage_age += 1<br/>eip += max(0, T - 16C)
+
+    Larva --> Adulto: eip >= 110 GD<br/>(~11 dias @ 25C)
+
+    Adulto --> Adulto: Dispersal<br/>10%/dia (C++) / 20% (Py)<br/>Gaussiana sigma=300m
+    Adulto --> Adulto: Mortalidad Lardeux<br/>(thermo-dependent) [C++]
+    Adulto --> Adulto: Birth<br/>binomial(n_adults/2, 0.10) [C++]<br/>binomial(K, 0.005) [Py]
+    Adulto --> [*]: muerte natural<br/>(Lardeux o senectud)
+
+    note right of Larva
+        Etapas colapsadas:
+        huevo + pupa = larva
+        (M7+ las separa)
+    end note
+
+    note right of Adulto
+        Sin ciclo gonotrofico (M7+)
+        Sin busqueda hospedador (M7+)
+        Sin infeccion Plasmodium (M7+)
+        1 especie: An. gambiae (M8+)
+    end note
+```
 
 ```
 [*] → Larva: Seeding (n_patches × K × 0.3)
@@ -488,6 +917,35 @@ Adulto → Adulto: Birth (binomial(n_adults/2, 0.10))
 ---
 
 ## 10. Contrato de salida
+
+### Diagrama de produccion de archivos
+
+```mermaid
+graph LR
+    ABM["mal-abm-fast (C++)<br/>o ABM Python"]
+
+    subgraph STATE["State COG (por tick ABM)"]
+        S_TIF["{aoi}_{scale}_{YYYY}_{MM}_seed{NNNN}.tif<br/>2 bandas:<br/>B1: density (count/K_MAX)<br/>B2: suitability (n_adults/K_MAX post-dispersal)"]
+        S_JSON["sidecar.json<br/>crs, transform, seed,<br/>n_rollouts, rollout_index,<br/>contract_version, band_names,<br/>k_max, generator_version"]
+    end
+
+    subgraph ENV["Env Tensor (por mes)"]
+        E_TIF["{aoi}_{scale}_{YYYY}_{MM}_env.tif<br/>4 bandas:<br/>B0: water_frac (JRC GSW)<br/>B1: rainfall (mm/mes)<br/>B2: temp_suitability<br/>B3: ndvi"]
+        E_JSON["sidecar.json<br/>rainfall_cap_mm,<br/>band_names"]
+    end
+
+    ABM -->|"monthly"| S_TIF
+    S_TIF --> S_JSON
+    ABM -->|"monthly"| E_TIF
+    E_TIF --> E_JSON
+
+    S_TIF -->|"consumido por"| UN["U-Net training<br/>(mal-core/dataset.py)"]
+    E_TIF -->|"consumido por"| UN
+
+    style STATE fill:#FFE4B5
+    style ENV fill:#B0E0E6
+    style UN fill:#98FB98
+```
 
 ### State COG
 
