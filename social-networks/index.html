@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="es">
+<html lang="en">
 <head>
   <meta charset="utf-8" />
   <title>MalariaSentinel — LinkedIn</title>
@@ -637,6 +637,14 @@
       max-width: 760px;
       line-height: 1.3;
     }
+    #scene-6 .closing-desc {
+      font-family: "JetBrains Mono", monospace;
+      font-size: 16px;
+      color: var(--fg-dim);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      margin-top: 4px;
+    }
     #scene-6 .closing-foot {
       position: absolute;
       left: 120px; right: 120px; bottom: 110px;
@@ -713,21 +721,21 @@
 
       <div class="scene-content" style="padding-top:200px;">
         <div style="position:relative;flex:1;display:flex;flex-direction:column;justify-content:flex-start;">
-          <div class="title-section" id="title-section" data-layout-allow-overflow>PROYECTO · 2026</div>
+          <div class="title-section" id="title-section" data-layout-allow-overflow>PROJECT · 2026</div>
 
           <div class="title-wrap">
             <div class="title-main" id="title-main">MalariaSentinel</div>
-            <div class="title-serif" id="title-serif">Sistema de Soporte</div>
-            <div class="title-serif" id="title-serif-2">de Decisiones Espacial</div>
-            <div class="title-tagline" id="title-tagline">para la eliminación de la malaria</div>
+            <div class="title-serif" id="title-serif">Spatial Decision</div>
+            <div class="title-serif" id="title-serif-2">Support System</div>
+            <div class="title-tagline" id="title-tagline">for malaria elimination</div>
           </div>
 
-          <div class="title-meta-right" id="title-meta-right">SDSS · 2026 · GHANA</div>
+          <div class="title-meta-right" id="title-meta-right">SDSS · 2026</div>
         </div>
 
         <div class="title-bottom-meta" id="title-bottom-meta">
-          <span>v0.5.0 Python · F1 C++</span>
-          <span class="right">Open Source</span>
+          <span>Open science</span>
+          <span class="right">Open Source · 2026</span>
         </div>
       </div>
     </div>
@@ -741,8 +749,8 @@
       <div class="scene-content">
         <div style="display:flex;flex-direction:column;gap:14px;">
           <div class="section-label" id="s2-label">01 · PIPELINE</div>
-          <div class="heading h-3" id="s2-headline">Del satélite al mapa de riesgo.</div>
-          <div class="subhead" id="s2-subhead">Seis etapas. Una decisión.</div>
+          <div class="heading h-3" id="s2-headline">From satellite to risk map.</div>
+          <div class="subhead" id="s2-subhead">Six stages. One decision.</div>
         </div>
 
         <div class="pipeline-stack" id="s2-stack">
@@ -753,18 +761,18 @@
           </div>
           <div class="stage-row" id="stage-2">
             <span class="stage-num">02</span>
-            <span class="stage-name">SUITABILIDAD</span>
-            <span class="stage-desc">TWI · modelo de idoneidad · 4 capas ambientales</span>
+            <span class="stage-name">SUITABILITY</span>
+            <span class="stage-desc">TWI · habitat suitability · 4 environmental layers</span>
           </div>
           <div class="stage-row" id="stage-3">
             <span class="stage-num">03</span>
             <span class="stage-name">ABM</span>
-            <span class="stage-desc">mal-abm-fast · C++20 · xoshiro256** · 7 ops/día</span>
+            <span class="stage-desc">mal-abm-fast · C++20 · xoshiro256** · 7 ops/day</span>
           </div>
           <div class="stage-row" id="stage-4">
             <span class="stage-num">04</span>
             <span class="stage-name">DATASET</span>
-            <span class="stage-desc">(state_t + env) → state_{t+1} · pares mensuales</span>
+            <span class="stage-desc">(state_t + env) → state_{t+1} · monthly pairs</span>
           </div>
           <div class="stage-row" id="stage-5">
             <span class="stage-num">05</span>
@@ -773,69 +781,82 @@
           </div>
           <div class="stage-row" id="stage-6">
             <span class="stage-num">06</span>
-            <span class="stage-name">PREDICCIÓN</span>
-            <span class="stage-desc">risk maps mensuales · FastAPI · GeoTIFF</span>
+            <span class="stage-name">PREDICTION</span>
+            <span class="stage-desc">risk maps · FastAPI · GeoTIFF</span>
           </div>
         </div>
 
         <div class="pipeline-foot" id="s2-foot">
           <span>ABM ↔ U-Net</span>
-          <span class="right">Profesor y estudiante</span>
+          <span class="right">Teacher and student</span>
         </div>
       </div>
     </div>
 
-    <!-- ============== SCENE 3 — EL SISTEMA EN 3 CAPAS ============== -->
+    <!-- ============== SCENE 3 — EL SISTEMA EN 4 PIEZAS ============== -->
     <div class="scene" id="scene-3">
       <div class="bg-grid"></div>
       <div class="bg-glow" style="width:800px;height:800px;right:-200px;top:-100px;background:radial-gradient(circle, var(--accent-glow) 0%, transparent 65%);"></div>
-      <div class="ghost" data-layout-allow-overflow style="left:-40px;top:60px;font-size:240px;" id="ghost-flow">FLUJO</div>
+      <div class="ghost" data-layout-allow-overflow style="left:-40px;top:60px;font-size:240px;" id="ghost-flow">FLOW</div>
 
       <div class="scene-content">
         <div style="display:flex;flex-direction:column;gap:10px;">
-          <div class="section-label" id="s3-label">02 · EL SISTEMA</div>
-          <div class="heading h-3" id="s3-headline">Tres piezas que trabajan juntas.</div>
+          <div class="section-label" id="s3-label">02 · THE SYSTEM</div>
+          <div class="heading h-3" id="s3-headline">Four pieces working together.</div>
         </div>
 
         <div class="s3-flow" id="s3-flow">
           <div class="s3-card" id="s3-card-1">
             <div class="num">01</div>
             <div class="body-col">
-              <div class="verbo">El satélite <span class="italic">mira.</span></div>
-              <div class="frase">Imágenes del espacio, clima, mapas de agua. Lo que ya sabemos del terreno.</div>
+              <div class="verbo">The satellite <span class="italic">watches.</span></div>
+              <div class="frase">Space imagery, climate, water maps. What we already know about the terrain.</div>
             </div>
           </div>
 
           <div class="s3-connector" id="s3-conn-1">
             <div class="line" id="s3-conn-1-line"></div>
-            <div class="lbl" id="s3-conn-1-lbl">alimenta</div>
+            <div class="lbl" id="s3-conn-1-lbl">feeds</div>
           </div>
 
           <div class="s3-card" id="s3-card-2">
             <div class="num">02</div>
             <div class="body-col">
-              <div class="verbo">La simulación <span class="italic">piensa.</span></div>
-              <div class="frase">Un programa imagina cómo se mueven los mosquitos. Lento pero preciso.</div>
+              <div class="verbo">The simulation <span class="italic">thinks.</span></div>
+              <div class="frase">A program imagines how mosquitoes move. Slow but accurate.</div>
             </div>
           </div>
 
           <div class="s3-connector" id="s3-conn-2">
             <div class="line" id="s3-conn-2-line"></div>
-            <div class="lbl" id="s3-conn-2-lbl">enseña a</div>
+            <div class="lbl" id="s3-conn-2-lbl">generates data</div>
           </div>
 
           <div class="s3-card" id="s3-card-3">
             <div class="num">03</div>
             <div class="body-col">
-              <div class="verbo">El mapa <span class="italic">avisa.</span></div>
-              <div class="frase">Un mapa mensual que dice dónde puede haber riesgo. En minutos.</div>
+              <div class="verbo">The model <span class="italic">learns.</span></div>
+              <div class="frase">Simulation data teaches the model to do it fast, without losing accuracy.</div>
+            </div>
+          </div>
+
+          <div class="s3-connector" id="s3-conn-3">
+            <div class="line" id="s3-conn-3-line"></div>
+            <div class="lbl" id="s3-conn-3-lbl">produces</div>
+          </div>
+
+          <div class="s3-card" id="s3-card-4">
+            <div class="num">04</div>
+            <div class="body-col">
+              <div class="verbo">The prediction <span class="italic">warns.</span></div>
+              <div class="frase">A time series, day by day. As far into the future as you want to look.</div>
             </div>
           </div>
         </div>
 
         <div class="s3-foot" id="s3-foot">
-          <span>3 capas</span>
-          <span class="right">Una sola decisión</span>
+          <span>4 pieces</span>
+          <span class="right">One single decision</span>
         </div>
       </div>
     </div>
@@ -844,38 +865,38 @@
     <div class="scene" id="scene-4">
       <div class="bg-grid"></div>
       <div class="bg-glow" style="width:1000px;height:1000px;left:-300px;top:200px;background:radial-gradient(circle, var(--accent-glow) 0%, transparent 65%);"></div>
-      <div class="ghost ghost-italic" data-layout-allow-overflow style="left:-40px;bottom:60px;font-size:220px;" id="ghost-region">REGIÓN</div>
+      <div class="ghost ghost-italic" data-layout-allow-overflow style="left:-40px;bottom:60px;font-size:220px;" id="ghost-region">REGION</div>
 
       <div class="scene-content">
         <div style="display:flex;flex-direction:column;gap:10px;">
-          <div class="section-label" id="s4-label">03 · A DÓNDE VAMOS</div>
+          <div class="section-label" id="s4-label">03 · WHERE WE'RE GOING</div>
         </div>
 
         <div class="s4-headline" id="s4-headline">
-          Le das una <span class="italic">región.</span><br/>
-          Te devuelve un mapa de riesgo.
+          You give it a <span class="italic">region.</span><br/>
+          It gives you a risk map.
         </div>
 
         <div class="s4-points" id="s4-points">
           <div class="s4-point" id="s4-point-1">
             <div class="mark">01</div>
-            <div class="txt">Cualquier <span class="italic">país,</span> cualquier zona endémica. El sistema se adapta.</div>
+            <div class="txt">Any <span class="italic">country,</span> any endemic zone. The system adapts.</div>
           </div>
 
           <div class="s4-point" id="s4-point-2">
             <div class="mark">02</div>
-            <div class="txt">Cada mes, un mapa nuevo con la expansión probable del mosquito.</div>
+            <div class="txt">A time series, day by day. You can look a day, a week, or a month ahead.</div>
           </div>
 
           <div class="s4-point" id="s4-point-3">
             <div class="mark">03</div>
-            <div class="txt">Listo para el personal de salud, <span class="italic">antes</span> de que llegue el brote.</div>
+            <div class="txt">Ready for health workers, <span class="italic">before</span> the outbreak arrives.</div>
           </div>
         </div>
 
         <div class="s4-foot" id="s4-foot">
-          <span>Input · región</span>
-          <span class="right">Output · mapa de riesgo</span>
+          <span>Input · region</span>
+          <span class="right">Output · risk map</span>
         </div>
       </div>
     </div>
@@ -884,22 +905,22 @@
     <div class="scene" id="scene-5">
       <div class="bg-grid"></div>
       <div class="bg-glow" style="width:1100px;height:1100px;right:-100px;top:-300px;background:radial-gradient(circle, var(--accent-glow) 0%, transparent 65%);"></div>
-      <div class="ghost" data-layout-allow-overflow style="right:-30px;bottom:60px;font-size:220px;" id="ghost-honest">HOY</div>
+      <div class="ghost" data-layout-allow-overflow style="right:-30px;bottom:60px;font-size:220px;" id="ghost-honest">NOW</div>
 
       <div class="scene-content">
         <div style="display:flex;flex-direction:column;gap:10px;">
-          <div class="section-label" id="s5-label">04 · DÓNDE ESTAMOS</div>
-          <div class="s5-honest" id="s5-honest">Hoy tenemos algo. <span class="accent">Todavía no lo que queremos.</span></div>
+          <div class="section-label" id="s5-label">04 · WHERE WE ARE</div>
+          <div class="s5-honest" id="s5-honest">Today we have something. <span class="accent">Not what we want yet.</span></div>
         </div>
 
         <div class="s5-grid" id="s5-grid">
           <div class="s5-col now" id="s5-col-now">
-            <div class="col-label">HOY</div>
-            <div class="col-lead">Una primera versión que funciona con datos reales de Ghana.</div>
+            <div class="col-label">TODAY</div>
+            <div class="col-lead">A first version that works with real data.</div>
             <ul class="col-bullets">
-              <li>La simulación es <em>básica</em> — solo dos etapas de vida del mosquito.</li>
-              <li>Las señales son simples: lluvia y agua.</li>
-              <li>Solo sirve para una región.</li>
+              <li>The simulation is <em>basic</em> — only two mosquito life stages.</li>
+              <li>The signals are simple: rain and water.</li>
+              <li>It only works for one region.</li>
             </ul>
           </div>
 
@@ -909,19 +930,19 @@
           </div>
 
           <div class="s5-col next" id="s5-col-next">
-            <div class="col-label">AHORA</div>
-            <div class="col-lead">Mejorando la simulación para que el sistema funcione de verdad.</div>
+            <div class="col-label">NOW</div>
+            <div class="col-lead">Improving the simulation so the system actually works.</div>
             <ul class="col-bullets">
-              <li>Ciclo de vida completo del mosquito.</li>
-              <li>El mosquito que busca comida, pone huevos, transmite.</li>
-              <li>Para que sirva en cualquier sitio, no solo Ghana.</li>
+              <li>Full mosquito life cycle.</li>
+              <li>The mosquito that seeks food, lays eggs, transmits disease.</li>
+              <li>So it works anywhere, not just one region.</li>
             </ul>
           </div>
         </div>
 
         <div class="s5-foot" id="s5-foot">
-          <span>Avanzando</span>
-          <span class="right">Próximo paso · biología v2</span>
+          <span>Advancing</span>
+          <span class="right">Next step · biology v2</span>
         </div>
       </div>
     </div>
@@ -930,21 +951,22 @@
     <div class="scene" id="scene-6">
       <div class="bg-grid"></div>
       <div class="bg-glow" style="width:1200px;height:1200px;left:-60px;top:-200px;background:radial-gradient(circle, var(--accent-glow) 0%, transparent 65%);"></div>
-      <div class="ghost ghost-italic" data-layout-allow-overflow style="left:-40px;bottom:-60px;font-size:340px;" id="ghost-gracias">gracias</div>
+      <div class="ghost ghost-italic" data-layout-allow-overflow style="left:-40px;bottom:-60px;font-size:340px;" id="ghost-gracias">thanks</div>
 
       <div class="scene-content" style="padding-top:140px;padding-bottom:140px;">
         <div class="closing-wrap">
-          <div class="closing-section" id="s6-section">05 · APOYO</div>
-          <div class="closing-lead" id="s6-lead">Este proyecto es posible gracias a</div>
+          <div class="closing-section" id="s6-section">05 · SUPPORT</div>
+          <div class="closing-lead" id="s6-lead">This project is made possible by</div>
           <div class="closing-anfaia" id="s6-anfaia">ANFAIA</div>
           <div class="closing-divider" id="s6-divider"></div>
-          <div class="closing-tagline" id="s6-tagline">Ciencia abierta para la eliminación de la malaria.</div>
+          <div class="closing-tagline" id="s6-tagline">Driving Progress with Artificial Intelligence</div>
+          <div class="closing-desc" id="s6-desc">Culture · Health · Robotics · Sustainability · Ethics</div>
         </div>
 
         <div class="closing-foot" id="s6-foot">
           <div class="gh"><span class="gh-prefix">github.com/</span>ANFAIA/MalariaSentinel</div>
           <div class="small">SDSS · Open Source · 2026</div>
-          <div class="agents" id="s6-agents">Sistema construido con ayuda de sistemas agénticos</div>
+          <div class="agents" id="s6-agents">Built with the help of agentic AI systems</div>
         </div>
       </div>
     </div>
@@ -1010,97 +1032,102 @@
         tl.set("#scene-2", { filter: "none", opacity: 0 }, 13.9);
         tl.set("#t-blur", { opacity: 0 }, 13.9);
 
-        // === Scene 3 — El sistema en 3 capas ===
+        // === Scene 3 — El sistema en 4 piezas ===
         tl.fromTo("#s3-label", { opacity: 0, x: -20 }, { opacity: 1, x: 0, duration: 0.4, ease: "power2.out" }, 14.0);
         tl.fromTo("#s3-headline", { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.5, ease: "power2.out" }, 14.3);
 
         // card 1: satélite
-        tl.fromTo("#s3-card-1", { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.5, ease: "power3.out" }, 14.8);
+        tl.fromTo("#s3-card-1", { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.5, ease: "power3.out" }, 14.7);
         // connector 1: alimenta
-        tl.fromTo("#s3-conn-1-line", { scaleY: 0, transformOrigin: "top center" }, { scaleY: 1, duration: 0.3, ease: "power2.out" }, 15.2);
-        tl.fromTo("#s3-conn-1-lbl", { opacity: 0 }, { opacity: 1, duration: 0.3, ease: "power2.out" }, 15.4);
+        tl.fromTo("#s3-conn-1-line", { scaleY: 0, transformOrigin: "top center" }, { scaleY: 1, duration: 0.3, ease: "power2.out" }, 15.1);
+        tl.fromTo("#s3-conn-1-lbl", { opacity: 0 }, { opacity: 1, duration: 0.3, ease: "power2.out" }, 15.3);
         // card 2: simulación
-        tl.fromTo("#s3-card-2", { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.5, ease: "power3.out" }, 15.7);
-        // connector 2: enseña a
-        tl.fromTo("#s3-conn-2-line", { scaleY: 0, transformOrigin: "top center" }, { scaleY: 1, duration: 0.3, ease: "power2.out" }, 16.1);
-        tl.fromTo("#s3-conn-2-lbl", { opacity: 0 }, { opacity: 1, duration: 0.3, ease: "power2.out" }, 16.3);
-        // card 3: mapa
-        tl.fromTo("#s3-card-3", { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.5, ease: "power3.out" }, 16.6);
-        tl.fromTo("#s3-foot", { opacity: 0 }, { opacity: 1, duration: 0.4, ease: "power2.out" }, 17.4);
+        tl.fromTo("#s3-card-2", { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.5, ease: "power3.out" }, 15.6);
+        // connector 2: genera datos
+        tl.fromTo("#s3-conn-2-line", { scaleY: 0, transformOrigin: "top center" }, { scaleY: 1, duration: 0.3, ease: "power2.out" }, 16.0);
+        tl.fromTo("#s3-conn-2-lbl", { opacity: 0 }, { opacity: 1, duration: 0.3, ease: "power2.out" }, 16.2);
+        // card 3: modelo aprende
+        tl.fromTo("#s3-card-3", { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.5, ease: "power3.out" }, 16.5);
+        // connector 3: produce
+        tl.fromTo("#s3-conn-3-line", { scaleY: 0, transformOrigin: "top center" }, { scaleY: 1, duration: 0.3, ease: "power2.out" }, 16.9);
+        tl.fromTo("#s3-conn-3-lbl", { opacity: 0 }, { opacity: 1, duration: 0.3, ease: "power2.out" }, 17.1);
+        // card 4: predicción avisa
+        tl.fromTo("#s3-card-4", { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.5, ease: "power3.out" }, 17.4);
+        tl.fromTo("#s3-foot", { opacity: 0 }, { opacity: 1, duration: 0.4, ease: "power2.out" }, 18.4);
 
-        tl.to("#scene-3 .bg-glow", { scale: 1.06, transformOrigin: "center center", duration: 4, ease: "sine.inOut", yoyo: true, repeat: Math.max(0, Math.floor(6.5 / 4) - 1) }, 14.0);
+        tl.to("#scene-3 .bg-glow", { scale: 1.06, transformOrigin: "center center", duration: 4, ease: "sine.inOut", yoyo: true, repeat: Math.max(0, Math.floor(7.5 / 4) - 1) }, 14.0);
 
-        // ====== BLUR CROSSFADE (scene 3 → scene 4) at t=20.5, 0.4s ======
-        tl.set("#scene-4", { opacity: 1 }, 20.5);
-        tl.to("#scene-3", { filter: "blur(14px)", duration: 0.2, ease: "power2.in" }, 20.5);
-        tl.to("#scene-3", { opacity: 0.0, duration: 0.2, ease: "power2.in" }, 20.5);
-        tl.fromTo("#t-blur", { opacity: 0 }, { opacity: 0.55, duration: 0.2, ease: "power2.in" }, 20.5);
-        tl.to("#scene-4", { filter: "blur(0px)", duration: 0.4, ease: "power2.out" }, 20.7);
-        tl.to("#t-blur", { opacity: 0, duration: 0.2, ease: "power2.out" }, 20.7);
-        tl.set("#scene-3", { filter: "none", opacity: 0 }, 20.9);
-        tl.set("#t-blur", { opacity: 0 }, 20.9);
+        // ====== BLUR CROSSFADE (scene 3 → scene 4) at t=21.5, 0.4s ======
+        tl.set("#scene-4", { opacity: 1 }, 21.5);
+        tl.to("#scene-3", { filter: "blur(14px)", duration: 0.2, ease: "power2.in" }, 21.5);
+        tl.to("#scene-3", { opacity: 0.0, duration: 0.2, ease: "power2.in" }, 21.5);
+        tl.fromTo("#t-blur", { opacity: 0 }, { opacity: 0.55, duration: 0.2, ease: "power2.in" }, 21.5);
+        tl.to("#scene-4", { filter: "blur(0px)", duration: 0.4, ease: "power2.out" }, 21.7);
+        tl.to("#t-blur", { opacity: 0, duration: 0.2, ease: "power2.out" }, 21.7);
+        tl.set("#scene-3", { filter: "none", opacity: 0 }, 21.9);
+        tl.set("#t-blur", { opacity: 0 }, 21.9);
 
         // === Scene 4 — A dónde vamos ===
-        tl.fromTo("#s4-label", { opacity: 0, x: -20 }, { opacity: 1, x: 0, duration: 0.4, ease: "power2.out" }, 21.0);
-        tl.fromTo("#s4-headline", { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.6, ease: "expo.out" }, 21.4);
+        tl.fromTo("#s4-label", { opacity: 0, x: -20 }, { opacity: 1, x: 0, duration: 0.4, ease: "power2.out" }, 22.0);
+        tl.fromTo("#s4-headline", { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.6, ease: "expo.out" }, 22.4);
 
         const s4Points = ["s4-point-1", "s4-point-2", "s4-point-3"];
         s4Points.forEach(function (id, i) {
-          tl.fromTo("#" + id, { opacity: 0, x: -20 }, { opacity: 1, x: 0, duration: 0.4, ease: "power2.out" }, 22.4 + i * 0.3);
+          tl.fromTo("#" + id, { opacity: 0, x: -20 }, { opacity: 1, x: 0, duration: 0.4, ease: "power2.out" }, 23.4 + i * 0.3);
         });
-        tl.fromTo("#s4-foot", { opacity: 0 }, { opacity: 1, duration: 0.4, ease: "power2.out" }, 23.6);
+        tl.fromTo("#s4-foot", { opacity: 0 }, { opacity: 1, duration: 0.4, ease: "power2.out" }, 24.6);
 
-        tl.to("#scene-4 .bg-glow", { scale: 1.06, transformOrigin: "center center", duration: 4, ease: "sine.inOut", yoyo: true, repeat: Math.max(0, Math.floor(6.5 / 4) - 1) }, 21.0);
+        tl.to("#scene-4 .bg-glow", { scale: 1.06, transformOrigin: "center center", duration: 4, ease: "sine.inOut", yoyo: true, repeat: Math.max(0, Math.floor(6.5 / 4) - 1) }, 22.0);
 
-        // ====== BLUR CROSSFADE (scene 4 → scene 5) at t=27.5, 0.4s ======
-        tl.set("#scene-5", { opacity: 1 }, 27.5);
-        tl.to("#scene-4", { filter: "blur(14px)", duration: 0.2, ease: "power2.in" }, 27.5);
-        tl.to("#scene-4", { opacity: 0.0, duration: 0.2, ease: "power2.in" }, 27.5);
-        tl.fromTo("#t-blur", { opacity: 0 }, { opacity: 0.55, duration: 0.2, ease: "power2.in" }, 27.5);
-        tl.to("#scene-5", { filter: "blur(0px)", duration: 0.4, ease: "power2.out" }, 27.7);
-        tl.to("#t-blur", { opacity: 0, duration: 0.2, ease: "power2.out" }, 27.7);
-        tl.set("#scene-4", { filter: "none", opacity: 0 }, 27.9);
-        tl.set("#t-blur", { opacity: 0 }, 27.9);
+        // ====== BLUR CROSSFADE (scene 4 → scene 5) at t=28.5, 0.4s ======
+        tl.set("#scene-5", { opacity: 1 }, 28.5);
+        tl.to("#scene-4", { filter: "blur(14px)", duration: 0.2, ease: "power2.in" }, 28.5);
+        tl.to("#scene-4", { opacity: 0.0, duration: 0.2, ease: "power2.in" }, 28.5);
+        tl.fromTo("#t-blur", { opacity: 0 }, { opacity: 0.55, duration: 0.2, ease: "power2.in" }, 28.5);
+        tl.to("#scene-5", { filter: "blur(0px)", duration: 0.4, ease: "power2.out" }, 28.7);
+        tl.to("#t-blur", { opacity: 0, duration: 0.2, ease: "power2.out" }, 28.7);
+        tl.set("#scene-4", { filter: "none", opacity: 0 }, 28.9);
+        tl.set("#t-blur", { opacity: 0 }, 28.9);
 
         // === Scene 5 — Dónde estamos ===
-        tl.fromTo("#s5-label", { opacity: 0, x: -20 }, { opacity: 1, x: 0, duration: 0.4, ease: "power2.out" }, 28.0);
-        tl.fromTo("#s5-honest", { opacity: 0, y: 12 }, { opacity: 1, y: 0, duration: 0.6, ease: "power2.out" }, 28.4);
+        tl.fromTo("#s5-label", { opacity: 0, x: -20 }, { opacity: 1, x: 0, duration: 0.4, ease: "power2.out" }, 29.0);
+        tl.fromTo("#s5-honest", { opacity: 0, y: 12 }, { opacity: 1, y: 0, duration: 0.6, ease: "power2.out" }, 29.4);
 
         // HOY column
-        tl.fromTo("#s5-col-now", { opacity: 0, x: -24 }, { opacity: 1, x: 0, duration: 0.5, ease: "power3.out" }, 29.2);
+        tl.fromTo("#s5-col-now", { opacity: 0, x: -24 }, { opacity: 1, x: 0, duration: 0.5, ease: "power3.out" }, 30.2);
         // arrow
-        tl.fromTo("#s5-arrow-line", { scaleX: 0, transformOrigin: "left center" }, { scaleX: 1, duration: 0.4, ease: "power2.out" }, 30.0);
-        tl.fromTo("#s5-arrow .arrow-head", { opacity: 0 }, { opacity: 1, duration: 0.2, ease: "power2.out" }, 30.3);
+        tl.fromTo("#s5-arrow-line", { scaleX: 0, transformOrigin: "left center" }, { scaleX: 1, duration: 0.4, ease: "power2.out" }, 31.0);
+        tl.fromTo("#s5-arrow .arrow-head", { opacity: 0 }, { opacity: 1, duration: 0.2, ease: "power2.out" }, 31.3);
         // AHORA column
-        tl.fromTo("#s5-col-next", { opacity: 0, x: 24 }, { opacity: 1, x: 0, duration: 0.5, ease: "power3.out" }, 30.5);
-        tl.fromTo("#s5-foot", { opacity: 0 }, { opacity: 1, duration: 0.4, ease: "power2.out" }, 31.6);
+        tl.fromTo("#s5-col-next", { opacity: 0, x: 24 }, { opacity: 1, x: 0, duration: 0.5, ease: "power3.out" }, 31.5);
+        tl.fromTo("#s5-foot", { opacity: 0 }, { opacity: 1, duration: 0.4, ease: "power2.out" }, 32.6);
 
-        tl.to("#scene-5 .bg-glow", { scale: 1.08, transformOrigin: "center center", duration: 4, ease: "sine.inOut", yoyo: true, repeat: Math.max(0, Math.floor(7.5 / 4) - 1) }, 28.0);
+        tl.to("#scene-5 .bg-glow", { scale: 1.08, transformOrigin: "center center", duration: 4, ease: "sine.inOut", yoyo: true, repeat: Math.max(0, Math.floor(7.5 / 4) - 1) }, 29.0);
 
-        // ====== BLUR CROSSFADE (scene 5 → scene 6) at t=35.5, 0.4s ======
-        tl.set("#scene-6", { opacity: 1 }, 35.5);
-        tl.to("#scene-5", { filter: "blur(14px)", duration: 0.2, ease: "power2.in" }, 35.5);
-        tl.to("#scene-5", { opacity: 0.0, duration: 0.2, ease: "power2.in" }, 35.5);
-        tl.fromTo("#t-blur", { opacity: 0 }, { opacity: 0.55, duration: 0.2, ease: "power2.in" }, 35.5);
-        tl.to("#scene-6", { filter: "blur(0px)", duration: 0.4, ease: "power2.out" }, 35.7);
-        tl.to("#t-blur", { opacity: 0, duration: 0.2, ease: "power2.out" }, 35.7);
-        tl.set("#scene-5", { filter: "none", opacity: 0 }, 35.9);
-        tl.set("#t-blur", { opacity: 0 }, 35.9);
+        // ====== BLUR CROSSFADE (scene 5 → scene 6) at t=36.5, 0.4s ======
+        tl.set("#scene-6", { opacity: 1 }, 36.5);
+        tl.to("#scene-5", { filter: "blur(14px)", duration: 0.2, ease: "power2.in" }, 36.5);
+        tl.to("#scene-5", { opacity: 0.0, duration: 0.2, ease: "power2.in" }, 36.5);
+        tl.fromTo("#t-blur", { opacity: 0 }, { opacity: 0.55, duration: 0.2, ease: "power2.in" }, 36.5);
+        tl.to("#scene-6", { filter: "blur(0px)", duration: 0.4, ease: "power2.out" }, 36.7);
+        tl.to("#t-blur", { opacity: 0, duration: 0.2, ease: "power2.out" }, 36.7);
+        tl.set("#scene-5", { filter: "none", opacity: 0 }, 36.9);
+        tl.set("#t-blur", { opacity: 0 }, 36.9);
 
         // === Scene 6 — Cierre (con sistemas agénticos) ===
-        tl.fromTo("#s6-section", { opacity: 0, y: -10 }, { opacity: 1, y: 0, duration: 0.4, ease: "power2.out" }, 36.0);
-        tl.fromTo("#s6-lead", { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.4, ease: "power2.out" }, 36.3);
-        tl.fromTo("#s6-anfaia", { opacity: 0, scale: 0.85, transformOrigin: "center center" }, { opacity: 1, scale: 1, duration: 0.7, ease: "expo.out" }, 36.7);
-        tl.fromTo("#s6-divider", { scaleX: 0, transformOrigin: "center center" }, { scaleX: 1, duration: 0.5, ease: "power3.out" }, 37.4);
-        tl.fromTo("#s6-tagline", { opacity: 0, x: -10 }, { opacity: 1, x: 0, duration: 0.5, ease: "power2.out" }, 37.8);
-        tl.fromTo("#s6-foot", { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.4, ease: "power2.out" }, 38.4);
-        tl.fromTo("#s6-agents", { opacity: 0 }, { opacity: 1, duration: 0.4, ease: "power2.out" }, 38.7);
+        tl.fromTo("#s6-section", { opacity: 0, y: -10 }, { opacity: 1, y: 0, duration: 0.4, ease: "power2.out" }, 37.0);
+        tl.fromTo("#s6-lead", { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.4, ease: "power2.out" }, 37.3);
+        tl.fromTo("#s6-anfaia", { opacity: 0, scale: 0.85, transformOrigin: "center center" }, { opacity: 1, scale: 1, duration: 0.7, ease: "expo.out" }, 37.7);
+        tl.fromTo("#s6-divider", { scaleX: 0, transformOrigin: "center center" }, { scaleX: 1, duration: 0.5, ease: "power3.out" }, 38.4);
+        tl.fromTo("#s6-tagline", { opacity: 0, x: -10 }, { opacity: 1, x: 0, duration: 0.5, ease: "power2.out" }, 38.8);
+        tl.fromTo("#s6-foot", { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.4, ease: "power2.out" }, 39.4);
+        tl.fromTo("#s6-agents", { opacity: 0 }, { opacity: 1, duration: 0.4, ease: "power2.out" }, 39.7);
 
-        tl.to("#scene-6 .bg-glow", { scale: 1.06, transformOrigin: "center center", duration: 4, ease: "sine.inOut", yoyo: true, repeat: Math.max(0, Math.floor(5.5 / 4) - 1) }, 36.0);
+        tl.to("#scene-6 .bg-glow", { scale: 1.06, transformOrigin: "center center", duration: 4, ease: "sine.inOut", yoyo: true, repeat: Math.max(0, Math.floor(5.5 / 4) - 1) }, 37.0);
 
         // ====== FINAL DIP TO BLACK ======
-        tl.to("#scene-6", { opacity: 0, duration: 0.7, ease: "power2.inOut" }, 42.5);
-        tl.set("#scene-6", { opacity: 0 }, 43.5);
+        tl.to("#scene-6", { opacity: 0, duration: 0.7, ease: "power2.inOut" }, 43.5);
+        tl.set("#scene-6", { opacity: 0 }, 44.5);
 
         // === Scene counter (running header) updates ===
         const counter = document.getElementById("scene-counter");
@@ -1108,9 +1135,9 @@
           { t: 0.0, v: "01" },
           { t: 6.5, v: "02" },
           { t: 14.0, v: "03" },
-          { t: 21.0, v: "04" },
-          { t: 28.0, v: "05" },
-          { t: 36.0, v: "06" },
+          { t: 22.0, v: "04" },
+          { t: 29.0, v: "05" },
+          { t: 37.0, v: "06" },
         ];
         stages.forEach(function (s) {
           tl.call(function () { counter.textContent = s.v; }, [], s.t);

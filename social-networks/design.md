@@ -10,12 +10,11 @@ Format: vertical 4:5 (1080×1350), ~45s total. A linked PDF export reuses the sa
 
 - **Repo identity:** `ANFAIA/MalariaSentinel` — a research-engineering project by David Flórez M., following the SDSS framework of Kelly et al. (2012).
 - **Tone:** serious, evidence-driven, technical but accessible. The viewer is a researcher, recruiter, funder, or program officer on LinkedIn — not necessarily a malaria specialist.
-- **Voice:** Spanish (the user brief is in Spanish; ANFAIA is the funder; LinkedIn audience LATAM + EU).
+- **Voice:** English (LinkedIn global audience).
 - **Reference text** (verbatim from `docs/abm-status.md`):
   - Project name: `MalariaSentinel`
-  - Tagline: `Sistema de Soporte de Decisiones Espacial`
-  - Subtitle: `para la eliminación de la malaria`
-  - Funder: `Con el apoyo de ANFAIA`
+  - Subtitle: `for malaria elimination`
+  - Funder: ANFAIA — Asociación Nacional Faro, para la Aceleración de la Inteligencia Artificial. Tagline: "Driving Progress with Artificial Intelligence". Summer scholarships program.
   - Stack: `ABM Python v0.5.0` · `ABM C++ mal-abm-fast F1`
   - Tests: `71/71 Python + 60/60 C++ + 5/5 parity`
   - Pipeline: `INGESTA → SUITABILIDAD → ABM → DATASET → U-NET → PREDICCIÓN`
@@ -123,47 +122,49 @@ Every scene has 8–10 visual elements across 3 layers:
 
 ### Scene 1 — Title
 - `MalariaSentinel`
-- `Sistema de Soporte de Decisiones Espacial`
-- `para la eliminación de la malaria`
-- Meta: `v0.5.0 Python · F1 C++ · Open Source`
+- `Spatial Decision Support System`
+- `for malaria elimination`
+- Vertical meta (right): `SDSS · 2026`
+- Bottom meta: `Open science` · `Open Source · 2026`
 
-### Scene 2 — El pipeline SDSS
-Headline: `Del satélite al mapa de riesgo.`
+### Scene 2 — The pipeline SDSS
+Headline: `From satellite to risk map.`
 Six-stage flow (kept technical — this is the bridge to scenes 3-5):
 1. `INGESTA` — CHIRPS, ERA5, MERIT DEM, JRC GSW, MODIS, WorldCover
-2. `SUITABILIDAD` — TWI, modelo de idoneidad
-3. `ABM` — motor C++ (xoshiro256**, 7 ops/día)
-4. `DATASET` — pares (state_t + env) → state_{t+1}
+2. `SUITABILITY` — TWI, habitat suitability, 4 environmental layers
+3. `ABM` — mal-abm-fast · C++20 · xoshiro256** · 7 ops/day
+4. `DATASET` — (state_t + env) → state_{t+1} · monthly pairs
 5. `U-NET` — 32→64→128→256→512, MSE + soft-Dice
-6. `PREDICCIÓN` — risk maps mensuales, FastAPI
+6. `PREDICTION` — risk maps · FastAPI · GeoTIFF
 
-### Scene 3 — El sistema en 3 capas
-Headline: `Tres piezas que trabajan juntas.`
-Three cards with connectors (no technical jargon):
-- **01 — El satélite mira.** Imágenes del espacio, clima, mapas de agua. Lo que ya sabemos del terreno.
-- **02 — La simulación piensa.** Un programa imagina cómo se mueven los mosquitos. Lento pero preciso.
-- **03 — El mapa avisa.** Un mapa mensual que dice dónde puede haber riesgo. En minutos.
-Connectors: `alimenta` (1→2), `enseña a` (2→3).
+### Scene 3 — The system in 4 pieces
+Headline: `Four pieces working together.`
+Four cards with connectors (no technical jargon):
+- **01 — The satellite watches.** Space imagery, climate, water maps. What we already know about the terrain.
+- **02 — The simulation thinks.** A program imagines how mosquitoes move. Slow but accurate.
+- **03 — The model learns.** Simulation data teaches the model to do it fast, without losing accuracy.
+- **04 — The prediction warns.** A time series, day by day. As far into the future as you want to look.
+Connectors: `feeds` (1→2), `generates data` (2→3), `produces` (3→4).
 
-### Scene 4 — A dónde vamos
-Headline: `Le das una región. Te devuelve un mapa de riesgo.`
+### Scene 4 — Where we're going
+Headline: `You give it a region. It gives you a risk map.`
 Three points (the value proposition, no cifras):
-- Cualquier país, cualquier zona endémica. El sistema se adapta.
-- Cada mes, un mapa nuevo con la expansión probable del mosquito.
-- Listo para el personal de salud, antes de que llegue el brote.
+- Any country, any endemic zone. The system adapts.
+- A time series, day by day. You can look a day, a week, or a month ahead.
+- Ready for health workers, before the outbreak arrives.
 
-### Scene 5 — Dónde estamos
-Honest admission: `Hoy tenemos algo. Todavía no lo que queremos.`
-Two columns (HOY / AHORA) connected by an arrow:
-- **HOY**: Una primera versión que funciona con datos reales de Ghana. La simulación es básica — solo dos etapas de vida del mosquito. Las señales son simples: lluvia y agua. Solo sirve para una región.
-- **AHORA**: Mejorando la simulación para que el sistema funcione de verdad. Ciclo de vida completo del mosquito. El mosquito que busca comida, pone huevos, transmite. Para que sirva en cualquier sitio, no solo Ghana.
+### Scene 5 — Where we are
+Honest admission: `Today we have something. Not what we want yet.`
+Two columns (TODAY / NOW) connected by an arrow:
+- **TODAY**: A first version that works with real data. The simulation is basic — only two mosquito life stages. The signals are simple: rain and water. It only works for one region.
+- **NOW**: Improving the simulation so the system actually works. Full mosquito life cycle. The mosquito that seeks food, lays eggs, transmits disease. So it works anywhere, not just one region.
 
-### Scene 6 — Cierre
-- Section: `05 · APOYO`
-- Lead: `Este proyecto es posible gracias a`
-- Wordmark: `ANFAIA`
-- Tagline: `Ciencia abierta para la eliminación de la malaria.`
+### Scene 6 — Closing
+- Section: `05 · SUPPORT`
+- Lead: `This project is made possible by`
+- Wordmark: `ANFAIA` (Asociación Nacional Faro, para la Aceleración de la Inteligencia Artificial)
+- Tagline: `Open science for malaria elimination.`
 - Foot:
   - `github.com/ANFAIA/MalariaSentinel`
   - `SDSS · Open Source · 2026`
-  - `Sistema construido con ayuda de sistemas agénticos` (italic, fg-dim)
+  - `Built with the help of agentic AI systems` (italic, fg-dim)
