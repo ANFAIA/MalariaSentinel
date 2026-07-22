@@ -1,0 +1,30 @@
+[project]
+name = "mal-abm-fast-calibration"
+version = "0.1.0"
+description = "Calibration test framework for the mal-abm-fast C++ ABM engine. Runs the 10-dimension scorecard and an LLM judge verdict against ABM rollouts."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "langchain-openai>=0.2",
+    "pydantic>=2.6",
+    "pytest>=7",
+    "rasterio>=1.3",
+    "numpy>=1.24",
+    "scipy>=1.11",
+    "pyyaml>=6",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["scorers"]
+
+[tool.pytest.ini_options]
+markers = [
+    "fast: subset of tests that complete in <5 minutes (deselect with -m 'not fast')",
+    "full: full integration suite (default when CALIBRATION_TIER=full)",
+    "llm: tests that call the OpenCode Zen LLM API (skip if OPENCODE_API_KEY is unset)",
+]
+testpaths = ["."]
