@@ -57,6 +57,9 @@ def _final_state_file(run_dir: Path) -> Path | None:
     days = sorted(run_dir.glob("state_day*.tif"))
     if days:
         return days[-1]
+    state = run_dir / "state.tif"
+    if state.exists():
+        return state
     return None
 
 
@@ -87,4 +90,3 @@ class MoransScorer(Scorer):
             target="0.20-0.70",
             passed=0.20 <= I <= 0.70,
         )
-

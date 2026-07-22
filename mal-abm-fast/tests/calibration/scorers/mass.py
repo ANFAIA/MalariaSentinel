@@ -21,6 +21,10 @@ class MassScorer(Scorer):
     def score(self, run_dir: Path, experiment: dict[str, Any]) -> ScorerResult:
         tifs = sorted(run_dir.glob("state_*.tif"))
         if not tifs:
+            state = run_dir / "state.tif"
+            if state.exists():
+                tifs = [state]
+        if not tifs:
             return ScorerResult(score=0.0, value=0.0, target="1.00",
                                 diagnostics={"error": "no tifs"}, passed=False)
         total_valid = 0

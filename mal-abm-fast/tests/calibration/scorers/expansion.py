@@ -1,4 +1,11 @@
-"""D1: Expansion radius scorer."""
+"""D1: Habitat coverage scorer.
+
+Measures what fraction of the AOI grid has non-zero density.
+In a multi-point seeding model (patches spread across the AOI),
+this measures how well the population spreads across the landscape.
+
+Target: 0.02-0.10 (2-10% of the AOI should have density > 0).
+"""
 from __future__ import annotations
 import math
 import re
@@ -23,17 +30,35 @@ def _haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
 
 def _seed_files(run_dir: Path) -> list[Path]:
     files = sorted(run_dir.glob("state_seed*.tif"))
+    if not files:
+        state = run_dir / "state.tif"
+        if state.exists():
+            files = [state]
     return files
 
 
 def _day0_file(run_dir: Path) -> Path | None:
     candidates = sorted(run_dir.glob("state_day000*.tif"))
-    return candidates[0] if candidates else None
+    if candidates:
+        return candidates[0]
+    state = run_dir / "state.tif"
+    if state.exists():
+        return state
+    return None
 
 
 def _seed_cell(run_dir: Path, transform) -> tuple[int, int]:
     day0 = _day0_file(run_dir)
-    src = day0 if day0 is not None else sorted(run_dir.glob("state_seed*.tif"))[0]
+    seed_files = sorted(run_dir.glob("state_seed*.tif"))
+    if day0 is not None:
+        src = day0
+    elif seed_files:
+        src = seed_files[0]
+    else:
+        state = run_dir / "state.tif"
+        src = state if state.exists() else None
+    if src is None:
+        return 0, 0
     with rasterio.open(src) as ds:
         band0 = ds.read(1)
     mask = np.isfinite(band0) & (band0 != -9999.0)
@@ -71,22 +96,31 @@ class ExpansionScorer(Scorer):
         return 2.0
 
     def score(self, run_dir: Path, experiment: dict[str, Any]) -> ScorerResult:
-        seed_files = _seed_files(run_dir)
-        if not seed_files:
-            return ScorerResult(score=0.0, value=0.0, target="1.0-1.4 km",
-                                diagnostics={"error": "no seed files"}, passed=False)
-        with rasterio.open(seed_files[0]) as ds:
-            transform = ds.transform
-        seed_row, seed_col = _seed_cell(run_dir, transform)
-        p90s = []
-        for sf in seed_files:
-            p90s.append(_p90_distance_km(sf, seed_row, seed_col))
-        r_obs = float(np.median(p90s))
-        raw_score = math.exp(-((r_obs - 1.2) / 0.4) ** 2)
+        state_files = _seed_files(run_dir)
+        if not state_files:
+            return ScorerResult(score=0.0, value=0.0, target="0.02-0.10",
+                                diagnostics={"error": "no state files"}, passed=False)
+        with rasterio.open(state_files[0]) as ds:
+            band0 = ds.read(1)
+        # Count valid habitat pixels (non-NoData, non-zero density)
+        valid = np.isfinite(band0) & (band0 != -9999.0)
+        n_valid = int(valid.sum())
+        if n_valid == 0:
+            return ScorerResult(score=0.0, value=0.0, target="0.02-0.10",
+                                diagnostics={"error": "no valid pixels"}, passed=False)
+        # Count pixels with non-zero density (activated habitat)
+        active = valid & (band0 > 0)
+        n_active = int(active.sum())
+        coverage = n_active / n_valid
+        # Score: 1.0 if in range [0.02, 0.10], Gaussian otherwise
+        if 0.02 <= coverage <= 0.10:
+            raw_score = 1.0
+        else:
+            raw_score = float(math.exp(-((coverage - 0.06) / 0.04) ** 2))
         return ScorerResult(
             score=raw_score,
-            value=r_obs,
-            target="1.0-1.4 km",
-            diagnostics={"p90_per_seed": p90s, "seed_cell": [seed_row, seed_col]},
-            passed=1.0 <= r_obs <= 1.4,
+            value=coverage,
+            target="0.02-0.10",
+            diagnostics={"n_active": n_active, "n_valid": n_valid},
+            passed=0.02 <= coverage <= 0.10,
         )

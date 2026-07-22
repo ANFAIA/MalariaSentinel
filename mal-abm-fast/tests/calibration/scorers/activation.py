@@ -22,6 +22,10 @@ class ActivationScorer(Scorer):
     def score(self, run_dir: Path, experiment: dict[str, Any]) -> ScorerResult:
         day_files = sorted(run_dir.glob("state_day*.tif")) + sorted(run_dir.glob("state_seed*_day*.tif"))
         if not day_files:
+            state = run_dir / "state.tif"
+            if state.exists():
+                day_files = [state]
+        if not day_files:
             return ScorerResult(score=0.0, value=0.0, target="0.05-0.30",
                                 diagnostics={"error": "no day files"}, passed=False)
         rates = []
