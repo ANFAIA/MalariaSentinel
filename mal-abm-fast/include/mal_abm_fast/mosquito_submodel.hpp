@@ -30,6 +30,18 @@
 
 namespace mal_abm_fast {
 
+/// Per-day population statistics, populated by advance_day().
+struct DailyStats {
+    int64_t day             = 0;
+    int64_t n_alive         = 0;
+    int64_t n_adults        = 0;
+    int64_t n_larvae        = 0;
+    int64_t n_births        = 0;
+    int64_t n_deaths        = 0;
+    int64_t n_maturation    = 0;
+    float   eip_frac        = 0.0f;  // fraction of adults with eip >= threshold
+};
+
 class MosquitoSubmodel {
 public:
     MosquitoSubmodel() = default;
@@ -71,6 +83,9 @@ public:
     //   5. birth(aoi, patch_states)
     void advance_day(const AOI& aoi,
                      const std::vector<PatchState>& patch_states);
+
+    /// Per-day stats from the most recent advance_day() call.
+    const DailyStats& last_day_stats() const { return last_day_stats_; }
 
     // -- debug instrumentation (M7.0 population-crash investigation) -----
     // When enabled, advance_day() writes one stderr line per day with
@@ -155,6 +170,8 @@ private:
     MosquitoSoA  soa_;
     Prng         rng_;
     int32_t      k_per_patch_ = K_PER_PATCH_DEFAULT;
+
+    DailyStats last_day_stats_{};
 
     // -- debug instrumentation state (see set_debug_population) -----
     bool     debug_population_      = false;

@@ -104,6 +104,12 @@ def ghana_habitat_path() -> Path:
     return GHANA_HABITAT_PATH
 
 
+@pytest.fixture(scope="session")
+def cohort_log_path(tmp_calibration_dir: Path) -> Path:
+    """Path for the cohort log JSON (populated by --emit-cohort-log)."""
+    return tmp_calibration_dir / "cohort.json"
+
+
 # ---------------------------------------------------------------------------
 # Markers
 # ---------------------------------------------------------------------------

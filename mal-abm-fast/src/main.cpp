@@ -36,6 +36,7 @@
 #include <cstdlib>
 #include <exception>
 #include <filesystem>
+#include <fstream>
 #include <iomanip>
 #include <iostream>
 #include <memory>
@@ -325,6 +326,13 @@ int main(int argc, char** argv) {
                   "Rate-limited: every day for the first 10 days, then "
                   "every 5 days. Default off.");
 
+    std::string cohort_log_path;
+    run->add_option("--emit-cohort-log", cohort_log_path,
+                    "Path to write the per-day cohort log JSON. "
+                    "Contains daily n_alive, n_adults, n_larvae, "
+                    "n_births, n_deaths, n_maturation, eip_frac.")
+        ->default_val("");
+
     CLI11_PARSE(app, argc, argv);
 
     // If no subcommand was given, print help and exit.
@@ -466,6 +474,12 @@ int main(int argc, char** argv) {
         const std::string rollout_path =
             rollout_output_path(output_path, i, n_rollouts);
 
+        // -- Cohort log collection -----------------------------------
+        std::vector<mal_abm_fast::DailyStats> cohort_log;
+        if (!cohort_log_path.empty()) {
+            cohort_log.reserve(static_cast<size_t>(days));
+        }
+
         // -- Step ----------------------------------------------------
         try {
             for (int d = 0; d < days; ++d) {
@@ -476,6 +490,10 @@ int main(int argc, char** argv) {
                               << " diverged on day " << (d + 1)
                               << ": " << e.what() << "\n";
                     std::exit(EXIT_FAILURE);
+                }
+
+                if (!cohort_log_path.empty()) {
+                    cohort_log.push_back(engine.last_day_stats());
                 }
 
                 // Intermediate snapshot every N days
@@ -500,6 +518,53 @@ int main(int argc, char** argv) {
                       << " snapshot failed during stepping: "
                       << e.what() << "\n";
             std::exit(EXIT_FAILURE);
+        }
+
+        // -- Write cohort log JSON ----------------------------------
+        if (!cohort_log_path.empty() && !cohort_log.empty()) {
+            std::string rollout_cohort_path;
+            if (n_rollouts == 1) {
+                rollout_cohort_path = cohort_log_path;
+            } else {
+                const std::filesystem::path cp(cohort_log_path);
+                const std::filesystem::path cparent = cp.has_parent_path()
+                    ? cp.parent_path() : std::filesystem::path{};
+                const std::string cstem = cp.stem().string();
+                const std::string cext  = cp.has_extension()
+                    ? cp.extension().string() : ".json";
+                std::ostringstream cname;
+                cname << cstem << "_cohort_seed"
+                      << std::setw(4) << std::setfill('0') << i << cext;
+                rollout_cohort_path = (cparent / cname.str()).string();
+            }
+            // Ensure parent directory exists
+            {
+                const std::filesystem::path cop(rollout_cohort_path);
+                if (cop.has_parent_path()) {
+                    std::error_code ec;
+                    std::filesystem::create_directories(cop.parent_path(), ec);
+                }
+            }
+            std::ofstream ofs(rollout_cohort_path);
+            ofs << "{\n  \"n_days\": " << days << ",\n  \"daily\": [\n";
+            for (size_t di = 0; di < cohort_log.size(); ++di) {
+                const auto& s = cohort_log[di];
+                ofs << "    {\"day\": " << s.day
+                    << ", \"n_alive\": " << s.n_alive
+                    << ", \"n_adults\": " << s.n_adults
+                    << ", \"n_larvae\": " << s.n_larvae
+                    << ", \"n_births\": " << s.n_births
+                    << ", \"n_deaths\": " << s.n_deaths
+                    << ", \"n_maturation\": " << s.n_maturation
+                    << ", \"eip_frac\": " << std::fixed << std::setprecision(4) << s.eip_frac
+                    << "}";
+                if (di + 1 < cohort_log.size()) ofs << ",";
+                ofs << "\n";
+            }
+            ofs << "  ]\n}\n";
+            ofs.close();
+            std::cout << "abm_run: rollout " << i << "/" << n_rollouts
+                      << " cohort log -> " << rollout_cohort_path << std::endl;
         }
 
         // -- Snapshot ------------------------------------------------

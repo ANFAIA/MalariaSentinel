@@ -82,6 +82,9 @@ public:
     //   4. coord_->current_date() += 1 day
     void step();
 
+    /// Per-day stats from the most recent step() call.
+    const DailyStats& last_day_stats() const { return sub_->last_day_stats(); }
+
     // -- debug instrumentation forwarders (M7.0 population-crash
     // investigation). Default off; the CLI's --debug-population flag
     // toggles it. The forwarders let the CLI talk to the submodel

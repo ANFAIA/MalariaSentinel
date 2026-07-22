@@ -1,0 +1,64 @@
+# Per-dimension scoring thresholds.
+# min_score: below this, the dimension is "regressed"
+# max_delta: if score drops more than this vs baseline, flag it
+# hard_floor: below this, the dimension is "collapsed"
+
+D1_expansion:
+  min_score: 0.50
+  max_delta: -0.30
+  hard_floor: 0.10
+  source: "Thomas 2013 negative-exp: 90th = 1.28 km; Costantini 1996: 350-650 m/day"
+
+D2_survival:
+  min_score: 0.50
+  max_delta: -0.40
+  hard_floor: 0.20
+  source: "Saarman 2019: 0.87; Midega 2007: 0.83-0.95"
+
+D3_eip:
+  min_score: 0.30
+  max_delta: -0.40
+  hard_floor: 0.10
+  source: "Mordecai 2013: EIP Briere optimum at 25C, 11-14d at 25-28C"
+
+D4_stability:
+  min_score: 0.70
+  max_delta: -0.20
+  hard_floor: 0.30
+  source: "Internal — derived from wire.hpp:80 and M7.0 calibration"
+
+D5_morans:
+  min_score: 0.50
+  max_delta: -0.30
+  hard_floor: 0.20
+  source: "Bissett 2026 (heterogeneous landscapes)"
+
+D6_mass:
+  min_score: 0.99
+  max_delta: -0.01
+  hard_floor: 0.95
+  source: "pitfall-abm-nan-cog-write (memory graph)"
+
+D7_determinism:
+  min_score: 0.99
+  max_delta: -0.01
+  hard_floor: 0.95
+  source: "F1.f milestone in comp-mal-abm-fast-engine"
+
+D8_coupling:
+  min_score: 0.40
+  max_delta: -0.40
+  hard_floor: 0.10
+  source: "C1 fix commit message (birth-at-cell)"
+
+D9_activation:
+  min_score: 0.40
+  max_delta: -0.40
+  hard_floor: 0.10
+  source: "wire.hpp:107-118 (PLUVIAL_POOL rule)"
+
+D10_perf:
+  min_score: 0.70
+  max_delta: -0.30
+  hard_floor: 0.30
+  source: "M-perf F1.g target (100 rollouts < 5 min on FT3)"

@@ -349,36 +349,51 @@ void MosquitoSubmodel::advance_day(const AOI& aoi,
     larva_mortality_inactive(patch_states);   // Op 1
     larva_mortality_density(patch_states);    // Op 2.5 (Beverton-Holt)
     larva_growth(patch_states);               // Op 2
-    // -- debug snapshot: pre-maturation (just before larva_to_adult).
+    // -- snapshot: pre-maturation (just before larva_to_adult).
     // n_maturation = post_mat_n_adults - pre_mat_n_adults.
-    const int64_t pre_mat_n_alive  = debug_population_ ? soa_.n_alive : 0;
-    const int64_t pre_mat_n_adults = debug_population_ ? count_stage(soa_, 1) : 0;
+    const int64_t pre_mat_n_alive  = soa_.n_alive;
+    const int64_t pre_mat_n_adults = count_stage(soa_, 1);
     larva_to_adult(aoi, patch_states);        // Op 3
-    // -- debug snapshot: post-maturation (just after larva_to_adult,
+    // -- snapshot: post-maturation (just after larva_to_adult,
     // before dispersal which only moves lon/lat not stage).
-    const int64_t post_mat_n_alive  = debug_population_ ? soa_.n_alive : 0;
-    const int64_t post_mat_n_adults = debug_population_ ? count_stage(soa_, 1) : 0;
+    const int64_t post_mat_n_alive  = soa_.n_alive;
+    const int64_t post_mat_n_adults = count_stage(soa_, 1);
     adult_dispersal(aoi);                     // Op 4
-    const int64_t pre_mort_n_alive = debug_population_ ? soa_.n_alive : 0;
+    const int64_t pre_mort_n_alive = soa_.n_alive;
     adult_mortality(patch_states);            // Op 6 (Lardeux)
-    const int64_t post_mort_n_alive = debug_population_ ? soa_.n_alive : 0;
+    const int64_t post_mort_n_alive = soa_.n_alive;
     birth(aoi, patch_states);                 // Op 5
-    const int64_t post_birth_n_alive = debug_population_ ? soa_.n_alive : 0;
+    const int64_t post_birth_n_alive = soa_.n_alive;
+
+    // Always compute last_day_stats_ (used by --emit-cohort-log).
+    const int64_t post_n_adults = count_stage(soa_, 1);
+    const int64_t post_n_larvae = count_stage(soa_, 0);
+    const int64_t n_maturation  = post_mat_n_adults - pre_mat_n_adults;
+    const int64_t n_deaths      = pre_mort_n_alive - post_mort_n_alive;
+    const int64_t n_births      = post_birth_n_alive - post_mort_n_alive;
+
+    last_day_stats_.day          = day_idx;
+    last_day_stats_.n_alive      = post_birth_n_alive;
+    last_day_stats_.n_adults     = post_n_adults;
+    last_day_stats_.n_larvae     = post_n_larvae;
+    last_day_stats_.n_births     = n_births;
+    last_day_stats_.n_deaths     = n_deaths;
+    last_day_stats_.n_maturation = n_maturation;
+    // Compute eip_completion_frac: fraction of adults with eip_progress >= EIP_THRESHOLD_GD
+    {
+        int64_t eip_complete = 0;
+        for (int64_t i = 0; i < soa_.n_alive; ++i) {
+            const size_t si = static_cast<size_t>(i);
+            if (soa_.stage[si] == 1 && soa_.eip_progress[si] >= EIP_THRESHOLD_GD) {
+                ++eip_complete;
+            }
+        }
+        last_day_stats_.eip_frac = (post_n_adults > 0)
+            ? static_cast<float>(eip_complete) / static_cast<float>(post_n_adults)
+            : 0.0f;
+    }
 
     if (debug_population_ && want_log) {
-        const int64_t post_n_adults = count_stage(soa_, 1);
-        const int64_t post_n_larvae = count_stage(soa_, 0);
-        // n_maturation: new adults created by larva_to_adult. The
-        // delta is post_mat - pre_mat, both taken around the
-        // larva_to_adult call. pre_mat already includes any adult
-        // that died in ops 1-2 (adults are not affected by larva
-        // mortality, so adults are unchanged from pre_n_adults
-        // through the larva ops).
-        const int64_t n_maturation  = post_mat_n_adults - pre_mat_n_adults;
-        // n_deaths: agents lost during adult_mortality (positive).
-        const int64_t n_deaths      = pre_mort_n_alive - post_mort_n_alive;
-        // n_births: agents added during birth (positive).
-        const int64_t n_births      = post_birth_n_alive - post_mort_n_alive;
         const float   temp_d        = seeding_temp_d(
             patch_states, debug_seeding_row_, debug_seeding_col_);
         const float   p_d           = lardeux_p_d(temp_d);
