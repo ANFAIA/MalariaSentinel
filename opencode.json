@@ -232,6 +232,45 @@
         "question": "allow"
       }
     },
+    "kb-updater": {
+      "description": "Daily KB update workflow. Loads the kb-update-daily protocol, runs the read-only analysis (commits + recall), produces a plan, and delegates the writes to the memory-curator via task. Does NOT write to the KG directly. Designed to be invoked as a primary agent (Tab or `opencode run --agent kb-updater`) so it does not get trapped in plan mode.",
+      "mode": "primary",
+      "prompt": "{file:agents/loops/kb-update-daily.md}",
+      "permission": {
+        "edit": "deny",
+        "read": "allow",
+        "glob": "allow",
+        "grep": "allow",
+        "bash": {
+          "*": "ask",
+          "git log *": "allow",
+          "git show *": "allow",
+          "git diff *": "allow",
+          "git status *": "allow",
+          "make -f agents/memory/scripts/Makefile status": "allow",
+          "make -f agents/memory/scripts/Makefile audit": "allow",
+          "make -f agents/memory/scripts/Makefile session-start": "allow",
+          "make -f agents/memory/scripts/Makefile session-end": "allow",
+          "make -f agents/memory/scripts/Makefile wipe *": "deny",
+          "make -f agents/memory/scripts/Makefile set-project *": "deny",
+          "*make*wipe*": "deny",
+          "*make*set-project*": "deny"
+        },
+        "task": "allow",
+        "memory_node": "deny",
+        "memory_rel": "deny",
+        "memory_query": "allow",
+        "memory_recall": "allow",
+        "memory_audit": "allow",
+        "memory_seed": "deny",
+        "memory_status": "allow",
+        "webfetch": "ask",
+        "websearch": "ask",
+        "question": "allow",
+        "todowrite": "allow",
+        "skill": "allow"
+      }
+    },
     "research-runner": {
       "description": "Focused worker for the research_harness/ pipeline. Pre-approves websearch, webfetch, and bash calls needed to run `uv run python -m agents.research_harness.run` and read/write papers/. Does NOT edit any file outside papers/. Used as primary agent via `opencode run --agent research-runner`. Also handles memory evaluation after each phase.",
       "mode": "primary",
