@@ -56,7 +56,10 @@ inline constexpr float  ADULT_DISPERSE_MAX_M        = 2000.0f;
 
 // Per-adult per-day fecundity: binomial(n_adults/2, BIRTH_FECUNDITY) new larvae.
 // Tuned so the population stays near the initial seeded count on the
-// 30k-patch, 30-day M1.5 perf budget.
+// 30k-patch, 30-day M1.5 perf budget. The M1.5 perf baseline; raising
+// this would only mask the structural 150-adult point-source collapse
+// (see docs/calibration-test-framework.md §6 and the p_7b70cbc1 proposal
+// summary for the resolution path discussion).
 inline constexpr float  BIRTH_FECUNDITY              = 0.10f;
 
 // Larva density-dependent mortality (Beverton-Holt, docs/abm-status.md:79).
@@ -66,11 +69,16 @@ inline constexpr float  LARVA_BH_ALPHA = 0.05f;   // competition coefficient
 // Adult daily mortality — Lardeux thermo-dependent with basal cap.
 //   p_d = ADULT_DAILY_MORT_BASAL * exp(-((T - ADULT_OPT_C)^2) / (2 * ADULT_SIGMA^2))
 //   clipped to [ADULT_MORT_FLOOR, ADULT_MORT_CAP]
-// ADULT_DAILY_MORT_BASAL (default 0.90) is the maximum daily survival at
+// ADULT_DAILY_MORT_BASAL (default 0.95) is the maximum daily survival at
 // the optimal temperature. It accounts for non-thermal mortality sources
 // (senescence, predation, accidents) that the Lardeux Gaussian does not
-// model. Calibrated to fall in the 0.80-0.94 range reported by West
-// African MRR studies (Costantini 1996, Thomas 2013, Saarman 2019).
+// model. At Ghana June median T=27.5°C: p_d=0.892, mean life 9.3 days,
+// matching Saarman 2019 (0.87) and Midega 2007 (0.83-0.95). Previous
+// value 0.90 was at the low end of the field MRR range and produced an
+// immediate 5-day collapse of the 150-adult point-source; 0.95 delays
+// collapse to ~day 30-45 but does not prevent it (the F=0.10 reproduction
+// rate cannot sustain 150 adults at p_d=0.892 — see proposal p_7b70cbc1
+// and docs/calibration-test-framework.md §6 for the resolution path).
 //   - Costantini 1996: 0.80-0.88 (Burkina Faso savanna)
 //   - Saarman 2019:    0.87 (West Africa, self-marking)
 //   - North 2018:      0.875 (model param)
@@ -80,7 +88,7 @@ inline constexpr float  LARVA_BH_ALPHA = 0.05f;   // competition coefficient
 // at 30-35°C remains survivable).
 // ADULT_MORT_CAP = 0.95: empirical upper bound from Midega 2007.
 // ADULT_MORT_FLOOR = 0.60: emergency floor for extreme temps.
-inline constexpr float  ADULT_DAILY_MORT_BASAL  = 0.90f;
+inline constexpr float  ADULT_DAILY_MORT_BASAL  = 0.95f;
 inline constexpr float  ADULT_OPT_C             = 25.0f;
 inline constexpr float  ADULT_SIGMA             = 7.0f;
 inline constexpr float  ADULT_MORT_CAP          = 0.95f;
