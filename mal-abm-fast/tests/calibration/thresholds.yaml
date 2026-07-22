@@ -62,3 +62,9 @@ D10_perf:
   max_delta: -0.30
   hard_floor: 0.30
   source: "M-perf F1.g target (100 rollouts < 5 min on FT3)"
+
+D11_larval_dynamics:
+  min_score: 0.70
+  max_delta: -0.15
+  hard_floor: 0.50
+  source: "Mordecai 2013: Anopheles gambiae larval population dynamics"

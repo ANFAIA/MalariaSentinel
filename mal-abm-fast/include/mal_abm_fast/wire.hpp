@@ -60,7 +60,7 @@ inline constexpr float  ADULT_DISPERSE_MAX_M        = 2000.0f;
 // this would only mask the structural 150-adult point-source collapse
 // (see docs/calibration-test-framework.md §6 and the p_7b70cbc1 proposal
 // summary for the resolution path discussion).
-inline constexpr float  BIRTH_FECUNDITY              = 0.10f;
+inline constexpr float  BIRTH_FECUNDITY              = 0.25f;
 
 // Larva density-dependent mortality (Beverton-Holt, docs/abm-status.md:79).
 inline constexpr float  LARVA_BH_S0    = 0.95f;   // baseline daily survival

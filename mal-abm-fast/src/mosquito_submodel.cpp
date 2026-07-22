@@ -31,6 +31,7 @@
 #include <vector>
 
 #include "mal_abm_fast/aoi.hpp"
+#include "mal_abm_fast/birth_rate.hpp"
 #include "mal_abm_fast/dispersal.hpp"
 #include "mal_abm_fast/eip.hpp"
 #include "mal_abm_fast/seeding.hpp"
@@ -817,8 +818,12 @@ void MosquitoSubmodel::birth(const AOI& aoi,
         const int64_t n_females = static_cast<int64_t>(kv.second) / 2;
         if (n_females <= 0) continue;
         const auto& ps = patch_states[static_cast<size_t>(cell_to_state_idx.at(kv.first))];
+        // Temperature-dependent birth rate (Mordecai 2013)
+        const double temp_c = static_cast<double>(ps.temp_d);
+        const double rate_mod = birth_rate_modifier(temp_c);
+        const double effective_fecundity = static_cast<double>(BIRTH_FECUNDITY) * rate_mod;
         const int n = rng_.binomial(static_cast<int>(n_females),
-                                    static_cast<double>(BIRTH_FECUNDITY));
+                                    effective_fecundity);
         const int64_t nb = static_cast<int64_t>(n);
         if (nb <= 0) continue;
         draws.push_back({ps.patch_id, ps.row, ps.col, nb});
