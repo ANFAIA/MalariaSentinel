@@ -113,6 +113,37 @@ Rules:
   that return findings, plans, or briefs each have their own
   contract — read it before writing the brief.
 
+### 3.1 Editing subagent brief template
+
+For subagents that edit files (not read-only), the brief MUST include
+these sections at the end:
+
+```
+## Files to CREATE
+- <exact path 1>
+- <exact path 2>
+
+## Files NOT to touch
+- <list of shared files this agent must NOT create>
+
+## Verification
+<exact commands to run, e.g. pytest, ctest>
+
+## Propose
+
+Do NOT commit files. Just edit them, then run from REPO ROOT:
+gitagent propose --agent <id> --title "feat: what was done" --summary "One paragraph" --confidence 0.8 --feature <feature-name>
+```
+
+Critical rules for subagents:
+- **Never run `git add` or `git commit`** inside the worktree. The
+  `propose` command captures the diff automatically (see gitagent skill §12).
+- Run `gitagent propose` from the **repo root**, not from inside the worktree.
+- If the agent needs a shared file (e.g. `scorers/base.py`) that doesn't
+  exist yet in its worktree, it can still import from it — the import
+  works after integration. For tests, create the file ONLY if this agent
+  is the designated owner.
+
 ## 4. Isolation with the `gitagent` skill
 
 > **RULE (non-negotiable): any work that edits files — by you or by a subagent — runs inside a `gitagent` worktree, and is performed by a subagent, not by the supervisor. Read-only work (memory queries, `explore`, `doc-researcher`, `code-reviewer`, `security-auditor`, the memory custom tools themselves) is exempt. The supervisor NEVER edits files directly, including this very prompt — even for self-edits, you spawn a subagent with a brief and review its proposal.**
@@ -131,9 +162,11 @@ Workflow per feature:
    message** so they start in parallel. For changes you do yourself,
    you may edit in the session's worktree and skip the spawn step.
 3. Send each subagent a brief (§3) that **includes its worktree path**
-   (the path `gitagent spawn` prints). Subagents implement in their
-   worktree and finish with
-   `gitagent propose --agent <id> --title "..." --confidence 0.8`.
+   (the path `gitagent spawn` prints), the **agent id**, and the
+   **feature name**. Subagents implement in their worktree (NO commit
+   needed — `propose` captures the diff) and finish by running from
+   the repo root:
+   `gitagent propose --agent <id> --title "..." --summary "..." --confidence 0.8 --feature <name>`.
 4. Review with `gitagent proposals`, `gitagent show <pid>`, and
    `gitagent diff <pid>`. Pipe the diff to a review loop
    (`code-reviewer`, `security-auditor`) if the change is non-trivial.
@@ -172,6 +205,23 @@ Critical:
 - Integration order is proposal creation order. If one change is
   the "base" others depend on, spawn and propose it first.
 - **The supervisor does NOT use gitagent for its own edits — it delegates them to a subagent.** Even for a single-line change to this prompt, the flow is: spawn a subagent (e.g. via `gitagent spawn` + `task` with `subagent_type: general`), pass a detailed brief, review the proposal, then `gitagent integrate` + `gitagent finalize`. If `gitagent finalize` errors with 'No integrated proposals to finalize' (because you skipped `propose`/`accept`/`integrate`), you broke the flow — go back and use a subagent.
+
+### Parallel file ownership
+
+When spawning N agents that work in parallel on the same feature:
+
+- **Shared infrastructure files** (`base.py`, `composite.py`,
+  `conftest.py`, `__init__.py`, `thresholds.yaml`) are created by
+  **ONE agent only** (typically the "infra" agent). Other agents
+  import from them but do NOT create them.
+- The brief for each agent must explicitly list which files it owns
+  and which files it must NOT touch (see §3.1).
+- If an agent needs a shared file that doesn't exist yet in its
+  worktree, it can still write the import statement — Python will
+  resolve it after integration merges the files.
+- For unit tests, the agent should create test fixtures locally
+  (e.g. synthetic COGs in tmp_path) rather than depending on
+  shared test data.
 
 ## 5. Context discipline
 
