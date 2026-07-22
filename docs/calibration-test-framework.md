@@ -626,6 +626,8 @@ and ships behind a feature flag so we can stage the rollout.
 
 **Estimated LoC**: ~1,200 LoC Python. ~50 LoC C++ (the `--emit-cohort-log` flag).
 
+> **Note**: Phase 3 adds `scorers/score.py`, `scorers/diff.py`, and `scorers/best.py` for the scorecard runner and dual-delta reporting. These are separate from the Phase 1 `report.py` (the markdown report renderer).
+
 ### Phase 2: LLM scorer integration
 
 **Goal**: D11 verdict via a direct `langchain_openai.ChatOpenAI` call
@@ -648,33 +650,60 @@ custom JSON parsers.
 text-output JSON parser are all gone). The prompt template is ~80
 lines of markdown.
 
-### Phase 3: Baseline storage + delta reporting
+### Phase 3: Scorecard runner + delta reporting
 
-**Goal**: Sweep-friendly baselines + delta reporting.
-
-| File | Description |
-|---|---|
-| `mal-abm-fast/tests/calibration/baselines/index.yaml` | The list of available baselines + their parameter hashes. |
-| `mal-abm-fast/tests/calibration/baselines/baseline_basal_0.90.json` | The post-90517f8 BASAL=0.90 baseline. Built once, committed. |
-| `mal-abm-fast/tests/calibration/baselines/baseline_basal_0.94.json` | The target BASAL=0.94 baseline. Built when we run the calibration sweep. |
-| `mal-abm-fast/tests/calibration/baselines/baseline_m7_0.json` | The M7.0 release baseline. The "is this still good?" anchor. |
-| `mal-abm-fast/tests/calibration/baselines/build_baseline.py` | CLI: run an experiment, score it, write the baseline JSON. Used by the calibration sweep workflow. |
-| `mal-abm-fast/tests/calibration/report_diff.py` | The diff renderer. Shows per-dimension delta + composite delta + LLM verdict comparison. |
-
-**Estimated LoC**: ~300 LoC Python + the JSON baselines (auto-generated).
-
-### Phase 4: CI integration
-
-**Goal**: Fast marker on every PR, full marker nightly, on-demand via `gh workflow run`.
+**Goal**: every run produces a scorecard; diff shows improvement/regression vs previous run AND vs best historical run.
 
 | File | Description |
 |---|---|
-| `.github/workflows/calibration-fast.yml` | Runs `pytest mal-abm-fast/tests/calibration -m fast` on every PR. Builds the C++ binary in the workflow, runs the calibration tests, posts the markdown report as a PR comment. |
-| `.github/workflows/calibration-full.yml` | Runs the full marker nightly. Caches the C++ binary. Posts the report to a `runs/calibration/nightly_<date>.md` artifact. |
-| `tools/calibration-local.sh` | The local equivalent: builds the binary, runs `pytest -m fast`, prints the report. |
-| `docs/calibration-test-framework.md` | This file. |
+| `mal-abm-fast/tests/calibration/scorers/score.py` | CLI: `python -m scorers.score --run-dir <path>` — runs all 10 scorers on a run directory, produces `scorecard.json`. Called automatically by pytest after scoring. |
+| `mal-abm-fast/tests/calibration/scorers/diff.py` | CLI: `python -m scorers.diff scorecard_a.json scorecard_b.json` — renders a markdown table showing per-dimension delta + composite delta + status (improved/regressed/unchanged). |
+| `mal-abm-fast/tests/calibration/scorers/best.py` | Tracks the best historical scorecard. After each run, compares current composite vs `best_scorecard.json`. If current is better, updates the best. Stores in `runs/calibration/best_scorecard.json`. |
+| `mal-abm-fast/tests/calibration/scorers/__init__.py` | Updated to export `score`, `diff`, `best` modules. |
 
-**Estimated LoC**: ~150 LoC YAML + ~30 LoC shell.
+**Scorecard JSON shape** (same as the LLM scorer input):
+```json
+{
+  "experiment": {"name": "...", "params": {...}, "n_days": 90, "n_seeds": 5},
+  "scores": {"D1_expansion": {"score": 0.82, "value": 1.15, "target": "1.0-1.4 km"}, ...},
+  "composite": 0.78,
+  "timestamp": "2026-07-22T15:30:00",
+  "run_dir": "/tmp/abm_run_001/"
+}
+```
+
+**Delta comparison** (dual):
+- `delta_prev`: current score vs previous run's score (same experiment, different params/code)
+- `delta_best`: current score vs best historical score (all-time best composite)
+
+The diff report shows both:
+```markdown
+# Delta Report: run_002 vs run_001 (and vs best)
+
+| Dim        | run_001 | run_002 | Best  | Δ prev | Δ best | Status |
+|------------|---------|---------|-------|--------|--------|--------|
+| D2 survival| 0.73    | 0.81    | 0.85  | +0.08  | -0.04  | ✅ prev / ⚠️ best |
+| Composite  | 0.71    | 0.78    | 0.82  | +0.07  | -0.04  | ✅ prev / ⚠️ best |
+```
+
+**Best scorecard tracking**:
+- `best_scorecard.json` is stored in `runs/calibration/` (gitignored, local only)
+- After each scoring run, `scorers/best.py` compares current composite vs best
+- If current > best, updates the best file
+- The best scorecard is never overwritten with a worse result
+- This prevents losing sight of the all-time best when iterating
+
+**Estimated LoC**: ~250 LoC Python.
+
+### Phase 4: Not needed (local workflow)
+
+Phase 4 (CI integration via GitHub Actions) is **not needed** for the current
+workflow. The quality gate is local: agents run `pytest -m fast` before proposing.
+The calibration tests serve as a living regression battery — every change is
+scored, and the diff shows improvement vs the previous run and vs the best
+historical run.
+
+If CI is needed in the future, the Phase 4 YAML files can be added at that point.
 
 ## 6. Worked example: the 90517f8 over-correction
 
@@ -946,6 +975,9 @@ The framework is "shipped" when:
 | CI fast marker runs in < 60s | wall time | pass |
 | CI full marker runs in < 6 min | wall time | pass |
 | The 90517f8 BASAL=0.90 experiment is scored as `"collapsed"` | manual reproduction | pass |
+| Phase 3 works | `python -m scorers.score --run-dir <path>` produces scorecard.json | pass |
+| Phase 3 diff works | `python -m scorers.diff a.json b.json` produces markdown table | pass |
+| Phase 3 best tracking | best_scorecard.json updates when composite improves | pass |
 
 When all 9 are green, the framework is the M7+ regression anchor and
 replaces the current "eyeball the GIF" workflow.

@@ -38,6 +38,11 @@ make -f agents/memory/scripts/Makefile audit
 make -f agents/memory/scripts/Makefile seed
 make -f agents/memory/scripts/Makefile session-start
 make -f agents/memory/scripts/Makefile session-end
+
+# Run the calibration scorers (Phase 1+2: 10 scorers + LLM verdict)
+cd mal-abm-fast/tests/calibration
+uv run pytest -m fast -v          # 10 scorers, 1 seed, 30 days (PR gate)
+uv run pytest -m full -v          # 10 scorers + LLM, 5 seeds, 90 days
 ```
 
 ## Monorepo layout
@@ -175,6 +180,30 @@ Promotion moves stable, useful code from an experiment into the core tier. It is
 | Edit a protected file | Ask the user (the `ask` prompt is the mechanism). | Don't try to bypass the `ask` prompt via delegation. |
 | Push to remote after a rewrite | `git ps origin main` (force-with-lease). | Don't use `git push --force`. |
 | Wipe or set the project | `make -f agents/memory/scripts/Makefile wipe` / `set-project`. | Don't call without the global+per-agent `deny` being lifted by the user. |
+
+## Calibration framework conventions
+
+When adding a new biological feature (gonotrophic cycle, host-seeking,
+reproduction, etc.) that affects adult survival, EIP, or population
+dynamics:
+
+1. **Check if an existing scorer covers the new feature.** If not,
+   create a new scorer in `mal-abm-fast/tests/calibration/scorers/`.
+2. **Register the scorer** in `thresholds.yaml` with `min_score`,
+   `max_delta`, and `hard_floor`.
+3. **Add the scorer to the composite** by adding its weight to
+   `scorers/composite.py::DEFAULT_WEIGHTS`.
+4. **Run the calibration tests** before proposing:
+   `cd mal-abm-fast/tests/calibration && uv run pytest -m fast -v`
+5. **The diff report** shows if the new feature improved or regressed
+   the composite vs the previous run AND vs the best historical run.
+
+Scorer naming: `D<id>_<name>.py` where `<id>` is the next number (D11, D12, ...).
+The composite handles variable dimensions automatically via the geometric mean.
+
+Delta comparison: every scorecard is compared against both the **previous run**
+(immediate delta) and the **best historical run** (all-time best composite).
+This prevents losing sight of the all-time best when iterating.
 
 ## Context architecture (3 layers + 2)
 
