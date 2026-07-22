@@ -50,7 +50,7 @@ inline constexpr float  EIP_THRESHOLD_GD            = 110.0f;
 //   Faso MRR) and Thomas et al. 2013 (median 386m, The Gambia).
 // Cap=2000m: Thomas et al. 2013 95th percentile (1.7-2.8 km); captures
 //   rare long-distance colonization events.
-inline constexpr float  ADULT_DISPERSE_PROB         = 0.10f;
+inline constexpr float  ADULT_DISPERSE_PROB         = 0.05f;
 inline constexpr float  ADULT_DISPERSE_SIGMA_M      = 450.0f;
 inline constexpr float  ADULT_DISPERSE_MAX_M        = 2000.0f;
 
@@ -88,10 +88,15 @@ inline constexpr float  LARVA_BH_ALPHA = 0.05f;   // competition coefficient
 // at 30-35°C remains survivable).
 // ADULT_MORT_CAP = 0.95: empirical upper bound from Midega 2007.
 // ADULT_MORT_FLOOR = 0.60: emergency floor for extreme temps.
-inline constexpr float  ADULT_DAILY_MORT_BASAL  = 0.95f;
+inline constexpr float  ADULT_DAILY_MORT_BASAL  = 0.93f;
 inline constexpr float  ADULT_OPT_C             = 25.0f;
-inline constexpr float  ADULT_SIGMA             = 7.0f;
-inline constexpr float  ADULT_MORT_CAP          = 0.95f;
+// ADULT_SIGMA = 15: broader curve, matches Martens 1997 (West Africa MRR
+// at 30-35°C remains survivable). With sigma=7, survival at 32°C was only
+// 57.7% (mean life 2.5 days) — too low for field observations. Sigma=15
+// gives p_d=0.852 at 32°C (mean life 6.8 days), matching the "survivable"
+// range from Martens 1997 and Costantini 1996.
+inline constexpr float  ADULT_SIGMA             = 15.0f;
+inline constexpr float  ADULT_MORT_CAP          = 0.93f;
 inline constexpr float  ADULT_MORT_FLOOR        = 0.60f;
 // Backward-compat alias for existing code that reads ADULT_DAILY_MORT_BASE.
 inline constexpr float  ADULT_DAILY_MORT_BASE   = ADULT_DAILY_MORT_BASAL;

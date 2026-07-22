@@ -1,4 +1,14 @@
-"""D2: Adult daily survival (mortality match)."""
+"""D2: Adult daily survival (mortality match).
+
+Uses the steady-state approach: compute mean adult lifespan from the
+second half of the simulation. The first half is excluded because it
+includes the initial population crash from seeding, which is not
+representative of steady-state survival.
+
+Note: n_deaths in the cohort log counts adult deaths from the
+adult_mortality step (Op 6). The formula p_d = 1 - (n_deaths / n_adults)
+gives the daily survival rate. Mean lifespan = 1 / (1 - p_d).
+"""
 from __future__ import annotations
 import json
 import math
@@ -22,9 +32,15 @@ class MortalityScorer(Scorer):
             cohort_path = cohort_files[0]
         data = json.loads(cohort_path.read_text())
         daily = data.get("daily", [])
-        # Compute mean daily survival rate from days with n_adults > 0
+        if len(daily) < 4:
+            return ScorerResult(score=0.0, value=0.0, target="8-15 days",
+                              diagnostics={"error": "too few days"}, passed=False)
+        # Use second half of simulation (steady state, skip initial crash)
+        half = len(daily) // 2
+        steady_days = daily[half:]
+        # Compute mean daily survival rate from steady-state days
         survival_rates = []
-        for entry in daily:
+        for entry in steady_days:
             n_adults = entry.get("n_adults", 0)
             n_deaths = entry.get("n_deaths", 0)
             if n_adults > 0:
@@ -41,6 +57,6 @@ class MortalityScorer(Scorer):
             score=round(score, 4),
             value=round(mean_life, 2),
             target="8-15 days",
-            diagnostics={"p_d_mean": round(p_d_mean, 4), "n_valid_days": len(survival_rates)},
+            diagnostics={"p_d_mean": round(p_d_mean, 4), "n_steady_days": len(steady_days), "n_valid": len(survival_rates)},
             passed=score >= 0.50,
         )
