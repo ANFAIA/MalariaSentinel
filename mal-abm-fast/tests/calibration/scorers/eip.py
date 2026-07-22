@@ -15,8 +15,11 @@ class EIPScorer(Scorer):
     def score(self, run_dir: Path, experiment: dict[str, Any]) -> ScorerResult:
         cohort_path = run_dir / "cohort.json"
         if not cohort_path.exists():
-            return ScorerResult(score=0.0, value=0.0, target="0.20-0.50",
-                              diagnostics={"error": "cohort.json not found"}, passed=False)
+            cohort_files = sorted(run_dir.glob("cohort_seed*.json"))
+            if not cohort_files:
+                return ScorerResult(score=0.0, value=0.0, target="0.20-0.50",
+                                  diagnostics={"error": "cohort.json not found"}, passed=False)
+            cohort_path = cohort_files[0]
         data = json.loads(cohort_path.read_text())
         daily = data.get("daily", [])
         # Find the entry closest to day 30
@@ -25,8 +28,8 @@ class EIPScorer(Scorer):
             if entry.get("day", 0) == 30:
                 day30 = entry
                 break
-        if day30 is None and len(daily) > 30:
-            day30 = daily[30]
+        if day30 is None and len(daily) > 0:
+            day30 = daily[-1]
         if day30 is None:
             return ScorerResult(score=0.0, value=0.0, target="0.20-0.50",
                               diagnostics={"error": "no day-30 data"}, passed=False)

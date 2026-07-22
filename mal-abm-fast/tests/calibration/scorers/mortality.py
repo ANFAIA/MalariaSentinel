@@ -15,8 +15,11 @@ class MortalityScorer(Scorer):
     def score(self, run_dir: Path, experiment: dict[str, Any]) -> ScorerResult:
         cohort_path = run_dir / "cohort.json"
         if not cohort_path.exists():
-            return ScorerResult(score=0.0, value=0.0, target="8-15 days",
-                              diagnostics={"error": "cohort.json not found"}, passed=False)
+            cohort_files = sorted(run_dir.glob("cohort_seed*.json"))
+            if not cohort_files:
+                return ScorerResult(score=0.0, value=0.0, target="8-15 days",
+                                  diagnostics={"error": "cohort.json not found"}, passed=False)
+            cohort_path = cohort_files[0]
         data = json.loads(cohort_path.read_text())
         daily = data.get("daily", [])
         # Compute mean daily survival rate from days with n_adults > 0

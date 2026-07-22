@@ -533,7 +533,7 @@ int main(int argc, char** argv) {
                 const std::string cext  = cp.has_extension()
                     ? cp.extension().string() : ".json";
                 std::ostringstream cname;
-                cname << cstem << "_cohort_seed"
+                cname << "cohort_seed"
                       << std::setw(4) << std::setfill('0') << i << cext;
                 rollout_cohort_path = (cparent / cname.str()).string();
             }

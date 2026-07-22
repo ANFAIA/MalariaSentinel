@@ -1706,6 +1706,12 @@ wheels = [
 name = "mal-abm-fast"
 version = "0.1.0"
 source = { virtual = "mal-abm-fast" }
+dependencies = [
+    { name = "langchain-openai" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "langchain-openai", specifier = ">=1.4.0" }]
 
 [[package]]
 name = "mal-abm-fast-calibration"

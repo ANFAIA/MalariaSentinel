@@ -25,7 +25,7 @@ class DeterminismScorer(Scorer):
         return 2.0
 
     def score(self, run_dir: Path, experiment: dict[str, Any]) -> ScorerResult:
-        tifs = sorted(run_dir.glob("state_seed*.tif"))
+        tifs = sorted(p for p in run_dir.glob("state_seed*.tif") if "_day" not in p.stem)
         if not tifs:
             return ScorerResult(score=1.0, value=1.0, target="1.00",
                                 diagnostics={"note": "no seed files, assumed OK"})
