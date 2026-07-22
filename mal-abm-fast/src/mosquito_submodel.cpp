@@ -133,9 +133,47 @@ MosquitoSubmodel::MosquitoSubmodel(int32_t n_patches, int32_t k_per_patch,
     soa_.stage_age.reserve(cap);
     soa_.days_since_active.reserve(cap);
 
+    // Stable age distribution at seeding time: 10% pre-mature (EIP
+    // already complete) and 90% fresh larvae (eip_progress=0, will
+    // mature over the next ~10 days). At p_d=0.95 mean adult life is
+    // ~13 days, so 10% is a reasonable steady-state adult fraction
+    // for the suitability band (which counts adults) to be non-zero
+    // from day 1 with this distribution.
+    //
+    // The pre-mature agents are seeded as stage=0 LARVAE with
+    // eip_progress = EIP_THRESHOLD_GD (NOT stage=1 adults). The
+    // first `larva_to_adult` pass on day 1 promotes them and
+    // snaps lon/lat to the cell centre of their birth patch (via
+    // the existing larva_to_adult snap). If we seeded them as
+    // stage=1, they would keep the (lon=0, lat=0) constructor
+    // sentinel and get bucketed into the SW corner of the AOI by
+    // adult_density_by_cell — exactly the bug the larva_to_adult
+    // snap was designed to prevent. The first advance_day then
+    // promotes and disperses them, so the day-1 state COG already
+    // shows them as spread adults with proper lon/lat.
+    constexpr float UNIFORM_ADULT_FRAC = 0.10f;
+    constexpr float EIP_COMPLETE = static_cast<float>(EIP_THRESHOLD_GD);
     for (int64_t p = 0; p < np; ++p) {
         const int64_t k = per_patch[static_cast<size_t>(p)];
-        for (int64_t j = 0; j < k; ++j) {
+        const int64_t n_premature = static_cast<int64_t>(std::llround(
+            static_cast<double>(k) * UNIFORM_ADULT_FRAC));
+        const int64_t n_larvae = k - n_premature;
+        // Pre-mature: larva with EIP complete. The first
+        // larva_to_adult pass promotes them and snaps lon/lat.
+        for (int64_t j = 0; j < n_premature; ++j) {
+            soa_.uid.push_back(static_cast<int64_t>(soa_.uid.size()));
+            soa_.patch_id.push_back(p);
+            soa_.row.push_back(0);
+            soa_.col.push_back(0);
+            soa_.stage.push_back(0);
+            soa_.lon.push_back(0.0f);
+            soa_.lat.push_back(0.0f);
+            soa_.eip_progress.push_back(EIP_COMPLETE);
+            soa_.stage_age.push_back(0);
+            soa_.days_since_active.push_back(0);
+        }
+        // Larvae: fresh eggs, will accumulate EIP
+        for (int64_t j = 0; j < n_larvae; ++j) {
             soa_.uid.push_back(static_cast<int64_t>(soa_.uid.size()));
             soa_.patch_id.push_back(p);
             soa_.row.push_back(0);
