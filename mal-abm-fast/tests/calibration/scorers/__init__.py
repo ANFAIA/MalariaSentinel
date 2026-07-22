@@ -7,3 +7,8 @@ same report via the OpenCode Zen chat/completions API.
 """
 
 from __future__ import annotations
+
+# Phase 3: scorecard runner, diff renderer, best tracker
+from scorers.score import score_run, save_scorecard
+from scorers.diff import diff_scorecards
+from scorers.best import load_best, save_best, update_best
