@@ -8,6 +8,7 @@ add_library(mal_abm_fast_core STATIC
     climate.cpp
     habitat_engine.cpp
     mosquito_state.cpp
+    aquatic_cohort_bank.cpp
     mosquito_submodel.cpp
     coordinator.cpp
     output_contract.cpp

@@ -1,20 +1,22 @@
 // SPDX-License-Identifier: MIT
-// mosquito_submodel.hpp — Polars-style vectorised mosquito half of the ABM.
+// mosquito_submodel.hpp — Vectorised mosquito half of the ABM.
 //
-// The submodel owns the entire mosquito population as a `MosquitoSoA`.
-// The constructor seeds `round(n_patches * k_per_patch * init_frac)`
-// larvae with round-robin patch assignment. `advance_day` is the
-// per-day orchestrator; the 7 operations it calls are listed below in
-// the exact order they execute (matching the Python
-// `mosquito_submodel.advance_day`).
+// The submodel owns the mosquito population as a `MosquitoSoA`
+// (adults only) and an `AquaticCohortBank` (eggs, larvae, pupas).
+// The constructor seeds adults + eggs. `advance_day` is the
+// per-day orchestrator:
+//
+//   1. aquatic_cohort_bank.advance_day() — egg/larva/pupa lifecycle
+//   2. aquatic_cohort_bank.collect_emergence() — pupa → adult
+//   3. Add emerged adults to MosquitoSoA
+//   4. adult_dispersal()
+//   5. adult_mortality()
 //
 // Determinism
 // -----------
-// The submodel's `Prng` is the single RNG source for larva mortality
-// (none — deterministic), larva growth (none), EIP completion (none),
-// adult dispersal (clipped Gaussian draws), and birth (binomial draws
-// per active patch). Two runs with the same `--seed` and the same
-// `advance_day` call sequence produce identical populations.
+// The submodel's `Prng` is the single RNG source for adult dispersal
+// (clipped Gaussian draws). Aquatic lifecycle uses deterministic
+// development rates and binomial mortality.
 #pragma once
 
 #include <cstdint>
@@ -28,6 +30,7 @@
 #include "wire.hpp"
 #include "mosquito_state.hpp"
 #include "aquatic_stages.hpp"
+#include "aquatic_cohort_bank.hpp"
 
 namespace mal_abm_fast {
 
@@ -44,6 +47,9 @@ struct DailyStats {
     int64_t n_males         = 0;
     int64_t n_host_seeking  = 0;
     float   eip_frac        = 0.0f;  // fraction of adults with eip >= threshold
+    int64_t n_eggs          = 0;     // aquatic cohort bank: egg count
+    int64_t n_pupae         = 0;     // aquatic cohort bank: pupa count
+    int64_t n_emerged       = 0;     // adults emerged this day
 };
 
 class MosquitoSubmodel {
@@ -76,17 +82,21 @@ public:
     // coordinator reads it for density aggregation).
     const MosquitoSoA& soa() const { return soa_; }
 
+    // Read-only access to the aquatic cohort bank.
+    const AquaticCohortBank& cohort_bank() const { return cohort_bank_; }
+
+    // Mutable access to the aquatic cohort bank (for seeding eggs).
+    AquaticCohortBank& cohort_bank_mutable() { return cohort_bank_; }
+
     // Total live agent count (= soa().n_alive).
     int64_t total_agents() const { return soa_.n_alive; }
 
-    // Per-day orchestrator. Calls the 7 ops in order:
-    //   1. larva_mortality_inactive(patch_states)
-    //   2.5. larva_mortality_density(patch_states)
-    //   2. larva_growth(patch_states)
-    //   3. larva_to_adult()
+    // Per-day orchestrator. New G3 lifecycle flow:
+    //   1. cohort_bank_.advance_day() — aquatic development + mortality
+    //   2. cohort_bank_.collect_emergence() — pupa → adult events
+    //   3. Add emerged adults to MosquitoSoA
     //   4. adult_dispersal()
-    //   6. adult_mortality(patch_states)
-    //   5. birth(aoi, patch_states)
+    //   5. adult_mortality()
     void advance_day(const AOI& aoi,
                      const std::vector<PatchState>& patch_states);
 
@@ -116,45 +126,13 @@ public:
         debug_seeding_col_  = col;
     }
 
-    // -- 7 per-day operations -----------------------------------------------
+    // -- per-day operations -----------------------------------------------
 
-    // 1. Remove larvae at patches that are activated=false.
-    //    Adults are unaffected (they dispersed away from the patch
-    //    on a previous day, so the per-patch mortality rule only
-    //    applies to the in-patch larvae pool).
-    void larva_mortality_inactive(const std::vector<PatchState>& patch_states);
-
-    // 2.5. Density-dependent larva mortality (Beverton-Holt) at active patches.
-    void larva_mortality_density(const std::vector<PatchState>& patch_states);
-
-    // 2. At active patches: stage_age += 1, development_progress += max(0, T - EIP_BASE_C).
-    //    Uses the post Mordecai-inverse deg C from PatchState.temp_d.
-    void larva_growth(const std::vector<PatchState>& patch_states);
-
-    // 3. Promote larva -> adult when development_progress >= EIP_THRESHOLD_GD.
-    //    The promoted agents' `lon`/`lat` are written to the patch
-    //    cell centre (via aoi + transform.xy) so the next dispersal
-    //    step has a valid origin.
-    // 3. Promote larva -> adult when development_progress >= EIP_THRESHOLD_GD.
-    //    Also writes the promoted agent's lon/lat to the patch cell
-    //    centre (via aoi + cell math) so the suitability grid places
-    //    the new adult at the correct cell. Mirrors the Python
-    //    reference (mosquito_submodel.py:_larva_to_adult + birth
-    //    cell-centre placement).
-    void larva_to_adult(const AOI& aoi,
-                        const std::vector<PatchState>& patch_states);
-
-    // 4. 20% of adults move by clipped Gaussian (2 km cap). Uses
-    //    the submodel's Prng so the stream is reproducible.
+    // 1. Adult dispersal: 5% of adults move by clipped Gaussian.
     void adult_dispersal(const AOI& aoi);
 
-    // 6. Adult mortality — Lardeux thermo-dependent daily survival.
+    // 2. Adult mortality — Lardeux thermo-dependent daily survival.
     void adult_mortality(const std::vector<PatchState>& patch_states);
-
-    // 5. binomial(n_adults/2, BIRTH_FECUNDITY) per active patch; new lon/lat =
-    //    patch cell centre. New agents start as larvae with
-    //    development_progress = 0, stage_age = 0, uid = soa().next_uid++.
-    void birth(const AOI& aoi, const std::vector<PatchState>& patch_states);
 
     // -- queries used by the coordinator -----------------------------------
 
@@ -174,6 +152,7 @@ public:
 
 private:
     MosquitoSoA  soa_;
+    AquaticCohortBank cohort_bank_;
     Prng         rng_;
     int32_t      k_per_patch_ = K_PER_PATCH_DEFAULT;
     RuntimeOverrides overrides_;

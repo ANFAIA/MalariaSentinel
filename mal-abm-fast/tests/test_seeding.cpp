@@ -277,7 +277,7 @@ TEST(MalAbmFastSeeding, ExplicitFallsBackToConfigCounts) {
 // ---------------------------------------------------------------------------
 
 TEST(MalAbmFastSeeding, SubmodelDetConstructorSeedsAdultsAndLarvae) {
-    // 1 detection point: 10 adults + 5 larvae = 15 total.
+    // 1 detection point: 10 adults + 5 larvae (→ eggs in cohort bank).
     std::vector<mal_abm_fast::SeedInstruction> instructions;
     mal_abm_fast::SeedInstruction inst;
     inst.patch_id = 7;
@@ -292,19 +292,19 @@ TEST(MalAbmFastSeeding, SubmodelDetConstructorSeedsAdultsAndLarvae) {
     mal_abm_fast::MosquitoSubmodel sub(/*n_patches*/ 100,
                                        /*k_per_patch*/ 1000,
                                        instructions, /*seed*/ 42);
-    EXPECT_EQ(sub.total_agents(), 15);
+    // G3: larvae are eggs in cohort bank, only adults in SoA.
+    EXPECT_EQ(sub.total_agents(), 10);
+    EXPECT_EQ(sub.cohort_bank().count_by_stage(mal_abm_fast::AquaticStage::EGG), 5);
 
-    // Count adults vs larvae.
-    int32_t n_adults = 0, n_larvae = 0;
+    // Count adults.
+    int32_t n_adults = 0;
     for (int64_t i = 0; i < sub.soa().n_alive; ++i) {
         const size_t si = static_cast<size_t>(i);
         if (sub.soa().stage[si] == 1) ++n_adults;
-        else                         ++n_larvae;
     }
     EXPECT_EQ(n_adults, 10);
-    EXPECT_EQ(n_larvae, 5);
 
-    // All agents must be at the requested patch / cell.
+    // All adults must be at the requested patch / cell.
     for (int64_t i = 0; i < sub.soa().n_alive; ++i) {
         const size_t si = static_cast<size_t>(i);
         EXPECT_EQ(sub.soa().patch_id[si], 7);
@@ -313,22 +313,11 @@ TEST(MalAbmFastSeeding, SubmodelDetConstructorSeedsAdultsAndLarvae) {
         EXPECT_FLOAT_EQ(sub.soa().lon[si], 2.5f);
         EXPECT_FLOAT_EQ(sub.soa().lat[si], 1.5f);
     }
-
-    // Adults must have development_progress = EIP_THRESHOLD_GD (ready to disperse).
-    for (int64_t i = 0; i < sub.soa().n_alive; ++i) {
-        const size_t si = static_cast<size_t>(i);
-        if (sub.soa().stage[si] == 1) {
-            EXPECT_FLOAT_EQ(sub.soa().development_progress[si],
-                            mal_abm_fast::EIP_THRESHOLD_GD);
-        } else {
-            EXPECT_FLOAT_EQ(sub.soa().development_progress[si], 0.0f);
-        }
-    }
 }
 
 TEST(MalAbmFastSeeding, SubmodelDetConstructorMultipleDetections) {
-    // 3 detection points, each with 4 adults + 2 larvae = 6 agents.
-    // Total = 18.
+    // 3 detection points, each with 4 adults + 2 larvae (→ eggs).
+    // G3: only adults in SoA = 12 total.
     std::vector<mal_abm_fast::SeedInstruction> instructions;
     for (int32_t i = 0; i < 3; ++i) {
         mal_abm_fast::SeedInstruction inst;
@@ -342,7 +331,8 @@ TEST(MalAbmFastSeeding, SubmodelDetConstructorMultipleDetections) {
         instructions.push_back(inst);
     }
     mal_abm_fast::MosquitoSubmodel sub(100, 1000, instructions, 42);
-    EXPECT_EQ(sub.total_agents(), 18);
+    EXPECT_EQ(sub.total_agents(), 12);  // 3 * 4 adults only
+    EXPECT_EQ(sub.cohort_bank().count_by_stage(mal_abm_fast::AquaticStage::EGG), 6);  // 3 * 2 eggs
 }
 
 TEST(MalAbmFastSeeding, SubmodelDetConstructorEmptyIsEmpty) {
@@ -354,11 +344,10 @@ TEST(MalAbmFastSeeding, SubmodelDetConstructorEmptyIsEmpty) {
 
 TEST(MalAbmFastSeeding, SubmodelLegacyConstructorStillWorks) {
     // Backward compat: the original 4-arg constructor must still
-    // produce the same round-robin init_frac seeding.
+    // produce seeding. G3: 10% adults + 90% eggs in cohort bank.
     mal_abm_fast::MosquitoSubmodel sub(100, 1000, 0.3f, 42);
-    EXPECT_EQ(sub.total_agents(), 30000);
-    const auto density = sub.density_by_patch();
-    EXPECT_EQ(density.size(), 100u);
+    EXPECT_EQ(sub.total_agents(), 3000);  // 10% of 30000
+    EXPECT_EQ(sub.cohort_bank().count_by_stage(mal_abm_fast::AquaticStage::EGG), 27000);
 }
 
 // ---------------------------------------------------------------------------
@@ -378,10 +367,11 @@ TEST(MalAbmFastSeeding, EndToEndRandomViableBuildsSeededSubmodel) {
     ASSERT_EQ(instructions.size(), 4u);
 
     mal_abm_fast::MosquitoSubmodel sub(100, 1000, instructions, 7);
-    // 4 * (25 + 15) = 160.
-    EXPECT_EQ(sub.total_agents(), 160);
+    // G3: 4 * 25 = 100 adults in SoA; 4 * 15 = 60 eggs in cohort bank.
+    EXPECT_EQ(sub.total_agents(), 100);
+    EXPECT_EQ(sub.cohort_bank().count_by_stage(mal_abm_fast::AquaticStage::EGG), 60);
 
-    // Exactly 4 distinct patch_ids should have agents.
+    // Exactly 4 distinct patch_ids should have adults.
     std::set<int64_t> pids;
     for (int64_t i = 0; i < sub.soa().n_alive; ++i) {
         pids.insert(sub.soa().patch_id[static_cast<size_t>(i)]);

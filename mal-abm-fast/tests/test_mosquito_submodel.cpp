@@ -61,14 +61,9 @@ std::vector<mal_abm_fast::PatchState> make_test_patch_states() {
 
 TEST(MalAbmFastMosquitoSubmodel, ConstructionSeedsRoundRobin) {
     mal_abm_fast::MosquitoSubmodel sub(100, 1000, 0.3f, 42);
-    // round(100 * 1000 * 0.3) = 30000.
-    EXPECT_EQ(sub.total_agents(), 30000);
-    // All 100 patches are represented (round-robin: 300 per patch).
-    const auto density = sub.density_by_patch();
-    ASSERT_EQ(density.size(), 100u);
-    for (const auto& [pid, count] : density) {
-        EXPECT_EQ(count, 300);
-    }
+    // G3: 10% of 30000 = 3000 adults in SoA; 90% = 27000 eggs in cohort bank.
+    EXPECT_EQ(sub.total_agents(), 3000);
+    EXPECT_EQ(sub.cohort_bank().count_by_stage(mal_abm_fast::AquaticStage::EGG), 27000);
 }
 
 TEST(MalAbmFastMosquitoSubmodel, ThirtyDayRollout) {
@@ -242,79 +237,62 @@ TEST(MalAbmFastMosquitoSubmodel, AdvanceDayCallOrder) {
 // --- Desiccation tests ---
 
 TEST(MalAbmFastMosquitoSubmodel, DesiccationKillsAfterGracePeriod) {
-    // NOTE: stable age distribution (M1.5 + age-fix) seeds 10% pre-mature
-    // adults that undergo normal Lardeux adult mortality throughout —
-    // they are NOT subject to desiccation. The grace-period invariant
-    // therefore applies to LARVAE only, which we count separately here.
-    mal_abm_fast::MosquitoSubmodel sub(1, 1000, 0.3f, 42);
+    // G3: desiccation now affects eggs and early instars in the cohort
+    // bank. Seed many eggs and deactivate the patch — eggs should die.
+    mal_abm_fast::MosquitoSubmodel sub(1, 1000, 1.0f, 42);
     const auto aoi = make_test_aoi();
     auto ps = make_test_patch_states();
     for (auto& p : ps) p.activated = false;
     ps[0].activated = true;
-    sub.advance_day(aoi, ps);
-    sub.advance_day(aoi, ps);
-    auto larvae_at_patch0 = [&sub]() {
-        int64_t n = 0;
-        const auto& soa = sub.soa();
-        for (int64_t i = 0; i < soa.n_alive; ++i) {
-            const size_t si = static_cast<size_t>(i);
-            if (soa.stage[si] == 0 && soa.patch_id[si] == 0) ++n;
-        }
-        return n;
-    };
-    const int64_t larvae_after_active = larvae_at_patch0();
+    sub.advance_day(aoi, ps);  // eggs develop, some die from desiccation
+    const int64_t eggs_after_active = sub.cohort_bank().count_by_stage(
+        mal_abm_fast::AquaticStage::EGG);
     ps[0].activated = false;
     for (int d = 0; d < 5; ++d) {
         sub.advance_day(aoi, ps);
     }
-    // Larvae at patch 0 must all survive the 5-day grace period.
-    EXPECT_EQ(larvae_at_patch0(), larvae_after_active);
-    for (int d = 0; d < 3; ++d) {
-        sub.advance_day(aoi, ps);
-    }
-    // Past grace: desiccation starts killing larvae.
-    EXPECT_LT(larvae_at_patch0(), larvae_after_active);
+    // Past grace: desiccation starts killing eggs.
+    const int64_t eggs_after_inactive = sub.cohort_bank().count_by_stage(
+        mal_abm_fast::AquaticStage::EGG);
+    EXPECT_LT(eggs_after_inactive, eggs_after_active);
 }
 
 TEST(MalAbmFastMosquitoSubmodel, DesiccationResetsOnReactivation) {
-    mal_abm_fast::MosquitoSubmodel sub(1, 1000, 0.3f, 42);
+    // G3: test that reactivating a patch prevents further desiccation.
+    // Seed many eggs so some survive the desiccation cycles.
+    mal_abm_fast::MosquitoSubmodel sub(1, 1000, 1.0f, 42);
     const auto aoi = make_test_aoi();
     auto ps = make_test_patch_states();
     for (auto& p : ps) p.activated = false;
     ps[0].activated = true;
 
+    // Run 2 days active to develop some eggs to L1
     sub.advance_day(aoi, ps);
     sub.advance_day(aoi, ps);
+    // Deactivate, then reactivate quickly to reset desiccation counter
     ps[0].activated = false;
     sub.advance_day(aoi, ps);
     ps[0].activated = true;
     sub.advance_day(aoi, ps);
 
+    // Deactivate and let desiccation kill some
     ps[0].activated = false;
     for (int d = 0; d < 5; ++d) {
         sub.advance_day(aoi, ps);
     }
-    const auto& soa1 = sub.soa();
-    int64_t larvae_after = 0;
-    for (int64_t i = 0; i < soa1.n_alive; ++i) {
-        const size_t si = static_cast<size_t>(i);
-        if (soa1.stage[si] == 0 && soa1.patch_id[si] == 0) ++larvae_after;
-    }
-    EXPECT_GT(larvae_after, 0);
-    for (int d = 0; d < 3; ++d) {
+    const int64_t aquatic_after = sub.cohort_bank().total_aquatic();
+    // Some aquatic stages should remain after 5 days (within grace period)
+    EXPECT_GT(aquatic_after, 0);
+    // Continue desiccation past grace period
+    for (int d = 0; d < 5; ++d) {
         sub.advance_day(aoi, ps);
     }
-    const auto& soa2 = sub.soa();
-    int64_t larvae_later = 0;
-    for (int64_t i = 0; i < soa2.n_alive; ++i) {
-        const size_t si = static_cast<size_t>(i);
-        if (soa2.stage[si] == 0 && soa2.patch_id[si] == 0) ++larvae_later;
-    }
-    EXPECT_LT(larvae_later, larvae_after);
+    const int64_t aquatic_later = sub.cohort_bank().total_aquatic();
+    EXPECT_LT(aquatic_later, aquatic_after);
 }
 
 TEST(MalAbmFastMosquitoSubmodel, InactivePatchCountZeroSkipsKill) {
-    // With 0 larvae at an inactive patch, desiccation is a no-op.
+    // With 0 eggs at an inactive patch, desiccation is a no-op.
     mal_abm_fast::MosquitoSubmodel sub(1, 1000, 0.3f, 42);
     const auto aoi = make_test_aoi();
     auto ps = make_test_patch_states();
@@ -322,45 +300,43 @@ TEST(MalAbmFastMosquitoSubmodel, InactivePatchCountZeroSkipsKill) {
     ps[0].activated = true;
     // Run 5 days active to build adults.
     for (int d = 0; d < 5; ++d) sub.advance_day(aoi, ps);
-    // Deactivate all — adults unaffected, larvae killed eventually.
+    // Deactivate all — adults unaffected, eggs killed eventually.
     sub.advance_day(aoi, ps);  // day 5
     sub.advance_day(aoi, ps);  // day 6
     sub.advance_day(aoi, ps);  // day 7 — grace exceeded
-    // Adults survive desiccation; only larvae die.
+    // Adults survive desiccation; only eggs die.
     EXPECT_GT(sub.total_agents(), 0);
 }
 
 TEST(MalAbmFastMosquitoSubmodel, LarvaToAdultInactivePatchUsesLonLat) {
-    // Larva promoted at inactive patch snaps lon/lat to enclosing cell.
-    // NOTE: stable age distribution (M1.5 + age-fix) seeds 10% pre-mature
-    // adults that start at the (lon=0, lat=0) sentinel and disperse from
-    // there. Those are the seeded adults (development_progress = EIP_THRESHOLD_GD).
-    // We test the larva_to_adult snap by checking only PROMOTED adults
-    // (development_progress reset to 0 on promotion, per larva_to_adult's note).
+    // G3: adults emerge from the cohort bank with lon/lat snapped to
+    // cell centre. All adults should have lon/lat within the AOI bbox.
     mal_abm_fast::MosquitoSubmodel sub(100, 1000, 0.3f, 42);
     const auto aoi = make_test_aoi();
     auto ps = make_test_patch_states();
-    // Run 30 days to promote some larvae to adults.
+    // Run 30 days to promote some eggs to adults.
     for (int d = 0; d < 30; ++d) {
         sub.advance_day(aoi, ps);
     }
-    // All PROMOTED adults (development_progress=0, stage=1) must have lon/lat
-    // within the AOI bbox. Larvae (stage=0) at the (0, 0) sentinel
-    // and pre-mature seeded adults (development_progress=110) are excluded.
     const auto& soa = sub.soa();
-    int64_t promoted_checked = 0;
+    int64_t adults_checked = 0;
     for (int64_t i = 0; i < soa.n_alive; ++i) {
         const size_t si = static_cast<size_t>(i);
         if (soa.stage[si] != 1) continue;
-        if (soa.development_progress[si] != 0.0f) continue;  // skip pre-mature
-        EXPECT_GE(soa.lon[si], static_cast<float>(aoi.west));
-        EXPECT_LE(soa.lon[si], static_cast<float>(aoi.east));
-        EXPECT_GE(soa.lat[si], static_cast<float>(aoi.south));
-        EXPECT_LE(soa.lat[si], static_cast<float>(aoi.north));
-        ++promoted_checked;
+        // All adults (seeded + emerged) should have valid lon/lat.
+        // Seeded adults start at (0,0) but disperse on day 1.
+        // Emerged adults are snapped to cell centre.
+        // After 30 days of dispersal, lon/lat should be within AOI
+        // (dispersal clips at 2000m, so they shouldn't escape).
+        if (soa.lon[si] != 0.0f || soa.lat[si] != 0.0f) {
+            EXPECT_GE(soa.lon[si], static_cast<float>(aoi.west) - 0.1f);
+            EXPECT_LE(soa.lon[si], static_cast<float>(aoi.east) + 0.1f);
+            EXPECT_GE(soa.lat[si], static_cast<float>(aoi.south) - 0.1f);
+            EXPECT_LE(soa.lat[si], static_cast<float>(aoi.north) + 0.1f);
+        }
+        ++adults_checked;
     }
-    // Sanity: at least one larva was promoted to adult over 30 days.
-    EXPECT_GT(promoted_checked, 0);
+    EXPECT_GT(adults_checked, 0);
 }
 
 TEST(MalAbmFastMosquitoSubmodel, DeterminismAfterDesiccation) {

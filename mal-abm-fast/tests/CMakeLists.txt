@@ -92,3 +92,10 @@ target_link_libraries(test_grid_spec
     PRIVATE mal_abm_fast_core GTest::gtest GTest::gtest_main mal_abm_fast::warnings
 )
 gtest_discover_tests(test_grid_spec)
+
+# G3: Complete lifecycle tests (Egg → Larva L1-L4 → Pupa → Adult).
+add_executable(test_lifecycle test_lifecycle.cpp)
+target_link_libraries(test_lifecycle
+    PRIVATE mal_abm_fast_core GTest::gtest GTest::gtest_main mal_abm_fast::warnings
+)
+gtest_discover_tests(test_lifecycle)

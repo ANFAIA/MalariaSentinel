@@ -168,13 +168,14 @@ TEST(MalAbmFastCoordinator, FullDayOrchestrator) {
     habitat.load_from_gpkg(hab_path, aoi);
     ASSERT_EQ(habitat.patches().size(), 1u);
 
-    // Submodel with 1 patch, 30% of K seeded = 300 larvae.
+    // Submodel with 1 patch, 30% of K seeded = 300 total.
+    // G3: 10% adults (30) + 90% eggs (270) in cohort bank.
     MosquitoSubmodel sub(
         /*n_patches=*/1,
         /*k_per_patch=*/K_PER_PATCH_DEFAULT,
         /*init_frac=*/INIT_FRAC,
         /*seed=*/uint64_t{42});
-    ASSERT_EQ(sub.total_agents(), 300);
+    ASSERT_EQ(sub.total_agents(), 30);
 
     CoordinatorModel coord(
         std::move(aoi), climate, std::move(habitat),
