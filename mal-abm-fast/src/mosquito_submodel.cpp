@@ -34,6 +34,9 @@
 #include "mal_abm_fast/dispersal.hpp"
 #include "mal_abm_fast/seeding.hpp"
 #include "mal_abm_fast/aquatic_cohort_bank.hpp"
+#include "mal_abm_fast/gonotrophic_cycle.hpp"
+#include "mal_abm_fast/bite_ledger.hpp"
+#include "mal_abm_fast/multirate_scheduler.hpp"
 
 namespace mal_abm_fast {
 
@@ -58,6 +61,9 @@ inline void swap_with_last(MosquitoSoA& soa, int64_t i, int64_t n) {
     std::swap(soa.larval_instar[i], soa.larval_instar[n - 1]);
     std::swap(soa.stage_age[i],    soa.stage_age[n - 1]);
     std::swap(soa.days_since_active[i], soa.days_since_active[n - 1]);
+    std::swap(soa.gonotrophic_state[i], soa.gonotrophic_state[n - 1]);
+    std::swap(soa.gonotrophic_timer[i], soa.gonotrophic_timer[n - 1]);
+    std::swap(soa.feeding_success[i],   soa.feeding_success[n - 1]);
 }
 
 // Trim every SoA vector to `new_size` (the new live range after a
@@ -78,6 +84,9 @@ inline void trim_soa(MosquitoSoA& soa, size_t new_size) {
     soa.larval_instar.resize(new_size);
     soa.stage_age.resize(new_size);
     soa.days_since_active.resize(new_size);
+    soa.gonotrophic_state.resize(new_size);
+    soa.gonotrophic_timer.resize(new_size);
+    soa.feeding_success.resize(new_size);
 }
 
 }  // namespace
@@ -163,6 +172,10 @@ MosquitoSubmodel::MosquitoSubmodel(int32_t n_patches, int32_t k_per_patch,
             soa_.larval_instar.push_back(0);
             soa_.stage_age.push_back(0);
             soa_.days_since_active.push_back(0);
+            soa_.gonotrophic_state.push_back(
+                static_cast<uint8_t>(GonotrophicState::TENERAL));
+            soa_.gonotrophic_timer.push_back(0);
+            soa_.feeding_success.push_back(0.0f);
         }
         // Eggs in cohort bank
         if (n_eggs > 0) {
@@ -230,6 +243,9 @@ MosquitoSubmodel::MosquitoSubmodel(int32_t n_patches, int32_t k_per_patch,
     soa_.larval_instar.reserve(cap);
     soa_.stage_age.reserve(cap);
     soa_.days_since_active.reserve(cap);
+    soa_.gonotrophic_state.reserve(cap);
+    soa_.gonotrophic_timer.reserve(cap);
+    soa_.feeding_success.reserve(cap);
 
     for (const auto& inst : instructions) {
         // Adults: ready to disperse immediately.
@@ -248,6 +264,10 @@ MosquitoSubmodel::MosquitoSubmodel(int32_t n_patches, int32_t k_per_patch,
             soa_.larval_instar.push_back(0);
             soa_.stage_age.push_back(0);
             soa_.days_since_active.push_back(0);
+            soa_.gonotrophic_state.push_back(
+                static_cast<uint8_t>(GonotrophicState::TENERAL));
+            soa_.gonotrophic_timer.push_back(0);
+            soa_.feeding_success.push_back(0.0f);
         }
         // Larvae: seed as eggs in the aquatic cohort bank.
         // The cohort bank will develop them through Egg→L1→L2→L3→L4→Pupa→Adult.
@@ -353,10 +373,71 @@ void MosquitoSubmodel::advance_day(const AOI& aoi,
             soa_.larval_instar.push_back(0);
             soa_.stage_age.push_back(0);
             soa_.days_since_active.push_back(0);
+            soa_.gonotrophic_state.push_back(
+                static_cast<uint8_t>(GonotrophicState::TENERAL));
+            soa_.gonotrophic_timer.push_back(0);
+            soa_.feeding_success.push_back(0.0f);
         }
         n_emerged += ev.n_adults;
     }
     soa_.n_alive = static_cast<int64_t>(soa_.uid.size());
+
+    // -- G4: gonotrophic cycle (females only) --
+    bite_ledger_.reset_day();
+    int64_t n_feeding_attempts = 0;
+    int64_t n_successful_feeds = 0;
+    int64_t n_ovipositions = 0;
+
+    for (int64_t i = 0; i < soa_.n_alive; ++i) {
+        const size_t si = static_cast<size_t>(i);
+        if (soa_.stage[si] != 1) continue;
+        if (soa_.sex[si] != 1) continue;  // females only
+
+        auto g_state = static_cast<GonotrophicState>(soa_.gonotrophic_state[si]);
+        auto& g_timer = soa_.gonotrophic_timer[si];
+        soa_.feeding_success[si] = 0.0f;
+
+        // Daily state transition
+        const bool wants_oviposit = advance_gonotrophic_one_day(
+            g_state, g_timer, gonotrophic_params_);
+        soa_.gonotrophic_state[si] = static_cast<uint8_t>(g_state);
+
+        if (wants_oviposit) {
+            // Egg batch: use mean value (binomial(105, 0.5) ≈ 52).
+            // Stochastic version will use Prng in a later gate.
+            int32_t eggs = gonotrophic_params_.egg_batch_mean;
+            if (eggs < gonotrophic_params_.egg_batch_min)
+                eggs = gonotrophic_params_.egg_batch_min;
+            if (eggs > gonotrophic_params_.egg_batch_max)
+                eggs = gonotrophic_params_.egg_batch_max;
+            // Deposit eggs in the aquatic cohort bank.
+            cohort_bank_.add_eggs(soa_.patch_id[si],
+                                  static_cast<int64_t>(eggs));
+            g_state = GonotrophicState::HOST_SEEKING;
+            g_timer = 0;
+            soa_.gonotrophic_state[si] = static_cast<uint8_t>(g_state);
+            soa_.gonotrophic_timer[si] = g_timer;
+            n_ovipositions += eggs;
+        }
+
+        // Nightly host-seeking: attempt feeding if HOST_SEEKING
+        if (g_state == GonotrophicState::HOST_SEEKING) {
+            // Record attempt (default host: HUMAN for now)
+            n_feeding_attempts++;
+            bite_ledger_.record_attempt(
+                soa_.row[si], soa_.col[si], HostType::HUMAN);
+            // Deterministic feeding for now (all succeed).
+            // Stochastic version will use Prng in a later gate.
+            g_state = GonotrophicState::BLOOD_FED;
+            g_timer = 0;
+            soa_.gonotrophic_state[si] = static_cast<uint8_t>(g_state);
+            soa_.gonotrophic_timer[si] = g_timer;
+            soa_.feeding_success[si] = 1.0f;
+            n_successful_feeds++;
+            bite_ledger_.record_success(
+                soa_.row[si], soa_.col[si], HostType::HUMAN);
+        }
+    }
 
     // 4. Adult dispersal
     adult_dispersal(aoi);
@@ -382,6 +463,10 @@ void MosquitoSubmodel::advance_day(const AOI& aoi,
     last_day_stats_.eip_frac = (post_mort_n_alive > 0)
         ? static_cast<float>(post_n_adults) / static_cast<float>(post_mort_n_alive)
         : 0.0f;
+    // G4: gonotrophic stats
+    last_day_stats_.n_feeding_attempts = n_feeding_attempts;
+    last_day_stats_.n_successful_feeds = n_successful_feeds;
+    last_day_stats_.n_ovipositions     = n_ovipositions;
 
     if (debug_population_ && want_log) {
         const float   temp_d        = seeding_temp_d(
@@ -391,6 +476,7 @@ void MosquitoSubmodel::advance_day(const AOI& aoi,
         std::fprintf(stderr,
             "abm_debug: day=%lld n_alive=%lld n_adults=%lld "
             "n_eggs=%lld n_pupae=%lld n_emerged=%lld "
+            "n_feed_att=%lld n_feed_ok=%lld n_ovi=%lld "
             "seeding_in_states=%s seeding_temp_d=%.2f "
             "p_d=%.4f n_deaths=%lld\n",
             static_cast<long long>(day_idx),
@@ -399,6 +485,9 @@ void MosquitoSubmodel::advance_day(const AOI& aoi,
             static_cast<long long>(last_day_stats_.n_eggs),
             static_cast<long long>(last_day_stats_.n_pupae),
             static_cast<long long>(n_emerged),
+            static_cast<long long>(n_feeding_attempts),
+            static_cast<long long>(n_successful_feeds),
+            static_cast<long long>(n_ovipositions),
             in_states ? "yes" : "no",
             static_cast<double>(temp_d),
             static_cast<double>(p_d),

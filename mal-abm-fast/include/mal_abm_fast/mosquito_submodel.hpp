@@ -31,6 +31,9 @@
 #include "mosquito_state.hpp"
 #include "aquatic_stages.hpp"
 #include "aquatic_cohort_bank.hpp"
+#include "bite_ledger.hpp"
+#include "gonotrophic_cycle.hpp"
+#include "multirate_scheduler.hpp"
 
 namespace mal_abm_fast {
 
@@ -50,6 +53,10 @@ struct DailyStats {
     int64_t n_eggs          = 0;     // aquatic cohort bank: egg count
     int64_t n_pupae         = 0;     // aquatic cohort bank: pupa count
     int64_t n_emerged       = 0;     // adults emerged this day
+    // G4: gonotrophic cycle stats
+    int64_t n_feeding_attempts = 0;
+    int64_t n_successful_feeds = 0;
+    int64_t n_ovipositions     = 0;  // eggs deposited via gonotrophic cycle
 };
 
 class MosquitoSubmodel {
@@ -87,6 +94,15 @@ public:
 
     // Mutable access to the aquatic cohort bank (for seeding eggs).
     AquaticCohortBank& cohort_bank_mutable() { return cohort_bank_; }
+
+    // Read-only access to the bite ledger (G4).
+    const BiteLedger& bite_ledger() const { return bite_ledger_; }
+
+    // Read-only access to gonotrophic parameters.
+    const GonotrophicParams& gonotrophic_params() const { return gonotrophic_params_; }
+
+    // Mutable access to gonotrophic parameters (for CLI overrides).
+    GonotrophicParams& gonotrophic_params_mutable() { return gonotrophic_params_; }
 
     // Total live agent count (= soa().n_alive).
     int64_t total_agents() const { return soa_.n_alive; }
@@ -158,6 +174,11 @@ private:
     RuntimeOverrides overrides_;
 
     DailyStats last_day_stats_{};
+
+    // G4: gonotrophic cycle
+    GonotrophicParams gonotrophic_params_;
+    BiteLedger        bite_ledger_;
+    MultirateDayState night_state_;
 
     // -- debug instrumentation state (see set_debug_population) -----
     bool     debug_population_      = false;

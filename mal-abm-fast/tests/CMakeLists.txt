@@ -99,3 +99,10 @@ target_link_libraries(test_lifecycle
     PRIVATE mal_abm_fast_core GTest::gtest GTest::gtest_main mal_abm_fast::warnings
 )
 gtest_discover_tests(test_lifecycle)
+
+# G4: Gonotrophic cycle + BiteLedger + multirate scheduler.
+add_executable(test_gonotrophic test_gonotrophic.cpp)
+target_link_libraries(test_gonotrophic
+    PRIVATE mal_abm_fast_core GTest::gtest GTest::gtest_main mal_abm_fast::warnings
+)
+gtest_discover_tests(test_gonotrophic)
