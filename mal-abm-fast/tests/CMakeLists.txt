@@ -113,3 +113,10 @@ target_link_libraries(test_host_seeking
     PRIVATE mal_abm_fast_core GTest::gtest GTest::gtest_main mal_abm_fast::warnings
 )
 gtest_discover_tests(test_host_seeking)
+
+# G6: Sparse OD mobility matrices + MobilitySchedule.
+add_executable(test_mobility test_mobility.cpp)
+target_link_libraries(test_mobility
+    PRIVATE mal_abm_fast_core GTest::gtest GTest::gtest_main mal_abm_fast::warnings
+)
+gtest_discover_tests(test_mobility)
