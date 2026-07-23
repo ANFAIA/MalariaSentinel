@@ -166,8 +166,8 @@ def build_host_static_nc(
             ),
         },
         coords={
-            "x": xs,
-            "y": ys,
+            "x": xr.DataArray(xs, dims="x", attrs={"axis": "X", "standard_name": "longitude", "units": "degrees_east"}),
+            "y": xr.DataArray(ys, dims="y", attrs={"axis": "Y", "standard_name": "latitude", "units": "degrees_north"}),
         },
         attrs={
             "Conventions": "CF-1.8",
