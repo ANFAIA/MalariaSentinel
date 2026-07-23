@@ -40,10 +40,12 @@ Engine::Engine(AOI aoi,
                Prng& rng,
                std::chrono::sys_days start_date,
                int32_t max_days,
-               SeedingConfig seeding_config)
+               SeedingConfig seeding_config,
+               RuntimeOverrides overrides)
     : aoi_(std::move(aoi)),
       current_date_(start_date),
-      start_date_(start_date) {
+      start_date_(start_date),
+      overrides_(overrides) {
     auto climate = std::make_shared<ClimateEngine>();
     try {
         const bool is_nc = env_path.size() >= 3
@@ -115,7 +117,7 @@ Engine::Engine(AOI aoi,
     if (seeding_config.mode == SeedingMode::UNIFORM) {
         // Legacy path: init_frac of K in every patch.
         sub_ = std::make_unique<MosquitoSubmodel>(
-            n_patches, K_PER_PATCH_DEFAULT, INIT_FRAC, sub_seed);
+            n_patches, K_PER_PATCH_DEFAULT, INIT_FRAC, sub_seed, overrides_);
     } else {
         // Detection-based path: ask the coordinator to filter
         // habitat patches by viability (water_frac / TWI) and
@@ -129,7 +131,7 @@ Engine::Engine(AOI aoi,
             seeding_patch_.col      = instructions.front().col;
         }
         sub_ = std::make_unique<MosquitoSubmodel>(
-            n_patches, K_PER_PATCH_DEFAULT, instructions, sub_seed);
+            n_patches, K_PER_PATCH_DEFAULT, instructions, sub_seed, overrides_);
     }
 }
 
@@ -139,11 +141,13 @@ Engine::Engine(AOI aoi,
                const std::string& habitat_path,
                Prng& rng,
                std::chrono::sys_days start_date,
-               SeedingConfig seeding_config)
+               SeedingConfig seeding_config,
+               RuntimeOverrides overrides)
     : aoi_(std::move(aoi)),
       climate_(std::move(shared_climate)),
       current_date_(start_date),
-      start_date_(start_date) {
+      start_date_(start_date),
+      overrides_(overrides) {
     // Skip climate loading - use the shared one
 
     auto habitat = std::make_unique<HabitatEngine>();
@@ -169,7 +173,7 @@ Engine::Engine(AOI aoi,
 
     if (seeding_config.mode == SeedingMode::UNIFORM) {
         sub_ = std::make_unique<MosquitoSubmodel>(
-            n_patches, K_PER_PATCH_DEFAULT, INIT_FRAC, sub_seed);
+            n_patches, K_PER_PATCH_DEFAULT, INIT_FRAC, sub_seed, overrides_);
     } else {
         const std::vector<SeedInstruction> instructions =
             coord_->build_seed_instructions(seeding_config);
@@ -179,7 +183,7 @@ Engine::Engine(AOI aoi,
             seeding_patch_.col      = instructions.front().col;
         }
         sub_ = std::make_unique<MosquitoSubmodel>(
-            n_patches, K_PER_PATCH_DEFAULT, instructions, sub_seed);
+            n_patches, K_PER_PATCH_DEFAULT, instructions, sub_seed, overrides_);
     }
 }
 

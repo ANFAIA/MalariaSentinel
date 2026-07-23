@@ -66,6 +66,16 @@ inline constexpr float  BIRTH_FECUNDITY              = 0.25f;
 inline constexpr float  LARVA_BH_S0    = 0.95f;   // baseline daily survival
 inline constexpr float  LARVA_BH_ALPHA = 0.05f;   // competition coefficient
 
+// Runtime-configurable overrides for dispersal and larval parameters.
+// Used by CLI to override wire.hpp defaults for invasion simulations.
+struct RuntimeOverrides {
+    float disperse_prob    = ADULT_DISPERSE_PROB;
+    float disperse_sigma_m = ADULT_DISPERSE_SIGMA_M;
+    float disperse_max_m   = ADULT_DISPERSE_MAX_M;
+    float larva_bh_alpha   = LARVA_BH_ALPHA;
+    float birth_fecundity  = BIRTH_FECUNDITY;
+};
+
 // Adult daily mortality — Lardeux thermo-dependent with basal cap.
 //   p_d = ADULT_DAILY_MORT_BASAL * exp(-((T - ADULT_OPT_C)^2) / (2 * ADULT_SIGMA^2))
 //   clipped to [ADULT_MORT_FLOOR, ADULT_MORT_CAP]

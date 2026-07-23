@@ -333,6 +333,37 @@ int main(int argc, char** argv) {
                     "n_births, n_deaths, n_maturation, eip_frac.")
         ->default_val("");
 
+    // Runtime overrides for dispersal and larval parameters.
+    float disperse_prob = mal_abm_fast::ADULT_DISPERSE_PROB;
+    run->add_option("--disperse-prob", disperse_prob,
+                    "Adult dispersal probability per day "
+                    "(default 0.05).")
+        ->default_val(mal_abm_fast::ADULT_DISPERSE_PROB);
+
+    float disperse_sigma_m = mal_abm_fast::ADULT_DISPERSE_SIGMA_M;
+    run->add_option("--disperse-sigma-m", disperse_sigma_m,
+                    "Dispersal kernel sigma in metres "
+                    "(default 450).")
+        ->default_val(mal_abm_fast::ADULT_DISPERSE_SIGMA_M);
+
+    float disperse_max_m = mal_abm_fast::ADULT_DISPERSE_MAX_M;
+    run->add_option("--disperse-max-m", disperse_max_m,
+                    "Dispersal kernel max distance in metres "
+                    "(default 2000).")
+        ->default_val(mal_abm_fast::ADULT_DISPERSE_MAX_M);
+
+    float larva_bh_alpha = mal_abm_fast::LARVA_BH_ALPHA;
+    run->add_option("--larva-bh-alpha", larva_bh_alpha,
+                    "Beverton-Holt competition coefficient "
+                    "(default 0.05).")
+        ->default_val(mal_abm_fast::LARVA_BH_ALPHA);
+
+    float birth_fecundity = mal_abm_fast::BIRTH_FECUNDITY;
+    run->add_option("--birth-fecundity", birth_fecundity,
+                    "Per-adult per-day fecundity "
+                    "(default 0.25).")
+        ->default_val(mal_abm_fast::BIRTH_FECUNDITY);
+
     CLI11_PARSE(app, argc, argv);
 
     // If no subcommand was given, print help and exit.
@@ -371,6 +402,14 @@ int main(int argc, char** argv) {
     seeding_config.n_detections         = n_detections;
     seeding_config.n_adults_per_detection = n_adults_per_detection;
     seeding_config.n_larvae_per_detection = n_larvae_per_detection;
+
+    // -- Runtime overrides for dispersal / larval parameters -----------
+    mal_abm_fast::RuntimeOverrides overrides;
+    overrides.disperse_prob    = disperse_prob;
+    overrides.disperse_sigma_m = disperse_sigma_m;
+    overrides.disperse_max_m   = disperse_max_m;
+    overrides.larva_bh_alpha   = larva_bh_alpha;
+    overrides.birth_fecundity  = birth_fecundity;
 
     // -- AOI resolution ------------------------------------------------
     mal_abm_fast::AOI aoi;
@@ -447,7 +486,7 @@ int main(int argc, char** argv) {
         try {
             engine_ptr = std::make_unique<mal_abm_fast::Engine>(
                 aoi, thread_climate, habitat_path, rng, start_date,
-                seeding_config);
+                seeding_config, overrides);
         } catch (const std::exception& e) {
             std::cerr << "abm_run: rollout " << i
                       << " failed to build engine: " << e.what() << "\n";

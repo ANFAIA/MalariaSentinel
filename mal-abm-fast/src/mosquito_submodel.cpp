@@ -97,8 +97,9 @@ static inline std::pair<int32_t, int32_t> LonLatToCell(
 // ---------------------------------------------------------------------------
 
 MosquitoSubmodel::MosquitoSubmodel(int32_t n_patches, int32_t k_per_patch,
-                                   float init_frac, uint64_t seed)
-    : rng_(seed), k_per_patch_(k_per_patch) {
+                                   float init_frac, uint64_t seed,
+                                   RuntimeOverrides overrides)
+    : rng_(seed), k_per_patch_(k_per_patch), overrides_(overrides) {
     if (n_patches <= 0 || k_per_patch <= 0 || !(init_frac > 0.0f)) {
         soa_.n_alive  = 0;
         soa_.next_uid = 0;
@@ -209,8 +210,9 @@ MosquitoSubmodel::MosquitoSubmodel(int32_t n_patches, int32_t k_per_patch,
 // at the same (lon, lat) so subsequent cell snapping is consistent.
 MosquitoSubmodel::MosquitoSubmodel(int32_t n_patches, int32_t k_per_patch,
                                    const std::vector<SeedInstruction>& instructions,
-                                   uint64_t seed)
-    : rng_(seed), k_per_patch_(k_per_patch) {
+                                   uint64_t seed,
+                                   RuntimeOverrides overrides)
+    : rng_(seed), k_per_patch_(k_per_patch), overrides_(overrides) {
     (void)n_patches;  // not needed; instructions are explicit
     if (instructions.empty()) {
         soa_.n_alive  = 0;
@@ -510,7 +512,7 @@ void MosquitoSubmodel::larva_mortality_density(
         if (soa_.stage[si] == 0 && active_by_id[soa_.patch_id[si]]) {
             const int64_t N = larva_count[soa_.patch_id[si]];
             const double p = static_cast<double>(LARVA_BH_S0) * K /
-                (K + static_cast<double>(LARVA_BH_ALPHA) * static_cast<double>(N));
+                (K + static_cast<double>(overrides_.larva_bh_alpha) * static_cast<double>(N));
             if (rng_.uniform_double() >= p) {
                 swap_with_last(soa_, i, soa_.n_alive);
                 --soa_.n_alive;
@@ -665,13 +667,13 @@ void MosquitoSubmodel::adult_dispersal(const AOI& aoi) {
         const size_t si = static_cast<size_t>(i);
         if (soa_.stage[si] != 1) continue;
         const double u = rng_.uniform_double();
-        if (u < static_cast<double>(ADULT_DISPERSE_PROB)) {
+        if (u < static_cast<double>(overrides_.disperse_prob)) {
             const DispOffset off = offset_m(
                 rng_,
                 static_cast<double>(soa_.lon[si]),
                 static_cast<double>(soa_.lat[si]),
-                static_cast<double>(ADULT_DISPERSE_SIGMA_M),
-                static_cast<double>(ADULT_DISPERSE_MAX_M));
+                static_cast<double>(overrides_.disperse_sigma_m),
+                static_cast<double>(overrides_.disperse_max_m));
             soa_.lon[si] = static_cast<float>(static_cast<double>(soa_.lon[si]) + off.dlon);
             soa_.lat[si] = static_cast<float>(static_cast<double>(soa_.lat[si]) + off.dlat);
         }
@@ -818,7 +820,7 @@ void MosquitoSubmodel::birth(const AOI& aoi,
         // Temperature-dependent birth rate (Mordecai 2013)
         const double temp_c = static_cast<double>(ps.temp_d);
         const double rate_mod = birth_rate_modifier(temp_c);
-        const double effective_fecundity = static_cast<double>(BIRTH_FECUNDITY) * rate_mod;
+        const double effective_fecundity = static_cast<double>(overrides_.birth_fecundity) * rate_mod;
         const int n = rng_.binomial(static_cast<int>(n_females),
                                     effective_fecundity);
         const int64_t nb = static_cast<int64_t>(n);

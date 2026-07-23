@@ -61,7 +61,8 @@ public:
            Prng& rng,
            std::chrono::sys_days start_date,
            int32_t max_days = 0,
-           SeedingConfig seeding_config = SeedingConfig{});
+           SeedingConfig seeding_config = SeedingConfig{},
+           RuntimeOverrides overrides = {});
 
     // Optimized constructor: accepts a pre-loaded shared ClimateEngine.
     // Used by multi-rollout simulations to share climate data across
@@ -73,7 +74,8 @@ public:
            const std::string& habitat_path,
            Prng& rng,
            std::chrono::sys_days start_date,
-           SeedingConfig seeding_config = SeedingConfig{});
+           SeedingConfig seeding_config = SeedingConfig{},
+           RuntimeOverrides overrides = {});
 
     // Advance the model by one day. Mirrors `AnophelesABM.step()`:
     //   1. coord_->activate_patches()
@@ -150,6 +152,7 @@ private:
     std::chrono::sys_days                   start_date_;
     SeedingPatch                            seeding_patch_;
     int64_t                                 max_population_ = 0;
+    RuntimeOverrides                        overrides_;
 };
 
 }  // namespace mal_abm_fast

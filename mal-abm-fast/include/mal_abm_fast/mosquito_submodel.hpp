@@ -53,7 +53,8 @@ public:
     // reads `patch_id`, not lon/lat; the first dispersal step
     // overwrites them).
     MosquitoSubmodel(int32_t n_patches, int32_t k_per_patch,
-                     float init_frac, uint64_t seed);
+                     float init_frac, uint64_t seed,
+                     RuntimeOverrides overrides = {});
 
     // Detection-based constructor: seed a mix of adults and
     // larvae at specific patches via the supplied SeedInstruction
@@ -64,7 +65,8 @@ public:
     // the per-day `birth()` step (binomial draw per active patch).
     MosquitoSubmodel(int32_t n_patches, int32_t k_per_patch,
                      const std::vector<SeedInstruction>& instructions,
-                     uint64_t seed);
+                     uint64_t seed,
+                     RuntimeOverrides overrides = {});
 
     // Read-only access to the SoA (the submodel owns it; the
     // coordinator reads it for density aggregation).
@@ -170,6 +172,7 @@ private:
     MosquitoSoA  soa_;
     Prng         rng_;
     int32_t      k_per_patch_ = K_PER_PATCH_DEFAULT;
+    RuntimeOverrides overrides_;
 
     DailyStats last_day_stats_{};
 
