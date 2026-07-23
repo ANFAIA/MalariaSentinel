@@ -1,3 +1,8 @@
+---
+name: mal-core-api
+description: API reference for the mal-core promoted modules — UNet training, prediction pipelines, model registry, scenario configuration, AOI/scale definitions, env data loading, ABM state loading, and FastAPI/CLI entrypoints. Use when working with mal-core stable modules, writing code that imports from mal_core, or needing to understand what public APIs are available in the promoted core.
+---
+
 # mal-core-api
 
 **Use this skill when:** working with the mal-core promoted modules — UNet training, prediction pipelines, model registry, scenario configuration, AOI/scale definitions, environmental data loading, ABM state loading, or the FastAPI/CLI entrypoints. This covers the stable, production-grade Centinela core.
