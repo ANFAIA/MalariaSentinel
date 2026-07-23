@@ -24,7 +24,7 @@ from mal_commonlib.data.host_utils import (
     build_host_static_nc,
     write_manifest,
 )
-from mal_commonlib.data.loaders.ghsl import GHSLLoader, GHSL_RURAL, GHSL_URBAN
+from mal_commonlib.data.loaders.ghsl import GHSLLoader, GHSL_URBAN
 from mal_commonlib.data.loaders.glw import GLWLoader
 from mal_commonlib.data.loaders.worldpop import WorldPopLoader
 
@@ -157,13 +157,20 @@ def main() -> None:
             method="nearest",
         )
         urban_class = urban_class.astype(np.int32)
-        n_urban = int((urban_class == GHSL_URBAN).sum())
-        n_rural = int((urban_class == GHSL_RURAL).sum())
+        # Reclassify GHSL SMOD R2023A classes to simple scheme:
+        #   30 → 30 (urban), 20-29 → 50 (rural), 0-19 → 20 (water)
+        reclassified = np.where(urban_class == 30, 30, np.where(
+            (urban_class >= 20) & (urban_class < 30), 50,
+            np.where((urban_class >= 0) & (urban_class < 20), 20, 50)
+        )).astype(np.int32)
+        urban_class = reclassified
+        n_urban = int((urban_class == 30).sum())
+        n_rural = int((urban_class == 50).sum())
         print(f"  Urban cells: {n_urban}, Rural cells: {n_rural}")
     except Exception as exc:
         print(f"  WARNING: GHSL load failed: {exc}", file=sys.stderr)
         print("  Filling urban_class with rural default (50).", file=sys.stderr)
-        urban_class = np.full((h, w), GHSL_RURAL, dtype=np.int32)
+        urban_class = np.full((h, w), 50, dtype=np.int32)  # 50 = rural default
 
     # 4. Write NetCDF + manifest
     print("\n[4/4] Writing host_static.nc + manifest...")
