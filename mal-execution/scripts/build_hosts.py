@@ -64,9 +64,10 @@ def _get_aoi(aoi_path: str | None) -> AOI:
     """Load or construct the AOI."""
     if aoi_path is not None:
         return AOI.from_file(aoi_path)
+    # Use WGS84 for the bbox (the default registry values are in degrees).
     return AOI.from_bbox(
         AOI_W, AOI_S, AOI_E, AOI_N,
-        crs=DST_CRS,
+        crs="EPSG:4326",
         slug="ghana",
         resolution_m=DST_RES,
     )
@@ -131,21 +132,26 @@ def main() -> None:
 
     # 3. Urban/rural classification (GHSL, 250m) — nearest-neighbour
     print("\n[3/4] Loading GHSL settlement classification...")
-    ghsl = GHSLLoader()
-    smod_da = ghsl.load(aoi, cache_dir=cache)
-    urban_class = aggregate_to_grid(
-        smod_da.values.astype(np.float32),
-        smod_da.rio.transform(),
-        smod_da.rio.crs,
-        target_transform,
-        aoi.crs_obj,
-        (h, w),
-        method="nearest",
-    )
-    urban_class = urban_class.astype(np.int32)
-    n_urban = int((urban_class == GHSL_URBAN).sum())
-    n_rural = int((urban_class == GHSL_RURAL).sum())
-    print(f"  Urban cells: {n_urban}, Rural cells: {n_rural}")
+    try:
+        ghsl = GHSLLoader()
+        smod_da = ghsl.load(aoi, cache_dir=cache)
+        urban_class = aggregate_to_grid(
+            smod_da.values.astype(np.float32),
+            smod_da.rio.transform(),
+            smod_da.rio.crs,
+            target_transform,
+            aoi.crs_obj,
+            (h, w),
+            method="nearest",
+        )
+        urban_class = urban_class.astype(np.int32)
+        n_urban = int((urban_class == GHSL_URBAN).sum())
+        n_rural = int((urban_class == GHSL_RURAL).sum())
+        print(f"  Urban cells: {n_urban}, Rural cells: {n_rural}")
+    except Exception as exc:
+        print(f"  WARNING: GHSL load failed: {exc}", file=sys.stderr)
+        print("  Filling urban_class with rural default (50).", file=sys.stderr)
+        urban_class = np.full((h, w), GHSL_RURAL, dtype=np.int32)
 
     # 4. Write NetCDF + manifest
     print("\n[4/4] Writing host_static.nc + manifest...")

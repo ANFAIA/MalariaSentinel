@@ -36,51 +36,47 @@ if TYPE_CHECKING:
     from mal_commonlib.aoi import AOI
 
 # GLW4 2020 species keys and FAO dataset identifiers
+# Using global GLW4 2020 rasters from FAO's Google Cloud bucket.
 _SPECIES_CONFIG: dict[str, dict] = {
     "cattle": {
-        "file_name": "GHA_Cattle_2010.tif",
+        "file_name": "GLW4-2020.D-DA.CTL.tif",
         "url": (
-            "https://data.apps.fao.org/catalog/dataset/"
-            "6bc08ae5-e91c-4063-b497-4e9c2bf7e2a0/resource/"
-            "31463d81-8ef0-4345-84b6-2137e309ba26/download/GHA_Cattle_2010.tif"
+            "https://storage.googleapis.com/fao-gismgr-glw4-2020-data/"
+            "DATA/GLW4-2020/MAPSET/D-DA/GLW4-2020.D-DA.CTL.tif"
         ),
-        "long_name": "GLW4 cattle head count",
+        "long_name": "GLW4 cattle density",
     },
     "goats": {
-        "file_name": "GHA_Goats_2010.tif",
+        "file_name": "GLW4-2020.D-DA.GTS.tif",
         "url": (
-            "https://data.apps.fao.org/catalog/dataset/"
-            "6bc08ae5-e91c-4063-b497-4e9c2bf7e2a0/resource/"
-            "18d7a946-4c26-4232-826d-1b6c57b2c2d9/download/GHA_Goats_2010.tif"
+            "https://storage.googleapis.com/fao-gismgr-glw4-2020-data/"
+            "DATA/GLW4-2020/MAPSET/D-DA/GLW4-2020.D-DA.GTS.tif"
         ),
-        "long_name": "GLW4 goats head count",
+        "long_name": "GLW4 goats density",
     },
     "sheep": {
-        "file_name": "GHA_Sheep_2010.tif",
+        "file_name": "GLW4-2020.D-DA.SHP.tif",
         "url": (
-            "https://data.apps.fao.org/catalog/dataset/"
-            "6bc08ae5-e91c-4063-b497-4e9c2bf7e2a0/resource/"
-            "6e2d6d55-4b1c-4c90-8f2f-9e5c51c7d3e0/download/GHA_Sheep_2010.tif"
+            "https://storage.googleapis.com/fao-gismgr-glw4-2020-data/"
+            "DATA/GLW4-2020/MAPSET/D-DA/GLW4-2020.D-DA.SHP.tif"
         ),
-        "long_name": "GLW4 sheep head count",
+        "long_name": "GLW4 sheep density",
     },
     "pigs": {
-        "file_name": "GHA_Pigs_2010.tif",
+        "file_name": "GLW4-2020.D-DA.PGS.tif",
         "url": (
-            "https://data.apps.fao.org/catalog/dataset/"
-            "6bc08ae5-e91c-4063-b497-4e9c2bf7e2a0/resource/"
-            "e7c7f6a4-2d3e-4b5a-9c1f-8d6e5f4a3b2c/download/GHA_Pigs_2010.tif"
+            "https://storage.googleapis.com/fao-gismgr-glw4-2020-data/"
+            "DATA/GLW4-2020/MAPSET/D-DA/GLW4-2020.D-DA.PGS.tif"
         ),
-        "long_name": "GLW4 pigs head count",
+        "long_name": "GLW4 pigs density",
     },
     "chickens": {
-        "file_name": "GHA_Chicken_2010.tif",
+        "file_name": "GLW4-2020.D-DA.CHK.tif",
         "url": (
-            "https://data.apps.fao.org/catalog/dataset/"
-            "6bc08ae5-e91c-4063-b497-4e9c2bf7e2a0/resource/"
-            "a1b2c3d4-e5f6-7890-abcd-ef1234567890/download/GHA_Chicken_2010.tif"
+            "https://storage.googleapis.com/fao-gismgr-glw4-2020-data/"
+            "DATA/GLW4-2020/MAPSET/D-DA/GLW4-2020.D-DA.CHK.tif"
         ),
-        "long_name": "GLW4 chickens head count",
+        "long_name": "GLW4 chickens density",
     },
 }
 

@@ -38,7 +38,7 @@ if TYPE_CHECKING:
 # WorldPop Ghana constrained UN-adjusted 2019 v2.0
 _WORLDPOP_URL_TEMPLATE = (
     "https://data.worldpop.org/GIS/Population/Global_2000_2020_Constrained/"
-    "2020/BSGM/GHA/gha_ppp_2019_constrained.tif"
+    "{year}/GHA/{iso3}_ppp_{year}_constrained.tif"
 )
 _WORLDPOP_FILE_NAME = "gha_ppp_2019_constrained.tif"
 
@@ -93,13 +93,15 @@ class WorldPopLoader:
         aoi: AOI,
         year: int = 2019,
         *,
+        country_iso3: str = "gha",
         cache_dir: pathlib.Path | None = None,
     ) -> xr.DataArray:
-        """Load WorldPop Ghana population for the AOI.
+        """Load WorldPop population for the AOI.
 
         Args:
             aoi: the AOI (bbox, CRS, resolution_m, slug).
-            year: must be 2019 (only constrained Ghana product available).
+            year: 2000–2020 (constrained UN-adjusted product).
+            country_iso3: lowercase ISO3 country code (default "gha").
             cache_dir: local cache for the downloaded GeoTIFF.
 
         Returns:
@@ -107,14 +109,16 @@ class WorldPopLoader:
             Values are population counts per cell (persons/pixel).
             ``-9999.0`` for cells with no data.
         """
-        if year != 2019:
+        if not (2000 <= year <= 2020):
             raise ValueError(
-                f"WorldPop Ghana constrained is only available for 2019; got {year}"
+                f"WorldPop constrained years are 2000–2020; got {year}"
             )
 
         cdir = cache_dir if cache_dir is not None else _default_cache_dir()
-        tif_path = cdir / _WORLDPOP_FILE_NAME
-        _download_to(_WORLDPOP_URL_TEMPLATE, tif_path)
+        file_name = f"{country_iso3}_ppp_{year}_constrained.tif"
+        tif_path = cdir / file_name
+        url = _WORLDPOP_URL_TEMPLATE.format(year=year, iso3=country_iso3)
+        _download_to(url, tif_path)
 
         return self._read_clip(aoi, tif_path, year)
 

@@ -33,6 +33,7 @@ def aggregate_to_grid(
     target_crs: Any,
     target_shape: tuple[int, int],
     method: str = "sum",
+    nodata: float = -9999.0,
 ) -> np.ndarray:
     """Aggregate a source raster to a target grid.
 
@@ -48,6 +49,7 @@ def aggregate_to_grid(
         target_crs: CRS of the target grid.
         target_shape: (H_dst, W_dst) of the target grid.
         method: "sum" (conservative) or "nearest" (categorical).
+        nodata: sentinel value to mask before summing (default -9999.0).
 
     Returns:
         (H_dst, W_dst) numpy array (float32).
@@ -55,12 +57,15 @@ def aggregate_to_grid(
     from rasterio.warp import Resampling, reproject
 
     h_dst, w_dst = target_shape
+
+    # Mask nodata before reproject to avoid summing sentinel values.
+    source_masked = np.where(source == nodata, 0.0, source).astype(np.float32)
     dst = np.zeros((h_dst, w_dst), dtype=np.float32)
 
     resampling = Resampling.sum if method == "sum" else Resampling.nearest
 
     reproject(
-        source=source.astype(np.float32),
+        source=source_masked,
         destination=dst,
         src_transform=source_transform,
         src_crs=source_crs,
