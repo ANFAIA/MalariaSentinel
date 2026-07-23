@@ -144,7 +144,7 @@ match without re-deriving it.
 | **Scoring** | `score = exp(-((r_90_obs − 1.2 km) / 0.4 km)²)` (Gaussian, peak at 1.2 km, σ=0.4 km). |
 | **Source** | `papers/anopheles-dynamics/dispersal-kernel-calibration.md` §2 (Thomas 2013). |
 | **Catches** | Dispersal kernel too narrow (sigma=300m, pre-commit `f7ddd44`) or too wide (sigma=1000m). |
-| **Reuses** | `scripts/raster_to_png.py` rasterio reads. |
+| **Reuses** | `mal-abm-fast/scripts/visualize_state.py` rasterio reads. |
 
 ### D2. Adult daily survival (mortality match)
 
