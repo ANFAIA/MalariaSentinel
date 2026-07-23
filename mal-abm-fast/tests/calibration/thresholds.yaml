@@ -68,3 +68,21 @@ D11_larval_dynamics:
   max_delta: -0.15
   hard_floor: 0.50
   source: "Mordecai 2013: Anopheles gambiae larval population dynamics"
+
+D12_host_density:
+  min_score: 0.50
+  max_delta: -0.30
+  hard_floor: 0.10
+  source: "WorldPop Ghana 2019 ~27M persons; GSS 2021 census ~30.8M"
+
+D13_host_seeking_distance:
+  min_score: 0.60
+  max_delta: -0.25
+  hard_floor: 0.30
+  source: "Takken et al. 1998: CO2 plume 20-70m; Costantini 1996: 35m baseline"
+
+D14_mobility_conservation:
+  min_score: 0.90
+  max_delta: -0.05
+  hard_floor: 0.70
+  source: "Row-stochastic OD matrices: rows must sum to 1.0"
