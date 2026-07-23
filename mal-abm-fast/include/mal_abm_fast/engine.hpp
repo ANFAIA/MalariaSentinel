@@ -19,6 +19,8 @@
 #include "climate.hpp"
 #include "coordinator.hpp"
 #include "habitat_engine.hpp"
+#include "host_landscape.hpp"
+#include "mobility_schedule.hpp"
 #include "mosquito_submodel.hpp"
 #include "prng.hpp"
 #include "seeding.hpp"
@@ -62,7 +64,9 @@ public:
            std::chrono::sys_days start_date,
            int32_t max_days = 0,
            SeedingConfig seeding_config = SeedingConfig{},
-           RuntimeOverrides overrides = {});
+           RuntimeOverrides overrides = {},
+           const std::string& hosts_path = "",
+           const std::string& mobility_dir = "");
 
     // Optimized constructor: accepts a pre-loaded shared ClimateEngine.
     // Used by multi-rollout simulations to share climate data across
@@ -75,7 +79,9 @@ public:
            Prng& rng,
            std::chrono::sys_days start_date,
            SeedingConfig seeding_config = SeedingConfig{},
-           RuntimeOverrides overrides = {});
+           RuntimeOverrides overrides = {},
+           const std::string& hosts_path = "",
+           const std::string& mobility_dir = "");
 
     // Advance the model by one day. Mirrors `AnophelesABM.step()`:
     //   1. coord_->activate_patches()
@@ -153,6 +159,10 @@ private:
     SeedingPatch                            seeding_patch_;
     int64_t                                 max_population_ = 0;
     RuntimeOverrides                        overrides_;
+
+    // Optional host-seeking components (loaded when --hosts is provided).
+    std::unique_ptr<HostLandscape>          host_landscape_;
+    std::unique_ptr<MobilitySchedule>       mobility_schedule_;
 };
 
 }  // namespace mal_abm_fast

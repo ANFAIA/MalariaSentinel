@@ -41,7 +41,9 @@ Engine::Engine(AOI aoi,
                std::chrono::sys_days start_date,
                int32_t max_days,
                SeedingConfig seeding_config,
-               RuntimeOverrides overrides)
+               RuntimeOverrides overrides,
+               const std::string& hosts_path,
+               const std::string& mobility_dir)
     : aoi_(std::move(aoi)),
       current_date_(start_date),
       start_date_(start_date),
@@ -133,16 +135,32 @@ Engine::Engine(AOI aoi,
         sub_ = std::make_unique<MosquitoSubmodel>(
             n_patches, K_PER_PATCH_DEFAULT, instructions, sub_seed, overrides_);
     }
-}
 
-// Optimized constructor: accepts a pre-loaded shared ClimateEngine
+    // -- Optional host-seeking components -----------------------------------
+    if (!hosts_path.empty()) {
+        host_landscape_ = std::make_unique<HostLandscape>();
+        host_landscape_->load_from_nc(hosts_path, aoi_);
+        std::cout << "Engine: loaded HostLandscape from " << hosts_path << "\n";
+    }
+    if (!mobility_dir.empty()) {
+        mobility_schedule_ = std::make_unique<MobilitySchedule>();
+        mobility_schedule_->load_from_directory(mobility_dir, aoi_);
+        if (mobility_schedule_->has_data()) {
+            std::cout << "Engine: loaded MobilitySchedule (" 
+                      << mobility_schedule_->n_matrices() << " matrices) from "
+                      << mobility_dir << "\n";
+        }
+    }
+}
 Engine::Engine(AOI aoi,
                std::shared_ptr<ClimateEngine> shared_climate,
                const std::string& habitat_path,
                Prng& rng,
                std::chrono::sys_days start_date,
                SeedingConfig seeding_config,
-               RuntimeOverrides overrides)
+               RuntimeOverrides overrides,
+               const std::string& hosts_path,
+               const std::string& mobility_dir)
     : aoi_(std::move(aoi)),
       climate_(std::move(shared_climate)),
       current_date_(start_date),
@@ -184,6 +202,22 @@ Engine::Engine(AOI aoi,
         }
         sub_ = std::make_unique<MosquitoSubmodel>(
             n_patches, K_PER_PATCH_DEFAULT, instructions, sub_seed, overrides_);
+    }
+
+    // -- Optional host-seeking components -----------------------------------
+    if (!hosts_path.empty()) {
+        host_landscape_ = std::make_unique<HostLandscape>();
+        host_landscape_->load_from_nc(hosts_path, aoi_);
+        std::cout << "Engine: loaded HostLandscape from " << hosts_path << "\n";
+    }
+    if (!mobility_dir.empty()) {
+        mobility_schedule_ = std::make_unique<MobilitySchedule>();
+        mobility_schedule_->load_from_directory(mobility_dir, aoi_);
+        if (mobility_schedule_->has_data()) {
+            std::cout << "Engine: loaded MobilitySchedule ("
+                      << mobility_schedule_->n_matrices() << " matrices) from "
+                      << mobility_dir << "\n";
+        }
     }
 }
 

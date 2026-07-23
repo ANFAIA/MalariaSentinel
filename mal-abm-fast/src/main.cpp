@@ -333,6 +333,22 @@ int main(int argc, char** argv) {
                     "n_births, n_deaths, n_maturation, eip_frac.")
         ->default_val("");
 
+    // Host data (optional; if not provided, no host-seeking).
+    std::string hosts_path;
+    run->add_option("--hosts", hosts_path,
+                    "Path to host_static.nc (optional; enables host-seeking)");
+
+    // Mobility matrices (optional; requires --hosts).
+    std::string human_mobility_day_path;
+    std::string human_mobility_night_path;
+    std::string livestock_mobility_path;
+    run->add_option("--human-mobility-day", human_mobility_day_path,
+                    "Path to human_mobility_day.csr (optional)");
+    run->add_option("--human-mobility-night", human_mobility_night_path,
+                    "Path to human_mobility_night.csr (optional)");
+    run->add_option("--livestock-mobility", livestock_mobility_path,
+                    "Path to livestock_mobility_season.csr (optional)");
+
     // Runtime overrides for dispersal and larval parameters.
     float disperse_prob = mal_abm_fast::ADULT_DISPERSE_PROB;
     run->add_option("--disperse-prob", disperse_prob,
@@ -482,11 +498,23 @@ int main(int argc, char** argv) {
         auto thread_climate = shared_climate->clone_for_thread();
 
         // -- Build the engine -----------------------------------------
+        // Derive mobility directory from the individual file paths (if any).
+        std::string mobility_dir;
+        if (!human_mobility_day_path.empty()) {
+            mobility_dir = std::filesystem::path(human_mobility_day_path)
+                .parent_path().string();
+        } else if (!human_mobility_night_path.empty()) {
+            mobility_dir = std::filesystem::path(human_mobility_night_path)
+                .parent_path().string();
+        } else if (!livestock_mobility_path.empty()) {
+            mobility_dir = std::filesystem::path(livestock_mobility_path)
+                .parent_path().string();
+        }
         std::unique_ptr<mal_abm_fast::Engine> engine_ptr;
         try {
             engine_ptr = std::make_unique<mal_abm_fast::Engine>(
                 aoi, thread_climate, habitat_path, rng, start_date,
-                seeding_config, overrides);
+                seeding_config, overrides, hosts_path, mobility_dir);
         } catch (const std::exception& e) {
             std::cerr << "abm_run: rollout " << i
                       << " failed to build engine: " << e.what() << "\n";

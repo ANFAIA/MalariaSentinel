@@ -16,6 +16,7 @@ add_library(mal_abm_fast_core STATIC
     seeding.cpp
     host_landscape.cpp
     host_seeking.cpp
+    mobility_schedule.cpp
 )
 target_include_directories(mal_abm_fast_core
     PUBLIC
