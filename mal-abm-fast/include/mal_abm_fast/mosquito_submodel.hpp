@@ -131,15 +131,9 @@ public:
     const DailyStats& last_day_stats() const { return last_day_stats_; }
 
     // Host-seeking components (optional; set after construction by Engine).
-    void set_host_landscape(const HostLandscape* h) { host_landscape_ = h; }
-    void set_mobility_schedule(const MobilitySchedule* m) { mobility_schedule_ = m; }
-    void set_host_seeking_model(const HostSeekingModel* h) { host_seeking_ = h; }
+    // (setters are above, near gonotrophic_params)
 
-    // -- debug instrumentation (M7.0 population-crash investigation) -----
-    // When enabled, advance_day() writes one stderr line per day with
-    // the day's population counts, the Lardeux p_d at the seeding
-    // patch (a strong proxy for whether the calibrated mortality
-    // model is being applied vs. the 0.90 fallback), and the
+    /// Per-day stats from the most recent advance_day() call.
     // per-day births / deaths / larva-to-adult maturations. Rate-
     // limited: every day for the first 10 days, then every 5 days.
     // Default off — does not change the per-day RNG stream or the
@@ -196,11 +190,7 @@ private:
     BiteLedger        bite_ledger_;
     MultirateDayState night_state_;
 
-<<<<<<< ours
     // Host-seeking (non-owning pointers; Engine owns the components).
-=======
-    // Host-seeking components (G14) — raw pointers; Engine owns the objects.
->>>>>>> theirs
     const HostLandscape*    host_landscape_    = nullptr;
     const MobilitySchedule* mobility_schedule_ = nullptr;
     const HostSeekingModel* host_seeking_      = nullptr;

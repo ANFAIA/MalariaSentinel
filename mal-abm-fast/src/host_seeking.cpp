@@ -44,11 +44,13 @@ float HostSeekingModel::cell_attraction(
 
     // Weighted sum across host types.
     float att = 0.0f;
-    att += cell.humans_present  * pref_.human    * indoor_mod * urban_mod;
-    att += cell.cattle_present  * pref_.cattle   * indoor_mod * urban_mod;
-    att += cell.goats_present   * pref_.goat     * indoor_mod * urban_mod;
-    att += cell.sheep_present   * pref_.sheep    * indoor_mod * urban_mod;
-    att += cell.wildlife_proxy  * pref_.wildlife * indoor_mod * urban_mod;
+    att += cell.humans_present   * pref_.human    * indoor_mod * urban_mod;
+    att += cell.cattle_present   * pref_.cattle   * indoor_mod * urban_mod;
+    att += cell.goats_present    * pref_.goat     * indoor_mod * urban_mod;
+    att += cell.sheep_present    * pref_.sheep    * indoor_mod * urban_mod;
+    att += cell.pigs_present     * pref_.cattle   * indoor_mod * urban_mod;  // pigs ≈ cattle
+    att += cell.chickens_present * pref_.wildlife  * indoor_mod * urban_mod; // chickens ≈ other
+    att += cell.wildlife_proxy   * pref_.wildlife  * indoor_mod * urban_mod;
 
     return att * decay;
 }
@@ -57,11 +59,13 @@ HostType HostSeekingModel::dominant_host(const HostCell& cell) const {
     // Find the host type with the highest count × preference.
     struct Score { HostType type; float score; };
     Score scores[] = {
-        {HostType::HUMAN,  cell.humans_present  * pref_.human},
-        {HostType::CATTLE, cell.cattle_present  * pref_.cattle},
-        {HostType::GOAT,   cell.goats_present   * pref_.goat},
-        {HostType::SHEEP,  cell.sheep_present   * pref_.sheep},
-        {HostType::OTHER,  cell.wildlife_proxy  * pref_.wildlife},
+        {HostType::HUMAN,  cell.humans_present   * pref_.human},
+        {HostType::CATTLE, cell.cattle_present   * pref_.cattle},
+        {HostType::GOAT,   cell.goats_present    * pref_.goat},
+        {HostType::SHEEP,  cell.sheep_present    * pref_.sheep},
+        {HostType::CATTLE, cell.pigs_present     * pref_.cattle},  // pigs ≈ cattle
+        {HostType::OTHER,  cell.chickens_present * pref_.wildlife}, // chickens ≈ other
+        {HostType::OTHER,  cell.wildlife_proxy   * pref_.wildlife},
     };
     HostType best = HostType::HUMAN;
     float best_score = 0.0f;

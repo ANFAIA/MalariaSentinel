@@ -152,7 +152,6 @@ Engine::Engine(AOI aoi,
         }
     }
 
-<<<<<<< ours
     // Wire host-seeking components to the submodel.
     if (sub_ && host_landscape_) {
         sub_->set_host_landscape(host_landscape_.get());
@@ -164,14 +163,8 @@ Engine::Engine(AOI aoi,
         host_seeking_model_ = std::make_unique<HostSeekingModel>();
         sub_->set_host_seeking_model(host_seeking_model_.get());
     }
-=======
-    // -- Wire host-seeking components to the submodel (G14) ----
-    if (sub_ && host_landscape_) sub_->set_host_landscape(host_landscape_.get());
-    if (sub_ && mobility_schedule_) sub_->set_mobility_schedule(mobility_schedule_.get());
-    host_seeking_model_ = std::make_unique<HostSeekingModel>();
-    sub_->set_host_seeking_model(host_seeking_model_.get());
->>>>>>> theirs
 }
+
 Engine::Engine(AOI aoi,
                std::shared_ptr<ClimateEngine> shared_climate,
                const std::string& habitat_path,
@@ -240,7 +233,6 @@ Engine::Engine(AOI aoi,
         }
     }
 
-<<<<<<< ours
     // Wire host-seeking components to the submodel.
     if (sub_ && host_landscape_) {
         sub_->set_host_landscape(host_landscape_.get());
@@ -252,13 +244,6 @@ Engine::Engine(AOI aoi,
         host_seeking_model_ = std::make_unique<HostSeekingModel>();
         sub_->set_host_seeking_model(host_seeking_model_.get());
     }
-=======
-    // -- Wire host-seeking components to the submodel (G14) ----
-    if (sub_ && host_landscape_) sub_->set_host_landscape(host_landscape_.get());
-    if (sub_ && mobility_schedule_) sub_->set_mobility_schedule(mobility_schedule_.get());
-    host_seeking_model_ = std::make_unique<HostSeekingModel>();
-    sub_->set_host_seeking_model(host_seeking_model_.get());
->>>>>>> theirs
 }
 
 void Engine::step() {

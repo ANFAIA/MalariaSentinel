@@ -63,6 +63,16 @@ def _parse_args() -> argparse.Namespace:
         default=None,
         help="Cache directory for downloads (default: XDG_CACHE_HOME/mal_commonlib/)",
     )
+    p.add_argument(
+        "--skip-buildings",
+        action="store_true",
+        help="Skip Overture Maps building_fraction loading (use urban_class heuristic)",
+    )
+    p.add_argument(
+        "--skip-wildlife",
+        action="store_true",
+        help="Skip wildlife_host_proxy loading (use constant 0.3)",
+    )
     return p.parse_args()
 
 
@@ -125,8 +135,8 @@ def main() -> None:
     glw = GLWLoader()
     livestock_totals = {}
 
-    print("\n[2/4] Loading GLW4 livestock...")
-    for species in ["cattle", "goats", "sheep"]:
+    print("\n[2/6] Loading GLW4 livestock...")
+    for species in ["cattle", "goats", "sheep", "pigs", "chickens"]:
         print(f"  Loading {species}...")
         livestock_da = glw.load(aoi, species=species, cache_dir=cache)
         livestock_arr = aggregate_to_grid(
@@ -143,7 +153,7 @@ def main() -> None:
         print(f"  {species}: {total:,.0f} animals")
 
     # 3. Urban/rural classification (GHSL, 250m) — nearest-neighbour
-    print("\n[3/4] Loading GHSL settlement classification...")
+    print("\n[3/6] Loading GHSL settlement classification...")
     try:
         ghsl = GHSLLoader()
         smod_da = ghsl.load(aoi, cache_dir=cache)
@@ -172,8 +182,62 @@ def main() -> None:
         print("  Filling urban_class with rural default (50).", file=sys.stderr)
         urban_class = np.full((h, w), 50, dtype=np.int32)  # 50 = rural default
 
-    # 4. Write NetCDF + manifest
-    print("\n[4/4] Writing host_static.nc + manifest...")
+    # 4. Building fraction (Overture Maps, ~1m) — conservative aggregation
+    building_frac = None
+    print("\n[4/6] Loading building fraction...")
+    if args.skip_buildings:
+        print("  Skipped (--skip-buildings). Using urban_class heuristic.")
+        building_frac = np.where(urban_class == 30, 0.6, 0.1).astype(np.float32)
+    else:
+        try:
+            from mal_commonlib.data.loaders.buildings import BuildingsLoader
+            bld = BuildingsLoader()
+            bld_da = bld.load(aoi, cache_dir=cache)
+            building_frac = aggregate_to_grid(
+                bld_da.values,
+                bld_da.rio.transform(),
+                bld_da.rio.crs,
+                target_transform,
+                aoi.crs_obj,
+                (h, w),
+                method="sum",
+            )
+            total = building_frac[building_frac != -9999.0].sum()
+            print(f"  Building fraction total: {total:,.1f}")
+        except Exception as exc:
+            print(f"  WARNING: Building loader failed: {exc}", file=sys.stderr)
+            print("  Falling back to urban_class heuristic.", file=sys.stderr)
+            building_frac = np.where(urban_class == 30, 0.6, 0.1).astype(np.float32)
+
+    # 5. Wildlife host proxy (WorldCover + JRC GSW + buildings)
+    wildlife_proxy = None
+    print("\n[5/6] Loading wildlife host proxy...")
+    if args.skip_wildlife:
+        print("  Skipped (--skip-wildlife). Using constant 0.3.")
+        wildlife_proxy = np.full((h, w), 0.3, dtype=np.float32)
+    else:
+        try:
+            from mal_commonlib.data.loaders.wildlife import WildlifeLoader
+            wl = WildlifeLoader()
+            wl_da = wl.load(aoi, cache_dir=cache)
+            wildlife_proxy = aggregate_to_grid(
+                wl_da.values,
+                wl_da.rio.transform(),
+                wl_da.rio.crs,
+                target_transform,
+                aoi.crs_obj,
+                (h, w),
+                method="nearest",
+            )
+            total = wildlife_proxy[wildlife_proxy != -9999.0].mean()
+            print(f"  Wildlife proxy mean: {total:.3f}")
+        except Exception as exc:
+            print(f"  WARNING: Wildlife loader failed: {exc}", file=sys.stderr)
+            print("  Using constant 0.3.", file=sys.stderr)
+            wildlife_proxy = np.full((h, w), 0.3, dtype=np.float32)
+
+    # 6. Write NetCDF + manifest
+    print("\n[6/6] Writing host_static.nc + manifest...")
     out_path = args.output_dir / "host_static.nc"
     build_host_static_nc(
         human=human,
@@ -183,6 +247,10 @@ def main() -> None:
         urban_class=urban_class,
         output_path=out_path,
         grid_spec=grid_spec,
+        pigs=livestock_totals.get("pigs"),
+        chickens=livestock_totals.get("chickens"),
+        building_fraction=building_frac,
+        wildlife_host_proxy=wildlife_proxy,
     )
     manifest_path = write_manifest(
         output_path=out_path,
@@ -192,6 +260,10 @@ def main() -> None:
         sheep=livestock_totals["sheep"],
         urban_class=urban_class,
         grid_spec=grid_spec,
+        pigs=livestock_totals.get("pigs"),
+        chickens=livestock_totals.get("chickens"),
+        building_fraction=building_frac,
+        wildlife_host_proxy=wildlife_proxy,
     )
     print(f"  Written: {out_path}")
     print(f"  Manifest: {manifest_path}")

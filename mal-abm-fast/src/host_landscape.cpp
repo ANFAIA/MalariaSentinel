@@ -223,11 +223,15 @@ void HostLandscape::load_from_nc(const std::string& path, const AOI& aoi) {
         return raw_f;
     };
 
-    std::vector<float> human     = read_float_var("human");
-    std::vector<float> cattle    = read_float_var("cattle");
-    std::vector<float> goats     = read_float_var("goats");
-    std::vector<float> sheep     = read_float_var("sheep");
-    std::vector<float> urban_cls = read_int32_var("urban_class");
+    std::vector<float> human      = read_float_var("human");
+    std::vector<float> cattle     = read_float_var("cattle");
+    std::vector<float> goats      = read_float_var("goats");
+    std::vector<float> sheep      = read_float_var("sheep");
+    std::vector<float> pigs       = read_float_var("pigs");
+    std::vector<float> chickens   = read_float_var("chickens");
+    std::vector<float> wildlife   = read_float_var("wildlife_host_proxy");
+    std::vector<float> bldg_frac  = read_float_var("building_fraction");
+    std::vector<float> urban_cls  = read_int32_var("urban_class");
 
     // Populate HostCell grid.
     const size_t n = static_cast<size_t>(h_) * static_cast<size_t>(w_);
@@ -238,10 +242,15 @@ void HostLandscape::load_from_nc(const std::string& path, const AOI& aoi) {
         c.cattle_present  = cattle[i];
         c.goats_present   = goats[i];
         c.sheep_present   = sheep[i];
-        c.wildlife_proxy  = 0.0f;  // not in host_static.nc
+        c.pigs_present    = pigs[i];
+        c.chickens_present = chickens[i];
+        c.wildlife_proxy  = wildlife[i];
+        c.building_fraction = bldg_frac[i];
         const float uc    = urban_cls[i];
         c.indoor_fraction      = urban_class_to_indoor_fraction(uc);
-        c.residential_fraction = c.indoor_fraction * 0.8f;
+        c.residential_fraction = (c.building_fraction > 0.0f)
+                                     ? c.building_fraction
+                                     : c.indoor_fraction * 0.8f;
         c.urbanicity           = urban_class_to_urbanicity(uc);
     }
     has_data_ = true;

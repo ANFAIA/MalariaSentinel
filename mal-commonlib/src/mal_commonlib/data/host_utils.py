@@ -86,15 +86,23 @@ def build_host_static_nc(
     grid_spec: dict,
     *,
     nodata: float = -9999.0,
+    pigs: np.ndarray | None = None,
+    chickens: np.ndarray | None = None,
+    building_fraction: np.ndarray | None = None,
+    wildlife_host_proxy: np.ndarray | None = None,
 ) -> pathlib.Path:
     """Write the static host density NetCDF for the ABM engine.
 
-    The NetCDF has 5 data variables on (y, x):
-        * ``human``          — persons per ABM cell (float32)
-        * ``cattle``         — cattle per ABM cell (float32)
-        * ``goats``          — goats per ABM cell (float32)
-        * ``sheep``          — sheep per ABM cell (float32)
-        * ``urban_class``    — settlement class code (int32: 30/50)
+    The NetCDF has 5 core data variables on (y, x), plus up to 4 optional:
+        * ``human``               — persons per ABM cell (float32)
+        * ``cattle``              — cattle per ABM cell (float32)
+        * ``goats``               — goats per ABM cell (float32)
+        * ``sheep``               — sheep per ABM cell (float32)
+        * ``urban_class``         — settlement class code (int32: 30/50)
+        * ``pigs``                — pigs per ABM cell (float32, optional)
+        * ``chickens``            — chickens per ABM cell (float32, optional)
+        * ``building_fraction``   — building footprint fraction [0,1] (float32, optional)
+        * ``wildlife_host_proxy`` — wildlife host suitability [0,1] (float32, optional)
 
     Global attributes include CRS WKT, grid transform, and nodata sentinel.
 
@@ -172,6 +180,37 @@ def build_host_static_nc(
         },
     )
 
+    # Optional variables
+    all_vars = ["human", "cattle", "goats", "sheep", "urban_class"]
+    if pigs is not None:
+        assert pigs.shape == (H, W), f"pigs shape {pigs.shape} != ({H}, {W})"
+        ds["pigs"] = xr.DataArray(
+            pigs.astype(np.float32), dims=("y", "x"),
+            attrs={"long_name": "Pig count", "units": "animals/cell", "nodata": nodata},
+        )
+        all_vars.append("pigs")
+    if chickens is not None:
+        assert chickens.shape == (H, W), f"chickens shape {chickens.shape} != ({H}, {W})"
+        ds["chickens"] = xr.DataArray(
+            chickens.astype(np.float32), dims=("y", "x"),
+            attrs={"long_name": "Chicken count", "units": "animals/cell", "nodata": nodata},
+        )
+        all_vars.append("chickens")
+    if building_fraction is not None:
+        assert building_fraction.shape == (H, W), f"building_fraction shape {building_fraction.shape} != ({H}, {W})"
+        ds["building_fraction"] = xr.DataArray(
+            building_fraction.astype(np.float32), dims=("y", "x"),
+            attrs={"long_name": "Building footprint fraction", "units": "fraction [0,1]", "nodata": nodata},
+        )
+        all_vars.append("building_fraction")
+    if wildlife_host_proxy is not None:
+        assert wildlife_host_proxy.shape == (H, W), f"wildlife_host_proxy shape {wildlife_host_proxy.shape} != ({H}, {W})"
+        ds["wildlife_host_proxy"] = xr.DataArray(
+            wildlife_host_proxy.astype(np.float32), dims=("y", "x"),
+            attrs={"long_name": "Wildlife host proxy suitability", "units": "suitability [0,1]", "nodata": nodata},
+        )
+        all_vars.append("wildlife_host_proxy")
+
     # Write CRS as a coordinate variable (CF convention)
     crs_var = xr.DataArray(
         np.int32(0),
@@ -181,7 +220,7 @@ def build_host_static_nc(
         },
     )
     ds["crs"] = crs_var
-    for var_name in ["human", "cattle", "goats", "sheep", "urban_class"]:
+    for var_name in all_vars:
         ds[var_name].attrs["grid_mapping"] = "crs"
 
     ds.to_netcdf(str(output_path), engine="netcdf4")
@@ -196,6 +235,11 @@ def write_manifest(
     sheep: np.ndarray,
     urban_class: np.ndarray,
     grid_spec: dict,
+    *,
+    pigs: np.ndarray | None = None,
+    chickens: np.ndarray | None = None,
+    building_fraction: np.ndarray | None = None,
+    wildlife_host_proxy: np.ndarray | None = None,
 ) -> pathlib.Path:
     """Write a JSON manifest describing the host static NetCDF.
 
@@ -232,6 +276,16 @@ def write_manifest(
             _stats(urban_class.astype(np.float32), "urban_class"),
         ],
     }
+
+    # Optional variables
+    if pigs is not None:
+        manifest["variables"].append(_stats(pigs, "pigs"))
+    if chickens is not None:
+        manifest["variables"].append(_stats(chickens, "chickens"))
+    if building_fraction is not None:
+        manifest["variables"].append(_stats(building_fraction, "building_fraction"))
+    if wildlife_host_proxy is not None:
+        manifest["variables"].append(_stats(wildlife_host_proxy, "wildlife_host_proxy"))
 
     manifest_path.parent.mkdir(parents=True, exist_ok=True)
     manifest_path.write_text(json.dumps(manifest, indent=2))
