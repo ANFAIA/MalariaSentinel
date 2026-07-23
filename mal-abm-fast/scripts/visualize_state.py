@@ -112,8 +112,8 @@ def make_frame(
     fig.tight_layout()
 
     fig.canvas.draw()
-    w, h = fig.canvas.get_width_height()
-    img = np.frombuffer(fig.canvas.tostring_rgb(), dtype=np.uint8).reshape(h, w, 3)
+    buf = fig.canvas.buffer_rgba()
+    img = np.asarray(buf)[:, :, :3]  # drop alpha channel → RGB
     plt.close(fig)
     return Image.fromarray(img)
 
