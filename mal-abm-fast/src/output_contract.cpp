@@ -2,9 +2,10 @@
 // output_contract.cpp — 2-band state COG writer + sidecar JSON writer.
 //
 // `write_state_cog` produces a tiled, deflate-compressed, 128x128
-// block GeoTIFF with two float32 bands: band 1 = density
-// (mosquitoes / K_MAX ∈ [0, 1]), band 2 = suitability (per-cell adult
-// density / K_MAX ∈ [0, 1]). The nodata sentinel is `NODATA_SENTINEL`
+// block GeoTIFF with two float32 bands: band 1 = adult_occupancy
+// (total adult mosquitoes in cell post-dispersal / K_MAX ∈ [0, 1]),
+// band 2 = host_seeking_pressure (female adults in host-seeking state
+// / K_MAX ∈ [0, 1]). The nodata sentinel is `NODATA_SENTINEL`
 // (-9999). The COG profile mirrors `docs/wire-spec.md` §2.
 //
 // `write_state_sidecar` writes a JSON sidecar next to the .tif, with

@@ -153,21 +153,21 @@ inline constexpr float  HABITAT_MIN_TWI             = 8.0f;
 inline constexpr float  NODATA_SENTINEL             = -9999.0f;
 
 // State COG band identifiers. The 2 bands are (in order):
-//   band 1 (STATE_BAND_DENSITY)     — normalised density (count / K_MAX)
-//   band 2 (STATE_BAND_SUITABILITY) — per-cell adult density (post-dispersal)
+//   band 1 (STATE_BAND_DENSITY)     — total adult mosquito occupancy in cell (post-dispersal) / K_MAX
+//   band 2 (STATE_BAND_SUITABILITY) — female host-seeking/biting pressure in cell / K_MAX
 inline constexpr int    STATE_BAND_DENSITY          = 1;
 inline constexpr int    STATE_BAND_SUITABILITY      = 2;
-inline constexpr const char* STATE_BAND_NAMES[2]     = {"density", "suitability"};
+inline constexpr const char* STATE_BAND_NAMES[2]     = {"adult_occupancy", "host_seeking_pressure"};
 
 // Contract and generator version strings — written into the sidecar JSON
 // and used by the Python parity test (F1.e) to verify engine equivalence.
 //
 // CONTRACT_VERSION bumped to "1.1" in F1.c with the addition of
 // `n_rollouts` and `rollout_index` to the sidecar JSON (see
-// output_contract.hpp). F1.e's parity test will need to special-case
-// the new keys (it compares everything except the F1.c additions).
-inline constexpr const char* CONTRACT_VERSION        = "1.1";
-inline constexpr const char* GENERATOR_VERSION       = "m1.5-mesa-frames+polars";
+// output_contract.hpp). Bumped to "2.0" in M7.1+M7.2 with the
+// band rename: band 1 = adult_occupancy, band 2 = host_seeking_pressure.
+inline constexpr const char* CONTRACT_VERSION        = "2.0";
+inline constexpr const char* GENERATOR_VERSION       = "m7.1-m7.2-multiscale";
 
 // ---------------------------------------------------------------------------
 // Value types — shared across all modules.

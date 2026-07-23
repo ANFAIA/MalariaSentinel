@@ -50,9 +50,13 @@ inline void swap_with_last(MosquitoSoA& soa, int64_t i, int64_t n) {
     std::swap(soa.row[i],          soa.row[n - 1]);
     std::swap(soa.col[i],          soa.col[n - 1]);
     std::swap(soa.stage[i],        soa.stage[n - 1]);
+    std::swap(soa.sex[i],          soa.sex[n - 1]);
     std::swap(soa.lon[i],          soa.lon[n - 1]);
     std::swap(soa.lat[i],          soa.lat[n - 1]);
-    std::swap(soa.eip_progress[i], soa.eip_progress[n - 1]);
+    std::swap(soa.development_progress[i], soa.development_progress[n - 1]);
+    std::swap(soa.parasite_eip_progress[i], soa.parasite_eip_progress[n - 1]);
+    std::swap(soa.aquatic_stage[i], soa.aquatic_stage[n - 1]);
+    std::swap(soa.larval_instar[i], soa.larval_instar[n - 1]);
     std::swap(soa.stage_age[i],    soa.stage_age[n - 1]);
     std::swap(soa.days_since_active[i], soa.days_since_active[n - 1]);
 }
@@ -66,9 +70,13 @@ inline void trim_soa(MosquitoSoA& soa, size_t new_size) {
     soa.row.resize(new_size);
     soa.col.resize(new_size);
     soa.stage.resize(new_size);
+    soa.sex.resize(new_size);
     soa.lon.resize(new_size);
     soa.lat.resize(new_size);
-    soa.eip_progress.resize(new_size);
+    soa.development_progress.resize(new_size);
+    soa.parasite_eip_progress.resize(new_size);
+    soa.aquatic_stage.resize(new_size);
+    soa.larval_instar.resize(new_size);
     soa.stage_age.resize(new_size);
     soa.days_since_active.resize(new_size);
 }
@@ -129,21 +137,25 @@ MosquitoSubmodel::MosquitoSubmodel(int32_t n_patches, int32_t k_per_patch,
     soa_.row.reserve(cap);
     soa_.col.reserve(cap);
     soa_.stage.reserve(cap);
+    soa_.sex.reserve(cap);
     soa_.lon.reserve(cap);
     soa_.lat.reserve(cap);
-    soa_.eip_progress.reserve(cap);
+    soa_.development_progress.reserve(cap);
+    soa_.parasite_eip_progress.reserve(cap);
+    soa_.aquatic_stage.reserve(cap);
+    soa_.larval_instar.reserve(cap);
     soa_.stage_age.reserve(cap);
     soa_.days_since_active.reserve(cap);
 
     // Stable age distribution at seeding time: 10% pre-mature (EIP
-    // already complete) and 90% fresh larvae (eip_progress=0, will
+    // already complete) and 90% fresh larvae (development_progress=0, will
     // mature over the next ~10 days). At p_d=0.95 mean adult life is
     // ~13 days, so 10% is a reasonable steady-state adult fraction
     // for the suitability band (which counts adults) to be non-zero
     // from day 1 with this distribution.
     //
     // The pre-mature agents are seeded as stage=0 LARVAE with
-    // eip_progress = EIP_THRESHOLD_GD (NOT stage=1 adults). The
+    // development_progress = EIP_THRESHOLD_GD (NOT stage=1 adults). The
     // first `larva_to_adult` pass on day 1 promotes them and
     // snaps lon/lat to the cell centre of their birth patch (via
     // the existing larva_to_adult snap). If we seeded them as
@@ -168,9 +180,13 @@ MosquitoSubmodel::MosquitoSubmodel(int32_t n_patches, int32_t k_per_patch,
             soa_.row.push_back(0);
             soa_.col.push_back(0);
             soa_.stage.push_back(0);
+            soa_.sex.push_back((rng_.uniform_double() < 0.5) ? 0 : 1);
             soa_.lon.push_back(0.0f);
             soa_.lat.push_back(0.0f);
-            soa_.eip_progress.push_back(EIP_COMPLETE);
+            soa_.development_progress.push_back(EIP_COMPLETE);
+            soa_.parasite_eip_progress.push_back(0.0f);
+            soa_.aquatic_stage.push_back(static_cast<uint8_t>(AquaticStage::LARVA));
+            soa_.larval_instar.push_back(4);
             soa_.stage_age.push_back(0);
             soa_.days_since_active.push_back(0);
         }
@@ -181,9 +197,13 @@ MosquitoSubmodel::MosquitoSubmodel(int32_t n_patches, int32_t k_per_patch,
             soa_.row.push_back(0);
             soa_.col.push_back(0);
             soa_.stage.push_back(0);
+            soa_.sex.push_back((rng_.uniform_double() < 0.5) ? 0 : 1);
             soa_.lon.push_back(0.0f);
             soa_.lat.push_back(0.0f);
-            soa_.eip_progress.push_back(0.0f);
+            soa_.development_progress.push_back(0.0f);
+            soa_.parasite_eip_progress.push_back(0.0f);
+            soa_.aquatic_stage.push_back(static_cast<uint8_t>(AquaticStage::EGG));
+            soa_.larval_instar.push_back(0);
             soa_.stage_age.push_back(0);
             soa_.days_since_active.push_back(0);
         }
@@ -198,13 +218,13 @@ MosquitoSubmodel::MosquitoSubmodel(int32_t n_patches, int32_t k_per_patch,
 //
 // For each `SeedInstruction`:
 //   * `n_adults` agents are added with `stage = 1` (adult) and
-//     `eip_progress = EIP_THRESHOLD_GD` so the first `larva_to_adult`
-//     pass does NOT re-promote them — they are already adult, ready
-//     to disperse on day 1.
+//     `development_progress = EIP_THRESHOLD_GD` so the first
+//     `larva_to_adult` pass does NOT re-promote them — they are
+//     already adult, ready to disperse on day 1.
 //   * `n_larvae` agents are added with `stage = 0` (larva) and
-//     `eip_progress = 0`. They must accumulate growing-degree-days
-//     before promotion (matches the legacy "seed K*init_frac larvae"
-//     path).
+//     `development_progress = 0`. They must accumulate
+//     growing-degree-days before promotion (matches the legacy
+//     "seed K*init_frac larvae" path).
 // Adults get the instruction's lon/lat (the cell centre) so the
 // first `adult_dispersal` pass has a valid origin; larvae are placed
 // at the same (lon, lat) so subsequent cell snapping is consistent.
@@ -238,14 +258,18 @@ MosquitoSubmodel::MosquitoSubmodel(int32_t n_patches, int32_t k_per_patch,
     soa_.row.reserve(cap);
     soa_.col.reserve(cap);
     soa_.stage.reserve(cap);
+    soa_.sex.reserve(cap);
     soa_.lon.reserve(cap);
     soa_.lat.reserve(cap);
-    soa_.eip_progress.reserve(cap);
+    soa_.development_progress.reserve(cap);
+    soa_.parasite_eip_progress.reserve(cap);
+    soa_.aquatic_stage.reserve(cap);
+    soa_.larval_instar.reserve(cap);
     soa_.stage_age.reserve(cap);
     soa_.days_since_active.reserve(cap);
 
     for (const auto& inst : instructions) {
-        // Adults: ready to disperse immediately. eip_progress is
+        // Adults: ready to disperse immediately. development_progress is
         // irrelevant for adults but we write EIP_THRESHOLD_GD so a
         // later code path that reads it sees a sensible value.
         for (int32_t j = 0; j < inst.n_adults; ++j) {
@@ -254,9 +278,13 @@ MosquitoSubmodel::MosquitoSubmodel(int32_t n_patches, int32_t k_per_patch,
             soa_.row.push_back(inst.row);
             soa_.col.push_back(inst.col);
             soa_.stage.push_back(1);  // adult
+            soa_.sex.push_back((rng_.uniform_double() < 0.5) ? 0 : 1);
             soa_.lon.push_back(static_cast<float>(inst.lon));
             soa_.lat.push_back(static_cast<float>(inst.lat));
-            soa_.eip_progress.push_back(EIP_THRESHOLD_GD);
+            soa_.development_progress.push_back(EIP_THRESHOLD_GD);
+            soa_.parasite_eip_progress.push_back(0.0f);
+            soa_.aquatic_stage.push_back(0);
+            soa_.larval_instar.push_back(0);
             soa_.stage_age.push_back(0);
             soa_.days_since_active.push_back(0);
         }
@@ -267,9 +295,13 @@ MosquitoSubmodel::MosquitoSubmodel(int32_t n_patches, int32_t k_per_patch,
             soa_.row.push_back(inst.row);
             soa_.col.push_back(inst.col);
             soa_.stage.push_back(0);  // larva
+            soa_.sex.push_back((rng_.uniform_double() < 0.5) ? 0 : 1);
             soa_.lon.push_back(static_cast<float>(inst.lon));
             soa_.lat.push_back(static_cast<float>(inst.lat));
-            soa_.eip_progress.push_back(0.0f);
+            soa_.development_progress.push_back(0.0f);
+            soa_.parasite_eip_progress.push_back(0.0f);
+            soa_.aquatic_stage.push_back(static_cast<uint8_t>(AquaticStage::LARVA));
+            soa_.larval_instar.push_back(1);
             soa_.stage_age.push_back(0);
             soa_.days_since_active.push_back(0);
         }
@@ -383,11 +415,11 @@ void MosquitoSubmodel::advance_day(const AOI& aoi,
     last_day_stats_.n_deaths     = n_deaths;
     last_day_stats_.n_maturation = n_maturation;
     // Compute eip_completion_frac: fraction of total population that are
-    // adults (i.e., have completed EIP). In the 2-stage model, all adults
-    // completed EIP by definition (larva_to_adult promotes when
-    // eip_progress >= EIP_THRESHOLD_GD). The adult fraction is a proxy
-    // for EIP completion rate: higher adult fraction = more larvae
-    // successfully completing EIP and becoming infective adults.
+    // adults (i.e., have completed egg-to-adult development). In the
+    // 2-stage model, all adults completed development by definition
+    // (larva_to_adult promotes when development_progress >= EIP_THRESHOLD_GD).
+    // The adult fraction is a proxy for development completion rate:
+    // higher adult fraction = more larvae successfully maturing into adults.
     // Target range for D3_eip scorer: 0.20-0.50 (20-50% adults).
     last_day_stats_.eip_frac = (post_birth_n_alive > 0)
         ? static_cast<float>(post_n_adults) / static_cast<float>(post_birth_n_alive)
@@ -525,7 +557,7 @@ void MosquitoSubmodel::larva_mortality_density(
 }
 
 // ---------------------------------------------------------------------------
-// Op 2: larva growth (age + EIP accumulation at active patches)
+// Op 2: larva growth (age + development_progress accumulation at active patches)
 // ---------------------------------------------------------------------------
 
 void MosquitoSubmodel::larva_growth(const std::vector<PatchState>& patch_states) {
@@ -535,11 +567,11 @@ void MosquitoSubmodel::larva_growth(const std::vector<PatchState>& patch_states)
     // flat std::vector<float> indexed by patch_id. We keep a parallel
     // std::vector<uint8_t> `active_by_id` to distinguish "inactive
     // patch (skip EIP update)" from "active patch with T == 0"
-    // (accumulate_eip would add 0 to eip_progress, so the EIP is
-    // unchanged in that case — but stage_age MUST still increment
-    // only for active patches, matching the original
-    // `active_temp.find() == end` skip). Sized by max_pid across
-    // both patch_states and the SoA (see op 1 for the rationale).
+    // (accumulate_eip would add 0 to development_progress, so the
+    // development_progress is unchanged in that case — but stage_age
+    // MUST still increment only for active patches, matching the
+    // original `active_temp.find() == end` skip). Sized by max_pid
+    // across both patch_states and the SoA (see op 1 for the rationale).
     int64_t max_pid = -1;
     for (const auto& ps : patch_states) {
         if (ps.patch_id > max_pid) max_pid = ps.patch_id;
@@ -568,13 +600,13 @@ void MosquitoSubmodel::larva_growth(const std::vector<PatchState>& patch_states)
         const int64_t pid = soa_.patch_id[si];
         if (!active_by_id[pid]) continue;
         ++soa_.stage_age[si];
-        soa_.eip_progress[si] = accumulate_eip(soa_.eip_progress[si],
-                                                temp_by_id[pid]);
+        soa_.development_progress[si] = accumulate_eip(soa_.development_progress[si],
+                                                       temp_by_id[pid]);
     }
 }
 
 // ---------------------------------------------------------------------------
-// Op 3: EIP completion (larva -> adult)
+// Op 3: development completion (larva -> adult)
 // ---------------------------------------------------------------------------
 
 void MosquitoSubmodel::larva_to_adult(const AOI& aoi,
@@ -623,13 +655,13 @@ void MosquitoSubmodel::larva_to_adult(const AOI& aoi,
 
     for (int64_t i = 0; i < soa_.n_alive; ++i) {
         const size_t si = static_cast<size_t>(i);
-        if (soa_.stage[si] == 0 && soa_.eip_progress[si] >= EIP_THRESHOLD_GD) {
+        if (soa_.stage[si] == 0 && soa_.development_progress[si] >= EIP_THRESHOLD_GD) {
             soa_.stage[si] = 1;
-            // The C++ implementation zeros eip_progress on promotion;
+            // The C++ implementation zeros development_progress on promotion;
             // the Python reference does not. The state COG output is
-            // identical (eip_progress is only read for larvae), but
+            // identical (development_progress is only read for larvae), but
             // document the divergence for the F1.e parity test.
-            soa_.eip_progress[si] = 0.0f;
+            soa_.development_progress[si] = 0.0f;
             // Write lon/lat to the patch cell centre. The patch_id
             // comes from the agent's own column; the (row, col) comes
             // from the per-day patch state cache. The presence flag
@@ -840,9 +872,13 @@ void MosquitoSubmodel::birth(const AOI& aoi,
     soa_.row.reserve(new_cap);
     soa_.col.reserve(new_cap);
     soa_.stage.reserve(new_cap);
+    soa_.sex.reserve(new_cap);
     soa_.lon.reserve(new_cap);
     soa_.lat.reserve(new_cap);
-    soa_.eip_progress.reserve(new_cap);
+    soa_.development_progress.reserve(new_cap);
+    soa_.parasite_eip_progress.reserve(new_cap);
+    soa_.aquatic_stage.reserve(new_cap);
+    soa_.larval_instar.reserve(new_cap);
     soa_.stage_age.reserve(new_cap);
     soa_.days_since_active.reserve(new_cap);
 
@@ -856,9 +892,13 @@ void MosquitoSubmodel::birth(const AOI& aoi,
             soa_.row.push_back(d.row);
             soa_.col.push_back(d.col);
             soa_.stage.push_back(0);
+            soa_.sex.push_back((rng_.uniform_double() < 0.5) ? 0 : 1);
             soa_.lon.push_back(static_cast<float>(lon));
             soa_.lat.push_back(static_cast<float>(lat));
-            soa_.eip_progress.push_back(0.0f);
+            soa_.development_progress.push_back(0.0f);
+            soa_.parasite_eip_progress.push_back(0.0f);
+            soa_.aquatic_stage.push_back(static_cast<uint8_t>(AquaticStage::EGG));
+            soa_.larval_instar.push_back(0);
             soa_.stage_age.push_back(0);
             soa_.days_since_active.push_back(0);
         }

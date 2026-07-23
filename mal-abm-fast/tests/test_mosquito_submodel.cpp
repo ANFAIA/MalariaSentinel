@@ -334,9 +334,9 @@ TEST(MalAbmFastMosquitoSubmodel, LarvaToAdultInactivePatchUsesLonLat) {
     // Larva promoted at inactive patch snaps lon/lat to enclosing cell.
     // NOTE: stable age distribution (M1.5 + age-fix) seeds 10% pre-mature
     // adults that start at the (lon=0, lat=0) sentinel and disperse from
-    // there. Those are the seeded adults (eip_progress = EIP_THRESHOLD_GD).
+    // there. Those are the seeded adults (development_progress = EIP_THRESHOLD_GD).
     // We test the larva_to_adult snap by checking only PROMOTED adults
-    // (eip_progress reset to 0 on promotion, per larva_to_adult's note).
+    // (development_progress reset to 0 on promotion, per larva_to_adult's note).
     mal_abm_fast::MosquitoSubmodel sub(100, 1000, 0.3f, 42);
     const auto aoi = make_test_aoi();
     auto ps = make_test_patch_states();
@@ -344,15 +344,15 @@ TEST(MalAbmFastMosquitoSubmodel, LarvaToAdultInactivePatchUsesLonLat) {
     for (int d = 0; d < 30; ++d) {
         sub.advance_day(aoi, ps);
     }
-    // All PROMOTED adults (eip_progress=0, stage=1) must have lon/lat
+    // All PROMOTED adults (development_progress=0, stage=1) must have lon/lat
     // within the AOI bbox. Larvae (stage=0) at the (0, 0) sentinel
-    // and pre-mature seeded adults (eip_progress=110) are excluded.
+    // and pre-mature seeded adults (development_progress=110) are excluded.
     const auto& soa = sub.soa();
     int64_t promoted_checked = 0;
     for (int64_t i = 0; i < soa.n_alive; ++i) {
         const size_t si = static_cast<size_t>(i);
         if (soa.stage[si] != 1) continue;
-        if (soa.eip_progress[si] != 0.0f) continue;  // skip pre-mature
+        if (soa.development_progress[si] != 0.0f) continue;  // skip pre-mature
         EXPECT_GE(soa.lon[si], static_cast<float>(aoi.west));
         EXPECT_LE(soa.lon[si], static_cast<float>(aoi.east));
         EXPECT_GE(soa.lat[si], static_cast<float>(aoi.south));

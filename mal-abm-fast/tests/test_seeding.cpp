@@ -314,14 +314,14 @@ TEST(MalAbmFastSeeding, SubmodelDetConstructorSeedsAdultsAndLarvae) {
         EXPECT_FLOAT_EQ(sub.soa().lat[si], 1.5f);
     }
 
-    // Adults must have eip_progress = EIP_THRESHOLD_GD (ready to disperse).
+    // Adults must have development_progress = EIP_THRESHOLD_GD (ready to disperse).
     for (int64_t i = 0; i < sub.soa().n_alive; ++i) {
         const size_t si = static_cast<size_t>(i);
         if (sub.soa().stage[si] == 1) {
-            EXPECT_FLOAT_EQ(sub.soa().eip_progress[si],
+            EXPECT_FLOAT_EQ(sub.soa().development_progress[si],
                             mal_abm_fast::EIP_THRESHOLD_GD);
         } else {
-            EXPECT_FLOAT_EQ(sub.soa().eip_progress[si], 0.0f);
+            EXPECT_FLOAT_EQ(sub.soa().development_progress[si], 0.0f);
         }
     }
 }

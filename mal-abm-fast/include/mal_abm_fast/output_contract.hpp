@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 // output_contract.hpp — 2-band state COG writer + sidecar JSON writer.
 //
-// The state COG is a 2-band GeoTIFF (band 1 = density, band 2 =
-// suitability), tiled, deflate-compressed, 128x128 blocks, with
+// The state COG is a 2-band GeoTIFF (band 1 = adult_occupancy, band 2 =
+// host_seeking_pressure), tiled, deflate-compressed, 128x128 blocks, with
 // `nodata = NODATA_SENTINEL` (-9999). The sidecar JSON is a small
 // metadata file written next to the .tif (e.g.
 // `ghana_regional_2024_06_seed0001.json` for the COG

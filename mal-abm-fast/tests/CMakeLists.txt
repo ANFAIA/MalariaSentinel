@@ -85,3 +85,10 @@ target_link_libraries(test_seeding
     PRIVATE mal_abm_fast_core GTest::gtest GTest::gtest_main mal_abm_fast::warnings
 )
 gtest_discover_tests(test_seeding)
+
+# G0: GridSpec spatial contract validation tests.
+add_executable(test_grid_spec test_grid_spec.cpp)
+target_link_libraries(test_grid_spec
+    PRIVATE mal_abm_fast_core GTest::gtest GTest::gtest_main mal_abm_fast::warnings
+)
+gtest_discover_tests(test_grid_spec)

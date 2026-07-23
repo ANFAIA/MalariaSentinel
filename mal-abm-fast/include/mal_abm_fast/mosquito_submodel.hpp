@@ -27,6 +27,7 @@
 #include "seeding.hpp"
 #include "wire.hpp"
 #include "mosquito_state.hpp"
+#include "aquatic_stages.hpp"
 
 namespace mal_abm_fast {
 
@@ -39,6 +40,9 @@ struct DailyStats {
     int64_t n_births        = 0;
     int64_t n_deaths        = 0;
     int64_t n_maturation    = 0;
+    int64_t n_females       = 0;
+    int64_t n_males         = 0;
+    int64_t n_host_seeking  = 0;
     float   eip_frac        = 0.0f;  // fraction of adults with eip >= threshold
 };
 
@@ -58,9 +62,9 @@ public:
 
     // Detection-based constructor: seed a mix of adults and
     // larvae at specific patches via the supplied SeedInstruction
-    // list. Adults start with `eip_progress = EIP_THRESHOLD_GD` so
+    // list. Adults start with `development_progress = EIP_THRESHOLD_GD` so
     // they are ready to disperse on day 1; larvae start with
-    // `eip_progress = 0` and must accumulate growing-degree-days
+    // `development_progress = 0` and must accumulate growing-degree-days
     // before promotion. The `k_per_patch` is still required for
     // the per-day `birth()` step (binomial draw per active patch).
     MosquitoSubmodel(int32_t n_patches, int32_t k_per_patch,
@@ -123,15 +127,15 @@ public:
     // 2.5. Density-dependent larva mortality (Beverton-Holt) at active patches.
     void larva_mortality_density(const std::vector<PatchState>& patch_states);
 
-    // 2. At active patches: stage_age += 1, eip_progress += max(0, T - EIP_BASE_C).
-    //    EIP uses the post Mordecai-inverse deg C from PatchState.temp_d.
+    // 2. At active patches: stage_age += 1, development_progress += max(0, T - EIP_BASE_C).
+    //    Uses the post Mordecai-inverse deg C from PatchState.temp_d.
     void larva_growth(const std::vector<PatchState>& patch_states);
 
-    // 3. Promote larva -> adult when eip_progress >= EIP_THRESHOLD_GD.
+    // 3. Promote larva -> adult when development_progress >= EIP_THRESHOLD_GD.
     //    The promoted agents' `lon`/`lat` are written to the patch
     //    cell centre (via aoi + transform.xy) so the next dispersal
     //    step has a valid origin.
-    // 3. Promote larva -> adult when eip_progress >= EIP_THRESHOLD_GD.
+    // 3. Promote larva -> adult when development_progress >= EIP_THRESHOLD_GD.
     //    Also writes the promoted agent's lon/lat to the patch cell
     //    centre (via aoi + cell math) so the suitability grid places
     //    the new adult at the correct cell. Mirrors the Python
@@ -149,7 +153,7 @@ public:
 
     // 5. binomial(n_adults/2, BIRTH_FECUNDITY) per active patch; new lon/lat =
     //    patch cell centre. New agents start as larvae with
-    //    eip_progress = 0, stage_age = 0, uid = soa().next_uid++.
+    //    development_progress = 0, stage_age = 0, uid = soa().next_uid++.
     void birth(const AOI& aoi, const std::vector<PatchState>& patch_states);
 
     // -- queries used by the coordinator -----------------------------------

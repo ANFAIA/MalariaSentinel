@@ -22,6 +22,7 @@
 #include "gdal.h"
 #include "cpl_string.h"
 #include <netcdf.h>
+#include <ogr_spatialref.h>
 
 #include "env_reader.hpp"
 
@@ -76,7 +77,19 @@ void WriteSyntheticEnv(const fs::path& path) {
     // a few GDAL validators in some builds).
     double gt[6] = {0.0, 1.0, 0.0, 0.0, 0.0, -1.0};
     GDALSetGeoTransform(ds, gt);
-    GDALSetProjection(ds, "EPSG:4326");
+
+    // GDALSetProjection requires a WKT string, not an EPSG code.
+    // Convert EPSG:4326 to WKT via OGRSpatialReference (C++ API).
+    {
+        OGRSpatialReference srs;
+        if (srs.SetFromUserInput("EPSG:4326") == OGRERR_NONE) {
+            char* wkt = nullptr;
+            if (srs.exportToWkt(&wkt) == OGRERR_NONE && wkt) {
+                GDALSetProjection(ds, wkt);
+                CPLFree(wkt);
+            }
+        }
+    }
 
     // Band 1: water_frac
     GDALRasterBandH b1 = GDALGetRasterBand(ds, 1);
