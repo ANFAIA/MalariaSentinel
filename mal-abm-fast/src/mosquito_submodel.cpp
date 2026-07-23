@@ -457,6 +457,31 @@ void MosquitoSubmodel::advance_day(const AOI& aoi,
         }
     }
 
+    // -- G14: host-seeking using HostSeekingModel --
+    if (host_seeking_ && host_landscape_) {
+        for (int64_t i = 0; i < soa_.n_alive; ++i) {
+            const size_t si = static_cast<size_t>(i);
+            if (soa_.stage[si] != 1) continue;
+            if (soa_.sex[si] != 1) continue;
+            auto gs = static_cast<GonotrophicState>(soa_.gonotrophic_state[si]);
+            if (gs != GonotrophicState::HOST_SEEKING) continue;
+
+            const auto attractions = host_seeking_->compute_attraction(
+                soa_.row[si], soa_.col[si], *host_landscape_, aoi);
+            const HostType host = host_seeking_->select_host(attractions, rng_);
+
+            n_feeding_attempts++;
+            bite_ledger_.record_attempt(soa_.row[si], soa_.col[si], host);
+
+            gs = GonotrophicState::BLOOD_FED;
+            soa_.gonotrophic_state[si] = static_cast<uint8_t>(gs);
+            soa_.gonotrophic_timer[si] = 0;
+            soa_.feeding_success[si] = 1.0f;
+            n_successful_feeds++;
+            bite_ledger_.record_success(soa_.row[si], soa_.col[si], host);
+        }
+    }
+
     // 4. Adult dispersal
     adult_dispersal(aoi);
     const int64_t pre_mort_n_alive = soa_.n_alive;

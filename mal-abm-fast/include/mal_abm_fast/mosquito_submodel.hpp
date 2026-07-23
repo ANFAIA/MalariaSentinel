@@ -37,6 +37,9 @@
 #include "host_seeking.hpp"
 #include "mobility_schedule.hpp"
 #include "multirate_scheduler.hpp"
+#include "mal_abm_fast/host_landscape.hpp"
+#include "mal_abm_fast/mobility_schedule.hpp"
+#include "mal_abm_fast/host_seeking.hpp"
 
 namespace mal_abm_fast {
 
@@ -106,6 +109,11 @@ public:
 
     // Mutable access to gonotrophic parameters (for CLI overrides).
     GonotrophicParams& gonotrophic_params_mutable() { return gonotrophic_params_; }
+
+    // Host-seeking component setters (G14).
+    void set_host_landscape(const HostLandscape* h) { host_landscape_ = h; }
+    void set_mobility_schedule(const MobilitySchedule* m) { mobility_schedule_ = m; }
+    void set_host_seeking_model(const HostSeekingModel* h) { host_seeking_ = h; }
 
     // Total live agent count (= soa().n_alive).
     int64_t total_agents() const { return soa_.n_alive; }
@@ -188,7 +196,11 @@ private:
     BiteLedger        bite_ledger_;
     MultirateDayState night_state_;
 
+<<<<<<< ours
     // Host-seeking (non-owning pointers; Engine owns the components).
+=======
+    // Host-seeking components (G14) — raw pointers; Engine owns the objects.
+>>>>>>> theirs
     const HostLandscape*    host_landscape_    = nullptr;
     const MobilitySchedule* mobility_schedule_ = nullptr;
     const HostSeekingModel* host_seeking_      = nullptr;
