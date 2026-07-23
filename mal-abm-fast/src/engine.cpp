@@ -297,6 +297,23 @@ void Engine::snapshot(const std::string& path,
 
     coord_->write_state_cog(path, density, suit, year, month, seed,
                             n_rollouts, rollout_index);
+
+    // Write aquatic cohort diagnostics to a separate JSON file.
+    // The diagnostic file is placed next to the state COG with
+    // suffix "_aquatic.json".
+    if (sub_) {
+        const int32_t day_index = static_cast<int32_t>(
+            (current_date_ - start_date_).count());
+        std::string diag_path = path;
+        // Replace .tif with _aquatic.json
+        const std::string tif_ext = ".tif";
+        if (diag_path.size() >= tif_ext.size() &&
+            diag_path.substr(diag_path.size() - tif_ext.size()) == tif_ext) {
+            diag_path = diag_path.substr(0, diag_path.size() - tif_ext.size());
+        }
+        diag_path += "_aquatic.json";
+        sub_->cohort_bank().write_diagnostics(diag_path, day_index);
+    }
 }
 
 int64_t Engine::total_agents() const {

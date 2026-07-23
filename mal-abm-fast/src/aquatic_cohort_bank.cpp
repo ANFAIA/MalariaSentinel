@@ -15,8 +15,11 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <fstream>
+#include <iomanip>
 #include <numeric>
 #include <random>
+#include <unordered_map>
 #include <utility>
 
 #include "mal_abm_fast/thermal_responses.hpp"
@@ -347,6 +350,79 @@ int64_t AquaticCohortBank::count_by_stage_instar(
         if (c.stage == stage && c.larval_instar == instar) total += c.count;
     }
     return total;
+}
+
+void AquaticCohortBank::write_diagnostics(const std::string& path,
+                                          int32_t day) const {
+    // Build a simple JSON diagnostic without nlohmann (header-only).
+    std::ofstream f(path);
+    if (!f.is_open()) return;
+
+    f << "{\n";
+    f << "  \"day\": " << day << ",\n";
+    f << "  \"total_aquatic\": " << total_aquatic() << ",\n";
+
+    // Per-stage counts
+    f << "  \"by_stage\": {\n";
+    f << "    \"egg\": " << count_by_stage(AquaticStage::EGG) << ",\n";
+    f << "    \"larva\": " << count_by_stage(AquaticStage::LARVA) << ",\n";
+    f << "    \"pupa\": " << count_by_stage(AquaticStage::PUPA) << "\n";
+    f << "  },\n";
+
+    // Per-instar counts (larvae only)
+    f << "  \"by_instar\": {\n";
+    for (uint8_t i = 1; i <= 4; ++i) {
+        f << "    \"L" << static_cast<int>(i) << "\": "
+          << count_by_stage_instar(AquaticStage::LARVA, i);
+        if (i < 4) f << ",";
+        f << "\n";
+    }
+    f << "  },\n";
+
+    // Per-patch summary (top 10 by count)
+    std::unordered_map<int64_t, int64_t> patch_counts;
+    for (const auto& c : cohorts_) {
+        patch_counts[c.patch_id] += c.count;
+    }
+    std::vector<std::pair<int64_t, int64_t>> sorted_patches(
+        patch_counts.begin(), patch_counts.end());
+    std::sort(sorted_patches.begin(), sorted_patches.end(),
+              [](const auto& a, const auto& b) { return a.second > b.second; });
+
+    f << "  \"top_patches\": [\n";
+    const size_t n = std::min(sorted_patches.size(), static_cast<size_t>(10));
+    for (size_t i = 0; i < n; ++i) {
+        f << "    {\"patch_id\": " << sorted_patches[i].first
+          << ", \"count\": " << sorted_patches[i].second << "}";
+        if (i + 1 < n) f << ",";
+        f << "\n";
+    }
+    f << "  ],\n";
+
+    // Mean development per stage
+    f << "  \"mean_development\": {\n";
+    for (auto stage : {AquaticStage::EGG, AquaticStage::LARVA, AquaticStage::PUPA}) {
+        float sum_dev = 0.0f;
+        int64_t count = 0;
+        for (const auto& c : cohorts_) {
+            if (c.stage == stage) {
+                sum_dev += c.development * static_cast<float>(c.count);
+                count += c.count;
+            }
+        }
+        const char* name = (stage == AquaticStage::EGG) ? "egg"
+                         : (stage == AquaticStage::LARVA) ? "larva" : "pupa";
+        f << "    \"" << name << "\": ";
+        if (count > 0) {
+            f << std::fixed << std::setprecision(4) << (sum_dev / static_cast<float>(count));
+        } else {
+            f << "0.0";
+        }
+        if (stage != AquaticStage::PUPA) f << ",";
+        f << "\n";
+    }
+    f << "  }\n";
+    f << "}\n";
 }
 
 }  // namespace mal_abm_fast

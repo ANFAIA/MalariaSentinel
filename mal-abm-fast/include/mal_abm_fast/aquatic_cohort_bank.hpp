@@ -78,6 +78,11 @@ public:
     int64_t count_by_stage(AquaticStage stage) const;
     int64_t count_by_stage_instar(AquaticStage stage, uint8_t instar) const;
 
+    // Write aquatic cohort state to a JSON diagnostic file.
+    // The file contains per-stage counts, per-patch breakdown,
+    // and development statistics. Called by the engine at snapshot time.
+    void write_diagnostics(const std::string& path, int32_t day) const;
+
     // Read-only access to cohorts (for testing / debug).
     const std::vector<AquaticCohort>& cohorts() const { return cohorts_; }
 

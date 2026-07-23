@@ -70,23 +70,35 @@ TEST(GonotrophicState, EnumValues) {
         static_cast<uint8_t>(mal_abm_fast::GonotrophicState::TENERAL) == 0,
         "TENERAL must be 0");
     static_assert(
-        static_cast<uint8_t>(mal_abm_fast::GonotrophicState::HOST_SEEKING) == 1,
-        "HOST_SEEKING must be 1");
+        static_cast<uint8_t>(mal_abm_fast::GonotrophicState::MATE_SEEKING) == 1,
+        "MATE_SEEKING must be 1");
     static_assert(
-        static_cast<uint8_t>(mal_abm_fast::GonotrophicState::BLOOD_FED) == 2,
-        "BLOOD_FED must be 2");
+        static_cast<uint8_t>(mal_abm_fast::GonotrophicState::HOST_SEEKING) == 2,
+        "HOST_SEEKING must be 2");
     static_assert(
-        static_cast<uint8_t>(mal_abm_fast::GonotrophicState::EGG_MATURING) == 3,
-        "EGG_MATURING must be 3");
+        static_cast<uint8_t>(mal_abm_fast::GonotrophicState::HOST_APPROACH) == 3,
+        "HOST_APPROACH must be 3");
     static_assert(
-        static_cast<uint8_t>(mal_abm_fast::GonotrophicState::GRAVID) == 4,
-        "GRAVID must be 4");
+        static_cast<uint8_t>(mal_abm_fast::GonotrophicState::PROBING) == 4,
+        "PROBING must be 4");
     static_assert(
-        static_cast<uint8_t>(mal_abm_fast::GonotrophicState::OVIPOSITION_SEEKING) == 5,
-        "OVIPOSITION_SEEKING must be 5");
+        static_cast<uint8_t>(mal_abm_fast::GonotrophicState::BLOOD_FED) == 5,
+        "BLOOD_FED must be 5");
     static_assert(
-        static_cast<uint8_t>(mal_abm_fast::GonotrophicState::OVIPOSITING) == 6,
-        "OVIPOSITING must be 6");
+        static_cast<uint8_t>(mal_abm_fast::GonotrophicState::RESTING) == 6,
+        "RESTING must be 6");
+    static_assert(
+        static_cast<uint8_t>(mal_abm_fast::GonotrophicState::EGG_MATURING) == 7,
+        "EGG_MATURING must be 7");
+    static_assert(
+        static_cast<uint8_t>(mal_abm_fast::GonotrophicState::GRAVID) == 8,
+        "GRAVID must be 8");
+    static_assert(
+        static_cast<uint8_t>(mal_abm_fast::GonotrophicState::OVIPOSITION_SEEKING) == 9,
+        "OVIPOSITION_SEEKING must be 9");
+    static_assert(
+        static_cast<uint8_t>(mal_abm_fast::GonotrophicState::OVIPOSITING) == 10,
+        "OVIPOSITING must be 10");
 }
 
 // ---------------------------------------------------------------------------
@@ -108,13 +120,13 @@ TEST(GonotrophicParams, DefaultValues) {
 // State machine transitions
 // ---------------------------------------------------------------------------
 
-TEST(GonotrophicCycle, TeneralTransitionsToHostSeeking) {
+TEST(GonotrophicCycle, TeneralTransitionsToMateSeeking) {
     auto state = mal_abm_fast::GonotrophicState::TENERAL;
     int32_t timer = 0;
     mal_abm_fast::GonotrophicParams params;
     const bool wants = mal_abm_fast::advance_gonotrophic_one_day(
         state, timer, params);
-    EXPECT_EQ(state, mal_abm_fast::GonotrophicState::HOST_SEEKING);
+    EXPECT_EQ(state, mal_abm_fast::GonotrophicState::MATE_SEEKING);
     EXPECT_FALSE(wants);
 }
 
@@ -129,11 +141,21 @@ TEST(GonotrophicCycle, HostSeekingStaysWhenNotFed) {
     EXPECT_FALSE(wants);
 }
 
-TEST(GonotrophicCycle, BloodFedToEggMaturing) {
+TEST(GonotrophicCycle, BloodFedToResting) {
     auto state = mal_abm_fast::GonotrophicState::BLOOD_FED;
     int32_t timer = 0;
     mal_abm_fast::GonotrophicParams params;
-    // After 1 day rest, should transition to EGG_MATURING.
+    // After 1 day rest, should transition to RESTING.
+    const bool wants = mal_abm_fast::advance_gonotrophic_one_day(
+        state, timer, params);
+    EXPECT_EQ(state, mal_abm_fast::GonotrophicState::RESTING);
+    EXPECT_FALSE(wants);
+}
+
+TEST(GonotrophicCycle, RestingToEggMaturing) {
+    auto state = mal_abm_fast::GonotrophicState::RESTING;
+    int32_t timer = 0;
+    mal_abm_fast::GonotrophicParams params;
     const bool wants = mal_abm_fast::advance_gonotrophic_one_day(
         state, timer, params);
     EXPECT_EQ(state, mal_abm_fast::GonotrophicState::EGG_MATURING);

@@ -17,14 +17,23 @@ namespace mal_abm_fast {
 
 /// Gonotrophic state for adult female mosquitoes.
 /// Males and aquatic stages ignore this field (kept at TENERAL=0).
+///
+/// Full state machine (An. gambiae s.s.):
+///   TENERAL → MATE_SEEKING → HOST_SEEKING → HOST_APPROACH → PROBING
+///   → BLOOD_FED → RESTING → EGG_MATURING → GRAVID
+///   → OVIPOSITION_SEEKING → OVIPOSITING → HOST_SEEKING (cycle restarts)
 enum class GonotrophicState : uint8_t {
-    TENERAL = 0,         // newly emerged, needs first blood meal
-    HOST_SEEKING,        // searching for host (18:00–06:00 active)
-    BLOOD_FED,           // post-feeding, resting
-    EGG_MATURING,        // developing eggs (2–4 days)
-    GRAVID,              // ready to oviposit
-    OVIPOSITION_SEEKING, // searching for oviposition site
-    OVIPOSITING,         // laying eggs
+    TENERAL = 0,          // newly emerged, needs first blood meal
+    MATE_SEEKING,         // seeking mating (pre-host-seeking)
+    HOST_SEEKING,         // searching for host (18:00–06:00 active)
+    HOST_APPROACH,        // approaching detected host (close range)
+    PROBING,              // probing / attempting to feed
+    BLOOD_FED,            // post-feeding, abdomen distended
+    RESTING,              // post-feed rest (endophilic / exophilic)
+    EGG_MATURING,         // developing eggs (2–4 days)
+    GRAVID,               // ready to oviposit
+    OVIPOSITION_SEEKING,  // searching for oviposition site
+    OVIPOSITING,          // laying eggs
 };
 
 /// Host type for bite events (BiteLedger aggregation).
@@ -52,7 +61,8 @@ struct GonotrophicParams {
 ///
 /// This function handles deterministic state transitions only.
 /// The caller is responsible for:
-///   - Checking host availability for HOST_SEEKING → BLOOD_FED
+///   - Checking host availability for HOST_SEEKING → HOST_APPROACH
+///   - Computing feeding success for PROBING → BLOOD_FED
 ///   - Computing egg batch size via binomial draw (Prng) when
 ///     transitioning OVIPOSITING → HOST_SEEKING
 ///   - Recording feeding events in the BiteLedger
@@ -66,14 +76,32 @@ inline bool advance_gonotrophic_one_day(
 {
     switch (state) {
     case GonotrophicState::TENERAL:
-        // Teneral females immediately begin seeking their first host.
+        // Teneral females first seek a mate, then seek a host.
+        state = GonotrophicState::MATE_SEEKING;
+        break;
+
+    case GonotrophicState::MATE_SEEKING:
+        // Mating is assumed instantaneous for An. gambiae (swarm mating).
+        // Proceed directly to host-seeking.
         state = GonotrophicState::HOST_SEEKING;
         break;
 
     case GonotrophicState::HOST_SEEKING:
-        // Caller handles host check + feeding success draw.
-        // If feeding succeeds, caller sets state = BLOOD_FED.
-        // If not, we stay HOST_SEEKING.
+        // Caller checks host availability in the landscape.
+        // If host detected: state → HOST_APPROACH.
+        // If not: stay HOST_SEEKING (retry next hourly step).
+        break;
+
+    case GonotrophicState::HOST_APPROACH:
+        // Caller computes approach vector toward host.
+        // Once close enough (within probing range): state → PROBING.
+        // If host escapes: state → HOST_SEEKING.
+        break;
+
+    case GonotrophicState::PROBING:
+        // Caller computes feeding success (0.75–0.90).
+        // If success: state → BLOOD_FED, record in BiteLedger.
+        // If fail (host defense, ITN): state → HOST_SEEKING.
         break;
 
     case GonotrophicState::BLOOD_FED:
@@ -81,8 +109,13 @@ inline bool advance_gonotrophic_one_day(
         timer++;
         if (timer >= static_cast<int32_t>(params.resting_duration_days)) {
             timer = 0;
-            state = GonotrophicState::EGG_MATURING;
+            state = GonotrophicState::RESTING;
         }
+        break;
+
+    case GonotrophicState::RESTING:
+        // Post-feed rest complete. Begin egg development.
+        state = GonotrophicState::EGG_MATURING;
         break;
 
     case GonotrophicState::EGG_MATURING: {
