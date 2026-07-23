@@ -14,6 +14,8 @@ add_library(mal_abm_fast_core STATIC
     output_contract.cpp
     engine.cpp
     seeding.cpp
+    host_landscape.cpp
+    host_seeking.cpp
 )
 target_include_directories(mal_abm_fast_core
     PUBLIC

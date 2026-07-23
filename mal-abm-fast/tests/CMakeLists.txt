@@ -106,3 +106,10 @@ target_link_libraries(test_gonotrophic
     PRIVATE mal_abm_fast_core GTest::gtest GTest::gtest_main mal_abm_fast::warnings
 )
 gtest_discover_tests(test_gonotrophic)
+
+# G5: Host-seeking kernel + HostLandscape.
+add_executable(test_host_seeking test_host_seeking.cpp)
+target_link_libraries(test_host_seeking
+    PRIVATE mal_abm_fast_core GTest::gtest GTest::gtest_main mal_abm_fast::warnings
+)
+gtest_discover_tests(test_host_seeking)
