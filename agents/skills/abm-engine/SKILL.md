@@ -21,8 +21,8 @@ Each day the model runs a 5-step loop:
 1. **Larva mortality** — inactive patches lose larvae (Beverton-Holt density-dependent + desiccation)
 2. **Larva growth** — EIP progress from temperature (Mordecai parabolic, `daily_gd = max(0, T - 16)`)
 3. **Larva to adult** — emergence when EIP >= 110 growing-degree-days
-4. **Adult dispersal** — 10% of adults move (clipped Gaussian, sigma=450m, max=2km)
-5. **Birth** — binomial(K=1000, p=0.10) per active patch
+4. **Adult dispersal** — configurable % of adults move (clipped Gaussian, default sigma=450m, max=2km)
+5. **Birth** — binomial(n_females, fecundity) per active cell, temperature-dependent (Mordecai 2013)
 
 ---
 
@@ -119,11 +119,15 @@ abm_run: AOI=ghana year=2024 month=06 seed=42 days=30 -> data/runs/ghana/ghana_r
 
 ```bash
 # Install dependencies
-brew install cmake ninja pkg-config gdal eigen cli11 nlohmann-json googletest
+brew install cmake ninja pkg-config gdal eigen cli11 nlohmann-json googletest libomp
 
-# Configure
+# Configure (macOS Apple Silicon — requires OpenMP from Homebrew)
 cmake -S mal-abm-fast -B mal-abm-fast/build -G Ninja \
       -DCMAKE_BUILD_TYPE=Release \
+      -DCMAKE_CXX_COMPILER=/opt/homebrew/opt/llvm/bin/clang++ \
+      -DOpenMP_CXX_FLAGS="-fopenmp" \
+      -DOpenMP_CXX_LIB_NAMES="omp" \
+      -DOpenMP_omp_LIBRARY=/opt/homebrew/opt/libomp/lib/libomp.dylib \
       -DCMAKE_PREFIX_PATH="$(brew --prefix gdal);$(brew --prefix eigen);$(brew --prefix nlohmann-json);$(brew --prefix googletest)"
 
 # Build
@@ -201,6 +205,11 @@ cmake --build $PROJECT_ROOT/mal-abm-fast/build -j
 | `--n-adults-per-detection` | 50 | Adults per detection point |
 | `--n-larvae-per-detection` | 30 | Larvae per detection point |
 | `--debug-population` | off | Emit per-day population diagnostics to stderr |
+| `--disperse-prob` | 0.05 | Adult dispersal probability per day (0.0-1.0) |
+| `--disperse-sigma-m` | 450.0 | Dispersal kernel sigma in metres |
+| `--disperse-max-m` | 2000.0 | Dispersal kernel max distance in metres |
+| `--larva-bh-alpha` | 0.05 | Beverton-Holt competition coefficient (0.0-1.0) |
+| `--birth-fecundity` | 0.25 | Per-adult per-day fecundity (0.0-1.0) |
 
 ### Expected output
 
@@ -255,6 +264,65 @@ Both engines produce identical output:
 | `state_dayNNN.tif` | Snapshot at day N (2-band COG, same format as final) |
 | `state_dayNNN.json` | Sidecar for intermediate snapshot |
 | `state_seedNNNN.tif` | Per-rollout final snapshot (when --n-rollouts > 1) |
+
+---
+
+## Invasion Simulation
+
+For simulating mosquito invasion from a small initial population, use `--seeding-mode random-viable` with literature-based dispersal parameters.
+
+### Quick start: 1-year invasion
+
+```bash
+cd mal-abm-fast && ./build/src/mal_abm_fast run \
+  --aoi ghana \
+  --env data/ghana/ghana_regional_2024_2025_env.nc \
+  --habitat data/runs/ghana/m2_run3seeds/ghana_regional_2024_06_habitat_patches.gpkg \
+  --output /tmp/invasion/state.tif \
+  --year 2024 --month 1 --days 365 --seed 1 --snapshot-every 1 \
+  --seeding-mode random-viable --n-detections 3 \
+  --n-adults-per-detection 5000 --n-larvae-per-detection 500 \
+  --disperse-prob 0.30 --disperse-sigma-m 1000 --disperse-max-m 5000 \
+  --larva-bh-alpha 0.01 --birth-fecundity 0.35 \
+  --emit-cohort-log /tmp/invasion/cohort.json
+```
+
+### Parameter rationale (literature-based)
+
+| Parameter | Invasion value | Source |
+|---|---|---|
+| `--disperse-prob 0.30` | 30% adults disperse/day | Costantini 1996 (Burkina Faso MRR) |
+| `--disperse-sigma-m 1000` | σ=1km | Midega 2019 (579m MDT, Kenya) |
+| `--disperse-max-m 5000` | max=5km | Caputo 2013 (95% < 2.8km, Gambia) |
+| `--larva-bh-alpha 0.01` | Low competition | Allows cold-start survival |
+| `--birth-fecundity 0.35` | High fecundity | Dozens of eggs per female |
+| `--n-detections 3` | 3 starting points | Random per rollout |
+| `--n-adults-per-detection 5000` | 5000 adults/point | Enough for establishment |
+
+### Expected behavior
+
+- Day 1: Mosquitoes appear at 3 random points (123 active cells)
+- Day 365: Population expands to ~700 active cells (0.16% coverage)
+- Population stabilizes around 17,000 individuals
+- Each rollout starts at different random locations
+
+### Steady-state vs invasion
+
+| Mode | Seeding | Dispersal | Duration | Use case |
+|---|---|---|---|---|
+| Steady-state | `uniform` | Default (5%/450m) | 30 days | Calibration, validation |
+| Invasion | `random-viable` | High (30%/1km) | 365 days | Expansion dynamics |
+
+### Visualization
+
+Use `mal-abm-fast/scripts/visualize_state.py` to generate GIF animations:
+
+```bash
+cd mal-abm-fast && uv run python scripts/visualize_state.py \
+  --run-dir /tmp/invasion \
+  --output /tmp/invasion/animation.gif \
+  --sample-every 5
+```
 
 ---
 
