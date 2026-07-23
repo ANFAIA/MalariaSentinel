@@ -46,6 +46,12 @@ def _parse_args() -> argparse.Namespace:
         help="Path to AOI JSON file. If not provided, uses the default Ghana AOI from config.",
     )
     p.add_argument(
+        "--bbox",
+        type=str,
+        default=None,
+        help='Custom bbox "W,S,E,N" in degrees (overrides --aoi and config).',
+    )
+    p.add_argument(
         "--worldpop-year",
         type=int,
         default=2019,
@@ -60,8 +66,14 @@ def _parse_args() -> argparse.Namespace:
     return p.parse_args()
 
 
-def _get_aoi(aoi_path: str | None) -> AOI:
+def _get_aoi(aoi_path: str | None, bbox_str: str | None) -> AOI:
     """Load or construct the AOI."""
+    if bbox_str is not None:
+        parts = [p.strip() for p in bbox_str.split(",")]
+        if len(parts) != 4:
+            raise ValueError(f"--bbox must be 4 floats 'W,S,E,N'; got {bbox_str!r}")
+        w, s, e, n = (float(x) for x in parts)
+        return AOI.from_bbox(w, s, e, n, crs="EPSG:4326", slug="custom", resolution_m=DST_RES)
     if aoi_path is not None:
         return AOI.from_file(aoi_path)
     # Use WGS84 for the bbox (the default registry values are in degrees).
@@ -76,7 +88,7 @@ def _get_aoi(aoi_path: str | None) -> AOI:
 def main() -> None:
     args = _parse_args()
 
-    aoi = _get_aoi(args.aoi)
+    aoi = _get_aoi(args.aoi, args.bbox)
     print(f"AOI: {aoi.slug} ({aoi.bbox})")
     print(f"CRS: {aoi.crs}, resolution: {aoi.resolution_m} m")
     h, w = aoi.cells_per_side()
