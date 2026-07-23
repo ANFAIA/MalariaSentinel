@@ -422,20 +422,38 @@ void MosquitoSubmodel::advance_day(const AOI& aoi,
 
         // Nightly host-seeking: attempt feeding if HOST_SEEKING
         if (g_state == GonotrophicState::HOST_SEEKING) {
-            // Record attempt (default host: HUMAN for now)
             n_feeding_attempts++;
-            bite_ledger_.record_attempt(
-                soa_.row[si], soa_.col[si], HostType::HUMAN);
-            // Deterministic feeding for now (all succeed).
-            // Stochastic version will use Prng in a later gate.
-            g_state = GonotrophicState::BLOOD_FED;
-            g_timer = 0;
-            soa_.gonotrophic_state[si] = static_cast<uint8_t>(g_state);
-            soa_.gonotrophic_timer[si] = g_timer;
-            soa_.feeding_success[si] = 1.0f;
-            n_successful_feeds++;
-            bite_ledger_.record_success(
-                soa_.row[si], soa_.col[si], HostType::HUMAN);
+            if (host_landscape_ && host_seeking_) {
+                // Use spatial host-seeking model with real host landscape.
+                auto attractions = host_seeking_->compute_attraction(
+                    soa_.row[si], soa_.col[si], *host_landscape_, aoi);
+                const HostType host = host_seeking_->select_host(attractions, rng_);
+                bite_ledger_.record_attempt(
+                    soa_.row[si], soa_.col[si], host);
+                // Check if any hosts are present (attraction field non-empty).
+                if (!attractions.empty()) {
+                    g_state = GonotrophicState::BLOOD_FED;
+                    g_timer = 0;
+                    soa_.gonotrophic_state[si] = static_cast<uint8_t>(g_state);
+                    soa_.gonotrophic_timer[si] = g_timer;
+                    soa_.feeding_success[si] = 1.0f;
+                    n_successful_feeds++;
+                    bite_ledger_.record_success(
+                        soa_.row[si], soa_.col[si], host);
+                }
+            } else {
+                // Fallback: deterministic feeding with default host (HUMAN).
+                bite_ledger_.record_attempt(
+                    soa_.row[si], soa_.col[si], HostType::HUMAN);
+                g_state = GonotrophicState::BLOOD_FED;
+                g_timer = 0;
+                soa_.gonotrophic_state[si] = static_cast<uint8_t>(g_state);
+                soa_.gonotrophic_timer[si] = g_timer;
+                soa_.feeding_success[si] = 1.0f;
+                n_successful_feeds++;
+                bite_ledger_.record_success(
+                    soa_.row[si], soa_.col[si], HostType::HUMAN);
+            }
         }
     }
 

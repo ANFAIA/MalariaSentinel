@@ -33,6 +33,9 @@
 #include "aquatic_cohort_bank.hpp"
 #include "bite_ledger.hpp"
 #include "gonotrophic_cycle.hpp"
+#include "host_landscape.hpp"
+#include "host_seeking.hpp"
+#include "mobility_schedule.hpp"
 #include "multirate_scheduler.hpp"
 
 namespace mal_abm_fast {
@@ -119,6 +122,11 @@ public:
     /// Per-day stats from the most recent advance_day() call.
     const DailyStats& last_day_stats() const { return last_day_stats_; }
 
+    // Host-seeking components (optional; set after construction by Engine).
+    void set_host_landscape(const HostLandscape* h) { host_landscape_ = h; }
+    void set_mobility_schedule(const MobilitySchedule* m) { mobility_schedule_ = m; }
+    void set_host_seeking_model(const HostSeekingModel* h) { host_seeking_ = h; }
+
     // -- debug instrumentation (M7.0 population-crash investigation) -----
     // When enabled, advance_day() writes one stderr line per day with
     // the day's population counts, the Lardeux p_d at the seeding
@@ -179,6 +187,11 @@ private:
     GonotrophicParams gonotrophic_params_;
     BiteLedger        bite_ledger_;
     MultirateDayState night_state_;
+
+    // Host-seeking (non-owning pointers; Engine owns the components).
+    const HostLandscape*    host_landscape_    = nullptr;
+    const MobilitySchedule* mobility_schedule_ = nullptr;
+    const HostSeekingModel* host_seeking_      = nullptr;
 
     // -- debug instrumentation state (see set_debug_population) -----
     bool     debug_population_      = false;

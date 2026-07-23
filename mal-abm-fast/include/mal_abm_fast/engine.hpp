@@ -20,6 +20,7 @@
 #include "coordinator.hpp"
 #include "habitat_engine.hpp"
 #include "host_landscape.hpp"
+#include "host_seeking.hpp"
 #include "mobility_schedule.hpp"
 #include "mosquito_submodel.hpp"
 #include "prng.hpp"
@@ -163,6 +164,7 @@ private:
     // Optional host-seeking components (loaded when --hosts is provided).
     std::unique_ptr<HostLandscape>          host_landscape_;
     std::unique_ptr<MobilitySchedule>       mobility_schedule_;
+    std::unique_ptr<HostSeekingModel>       host_seeking_model_;
 };
 
 }  // namespace mal_abm_fast
