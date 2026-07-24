@@ -26,13 +26,19 @@ def test_abm_flags_schema_types():
 
 
 def test_wrapper_resolve_binary_not_found(tmp_path):
-    """CppAbmWrapper raises FileNotFoundError when binary is missing."""
-    fake_pkg = tmp_path / "fake_pkg"
-    fake_pkg.mkdir()
-    with pytest.raises(FileNotFoundError, match="ABM binary not found"):
-        CppAbmWrapper(binary_path=None)
-        # This will fail because we're not in the real package dir
-        # but that's expected
+    """CppAbmWrapper._resolve_binary raises when no binary exists."""
+    # Create a wrapper with no binary_path to trigger _resolve_binary
+    # We mock the parent directory to a temp dir with no build/bin subdirs
+    wrapper = CppAbmWrapper.__new__(CppAbmWrapper)
+    # Override the file path resolution by patching __file__
+    import mal_core.abm.wrapper as mod
+    original_file = mod.__file__
+    try:
+        mod.__file__ = str(tmp_path / "wrapper.py")
+        with pytest.raises(FileNotFoundError, match="ABM binary not found"):
+            wrapper._resolve_binary()
+    finally:
+        mod.__file__ = original_file
 
 
 def test_wrapper_run_builds_command():

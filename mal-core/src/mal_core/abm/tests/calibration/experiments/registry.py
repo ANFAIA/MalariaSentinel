@@ -3,8 +3,8 @@ from __future__ import annotations
 from experiments.experiment import Experiment
 
 # Ghana June 2024 env + habitat paths (relative to repo root)
-_ENV = "data/runs/ghana/ghana_regional_2024_06_env.tif"
-_HAB = "data/runs/ghana/ghana_regional_2024_06_habitat_patches.gpkg"
+_ENV = "data/ghana/ghana_regional_2024_2025_env.nc"
+_HAB = "data/ghana/ghana_regional_2024_06_habitat_patches.gpkg"
 
 EXPERIMENTS: dict[str, Experiment] = {
     "default": Experiment(

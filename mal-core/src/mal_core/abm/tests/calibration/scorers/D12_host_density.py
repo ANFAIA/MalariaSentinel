@@ -67,6 +67,7 @@ class HostDensityScorer(Scorer):
         candidates = [
             run_dir / "host_static.nc",
             run_dir.parent / "hosts" / "host_static.nc",
+            Path("data/ghana/host_static.nc"),
             Path("/tmp/hosts_ghana/host_static.nc"),
         ]
         for p in candidates:
