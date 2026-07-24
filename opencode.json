@@ -302,6 +302,27 @@
         "question": "allow"
       }
     },
+    "deepagent-orchestrator": {
+      "description": "LangChain deepagents-based orchestrator for multi-agent ABM calibration improvement. Uses gitagent for worktree isolation, OpenCode/Exa for web search, and the mal-core pipeline for scoring.",
+      "mode": "primary",
+      "prompt": "Run improvement cycles via: uv run python -m agents.deepagents calibration",
+      "permission": {
+        "bash": {
+          "*": "ask",
+          "uv run python -m agents.deepagents *": "allow",
+          "gitagent *": "allow",
+          "uv run pytest *": "allow",
+          "git diff *": "allow",
+          "git status *": "allow"
+        },
+        "task": "allow",
+        "edit": "ask",
+        "read": "allow",
+        "memory_query": "allow",
+        "memory_recall": "allow",
+        "skill": "allow"
+      }
+    },
     "improvement-agent": {
       "description": "Reviews the output of a complete research cycle and auto-applies improvements to prompts, tools, skills, and papers. Records improvements in the knowledge graph. Can edit agents/research_harness/, papers/, and opencode.json (for skill/agent config only).",
       "mode": "primary",
