@@ -1,7 +1,6 @@
 """CLI entry point for the MalariaSentinel DeepAgent system."""
 from __future__ import annotations
 
-import json
 import sys
 from pathlib import Path
 
@@ -22,51 +21,68 @@ app = typer.Typer(
 @app.command()
 def calibration(
     max_iterations: int = typer.Option(10, "--max-iterations", "-n", help="Maximum improvement iterations."),
+    provider: str = typer.Option("openrouter", "--provider", "-p", help="LLM provider."),
+    model: str = typer.Option("xiaomi/mimo-v2.5", "--model", "-m", help="Model identifier."),
+    thread_id: str = typer.Option("calibration-session", "--thread-id", "-t", help="Thread ID for checkpointing."),
     dry_run: bool = typer.Option(False, "--dry-run", help="Print the prompt without executing."),
 ):
     """Run the ABM calibration improvement cycle."""
     from agents.deepagents.cycles.calibration_cycle import run_calibration_cycle
 
-    result = run_calibration_cycle(max_iterations=max_iterations, dry_run=dry_run)
-
-    if dry_run:
-        typer.echo(result)
-    else:
-        typer.echo(result)
+    result = run_calibration_cycle(
+        max_iterations=max_iterations,
+        provider=provider,
+        model=model,
+        thread_id=thread_id,
+        dry_run=dry_run,
+    )
+    typer.echo(result)
 
 
 @app.command()
 def feature(
     name: str = typer.Argument(..., help="Feature name."),
     description: str = typer.Argument(..., help="Feature description."),
+    provider: str = typer.Option("openrouter", "--provider", "-p", help="LLM provider."),
+    model: str = typer.Option("xiaomi/mimo-v2.5", "--model", "-m", help="Model identifier."),
+    thread_id: str = typer.Option("feature-session", "--thread-id", "-t", help="Thread ID for checkpointing."),
     dry_run: bool = typer.Option(False, "--dry-run", help="Print the prompt without executing."),
 ):
     """Run a feature development cycle."""
     from agents.deepagents.cycles.feature_cycle import run_feature_cycle
 
-    result = run_feature_cycle(name=name, description=description, dry_run=dry_run)
-
-    if dry_run:
-        typer.echo(result)
-    else:
-        typer.echo(result)
+    result = run_feature_cycle(
+        name=name,
+        description=description,
+        provider=provider,
+        model=model,
+        thread_id=thread_id,
+        dry_run=dry_run,
+    )
+    typer.echo(result)
 
 
 @app.command()
 def research(
     topic: str = typer.Argument(..., help="Research topic to investigate."),
     cycles: int = typer.Option(1, "--cycles", "-c", help="Number of research cycles."),
+    provider: str = typer.Option("openrouter", "--provider", "-p", help="LLM provider."),
+    model: str = typer.Option("xiaomi/mimo-v2.5", "--model", "-m", help="Model identifier."),
+    thread_id: str = typer.Option("research-session", "--thread-id", "-t", help="Thread ID for checkpointing."),
     dry_run: bool = typer.Option(False, "--dry-run", help="Print the prompt without executing."),
 ):
     """Run a research + improvement cycle."""
     from agents.deepagents.cycles.research_cycle import run_research_cycle
 
-    result = run_research_cycle(topic=topic, cycles=cycles, dry_run=dry_run)
-
-    if dry_run:
-        typer.echo(result)
-    else:
-        typer.echo(result)
+    result = run_research_cycle(
+        topic=topic,
+        cycles=cycles,
+        provider=provider,
+        model=model,
+        thread_id=thread_id,
+        dry_run=dry_run,
+    )
+    typer.echo(result)
 
 
 if __name__ == "__main__":

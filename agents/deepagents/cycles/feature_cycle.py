@@ -19,12 +19,22 @@ Description: {description}
 """
 
 
-def run_feature_cycle(name: str, description: str, dry_run: bool = False) -> str:
+def run_feature_cycle(
+    name: str,
+    description: str,
+    provider: str = "openrouter",
+    model: str = "xiaomi/mimo-v2.5",
+    thread_id: str = "feature-session",
+    dry_run: bool = False,
+) -> str:
     """Run a feature development cycle.
 
     Args:
         name: Feature name.
         description: Feature description.
+        provider: LLM provider.
+        model: Model identifier.
+        thread_id: Thread ID for checkpointing.
         dry_run: If True, print the prompt without executing.
 
     Returns:
@@ -41,7 +51,7 @@ def run_feature_cycle(name: str, description: str, dry_run: bool = False) -> str
 
     from agents.deepagents.agent import create_orchestrator
 
-    agent = create_orchestrator()
+    agent = create_orchestrator(provider=provider, model=model, thread_id=thread_id)
 
     result = agent.invoke({
         "messages": [{"role": "user", "content": prompt}]

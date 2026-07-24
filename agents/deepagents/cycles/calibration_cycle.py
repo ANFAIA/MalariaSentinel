@@ -21,11 +21,20 @@ Start by recalling what patterns and pitfalls exist from past calibration sessio
 """
 
 
-def run_calibration_cycle(max_iterations: int = 10, dry_run: bool = False) -> str:
+def run_calibration_cycle(
+    max_iterations: int = 10,
+    provider: str = "openrouter",
+    model: str = "xiaomi/mimo-v2.5",
+    thread_id: str = "calibration-session",
+    dry_run: bool = False,
+) -> str:
     """Run the ABM calibration improvement cycle.
 
     Args:
         max_iterations: Maximum number of improvement iterations.
+        provider: LLM provider.
+        model: Model identifier.
+        thread_id: Thread ID for checkpointing.
         dry_run: If True, print the prompt without executing.
 
     Returns:
@@ -42,7 +51,7 @@ def run_calibration_cycle(max_iterations: int = 10, dry_run: bool = False) -> st
 
     from agents.deepagents.agent import create_orchestrator
 
-    agent = create_orchestrator()
+    agent = create_orchestrator(provider=provider, model=model, thread_id=thread_id)
 
     result = agent.invoke({
         "messages": [{"role": "user", "content": prompt}]

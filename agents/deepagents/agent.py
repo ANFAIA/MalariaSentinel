@@ -1,6 +1,7 @@
 """MalariaSentinel DeepAgent orchestrator — create_orchestrator() factory."""
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
@@ -20,6 +21,11 @@ from agents.deepagents.tools import (
     memory_recall_kg,
     improve_prompt,
 )
+
+AGENT_DIR = Path(__file__).resolve().parent
+REPO_ROOT = _project_root
+PROJECT_SKILLS = REPO_ROOT / "agents" / "skills"
+GLOBAL_SKILLS = Path.home() / ".agents" / "skills"
 
 ORCHESTRATOR_PROMPT = """\
 You are the MalariaSentinel Centinela orchestrator — an autonomous agent \
@@ -108,36 +114,88 @@ TOOLS = [
     improve_prompt,
 ]
 
-MEMORY_FILES = ["agents/deepagents/AGENTS.md"]
-SKILLS_DIR = "agents/skills/"
+MEMORY_FILES = [str(AGENT_DIR / "AGENTS.md")]
 
 
-def create_orchestrator():
+def _resolve_provider(provider: str, model: str):
+    """Resolve the LLM based on provider and model."""
+    if provider == "openrouter":
+        try:
+            from langchain_openai import ChatOpenAI
+        except ImportError:
+            raise ImportError(
+                "langchain-openai is required for OpenRouter. "
+                "Install with: pip install 'mal-deepagents[openrouter]'"
+            )
+        api_key = os.environ.get("OPENROUTER_API_KEY")
+        if not api_key:
+            raise ValueError("OPENROUTER_API_KEY env var required for OpenRouter provider")
+        return ChatOpenAI(
+            model=model,
+            base_url="https://openrouter.ai/api/v1",
+            api_key=api_key,
+        )
+    else:
+        try:
+            from langchain.chat_models import init_chat_model
+        except ImportError:
+            raise ImportError(
+                "langchain-core is required. Install with: pip install deepagents"
+            )
+        return init_chat_model(model=model, model_provider=provider)
+
+
+def create_orchestrator(
+    provider: str = "openrouter",
+    model: str = "xiaomi/mimo-v2.5",
+    thread_id: str = "centinela-session",
+):
     """Create the main orchestrator agent using deepagents.
+
+    Args:
+        provider: LLM provider ("openrouter", "anthropic", "openai", "google_genai").
+        model: Model identifier.
+        thread_id: Thread ID for checkpointing.
 
     Returns:
         A compiled agent graph ready to invoke.
 
     Raises:
-        ImportError: If the `deepagents` package is not installed.
+        ImportError: If required packages are not installed.
     """
     try:
         from deepagents import create_deep_agent
+        from deepagents.backends import FilesystemBackend
+        from langgraph.checkpoint.memory import MemorySaver
     except ImportError:
         raise ImportError(
             "The 'deepagents' package is required but not installed. "
-            "Install it with: pip install deepagents"
+            "Install it with: pip install 'mal-deepagents' or pip install deepagents"
         )
 
+    llm = _resolve_provider(provider, model)
+
+    # FilesystemBackend with virtual_mode=False so global skills at ~/.agents/skills work
+    backend = FilesystemBackend(root_dir=str(REPO_ROOT), virtual_mode=False)
+
+    # Collect skills directories
+    skills = []
+    if PROJECT_SKILLS.is_dir():
+        skills.append(str(PROJECT_SKILLS))
+    if GLOBAL_SKILLS.is_dir():
+        skills.append(str(GLOBAL_SKILLS))
+
     return create_deep_agent(
-        model="openrouter:xiaomi/mimo-v2.5",
+        model=llm,
         tools=TOOLS,
         subagents=WORKER_DEFINITIONS,
         system_prompt=ORCHESTRATOR_PROMPT,
-        memory=MEMORY_FILES,
-        skills=[SKILLS_DIR],
+        backend=backend,
+        skills=skills or None,
+        checkpointer=MemorySaver(),
         interrupt_on={
             "gitagent_integrate": True,
             "gitagent_finalize": True,
         },
+        name="centinela-orchestrator",
     )

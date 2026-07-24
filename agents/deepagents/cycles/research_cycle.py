@@ -18,12 +18,22 @@ Run a research and improvement cycle for topic: {topic}
 """
 
 
-def run_research_cycle(topic: str, cycles: int = 1, dry_run: bool = False) -> str:
+def run_research_cycle(
+    topic: str,
+    cycles: int = 1,
+    provider: str = "openrouter",
+    model: str = "xiaomi/mimo-v2.5",
+    thread_id: str = "research-session",
+    dry_run: bool = False,
+) -> str:
     """Run a research + improvement cycle.
 
     Args:
         topic: Research topic to investigate.
         cycles: Number of research cycles to run.
+        provider: LLM provider.
+        model: Model identifier.
+        thread_id: Thread ID for checkpointing.
         dry_run: If True, print the prompt without executing.
 
     Returns:
@@ -41,7 +51,7 @@ def run_research_cycle(topic: str, cycles: int = 1, dry_run: bool = False) -> st
 
     from agents.deepagents.agent import create_orchestrator
 
-    agent = create_orchestrator()
+    agent = create_orchestrator(provider=provider, model=model, thread_id=thread_id)
 
     all_results = []
     for i in range(cycles):
