@@ -14,7 +14,7 @@ from pydantic import BaseModel, Field
 
 from mal_commonlib.aoi import Scale
 
-from .predict import get_latest_prediction, get_prediction_metadata, run_prediction
+from .prediction.predictor import get_latest_prediction, get_prediction_metadata, run_prediction
 from .scenario import (
     ClimateConfig,
     InterventionConfig,

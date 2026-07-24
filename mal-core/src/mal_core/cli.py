@@ -13,7 +13,7 @@ import typer
 
 from mal_commonlib.aoi import Scale
 
-from .predict import get_prediction_metadata, run_prediction
+from .prediction.predictor import get_prediction_metadata, run_prediction
 from .scenario import load_scenario
 
 app = typer.Typer(name="malariasim", help="MalariaSentinel SDSS CLI", no_args_is_help=True)

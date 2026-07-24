@@ -45,6 +45,4 @@ members = [
     "mal-execution",
     "mal-ghana-sim",
     "mal-data-explorer",
-    "mal-abm-fast",
-    "mal-abm-fast/tests/calibration",
 ]

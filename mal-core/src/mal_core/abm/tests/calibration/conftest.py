@@ -31,12 +31,12 @@ import pytest
 # Constants — paths into the project tree
 # ---------------------------------------------------------------------------
 
-_REPO_ROOT = Path(__file__).resolve().parents[4]
+_REPO_ROOT = Path(__file__).resolve().parents[6]
 """Repo root. The calibration package sits at
-``<repo>/mal-abm-fast/tests/calibration/``; four ``..`` from this file
+``<repo>/mal-core/src/mal_core/abm/tests/calibration/``; six ``..`` from this file
 takes us back to the repo root."""
 
-MAL_ABM_FAST_DIR = _REPO_ROOT / "mal-abm-fast"
+MAL_ABM_FAST_DIR = _REPO_ROOT / "mal-core" / "src" / "mal_core" / "abm"
 CPP_BINARY_DEFAULT = MAL_ABM_FAST_DIR / "build" / "src" / "mal_abm_fast"
 GHANA_ENV_PATH = _REPO_ROOT / "data" / "runs" / "ghana" / "ghana_regional_2024_06_env.tif"
 GHANA_HABITAT_PATH = _REPO_ROOT / "data" / "runs" / "ghana" / "ghana_regional_2024_06_habitat_patches.gpkg"

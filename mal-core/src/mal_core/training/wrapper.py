@@ -9,7 +9,7 @@ from pathlib import Path
 import numpy as np
 import torch
 
-from mal_core import UNet
+from .model import UNet
 
 
 class UNetWrapper:

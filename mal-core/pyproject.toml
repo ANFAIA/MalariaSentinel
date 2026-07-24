@@ -1,7 +1,7 @@
 [project]
 name = "mal-core"
-version = "0.1.0"
-description = "MalariaSentinel — stable pipeline logic (M3-M4 U-Net + M5 SDSS shell)"
+version = "0.2.0"
+description = "MalariaSentinel — unified SDSS pipeline (ABM + training + prediction + scoring)"
 requires-python = ">=3.12"
 dependencies = [
     "mal-commonlib",
@@ -13,6 +13,7 @@ dependencies = [
     "typer>=0.12",
     "pydantic>=2.7",
     "pyyaml>=6.0",
+    "langchain-openai>=1.4.0",
 ]
 
 [build-system]

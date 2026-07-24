@@ -19,11 +19,11 @@ from rasterio.transform import from_bounds
 from mal_commonlib.aoi import Scale
 from mal_commonlib.config import RUNS_DIR
 
-from .aoi import get_aggregator, grid_shape, make_aoi
-from .env import ENV_CHANNELS, load_env_stack
+from .aggregator import get_aggregator, grid_shape, make_aoi
+from .env_loader import ENV_CHANNELS, load_env_stack
 from .registry import ModelRegistry
-from .scenario import ScenarioConfig, interventions_to_params
-from .state import load_abm_state
+from ..scenario import ScenarioConfig, interventions_to_params
+from .state_loader import load_abm_state
 
 
 def _generate_dummy_inputs(h: int, w: int) -> tuple[np.ndarray, np.ndarray]:

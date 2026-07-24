@@ -85,7 +85,7 @@ class ModelRegistry:
 
         # If the manifest points to a checkpoint, load the U-Net wrapper.
         if entry.manifest.checkpoint:
-            from .unet_wrapper import UNetWrapper
+            from ..training.wrapper import UNetWrapper
             ckpt = entry.path / entry.manifest.checkpoint
             if not ckpt.exists():
                 raise FileNotFoundError(
