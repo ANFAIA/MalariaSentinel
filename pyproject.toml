@@ -35,6 +35,11 @@ dependencies = [
     "xarray>=2024.7",
 ]
 
+[dependency-groups]
+dev = [
+    "gawt>=0.4.1",
+]
+
 [tool.uv]
 package = false
 
