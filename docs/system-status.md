@@ -1,6 +1,6 @@
 # MalariaSentinel — Estado del Proyecto y Arquitectura
 
-> Actualizado: 2026-07-24 · ABM Python: **v0.5.0** · ABM C++ (mal-abm-fast): **M7.2 in progress** · Tests: **71/71 Python + 60+/60+ C++ + 5/5 parity + 14 calibration scorers**
+> Actualizado: 2026-07-24 · ABM C++ (M9 consolidated in mal-core): **M7.2** · Pipeline: **M9 complete** · Tests: **26 Python (mal-core) + 60+ C++ + 14 calibration scorers**
 
 ---
 
@@ -69,9 +69,8 @@ graph TB
 ```
 MalariaSentinel/
   mal-commonlib/          # Base compartida: config, paths, loaders de datos
-  mal-core/               # Logica estable del pipeline (U-Net, SDSS, API)
+  mal-core/               # Logica estable + ABM C++ (M9 consolidado)
   mal-execution/          # CLI batch, scripts CESGA/Hetzner
-  mal-abm-fast/           # ABM en C++20 (motor de alto rendimiento)
   mal-data-explorer/      # Visualizacion de datasets, analisis de sesgo
   agents/                 # Infraestructura de agentes, memoria, loops
   mal-ghana-sim/          # [DEPRECATED] Experimento original
@@ -92,28 +91,24 @@ graph TB
     ME["mal-execution<br/>scripts CESGA/Hetzner"]
     GS["mal-ghana-sim<br/>[DEPRECATED]"]
     DE["mal-data-explorer<br/>scripts sueltos"]
-    ABM["mal-abm-fast<br/>C++20 + CMake"]
 
     CL --> MC
     MC --> ME
     CL --> GS
 
     DE -.->|"sin deps"| DE
-    ABM -.->|"sin deps Python"| ABM
 
     style CL fill:#90EE90
     style MC fill:#87CEEB
     style ME fill:#87CEEB
     style GS fill:#FFB6C1,stroke:#FF0000,stroke-width:2px
     style DE fill:#FFD700
-    style ABM fill:#DDA0DD
 ```
 
 **Reglas de importacion**:
 - `mal-core` solo puede importar de `mal-commonlib`
 - `mal-execution` puede importar de `mal-core` y `mal-commonlib`
 - Los paquetes deprecated (`mal-ghana-sim`) no deben ser importados por paquetes activos
-- `mal-abm-fast` es independiente (C++ puro, sin imports Python)
 
 ---
 
@@ -161,64 +156,90 @@ graph TB
 ```mermaid
 graph TB
     subgraph CLI["Entry points"]
-        CLI_T["cli.py<br/>Typer CLI<br/>predict, status, serve"]
+        CLI_T["cli.py<br/>Typer CLI<br/>9 commands"]
         SRV["server.py<br/>FastAPI REST"]
     end
 
-    subgraph PREDICCION["Pipeline de prediccion"]
-        PRED["predict.py<br/>orchestrator"]
-        REG["registry.py<br/>ModelRegistry"]
-        ENV["env.py<br/>load_env_stack"]
-        ST["state.py<br/>load_abm_state"]
-        SCN["scenario.py<br/>interventions_to_params"]
-        AOI["aoi.py<br/>make_aoi, aggregators"]
+    subgraph PIPELINE["Pipeline orchestrator"]
+        PL["pipeline/runner.py<br/>run_pipeline()"]
+        STG["pipeline/stages.py<br/>Stage enum"]
+        FR["pipeline/flag_registry.py<br/>auto-aggregate flags"]
     end
 
-    subgraph ENTRENAMIENTO["Pipeline de entrenamiento"]
-        TR["train.py<br/>train_unet loop"]
-        DS["dataset.py<br/>RolloutDataset"]
-        UN["unet.py<br/>UNet model"]
+    subgraph ABM_PKG["ABM engine"]
+        WR["abm/wrapper.py<br/>CppAbmWrapper"]
+        RUN_A["abm/runner.py<br/>run_abm()"]
     end
 
-    subgraph INFERENCIA["Inferencia"]
-        UW["unet_wrapper.py<br/>UNetWrapper"]
+    subgraph PREDICCION["Prediction"]
+        PRED["prediction/predictor.py"]
+        REG["prediction/registry.py"]
+        AIO["prediction/aggregator.py"]
+        RES["prediction/aoi_resolver.py"]
     end
 
-    CLI_T --> PRED
+    subgraph ENTRENAMIENTO["Training"]
+        TR["training/trainer.py"]
+        DS["training/dataset.py"]
+        UN["training/model.py<br/>UNet"]
+    end
+
+    subgraph SCORING["Scoring"]
+        SCR["scoring/runner.py<br/>run_calibration()"]
+        FB["scoring/feedback.py<br/>get_feedback()"]
+    end
+
+    subgraph INGEST["Ingest"]
+        ING["ingest/env_builder.py"]
+    end
+
+    CLI_T --> PL
     SRV --> PRED
+    PL --> WR
+    PL --> SCR
+    PL --> TR
+    PL --> PRED
+    PL --> ING
+    WR --> RUN_A
     PRED --> REG
-    PRED --> ENV
-    PRED --> ST
-    PRED --> SCN
-    PRED --> AOI
-    REG --> UW
-    UW --> UN
-
+    REG --> UN
     TR --> DS
     TR --> UN
 
     style CLI fill:#E6F3FF
+    style PIPELINE fill:#FFE6E6
+    style ABM_PKG fill:#DDA0DD
     style PREDICCION fill:#FFE6E6
     style ENTRENAMIENTO fill:#E6FFE6
-    style INFERENCIA fill:#FFF5E6
+    style SCORING fill:#FFF5E6
+    style INGEST fill:#B0E0E6
 ```
 
 ### Modulos
 
 | Modulo | Funcion | Estado |
 |---|---|---|
-| `cli.py` | CLI Typer: `predict`, `status`, `serve` | Implementado |
-| `unet.py` | U-Net 4 bloques down/up, 32-64-128-256, MSE + soft-Dice | Implementado |
-| `unet_wrapper.py` | Wrapper de inferencia U-Net | Implementado |
-| `train.py` | Loop de entrenamiento U-Net (Adam, val Dice) | Implementado |
-| `dataset.py` | Dataset builder: pares (state_t + env) → state_{t+1} | Implementado |
-| `predict.py` | Pipeline de prediccion: load model → inference → GeoTIFF | Implementado |
-| `env.py` | Carga de env stack (4 canales: water_frac, rain, temp, ndvi) | Implementado |
-| `state.py` | Carga de estado ABM desde COGs | Implementado |
-| `registry.py` | Registro de modelos (model.yaml manifests) | Implementado |
-| `scenario.py` | Schema YAML de escenarios (intervenciones + clima) | Implementado |
-| `server.py` | FastAPI: `/predict`, `/aoi/{name}/risk`, `/aoi/{name}/status` | Implementado |
-| `aoi.py` | AOI + aggregators (promoted desde commonlib) | Implementado |
+| `cli.py` | CLI Typer: 9 commands (run, ingest, abm, score, train, predict, feedback, status, serve) | Implementado |
+| `pipeline/runner.py` | Pipeline orchestrator (run_pipeline, run_stage) | Implementado |
+| `pipeline/stages.py` | Stage enum (INGEST, ABM, SCORE, TRAIN, PREDICT) | Implementado |
+| `pipeline/flag_registry.py` | Auto-aggregate flags from all subpackages | Implementado |
+| `abm/wrapper.py` | CppAbmWrapper (C++ binary wrapper with flag introspection) | Implementado |
+| `abm/runner.py` | run_abm() — Python API for ABM | Implementado |
+| `training/model.py` | U-Net 4 bloques down/up, 32-64-128-256, MSE + soft-Dice | Implementado |
+| `training/dataset.py` | Dataset builder: pares (state_t + env) → state_{t+1} | Implementado |
+| `training/trainer.py` | Loop de entrenamiento U-Net | Implementado |
+| `training/wrapper.py` | Wrapper de inferencia U-Net | Implementado |
+| `prediction/predictor.py` | Pipeline de prediccion | Implementado |
+| `prediction/registry.py` | Registro de modelos | Implementado |
+| `prediction/env_loader.py` | Carga de env stack | Implementado |
+| `prediction/state_loader.py` | Carga de estado ABM | Implementado |
+| `prediction/aggregator.py` | AOI + aggregators | Implementado |
+| `prediction/aoi_resolver.py` | AOI data path resolver (manifest-based) | Implementado |
+| `ingest/env_builder.py` | Env tensor builder (delegates to mal-execution) | Implementado |
+| `scoring/runner.py` | Calibration scorer runner | Implementado |
+| `scoring/feedback.py` | Scorecard feedback generator | Implementado |
+| `scenario.py` | Schema YAML de escenarios | Implementado |
+| `server.py` | FastAPI REST API | Implementado |
 
 ### U-Net Arquitectura
 
@@ -269,8 +290,18 @@ Loss: MSE + 0.5 × soft-Dice
 ### CLI
 
 ```bash
+# Pipeline completo
+malariasim run --aoi ghana --stages ingest,abm,score --days 90
+
+# Etapas individuales
+malariasim ingest --aoi ghana --year 2024 --month 6
+malariasim abm --aoi ghana --year 2024 --month 1 --days 90
+malariasim score --run-dir runs/pipeline/
+malariasim train --run-dir runs/abm/ --epochs 50
+malariasim feedback --run-dir runs/pipeline/
+
 # Prediccion
-malariasim predict --aoi ghana --scale regional --year 2026 --month 6 --model best_model
+malariasim predict --aoi ghana --scale regional --year 2026 --month 6
 
 # Estado
 malariasim status --aoi ghana
@@ -281,19 +312,28 @@ malariasim serve --host 127.0.0.1 --port 8000
 
 ### Como mal-core se conecta con el ABM
 
-mal-core consume la salida del ABM (state COGs) para entrenar la U-Net y generar predicciones:
+mal-core contiene el ABM (abm/) y lo orquesta via el pipeline (pipeline/):
 
 ```mermaid
 graph LR
-    ABM["ABM<br/>(C++ o Python)"]
+    subgraph MAL_CORE["mal-core"]
+        WR["abm/wrapper.py<br/>CppAbmWrapper"]
+        RUN["abm/runner.py<br/>run_abm()"]
+        PL["pipeline/runner.py<br/>run_pipeline()"]
+        DS["training/dataset.py<br/>RolloutDataset"]
+        TR["training/trainer.py<br/>train_unet"]
+        PRED["prediction/predictor.py<br/>run_prediction"]
+        API["server.py<br/>FastAPI"]
+    end
+
+    BIN["C++ binary<br/>(compiled)"]
     COG["state COG<br/>(2 bandas)<br/>runs/*.tif"]
-    DS["dataset.py<br/>RolloutDataset"]
-    TR["train.py<br/>train_unet"]
-    PRED["predict.py<br/>run_prediction"]
-    API["server.py<br/>FastAPI"]
     UN["U-Net<br/>entrenada"]
 
-    ABM -->|"produce"| COG
+    PL --> WR
+    WR --> RUN
+    RUN -->|"invokes"| BIN
+    BIN -->|"produce"| COG
     COG -->|"lee y tilea<br/>128x128"| DS
     DS -->|"pares<br/>(t -> t+1)"| TR
     TR -->|"guarda pesos"| UN
@@ -304,11 +344,12 @@ graph LR
 ```
 
 **Flujo paso a paso**:
-1. **ABM** (C++ o Python) produce state COGs mensuales en `runs/`
-2. **mal-core/dataset.py** lee los COGs y construye pares de entrenamiento (state_t → state_{t+1})
-3. **mal-core/train.py** entrena la U-Net con esos pares
-4. **mal-core/predict.py** carga la U-Net entrenada y genera risk maps
-5. **mal-core/server.py** expone la prediccion via REST API
+1. **Pipeline** (`pipeline/runner.py`) orquesta las etapas
+2. **ABM wrapper** (`abm/wrapper.py`) invoca el binario C++ y produce state COGs mensuales
+3. **Dataset** (`training/dataset.py`) lee los COGs y construye pares de entrenamiento (state_t → state_{t+1})
+4. **Trainer** (`training/trainer.py`) entrena la U-Net con esos pares
+5. **Predictor** (`prediction/predictor.py`) carga la U-Net entrenada y genera risk maps
+6. **Server** (`server.py`) expone la prediccion via REST API
 
 ---
 
@@ -399,10 +440,10 @@ graph LR
 
 ---
 
-## 6. mal-abm-fast — Motor ABM en C++
+## 6. ABM C++ Engine (inside mal-core)
 
-**Ubicacion**: `mal-abm-fast/`
-**Estado**: M7.2 **in progress** — F1 complete (60/60 ctest + 5/5 parity), M7 biology v2 actively developing
+**Ubicacion**: `mal-core/src/mal_core/abm/`
+**Estado**: M7.2 — F1 complete (60/60 ctest + 5/5 parity), M7 biology v2 actively developing
 **Objetivo**: 100 rollouts en <5 min wall en un nodo FT3 ilk
 
 ### Que es?
@@ -669,22 +710,22 @@ sequenceDiagram
 # Single rollout
 ./mal_abm_fast run \
     --aoi ghana --year 2024 --month 6 --seed 1 --days 30 \
-    --env data/runs/ghana/ghana_regional_2024_06_env.tif \
-    --habitat data/runs/ghana/ghana_regional_2024_06_habitat_patches.gpkg \
-    --output data/runs/ghana/ghana_regional_2024_06_state.tif
+    --env data/ghana/ghana_regional_2024_06_env.tif \
+    --habitat data/ghana/ghana_regional_2024_06_habitat_patches.gpkg \
+    --output data/ghana/ghana_regional_2024_06_state.tif
 
 # 100 rollouts (M-perf target)
 ./mal_abm_fast run --n-rollouts 100 \
     --aoi ghana --year 2024 --month 6 --seed 1 --days 30 \
-    --env data/runs/ghana/ghana_regional_2024_06_env.tif \
-    --habitat data/runs/ghana/ghana_regional_2024_06_habitat_patches.gpkg \
+    --env data/ghana/ghana_regional_2024_06_env.tif \
+    --habitat data/ghana/ghana_regional_2024_06_habitat_patches.gpkg \
     --output /tmp/rollout/state.tif
 
 # Daily snapshots (time-series para U-Net)
 ./mal_abm_fast run --snapshot-every 1 --n-rollouts 10 \
     --aoi ghana --year 2024 --month 6 --seed 1 --days 30 \
-    --env data/runs/ghana/ghana_regional_2024_06_env.tif \
-    --habitat data/runs/ghana/ghana_regional_2024_06_habitat_patches.gpkg \
+    --env data/ghana/ghana_regional_2024_06_env.tif \
+    --habitat data/ghana/ghana_regional_2024_06_habitat_patches.gpkg \
     --output /tmp/rollout/state.tif
 ```
 
@@ -739,11 +780,11 @@ PRNG xoshiro256** canonico. Dos runs con mismo `(seed, i, days, AOI, env, habita
 
 ```bash
 # C++ unit tests (GoogleTest)
-ctest --test-dir mal-abm-fast/build --output-on-failure
+ctest --test-dir mal-core/build --output-on-failure
 # 60 tests
 
 # Python parity test (F1.e)
-cd mal-ghana-sim && uv run pytest tests/test_abm_fast_parity.py -v
+cd mal-core && uv run pytest src/mal_core/abm/tests/test_abm_fast_parity.py -v
 # 5 tests, tolerance: max(2e-2 abs, 12% rel)
 ```
 
@@ -751,10 +792,10 @@ cd mal-ghana-sim && uv run pytest tests/test_abm_fast_parity.py -v
 
 ```bash
 brew install cmake ninja pkg-config gdal eigen cli11 nlohmann-json googletest
-cmake -S mal-abm-fast -B mal-abm-fast/build -G Ninja \
+cmake -S mal-core -B mal-core/build -G Ninja \
       -DCMAKE_BUILD_TYPE=Release
-cmake --build mal-abm-fast/build -j
-ctest --test-dir mal-abm-fast/build --output-on-failure
+cmake --build mal-core/build -j
+ctest --test-dir mal-core/build --output-on-failure
 ```
 
 ---
@@ -1052,6 +1093,7 @@ graph LR
 | M5 | SDSS Shell | Pendiente |
 | M6 | Operational | Pendiente |
 | M7 | Biology v2 | **En progreso** (M7.2: gonotrophic cycle, host-seeking, mobility, host data) |
+| M9 | Unified SDSS pipeline + ABM→core consolidation | Completado |
 
 ---
 

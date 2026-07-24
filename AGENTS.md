@@ -40,7 +40,7 @@ make -f agents/memory/scripts/Makefile session-start
 make -f agents/memory/scripts/Makefile session-end
 
 # Run the calibration scorers (Phase 1+2: 10 scorers + LLM verdict)
-cd mal-abm-fast/tests/calibration
+cd mal-core/src/mal_core/abm/tests/calibration
 uv run pytest -m fast -v          # 10 scorers, 1 seed, 30 days (PR gate)
 uv run pytest -m full -v          # 10 scorers + LLM, 5 seeds, 90 days
 ```
@@ -188,13 +188,13 @@ reproduction, etc.) that affects adult survival, EIP, or population
 dynamics:
 
 1. **Check if an existing scorer covers the new feature.** If not,
-   create a new scorer in `mal-abm-fast/tests/calibration/scorers/`.
+   create a new scorer in `mal-core/src/mal_core/abm/tests/calibration/scorers/`.
 2. **Register the scorer** in `thresholds.yaml` with `min_score`,
    `max_delta`, and `hard_floor`.
 3. **Add the scorer to the composite** by adding its weight to
    `scorers/composite.py::DEFAULT_WEIGHTS`.
 4. **Run the calibration tests** before proposing:
-   `cd mal-abm-fast/tests/calibration && uv run pytest -m fast -v`
+   `cd mal-core/src/mal_core/abm/tests/calibration && uv run pytest -m fast -v`
 5. **The diff report** shows if the new feature improved or regressed
    the composite vs the previous run AND vs the best historical run.
 

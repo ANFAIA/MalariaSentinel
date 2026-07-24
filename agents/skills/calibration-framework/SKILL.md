@@ -1,20 +1,20 @@
 ---
 name: calibration-framework
-description: Understand and extend the ABM calibration scorecard framework. Covers the 11 scorer dimensions, composite scoring, thresholds, how to add new scorers, and how to interpret results. Use when adding biological features to the ABM, writing new scorers, or debugging calibration regressions.
+description: Understand and extend the ABM calibration scorecard framework. Covers the 14 scorer dimensions, composite scoring, thresholds, how to add new scorers, and how to interpret results. Use when adding biological features to the ABM, writing new scorers, or debugging calibration regressions.
 ---
 
 # Calibration Framework
 
 ## Overview
 
-The calibration framework scores mal-abm-fast C++ ABM rollouts against biological, physical, and computational expectations. It runs 11 deterministic scorers (D1-D11) that each evaluate one dimension of the simulation, then combines them into a single composite score via weighted geometric mean. An optional LLM judge (D12) provides a qualitative verdict on the same report.
+The calibration framework scores mal-abm-fast C++ ABM rollouts against biological, physical, and computational expectations. It runs 14 deterministic scorers (D1-D14) that each evaluate one dimension of the simulation, then combines them into a single composite score via weighted geometric mean. An optional LLM judge provides a qualitative verdict on the same report.
 
-The framework lives at `mal-abm-fast/tests/calibration/` and is a separate workspace member.
+The framework lives at `mal-core/src/mal_core/abm/tests/calibration/` (moved from `mal-abm-fast/` in M9).
 
 ## Quick reference
 
 ```bash
-# From the calibration directory (mal-abm-fast/tests/calibration/)
+# From the calibration directory (mal-core/src/mal_core/abm/tests/calibration/)
 uv run pytest -m fast -v          # 10 scorers, 1 seed, 30 days (PR gate)
 uv run pytest -m full -v          # 10 scorers + LLM, 5 seeds, 90 days
 uv run pytest -m llm -v           # LLM judge only (requires OPENCODE_API_KEY)
@@ -28,7 +28,7 @@ uv run python -m scorers.diff scorecard_a.json scorecard_b.json [--best best.jso
 
 Tier selection is via `CALIBRATION_TIER` env var (`fast` or `full`). LLM tests require `OPENCODE_API_KEY`.
 
-## The 11 dimensions
+## The 14 dimensions
 
 | Dim | Scorer | What it measures | Target | Source |
 |---|---|---|---|---|
@@ -43,10 +43,13 @@ Tier selection is via `CALIBRATION_TIER` env var (`fast` or `full`). LLM tests r
 | D9 | `activation.py` | Patch activation fraction across timesteps | 0.05-0.30 | wire.hpp:107-118 |
 | D10 | `performance.py` | Wall-clock time per rollout | <=30s | M-perf F1.g target |
 | D11 | `larval_dynamics.py` | Larval fraction of total population | 30-60% | Mordecai 2013 |
+| D12 | `D12_host_density.py` | Host density match to census | human ~27M (Ghana 2019) | WorldPop 2019 |
+| D13 | `D13_host_seeking_distance.py` | Host-seeking distance validation | 30-100m | Literature review |
+| D14 | `D14_mobility_conservation.py` | Mobility mass conservation | 1.0 | Internal |
 
 ## Composite scoring
 
-The composite is a **weighted geometric mean** of D1-D11 scores. Implemented in `scorers/composite.py::geometric_mean()`.
+The composite is a **weighted geometric mean** of D1-D14 scores. Implemented in `scorers/composite.py::geometric_mean()`.
 
 ```python
 DEFAULT_WEIGHTS = {
@@ -54,6 +57,8 @@ DEFAULT_WEIGHTS = {
     "D4_stability": 3.0, "D5_morans": 1.0, "D6_mass": 2.0,
     "D7_determinism": 2.0, "D8_coupling": 2.0, "D9_activation": 1.0,
     "D10_perf": 1.0, "D11_larval_dynamics": 1.0,
+    "D12_host_density": 2.0, "D13_host_seeking_distance": 2.0,
+    "D14_mobility_conservation": 2.0,
 }
 ```
 
@@ -116,7 +121,7 @@ Current values from `thresholds.yaml`:
 
 5. **Run tests**:
    ```bash
-   cd mal-abm-fast/tests/calibration
+   cd mal-core/src/mal_core/abm/tests/calibration
    uv run pytest -m fast -v
    ```
 
@@ -124,9 +129,9 @@ Current values from `thresholds.yaml`:
 
 ## Scorer naming convention
 
-Files: `D<id>_<name>.py` — e.g. `D1_expansion.py`, `D11_larval_dynamics.py`.
+Files: `D<id>_<name>.py` — e.g. `D1_expansion.py`, `D14_mobility_conservation.py`.
 
-The `<id>` is sequential (D1 through D11 currently). The `<name>` is a short snake_case description. The scorer's `name` property must match `D<id>_<name>` exactly (used as the key in scorecards and `DEFAULT_WEIGHTS`).
+The `<id>` is sequential (D1 through D14 currently). The `<name>` is a short snake_case description. The scorer's `name` property must match `D<id>_<name>` exactly (used as the key in scorecards and `DEFAULT_WEIGHTS`).
 
 ## LLM verdict
 
@@ -153,5 +158,5 @@ The LLM is deterministic at temperature 0, content-hash-cached, and falls back t
 
 ## Related skills
 
-- **abm-engine** — mal-abm-fast C++ engine build, run, and configuration
+- **abm-engine** — C++ ABM engine build, run, and configuration (now inside mal-core/src/mal_core/abm/)
 - **mal-core-api** — stable pipeline logic in mal-core/ (promotion target for stabilised scorers)

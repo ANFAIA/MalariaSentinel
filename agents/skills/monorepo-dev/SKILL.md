@@ -7,7 +7,7 @@ description: Work with the MalariaSentinel monorepo structure. Covers package ma
 
 ## Monorepo Overview
 
-MalariaSentinel is a **uv workspace monorepo** with 6 packages. The root `pyproject.toml` defines the workspace; individual packages declare their own dependencies and build config.
+MalariaSentinel is a **uv workspace monorepo** with 5 packages. The root `pyproject.toml` defines the workspace; individual packages declare their own dependencies and build config.
 
 ```
 MalariaSentinel/
@@ -15,9 +15,16 @@ MalariaSentinel/
 ├── mal-commonlib/              # Shared config, paths, data utilities
 │   ├── pyproject.toml
 │   └── src/mal_commonlib/
-├── mal-core/                   # Stable pipeline logic (M3-M4 U-Net + M5 SDSS shell)
+├── mal-core/                   # Stable pipeline logic + ABM engine (M9 consolidated)
 │   ├── pyproject.toml
-│   └── src/mal_core/
+│   ├── src/mal_core/
+│   │   ├── abm/                # C++ ABM engine (moved from mal-abm-fast/)
+│   │   ├── training/           # UNet model, dataset, trainer
+│   │   ├── prediction/         # Predictor, registry, env/state loaders
+│   │   ├── ingest/             # Env tensor builder
+│   │   ├── scoring/            # Calibration scorers
+│   │   └── pipeline/           # Pipeline orchestrator
+│   └── tests/
 ├── mal-execution/              # CLI entrypoints, batch jobs (deprecated, use mal-core)
 │   ├── pyproject.toml
 │   ├── scripts/
@@ -29,13 +36,6 @@ MalariaSentinel/
 ├── mal-data-explorer/          # Dataset visualization, mapping, bias analysis
 │   ├── pyproject.toml
 │   └── *.py                    # Standalone scripts (no src layout)
-├── mal-abm-fast/               # Fast C++ ABM engine (HPC production)
-│   ├── pyproject.toml
-│   ├── CMakeLists.txt
-│   ├── src/
-│   ├── include/
-│   ├── tests/
-│   └── slurm/
 ├── agents/                     # Agent loops + memory module
 ├── data/                       # Datasets (gitignored)
 ├── papers/                     # Research papers
@@ -54,7 +54,6 @@ members = [
     "mal-execution",
     "mal-ghana-sim",
     "mal-data-explorer",
-    "mal-abm-fast",
 ]
 ```
 
@@ -71,7 +70,6 @@ mal-execution          ← depends on mal-core + mal-commonlib (HPC/cloud automa
 
 mal-ghana-sim          ← depends on mal-commonlib ONLY (NOT mal-core)
 mal-data-explorer      ← no workspace deps (standalone scripts)
-mal-abm-fast           ← no workspace deps (C++ engine)
 ```
 
 **Rules:**
@@ -79,7 +77,7 @@ mal-abm-fast           ← no workspace deps (C++ engine)
 - `mal-core` depends only on `mal-commonlib`.
 - `mal-execution` depends on `mal-core` + `mal-commonlib`. Its Python module (`mal_cli`) is minimal, but `scripts/` contains HPC automation (CESGA SLURM, Hetzner cloud).
 - `mal-ghana-sim` depends only on `mal-commonlib` — **never** on `mal-core`.
-- `mal-data-explorer` and `mal-abm-fast` have no workspace dependencies.
+- `mal-data-explorer` has no workspace dependencies.
 - **Nothing depends on research packages.** Research code promotes into core; it never flows downward.
 
 ## Package Management
@@ -184,13 +182,13 @@ cd mal-core && uv run pytest
 cd mal-ghana-sim && uv run pytest
 
 # C++ ABM engine (GoogleTest)
-cd mal-abm-fast && ctest --test-dir build --output-on-failure
+cd mal-core/src/mal_core/abm && ctest --test-dir build --output-on-failure
 ```
 
 ### Testing conventions
 
 - **Python packages**: tests go in `tests/` at the package root (e.g., `mal-ghana-sim/tests/`) or `src/<package>/tests/` (e.g., `mal-commonlib/src/mal_commonlib/tests/`).
-- **Framework**: pytest for Python. GoogleTest for C++ (`mal-abm-fast`).
+- **Framework**: pytest for Python. GoogleTest for C++ (`mal-core/src/mal_core/abm/`).
 - **Dev dependencies**: declared in `[dependency-groups] dev = ["pytest>=8.0"]` in each package's `pyproject.toml`.
 - Every promoted module **must** have tests before it lands in `mal-core` or `mal-commonlib`.
 
@@ -218,7 +216,6 @@ Use prefixes that match the package tier:
 | `sim/` | `mal-ghana-sim` |
 | `data/` | `mal-data-explorer` |
 | `docs/` | Documentation |
-| `abm/` | `mal-abm-fast` |
 
 ### Python modules
 
@@ -229,7 +226,6 @@ Use prefixes that match the package tier:
 | `mal-execution` | (scripts only, no importable module) |
 | `mal-ghana-sim` | `mal_ghana_sim` |
 | `mal-data-explorer` | (standalone scripts, no importable module) |
-| `mal-abm-fast` | (C++ engine, no Python module) |
 
 ### New experiments
 
@@ -241,7 +237,14 @@ Follow the pattern: `mal-<topic>-sim/` or `mal-<topic>-explorer/`.
 Shared config, paths, data utilities. Modules: `config`, `aoi`, `data/`, `terrain/`.
 
 ### mal-core
-Stable pipeline logic (promoted from experiments). Modules: `aoi`, `cli`, `dataset`, `env`, `predict`, `registry`, `scenario`, `server`, `state`, `train`, `unet_wrapper`, `unet`. Entry point: `malariasim` CLI.
+Stable pipeline logic + ABM engine (M9 consolidated). Subpackages:
+- `abm/` — C++ ABM engine wrapper (CppAbmWrapper, run_abm, flags)
+- `training/` — UNet model, dataset, trainer, wrapper
+- `prediction/` — predictor, registry, env/state loaders, aggregator, aoi_resolver
+- `ingest/` — env tensor builder (delegates to mal-execution)
+- `scoring/` — calibration runner, feedback generator
+- `pipeline/` — orchestrator (run_pipeline), stages enum, flag registry
+Entry point: `malariasim` CLI (9 commands: run, ingest, abm, score, train, predict, feedback, status, serve).
 
 ### mal-execution
 HPC and cloud automation. Python module is minimal (`mal_cli/__init__.py`). Key content:
@@ -254,9 +257,6 @@ Ghana spread simulation + U-Net surrogate. Modules: `config`, `dataset`, `ingest
 
 ### mal-data-explorer
 Standalone visualization scripts (01-12). No src layout, no importable module.
-
-### mal-abm-fast
-C++ agent-based model engine. Built with CMake. 12 source files, 11 GoogleTest suites (60 tests). CLI via CLI11.
 
 ## Contribution Guidelines
 
@@ -306,9 +306,9 @@ Run `uv sync --all-packages` from the repo root. Verify the package's `pyproject
 
 Ensure you are running tests with `uv run pytest` (not bare `pytest`), so the workspace venv is active.
 
-### C++ build fails (`mal-abm-fast`)
+### C++ build fails (`mal-core/src/mal_core/abm/`)
 
-Ensure CMake and a C++17 compiler are available. Check `mal-abm-fast/CMakeLists.txt` for required dependencies (vcpkg).
+Ensure CMake and a C++20 compiler are available. Check `mal-core/src/mal_core/abm/CMakeLists.txt` for required dependencies. On macOS: `brew install libomp` for OpenMP support.
 
 ### Promotion broke an experiment
 

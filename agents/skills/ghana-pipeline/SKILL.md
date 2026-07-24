@@ -7,7 +7,47 @@ description: Run the Ghana malaria simulation pipeline end-to-end. Covers enviro
 
 End-to-end guide for running the MalariaSentinel Ghana malaria spread simulation and U-Net surrogate pipeline. The pipeline ingests satellite environmental rasters, builds a habitat-suitability field, runs a mechanistic reaction-diffusion simulator, trains a U-Net transition surrogate, and produces risk-expansion maps.
 
+## New: Unified Pipeline (M9)
+
+As of M9, the primary way to run ABM simulations is through the unified pipeline in `mal-core`:
+
+```bash
+# Run the full pipeline (ingest → ABM → score → train → predict)
+malariasim run --aoi ghana --stages ingest,abm,score --days 90 --seed 1
+
+# Run individual stages
+malariasim ingest --aoi ghana --year 2024 --month 6
+malariasim abm --aoi ghana --year 2024 --month 1 --days 90 --seed 1
+malariasim score --run-dir runs/pipeline/
+malariasim train --run-dir runs/abm/ --epochs 50
+malariasim feedback --run-dir runs/pipeline/
+```
+
+### Data organization
+
+All Ghana data lives in `data/ghana/`:
+
+| File | Purpose | ABM flag |
+|---|---|---|
+| `ghana_regional_2024_2025_env.nc` | Daily env tensor (731 days, 4 vars) | `--env` |
+| `ghana_regional_2024_06_habitat_patches.gpkg` | Habitat patches | `--habitat` |
+| `host_static.nc` | Host density (5 vars) | `--hosts` |
+| `human_mobility_day.csr` | Day mobility matrix | `--human-mobility-day` |
+| `human_mobility_night.csr` | Night mobility matrix | `--human-mobility-night` |
+| `livestock_mobility_season.csr` | Livestock mobility | `--livestock-mobility` |
+| `manifest.json` | AOI data manifest | (used by aoi_resolver) |
+
+### Adding a new AOI
+
+1. Create `data/<aoi>/manifest.json` listing all data files
+2. Run `malariasim ingest --aoi <aoi>` to build env tensor
+3. Run `malariasim abm --aoi <aoi>` to simulate
+
+The system is AOI-agnostic: `mal_core.prediction.aoi_resolver` resolves paths from the manifest.
+
 ## 1. Pipeline Overview
+
+> **Note**: The sections below describe the original mal-ghana-sim reaction-diffusion pipeline (stages 1-6). For the ABM-based pipeline, see the "New: Unified Pipeline (M9)" section above.
 
 The pipeline has 6 stages, each with a dedicated script:
 

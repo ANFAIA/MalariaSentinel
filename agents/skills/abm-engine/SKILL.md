@@ -1,6 +1,6 @@
 ---
 name: abm-engine
-description: Use the Agent-Based Model (ABM) engines for malaria simulation. Covers both the Python reference implementation (mal-ghana-sim) and the fast C++ engine (mal-abm-fast) for HPC deployment. Use when running ABM simulations, comparing engines, or deploying to CESGA.
+description: Use the Agent-Based Model (ABM) engine for malaria simulation. The C++ engine lives inside mal-core/src/mal_core/abm/. Use when running ABM simulations, building the engine, or deploying to CESGA.
 ---
 
 # ABM Engine Skill
@@ -9,8 +9,8 @@ Two implementations of the M1.5 thin-slice ABM for mosquito population dynamics 
 
 | Engine | Location | Use case |
 |---|---|---|
-| Python reference | `mal-ghana-sim/src/mal_ghana_sim/abm/` | Development, validation, prototyping |
-| C++ fast engine | `mal-abm-fast/` | HPC production runs (CESGA FT3), 100x faster |
+| Python reference | `mal-ghana-sim/src/mal_ghana_sim/abm/` | Development, validation, prototyping (deprecated) |
+| C++ fast engine | `mal-core/src/mal_core/abm/` | Production runs, HPC (CESGA FT3), 100x faster |
 
 Both produce identical 2-band COG output (density + suitability) and sidecar JSON, verified by the parity test (F1.e).
 
@@ -55,18 +55,18 @@ cd mal-ghana-sim
 # Using the Python module
 uv run python -m mal_ghana_sim.abm.run \
     --aoi ghana --year 2024 --month 6 \
-    --env data/runs/ghana/ghana_regional_2024_06_env.tif \
-    --habitat data/runs/ghana/ghana_regional_2024_06_habitat_patches.gpkg \
+    --env data/ghana/ghana_regional_2024_2025_env.nc \
+    --habitat data/ghana/ghana_regional_2024_06_habitat_patches.gpkg \
     --seed 42 --days 30 \
-    --output data/runs/ghana/ghana_regional_2024_06_state.tif
+    --output runs/output/state.tif
 
 # Using the entry point (after uv sync)
 uv run abm_run \
     --aoi ghana --year 2024 --month 6 \
-    --env data/runs/ghana/ghana_regional_2024_06_env.tif \
-    --habitat data/runs/ghana/ghana_regional_2024_06_habitat_patches.gpkg \
+    --env data/ghana/ghana_regional_2024_2025_env.nc \
+    --habitat data/ghana/ghana_regional_2024_06_habitat_patches.gpkg \
     --seed 42 --days 30 \
-    --output data/runs/ghana/ghana_regional_2024_06_state.tif
+    --output runs/output/state.tif
 ```
 
 ### CLI parameters
@@ -88,7 +88,7 @@ uv run abm_run \
 ### Expected output
 
 ```
-abm_run: AOI=ghana year=2024 month=06 seed=42 days=30 -> data/runs/ghana/ghana_regional_2024_06_state.tif
+abm_run: AOI=ghana year=2024 month=06 seed=42 days=30 -> runs/output/state.tif
 ```
 
 ---
@@ -97,7 +97,7 @@ abm_run: AOI=ghana year=2024 month=06 seed=42 days=30 -> data/runs/ghana/ghana_r
 
 ### Location
 
-`mal-abm-fast/`
+`mal-core/src/mal_core/abm/`
 
 ### Purpose
 
@@ -122,7 +122,7 @@ abm_run: AOI=ghana year=2024 month=06 seed=42 days=30 -> data/runs/ghana/ghana_r
 brew install cmake ninja pkg-config gdal eigen cli11 nlohmann-json googletest libomp
 
 # Configure (macOS Apple Silicon — requires OpenMP from Homebrew)
-cmake -S mal-abm-fast -B mal-abm-fast/build -G Ninja \
+cmake -S mal-core/src/mal_core/abm -B mal-core/src/mal_core/abm/build -G Ninja \
       -DCMAKE_BUILD_TYPE=Release \
       -DCMAKE_CXX_COMPILER=/opt/homebrew/opt/llvm/bin/clang++ \
       -DOpenMP_CXX_FLAGS="-fopenmp" \
@@ -131,10 +131,10 @@ cmake -S mal-abm-fast -B mal-abm-fast/build -G Ninja \
       -DCMAKE_PREFIX_PATH="$(brew --prefix gdal);$(brew --prefix eigen);$(brew --prefix nlohmann-json);$(brew --prefix googletest)"
 
 # Build
-cmake --build mal-abm-fast/build -j
+cmake --build mal-core/src/mal_core/abm/build -j
 
 # Test
-ctest --test-dir mal-abm-fast/build --output-on-failure
+ctest --test-dir mal-core/src/mal_core/abm/build --output-on-failure
 ```
 
 ### Build (CESGA FT3)
@@ -149,34 +149,37 @@ module load intel/2021.3.0
 module load impi/2021.3.0
 module load gdal/3.7.0
 
-cmake -S $PROJECT_ROOT/mal-abm-fast -B $PROJECT_ROOT/mal-abm-fast/build \
+cmake -S $PROJECT_ROOT/mal-core/src/mal_core/abm -B $PROJECT_ROOT/mal-core/src/mal_core/abm/build \
       -DCMAKE_BUILD_TYPE=Release
-cmake --build $PROJECT_ROOT/mal-abm-fast/build -j
+cmake --build $PROJECT_ROOT/mal-core/src/mal_core/abm/build -j
 ```
 
 ### How to run
 
 ```bash
 # Single rollout
-./mal-abm-fast/build/mal_abm_fast run \
-    --aoi ghana --year 2024 --month 6 --seed 1 --days 30 \
-    --env data/runs/ghana/ghana_regional_2024_06_env.tif \
-    --habitat data/runs/ghana/ghana_regional_2024_06_habitat_patches.gpkg \
-    --output data/runs/ghana/ghana_regional_2024_06_state.tif
+mal-core/src/mal_core/abm/build/src/mal_abm_fast run \
+    --aoi ghana --year 2024 --month 1 --seed 1 --days 30 \
+    --env data/ghana/ghana_regional_2024_2025_env.nc \
+    --habitat data/ghana/ghana_regional_2024_06_habitat_patches.gpkg \
+    --hosts data/ghana/host_static.nc \
+    --output runs/output/state.tif
 
 # Multiple rollouts (each gets fresh PRNG: seed+i)
-./mal-abm-fast/build/mal_abm_fast run --n-rollouts 100 \
-    --aoi ghana --year 2024 --month 6 --seed 1 --days 30 \
-    --env data/runs/ghana/ghana_regional_2024_06_env.tif \
-    --habitat data/runs/ghana/ghana_regional_2024_06_habitat_patches.gpkg \
+mal-core/src/mal_core/abm/build/src/mal_abm_fast run --n-rollouts 100 \
+    --aoi ghana --year 2024 --month 1 --seed 1 --days 30 \
+    --env data/ghana/ghana_regional_2024_2025_env.nc \
+    --habitat data/ghana/ghana_regional_2024_06_habitat_patches.gpkg \
+    --hosts data/ghana/host_static.nc \
     --output /tmp/rollout/state.tif
 # Produces: state_seed0000.tif ... state_seed0099.tif + .json sidecars
 
 # Daily snapshots (for U-Net training time-series)
-./mal-abm-fast/build/mal_abm_fast run --snapshot-every 1 --n-rollouts 10 \
-    --aoi ghana --year 2024 --month 6 --seed 1 --days 30 \
-    --env data/runs/ghana/ghana_regional_2024_06_env.tif \
-    --habitat data/runs/ghana/ghana_regional_2024_06_habitat_patches.gpkg \
+mal-core/src/mal_core/abm/build/src/mal_abm_fast run --snapshot-every 1 --n-rollouts 10 \
+    --aoi ghana --year 2024 --month 1 --seed 1 --days 30 \
+    --env data/ghana/ghana_regional_2024_2025_env.nc \
+    --habitat data/ghana/ghana_regional_2024_06_habitat_patches.gpkg \
+    --hosts data/ghana/host_static.nc \
     --output /tmp/rollout/state.tif
 # Produces: state_day001.tif ... state_day030.tif per rollout
 ```
@@ -187,7 +190,7 @@ cmake --build $PROJECT_ROOT/mal-abm-fast/build -j
 |---|---|---|
 | `--aoi` | — | AOI slug (`ghana`) |
 | `--bbox` | — | Custom bbox `W,S,E,N` (overrides `--aoi`) |
-| `--env` | required | Path to 4-band env GeoTIFF (.tif) or daily NetCDF (.nc) |
+| `--env` | required | Path to daily env NetCDF (.nc) — preferred format |
 | `--habitat` | required | Path to habitat patches gpkg |
 | `--output` | required | Output path for state COG (.tif) |
 | `--year` | required | Start year |
@@ -274,10 +277,11 @@ For simulating mosquito invasion from a small initial population, use `--seeding
 ### Quick start: 1-year invasion
 
 ```bash
-cd mal-abm-fast && ./build/src/mal_abm_fast run \
+cd mal-core/src/mal_core/abm && ./build/src/mal_abm_fast run \
   --aoi ghana \
   --env data/ghana/ghana_regional_2024_2025_env.nc \
-  --habitat data/runs/ghana/m2_run3seeds/ghana_regional_2024_06_habitat_patches.gpkg \
+  --habitat data/ghana/ghana_regional_2024_06_habitat_patches.gpkg \
+  --hosts data/ghana/host_static.nc \
   --output /tmp/invasion/state.tif \
   --year 2024 --month 1 --days 365 --seed 1 --snapshot-every 1 \
   --seeding-mode random-viable --n-detections 3 \
@@ -315,10 +319,10 @@ cd mal-abm-fast && ./build/src/mal_abm_fast run \
 
 ### Visualization
 
-Use `mal-abm-fast/scripts/visualize_state.py` to generate GIF animations:
+Use `mal-core/src/mal_core/abm/scripts/visualize_state.py` to generate GIF animations:
 
 ```bash
-cd mal-abm-fast && uv run python scripts/visualize_state.py \
+cd mal-core/src/mal_core/abm && uv run python scripts/visualize_state.py \
   --run-dir /tmp/invasion \
   --output /tmp/invasion/animation.gif \
   --sample-every 5
@@ -331,7 +335,7 @@ cd mal-abm-fast && uv run python scripts/visualize_state.py \
 ### C++ unit tests (GoogleTest)
 
 ```bash
-ctest --test-dir mal-abm-fast/build --output-on-failure
+ctest --test-dir mal-core/src/mal_core/abm/build --output-on-failure
 # 60 tests: prng, dispersal, eip, climate, habitat_engine, mosquito_submodel,
 #           coordinator, engine, output_contract, state_cog, smoke
 ```
@@ -363,19 +367,20 @@ ssh cesga
 cd $STORE/MalariaSentinel
 
 # Transfer data (from local)
-rsync -avz --progress ./data/runs/ghana/ cesga:$STORE/MalariaSentinel/data/runs/ghana/
+rsync -avz --progress ./data/ghana/ cesga:$STORE/MalariaSentinel/data/ghana/
 
 # Build C++ engine (one-time)
 module load cesga/system intel/2021.3.0 impi/2021.3.0 gdal/3.7.0
-cmake -S mal-abm-fast -B mal-abm-fast/build -DCMAKE_BUILD_TYPE=Release
-cmake --build mal-abm-fast/build -j
+cmake -S mal-core/src/mal_core/abm -B mal-core/src/mal_core/abm/build -DCMAKE_BUILD_TYPE=Release
+cmake --build mal-core/src/mal_core/abm/build -j
 
 # Run 100 rollouts
-srun mal-abm-fast/build/mal_abm_fast run \
-    --aoi ghana --year 2024 --month 6 --seed 1 --days 30 \
-    --env data/runs/ghana/m2/ghana_regional_2024_06_env.tif \
-    --habitat data/runs/ghana/m2/ghana_regional_2024_06_habitat_patches.gpkg \
-    --output runs/m-perf/ghana_2024_06/state.tif \
+srun mal-core/src/mal_core/abm/build/src/mal_abm_fast run \
+    --aoi ghana --year 2024 --month 1 --seed 1 --days 30 \
+    --env data/ghana/ghana_regional_2024_2025_env.nc \
+    --habitat data/ghana/ghana_regional_2024_06_habitat_patches.gpkg \
+    --hosts data/ghana/host_static.nc \
+    --output runs/m-perf/ghana_2024_01/state.tif \
     --n-rollouts 100 --threads 64
 
 # Transfer results back
@@ -386,13 +391,13 @@ rsync -avz --progress cesga:$STORE/MalariaSentinel/runs/m-perf/ ./runs/m-perf/
 
 ```bash
 # Short job (6h, 100 rollouts)
-sbatch mal-abm-fast/slurm/short.sh
+sbatch mal-core/src/mal_core/abm/slurm/short.sh
 
 # Override parameters
-MONTH=6 YEAR=2024 N_ROLLOUTS=100 sbatch mal-abm-fast/slurm/short.sh
+MONTH=6 YEAR=2024 N_ROLLOUTS=100 sbatch mal-core/src/mal_core/abm/slurm/short.sh
 
 # Long job (7d, multi-month)
-NUM_MONTHS=24 N_ROLLOUTS=100 sbatch mal-abm-fast/slurm/long.sh
+NUM_MONTHS=24 N_ROLLOUTS=100 sbatch mal-core/src/mal_core/abm/slurm/long.sh
 ```
 
 ### Python ABM on CESGA
@@ -427,14 +432,14 @@ uv run python -m mal_ghana_sim.abm.run \
 | `nlohmann/json.hpp not found` | nlohmann-json not installed | `brew install nlohmann-json` |
 | `Eigen/Dense not found` | Eigen not installed | `brew install eigen` |
 | `omp.h not found` | OpenMP not available | On macOS, use `brew install libomp`; on CESGA, load `intel/2021.3.0` |
-| C++ build succeeds but tests fail | Outdated build cache | `rm -rf mal-abm-fast/build && cmake ...` (clean rebuild) |
+| C++ build succeeds but tests fail | Outdated build cache | `rm -rf mal-core/src/mal_core/abm/build && cmake ...` (clean rebuild) |
 
 ### Runtime issues
 
 | Error | Cause | Fix |
 |---|---|---|
-| `--env not found` | Wrong path to env COG | Check the path; files are under `data/runs/<aoi>/m2/` |
-| `--habitat not found` | Wrong path to habitat gpkg | Check the path; files are under `data/runs/<aoi>/m2/` |
+| `--env not found` | Wrong path to env NC | Check the path; files are under `data/<aoi>/` |
+| `--habitat not found` | Wrong path to habitat gpkg | Check the path; files are under `data/<aoi>/` |
 | `diverged on day N` | Population explosion or NaN | Check `--debug-population` output; reduce `--n-rollouts` or use `--max-population` |
 | Empty output (all NaN) | No active patches | Verify env COG has non-zero rainfall and water_frac bands |
 | Python parity mismatch | Version skew between engines | Ensure both engines use the same `wire.hpp` constants; run `uv sync --all-packages` |
@@ -443,7 +448,7 @@ uv run python -m mal_ghana_sim.abm.run \
 
 | Symptom | Fix |
 |---|---|
-| Python ABM is too slow for >10 rollouts | Use the C++ engine (`mal-abm-fast`) |
+| Python ABM is too slow for >10 rollouts | Use the C++ engine (`mal-core/src/mal_core/abm`) |
 | C++ engine uses too much memory | Reduce `--n-rollouts` or `--threads`; check grid size |
 | SLURM job killed (OOM) | Increase `--mem`; reduce grid resolution or `--n-rollouts` |
 | Rollouts not parallelising | Check `OMP_NUM_THREADS` and `--threads` flag |
