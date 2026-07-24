@@ -1,3 +1,8 @@
+---
+name: linkedin-post
+description: Generate LinkedIn posts for MalariaSentinel projects. Produces bilingual (English + Spanish) posts with honest tone, no hype, under 150 words per version. Use when user says "write a LinkedIn post", "create social copy", "draft a post for this project".
+---
+
 # LinkedIn Post Generator
 
 Generates a LinkedIn post to accompany a visual presentation (carousel, video, slides) of a project.

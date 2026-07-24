@@ -145,7 +145,7 @@ Based on the transcription, generate a markdown file with:
 - **Target platform** — LinkedIn, Twitter, etc.
 - **Suggested hashtags**
 
-Follow the tone rules from `linkedin-post.md`:
+Follow the tone rules from `linkedin-post` skill:
 
 - Conversational, first-person
 - No hype, no "thrilled to announce"
@@ -208,6 +208,6 @@ If the model is not present, it can be downloaded from HuggingFace: `nvidia/para
 
 This skill produces raw material for:
 
-- **LinkedIn Presentation Builder** (`social-networks/SKILL.md`) — use the transcription as source content for carousels/videos
-- **LinkedIn Post Generator** (`social-networks/linkedin-post.md`) — feed the transcription into the post template
+- **LinkedIn Presentation Builder** (`video-composition` skill) — use the transcription as source content for carousels/videos
+- **LinkedIn Post Generator** (`linkedin-post` skill) — feed the transcription into the post template
 - Any social platform content pipeline

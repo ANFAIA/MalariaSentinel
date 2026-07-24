@@ -1,3 +1,8 @@
+---
+name: video-composition
+description: Build LinkedIn carousel/video presentations for MalariaSentinel using HyperFrames. Covers design system, HTML composition, GSAP animation, rendering, and PDF generation. Use when user says "make a LinkedIn video", "create a carousel", "generate a presentation for LinkedIn", or wants to update an existing presentation.
+---
+
 # Skill: LinkedIn Presentation Builder
 
 Build LinkedIn carousel/video presentations for MalariaSentinel (and future projects) using HyperFrames. This skill captures David's preferences, known pitfalls, and the proven workflow.
@@ -221,7 +226,7 @@ ANFAIA = **Asociación Nacional Faro, para la Aceleración de la Inteligencia Ar
 - `Carousel Base Idea/design.md` — the full design system
 - `Carousel Base Idea/render.mp4` — the rendered video (45s, 1080×1350)
 - `Carousel Base Idea/carouselpdf.pdf` — the LinkedIn carousel PDF (6 pages)
-- `linkedin-post.md` — template for the accompanying LinkedIn text post
+- `linkedin-post` skill — template for the accompanying LinkedIn text post
 
 ---
 
@@ -231,5 +236,5 @@ When building a new presentation for a different project:
 1. Copy the palette and typography from this skill (or let user define new ones)
 2. Follow the same content preferences: non-technical, honest, no hype
 3. Verify funder/partner identity from their website
-4. Run the full check pipeline: `npx hyperframes check` → render → PDF → clean → commit
+4. Run the full check pipeline: `npx hyperframes check` -> render -> PDF -> clean -> commit
 5. Update this skill with any new pitfalls discovered
