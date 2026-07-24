@@ -82,16 +82,41 @@ All generated content goes into `social-networks/`:
 
 
 def create_agent(
-    model: str = "anthropic:claude-sonnet-4-5-20250929",
+    provider: str = "anthropic",
+    model: str = "claude-sonnet-4-5-20250929",
 ) -> "CompiledStateGraph":
     """Create and return the Social Networks Agent.
 
     Args:
-        model: Model string (e.g., "anthropic:claude-sonnet-4-5-20250929").
-
-    Returns:
-        A compiled LangGraph agent.
+        provider: Model provider (anthropic, openai, openrouter, google_genai, etc.).
+        model: Model name (claude-sonnet-4-5-20250929, gpt-4.1, xiaomi/mimo-v2.5, etc.).
     """
+    # Build the model instance
+    if provider == "openrouter":
+        # OpenRouter uses OpenAI-compatible API
+        try:
+            from langchain_openai import ChatOpenAI
+        except ImportError:
+            raise ImportError(
+                "langchain-openai is required for OpenRouter. "
+                "Install with: uv add --extra openrouter social-networks-agent"
+            )
+        api_key = os.environ.get("OPENROUTER_API_KEY")
+        if not api_key:
+            raise ValueError(
+                "OPENROUTER_API_KEY environment variable is required for OpenRouter. "
+                "Get your key at https://openrouter.ai/keys"
+            )
+        llm = ChatOpenAI(
+            model=model,
+            base_url="https://openrouter.ai/api/v1",
+            api_key=api_key,
+        )
+    else:
+        # Standard providers: use init_chat_model
+        from langchain.chat_models import init_chat_model
+        llm = init_chat_model(model=model, model_provider=provider)
+
     backend = FilesystemBackend(root_dir=REPO_ROOT, virtual_mode=True)
 
     skills = []
@@ -101,7 +126,7 @@ def create_agent(
         skills.append(GLOBAL_SKILLS)
 
     return create_deep_agent(
-        model=model,
+        model=llm,
         tools=[
             transcribe_audio,
             render_hyperframes,

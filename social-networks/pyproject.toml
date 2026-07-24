@@ -7,10 +7,19 @@ dependencies = [
     "deepagents>=0.6",
     "langgraph>=0.4",
     "langchain-core>=0.3",
+    "langchain-openai>=0.3",
 ]
 
 [project.optional-dependencies]
+openrouter = [
+    "langchain-openai>=0.3",
+]
 transcribe = [
+    "sherpa-onnx>=1.12",
+    "numpy>=2.0",
+]
+all = [
+    "langchain-openai>=0.3",
     "sherpa-onnx>=1.12",
     "numpy>=2.0",
 ]
