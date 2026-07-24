@@ -118,10 +118,19 @@ def make_frame(
     return Image.fromarray(img)
 
 
-def find_snapshot_files(run_dir: Path) -> list[Path]:
-    """Find state_dayNNN.tif files, sorted by day number."""
-    files = sorted(run_dir.glob("state_day*.tif"), key=lambda p: p.name)
-    return files
+def find_snapshot_files(run_dir: Path) -> list[tuple[Path, int]]:
+    """Find state_dayNNN.tif files, sorted by day number.
+
+    Returns list of (path, day_number) tuples.
+    """
+    import re
+    results = []
+    for p in run_dir.glob("state_day*.tif"):
+        m = re.search(r"state_day(\d+)", p.name)
+        if m:
+            results.append((p, int(m.group(1))))
+    results.sort(key=lambda x: x[1])
+    return results
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -172,17 +181,19 @@ def main(argv: list[str] | None = None) -> None:
     if cohort is None:
         print(f"warning: {cohort_path} not found; population panel will be empty", file=sys.stderr)
 
-    # sample
+    # sample — tif_files is list of (path, day_number)
     sampled = tif_files[:: max(args.sample_every, 1)]
     print(f"Found {len(tif_files)} snapshots, sampling every {args.sample_every} -> {len(sampled)} frames")
 
     # load all sampled frames to compute global dynamic range
     all_density: list[np.ndarray] = []
     all_suit: list[np.ndarray] = []
-    for f in sampled:
+    all_days: list[int] = []
+    for f, day_num in sampled:
         d, s = load_tif(f)
         all_density.append(d)
         all_suit.append(s)
+        all_days.append(day_num)
 
     # stack for global percentile computation
     stack_d = np.concatenate([a.ravel() for a in all_density])
@@ -209,7 +220,7 @@ def main(argv: list[str] | None = None) -> None:
     # generate frames
     frames: list[Image.Image] = []
     for i, (d, s) in enumerate(zip(all_density, all_suit)):
-        day_num = i * max(args.sample_every, 1) + 1  # day numbering starts at 1
+        day_num = all_days[i]  # actual day from filename
         frame = make_frame(d, s, cohort, day_num, density_norm, suit_norm,
                            args.density_cmap, args.suit_cmap)
         frames.append(frame)

@@ -33,12 +33,11 @@ from pydantic import BaseModel, Field, ValidationError
 # Module-level constants
 # ---------------------------------------------------------------------------
 
-LLM_BASE_URL: str = "https://opencode.ai/zen/v1"
-"""Base URL for the OpenCode Zen chat/completions endpoint."""
+LLM_BASE_URL: str = "https://openrouter.ai/api/v1"
+"""Base URL for the OpenRouter chat/completions endpoint."""
 
-LLM_MODEL_DEFAULT: str = "minimax-m3"
-"""Default model id. The ``opencode-go/`` prefix is the harness's internal
-alias; when calling the API directly we use the bare model id."""
+LLM_MODEL_DEFAULT: str = "minimax/minimax-m3"
+"""Default model id on OpenRouter."""
 
 LLM_TIMEOUT_S: int = 180
 """Per-request timeout in seconds. Tuned for the worst case (long report
@@ -115,10 +114,10 @@ def _report_hash(report: dict[str, Any], model: str) -> str:
 
 
 def _load_api_key() -> str | None:
-    """Resolve the OpenCode API key from the environment.
+    """Resolve the OpenRouter API key from the environment.
 
     Order of precedence:
-    1. ``OPENCODE_API_KEY`` already in ``os.environ`` (covers shell exports
+    1. ``OPENROUTER_KEY`` already in ``os.environ`` (covers shell exports
        and CI).
     2. A ``.env`` file walked up from this file's directory (covers
        ``/Users/.../MalariaSentinel/.env`` and CI runners that mount
@@ -130,7 +129,7 @@ def _load_api_key() -> str | None:
     Returns:
         The API key string, or ``None`` if not found.
     """
-    env_key = os.environ.get("OPENCODE_API_KEY")
+    env_key = os.environ.get("OPENROUTER_KEY")
     if env_key:
         return env_key
 
@@ -145,7 +144,7 @@ def _load_api_key() -> str | None:
                 if "=" not in line:
                     continue
                 k, _, v = line.partition("=")
-                if k.strip() == "OPENCODE_API_KEY":
+                if k.strip() == "OPENROUTER_KEY":
                     return v.strip().strip('"').strip("'") or None
             return None
         parent = here.parent
@@ -285,43 +284,49 @@ def score_with_llm(
     # 2. API key
     api_key = _load_api_key()
     if not api_key:
-        return deterministic_fallback(report, reason="OPENCODE_API_KEY not set")
+        return deterministic_fallback(report, reason="OPENROUTER_KEY not set")
 
-    # 3. Build the LLM call. Imported lazily so the module is importable
-    #    even when langchain_openai is not installed (e.g. for unit tests
-    #    that only exercise the fallback path).
-    try:
-        from langchain_openai import ChatOpenAI
-    except ImportError as exc:
-        return deterministic_fallback(
-            report,
-            reason=f"langchain_openai not installed: {exc}",
-        )
+    # 3. Call the OpenRouter API directly via requests + parse JSON response.
 
     try:
-        llm = ChatOpenAI(
-            model=model,
-            api_key=api_key,
-            base_url=LLM_BASE_URL,
-            temperature=0,
-            timeout=timeout_s,
-            max_retries=0,
-        )
-        structured = llm.with_structured_output(Verdict)
+        import requests
 
-        # The LLM gets the report as a human-readable JSON dump, plus the
-        # full system prompt as context.
-        user_payload = json.dumps(report, indent=2, default=str)
-        started = time.monotonic()
-        result: Verdict = structured.invoke(
-            [
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {api_key}",
+        }
+        payload = {
+            "model": model,
+            "temperature": 0,
+            "timeout": timeout_s,
+            "messages": [
                 {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": f"Calibration report:\n```json\n{user_payload}\n```"},
-            ]
+                {"role": "user", "content": f"Calibration report:\n```json\n{json.dumps(report, indent=2, default=str)}\n```\n\nReturn ONLY a JSON object matching this schema:\n{Verdict.model_json_schema()}"},
+            ],
+        }
+
+        started = time.monotonic()
+        resp = requests.post(
+            f"{LLM_BASE_URL}/chat/completions",
+            headers=headers,
+            json=payload,
+            timeout=timeout_s,
         )
+        resp.raise_for_status()
         elapsed = time.monotonic() - started
 
-        verdict_dict = result.model_dump()
+        content = resp.json()["choices"][0]["message"]["content"]
+        # Strip markdown fences if present
+        content = content.strip()
+        if content.startswith("```"):
+            content = content.split("\n", 1)[1]
+            if content.endswith("```"):
+                content = content[:-3]
+            content = content.strip()
+
+        parsed = json.loads(content)
+        verdict_obj = Verdict(**parsed)
+        verdict_dict = verdict_obj.model_dump()
         verdict_dict["latency_s"] = round(elapsed, 3)
         verdict_dict["model"] = model
         verdict_dict["cache_hit"] = False
