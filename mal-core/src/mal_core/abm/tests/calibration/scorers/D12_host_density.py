@@ -64,13 +64,34 @@ class HostDensityScorer(Scorer):
         )
 
     def _find_hosts_nc(self, run_dir: Path) -> Path | None:
+        # Try AOI resolver first (abstract, works for any AOI)
+        try:
+            from mal_core.prediction.aoi_resolver import resolve_aoi
+            aoi_slug = self._guess_aoi(run_dir)
+            if aoi_slug:
+                files = resolve_aoi(aoi_slug)
+                if files.hosts and files.hosts.exists():
+                    return files.hosts
+        except (ImportError, Exception):
+            pass
+        # Fallback: scan common locations
         candidates = [
             run_dir / "host_static.nc",
             run_dir.parent / "hosts" / "host_static.nc",
-            Path("data/ghana/host_static.nc"),
-            Path("/tmp/hosts_ghana/host_static.nc"),
         ]
         for p in candidates:
             if p.exists():
                 return p
+        return None
+
+    def _guess_aoi(self, run_dir: Path) -> str | None:
+        """Try to guess AOI slug from run_dir path or parent data dir."""
+        # Check if run_dir is under data/<aoi>/
+        parts = run_dir.resolve().parts
+        for i, part in enumerate(parts):
+            if part == "data" and i + 1 < len(parts):
+                candidate = parts[i + 1]
+                from pathlib import Path as _P
+                if (_P(*parts[:i + 2]) / "manifest.json").exists():
+                    return candidate
         return None
