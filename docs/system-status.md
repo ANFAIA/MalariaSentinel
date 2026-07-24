@@ -1,6 +1,6 @@
 # MalariaSentinel — Estado del Proyecto y Arquitectura
 
-> Actualizado: 2026-07-20 · ABM Python: **v0.5.0** · ABM C++ (mal-abm-fast): **F1 complete** · Tests: **71/71 Python + 60/60 C++ + 5/5 parity**
+> Actualizado: 2026-07-24 · ABM Python: **v0.5.0** · ABM C++ (mal-abm-fast): **M7.2 in progress** · Tests: **71/71 Python + 60+/60+ C++ + 5/5 parity + 14 calibration scorers**
 
 ---
 
@@ -134,12 +134,19 @@ graph TB
 | `data/loaders/jrc_gsw.py` | Cargador JRC Global Surface Water |
 | `data/loaders/modis.py` | Cargador MODIS NDVI (MOD13A3) |
 | `data/loaders/worldcover.py` | Cargador ESA WorldCover (uso de suelo) |
+| `data/loaders/buildings.py` | Cargador Overture Maps Buildings (building_fraction, M7) |
+| `data/loaders/worldpop.py` | Cargador WorldPop (densidad poblacional, M7) |
+| `data/loaders/glw.py` | Cargador FAO GLW4 (ganado: cattle, goats, sheep, pigs, chickens, M7) |
+| `data/loaders/ghsl.py` | Cargador GHS-SMOD (clasificacion urbano/rural, M7) |
+| `data/loaders/wildlife.py` | Cargador proxy wildlife (host no-humano/no-ganado, M7) |
+| `data/host_utils.py` | Agregacion a grilla ABM + escritura host_static.nc (M7) |
+| `data/mobility.py` | Utilidades de movilidad OD (M7) |
 | `data/utils.py` | Utilidades de procesamiento de datos |
 | `terrain/twi.py` | Topographic Wetness Index |
 
 ### Tests
 
-8 test files: `test_aoi.py`, `test_chirps.py`, `test_dem.py`, `test_era5.py`, `test_jrc_gsw.py`, `test_modis.py`, `test_twi.py`, `test_worldcover.py`
+9 test files: `test_aoi.py`, `test_chirps.py`, `test_dem.py`, `test_era5.py`, `test_host_loaders.py`, `test_jrc_gsw.py`, `test_modis.py`, `test_twi.py`, `test_worldcover.py`
 
 ---
 
@@ -395,7 +402,7 @@ graph LR
 ## 6. mal-abm-fast — Motor ABM en C++
 
 **Ubicacion**: `mal-abm-fast/`
-**Estado**: M-perf F1 **complete** (60/60 ctest + 5/5 parity pytest)
+**Estado**: M7.2 **in progress** — F1 complete (60/60 ctest + 5/5 parity), M7 biology v2 actively developing
 **Objetivo**: 100 rollouts en <5 min wall en un nodo FT3 ilk
 
 ### Que es?
@@ -469,7 +476,7 @@ graph TB
 
 | Header | Funcion |
 |---|---|
-| `wire.hpp` | Tipos de datos compartidos + constantes (K_MAX, EIP, etc.) |
+| `wire.hpp` | Tipos de datos compartidos + constantes (K_MAX, EIP, contract v2.0) |
 | `aoi.hpp` | Area of Interest (bbox, cells_per_side, transform) |
 | `prng.hpp` | PRNG xoshiro256** (determinista, por-rollout aislado) |
 | `eip.hpp` | EIP: accumulate_eip (grado-dias, NaN-safe) |
@@ -478,13 +485,24 @@ graph TB
 | `env_reader.hpp` | Lector de env NetCDF4 (rainfall, temp, water_frac, ndvi) |
 | `habitat_engine.hpp` | HabitatEngine (lector gpkg, materialise patches) |
 | `coordinator.hpp` | CoordinatorModel (activacion, dynamic patches, densidad) |
-| `mosquito_state.hpp` | MosquitoSoA (struct-of-arrays, poblacion) |
-| `mosquito_submodel.hpp` | MosquitoSubmodel (7 operaciones diarias) |
-| `engine.hpp` | Engine facade (orchestration) |
-| `output_contract.hpp` | Escritura COG + sidecar JSON (GDAL) |
+| `mosquito_state.hpp` | MosquitoSoA (struct-of-arrays, poblacion + sex + aquatic_stage + gonotrophic) |
+| `mosquito_submodel.hpp` | MosquitoSubmodel (lifecycle completo: aquatic + adult + gonotrophic + host-seeking) |
+| `engine.hpp` | Engine facade (orchestration, incluye HostLandscape + MobilitySchedule) |
+| `output_contract.hpp` | Escritura COG + sidecar JSON (GDAL, contract v2.0) |
 | `seeding.hpp` | Seeding modes (UNIFORM, RANDOM_VIABLE, EXPLICIT) |
+| `aquatic_stages.hpp` | Enums: AquaticStage (EGG/LARVA/PUPA), AdultSex (MALE/FEMALE) |
+| `aquatic_cohort_bank.hpp` | Cohort-based ciclo acuatico (egg→larva L1-L4→pupa→adult) |
+| `thermal_responses.hpp` | Curvas termicas por estadio (Briere-1 eggs/pupae, quadratic larvae) |
+| `gonotrophic_cycle.hpp` | Maquina de estados gonotrofica (11 estados, HostType) |
+| `host_seeking.hpp` | Kernel espacial host-seeking (CO2 plume, 35m scale, anthropophilic) |
+| `host_landscape.hpp` | Lector host_static.nc (9 variables: human, cattle, goats, sheep, etc.) |
+| `bite_ledger.hpp` | Agregador de eventos de picadura por celda/dia/host |
+| `mobility_schedule.hpp` | Matrices OD sparse (CSR) + schedule 4 fases (DAY/EVENING/NIGHT/DAWN) |
+| `multirate_scheduler.hpp` | Scheduler multirate: 12 sub-pasos nocturnos (18:00-06:00) para host-seeking |
+| `birth_rate.hpp` | Tasa de nacimiento termica (Mordecai 2013 EFD, reemplaza fecundity constante) |
+| `grid_spec.hpp` | Validacion espacial multi-capa (CRS, transform, resolucion) |
 
-### Constantes del motor C++ (actualizadas en F1)
+### Constantes del motor C++ (actualizadas en M7.2)
 
 | Constante | Valor C++ | Valor Python | Notas |
 |---|---|---|---|
@@ -492,56 +510,74 @@ graph TB
 | `INIT_FRAC` | 0.30 | 0.30 | Iguales |
 | `EIP_BASE_C` | 16.0 | 16.0 | Iguales |
 | `EIP_THRESHOLD_GD` | 110.0 | 110.0 | Iguales |
-| `ADULT_DISPERSE_PROB` | **0.10** | 0.20 | C++ usa 10% (Python 20%) |
-| `ADULT_DISPERSE_SIGMA_M` | **300.0** | 1000.0 | C++ sigma=300m (Python 1km) |
-| `ADULT_DISPERSE_MAX_M` | **800.0** | 2000.0 | C++ cap 800m (Python 2km) |
-| `BIRTH_FECUNDITY` | **0.10** | 0.005 (xK) | C++: 10% adultos/2 |
-| `PLUVIAL_POOL_RAIN_THRESHOLD_MM` | **50.0** | 15.0 | C++ 50mm (Python 15mm) |
+| `ADULT_DISPERSE_PROB` | **0.05** | 0.20 | C++ 5% (calibrado M7, Costantini+Thomas) |
+| `ADULT_DISPERSE_SIGMA_M` | **450.0** | 1000.0 | C++ sigma=450m (Costantini 1996 midpoint) |
+| `ADULT_DISPERSE_MAX_M` | **2000.0** | 2000.0 | C++ cap 2km (Thomas 2013 95th pctl) |
+| `BIRTH_FECUNDITY` | **0.25** | 0.005 (xK) | C++: 25% adultos/2 (calibrado M7) |
+| `BIRTH_RATE` | **Mordecai EFD** | constante | C++: termica (T0=16, Tm=34, Topt=25) |
+| `PLUVIAL_POOL_RAIN_THRESHOLD_MM` | **15.0** | 15.0 | Iguales (50mm revertido, biologico) |
 | `LARVA_BH_S0` | 0.95 | — | Mortalidad Beverton-Holt |
 | `LARVA_BH_ALPHA` | 0.05 | — | Coeficiente competencia |
-| `ADULT_DAILY_MORT_BASE` | 0.90 | — | Mortalidad Lardeux 2009 |
-| `ADULT_OPT_C` | 26.0 | — | Temperatura optima |
-| `ADULT_SIGMA` | 7.0 | — | Ancho respuesta termica |
+| `ADULT_DAILY_MORT_BASAL` | **0.93** | — | Mortalidad basal (Saarman 2019, Midega 2007) |
+| `ADULT_OPT_C` | **25.0** | — | Temperatura optima (Mordecai 2013) |
+| `ADULT_SIGMA` | **15.0** | — | Ancho respuesta termica (Martens 1997) |
+| `ADULT_MORT_CAP` | 0.93 | — | Upper bound supervivencia (Midega 2007) |
+| `ADULT_MORT_FLOOR` | 0.60 | — | Floor mortalidad extremos |
+| `ADULT_TEMP_FALLBACK_C` | 25.0 | — | Temp fallback NaN pixels |
+| `CONTRACT_VERSION` | **"2.0"** | — | Band rename: adult_occupancy + host_seeking_pressure |
+| `GENERATOR_VERSION` | **"m7.1-m7.2-multiscale"** | — | — |
 | `LARVA_DESICCATION_GRACE_DAYS` | 5 | — | Dias gracia desecacion |
 | `LARVA_DESICCATION_DAILY_RATE` | 0.10 | — | Tasa desecacion |
 
-**Diferencias clave C++ vs Python**: Parametros calibrados para M-perf budget (30k parches, 30 dias, 60s). Dispersion y nacimiento mas conservadores. Umbral de lluvia subido a 50mm.
+**Cambios clave M7 vs F1**: Dispersal mas conservador (5% prob, sigma=450m, cap=2km). Nacimiento reemplazado por Mordecai EFD termico (0.25 fecundity constante + curva cuadratica). Mortalidad adulta recalibrada (basal 0.93, sigma=15, caps). Pluvial pool rain threshold revertido a 15mm (era 50mm en F1). Contract v2.0: bandas renombradas.
 
-### Operaciones diarias del submodel (7 ops, Python tiene 5)
+### Operaciones diarias del submodel (M7: lifecycle completo)
 
 ```mermaid
 graph TB
     START["advance_day(aoi, patch_states)"]
 
-    OP1["1. larva_mortality_inactive<br/>filter: patch.activated == false"]
-    OP25["2.5. larva_mortality_density<br/>Beverton-Holt: S = 0.95*K/(K+0.05*(N-K))"]
-    OP2["2. larva_growth<br/>stage_age += 1<br/>eip += max(0, T - 16C)"]
-    OP3["3. larva_to_adult<br/>eip >= 110 GD -> promote"]
-    OP4["4. adult_dispersal<br/>10% move, Gaussiana sigma=300m"]
-    OP6["6. adult_mortality<br/>Lardeux: p_d = exp(-((T-26)^2)/(2*49))"]
-    OP5["5. birth<br/>binomial(n_adults/2, 0.10) per active patch"]
+    subgraph AQUATIC["Ciclo acuatico (AquaticCohortBank)"]
+        AQ1["1. aquatic_cohort_bank.advance_day()<br/>egg→larva L1-L4→pupa<br/>thermal curves (Briere/quadratic)"]
+        AQ2["2. collect_emergence()<br/>pupa → adult (EmergenceEvent)"]
+    end
 
-    END["updated SoA"]
+    subgraph ADULT["Ciclo adulto"]
+        AD1["3. Add emerged adults to SoA<br/>(sex=MALE/FEMALE)"]
+        AD2["4. adult_dispersal<br/>5% move, Gaussiana sigma=450m"]
+        AD3["5. adult_mortality<br/>Lardeux: p_d = 0.93 * exp(-((T-25)^2)/(2*225))"]
+    end
 
-    START --> OP1 --> OP25 --> OP2 --> OP3 --> OP4 --> OP6 --> OP5 --> END
+    subgraph GONOTROPHIC["Ciclo gonotrofico (nocturno, 12 sub-pasos)"]
+        GN1["6. host_seeking<br/>CO2 plume 35m, anthropophilic"]
+        GN2["7. gonotrophic_cycle<br/>11 estados, BiteLedger"]
+        GN3["8. oviposition<br/>egg_production_rate(Mordecai EFD)"]
+    end
 
-    style OP25 fill:#FFD700
-    style OP6 fill:#FFD700
+    END["updated SoA + AquaticCohortBank + BiteLedger"]
+
+    START --> AQ1 --> AQ2 --> AD1 --> AD2 --> AD3
+    AD3 --> GN1 --> GN2 --> GN3 --> END
+
+    style AQUATIC fill:#B0E0E6
+    style ADULT fill:#FFE4B5
+    style GONOTROPHIC fill:#FFD700
     style START fill:#90EE90
     style END fill:#FFB6C1
 ```
 
 | # | Operacion | Descripcion |
 |---|---|---|
-| 1 | `larva_mortality_inactive` | Elimina larvas en parches inactivos |
-| **2.5** | `larva_mortality_density` | Mortalidad Beverton-Holt density-dependent |
-| 2 | `larva_growth` | Crecimiento + acumulacion EIP |
-| 3 | `larva_to_adult` | Promocion larva→adulto (eip ≥ 110 GD) |
-| 4 | `adult_dispersal` | 10% se mueven (Gaussiana, σ=300m, cap 800m) |
-| **6** | `adult_mortality` | Mortalidad Lardeux thermo-dependent |
-| 5 | `birth` | binomial(n_adults/2, 0.10) nuevas larvas |
+| 1 | `aquatic_cohort_bank.advance_day()` | Ciclo acuatico: egg→larva L1-L4→pupa con curvas termicas |
+| 2 | `collect_emergence()` | Pupa → adult (EmergenceEvent por parche) |
+| 3 | Add emerged adults | Adultos emergidos se agregan a MosquitoSoA (sex aleatorio) |
+| 4 | `adult_dispersal` | 5% se mueven (Gaussiana, σ=450m, cap 2000m) |
+| 5 | `adult_mortality` | Mortalidad Lardeux thermo-dependent (basal=0.93, sigma=15) |
+| 6 | `host_seeking` | Busqueda de hospedador nocturna (CO2 plume 35m, 12 sub-pasos) |
+| 7 | `gonotrophic_cycle` | 11 estados (TENERAL→...→OVIPOSITING), BiteLedger |
+| 8 | `oviposition` | Deposicion de huevos (Mordecai EFD termica, batch 30-170) |
 
-**Nuevas en C++**: `larva_mortality_density` y `adult_mortality`.
+**Nuevas en M7**: `aquatic_cohort_bank`, `host_seeking`, `gonotrophic_cycle`, `oviposition`. Ciclo acuatico completo (egg→larva→pupa→adult). Busqueda de hospedador nocturna (multirate scheduler). Ciclo gonotrofico de 11 estados.
 
 ### Flujo por dia
 
@@ -552,7 +588,11 @@ sequenceDiagram
     participant COORD as CoordinatorModel
     participant CLIM as ClimateEngine
     participant SUB as MosquitoSubmodel
+    participant AQUA as AquaticCohortBank
     participant SOA as MosquitoSoA
+    participant HOST as HostLandscape
+    participant SEEK as HostSeekingModel
+    participant BITE as BiteLedger
     participant OUT as output_contract
 
     CLI->>ENG: step()
@@ -565,27 +605,34 @@ sequenceDiagram
         CLIM-->>COORD: temp_c
     end
 
-    Note over COORD: Evalua PLUVIAL_POOL<br/>TWI>8 AND water>0 AND rain>50mm<br/>sobre toda la grilla
+    Note over COORD: Evalua PLUVIAL_POOL<br/>TWI>8 AND water>0 AND rain>15mm
 
     COORD->>COORD: to_dataframe()
-    Note over COORD: vector<PatchState><br/>(pre-existentes + dinamicos)
-
     COORD-->>ENG: patch_states
     ENG->>SUB: advance_day(aoi, patch_states)
 
-    Note over SUB: 7 operaciones en orden:<br/>1. larva_mortality_inactive<br/>2.5. larva_mortality_density (Beverton-Holt)<br/>2. larva_growth (+EIP)<br/>3. larva_to_adult (eip >= 110)<br/>4. adult_dispersal (10%, sigma=300m)<br/>6. adult_mortality (Lardeux)<br/>5. birth (binomial)
+    Note over SUB: 1. aquatic_cohort_bank.advance_day()<br/>2. collect_emergence()<br/>3. Add emerged adults<br/>4. adult_dispersal (5%, sigma=450m)<br/>5. adult_mortality (Lardeux basal=0.93)
 
-    SUB->>SOA: mutar vectores (SoA)
-    SOA-->>SUB: estado actualizado
-    SUB-->>ENG: updated SoA
+    SUB->>AQUA: advance_day(temp_by_patch)
+    AQUA-->>SUB: EmergenceEvents
+    SUB->>SOA: add emerged adults (sex=MALE/FEMALE)
+
+    Note over SUB: Nocturno (18:00-06:00, 12 sub-pasos)
+    SUB->>HOST: get_cell(row, col)
+    HOST-->>SUB: HostCell (human, cattle, goats, ...)
+    SUB->>SEEK: select_host(mosquito_pos, host_landscape, prng)
+    SEEK-->>SUB: (target_row, target_col, HostType)
+    SUB->>BITE: record_attempt/success/death
+
+    SUB-->>ENG: updated SoA + BiteLedger
 
     alt Fin de mes
         ENG->>COORD: aggregate_density(sub)
         COORD-->>ENG: DensityGrid
         ENG->>COORD: suitability_grid(sub)
         COORD-->>ENG: SuitabilityGrid
-        ENG->>OUT: write_state_cog(density, suit, ...)
-        OUT-->>CLI: state.tif + state.json
+        ENG->>OUT: write_state_cog(occupancy, host_seeking, ...)
+        OUT-->>CLI: state.tif + state.json (contract v2.0)
     end
 
     ENG->>ENG: current_date += 1 day
@@ -595,24 +642,25 @@ sequenceDiagram
 
 ```
 1. activate_patches(day)
-   → Consulta ClimateEngine → activated = (rain > 50mm)
-   → Evalua PLUVIAL_POOL: TWI>8 AND water>0 AND rain>50mm
+   → Consulta ClimateEngine → activated = (rain > 15mm)
+   → Evalua PLUVIAL_POOL: TWI>8 AND water>0 AND rain>15mm
 
 2. to_dataframe()
    → Materializa todos los parches en vector<PatchState>
 
 3. advance_day(aoi, patch_states)
-   → larva_mortality_inactive
-   → larva_mortality_density (Beverton-Holt)
-   → larva_growth (eip += max(0, T - 16°C))
-   → larva_to_adult (eip ≥ 110 GD)
-   → adult_dispersal (10%, Gaussiana σ=300m, cap 800m)
-   → adult_mortality (Lardeux)
-   → birth (binomial(n_adults/2, 0.10))
+   → aquatic_cohort_bank.advance_day() (egg→larva L1-L4→pupa, thermal curves)
+   → collect_emergence() (pupa → adult, EmergenceEvents)
+   → Add emerged adults to SoA (sex aleatorio MALE/FEMALE)
+   → adult_dispersal (5%, Gaussiana σ=450m, cap 2000m)
+   → adult_mortality (Lardeux basal=0.93, sigma=15)
+   → [nocturno] host_seeking (12 sub-pasos, CO2 plume 35m)
+   → [nocturno] gonotrophic_cycle (11 estados, BiteLedger)
+   → [nocturno] oviposition (Mordecai EFD termica)
 
 4. snapshot(...) (fin de mes)
    → aggregate_density + suitability_grid
-   → write_state_cog (2-band COG + sidecar)
+   → write_state_cog (2-band COG: adult_occupancy + host_seeking_pressure, contract v2.0)
 ```
 
 ### CLI del motor C++
@@ -862,57 +910,86 @@ Pipeline para ciclos de investigacion: search → write → review → hypothesi
 
 ## 9. Ciclo de vida del mosquito (ABM)
 
-### Estados y transiciones
+### Estados y transiciones (M7: ciclo completo)
 
 ```mermaid
 stateDiagram-v2
-    [*] --> Larva: Seeding<br/>n_patches * K * 0.3<br/>(round-robin)
+    [*] --> Egg: Seeding<br/>o Oviposition<br/>(gonotrophic cycle)
 
-    Larva --> Larva: Mortalidad inactive patches<br/>(filter por patch_id)
-    Larva --> Larva: Mortalidad density-dependent<br/>(Beverton-Holt) [C++]
-    Larva --> Larva: Crecimiento<br/>stage_age += 1<br/>eip += max(0, T - 16C)
+    Egg --> Larva: Desarrollo termico<br/>(Briere-1, ~1 dia @ 25C)
 
-    Larva --> Adulto: eip >= 110 GD<br/>(~11 dias @ 25C)
+    Larva --> Larva: Mortalidad Beverton-Holt<br/>density-dependent
+    Larva --> Larva: Crecimiento termico<br/>(quadratic, L1→L2→L3→L4)
+    Larva --> Pupa: L4 completo<br/>(~8-10 dias @ 25C)
 
-    Adulto --> Adulto: Dispersal<br/>10%/dia (C++) / 20% (Py)<br/>Gaussiana sigma=300m
-    Adulto --> Adulto: Mortalidad Lardeux<br/>(thermo-dependent) [C++]
-    Adulto --> Adulto: Birth<br/>binomial(n_adults/2, 0.10) [C++]<br/>binomial(K, 0.005) [Py]
-    Adulto --> [*]: muerte natural<br/>(Lardeux o senectud)
+    Pupa --> Adulto: Emergencia<br/>(~1 dia @ 25C)
 
-    note right of Larva
-        Etapas colapsadas:
-        huevo + pupa = larva
-        (M7+ las separa)
+    state Adulto {
+        [*] --> TENERAL: recien emergido
+        TENERAL --> MATE_SEEKING: apareamiento
+        MATE_SEEKING --> HOST_SEEKING: busca hospedador
+        HOST_SEEKING --> HOST_APPROACH: detecta CO2 plume
+        HOST_APPROACH --> PROBING: intenta picar
+        PROBING --> BLOOD_FED: exito (82.5%)
+        PROBING --> HOST_SEEKING: fallo
+        BLOOD_FED --> RESTING: descanso post-picadura
+        RESTING --> EGG_MATURING: desarrollo de huevos (2-4 dias)
+        EGG_MATURING --> GRAVID: lista para ovipositar
+        GRAVID --> OVIPOSITION_SEEKING: busca sitio
+        OVIPOSITION_SEEKING --> OVIPOSITING: deposita huevos (30-170)
+        OVIPOSITING --> HOST_SEEKING: ciclo reinicia
+    }
+
+    Adulto --> [*]: muerte natural<br/>(Lardeux thermo-dependent)
+
+    note right of Egg
+        M7: ciclo acuatico completo
+        Egg → Larva (L1-L4) → Pupa → Adult
+        Cohort-based (no agentes individuales)
     end note
 
     note right of Adulto
-        Sin ciclo gonotrofico (M7+)
-        Sin busqueda hospedador (M7+)
-        Sin infeccion Plasmodium (M7+)
-        1 especie: An. gambiae (M8+)
+        M7: ciclo gonotrofico de 11 estados
+        Busqueda nocturna (18:00-06:00)
+        Host-seeking kernel (CO2 35m)
+        BiteLedger por celda/dia/host
     end note
 ```
 
 ```
-[*] → Larva: Seeding (n_patches × K × 0.3)
+[*] → Egg: Seeding o Oviposition (batch 30-170)
+Egg → Larva: Desarrollo termico (Briere-1, ~1 dia @ 25°C)
+Larva → Larva: Mortalidad Beverton-Holt, crecimiento termico (L1→L2→L3→L4)
+Larva → Pupa: L4 completo (~8-10 dias @ 25°C)
+Pupa → Adult: Emergencia (~1 dia @ 25°C)
 
-Larva → Larva: Mortalidad inactive patches
-Larva → Larva: Mortalidad Beverton-Holt
-Larva → Larva: Crecimiento (eip += max(0, T - 16°C))
-Larva → Adulto: eip ≥ 110 GD (~11 dias @ 25°C)
+Adult (gonotrophic cycle, 11 estados):
+  TENERAL → MATE_SEEKING → HOST_SEEKING → HOST_APPROACH → PROBING
+  → BLOOD_FED → RESTING → EGG_MATURING → GRAVID
+  → OVIPOSITION_SEEKING → OVIPOSITING → HOST_SEEKING (repite)
 
-Adulto → Adulto: Dispersal (10%/dia, σ=300m, cap 800m)
-Adulto → Adulto: Mortalidad Lardeux [C++ only]
-Adulto → Adulto: Birth (binomial(n_adults/2, 0.10))
+Adult → [*]: muerte natural (Lardeux basal=0.93, sigma=15)
 ```
 
-### Simplificaciones (M1)
+### Componentes nuevos M7
 
-- Etapas colapsadas: huevo + pupa ignorados (M7+)
-- Sin ciclo gonotrofico (M7+)
-- Sin busqueda de hospedador (M7+)
-- Sin infeccion Plasmodium (M7+)
-- 1 sola especie: An. gambiae s.s. (M8+)
+| Componente | Funcion |
+|---|---|
+| `AquaticCohortBank` | Ciclo acuatico cohort-based (egg→larva L1-L4→pupa→adult) |
+| `GonotrophicState` | 11 estados gonotroficos (TENERAL→...→OVIPOSITING) |
+| `HostSeekingModel` | Kernel espacial host-seeking (CO2 plume 35m, anthropophilic 99%) |
+| `HostLandscape` | Lector host_static.nc (9 variables: human, cattle, goats, sheep, pigs, chickens, wildlife, building, indoor) |
+| `BiteLedger` | Agregador de eventos de picadura por celda/dia/host |
+| `MobilitySchedule` | Matrices OD sparse (CSR) + schedule 4 fases (DAY/EVENING/NIGHT/DAWN) |
+| `MultirateScheduler` | 12 sub-pasos nocturnos (18:00-06:00) para host-seeking |
+| `ThermalResponses` | Curvas termicas Briere-1 (eggs/pupae) y quadratic (larvae) |
+| `BirthRate` | Mordecai EFD termica (reemplaza fecundity constante) |
+
+### Simplificaciones (estado actual)
+
+- **Implementado en M7**: ciclo acuatico completo (egg→larva→pupa→adult), ciclo gonotrofico (11 estados), busqueda de hospedador (CO2 plume), mortalidad termica (Lardeux recalibrado), nacimiento termico (Mordecai EFD), movilidad humana/ganado (OD matrices), host data (9 variables)
+- **Pendiente (M7+)**: infeccion Plasmodium (parasite_eip_progress ya en SoA), ITN/IRS (bite_ledger tiene campo mosquito_deaths preparado)
+- **Pendiente (M8+)**: 1 sola especie An. gambiae s.s.
 
 ---
 
@@ -925,7 +1002,7 @@ graph LR
     ABM["mal-abm-fast (C++)<br/>o ABM Python"]
 
     subgraph STATE["State COG (por tick ABM)"]
-        S_TIF["{aoi}_{scale}_{YYYY}_{MM}_seed{NNNN}.tif<br/>2 bandas:<br/>B1: density (count/K_MAX)<br/>B2: suitability (n_adults/K_MAX post-dispersal)"]
+        S_TIF["{aoi}_{scale}_{YYYY}_{MM}_seed{NNNN}.tif<br/>2 bandas:<br/>B1: adult_occupancy (post-dispersal/K_MAX)<br/>B2: host_seeking_pressure (female biting/K_MAX)"]
         S_JSON["sidecar.json<br/>crs, transform, seed,<br/>n_rollouts, rollout_index,<br/>contract_version, band_names,<br/>k_max, generator_version"]
     end
 
@@ -947,11 +1024,11 @@ graph LR
     style UN fill:#98FB98
 ```
 
-### State COG
+### State COG (contract v2.0)
 
-- **Band 1**: density (count / K_MAX, [0,1])
-- **Band 2**: suitability (n_adults / K_MAX, post-dispersal, [0,1])
-- **Sidecar JSON**: crs, transform, seed, contract_version, band_names, k_max
+- **Band 1**: adult_occupancy (total adult mosquito occupancy in cell, post-dispersal / K_MAX, [0,1])
+- **Band 2**: host_seeking_pressure (female host-seeking/biting pressure in cell / K_MAX, [0,1])
+- **Sidecar JSON**: crs, transform, seed, contract_version (2.0), band_names, k_max, generator_version (m7.1-m7.2-multiscale)
 
 ### Env Tensor
 
@@ -974,26 +1051,32 @@ graph LR
 | M4 | U-Net Inference | Pendiente |
 | M5 | SDSS Shell | Pendiente |
 | M6 | Operational | Pendiente |
-| M7 | Biology v2 | Pendiente |
+| M7 | Biology v2 | **En progreso** (M7.2: gonotrophic cycle, host-seeking, mobility, host data) |
 
 ---
 
-## 12. M2 vs. futuro (M3+)
+## 12. M7 vs. futuro (M8+)
 
-| Componente | M2 (actual) | M3+ |
+| Componente | M7 (actual) | M8+ |
 |---|---|---|
 | Especies | 1: An. gambiae s.s. | + An. stephensi |
 | Habitat | PLUVIAL_POOL + dynamic | 12 subtipos Hardy |
-| Etapas vida | 2: larva + adulto | 4: huevo→larva→pupa→adulto |
-| Ciclo gonotrofico | No | 2-4 dias @ 28°C |
-| EIP | grado-dia (16°C, 110 GD) | + Sharpe-DeMichele |
-| Dispersion | Gaussiana local | + Eolica 120-290m |
-| Busqueda hospedador | No | CO2, olor, calor |
+| Etapas vida | 4: egg→larva L1-L4→pupa→adult (cohort-based) | — |
+| Ciclo gonotrofico | 11 estados (TENERAL→...→OVIPOSITING) | Validacion campo |
+| EIP | grado-dia (16°C, 110 GD) + thermal curves (Briere/quadratic) | + Sharpe-DeMichele |
+| Dispersion | Gaussiana (5%, σ=450m, cap 2km) | + Eolica 120-290m |
+| Busqueda hospedador | CO2 plume 35m, 12 nocturnal sub-steps | + olor, calor |
+| Host data | 9 variables (human, cattle, goats, sheep, pigs, chickens, wildlife, building, indoor) | — |
+| Mobility | Sparse OD matrices (CSR), 4 time phases | — |
 | Resistencia kdr | No | alleles Vgsc |
-| Mortalidad adulta | C++: Lardeux; Py: simplificada | Validacion datos |
-| Mortalidad larvaria | C++: Beverton-Holt; Py: solo inactive | — |
-| Poblacion | Polars/SoA | + mesa-frames |
-| Validacion | 20 sitios + parity | 100+ rollouts |
+| Mortalidad adulta | Lardeux basal=0.93, sigma=15, caps | Validacion datos |
+| Mortalidad larvaria | Beverton-Holt + thermal (Briere/quadratic) | — |
+| Birth rate | Mordecai EFD termica (T0=16, Tm=34, Topt=25) | — |
+| Infeccion Plasmodium | No (parasite_eip_progress en SoA, preparado) | M8+ |
+| ITN/IRS | No (BiteLedger mosquito_deaths preparado) | M8+ |
+| Poblacion | SoA + AquaticCohortBank | + mesa-frames |
+| Validacion | 14 calibration scorers (D1-D14) + parity | 100+ rollouts |
+| Contract | v2.0 (adult_occupancy + host_seeking_pressure) | — |
 
 ---
 
@@ -1003,14 +1086,17 @@ graph LR
 
 **ABM Python (v0.5.0)**: 71/71 tests, ~9M agentes Polars, JRC GSW 30m, dynamic patches, adult density by cell post-dispersal, ciclo biologico completo.
 
-**ABM C++ (mal-abm-fast F1)**: 60/60 ctest + 5/5 parity, C++20 black-box equivalente, Beverton-Holt + Lardeux mortality, PRNG xoshiro256** determinista, seeding modes, --n-rollouts + --snapshot-every.
+**ABM C++ (mal-abm-fast M7.2)**: 60+ ctest + 5/5 parity + 14 calibration scorers (D1-D14), C++20 black-box equivalente, ciclo completo egg→larva→pupa→adult (cohort-based), ciclo gonotrofico 11 estados, host-seeking kernel (CO2 plume 35m), host data 9 variables, mobility OD matrices (CSR, 4 fases), Mortalidad Lardeux recalibrada (basal=0.93, sigma=15), nacimiento Mordecai EFD termico, PRNG xoshiro256** determinista, contract v2.0.
+
+**Host data pipeline (M7)**: WorldPop (poblacion), GLW4 (ganado), GHSL (urbano/rural), Overture Maps (building_fraction), wildlife proxy. Todo agrega a host_static.nc (9 variables). Mobility matrices via gravity model (build_mobility.py).
 
 **Pipeline SDSS (mal-core)**: U-Net 32-64-128-256, CLI `malariasim`, FastAPI REST API, model registry, scenario config.
 
 ### Siguientes pasos
 
-1. **M3**: Generar 100+ rollouts con mal-abm-fast → dataset → entrenar surrogate
-2. **M4**: Integrar prediccion → risk maps mensuales
-3. **M5**: Interfaz SDSS para programas de eliminacion
-4. **M6**: Deployment en Ghana con datos en vivo
-5. **M7**: 4 etapas vida, ciclo gonotrofico, busqueda hospedador, resistencia kdr
+1. **M7 completar**: Infeccion Plasmodium (parasite_eip_progress preparado), ITN/IRS (BiteLedger preparado), validacion 100+ rollouts
+2. **M3**: Generar 100+ rollouts con mal-abm-fast → dataset → entrenar surrogate
+3. **M4**: Integrar prediccion → risk maps mensuales
+4. **M5**: Interfaz SDSS para programas de eliminacion
+5. **M6**: Deployment en Ghana con datos en vivo
+6. **M8**: An. stephensi, resistencia kdr, Sharpe-DeMichele EIP
