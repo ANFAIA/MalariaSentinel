@@ -23,7 +23,10 @@ Single entry point for any agent starting from scratch on MalariaSentinel. Follo
 | Use shared utilities | `mal-commonlib-api` |
 | Use core pipeline | `mal-core-api` |
 | Work across packages | `monorepo-dev` |
-| Set up memory module | `project-memory` (install section) |
+| Set up memory module | `memory-setup` |
+| Use subagents/loops | `subagents-loops` |
+| Run CLI commands | `mal-execution-api` |
+| Onboard from scratch | `agent-onboarding` (this skill) |
 
 ## Step 1: Project Setup (~5 min)
 

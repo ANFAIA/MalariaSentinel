@@ -264,5 +264,9 @@ The Ghana simulation models mosquito population expansion from seed points (obse
 | `project-memory` | Querying or recording domain knowledge in the project knowledge graph |
 | `monorepo-dev` | Monorepo conventions, promotion flow, package structure |
 | `project-setup` | First-time project setup and verification |
+| `memory-setup` | Setting up the knowledge graph for domain knowledge storage. |
+| `subagents-loops` | Using agent loops for domain research and review. |
+| `mal-execution-api` | Running production CLI commands and training scripts. |
+| `agent-onboarding` | Complete onboarding guide for new agents. |
 
 Load these with `skill({ name: "<skill-name>" })` when the task requires their specific guidance.

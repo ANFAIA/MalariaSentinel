@@ -269,3 +269,7 @@ Multiple `task` calls in one message run in parallel. Use this to fan out indepe
 | `project-setup` | Initialising a new project with the memory module, Neo4j, and agent config. |
 | `monorepo-dev` | Working across the monorepo — package structure, dependencies, promotion flow. |
 | `gitagent` | Coordinating multi-agent work via isolated worktrees. |
+| `memory-setup` | Installing, configuring, and troubleshooting the knowledge graph. |
+| `subagents-loops` | Reference for all 7 agent loops and how to use them. |
+| `mal-execution-api` | CLI entrypoints, training scripts, and HPC automation. |
+| `agent-onboarding` | Complete onboarding guide for new agents. |
