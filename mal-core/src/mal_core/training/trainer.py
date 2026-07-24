@@ -6,7 +6,7 @@ from pathlib import Path
 import torch
 from torch.optim import Adam
 
-from .unet import UNet, combined_loss, eval_dice
+from .model import UNet, combined_loss, eval_dice
 from .dataset import get_dataloaders
 
 

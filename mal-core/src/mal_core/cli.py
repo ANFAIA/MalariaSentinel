@@ -1,7 +1,12 @@
 """Typer CLI — command-line interface to the SDSS.
 
 Commands:
+    malariasim run --aoi {aoi} --stages abm,score --abm-days 30
+    malariasim ingest --aoi {aoi} --year {year} --month {month}
+    malariasim abm --aoi {aoi} --days 30
+    malariasim score --run-dir {dir}
     malariasim predict --aoi {aoi} --scale {regional|national|continental} --year {year}
+    malariasim feedback --run-dir {dir}
     malariasim status --aoi {aoi}
     malariasim serve --host {host} --port {port}
 """
@@ -51,6 +56,89 @@ def predict(
         scenario=scenario,
     )
     typer.echo(f"Prediction saved: {out}")
+
+
+@app.command()
+def run(
+    aoi: str = typer.Option(..., "--aoi", help="AOI slug (e.g. ghana)"),
+    year: int = typer.Option(2024, "--year", help="Simulation year"),
+    month: int = typer.Option(1, "--month", help="Simulation month"),
+    seed: int = typer.Option(1, "--seed", help="Random seed"),
+    days: int = typer.Option(30, "--days", help="ABM simulation days"),
+    n_rollouts: int = typer.Option(1, "--n-rollouts", help="Number of ABM rollouts"),
+    stages: str = typer.Option("ingest,abm,score,train,predict", "--stages", help="Comma-separated stages"),
+    output_dir: Path = typer.Option(Path("runs/pipeline"), "--output-dir", help="Output directory"),
+    resume: bool = typer.Option(True, "--resume/--no-resume", help="Skip completed stages"),
+) -> None:
+    """Run the full SDSS pipeline or selected stages."""
+    from .pipeline.runner import run_pipeline
+    from .pipeline.stages import Stage
+
+    stage_list = [Stage(s.strip()) for s in stages.split(",")]
+    result = run_pipeline(
+        aoi=aoi, year=year, month=month, seed=seed,
+        days=days, n_rollouts=n_rollouts,
+        stages=stage_list, output_dir=output_dir, resume=resume,
+    )
+    typer.echo(f"Pipeline result: {result}")
+
+
+@app.command()
+def ingest(
+    aoi: str = typer.Option("ghana", "--aoi", help="AOI slug"),
+    year: int = typer.Option(2024, "--year", help="Year"),
+    month: int = typer.Option(6, "--month", help="Month"),
+    output_dir: Path = typer.Option(Path("runs/ingest"), "--output-dir"),
+    scale: str = typer.Option("regional", "--scale"),
+) -> None:
+    """Build environmental tensors for an AOI."""
+    from .ingest import build_environment
+
+    result = build_environment(aoi=aoi, year=year, month=month, output_dir=output_dir, scale=scale)
+    typer.echo(f"Ingest result: {result}")
+
+
+@app.command()
+def abm(
+    aoi: str = typer.Option(..., "--aoi", help="AOI slug"),
+    year: int = typer.Option(2024, "--year"),
+    month: int = typer.Option(1, "--month"),
+    seed: int = typer.Option(1, "--seed"),
+    days: int = typer.Option(30, "--days"),
+    n_rollouts: int = typer.Option(1, "--n-rollouts"),
+    output_dir: Path = typer.Option(Path("runs/abm"), "--output-dir"),
+) -> None:
+    """Run the ABM simulation."""
+    from .abm import run_abm
+
+    result = run_abm(aoi=aoi, year=year, month=month, seed=seed, days=days, n_rollouts=n_rollouts, output_dir=output_dir)
+    typer.echo(f"ABM result: {result}")
+
+
+@app.command()
+def score(
+    run_dir: Path = typer.Option(..., "--run-dir", help="Directory with ABM outputs"),
+    tier: str = typer.Option("fast", "--tier", help="Test tier (fast/full)"),
+) -> None:
+    """Run calibration scorers."""
+    from .scoring import run_calibration
+
+    result = run_calibration(run_dir=run_dir, tier=tier)
+    typer.echo(f"Scoring result: {result}")
+
+
+@app.command()
+def feedback(
+    run_dir: Path = typer.Option(..., "--run-dir", help="Directory with ABM outputs"),
+    baseline_dir: Path | None = typer.Option(None, "--baseline", help="Baseline for comparison"),
+) -> None:
+    """Generate feedback from calibration results."""
+    from .scoring import get_feedback, run_calibration
+
+    scorecard = run_calibration(run_dir=run_dir)
+    baseline = run_calibration(run_dir=baseline_dir) if baseline_dir else None
+    fb = get_feedback(scorecard, baseline)
+    typer.echo(fb)
 
 
 @app.command()
