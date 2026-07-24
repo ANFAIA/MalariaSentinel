@@ -8,14 +8,9 @@ Usage:
 """
 from __future__ import annotations
 import argparse
-import os
-import sys
 
 def main() -> None:
-    # Allow running directly from the agent/ directory
-    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-    
-    from main import create_agent
+    from agent.main import create_agent
     
     parser = argparse.ArgumentParser(description="Social Networks Agent — interactive CLI")
     parser.add_argument("--model", default="anthropic:claude-sonnet-4-5-20250929")

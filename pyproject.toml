@@ -45,4 +45,5 @@ members = [
     "mal-execution",
     "mal-ghana-sim",
     "mal-data-explorer",
+    "social-networks",
 ]

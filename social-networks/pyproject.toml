@@ -1,0 +1,26 @@
+[project]
+name = "social-networks-agent"
+version = "0.1.0"
+description = "Deep Agent for social networks content generation"
+requires-python = ">=3.12"
+dependencies = [
+    "deepagents>=0.6",
+    "langgraph>=0.4",
+    "langchain-core>=0.3",
+]
+
+[project.optional-dependencies]
+transcribe = [
+    "sherpa-onnx>=1.12",
+    "numpy>=2.0",
+]
+
+[project.scripts]
+social-agent = "agent.run:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["agent"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
