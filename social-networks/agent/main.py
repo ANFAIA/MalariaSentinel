@@ -117,7 +117,8 @@ def create_agent(
         from langchain.chat_models import init_chat_model
         llm = init_chat_model(model=model, model_provider=provider)
 
-    backend = FilesystemBackend(root_dir=REPO_ROOT, virtual_mode=True)
+    # virtual_mode=False: absolute paths work (needed for ~/.agents/skills global skills)
+    backend = FilesystemBackend(root_dir=REPO_ROOT, virtual_mode=False)
 
     skills = []
     if os.path.isdir(PROJECT_SKILLS):
