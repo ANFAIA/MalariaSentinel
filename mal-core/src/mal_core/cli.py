@@ -128,6 +128,21 @@ def score(
 
 
 @app.command()
+def train(
+    run_dir: Path = typer.Option(..., "--run-dir", help="Directory with ABM rollout outputs"),
+    output_dir: Path = typer.Option(Path("runs/training"), "--output-dir", help="Model output directory"),
+    epochs: int = typer.Option(50, "--epochs", help="Training epochs"),
+    batch_size: int = typer.Option(16, "--batch-size", help="Batch size"),
+    lr: float = typer.Option(1e-3, "--lr", help="Learning rate"),
+) -> None:
+    """Train the U-Net surrogate model."""
+    from .training import train_unet
+
+    best_dice = train_unet(run_dir=run_dir, output_dir=output_dir, epochs=epochs, batch_size=batch_size, lr=lr)
+    typer.echo(f"Training complete. Best val_dice: {best_dice:.4f}")
+
+
+@app.command()
 def feedback(
     run_dir: Path = typer.Option(..., "--run-dir", help="Directory with ABM outputs"),
     baseline_dir: Path | None = typer.Option(None, "--baseline", help="Baseline for comparison"),
