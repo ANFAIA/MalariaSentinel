@@ -53,12 +53,10 @@ def run_research_cycle(
 
     agent = create_orchestrator(provider=provider, model=model, thread_id=thread_id)
 
-    config = {"configurable": {"thread_id": thread_id}}
     all_results = []
     for i in range(cycles):
         result = agent.invoke(
             {"messages": [{"role": "user", "content": prompt}]},
-            config=config,
         )
         all_results.append(result["messages"][-1].content)
 

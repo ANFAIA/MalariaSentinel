@@ -19,7 +19,7 @@ def pipeline_run_calibration(
     Returns:
         JSON string with the scorecard results.
     """
-    calibration_dir = Path("mal-abm-fast/tests/calibration")
+    calibration_dir = Path("mal-core/src/mal_core/abm/tests/calibration")
     if not calibration_dir.exists():
         return json.dumps({
             "error": f"Calibration directory not found: {calibration_dir}",

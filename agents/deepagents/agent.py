@@ -28,28 +28,20 @@ PROJECT_SKILLS = REPO_ROOT / "agents" / "skills"
 GLOBAL_SKILLS = Path.home() / ".agents" / "skills"
 
 ORCHESTRATOR_PROMPT = """\
-You are the MalariaSentinel Centinela orchestrator — an autonomous agent \
-that improves the ABM calibration by running parallel experiments.
+You are the MalariaSentinel Centinela orchestrator.
 
-## Your workflow
+CALIBRATION CYCLE — do these 4 steps in order, one tool call per message:
+1. memory_recall_kg → recall past patterns
+2. pipeline_run_calibration → get baseline score
+3. Pick 1 improvement. gitagent_spawn a worker for it.
+4. pipeline_run_calibration → score the result
 
-1. RECALL: Use memory_recall_kg to find past patterns, pitfalls, and best practices.
-2. PLAN: Use write_todos to plan hypotheses to test.
-3. RESEARCH: Use opencode_search to find relevant literature (OpenCode has Exa).
-4. SPAWN: Use gitagent_spawn to create worker agents in isolated worktrees.
-5. WAIT: Workers edit code and propose changes via gitagent.
-6. SCORE: Use pipeline_run_calibration to evaluate each proposal.
-7. COMPARE: Use pipeline_compare_scorecards to find the best improvement.
-8. DECIDE: Accept the best proposal, reject others.
-9. IMPROVE: Use improve_prompt to update worker prompts based on failures.
-10. LOOP: Repeat from step 1 until convergence (3 iterations without improvement).
-
-## Rules
-- Maximum 3 parallel workers at a time.
-- Always compare against the best historical composite score.
-- Never weaken tests or skip scorers.
-- Record every improvement and failure in the knowledge graph.
-- When a worker fails, analyze WHY and patch its prompt before the next iteration.
+CRITICAL RULES:
+- ONE tool call per message. Wait for result, then next step.
+- If pipeline_run_calibration returns "tests_failed", say "Baseline: tests_failed" and IMMEDIATELY move to step 3.
+- Do NOT investigate test failures. Do NOT read test files. Do NOT glob/grep for test config.
+- Do NOT check gitagent_proposals until step 4 completes.
+- Under 50 words per response.
 """
 
 WORKER_DEFINITIONS = [
@@ -62,7 +54,7 @@ WORKER_DEFINITIONS = [
         "system_prompt": (
             "You are an ABM calibration worker. You modify C++ parameters in "
             "mal-core/src/mal_core/abm/, run tests, and report results. "
-            "Always run: cd mal-abm-fast/tests/calibration && uv run pytest -m fast -v"
+            "Always run: cd mal-core/src/mal_core/abm/tests/calibration && uv run pytest -m fast -v"
         ),
         "skills": [
             "agents/skills/abm-engine/SKILL.md",
@@ -77,9 +69,9 @@ WORKER_DEFINITIONS = [
         ),
         "system_prompt": (
             "You are a calibration scorer worker. You modify Python scoring code "
-            "in mal-abm-fast/tests/calibration/scorers/, update thresholds.yaml, "
+            "in mal-core/src/mal_core/abm/tests/calibration/scorers/, update thresholds.yaml, "
             "and run the calibration suite. "
-            "Always run: cd mal-abm-fast/tests/calibration && uv run pytest -m fast -v"
+            "Always run: cd mal-core/src/mal_core/abm/tests/calibration && uv run pytest -m fast -v"
         ),
         "skills": [
             "agents/skills/calibration-framework/SKILL.md",
@@ -166,7 +158,6 @@ def create_orchestrator(
     try:
         from deepagents import create_deep_agent
         from deepagents.backends import FilesystemBackend
-        from langgraph.checkpoint.memory import MemorySaver
     except ImportError:
         raise ImportError(
             "The 'deepagents' package is required but not installed. "
@@ -175,10 +166,8 @@ def create_orchestrator(
 
     llm = _resolve_provider(provider, model)
 
-    # FilesystemBackend with virtual_mode=False so global skills at ~/.agents/skills work
     backend = FilesystemBackend(root_dir=str(REPO_ROOT), virtual_mode=False)
 
-    # Collect skills directories
     skills = []
     if PROJECT_SKILLS.is_dir():
         skills.append(str(PROJECT_SKILLS))
@@ -192,10 +181,5 @@ def create_orchestrator(
         system_prompt=ORCHESTRATOR_PROMPT,
         backend=backend,
         skills=skills or None,
-        checkpointer=MemorySaver(),
-        interrupt_on={
-            "gitagent_integrate": True,
-            "gitagent_finalize": True,
-        },
         name="centinela-orchestrator",
     )
