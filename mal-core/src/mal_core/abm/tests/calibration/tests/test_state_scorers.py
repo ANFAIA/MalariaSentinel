@@ -83,7 +83,7 @@ class TestExpansion:
 
 class TestMoransI:
     def test_morans_clustered(self, tmp_path: Path) -> None:
-        from scorers.spatial import MoransScorer, _morans_i
+        from scorers.spatial import MoransScorer, _morans_i_active
 
         rng = np.random.default_rng(42)
         # Moderate spatial autocorrelation: smooth gradient + noise
@@ -103,7 +103,7 @@ class TestMoransI:
         assert result.score == 1.0
 
     def test_morans_random(self, tmp_path: Path) -> None:
-        from scorers.spatial import MoransScorer, _morans_i
+        from scorers.spatial import MoransScorer, _morans_i_active
 
         rng = np.random.default_rng(42)
         b0 = np.zeros((30, 30), dtype=np.float32)

@@ -119,9 +119,9 @@ def _resolve_provider(provider: str, model: str):
                 "langchain-openai is required for OpenRouter. "
                 "Install with: pip install 'mal-deepagents[openrouter]'"
             )
-        api_key = os.environ.get("OPENROUTER_API_KEY")
+        api_key = os.environ.get("OPENROUTER_API_KEY") or os.environ.get("OPENROUTER_KEY")
         if not api_key:
-            raise ValueError("OPENROUTER_API_KEY env var required for OpenRouter provider")
+            raise ValueError("OPENROUTER_API_KEY or OPENROUTER_KEY env var required for OpenRouter provider")
         return ChatOpenAI(
             model=model,
             base_url="https://openrouter.ai/api/v1",
