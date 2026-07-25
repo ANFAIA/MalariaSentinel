@@ -53,8 +53,10 @@ def run_feature_cycle(
 
     agent = create_orchestrator(provider=provider, model=model, thread_id=thread_id)
 
-    result = agent.invoke({
-        "messages": [{"role": "user", "content": prompt}]
-    })
+    config = {"configurable": {"thread_id": thread_id}}
+    result = agent.invoke(
+        {"messages": [{"role": "user", "content": prompt}]},
+        config=config,
+    )
 
     return result["messages"][-1].content
