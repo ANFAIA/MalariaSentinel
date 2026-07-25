@@ -5,6 +5,8 @@ import json
 
 
 FEATURE_PROMPT = """\
+GOAL: {goal}
+
 Run a feature development cycle for: {feature_name}
 Description: {description}
 
@@ -16,12 +18,14 @@ Description: {description}
 6. Run tests to verify the implementation
 7. If tests pass, accept the proposal; if not, patch the worker prompt and retry
 8. Integrate and finalize
-"""
+
+Keep all actions aligned with the GOAL above."""
 
 
 def run_feature_cycle(
     name: str,
     description: str,
+    goal: str,
     provider: str = "openrouter",
     model: str = "xiaomi/mimo-v2.5",
     thread_id: str = "feature-session",
@@ -32,6 +36,7 @@ def run_feature_cycle(
     Args:
         name: Feature name.
         description: Feature description.
+        goal: The objective for this feature run.
         provider: LLM provider.
         model: Model identifier.
         thread_id: Thread ID for checkpointing.
@@ -40,12 +45,13 @@ def run_feature_cycle(
     Returns:
         The final agent response after the cycle completes.
     """
-    prompt = FEATURE_PROMPT.format(feature_name=name, description=description)
+    prompt = FEATURE_PROMPT.format(feature_name=name, description=description, goal=goal)
 
     if dry_run:
         return json.dumps({
             "status": "dry_run",
             "prompt": prompt,
+            "goal": goal,
             "feature_name": name,
         })
 
@@ -56,7 +62,7 @@ def run_feature_cycle(
     # Initialize session logger
     logger = SessionLogger()
     agent_mod.SESSION_LOGGER = logger
-    logger.log_decision("session_start", f"feature cycle: {name}")
+    logger.log_decision("session_start", f"feature cycle: {name}, goal={goal}")
 
     try:
         agent = create_orchestrator(provider=provider, model=model, thread_id=thread_id)

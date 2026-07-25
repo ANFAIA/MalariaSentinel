@@ -5,6 +5,8 @@ import json
 
 
 CALIBRATION_PROMPT = """\
+GOAL: {goal}
+
 Run a calibration improvement cycle (max {max_iterations} iterations).
 
 FLOW — follow these steps IN ORDER. Do NOT skip steps or investigate failures.
@@ -31,10 +33,11 @@ Step 6: Compare against baseline.
   If tests pass now: use gitagent_integrate() then gitagent_finalize() to land the fix.
   If tests still fail: use improve_prompt() to record what didn't work.
 
-Start with step 1 now."""
+Keep all actions aligned with the GOAL above. Start with step 1 now."""
 
 
 def run_calibration_cycle(
+    goal: str,
     max_iterations: int = 10,
     provider: str = "openrouter",
     model: str = "xiaomi/mimo-v2.5",
@@ -44,6 +47,7 @@ def run_calibration_cycle(
     """Run the ABM calibration improvement cycle.
 
     Args:
+        goal: The objective for this calibration run.
         max_iterations: Maximum number of improvement iterations.
         provider: LLM provider.
         model: Model identifier.
@@ -53,12 +57,13 @@ def run_calibration_cycle(
     Returns:
         The final agent response after the cycle completes.
     """
-    prompt = CALIBRATION_PROMPT.format(max_iterations=max_iterations)
+    prompt = CALIBRATION_PROMPT.format(goal=goal, max_iterations=max_iterations)
 
     if dry_run:
         return json.dumps({
             "status": "dry_run",
             "prompt": prompt,
+            "goal": goal,
             "max_iterations": max_iterations,
         })
 
@@ -68,7 +73,7 @@ def run_calibration_cycle(
     # Initialize session logger
     logger = SessionLogger()
     agent_mod.SESSION_LOGGER = logger
-    logger.log_decision("session_start", f"calibration cycle, max_iterations={max_iterations}")
+    logger.log_decision("session_start", f"calibration cycle, goal={goal}, max_iterations={max_iterations}")
 
     try:
         agent = agent_mod.create_orchestrator(provider=provider, model=model, thread_id=thread_id)

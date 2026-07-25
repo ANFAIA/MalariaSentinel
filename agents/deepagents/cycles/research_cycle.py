@@ -5,6 +5,8 @@ import json
 
 
 RESEARCH_PROMPT = """\
+GOAL: {goal}
+
 Run a research and improvement cycle for topic: {topic}
 
 1. Recall what the knowledge graph already knows about this topic
@@ -15,11 +17,13 @@ Run a research and improvement cycle for topic: {topic}
 6. Run calibration to measure impact
 7. Accept improvements that measurably improve the composite score
 8. Record findings and decisions in the knowledge graph
-"""
+
+Keep all actions aligned with the GOAL above."""
 
 
 def run_research_cycle(
     topic: str,
+    goal: str,
     cycles: int = 1,
     provider: str = "openrouter",
     model: str = "xiaomi/mimo-v2.5",
@@ -30,6 +34,7 @@ def run_research_cycle(
 
     Args:
         topic: Research topic to investigate.
+        goal: The objective for this research run.
         cycles: Number of research cycles to run.
         provider: LLM provider.
         model: Model identifier.
@@ -39,12 +44,13 @@ def run_research_cycle(
     Returns:
         The final agent response after the cycle completes.
     """
-    prompt = RESEARCH_PROMPT.format(topic=topic)
+    prompt = RESEARCH_PROMPT.format(topic=topic, goal=goal)
 
     if dry_run:
         return json.dumps({
             "status": "dry_run",
             "prompt": prompt,
+            "goal": goal,
             "topic": topic,
             "cycles": cycles,
         })
@@ -56,7 +62,7 @@ def run_research_cycle(
     # Initialize session logger
     logger = SessionLogger()
     agent_mod.SESSION_LOGGER = logger
-    logger.log_decision("session_start", f"research cycle: {topic}, cycles={cycles}")
+    logger.log_decision("session_start", f"research cycle: {topic}, goal={goal}, cycles={cycles}")
 
     try:
         agent = create_orchestrator(provider=provider, model=model, thread_id=thread_id)
