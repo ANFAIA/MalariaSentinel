@@ -29,7 +29,7 @@ def pipeline_run_calibration(
     try:
         result = subprocess.run(
             [
-                "uv", "run", "pytest", "-m", "fast", "-v",
+                "uv", "run", "pytest", "-v",
                 "--tb=short",
             ],
             cwd=str(calibration_dir),

@@ -27,6 +27,9 @@ from pathlib import Path
 
 import pytest
 
+# Mark all tests in this directory as `fast` so they run with default tier
+pytestmark = pytest.mark.fast
+
 # ---------------------------------------------------------------------------
 # Constants — paths into the project tree
 # ---------------------------------------------------------------------------
@@ -125,11 +128,15 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
     - Tests marked ``llm`` are deselected if ``OPENCODE_API_KEY`` is
       unset.
     """
-    tier = os.environ.get(CALIBRATION_TIER_ENV, "fast").lower()
+    tier = os.environ.get(CALIBRATION_TIER_ENV, "full").lower()
     api_key_present = bool(os.environ.get(OPENCODE_API_KEY_ENV))
 
     for item in items:
         markers = {m.name for m in item.iter_markers()}
+
+        # Auto-tag tests without an explicit tier marker as `fast`
+        if not markers.intersection({"fast", "full", "llm"}):
+            item.add_marker(pytest.mark.fast)
 
         if "llm" in markers and not api_key_present:
             item.add_marker(pytest.mark.skip(reason=f"{OPENCODE_API_KEY_ENV} not set"))
