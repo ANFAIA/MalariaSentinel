@@ -62,12 +62,24 @@ def run_calibration_cycle(
             "max_iterations": max_iterations,
         })
 
-    from agents.deepagents.agent import create_orchestrator
+    import agents.deepagents.agent as agent_mod
+    from agents.deepagents.logger import SessionLogger
 
-    agent = create_orchestrator(provider=provider, model=model, thread_id=thread_id)
+    # Initialize session logger
+    logger = SessionLogger()
+    agent_mod.SESSION_LOGGER = logger
+    logger.log_decision("session_start", f"calibration cycle, max_iterations={max_iterations}")
 
-    result = agent.invoke(
-        {"messages": [{"role": "user", "content": prompt}]},
-    )
+    try:
+        agent = agent_mod.create_orchestrator(provider=provider, model=model, thread_id=thread_id)
 
-    return result["messages"][-1].content
+        result = agent.invoke(
+            {"messages": [{"role": "user", "content": prompt}]},
+        )
+
+        final_content = result["messages"][-1].content
+        logger.log_summary(final_content)
+        return final_content
+    finally:
+        logger.close()
+        agent_mod.SESSION_LOGGER = None

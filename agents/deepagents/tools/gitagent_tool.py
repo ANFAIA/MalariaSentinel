@@ -111,16 +111,39 @@ def gitagent_integrate(feature: str) -> str:
     return json.dumps({"result": result["stdout"], "status": "integrated"})
 
 
-def gitagent_finalize(feature: str, message: str) -> str:
+def gitagent_finalize(feature: str, message: str, *, verify: bool = True) -> str:
     """Create one clean commit on main from all accepted proposals.
 
     Args:
         feature: The feature name.
         message: The commit message.
+        verify: If True (default), print the proposal summary and require
+            user confirmation before running. Pass False to skip.
 
     Returns:
         JSON with finalize result.
     """
+    if verify:
+        # Show what will be finalized
+        proposals_result = _run_gitagent(["proposals", "--feature", feature])
+        summary = proposals_result.get("stdout", "No proposals found.")
+
+        print("\n" + "=" * 60)
+        print("FINALIZE REQUIRES APPROVAL")
+        print("=" * 60)
+        print(f"Feature:  {feature}")
+        print(f"Message:  {message}")
+        print(f"Proposals:\n{summary}")
+        print("=" * 60)
+
+        answer = input("Proceed with finalize? [y/N] ").strip().lower()
+        if answer not in ("y", "yes"):
+            return json.dumps({
+                "status": "aborted",
+                "reason": "User rejected finalize",
+                "feature": feature,
+            })
+
     result = _run_gitagent([
         "finalize", "--feature", feature,
         "--message", message,

@@ -50,14 +50,27 @@ def run_research_cycle(
         })
 
     from agents.deepagents.agent import create_orchestrator
+    import agents.deepagents.agent as agent_mod
+    from agents.deepagents.logger import SessionLogger
 
-    agent = create_orchestrator(provider=provider, model=model, thread_id=thread_id)
+    # Initialize session logger
+    logger = SessionLogger()
+    agent_mod.SESSION_LOGGER = logger
+    logger.log_decision("session_start", f"research cycle: {topic}, cycles={cycles}")
 
-    all_results = []
-    for i in range(cycles):
-        result = agent.invoke(
-            {"messages": [{"role": "user", "content": prompt}]},
-        )
-        all_results.append(result["messages"][-1].content)
+    try:
+        agent = create_orchestrator(provider=provider, model=model, thread_id=thread_id)
 
-    return "\n\n---\n\n".join(all_results)
+        all_results = []
+        for i in range(cycles):
+            result = agent.invoke(
+                {"messages": [{"role": "user", "content": prompt}]},
+            )
+            all_results.append(result["messages"][-1].content)
+
+        final = "\n\n---\n\n".join(all_results)
+        logger.log_summary(final)
+        return final
+    finally:
+        logger.close()
+        agent_mod.SESSION_LOGGER = None

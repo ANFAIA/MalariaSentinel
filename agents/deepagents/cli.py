@@ -25,8 +25,12 @@ def calibration(
     model: str = typer.Option("xiaomi/mimo-v2.5", "--model", "-m", help="Model identifier."),
     thread_id: str = typer.Option("calibration-session", "--thread-id", "-t", help="Thread ID for checkpointing."),
     dry_run: bool = typer.Option(False, "--dry-run", help="Print the prompt without executing."),
+    no_verify: bool = typer.Option(False, "--no-verify", help="Skip approval prompt before gitagent finalize."),
 ):
     """Run the ABM calibration improvement cycle."""
+    import agents.deepagents.agent as agent_mod
+    agent_mod.VERIFY_FINALIZE = not no_verify
+
     from agents.deepagents.cycles.calibration_cycle import run_calibration_cycle
 
     result = run_calibration_cycle(
@@ -47,8 +51,12 @@ def feature(
     model: str = typer.Option("xiaomi/mimo-v2.5", "--model", "-m", help="Model identifier."),
     thread_id: str = typer.Option("feature-session", "--thread-id", "-t", help="Thread ID for checkpointing."),
     dry_run: bool = typer.Option(False, "--dry-run", help="Print the prompt without executing."),
+    no_verify: bool = typer.Option(False, "--no-verify", help="Skip approval prompt before gitagent finalize."),
 ):
     """Run a feature development cycle."""
+    import agents.deepagents.agent as agent_mod
+    agent_mod.VERIFY_FINALIZE = not no_verify
+
     from agents.deepagents.cycles.feature_cycle import run_feature_cycle
 
     result = run_feature_cycle(
@@ -70,8 +78,12 @@ def research(
     model: str = typer.Option("xiaomi/mimo-v2.5", "--model", "-m", help="Model identifier."),
     thread_id: str = typer.Option("research-session", "--thread-id", "-t", help="Thread ID for checkpointing."),
     dry_run: bool = typer.Option(False, "--dry-run", help="Print the prompt without executing."),
+    no_verify: bool = typer.Option(False, "--no-verify", help="Skip approval prompt before gitagent finalize."),
 ):
     """Run a research + improvement cycle."""
+    import agents.deepagents.agent as agent_mod
+    agent_mod.VERIFY_FINALIZE = not no_verify
+
     from agents.deepagents.cycles.research_cycle import run_research_cycle
 
     result = run_research_cycle(

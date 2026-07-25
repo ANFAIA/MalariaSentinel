@@ -21,6 +21,11 @@ from agents.deepagents.tools import (
     memory_recall_kg,
     improve_prompt,
 )
+from agents.deepagents.logger import SessionLogger
+
+# Module-level flags set by CLI before creating the agent
+VERIFY_FINALIZE: bool = True
+SESSION_LOGGER: SessionLogger | None = None
 
 AGENT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = _project_root
@@ -94,16 +99,52 @@ WORKER_DEFINITIONS = [
     },
 ]
 
+
+def _wrap_with_logging(tool_func):
+    """Wrap a tool function to add structured logging."""
+    import functools
+
+    @functools.wraps(tool_func)
+    def wrapper(*args, **kwargs):
+        import time
+        start = time.monotonic()
+        result = tool_func(*args, **kwargs)
+        elapsed = time.monotonic() - start
+
+        if SESSION_LOGGER is not None:
+            # Build input dict from args + kwargs
+            import inspect
+            sig = inspect.signature(tool_func)
+            bound = sig.bind(*args, **kwargs)
+            bound.apply_defaults()
+            input_dict = {k: v for k, v in bound.arguments.items()}
+
+            SESSION_LOGGER.log_tool(
+                tool_name=tool_func.__name__,
+                tool_input=input_dict,
+                output=result,
+                latency_s=elapsed,
+            )
+        return result
+
+    return wrapper
+
+
+def _gitagent_finalize_wrapped(feature: str, message: str) -> str:
+    """Wrapper that injects the verify flag from module-level setting."""
+    return gitagent_finalize(feature, message, verify=VERIFY_FINALIZE)
+
+
 TOOLS = [
-    opencode_search,
-    gitagent_spawn,
-    gitagent_proposals,
-    gitagent_integrate,
-    gitagent_finalize,
-    pipeline_run_calibration,
-    pipeline_compare_scorecards,
-    memory_recall_kg,
-    improve_prompt,
+    _wrap_with_logging(opencode_search),
+    _wrap_with_logging(gitagent_spawn),
+    _wrap_with_logging(gitagent_proposals),
+    _wrap_with_logging(gitagent_integrate),
+    _wrap_with_logging(_gitagent_finalize_wrapped),
+    _wrap_with_logging(pipeline_run_calibration),
+    _wrap_with_logging(pipeline_compare_scorecards),
+    _wrap_with_logging(memory_recall_kg),
+    _wrap_with_logging(improve_prompt),
 ]
 
 MEMORY_FILES = [str(AGENT_DIR / "AGENTS.md")]
