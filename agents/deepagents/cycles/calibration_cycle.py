@@ -7,10 +7,31 @@ import json
 CALIBRATION_PROMPT = """\
 Run a calibration improvement cycle (max {max_iterations} iterations).
 
-Steps: recall KG → run baseline calibration → pick 1 improvement → spawn worker → score → compare → improve prompt if failed.
+FLOW — follow these steps IN ORDER. Do NOT skip steps or investigate failures.
 
-Start with step 1: use memory_recall_kg to find past patterns.
-"""
+Step 1: Recall past patterns.
+  Use memory_recall_kg(query="calibration improvement patterns ABM scoring regression", k=5)
+
+Step 2: Run baseline calibration.
+  Use pipeline_run_calibration(seed=1, days=30, n_rollouts=1)
+  If tests_failed: note the failure count, do NOT investigate. Move to step 3.
+
+Step 3: Spawn a worker to fix the failures.
+  Use gitagent_spawn(agent_id="scorer-worker-1", role="scorer", brief="Fix the calibration test failures identified in step 2. Do NOT skip or weaken tests.")
+
+Step 4: Check if worker proposed changes.
+  Use gitagent_proposals()
+  If NO proposals: report "Worker spawned, waiting for proposal" and STOP.
+  If proposals exist: continue to step 5.
+
+Step 5: Re-run calibration to score the result.
+  Use pipeline_run_calibration(seed=1, days=30, n_rollouts=1)
+
+Step 6: Compare against baseline.
+  If tests pass now: use gitagent_integrate() then gitagent_finalize() to land the fix.
+  If tests still fail: use improve_prompt() to record what didn't work.
+
+Start with step 1 now."""
 
 
 def run_calibration_cycle(
