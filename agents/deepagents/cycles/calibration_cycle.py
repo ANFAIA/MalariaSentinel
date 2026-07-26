@@ -9,7 +9,7 @@ GOAL: {goal}
 
 Run a calibration improvement cycle (max {max_iterations} iterations).
 
-FLOW — follow these steps IN ORDER. Do NOT skip steps or investigate failures.
+FLOW — follow these steps IN ORDER:
 
 Step 1: Recall past patterns.
   Use memory_recall_kg(query="calibration improvement patterns ABM scoring regression", k=5)
@@ -18,20 +18,34 @@ Step 2: Run baseline calibration.
   Use pipeline_run_calibration(seed=1, days=30, n_rollouts=1)
   If tests_failed: note the failure count, do NOT investigate. Move to step 3.
 
-Step 3: Spawn a worker to fix the failures.
-  Use gitagent_spawn(agent_id="scorer-worker-1", role="scorer", brief="Fix the calibration test failures identified in step 2. Do NOT skip or weaken tests.")
+Step 3: Open gitagent session and spawn a worker.
+  Use gitagent_init()
+  Use gitagent_start(feature="calibration-<short-id>")  # pick a unique name
+  Use gitagent_spawn(feature="calibration-<short-id>", agent_id="abm-worker-1", role="abm")
 
-Step 4: Check if worker proposed changes.
-  Use gitagent_proposals()
+Step 4: Create worker subagent with create_abm_worker_subagent(worktree_path).
+  The worker will compile, run tests, and score results in its isolated worktree.
+
+Step 5: Check proposals.
+  Use gitagent_proposals(feature="calibration-<short-id>")
   If NO proposals: report "Worker spawned, waiting for proposal" and STOP.
-  If proposals exist: continue to step 5.
+  If proposals exist: continue to step 6.
 
-Step 5: Re-run calibration to score the result.
+Step 6: Review the diff.
+  Use gitagent_diff(proposal_id, feature="calibration-<short-id>")
+  Review the changes carefully.
+
+Step 7: Decide.
+  If changes are correct: gitagent_accept(proposal_id, feature="calibration-<short-id>")
+  If changes need revision: gitagent_revise(proposal_id, feature="calibration-<short-id>", feedback="...") then go back to step 5
+  If changes are wrong: gitagent_reject(proposal_id, feature="calibration-<short-id>", reason="...")
+
+Step 8: Re-run calibration to score the result.
   Use pipeline_run_calibration(seed=1, days=30, n_rollouts=1)
 
-Step 6: Compare against baseline.
-  If tests pass now: use gitagent_integrate() then gitagent_finalize() to land the fix.
-  If tests still fail: use improve_prompt() to record what didn't work.
+Step 9: Finalize.
+  If tests pass: gitagent_integrate(feature="calibration-<short-id>") then gitagent_finalize(feature="calibration-<short-id>", message="calibration: <description>")
+  If tests still fail: use improve_prompt() to record what didn't work, then go back to step 3 with a new feature name.
 
 Keep all actions aligned with the GOAL above. Start with step 1 now."""
 

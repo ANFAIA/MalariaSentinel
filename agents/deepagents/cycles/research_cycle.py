@@ -9,14 +9,35 @@ GOAL: {goal}
 
 Run a research and improvement cycle for topic: {topic}
 
-1. Recall what the knowledge graph already knows about this topic
-2. Search the literature using opencode_search for recent findings
-3. Analyze how findings relate to the current ABM implementation
-4. Identify 2-3 actionable improvements based on the research
-5. Spawn workers to implement the most promising improvements
-6. Run calibration to measure impact
-7. Accept improvements that measurably improve the composite score
-8. Record findings and decisions in the knowledge graph
+FLOW — follow these steps IN ORDER:
+
+Step 1: Recall what the knowledge graph already knows.
+  Use memory_recall_kg(query="{topic} findings patterns", k=5)
+
+Step 2: Search the literature.
+  Use opencode_search(query="{topic} recent findings 2024 2025")
+
+Step 3: Analyze findings and identify 2-3 actionable improvements.
+
+Step 4: Open gitagent session and spawn workers.
+  Use gitagent_init()
+  Use gitagent_start(feature="research-<short-topic>")
+  Use gitagent_spawn(feature="research-<short-topic>", agent_id="abm-worker-1", role="abm")
+
+Step 5: Create worker subagent with create_abm_worker_subagent(worktree_path).
+
+Step 6: Check proposals and review.
+  Use gitagent_proposals + gitagent_diff
+  Accept improvements that measurably improve the composite score.
+
+Step 7: Run calibration to measure impact.
+  Use pipeline_run_calibration(seed=1, days=30, n_rollouts=1)
+
+Step 8: Finalize accepted improvements.
+  gitagent_integrate + gitagent_finalize
+
+Step 9: Record findings in the knowledge graph.
+  Use improve_prompt() to record what worked and what didn't.
 
 Keep all actions aligned with the GOAL above."""
 

@@ -10,14 +10,35 @@ GOAL: {goal}
 Run a feature development cycle for: {feature_name}
 Description: {description}
 
-1. Recall relevant patterns and architecture decisions from the knowledge graph
-2. Research the literature using opencode_search if needed
-3. Plan the implementation with write_todos
-4. Spawn a feature-worker in an isolated worktree using gitagent_spawn
-5. The worker implements the feature and proposes via gitagent
-6. Run tests to verify the implementation
-7. If tests pass, accept the proposal; if not, patch the worker prompt and retry
-8. Integrate and finalize
+FLOW — follow these steps IN ORDER:
+
+Step 1: Recall relevant patterns and architecture decisions.
+  Use memory_recall_kg(query="<feature topic> patterns architecture", k=5)
+
+Step 2: Research if needed.
+  Use opencode_search(query="<feature topic> implementation best practices")
+
+Step 3: Open gitagent session and spawn a worker.
+  Use gitagent_init()
+  Use gitagent_start(feature="feature-<short-name>")
+  Use gitagent_spawn(feature="feature-<short-name>", agent_id="abm-worker-1", role="abm")
+
+Step 4: Create worker subagent with create_abm_worker_subagent(worktree_path).
+
+Step 5: Check proposals.
+  Use gitagent_proposals(feature="feature-<short-name>")
+  If NO proposals: report "Worker spawned, waiting for proposal" and STOP.
+
+Step 6: Review and decide.
+  Use gitagent_diff(proposal_id, feature="feature-<short-name>")
+  If OK → gitagent_accept; if not → gitagent_revise with feedback → back to step 5
+
+Step 7: Run tests to verify.
+  Use pipeline_run_calibration(seed=1, days=30, n_rollouts=1)
+
+Step 8: Finalize.
+  If tests pass: gitagent_integrate + gitagent_finalize
+  If tests fail: gitagent_revise with feedback about failures → back to step 5
 
 Keep all actions aligned with the GOAL above."""
 
