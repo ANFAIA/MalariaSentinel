@@ -12,8 +12,16 @@ if str(_project_root) not in sys.path:
 
 from agents.deepagents.tools import (
     opencode_search,
+    gitagent_init,
+    gitagent_start,
     gitagent_spawn,
+    gitagent_list_agents,
+    gitagent_kill,
     gitagent_proposals,
+    gitagent_diff,
+    gitagent_accept,
+    gitagent_reject,
+    gitagent_revise,
     gitagent_integrate,
     gitagent_finalize,
     pipeline_run_calibration,
@@ -35,18 +43,26 @@ GLOBAL_SKILLS = Path.home() / ".agents" / "skills"
 ORCHESTRATOR_PROMPT = """\
 You are the MalariaSentinel Centinela orchestrator.
 
-CALIBRATION CYCLE — do these 4 steps in order, one tool call per message:
-1. memory_recall_kg → recall past patterns
-2. pipeline_run_calibration → get baseline score
-3. Pick 1 improvement. gitagent_spawn a worker for it.
-4. pipeline_run_calibration → score the result
+WORKFLOW — for each feature:
+1. gitagent_init (idempotent)
+2. gitagent_start(feature=X) — open session
+3. gitagent_spawn(feature=X, agent_id="abm-worker-X", role="abm") — get worktree path
+4. Create worker subagent with FilesystemBackend(worktree_path) — use create_abm_worker_subagent()
+5. Let worker do its work (compile, test, score)
+6. gitagent_proposals(feature=X) — check what worker proposed
+7. gitagent_diff(proposal_id, feature=X) — review the changes
+8. If OK → gitagent_accept; if not → gitagent_revise with feedback → back to step 5
+9. gitagent_integrate(feature=X) — apply accepted proposals
+10. gitagent_finalize(feature=X, message="...") — one commit on main
+
+MULTI-FEATURE: you can manage N features in parallel. Each feature is independent.
 
 CRITICAL RULES:
-- ONE tool call per message. Wait for result, then next step.
-- If pipeline_run_calibration returns "tests_failed", say "Baseline: tests_failed" and IMMEDIATELY move to step 3.
-- Do NOT investigate test failures. Do NOT read test files. Do NOT glob/grep for test config.
-- Do NOT check gitagent_proposals until step 4 completes.
-- Under 50 words per response.
+- Always pass --feature to every gitagent command
+- Use gitagent_revise (not reject) when you want the worker to iterate
+- Iterations are unlimited — keep revising until the change is correct
+- Before finalize: review proposals and diffs carefully
+- Under 80 words per response unless explaining a decision
 """
 
 WORKER_DEFINITIONS = [
@@ -137,8 +153,16 @@ def _gitagent_finalize_wrapped(feature: str, message: str) -> str:
 
 TOOLS = [
     _wrap_with_logging(opencode_search),
+    _wrap_with_logging(gitagent_init),
+    _wrap_with_logging(gitagent_start),
     _wrap_with_logging(gitagent_spawn),
+    _wrap_with_logging(gitagent_list_agents),
+    _wrap_with_logging(gitagent_kill),
     _wrap_with_logging(gitagent_proposals),
+    _wrap_with_logging(gitagent_diff),
+    _wrap_with_logging(gitagent_accept),
+    _wrap_with_logging(gitagent_reject),
+    _wrap_with_logging(gitagent_revise),
     _wrap_with_logging(gitagent_integrate),
     _wrap_with_logging(_gitagent_finalize_wrapped),
     _wrap_with_logging(pipeline_run_calibration),
@@ -207,7 +231,11 @@ def create_orchestrator(
 
     llm = _resolve_provider(provider, model)
 
-    backend = FilesystemBackend(root_dir=str(REPO_ROOT), virtual_mode=False)
+    backend = FilesystemBackend(
+        root_dir=str(REPO_ROOT),
+        virtual_mode=True,
+        read_only=True,
+    )
 
     skills = []
     if PROJECT_SKILLS.is_dir():
@@ -223,6 +251,11 @@ def create_orchestrator(
         backend=backend,
         skills=skills or None,
         name="centinela-orchestrator",
+        permissions=[
+            {"operations": ["read"], "paths": ["/**"], "mode": "allow"},
+            {"operations": ["read"], "paths": ["/.env", "/**/.env", "/**/*secret*", "/**/*credential*"], "mode": "deny"},
+            {"operations": ["write", "edit"], "paths": ["/**"], "mode": "deny"},
+        ],
     )
 
 
