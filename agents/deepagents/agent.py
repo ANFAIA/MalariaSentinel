@@ -224,3 +224,81 @@ def create_orchestrator(
         skills=skills or None,
         name="centinela-orchestrator",
     )
+
+
+def create_abm_worker_subagent(worktree_path: Path) -> dict:
+    """Create a worker subagent isolated to its gitagent worktree.
+
+    The worker uses FilesystemBackend with virtual_mode=True to ensure
+    it can only access files under its worktree root (no ../ escaping).
+
+    Args:
+        worktree_path: Absolute path to the agent's gitagent worktree.
+
+    Returns:
+        A dict compatible with deepagents subagent specification.
+    """
+    try:
+        from deepagents.backends import FilesystemBackend
+        from deepagents.permissions import FilesystemPermission
+    except ImportError:
+        raise ImportError(
+            "The 'deepagents' package is required but not installed. "
+            "Install it with: pip install 'mal-deepagents' or pip install deepagents"
+        )
+
+    worker_backend = FilesystemBackend(
+        root_dir=str(worktree_path),
+        virtual_mode=True,
+    )
+
+    return {
+        "name": "abm-worker",
+        "description": (
+            "Modifies ABM C++ parameters, runs tests, and scores results. "
+            "Worktree-isolated — can only see files under its worktree root."
+        ),
+        "system_prompt": (
+            "You are an ABM calibration worker working inside an isolated gitagent worktree. "
+            "You can only see files under your worktree root. "
+            "Use the 3 custom tools for execution: "
+            "abm_run (compile + simulate), abm_test (pytest), abm_score (14 scorers + LLM verdict). "
+            "Use read_file/write_file/edit_file/glob/grep for file operations. "
+            "When your work is done, run from the REPO ROOT: "
+            "gitagent propose --feature <name> --agent <your-id> --title '...' --summary '...' --confidence 0.8"
+        ),
+        "backend": worker_backend,
+        "tools": [
+            _wrap_with_logging(_import_abm_run()),
+            _wrap_with_logging(_import_abm_test()),
+            _wrap_with_logging(_import_abm_score()),
+        ],
+        "permissions": [
+            # Worker can read and write within its worktree
+            {"operations": ["read", "write", "edit"], "paths": ["/**"], "mode": "allow"},
+            # Deny reading secrets
+            {"operations": ["read"], "paths": ["/.env", "/**/.env", "/**/*secret*", "/**/*credential*"], "mode": "deny"},
+            # Deny writing to data inputs (read-only)
+            {"operations": ["write", "edit"], "paths": ["/data/**"], "mode": "deny"},
+            # Deny writing to gitagent metadata
+            {"operations": ["write", "edit"], "paths": ["/.gitagent/**", "/.git/**"], "mode": "deny"},
+        ],
+    }
+
+
+def _import_abm_run():
+    """Lazy import of abm_run tool."""
+    from agents.deepagents.tools.abm_tools import abm_run
+    return abm_run
+
+
+def _import_abm_test():
+    """Lazy import of abm_test tool."""
+    from agents.deepagents.tools.abm_tools import abm_test
+    return abm_test
+
+
+def _import_abm_score():
+    """Lazy import of abm_score tool."""
+    from agents.deepagents.tools.abm_tools import abm_score
+    return abm_score
