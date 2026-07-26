@@ -25,7 +25,7 @@ MalariaSentinel/
 │   │   ├── scoring/            # Calibration scorers
 │   │   └── pipeline/           # Pipeline orchestrator
 │   └── tests/
-├── mal-execution/              # CLI entrypoints, batch jobs (deprecated, use mal-core)
+├── mal-execution/              # CLI entrypoints, batch jobs, HPC/cloud automation
 │   ├── pyproject.toml
 │   ├── scripts/
 │   └── src/
@@ -54,6 +54,7 @@ members = [
     "mal-execution",
     "mal-ghana-sim",
     "mal-data-explorer",
+    "social-networks",
 ]
 ```
 
@@ -75,7 +76,7 @@ mal-data-explorer      ← no workspace deps (standalone scripts)
 **Rules:**
 - `mal-commonlib` is the foundation — no internal dependencies.
 - `mal-core` depends only on `mal-commonlib`.
-- `mal-execution` depends on `mal-core` + `mal-commonlib`. Its Python module (`mal_cli`) is minimal, but `scripts/` contains HPC automation (CESGA SLURM, Hetzner cloud).
+- `mal-execution` depends on `mal-core` + `mal-commonlib`. Its Python module (`mal_cli`) is minimal, but `scripts/` contains HPC automation (CESGA SLURM, Hetzner cloud) and training scripts.
 - `mal-ghana-sim` depends only on `mal-commonlib` — **never** on `mal-core`.
 - `mal-data-explorer` has no workspace dependencies.
 - **Nothing depends on research packages.** Research code promotes into core; it never flows downward.
@@ -249,8 +250,9 @@ Entry point: `malariasim` CLI (9 commands: run, ingest, abm, score, train, predi
 ### mal-execution
 HPC and cloud automation. Python module is minimal (`mal_cli/__init__.py`). Key content:
 - `scripts/cesga-run/` — CESGA SLURM automation (setup_env.sh, prepare_data.sh, run_abm.sh, manage_jobs.sh, cesga_config.sh)
-- `scripts/hetzner-run/` — Hetzner cloud automation (cloud-init.yaml, lib/, tests/)
+- `scripts/hetzner-run/` — Hetzner cloud automation (hetzner-run, cloud-init.yaml)
 - `scripts/train_unet.py`, `train_unet_subsample.py`, `validate_unet.py` — training scripts
+- `scripts/build_environment.py`, `build_hosts.py`, `build_mobility.py` — data preparation scripts
 
 ### mal-ghana-sim
 Ghana spread simulation + U-Net surrogate. Modules: `config`, `dataset`, `ingest`, `predict`, `simulator`, `suitability`, `train`, `unet`, `viz`, `abm/` (agent-based model).

@@ -1,6 +1,6 @@
 ---
 name: mal-commonlib-api
-description: Expert guide to all shared utilities in mal-commonlib — config constants, AOI schema, data loaders (DEM, CHIRPS, ERA5, JRC GSW, MODIS, WorldCover), terrain TWI, and data utilities. Use this skill when working with any mal-commonlib module, writing code that imports from mal_commonlib, or needing to understand what public APIs are available in the foundation package.
+description: Expert guide to all shared utilities in mal-commonlib — config constants, AOI schema, data loaders (DEM, CHIRPS, ERA5, JRC GSW, MODIS, WorldCover, WorldPop, GLW, GHSL, buildings, wildlife), terrain TWI, mobility/host utilities, and data utilities. Use this skill when working with any mal-commonlib module, writing code that imports from mal_commonlib, or needing to understand what public APIs are available in the foundation package.
 ---
 
 # mal-commonlib API Reference
@@ -20,7 +20,14 @@ Foundation package for MalariaSentinel. No internal dependencies — everything 
 | **JRC GSW loader** | `mal_commonlib.data.loaders.jrc_gsw` | `load_jrc_gsw_water_frac` — JRC Global Surface Water 30 m |
 | **MODIS loader** | `mal_commonlib.data.loaders.modis` | `load_modis_ndvi` — MODIS MOD13A3 v061 monthly NDVI |
 | **WorldCover loader** | `mal_commonlib.data.loaders.worldcover` | `load_worldcover_water_frac` — ESA WorldCover 10 m |
+| **WorldPop loader** | `mal_commonlib.data.loaders.worldpop` | `load_worldpop_population` — WorldPop population density |
+| **GLW loader** | `mal_commonlib.data.loaders.glw` | `load_glw_livestock` — FAO Global Livestock Distribution |
+| **GHSL loader** | `mal_commonlib.data.loaders.ghsl` | `load_ghsl_urban_rural` — Global Human Settlement Layer |
+| **Buildings loader** | `mal_commonlib.data.loaders.buildings` | `load_overture_buildings` — Overture Maps building footprints |
+| **Wildlife loader** | `mal_commonlib.data.loaders.wildlife` | `load_wildlife_proxy` — Wildlife/livestock proximity proxy |
 | **TWI** | `mal_commonlib.terrain.twi` | `compute_twi` — Topographic Wetness Index from DEM |
+| **Mobility** | `mal_commonlib.data.mobility` | Gravity-model mobility OD matrices |
+| **Host utils** | `mal_commonlib.data.host_utils` | Host density aggregation utilities |
 | **Data utils** | `mal_commonlib.data.utils` | `read_raster`, `reproject_to_grid`, `points_to_grid`, `norm_minmax` |
 
 ---
@@ -201,6 +208,11 @@ All loaders share a common pattern:
 | JRC GSW | No | — (Planetary Computer) |
 | MODIS | Yes (token) | `EARTHDATA_TOKEN` |
 | WorldCover | No | — (Planetary Computer) |
+| WorldPop | No | — (direct download) |
+| GLW | No | — (FAO FTP) |
+| GHSL | No | — (JRC FTP) |
+| Buildings | No | — (Overture Maps S3) |
+| Wildlife | No | — (derived from WorldCover + JRC + Buildings) |
 
 ---
 
@@ -318,6 +330,81 @@ ESA WorldCover 10 m via Planetary Computer STAC. Default water classes: `(80, 90
 - `year`: 2020 or 2021.
 - `month`: accepted for signature uniformity; ignored (annual product).
 - `water_classes`: override default `(80, 90, 95)`.
+
+**Returns**: `xr.DataArray` (y, x), float32, [0, 1], NoData = `-9999.0`
+
+---
+
+### WorldPop — `load_worldpop_population`
+
+```python
+from mal_commonlib.data.loaders.worldpop import WorldPopLoader
+
+loader = WorldPopLoader()
+pop = loader.load(aoi, year=2019, cache_dir=None)
+```
+
+WorldPop Ghana 2019 v2.0 constrained UN-adjusted population estimate (~100 m). Returns population count per cell (persons/pixel).
+
+**Returns**: `xr.DataArray` (y, x), float32, persons/pixel, NoData = `-9999.0`
+
+---
+
+### GLW — `load_glw_livestock`
+
+```python
+from mal_commonlib.data.loaders.glw import GLWLoader
+
+loader = GLWLoader()
+cattle = loader.load(aoi, species="cattle", cache_dir=None)
+```
+
+FAO Gridded Livestock of the World v4 (2020). Supported species: `cattle`, `goats`, `sheep`, `pigs`, `chickens`. Resolution ~10 km (5 arc-minutes).
+
+**Returns**: `xr.DataArray` (y, x), float32, animals/pixel, NoData = `-9999.0`
+
+---
+
+### GHSL — `load_ghsl_urban_rural`
+
+```python
+from mal_commonlib.data.loaders.ghsl import GHSLLoader
+
+loader = GHSLLoader()
+settlement = loader.load(aoi, cache_dir=None)
+```
+
+GHS-SMOD settlement classification from JRC. Classes: 20 (water), 30 (urban), 50 (rural). Resolution ~1 km.
+
+**Returns**: `xr.DataArray` (y, x), float32, settlement class, NoData = `-9999.0`
+
+---
+
+### Buildings — `load_overture_buildings`
+
+```python
+from mal_commonlib.data.loaders.buildings import BuildingsLoader
+
+loader = BuildingsLoader()
+building_frac = loader.load(aoi, cache_dir=None)
+```
+
+Overture Maps building footprints rasterized to building-fraction layer (fraction of each ABM cell covered by buildings). Values in [0, 1].
+
+**Returns**: `xr.DataArray` (y, x), float32, [0, 1], NoData = `-9999.0`
+
+---
+
+### Wildlife — `load_wildlife_proxy`
+
+```python
+from mal_commonlib.data.loaders.wildlife import WildlifeLoader
+
+loader = WildlifeLoader()
+wildlife = loader.load(aoi, year=2021, cache_dir=None)
+```
+
+Wildlife host proxy derived from WorldCover habitat suitability (0.5), JRC GSW water proximity (0.3), and Overture Maps remoteness (0.2). Values in [0, 1].
 
 **Returns**: `xr.DataArray` (y, x), float32, [0, 1], NoData = `-9999.0`
 

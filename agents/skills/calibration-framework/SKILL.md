@@ -7,16 +7,18 @@ description: Understand and extend the ABM calibration scorecard framework. Cove
 
 ## Overview
 
-The calibration framework scores mal-abm-fast C++ ABM rollouts against biological, physical, and computational expectations. It runs 14 deterministic scorers (D1-D14) that each evaluate one dimension of the simulation, then combines them into a single composite score via weighted geometric mean. An optional LLM judge provides a qualitative verdict on the same report.
+The calibration framework scores C++ ABM rollouts against biological, physical, and computational expectations. It has 14 scorer dimensions (D1-D14), each evaluating one dimension of the simulation, then combines them into a single composite score via weighted geometric mean. An optional LLM judge provides a qualitative verdict on the same report.
 
-The framework lives at `mal-core/src/mal_core/abm/tests/calibration/` (moved from `mal-abm-fast/` in M9).
+**Note**: D1-D10 are registered in `ALL_SCORERS` and run by default. D11-D14 exist as scorer files with weights in `composite.py` but are not yet registered in `score.py::ALL_SCORERS`. To run all 14, import and append them to `ALL_SCORERS`.
+
+The framework lives at `mal-core/src/mal_core/abm/tests/calibration/` (moved from the old `mal-abm-fast` package in M9).
 
 ## Quick reference
 
 ```bash
 # From the calibration directory (mal-core/src/mal_core/abm/tests/calibration/)
-uv run pytest -m fast -v          # 10 scorers, 1 seed, 30 days (PR gate)
-uv run pytest -m full -v          # 10 scorers + LLM, 5 seeds, 90 days
+uv run pytest -m fast -v          # D1-D10 scorers, 1 seed, 30 days (PR gate)
+uv run pytest -m full -v          # D1-D10 scorers + LLM, 5 seeds, 90 days
 uv run pytest -m llm -v           # LLM judge only (requires OPENCODE_API_KEY)
 
 # Score a single run directory
@@ -94,7 +96,7 @@ Current values from `thresholds.yaml`:
 
 ## Adding a new scorer
 
-1. **Create the scorer file**: `scorers/D<id>_<name>.py` where `<id>` is the next number (D12, D13, ...). Implement the `Scorer` ABC from `scorers/base.py`:
+1. **Create the scorer file**: `scorers/D<id>_<name>.py` where `<id>` is the next number (D15, D16, ...). Implement the `Scorer` ABC from `scorers/base.py`:
 
    ```python
    from scorers.base import Scorer, ScorerResult
@@ -131,7 +133,7 @@ Current values from `thresholds.yaml`:
 
 Files: `D<id>_<name>.py` — e.g. `D1_expansion.py`, `D14_mobility_conservation.py`.
 
-The `<id>` is sequential (D1 through D14 currently). The `<name>` is a short snake_case description. The scorer's `name` property must match `D<id>_<name>` exactly (used as the key in scorecards and `DEFAULT_WEIGHTS`).
+The `<id>` is sequential (D1 through D14 currently). The `<name>` is a short snake_case description. The scorer's `name` property must match `D<id>_<name>` exactly (used as the key in scorecards and `DEFAULT_WEIGHTS`). New scorers should start at D15.
 
 ## LLM verdict
 

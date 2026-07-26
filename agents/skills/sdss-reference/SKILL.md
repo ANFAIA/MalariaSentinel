@@ -119,7 +119,7 @@ The Centinela implements a 5-stage pipeline:
 | **Baseline GIS layers** | `data/`, `terrain/`, `runs/layers/` | SRTM DEM, JRC water, CHIRPS rainfall, WorldClim temperature, MODIS NDVI |
 | **Expert knowledge** | `agents/`, `AGENTS.md`, knowledge graph | Accumulated conventions, patterns, pitfalls |
 | **Spatial analysis** | `mal-ghana-sim/scripts/02_suitability.py` | Weighted overlay + thermal curve |
-| **Modeling (ABM)** | `mal-ghana-sim/src/mal_ghana_sim/abm/` + `mal-abm-fast/` | Agent-based mosquito simulation |
+| **Modeling (ABM)** | `mal-ghana-sim/src/mal_ghana_sim/abm/` + `mal-core/src/mal_core/abm/` | Agent-based mosquito simulation |
 | **Modeling (KPP)** | `mal-ghana-sim/scripts/03_simulate.py` | Fisher-KPP reaction-diffusion |
 | **ML surrogate** | `mal-ghana-sim/scripts/05_train.py` + `06_predict_and_map.py` | U-Net transition model |
 | **Automated outputs** | `mal-execution/scripts/` | CLI entrypoints, batch jobs |
@@ -177,7 +177,7 @@ The SDSS supports planning and evaluating five intervention types:
 
 ### Parameterization conventions
 
-All intervention parameters live in `mal-ghana-sim/src/mal_ghana_sim/config.py` (suitability/simulation parameters) or are passed as CLI flags to the ABM engine. The calibration framework (`mal-abm-fast/tests/calibration/`) validates that parameterized interventions produce realistic population dynamics.
+All intervention parameters live in `mal-ghana-sim/src/mal_ghana_sim/config.py` (suitability/simulation parameters) or are passed as CLI flags to the ABM engine. The calibration framework (`mal-core/src/mal_core/abm/tests/calibration/`) validates that parameterized interventions produce realistic population dynamics.
 
 ---
 

@@ -29,7 +29,7 @@ def opencode_search(query: str, num_results: int = 5) -> str:
     # Use OpenRouter with a web-search-capable model
     try:
         payload = json.dumps({
-            "model": "openrouter/perplexity/sonar",
+            "model": "perplexity/sonar",
             "messages": [
                 {
                     "role": "user",

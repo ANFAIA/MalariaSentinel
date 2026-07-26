@@ -19,7 +19,7 @@ Complete setup guide for MalariaSentinel. An agent with only this skill and the 
 | Eigen3, CLI11, nlohmann-json, googletest (ABM engine only) | `brew list eigen cli11 nlohmann-json googletest 2>/dev/null` | `brew install eigen cli11 nlohmann-json googletest` |
 | `OPENTOPO_API_KEY` (optional) | `echo $OPENTOPO_API_KEY` | Get a free key from https://opentopography.org/ — needed for SRTM terrain layers |
 
-The ABM engine dependencies (`mal-abm-fast`) are only needed if you plan to build and run the C++ agent-based model. The core Python pipeline works without them.
+The ABM engine dependencies (C++ build tools) are only needed if you plan to build and run the C++ agent-based model at `mal-core/src/mal_core/abm/`. The core Python pipeline works without them.
 
 ## Quick Start
 
@@ -29,7 +29,7 @@ cd MalariaSentinel
 uv sync --all-packages
 ```
 
-This installs all workspace packages (`mal-commonlib`, `mal-core`, `mal-execution`, `mal-ghana-sim`, `mal-data-explorer`, `mal-abm-fast`) and their Python dependencies. The first sync may take a few minutes for torch and other large wheels.
+This installs all workspace packages (`mal-commonlib`, `mal-core`, `mal-execution`, `mal-ghana-sim`, `mal-data-explorer`, `social-networks`) and their Python dependencies. The first sync may take a few minutes for torch and other large wheels.
 
 ## Data Restoration
 
@@ -82,8 +82,7 @@ from mal_commonlib import config as C
 from mal_ghana_sim import config as GC
 import mal_core, mal_cli
 import mal_data_explorer
-import mal_abm_fast
-print('All 6 workspace packages import OK')
+print('All workspace packages import OK')
 print('  REPO_ROOT:', C.REPO_ROOT)
 print('  DATA_DIR:', C.DATA_DIR)
 print('  OCCURRENCE:', GC.OCCURRENCE)
@@ -112,7 +111,7 @@ cd mal-commonlib && uv run pytest
 cd mal-core && uv run pytest
 
 # C++ ABM engine tests (GoogleTest, requires cmake + build)
-cd mal-abm-fast && ctest --test-dir build --output-on-failure
+cd mal-core/src/mal_core/abm && ctest --test-dir build --output-on-failure
 ```
 
 The `run_all_tests.sh` script iterates through each workspace package, runs `uv run pytest`, and reports which packages have tests vs. which have none yet.

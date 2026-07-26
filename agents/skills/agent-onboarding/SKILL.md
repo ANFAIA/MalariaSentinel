@@ -104,7 +104,7 @@ Then load these skills for deeper context:
 | `mal-commonlib-api` | Shared config, paths, data utilities |
 | `mal-core-api` | Stable pipeline logic API |
 
-**Key insight**: MalariaSentinel has two tiers — **core** (the Centinela: `mal-commonlib`, `mal-core`, `mal-execution`) and **experiments** (`mal-ghana-sim`, `mal-data-explorer`, `mal-abm-fast`). Experiments either die or promote stable code into core. Nothing depends on experiments.
+**Key insight**: MalariaSentinel has two tiers — **core** (the Centinela: `mal-commonlib`, `mal-core`, `mal-execution`) and **experiments** (`mal-ghana-sim`, `mal-data-explorer`). Experiments either die or promote stable code into core. Nothing depends on experiments.
 
 ## Step 5: Run Something (~5 min)
 
@@ -157,7 +157,6 @@ Branch naming conventions:
 | `sim/` | `mal-ghana-sim` changes |
 | `data/` | `mal-data-explorer` changes |
 | `docs/` | Documentation only |
-| `abm/` | `mal-abm-fast` changes |
 
 **Promotion flow** (experiment → core):
 

@@ -13,7 +13,7 @@ description: CLI entrypoints, training scripts, and HPC/cloud automation in mal-
 
 | Layer | Contents |
 |---|---|
-| `src/mal_cli/` | Minimal Python module (`__init__.py` only — no substantial code) |
+| `src/mal_cli/` | Minimal Python module (`__init__.py` only — version string) |
 | `scripts/` | All the real value: training scripts, data builders, CESGA/Hetzner automation |
 
 **Key dependency**: `mal-execution` scripts call into `mal_core` (training loops, model classes) and `mal_commonlib` (AOI, data loaders, config).

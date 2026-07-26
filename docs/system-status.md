@@ -1,6 +1,6 @@
 # MalariaSentinel — Estado del Proyecto y Arquitectura
 
-> Actualizado: 2026-07-24 · ABM C++ (M9 consolidated in mal-core): **M7.2** · Pipeline: **M9 complete** · Tests: **26 Python (mal-core) + 60+ C++ + 14 calibration scorers**
+> Actualizado: 2026-07-26 · ABM C++ (M9 consolidated in mal-core): **M7.2** · Pipeline: **M9 complete** · DeepAgent: **M10 skeleton** · Tests: **26 Python (mal-core) + 60+ C++ + 14 calibration scorers**
 
 ---
 
@@ -19,7 +19,7 @@ graph LR
     end
 
     subgraph ETAPA3["Etapa 3: ABM"]
-        ABM["mal-abm-fast (C++)<br/>o mal-ghana-sim (Py)<br/>9M+ agentes<br/>30 dias/rollout"]
+        ABM["mal-core/abm (C++)<br/>o mal-ghana-sim (Py)<br/>9M+ agentes<br/>30 dias/rollout"]
     end
 
     subgraph ETAPA4["Etapa 4: Dataset"]
@@ -69,10 +69,11 @@ graph TB
 ```
 MalariaSentinel/
   mal-commonlib/          # Base compartida: config, paths, loaders de datos
-  mal-core/               # Logica estable + ABM C++ (M9 consolidado)
+  mal-core/               # Logica estable + ABM C++ (M9 consolidated)
   mal-execution/          # CLI batch, scripts CESGA/Hetzner
   mal-data-explorer/      # Visualizacion de datasets, analisis de sesgo
-  agents/                 # Infraestructura de agentes, memoria, loops
+  agents/                 # Infraestructura de agentes, memoria, loops, deepagents
+  social-networks/        # Deep Agent para contenido social (carousel, LinkedIn, video)
   mal-ghana-sim/          # [DEPRECATED] Experimento original
   data/                   # Datasets (gitignored raw data)
   papers/                 # Papers de investigacion
@@ -87,22 +88,25 @@ MalariaSentinel/
 ```mermaid
 graph TB
     CL["mal-commonlib<br/>(sin dependencias)<br/>loaders, config, paths"]
-    MC["mal-core<br/>U-Net, predict, server"]
+    MC["mal-core<br/>ABM C++, U-Net, predict, server"]
     ME["mal-execution<br/>scripts CESGA/Hetzner"]
     GS["mal-ghana-sim<br/>[DEPRECATED]"]
     DE["mal-data-explorer<br/>scripts sueltos"]
+    SN["social-networks<br/>(independiente)"]
 
     CL --> MC
     MC --> ME
     CL --> GS
 
     DE -.->|"sin deps"| DE
+    SN -.->|"sin deps"| SN
 
     style CL fill:#90EE90
     style MC fill:#87CEEB
     style ME fill:#87CEEB
     style GS fill:#FFB6C1,stroke:#FF0000,stroke-width:2px
     style DE fill:#FFD700
+    style SN fill:#DDA0DD
 ```
 
 **Reglas de importacion**:
@@ -148,7 +152,8 @@ graph TB
 ## 4. mal-core — Logica estable del pipeline
 
 **Ubicacion**: `mal-core/src/mal_core/`
-**Dependencias**: mal-commonlib, torch, fastapi, typer, pydantic, pyyaml
+**Version**: 0.2.0
+**Dependencias**: mal-commonlib, torch, fastapi, typer, pydantic, pyyaml, langchain-openai
 **CLI**: `malariasim` (entry point)
 
 ### Arquitectura interna
@@ -310,6 +315,21 @@ malariasim status --aoi ghana
 malariasim serve --host 127.0.0.1 --port 8000
 ```
 
+### Tests Python (mal-core)
+
+| Test file | Tests | Cubre |
+|---|---|---|
+| `test_abm_wrapper.py` | 4 | CppAbmWrapper: binary resolution, flag introspection, run |
+| `test_feedback.py` | 5 | Scorecard feedback generator |
+| `test_flag_registry.py` | 7 | Pipeline flag auto-aggregation |
+| `test_pipeline.py` | 4 | Pipeline orchestrator: run_stage, run_pipeline |
+| `test_runner.py` | 6 | CLI entrypoints |
+
+```bash
+cd mal-core && uv run pytest tests/ -v
+# 26 tests
+```
+
 ### Como mal-core se conecta con el ABM
 
 mal-core contiene el ABM (abm/) y lo orquesta via el pipeline (pipeline/):
@@ -402,7 +422,7 @@ graph LR
         SETUP["setup_env.sh"]
         PREP["prepare_data.sh"]
         CONFIG["cesga_config.sh"]
-        RUN["run_abm.sh<br/>sbatch mal-abm-fast"]
+        RUN["run_abm.sh<br/>sbatch mal-core/abm"]
         MANAGE["manage_jobs.sh<br/>squeue, scancel"]
     end
 
@@ -419,7 +439,7 @@ graph LR
         VAL["validate_unet.py"]
     end
 
-    LOCAL -->|"mismo flujo"| ABM["mal-abm-fast (C++)<br/>o ABM Python"]
+    LOCAL -->|"mismo flujo"| ABM["mal-core/abm (C++)<br/>o ABM Python"]
     CESGA --> ABM
     HETZNER --> ABM
     ABM -->|"state COGs"| OUT["runs/"]
@@ -707,22 +727,25 @@ sequenceDiagram
 ### CLI del motor C++
 
 ```bash
-# Single rollout
-./mal_abm_fast run \
+# Via mal-core wrapper (recommended)
+malariasim abm --aoi ghana --year 2024 --month 6 --seed 1 --days 30
+
+# Direct binary (from build or bin)
+mal-core/src/mal_core/abm/bin/mal_abm_fast_darwin run \
     --aoi ghana --year 2024 --month 6 --seed 1 --days 30 \
     --env data/ghana/ghana_regional_2024_06_env.tif \
     --habitat data/ghana/ghana_regional_2024_06_habitat_patches.gpkg \
     --output data/ghana/ghana_regional_2024_06_state.tif
 
 # 100 rollouts (M-perf target)
-./mal_abm_fast run --n-rollouts 100 \
+mal-core/src/mal_core/abm/bin/mal_abm_fast_darwin run --n-rollouts 100 \
     --aoi ghana --year 2024 --month 6 --seed 1 --days 30 \
     --env data/ghana/ghana_regional_2024_06_env.tif \
     --habitat data/ghana/ghana_regional_2024_06_habitat_patches.gpkg \
     --output /tmp/rollout/state.tif
 
 # Daily snapshots (time-series para U-Net)
-./mal_abm_fast run --snapshot-every 1 --n-rollouts 10 \
+mal-core/src/mal_core/abm/bin/mal_abm_fast_darwin run --snapshot-every 1 --n-rollouts 10 \
     --aoi ghana --year 2024 --month 6 --seed 1 --days 30 \
     --env data/ghana/ghana_regional_2024_06_env.tif \
     --habitat data/ghana/ghana_regional_2024_06_habitat_patches.gpkg \
@@ -780,7 +803,7 @@ PRNG xoshiro256** canonico. Dos runs con mismo `(seed, i, days, AOI, env, habita
 
 ```bash
 # C++ unit tests (GoogleTest)
-ctest --test-dir mal-core/build --output-on-failure
+ctest --test-dir mal-core/src/mal_core/abm/build --output-on-failure
 # 60 tests
 
 # Python parity test (F1.e)
@@ -792,10 +815,14 @@ cd mal-core && uv run pytest src/mal_core/abm/tests/test_abm_fast_parity.py -v
 
 ```bash
 brew install cmake ninja pkg-config gdal eigen cli11 nlohmann-json googletest
-cmake -S mal-core -B mal-core/build -G Ninja \
+# Via build.sh (recommended)
+bash mal-core/src/mal_core/abm/build.sh
+
+# Manual
+cmake -S mal-core/src/mal_core/abm -B mal-core/src/mal_core/abm/build -G Ninja \
       -DCMAKE_BUILD_TYPE=Release
-cmake --build mal-core/build -j
-ctest --test-dir mal-core/build --output-on-failure
+cmake --build mal-core/src/mal_core/abm/build -j
+ctest --test-dir mal-core/src/mal_core/abm/build --output-on-failure
 ```
 
 ---
@@ -896,6 +923,12 @@ graph TB
         IA["improvement-agent<br/>ask: auto-aplica"]
     end
 
+    subgraph DEEPAGENTS["DeepAgent orchestrator (M10)"]
+        DA["agents/deepagents/<br/>LangChain deepagents"]
+        DA_CYCLES["3 cycles:<br/>calibration, feature, research"]
+        DA_TOOLS["5 tools:<br/>gitagent, pipeline,<br/>kg, improve, opencode"]
+    end
+
     subgraph MEMORIA["Memory module"]
         MEM["agents/memory/<br/>Neo4j + Graphiti MCP<br/>8-label schema"]
         TOOLS["8 herramientas custom<br/>memory_node, memory_rel,<br/>memory_query, etc."]
@@ -914,6 +947,11 @@ graph TB
     SUP -->|"delega"| MC
     SUP -->|"delega"| IA
     SUP -->|"delega"| RH
+    SUP -->|"delega"| DA
+
+    DA --> DA_CYCLES
+    DA --> DA_TOOLS
+    DA_TOOLS -->|"pipeline scoring"| ABM_PIPE["mal-core pipeline"]
 
     MC -->|"escribe"| MEM
     MEM <-->|"lee/escribe"| TOOLS
@@ -922,6 +960,7 @@ graph TB
 
     style SUP fill:#FFB6C1
     style LOOPS fill:#E6F3FF
+    style DEEPAGENTS fill:#DDA0DD
     style MEMORIA fill:#E6FFE6
     style HARNESS fill:#FFF5E6
 ```
@@ -936,6 +975,31 @@ graph TB
 | `security-auditor` | Auditoria OWASP (solo lectura) | ask |
 | `memory-curator` | Unico writer al knowledge graph | ask |
 | `improvement-agent` | Revisa + aplica mejoras | ask |
+| `deepagent-orchestrator` | LangChain deepagents: calibracion ABM via ciclos | primary |
+
+### DeepAgent orchestrator (M10)
+
+**Ubicacion**: `agents/deepagents/`
+**Dependencias**: deepagents, langgraph, langchain-core, typer, rich
+**CLI**: `deepagents` (entry point) o `uv run python -m agents.deepagents`
+
+Orquestador LangChain DeepAgents para calibracion automatica del ABM. Usa gitagent para aislamiento en worktrees, OpenCode/Exa para busqueda web, y el pipeline de mal-core para scoring.
+
+| Ciclo | Descripcion |
+|---|---|
+| `calibration` | Recall KG → baseline score → spawn worker improvement → re-score |
+| `feature` | Recall KG → design feature → spawn worker → test |
+| `research` | Recall KG → web search → write findings → hypothesize |
+
+| Tool | Funcion |
+|---|---|
+| `gitagent_tool.py` | Spawn, proposals, integrate, finalize worktrees |
+| `pipeline_tool.py` | Run calibration, compare scorecards |
+| `kg_tool.py` | Memory recall from knowledge graph |
+| `improve_tool.py` | Auto-apply improvements to prompts/tools |
+| `opencode_tool.py` | Web search via OpenCode/Exa |
+
+**Session logger**: registra cada paso del ciclo en JSON para auditoria.
 
 ### Memory module
 
@@ -1040,7 +1104,7 @@ Adult → [*]: muerte natural (Lardeux basal=0.93, sigma=15)
 
 ```mermaid
 graph LR
-    ABM["mal-abm-fast (C++)<br/>o ABM Python"]
+    ABM["mal-core/abm (C++)<br/>o ABM Python"]
 
     subgraph STATE["State COG (por tick ABM)"]
         S_TIF["{aoi}_{scale}_{YYYY}_{MM}_seed{NNNN}.tif<br/>2 bandas:<br/>B1: adult_occupancy (post-dispersal/K_MAX)<br/>B2: host_seeking_pressure (female biting/K_MAX)"]
@@ -1094,6 +1158,7 @@ graph LR
 | M6 | Operational | Pendiente |
 | M7 | Biology v2 | **En progreso** (M7.2: gonotrophic cycle, host-seeking, mobility, host data) |
 | M9 | Unified SDSS pipeline + ABM→core consolidation | Completado |
+| M10 | DeepAgent orchestrator (LangChain deepagents) | **En progreso** (skeleton + calibration cycle + session logger) |
 
 ---
 
@@ -1128,17 +1193,20 @@ graph LR
 
 **ABM Python (v0.5.0)**: 71/71 tests, ~9M agentes Polars, JRC GSW 30m, dynamic patches, adult density by cell post-dispersal, ciclo biologico completo.
 
-**ABM C++ (mal-abm-fast M7.2)**: 60+ ctest + 5/5 parity + 14 calibration scorers (D1-D14), C++20 black-box equivalente, ciclo completo egg→larva→pupa→adult (cohort-based), ciclo gonotrofico 11 estados, host-seeking kernel (CO2 plume 35m), host data 9 variables, mobility OD matrices (CSR, 4 fases), Mortalidad Lardeux recalibrada (basal=0.93, sigma=15), nacimiento Mordecai EFD termico, PRNG xoshiro256** determinista, contract v2.0.
+**ABM C++ (mal-core/src/mal_core/abm/ M7.2)**: 60+ ctest + 5/5 parity + 14 calibration scorers (D1-D14), C++20 black-box equivalente, ciclo completo egg→larva→pupa→adult (cohort-based), ciclo gonotrofico 11 estados, host-seeking kernel (CO2 plume 35m), host data 9 variables, mobility OD matrices (CSR, 4 fases), Mortalidad Lardeux recalibrada (basal=0.93, sigma=15), nacimiento Mordecai EFD termico, PRNG xoshiro256** determinista, contract v2.0. Consolidado en mal-core (M9).
 
 **Host data pipeline (M7)**: WorldPop (poblacion), GLW4 (ganado), GHSL (urbano/rural), Overture Maps (building_fraction), wildlife proxy. Todo agrega a host_static.nc (9 variables). Mobility matrices via gravity model (build_mobility.py).
 
-**Pipeline SDSS (mal-core)**: U-Net 32-64-128-256, CLI `malariasim`, FastAPI REST API, model registry, scenario config.
+**Pipeline SDSS (mal-core v0.2.0)**: U-Net 32-64-128-256, CLI `malariasim` (9 commands), FastAPI REST API, model registry, scenario config, AOI-driven data resolution. Subpackages: `pipeline/`, `prediction/`, `training/`, `scoring/`, `ingest/`, `abm/`. 26 Python tests.
+
+**DeepAgent orchestrator (M10, skeleton)**: LangChain deepagents-based orchestrator para calibracion ABM. 3 cycles (calibration, feature, research), 5 tools (gitagent, pipeline, kg, improve, opencode), session logger, `--goal` flag. Registered en opencode.json como `deepagent-orchestrator`.
 
 ### Siguientes pasos
 
 1. **M7 completar**: Infeccion Plasmodium (parasite_eip_progress preparado), ITN/IRS (BiteLedger preparado), validacion 100+ rollouts
-2. **M3**: Generar 100+ rollouts con mal-abm-fast → dataset → entrenar surrogate
+2. **M3**: Generar 100+ rollouts con mal-core ABM → dataset → entrenar surrogate
 3. **M4**: Integrar prediccion → risk maps mensuales
 4. **M5**: Interfaz SDSS para programas de eliminacion
 5. **M6**: Deployment en Ghana con datos en vivo
 6. **M8**: An. stephensi, resistencia kdr, Sharpe-DeMichele EIP
+7. **M10 completar**: DeepAgent cycles operacionales, integration con pipeline completo
