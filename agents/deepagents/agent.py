@@ -279,7 +279,6 @@ def create_abm_worker_subagent(worktree_path: Path) -> dict:
     """
     try:
         from deepagents.backends import FilesystemBackend
-        from deepagents.permissions import FilesystemPermission
     except ImportError:
         raise ImportError(
             "The 'deepagents' package is required but not installed. "

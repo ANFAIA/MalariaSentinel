@@ -9,7 +9,7 @@ import pytest
 class TestAbmRun:
     @patch("agents.deepagents.tools.abm_tools.subprocess.run")
     def test_run_success(self, mock_run):
-        mock_run.return_value = MagicMock(returncode=0, stdout="Done", stderr="", returncode=0)
+        mock_run.return_value = MagicMock(returncode=0, stdout="Done", stderr="")
         with patch("agents.deepagents.tools.abm_tools.Path") as mock_path:
             mock_path.return_value.resolve.return_value.parent.parent.parent.parent = MagicMock()
             # Just test that it doesn't crash
