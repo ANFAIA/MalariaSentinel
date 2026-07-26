@@ -160,8 +160,44 @@ def gitagent_revise(proposal_id: str, feature: str, feedback: str) -> str:
 
 # ── Integration and finalization ────────────────────────────────────
 
-def gitagent_integrate(feature: str) -> str:
-    """Apply all accepted proposals onto the integration worktree. Uses --json."""
+def gitagent_integrate(feature: str, *, verify: bool = True) -> str:
+    """Apply all accepted proposals onto the integration worktree. Uses --json.
+
+    Args:
+        feature: The feature name.
+        verify: If True (default), show proposals and require user confirmation
+            before applying. Pass False to skip.
+    """
+    if verify:
+        # Show what will be integrated
+        proposals_result = _run_gitagent(["proposals", "--feature", feature, "--json"])
+        summary = proposals_result.get("stdout", "No proposals found.")
+        try:
+            proposals = json.loads(summary)
+            accepted = [p for p in proposals if p.get("review", {}).get("state") == "accepted"]
+        except (json.JSONDecodeError, TypeError):
+            accepted = []
+            summary = proposals_result.get("stdout", "")
+
+        print("\n" + "=" * 60)
+        print("INTEGRATE REQUIRES APPROVAL")
+        print("=" * 60)
+        print(f"Feature:       {feature}")
+        print(f"Accepted:      {len(accepted)}")
+        for p in accepted:
+            title = p.get("manifest", {}).get("title", "no title")
+            pid = p.get("manifest", {}).get("id", "?")
+            print(f"  - {pid}: {title}")
+        print("=" * 60)
+
+        answer = input("Proceed with integrate? [y/N] ").strip().lower()
+        if answer not in ("y", "yes"):
+            return json.dumps({
+                "status": "aborted",
+                "reason": "User rejected integrate",
+                "feature": feature,
+            })
+
     result = _run_gitagent(["integrate", "--feature", feature, "--json"])
     if result["returncode"] != 0:
         return json.dumps({"error": result["stderr"], "status": "failed"})

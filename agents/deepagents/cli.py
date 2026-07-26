@@ -40,6 +40,7 @@ def calibration(
 
     import agents.deepagents.agent as agent_mod
     agent_mod.VERIFY_FINALIZE = not no_verify
+    agent_mod.VERIFY_INTEGRATE = not no_verify
 
     from agents.deepagents.cycles.calibration_cycle import run_calibration_cycle
 
@@ -70,6 +71,7 @@ def feature(
 
     import agents.deepagents.agent as agent_mod
     agent_mod.VERIFY_FINALIZE = not no_verify
+    agent_mod.VERIFY_INTEGRATE = not no_verify
 
     from agents.deepagents.cycles.feature_cycle import run_feature_cycle
 
@@ -101,6 +103,7 @@ def research(
 
     import agents.deepagents.agent as agent_mod
     agent_mod.VERIFY_FINALIZE = not no_verify
+    agent_mod.VERIFY_INTEGRATE = not no_verify
 
     from agents.deepagents.cycles.research_cycle import run_research_cycle
 

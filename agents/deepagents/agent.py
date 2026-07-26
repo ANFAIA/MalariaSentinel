@@ -33,6 +33,7 @@ from agents.deepagents.logger import SessionLogger
 
 # Module-level flags set by CLI before creating the agent
 VERIFY_FINALIZE: bool = True
+VERIFY_INTEGRATE: bool = True
 SESSION_LOGGER: SessionLogger | None = None
 
 AGENT_DIR = Path(__file__).resolve().parent
@@ -151,6 +152,11 @@ def _gitagent_finalize_wrapped(feature: str, message: str) -> str:
     return gitagent_finalize(feature, message, verify=VERIFY_FINALIZE)
 
 
+def _gitagent_integrate_wrapped(feature: str) -> str:
+    """Wrapper that injects the verify flag from module-level setting."""
+    return gitagent_integrate(feature, verify=VERIFY_INTEGRATE)
+
+
 TOOLS = [
     _wrap_with_logging(opencode_search),
     _wrap_with_logging(gitagent_init),
@@ -163,7 +169,7 @@ TOOLS = [
     _wrap_with_logging(gitagent_accept),
     _wrap_with_logging(gitagent_reject),
     _wrap_with_logging(gitagent_revise),
-    _wrap_with_logging(gitagent_integrate),
+    _wrap_with_logging(_gitagent_integrate_wrapped),
     _wrap_with_logging(_gitagent_finalize_wrapped),
     _wrap_with_logging(pipeline_run_calibration),
     _wrap_with_logging(pipeline_compare_scorecards),
