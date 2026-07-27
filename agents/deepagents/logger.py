@@ -102,6 +102,23 @@ class SessionLogger:
             "summary": summary,
         })
 
+    def log_conversation(self, messages: list[dict]) -> None:
+        """Log the full conversation (LLM reasoning + tool results).
+
+        Args:
+            messages: List of {"type": "AIMessage"|"ToolMessage"|"HumanMessage", "content": "..."}
+        """
+        self._append({
+            "event": "conversation",
+            "ts": self._now_iso(),
+            "step": self._step,
+            "message_count": len(messages),
+            "messages": [
+                {"type": m["type"], "content": _truncate(m["content"], max_chars=2000)}
+                for m in messages
+            ],
+        })
+
     def close(self) -> None:
         """Write session end marker."""
         elapsed = time.monotonic() - self._session_start
