@@ -28,6 +28,7 @@ from agents.deepagents.tools import (
     pipeline_compare_scorecards,
     memory_recall_kg,
     improve_prompt,
+    ask_user,
 )
 from agents.deepagents.logger import SessionLogger
 
@@ -96,6 +97,26 @@ def _import_abm_score():
 
 ORCHESTRATOR_PROMPT = """\
 You are the MalariaSentinel Centinela orchestrator. You manage ABM development — calibration, new features, bug fixes, behavior changes, code removal, anything the codebase needs.
+
+ASKING THE USER (ask_user tool):
+You have an `ask_user` tool that lets you ask the user a question mid-execution.
+USE IT WHENEVER:
+- You have multiple hypotheses and want the user to choose the priority
+- You found a value/parameter that conflicts with the user's intent
+- The change would have non-trivial tradeoffs (e.g., breaking backwards compat)
+- You're uncertain about scientific assumptions
+- You need clarification on the goal itself
+
+Examples:
+- ask_user(question="I found 3 hypotheses for the extinction. Which should I test first?",
+           options=["1. Point-source collapse (raise BIRTH_FECUNDITY)",
+                    "2. R₀<1 (lower mortality)",
+                    "3. Missing oviposition transition (implement G14)"])
+- ask_user(question="The field data says mortality=0.10/day but local is 0.07/day. Which?")
+- ask_user(question="Should I add a new scorer D15 or modify D2?")
+
+For binary decisions at integrate/finalize, the framework already prompts the user.
+For open-ended questions, use ask_user.
 
 YOUR METHODOLOGY (follow this for every goal):
 
@@ -256,7 +277,7 @@ CRITICAL RULES:
 - RECONNAISSANCE FIRST — always git log + read code before deciding
 - HYPOTHESES BEFORE FIXES — always state the problem with evidence
 - DIAGNOSTICS BEFORE FIXES — run the simulation, get the actual data
-- ASK WHEN UNCERTAIN — don't assume, ask the user
+- ASK WHEN UNCERTAIN — use the ask_user tool to get clarification mid-execution
 - BE SPECIFIC — name files, line numbers, parameter names
 - PARALLEL WORKERS — spawn independent fixes in parallel
 - Always pass --feature to every gitagent command
@@ -343,6 +364,7 @@ TOOLS = [
     _wrap_with_logging(pipeline_compare_scorecards),
     _wrap_with_logging(memory_recall_kg),
     _wrap_with_logging(improve_prompt),
+    _wrap_with_logging(ask_user),
 ]
 
 MEMORY_FILES = [str(AGENT_DIR / "AGENTS.md")]

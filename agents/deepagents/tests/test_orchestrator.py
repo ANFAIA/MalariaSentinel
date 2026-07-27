@@ -31,6 +31,7 @@ class TestModuleFlags:
         assert "DIAGNOSTICS" in ORCHESTRATOR_PROMPT
         assert "ASK WHEN UNCERTAIN" in ORCHESTRATOR_PROMPT
         assert "PARALLEL WORKERS" in ORCHESTRATOR_PROMPT
+        assert "ask_user" in ORCHESTRATOR_PROMPT
 
 
 class TestWorkerDefinitions:

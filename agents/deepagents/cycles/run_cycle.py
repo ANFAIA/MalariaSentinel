@@ -50,6 +50,28 @@ Run an ABM improvement cycle (max {max_iterations} iterations).
 {mode_focus}
 
 ═══════════════════════════════════════════════════════════════════════════════
+ASKING THE USER (ask_user tool)
+═══════════════════════════════════════════════════════════════════════════════
+
+You have an `ask_user` tool for open-ended questions. USE IT WHENEVER:
+- You have multiple hypotheses and want the user to choose priority
+- You found a value that conflicts with the user's intent
+- The change would have non-trivial tradeoffs
+- You're uncertain about scientific assumptions
+- You need clarification on the goal itself
+
+For binary decisions (accept/reject at integrate/finalize), the framework handles it.
+For open-ended questions, call ask_user(question=..., options=[...]).
+
+Examples:
+- ask_user("3 hypotheses for extinction. Which first?",
+           options=["Point-source collapse (raise fecundity)",
+                    "R₀<1 (lower mortality)",
+                    "Missing oviposition transition"])
+- ask_user("Field data says mort=0.10/day, local is 0.07. Which?")
+- ask_user("Add new scorer D15 or modify D2?")
+
+═══════════════════════════════════════════════════════════════════════════════
 PHASE 1 — RECONNAISSANCE (mandatory, ~5-10 minutes)
 ═══════════════════════════════════════════════════════════════════════════════
 
