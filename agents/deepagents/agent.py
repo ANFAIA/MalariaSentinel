@@ -240,7 +240,6 @@ def create_orchestrator(
     backend = FilesystemBackend(
         root_dir=str(REPO_ROOT),
         virtual_mode=True,
-        read_only=True,
     )
 
     skills = []

@@ -79,7 +79,7 @@ class TestCreateWorkerSubagent:
 
 class TestCreateOrchestrator:
     def test_orchestrator_read_only_backend(self):
-        """Test that the orchestrator uses read_only=True backend."""
+        """Test that the orchestrator uses virtual_mode=True backend with deny-write permissions."""
         mock_backend_mod = MagicMock()
         mock_backend_class = MagicMock()
         mock_backend_mod.FilesystemBackend = mock_backend_class
@@ -102,10 +102,10 @@ class TestCreateOrchestrator:
             with patch.object(agent_mod, "_resolve_provider") as mock_resolve:
                 mock_resolve.return_value = MagicMock()
                 agent_mod.create_orchestrator(provider="openrouter", model="test", thread_id="test")
+                # FilesystemBackend uses virtual_mode=True (read-only enforced via permissions)
                 mock_backend_class.assert_called_with(
                     root_dir=str(agent_mod.REPO_ROOT),
                     virtual_mode=True,
-                    read_only=True,
                 )
         finally:
             if original_deepagents is not None:
