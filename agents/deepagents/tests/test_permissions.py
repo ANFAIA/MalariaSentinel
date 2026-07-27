@@ -3,17 +3,21 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 import pytest
 
 
 class TestWorkerPermissions:
-    def _create_worker_with_mock(self):
-        """Helper to create worker with mocked backends."""
-        mock_deepagents = MagicMock()
+    """Test that worker permissions are correctly configured via create_orchestrator."""
+
+    def _create_orchestrator_with_mock(self):
+        """Helper to create orchestrator with mocked deepagents."""
         mock_backend_mod = MagicMock()
         mock_backend_class = MagicMock()
         mock_backend_mod.FilesystemBackend = mock_backend_class
+
+        mock_deepagents = MagicMock()
+        mock_deepagents.create_deep_agent = MagicMock()
         mock_deepagents.backends = mock_backend_mod
         mock_deepagents.FilesystemPermission = MagicMock
 
@@ -25,28 +29,39 @@ class TestWorkerPermissions:
         sys.modules["deepagents.backends"] = mock_backend_mod
 
         try:
-            from agents.deepagents.agent import create_abm_worker_subagent
-            wt = Path("/tmp/test-worktree")
-            return create_abm_worker_subagent(wt)
+            import importlib
+            import agents.deepagents.agent as agent_mod
+            importlib.reload(agent_mod)
+
+            with patch.object(agent_mod, "_resolve_provider") as mock_resolve:
+                mock_resolve.return_value = MagicMock()
+                agent_mod.create_orchestrator(provider="openrouter", model="test", thread_id="test")
+
+            # Get the worker definitions that were passed to create_deep_agent
+            call_kwargs = mock_deepagents.create_deep_agent.call_args
+            worker_defs = call_kwargs.kwargs.get("subagents", call_kwargs.args[2] if len(call_kwargs.args) > 2 else [])
+            return worker_defs[0] if worker_defs else None
         finally:
             for key, val in originals.items():
                 if val is not None:
                     sys.modules[key] = val
                 else:
                     sys.modules.pop(key, None)
+            importlib.reload(agent_mod)
 
     def test_deny_secrets(self):
-        result = self._create_worker_with_mock()
-        perms = result["permissions"]
-        # All permissions are FilesystemPermission objects
+        result = self._create_orchestrator_with_mock()
+        assert result is not None, "No worker definitions found"
+        perms = result.get("permissions", [])
         deny_perms = [p for p in perms if hasattr(p, 'mode') and p.mode == "deny"]
         all_deny_paths = [path for p in deny_perms for path in p.paths]
         assert any("secret" in p for p in all_deny_paths)
         assert any(".env" in p for p in all_deny_paths)
 
     def test_deny_data_write(self):
-        result = self._create_worker_with_mock()
-        perms = result["permissions"]
+        result = self._create_orchestrator_with_mock()
+        assert result is not None
+        perms = result.get("permissions", [])
         deny_write = [
             p for p in perms
             if hasattr(p, 'mode') and p.mode == "deny" and "write" in p.operations
@@ -55,8 +70,9 @@ class TestWorkerPermissions:
         assert any("/data/**" in p for p in all_deny_paths)
 
     def test_deny_gitagent_write(self):
-        result = self._create_worker_with_mock()
-        perms = result["permissions"]
+        result = self._create_orchestrator_with_mock()
+        assert result is not None
+        perms = result.get("permissions", [])
         deny_write = [
             p for p in perms
             if hasattr(p, 'mode') and p.mode == "deny" and "write" in p.operations
