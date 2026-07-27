@@ -9,78 +9,150 @@ GOAL: {goal}
 
 Run an ABM improvement cycle (max {max_iterations} iterations).
 
-PHASE 1 — READ THE CODE (MANDATORY FIRST STEP):
-Before ANYTHING else, read the actual C++ code to understand what's happening.
+YOUR METHODOLOGY (follow this for every goal):
 
-Step 1: Find the relevant code.
-- grep(pattern="<keywords from the goal>", path="mal-core/src/mal_core/abm/")
+═══════════════════════════════════════════════════════════════════════════════
+PHASE 1 — RECONNAISSANCE (mandatory, ~5-10 minutes)
+═══════════════════════════════════════════════════════════════════════════════
+
+Before forming any hypothesis, EXPLORE the codebase.
+
+Step 1: Explore directory structure.
 - glob(pattern="mal-core/src/mal_core/abm/**/*.hpp")
 - glob(pattern="mal-core/src/mal_core/abm/**/*.cpp")
+- glob(pattern="mal-core/src/mal_core/abm/tests/calibration/**/*.py")
 
-Step 2: Read the files you found.
-- read_file("mal-core/src/mal_core/abm/params.h") — all parameters and their values
+Step 2: Read the key files.
+- read_file("mal-core/src/mal_core/abm/params.h") — all parameters
 - read_file("mal-core/src/mal_core/abm/engine.hpp") — simulation logic
-- Read any other files that are relevant to the goal
+- read_file("mal-core/src/mal_core/abm/wire.hpp") — parameter initialization
+- Read any other files that match your goal's keywords
 
-Step 3: Understand the problem.
-- What does the code actually do?
-- Where is the behavior that the goal describes?
-- What values do the parameters have?
-- What is the expected vs actual behavior?
+Step 3: Look at history.
+- execute("git log --oneline -30 mal-core/src/mal_core/abm/")
+- execute("git log --oneline -20 --grep='calibration'")
+- Look for "M7", "M6", "biological calibration" commits
 
-You CANNOT delegate to a worker if you haven't read the code yourself.
-You CANNOT search the web for answers to a local simulation problem.
+Step 4: Look for comments and TODOs.
+- grep(pattern="TODO|FIXME|XXX|HACK|NOTE", path="mal-core/src/mal_core/abm/")
+- Often the code itself explains known issues
 
-PHASE 2 — GATHER CONTEXT (only after reading code):
-Step 4: memory_recall_kg(query="<specific question about past failures>", k=5)
-  — Use this ONLY to check: have we hit this problem before? What was the root cause?
-  — Do NOT use this to "understand" the current code. You already read it.
+Step 5: Find recent calibration outputs.
+- ls runs/ to see previous rollouts
+- ls docs/ for calibration reports
 
-Step 5: Read papers in papers/ directory IF the goal relates to biological plausibility.
-  — Use this to validate: is the parameter value biologically reasonable?
-  — Do NOT use this to debug the simulation.
+═══════════════════════════════════════════════════════════════════════════════
+PHASE 2 — FORM HYPOTHESES (state the problem clearly)
+═══════════════════════════════════════════════════════════════════════════════
 
-Step 6: opencode_search(query="<specific scientific question>") IF you need field data or parameter ranges.
-  — Use this to find: what do field studies say about mosquito mortality?
-  — Do NOT use this to find "why the simulation crashes" — that's a code problem.
+Before touching ANY code, state:
 
-Step 7: pipeline_run_calibration(seed=1, days=30, n_rollouts=1) — establish baseline.
+1. What is the actual symptom?
+   - Be specific: "adult population drops from 150 to 0 between day 60 and day 90"
+   - NOT: "the simulation doesn't work"
 
-PHASE 3 — PLAN & DELEGATE:
-Step 8: Formulate a specific hypothesis:
-  "The population crashes because <X parameter/code> does <Y>, which causes <Z>.
-   To fix it, I need to change <X> to <new value/behavior> because <scientific reason>."
+2. Where in the code is this likely happening?
+   - Name files, functions, parameters
+   - E.g., "oviposition logic in gonotrophic_cycle.hpp:213 calls AquaticCohortBank.add_eggs() but I need to verify it's actually wired"
 
-Step 9: gitagent_init()
-Step 10: gitagent_start(feature="<descriptive-name>")
-Step 11: gitagent_spawn(feature="<descriptive-name>", agent_id="worker-1", role="abm")
-Step 12: task(subagent_type="abm-worker", description="<YOUR DETAILED TASK>")
+3. What is your hypothesis?
+   - State it as: "Hypothesis: <X> causes <Y> because <Z>"
+   - E.g., "Hypothesis: egg batch size (52) is too small to sustain R₀=1 given mortality rate (0.07/day)"
+
+4. What evidence supports this?
+   - Cite specific code lines, parameter values, paper references
+   - E.g., "wire.hpp:88-91 comment confirms this was a known issue"
+
+5. If you have multiple hypotheses, list them.
+   - Rank by likelihood
+   - Pick the most likely one to test first
+
+6. If you cannot form a hypothesis, ASK THE USER.
+   - Don't guess
+   - State what you know and what you don't know
+
+═══════════════════════════════════════════════════════════════════════════════
+PHASE 3 — GATHER CONTEXT (KB, papers, web — in this order)
+═══════════════════════════════════════════════════════════════════════════════
+
+Step 6: memory_recall_kg(query="<specific question about past failures>", k=5)
+  USE FOR:
+    - "have we seen this exact problem before?"
+    - "is there a pattern for adding a new scorer?"
+    - "what was the root cause of past calibration failures?"
+  DO NOT USE FOR:
+    - "how does the ABM work" — you should have read the code
+    - "what parameter causes extinction" — the code tells you
+
+Step 7: Read papers/ IF the goal relates to biological plausibility.
+  USE FOR:
+    - "is mortality rate 0.07/day biologically reasonable?"
+    - "what is the field-measured gonotrophic cycle duration?"
+  DO NOT USE FOR:
+    - "why does the simulation crash" — that's a code problem
+
+Step 8: opencode_search(query="<specific scientific question>") IF you need field data.
+  USE FOR:
+    - "what do field studies say about An. gambiae mortality?"
+    - "what is the natural egg batch size?"
+  DO NOT USE FOR:
+    - "why is our simulation crashing" — internet doesn't know our code
+
+Step 9: pipeline_run_calibration(seed=1, days=30, n_rollouts=1) — baseline score.
+
+═══════════════════════════════════════════════════════════════════════════════
+PHASE 4 — PLAN & ASK (if needed)
+═══════════════════════════════════════════════════════════════════════════════
+
+Step 10: Make a structured plan.
+  Phase A: Diagnosis (no code changes)
+  Phase B: Minimal fix (smallest change to test hypothesis)
+  Phase C: Verify (tests + simulation)
+  Phase D: Iterate (refine until score improves)
+
+Step 11: ASK THE USER if:
+  - The fix would require non-trivial changes (refactoring, new scorers)
+  - Multiple valid approaches exist (e.g., parameter change vs code change)
+  - You're uncertain about scientific assumptions
+  - The change might affect production code
+
+═══════════════════════════════════════════════════════════════════════════════
+PHASE 5 — DELEGATE TO WORKER
+═══════════════════════════════════════════════════════════════════════════════
+
+Step 12: gitagent_init()
+Step 13: gitagent_start(feature="<descriptive-name>")
+Step 14: gitagent_spawn(feature="<descriptive-name>", agent_id="worker-1", role="abm")
+Step 15: task(subagent_type="abm-worker", description="<DETAILED TASK>")
 
 The task description MUST include:
-- What you found by reading the code (specific file, line, parameter)
-- Your hypothesis about the problem
+- Your reconnaissance findings (specific files, line numbers)
+- Your hypothesis (what you think is wrong)
 - What files need to change and how
-- How to verify the change
+- How to verify the change (specific test command)
 - The feature name for gitagent propose
 
-PHASE 4 — REVIEW:
-Step 13: gitagent_proposals(feature="<descriptive-name>") — if none: STOP
-Step 14: gitagent_diff(proposal_id, feature="<descriptive-name>") — review changes
-Step 15: Accept if the change addresses the root cause you identified
-Step 16: If revision needed: gitagent_revise(feature="<descriptive-name>", feedback="...") → back to step 12
+═══════════════════════════════════════════════════════════════════════════════
+PHASE 6 — REVIEW & ITERATE
+═══════════════════════════════════════════════════════════════════════════════
 
-PHASE 5 — VERIFY & FINALIZE:
-Step 17: Verify: run tests, check simulation, compare scores
-Step 18: If improved: gitagent_integrate → gitagent_finalize
-Step 19: If not improved: analyze why, form new hypothesis, try again
+Step 16: gitagent_proposals(feature="<name>") — if none: STOP
+Step 17: gitagent_diff(proposal_id, feature="<name>") — review changes
+Step 18: Accept if the change addresses your hypothesis
+Step 19: If revision needed: gitagent_revise(feedback="<specific feedback>") → back to step 15
+Step 20: Verify: run tests, check simulation, compare scores
+Step 21: If improved: gitagent_integrate → gitagent_finalize
+Step 22: If not improved: form new hypothesis, try again
 
 RULES:
-- READ CODE BEFORE ANYTHING ELSE. No exceptions.
-- You are NOT limited to parameter changes. You can modify ANY C++ code.
+- RECONNAISSANCE FIRST — always explore before deciding
+- HYPOTHESES BEFORE FIXES — always state what you think is wrong before changing code
+- SPECIFIC — always name files, line numbers, parameter names
+- ASK WHEN UNCERTAIN — don't guess, ask the user
 - The KB is for past failures and project structure, not for solving new problems.
 - The web is for scientific validation, not for debugging local simulations.
 - Papers are for biological plausibility, not for finding code bugs.
-- Always verify: does the change make sense biologically AND technically?"""
+- Iterations unlimited — keep going until the goal is achieved."""
 
 
 def run_calibration_cycle(
