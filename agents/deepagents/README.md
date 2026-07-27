@@ -26,9 +26,9 @@ uv run python -m agents.deepagents calibration -g "Improve spatial scorers" --dr
 ```
 ┌──────────────────────────────────────────────────────────┐
 │ ORCHESTRATOR (LLM)                                       │
-│ Backend: FilesystemBackend(read_only=True)               │
+│ Backend: FilesystemBackend(virtual_mode=True)             │
 │ Tools: 17 (gitagent, pipeline, kg, search, improve)      │
-│ Read-only access to full repo. Writes via gitagent only.  │
+│ Read-only via deny-write permissions.                     │
 └───────────┬──────────────────────────────────────────────┘
             │ gitagent spawn → worktree
             ▼
@@ -189,7 +189,7 @@ agents/deepagents/
 | `/.env`, `/**/.env`, `/**/*secret*`, `/**/*credential*` | read | deny |
 | `/**` | write, edit | deny |
 
-The orchestrator has **read-only access to the entire repo**. It writes only via `gitagent_*` tools (which operate through the gitagent CLI, not the filesystem).
+The orchestrator has **read-only access to the entire repo** via `deny-write` permissions. It writes only via `gitagent_*` tools (which operate through the gitagent CLI, not the filesystem).
 
 ### Worker permissions
 
