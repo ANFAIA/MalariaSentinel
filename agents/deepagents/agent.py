@@ -244,9 +244,8 @@ def create_orchestrator(
 
     skills = []
     if PROJECT_SKILLS.is_dir():
-        skills.append(str(PROJECT_SKILLS))
-    if GLOBAL_SKILLS.is_dir():
-        skills.append(str(GLOBAL_SKILLS))
+        skills.append("agents/skills/")
+    # GLOBAL_SKILLS (~/.agents/skills/) is outside root_dir, skip it
 
     return create_deep_agent(
         model=llm,
