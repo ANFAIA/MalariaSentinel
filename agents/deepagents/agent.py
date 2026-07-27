@@ -79,8 +79,8 @@ WORKER_DEFINITIONS = [
             "Always run: cd mal-core/src/mal_core/abm/tests/calibration && uv run pytest -m fast -v"
         ),
         "skills": [
-            "agents/skills/abm-engine/SKILL.md",
-            "agents/skills/calibration-framework/SKILL.md",
+            "agents/skills/abm-engine/",
+            "agents/skills/calibration-framework/",
         ],
     },
     {
@@ -96,7 +96,7 @@ WORKER_DEFINITIONS = [
             "Always run: cd mal-core/src/mal_core/abm/tests/calibration && uv run pytest -m fast -v"
         ),
         "skills": [
-            "agents/skills/calibration-framework/SKILL.md",
+            "agents/skills/calibration-framework/",
         ],
     },
     {
@@ -111,7 +111,7 @@ WORKER_DEFINITIONS = [
             "Always run: uv run pytest in the relevant package after changes."
         ),
         "skills": [
-            "agents/skills/monorepo-dev/SKILL.md",
+            "agents/skills/monorepo-dev/",
         ],
     },
 ]
