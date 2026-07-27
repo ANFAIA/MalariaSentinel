@@ -1,6 +1,6 @@
 ---
 name: agent-onboarding
-description: Complete onboarding guide for new agents starting from scratch on MalariaSentinel. Covers the full path from GitHub clone to expert operation: project setup, memory module initialization, understanding the monorepo, running pipelines, using subagents, and contributing. Load this skill FIRST when you land in this project for the first time.
+description: "Complete onboarding guide for new agents starting from scratch on MalariaSentinel. Covers the full path from GitHub clone to expert operation: project setup, memory module initialization, understanding the monorepo, running pipelines, using subagents, and contributing. Load this skill FIRST when you land in this project for the first time."
 ---
 
 # Agent Onboarding
