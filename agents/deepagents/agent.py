@@ -227,7 +227,7 @@ def create_orchestrator(
         ImportError: If required packages are not installed.
     """
     try:
-        from deepagents import create_deep_agent
+        from deepagents import create_deep_agent, FilesystemPermission
         from deepagents.backends import FilesystemBackend
     except ImportError:
         raise ImportError(
@@ -257,9 +257,9 @@ def create_orchestrator(
         skills=skills or None,
         name="centinela-orchestrator",
         permissions=[
-            {"operations": ["read"], "paths": ["/**"], "mode": "allow"},
-            {"operations": ["read"], "paths": ["/.env", "/**/.env", "/**/*secret*", "/**/*credential*"], "mode": "deny"},
-            {"operations": ["write", "edit"], "paths": ["/**"], "mode": "deny"},
+            FilesystemPermission(operations=["read"], paths=["/.env", "/**/.env", "/**/*secret*", "/**/*credential*"], mode="deny"),
+            FilesystemPermission(operations=["write"], paths=["/**"], mode="deny"),
+            FilesystemPermission(operations=["read"], paths=["/**"], mode="allow"),
         ],
     )
 
@@ -277,6 +277,7 @@ def create_abm_worker_subagent(worktree_path: Path) -> dict:
         A dict compatible with deepagents subagent specification.
     """
     try:
+        from deepagents import FilesystemPermission
         from deepagents.backends import FilesystemBackend
     except ImportError:
         raise ImportError(
@@ -311,14 +312,14 @@ def create_abm_worker_subagent(worktree_path: Path) -> dict:
             _wrap_with_logging(_import_abm_score()),
         ],
         "permissions": [
-            # Worker can read and write within its worktree
-            {"operations": ["read", "write", "edit"], "paths": ["/**"], "mode": "allow"},
             # Deny reading secrets
-            {"operations": ["read"], "paths": ["/.env", "/**/.env", "/**/*secret*", "/**/*credential*"], "mode": "deny"},
+            FilesystemPermission(operations=["read"], paths=["/.env", "/**/.env", "/**/*secret*", "/**/*credential*"], mode="deny"),
             # Deny writing to data inputs (read-only)
-            {"operations": ["write", "edit"], "paths": ["/data/**"], "mode": "deny"},
+            FilesystemPermission(operations=["write"], paths=["/data/**"], mode="deny"),
             # Deny writing to gitagent metadata
-            {"operations": ["write", "edit"], "paths": ["/.gitagent/**", "/.git/**"], "mode": "deny"},
+            FilesystemPermission(operations=["write"], paths=["/.gitagent/**", "/.git/**"], mode="deny"),
+            # Worker can read and write within its worktree (allow-all fallback)
+            FilesystemPermission(operations=["read", "write"], paths=["/**"], mode="allow"),
         ],
     }
 

@@ -30,16 +30,34 @@ class TestModuleFlags:
 
 
 class TestCreateWorkerSubagent:
-    def test_worker_subagent_structure(self):
-        """Test that create_abm_worker_subagent returns the correct structure."""
-        # Mock the deepagents.backends module in sys.modules
+    def _setup_deepagents_mock(self):
+        """Inject mock deepagents modules into sys.modules."""
+        mock_deepagents = MagicMock()
         mock_backend_mod = MagicMock()
         mock_backend_class = MagicMock()
         mock_backend_mod.FilesystemBackend = mock_backend_class
+        mock_deepagents.backends = mock_backend_mod
+        mock_deepagents.FilesystemPermission = MagicMock
 
-        original_backends = sys.modules.get("deepagents.backends")
+        originals = {
+            "deepagents": sys.modules.get("deepagents"),
+            "deepagents.backends": sys.modules.get("deepagents.backends"),
+        }
+        sys.modules["deepagents"] = mock_deepagents
         sys.modules["deepagents.backends"] = mock_backend_mod
+        return originals, mock_backend_class
 
+    def _restore(self, originals):
+        """Restore original sys.modules entries."""
+        for key, val in originals.items():
+            if val is not None:
+                sys.modules[key] = val
+            else:
+                sys.modules.pop(key, None)
+
+    def test_worker_subagent_structure(self):
+        """Test that create_abm_worker_subagent returns the correct structure."""
+        originals, mock_backend_class = self._setup_deepagents_mock()
         try:
             from agents.deepagents.agent import create_abm_worker_subagent
             wt = Path("/tmp/test-worktree")
@@ -51,30 +69,18 @@ class TestCreateWorkerSubagent:
             assert "permissions" in result
             assert len(result["tools"]) == 3  # abm_run, abm_test, abm_score
         finally:
-            if original_backends is not None:
-                sys.modules["deepagents.backends"] = original_backends
-            else:
-                sys.modules.pop("deepagents.backends", None)
+            self._restore(originals)
 
     def test_worker_backend_virtual_mode(self):
         """Test that the worker backend uses virtual_mode=True."""
-        mock_backend_mod = MagicMock()
-        mock_backend_class = MagicMock()
-        mock_backend_mod.FilesystemBackend = mock_backend_class
-
-        original_backends = sys.modules.get("deepagents.backends")
-        sys.modules["deepagents.backends"] = mock_backend_mod
-
+        originals, mock_backend_class = self._setup_deepagents_mock()
         try:
             from agents.deepagents.agent import create_abm_worker_subagent
             wt = Path("/tmp/test-worktree")
             create_abm_worker_subagent(wt)
             mock_backend_class.assert_called_with(root_dir=str(wt), virtual_mode=True)
         finally:
-            if original_backends is not None:
-                sys.modules["deepagents.backends"] = original_backends
-            else:
-                sys.modules.pop("deepagents.backends", None)
+            self._restore(originals)
 
 
 class TestCreateOrchestrator:
@@ -87,6 +93,7 @@ class TestCreateOrchestrator:
         mock_deepagents = MagicMock()
         mock_deepagents.create_deep_agent = MagicMock()
         mock_deepagents.backends = mock_backend_mod
+        mock_deepagents.FilesystemPermission = MagicMock
 
         original_deepagents = sys.modules.get("deepagents")
         original_backends = sys.modules.get("deepagents.backends")
