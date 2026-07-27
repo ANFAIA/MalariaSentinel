@@ -9,149 +9,159 @@ GOAL: {goal}
 
 Run an ABM improvement cycle (max {max_iterations} iterations).
 
-YOUR METHODOLOGY (follow this for every goal):
-
 ═══════════════════════════════════════════════════════════════════════════════
 PHASE 1 — RECONNAISSANCE (mandatory, ~5-10 minutes)
 ═══════════════════════════════════════════════════════════════════════════════
 
 Before forming any hypothesis, EXPLORE the codebase.
 
-Step 1: Explore directory structure.
+Step 1: Check git history to know what's already been done.
+- execute("git log --oneline -30") — recent commits
+- execute("git log --oneline -20 --grep='calibration'") — calibration work
+- execute("git log --oneline -20 --grep='M7'") — milestone work
+- Look for "biological calibration", "scorer", "D15" — what's already optimized
+
+Step 2: Explore directory structure.
 - glob(pattern="mal-core/src/mal_core/abm/**/*.hpp")
 - glob(pattern="mal-core/src/mal_core/abm/**/*.cpp")
 - glob(pattern="mal-core/src/mal_core/abm/tests/calibration/**/*.py")
 
-Step 2: Read the key files.
+Step 3: Read the key files.
 - read_file("mal-core/src/mal_core/abm/params.h") — all parameters
 - read_file("mal-core/src/mal_core/abm/engine.hpp") — simulation logic
 - read_file("mal-core/src/mal_core/abm/wire.hpp") — parameter initialization
-- Read any other files that match your goal's keywords
+- Read other files that match your goal's keywords
 
-Step 3: Look at history.
-- execute("git log --oneline -30 mal-core/src/mal_core/abm/")
-- execute("git log --oneline -20 --grep='calibration'")
-- Look for "M7", "M6", "biological calibration" commits
-
-Step 4: Look for comments and TODOs.
+Step 4: Look for comments and TODOs in the code.
 - grep(pattern="TODO|FIXME|XXX|HACK|NOTE", path="mal-core/src/mal_core/abm/")
-- Often the code itself explains known issues
+- Often the code itself documents known issues
 
-Step 5: Find recent calibration outputs.
-- ls runs/ to see previous rollouts
-- ls docs/ for calibration reports
+Step 5: Check for version mismatches (binary vs source).
+- execute("ls -la mal-core/src/mal_core/abm/build/src/mal_abm_fast")
+- execute("git log -1 --format='%ai %s' mal-core/src/mal_core/abm/src/main.cpp")
+- If binary is older than source → rebuild before any diagnostic run
+
+Step 6: Find recent calibration outputs.
+- ls runs/, ls docs/, ls mal-core/src/mal_core/abm/tests/calibration/runs/
 
 ═══════════════════════════════════════════════════════════════════════════════
-PHASE 2 — FORM HYPOTHESES (state the problem clearly)
+PHASE 2 — RUN DIAGNOSTICS (get the actual data)
+═══════════════════════════════════════════════════════════════════════════════
+
+Step 7: Get the actual symptom data BEFORE forming hypotheses.
+- pipeline_run_calibration(seed=1, days=365, include_trajectory=True) — full year + trajectory
+- Look at the trajectory: day-by-day adults, aquatic, eggs
+- Identify: when does the decline start? Is it exponential collapse or sudden?
+- Compare 3 seeds to distinguish structural vs stochastic issues
+
+Step 8: Check what the scorers validate.
+- read_file("mal-core/src/mal_core/abm/tests/calibration/thresholds.yaml")
+- read_file("mal-core/src/mal_core/abm/tests/calibration/scorers/composite.py")
+- Are there gaps? (e.g., no 1-year scorer → extinction goes undetected)
+
+═══════════════════════════════════════════════════════════════════════════════
+PHASE 3 — FORM HYPOTHESES (state the problem clearly)
 ═══════════════════════════════════════════════════════════════════════════════
 
 Before touching ANY code, state:
 
-1. What is the actual symptom?
-   - Be specific: "adult population drops from 150 to 0 between day 60 and day 90"
+1. What is the actual symptom? (Be specific with numbers)
+   - "Adult population drops from 150 to 0 between day 60 and day 90"
    - NOT: "the simulation doesn't work"
 
-2. Where in the code is this likely happening?
-   - Name files, functions, parameters
-   - E.g., "oviposition logic in gonotrophic_cycle.hpp:213 calls AquaticCohortBank.add_eggs() but I need to verify it's actually wired"
+2. Where in the code is this likely happening? (Name files, functions, parameters)
+   - "oviposition logic in mosquito_submodel.cpp:385-458 calls cohort_bank_.add_eggs() but only for HOST_SEEKING state, not OVIPOSITION_SEEKING"
 
 3. What is your hypothesis?
-   - State it as: "Hypothesis: <X> causes <Y> because <Z>"
-   - E.g., "Hypothesis: egg batch size (52) is too small to sustain R₀=1 given mortality rate (0.07/day)"
+   - "Hypothesis: female mosquitoes never reach OVIPOSITING state because the OVIPOSITION_SEEKING→OVIPOSITING transition is delegated to caller but not implemented"
 
 4. What evidence supports this?
-   - Cite specific code lines, parameter values, paper references
-   - E.g., "wire.hpp:88-91 comment confirms this was a known issue"
+   - Cite specific code lines, parameters, comments, paper references
 
-5. If you have multiple hypotheses, list them.
-   - Rank by likelihood
+5. If you have multiple hypotheses, list and rank them.
    - Pick the most likely one to test first
 
 6. If you cannot form a hypothesis, ASK THE USER.
-   - Don't guess
    - State what you know and what you don't know
 
 ═══════════════════════════════════════════════════════════════════════════════
-PHASE 3 — GATHER CONTEXT (KB, papers, web — in this order)
+PHASE 4 — GATHER CONTEXT (KB, papers, web — in this order)
 ═══════════════════════════════════════════════════════════════════════════════
 
-Step 6: memory_recall_kg(query="<specific question about past failures>", k=5)
-  USE FOR:
-    - "have we seen this exact problem before?"
-    - "is there a pattern for adding a new scorer?"
-    - "what was the root cause of past calibration failures?"
-  DO NOT USE FOR:
-    - "how does the ABM work" — you should have read the code
-    - "what parameter causes extinction" — the code tells you
+Step 9: memory_recall_kg(query="<specific question about past failures>", k=5)
+  USE FOR: "have we seen this symptom before?", "pattern for adding scorers", "pitfall with X"
+  DO NOT USE FOR: "how does the ABM work", "what parameter causes extinction"
 
-Step 7: Read papers/ IF the goal relates to biological plausibility.
-  USE FOR:
-    - "is mortality rate 0.07/day biologically reasonable?"
-    - "what is the field-measured gonotrophic cycle duration?"
-  DO NOT USE FOR:
-    - "why does the simulation crash" — that's a code problem
+Step 10: Read papers/ IF the goal relates to biological plausibility.
+  USE FOR: validating parameter values
+  DO NOT USE FOR: code debugging
 
-Step 8: opencode_search(query="<specific scientific question>") IF you need field data.
-  USE FOR:
-    - "what do field studies say about An. gambiae mortality?"
-    - "what is the natural egg batch size?"
-  DO NOT USE FOR:
-    - "why is our simulation crashing" — internet doesn't know our code
-
-Step 9: pipeline_run_calibration(seed=1, days=30, n_rollouts=1) — baseline score.
+Step 11: opencode_search(query="<scientific question>") IF you need field data.
+  USE FOR: field mortality rates, dispersal distances, cycle durations
+  DO NOT USE FOR: "why our simulation crashes"
 
 ═══════════════════════════════════════════════════════════════════════════════
-PHASE 4 — PLAN & ASK (if needed)
+PHASE 5 — PRESENT DIAGNOSIS & ASK
 ═══════════════════════════════════════════════════════════════════════════════
 
-Step 10: Make a structured plan.
-  Phase A: Diagnosis (no code changes)
-  Phase B: Minimal fix (smallest change to test hypothesis)
-  Phase C: Verify (tests + simulation)
-  Phase D: Iterate (refine until score improves)
+Step 12: Present a structured diagnosis:
+  - Symptom (with data from trajectory)
+  - Root cause (with file:line citations)
+  - Hypothesis ranking
+  - Proposed fix(es) with rationale
 
-Step 11: ASK THE USER if:
-  - The fix would require non-trivial changes (refactoring, new scorers)
-  - Multiple valid approaches exist (e.g., parameter change vs code change)
-  - You're uncertain about scientific assumptions
-  - The change might affect production code
-
-═══════════════════════════════════════════════════════════════════════════════
-PHASE 5 — DELEGATE TO WORKER
-═══════════════════════════════════════════════════════════════════════════════
-
-Step 12: gitagent_init()
-Step 13: gitagent_start(feature="<descriptive-name>")
-Step 14: gitagent_spawn(feature="<descriptive-name>", agent_id="worker-1", role="abm")
-Step 15: task(subagent_type="abm-worker", description="<DETAILED TASK>")
-
-The task description MUST include:
-- Your reconnaissance findings (specific files, line numbers)
-- Your hypothesis (what you think is wrong)
-- What files need to change and how
-- How to verify the change (specific test command)
-- The feature name for gitagent propose
+Step 13: ASK THE USER to confirm or revise before iterating.
+  - "Shall I proceed with this fix?"
+  - "Is the hypothesis plausible?"
+  - "Which of these N approaches do you prefer?"
 
 ═══════════════════════════════════════════════════════════════════════════════
-PHASE 6 — REVIEW & ITERATE
+PHASE 6 — DELEGATE TO WORKERS (parallel when possible)
 ═══════════════════════════════════════════════════════════════════════════════
 
-Step 16: gitagent_proposals(feature="<name>") — if none: STOP
-Step 17: gitagent_diff(proposal_id, feature="<name>") — review changes
-Step 18: Accept if the change addresses your hypothesis
-Step 19: If revision needed: gitagent_revise(feedback="<specific feedback>") → back to step 15
-Step 20: Verify: run tests, check simulation, compare scores
-Step 21: If improved: gitagent_integrate → gitagent_finalize
-Step 22: If not improved: form new hypothesis, try again
+Step 14: For each independent piece of work, spawn a worker in PARALLEL.
+  - C++ fix → one worker
+  - New scorer → another worker (if needed)
+  - Both can run in parallel (independent files)
+
+  workflow:
+  - gitagent_init
+  - gitagent_start(feature="<descriptive-name>")
+  - gitagent_spawn(feature="<name>", agent_id="a_fix", role="abm")      # C++ fix
+  - gitagent_spawn(feature="<name>", agent_id="a_scorer", role="scorer") # scorer (if needed)
+  - task(subagent_type="abm-worker", description="<detailed task>") for each
+
+  The task description MUST include:
+  - Reconnaissance findings (specific files, line numbers)
+  - Hypothesis (what you think is wrong)
+  - What files to change and how
+  - How to verify (specific test command)
+  - Feature name for gitagent propose
+
+Step 15: Wait for proposals, review with gitagent_diff, accept/reject/revise.
+
+Step 16: gitagent_integrate(feature="<name>") → gitagent_finalize(feature="<name>", message="...")
+
+═══════════════════════════════════════════════════════════════════════════════
+PHASE 7 — VALIDATE END-TO-END
+═══════════════════════════════════════════════════════════════════════════════
+
+Step 17: Re-run the simulation: pipeline_run_calibration(seed=1, days=365, include_trajectory=True)
+Step 18: Compare before/after trajectories — present as a table.
+Step 19: Report final state: files modified, test results, commit hash, before/after data.
+
+═══════════════════════════════════════════════════════════════════════════════
 
 RULES:
-- RECONNAISSANCE FIRST — always explore before deciding
-- HYPOTHESES BEFORE FIXES — always state what you think is wrong before changing code
-- SPECIFIC — always name files, line numbers, parameter names
-- ASK WHEN UNCERTAIN — don't guess, ask the user
-- The KB is for past failures and project structure, not for solving new problems.
-- The web is for scientific validation, not for debugging local simulations.
-- Papers are for biological plausibility, not for finding code bugs.
+- RECONNAISSANCE FIRST — always git log + read code before deciding
+- DIAGNOSTICS BEFORE FIXES — run the simulation, get the actual data
+- HYPOTHESES BEFORE FIXES — always state the problem with evidence
+- ASK WHEN UNCERTAIN — don't assume, ask the user
+- BE SPECIFIC — name files, line numbers, parameter names
+- PARALLEL WORKERS — spawn independent fixes in parallel
+- The KB is for past failures and project structure, not for solving new problems
+- The web is for scientific validation, not for debugging local simulations
+- Papers are for biological plausibility, not for finding code bugs
 - Iterations unlimited — keep going until the goal is achieved."""
 
 

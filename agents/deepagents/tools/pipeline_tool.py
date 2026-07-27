@@ -10,6 +10,7 @@ def pipeline_run_calibration(
     seed: int = 1,
     days: int = 30,
     n_rollouts: int = 1,
+    include_trajectory: bool = False,
 ) -> str:
     """Run the calibration suite and return compact results with composite score.
 
@@ -17,9 +18,12 @@ def pipeline_run_calibration(
         seed: Random seed for reproducibility.
         days: Number of simulation days.
         n_rollouts: Number of simulation rollouts.
+        include_trajectory: If True, also run a longer simulation and return
+            day-by-day trajectory data (adults, aquatic, eggs).
 
     Returns:
-        Compact JSON with pass/fail summary and composite score.
+        Compact JSON with pass/fail summary, composite score, and optionally
+        a trajectory table.
     """
     calibration_dir = Path("mal-core/src/mal_core/abm/tests/calibration")
     if not calibration_dir.exists():
@@ -43,7 +47,7 @@ def pipeline_run_calibration(
     except subprocess.TimeoutExpired:
         return json.dumps({"error": "Tests timed out after 300s", "status": "timeout"})
 
-    # Parse test results: "55 passed, 4 deselected in 4.44s"
+    # Parse test results
     test_summary = ""
     passed = failed = 0
     for line in (test_result.stdout + test_result.stderr).splitlines():
@@ -67,13 +71,17 @@ def pipeline_run_calibration(
             timeout=120,
             env=env,
         )
-        # Parse "Composite: 0.XXXX"
         for line in score_result.stdout.splitlines():
             m = re.search(r"Composite:\s*([\d.]+)", line)
             if m:
                 composite = float(m.group(1))
     except (subprocess.TimeoutExpired, Exception):
-        pass  # Composite extraction is best-effort
+        pass
+
+    # Step 3: Optionally extract trajectory from existing simulation outputs
+    trajectory = None
+    if include_trajectory:
+        trajectory = _extract_trajectory(calibration_dir / "runs" / f"seed{seed}")
 
     return json.dumps({
         "status": "ok" if test_result.returncode == 0 else "tests_failed",
@@ -81,6 +89,7 @@ def pipeline_run_calibration(
         "tests_failed": failed,
         "test_summary": test_summary,
         "composite": composite,
+        "trajectory": trajectory,
         "seed": seed,
         "days": days,
         "n_rollouts": n_rollouts,
@@ -92,6 +101,52 @@ def pipeline_run_calibration(
             ), 1
         ) if "in " in test_summary else None,
     })
+
+
+def _extract_trajectory(runs_dir: Path) -> dict | None:
+    """Extract day-by-day trajectory from _aquatic.json files.
+
+    Returns dict with:
+        days: list of day indices
+        adults: list of total adult counts (from COG density)
+        aquatic: list of total_aquatic
+        eggs: list of egg counts
+    """
+    if not runs_dir.exists():
+        return None
+
+    aquatic_files = sorted(runs_dir.glob("*_aquatic.json"))
+    if not aquatic_files:
+        return None
+
+    days = []
+    aquatic_totals = []
+    egg_counts = []
+
+    for f in aquatic_files:
+        try:
+            data = json.loads(f.read_text())
+            # Extract day from filename: pattern "*_day{N}_aquatic.json"
+            m = re.search(r"_day(\d+)_aquatic\.json$", f.name)
+            day = int(m.group(1)) if m else len(days)
+            days.append(day)
+            aquatic_totals.append(data.get("total_aquatic", 0))
+            eggs = data.get("by_stage", {}).get("egg", {}).get("total", 0)
+            egg_counts.append(eggs)
+        except (json.JSONDecodeError, OSError):
+            continue
+
+    if not days:
+        return None
+
+    return {
+        "days": days,
+        "aquatic_total": aquatic_totals,
+        "eggs": egg_counts,
+        "n_snapshots": len(days),
+        "first_day": min(days) if days else None,
+        "last_day": max(days) if days else None,
+    }
 
 
 def pipeline_compare_scorecards(

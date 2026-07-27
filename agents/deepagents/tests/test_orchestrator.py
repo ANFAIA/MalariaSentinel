@@ -26,7 +26,11 @@ class TestModuleFlags:
     def test_orchestrator_prompt_mentions_workflow(self):
         assert "gitagent_init" in ORCHESTRATOR_PROMPT
         assert "gitagent_start" in ORCHESTRATOR_PROMPT
-        assert "MULTI-FEATURE" in ORCHESTRATOR_PROMPT
+        assert "RECONNAISSANCE" in ORCHESTRATOR_PROMPT
+        assert "HYPOTHESES" in ORCHESTRATOR_PROMPT
+        assert "DIAGNOSTICS" in ORCHESTRATOR_PROMPT
+        assert "ASK WHEN UNCERTAIN" in ORCHESTRATOR_PROMPT
+        assert "PARALLEL WORKERS" in ORCHESTRATOR_PROMPT
 
 
 class TestWorkerDefinitions:
