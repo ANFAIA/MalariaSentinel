@@ -86,3 +86,9 @@ D14_mobility_conservation:
   max_delta: -0.05
   hard_floor: 0.70
   source: "Row-stochastic OD matrices: rows must sum to 1.0"
+
+D15_long_horizon_persistence:
+  min_score: 0.70
+  max_delta: -0.30
+  hard_floor: 0.40
+  source: "Population must survive 365 days without extinction (day-90 regression fix)"

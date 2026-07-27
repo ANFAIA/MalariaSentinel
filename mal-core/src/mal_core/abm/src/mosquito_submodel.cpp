@@ -398,19 +398,37 @@ void MosquitoSubmodel::advance_day(const AOI& aoi,
         soa_.feeding_success[si] = 0.0f;
 
         // Daily state transition
-        const bool wants_oviposit = advance_gonotrophic_one_day(
+        advance_gonotrophic_one_day(
             g_state, g_timer, gonotrophic_params_);
         soa_.gonotrophic_state[si] = static_cast<uint8_t>(g_state);
 
-        if (wants_oviposit) {
-            // Egg batch: use mean value (binomial(105, 0.5) ≈ 52).
-            // Stochastic version will use Prng in a later gate.
+        // Handle OVIPOSITION_SEEKING: check for viable oviposition site.
+        if (g_state == GonotrophicState::OVIPOSITION_SEEKING) {
+            bool found_site = false;
+            for (const auto& ps : patch_states) {
+                if (ps.row == soa_.row[si] &&
+                    ps.col == soa_.col[si] &&
+                    ps.activated) {
+                    found_site = true;
+                    break;
+                }
+            }
+            if (found_site) {
+                g_state = GonotrophicState::OVIPOSITING;
+                g_timer = 0;
+                soa_.gonotrophic_state[si] =
+                    static_cast<uint8_t>(g_state);
+                soa_.gonotrophic_timer[si] = g_timer;
+            }
+        }
+
+        // Handle OVIPOSITING: deposit eggs into aquatic cohort bank.
+        if (g_state == GonotrophicState::OVIPOSITING) {
             int32_t eggs = gonotrophic_params_.egg_batch_mean;
             if (eggs < gonotrophic_params_.egg_batch_min)
                 eggs = gonotrophic_params_.egg_batch_min;
             if (eggs > gonotrophic_params_.egg_batch_max)
                 eggs = gonotrophic_params_.egg_batch_max;
-            // Deposit eggs in the aquatic cohort bank.
             cohort_bank_.add_eggs(soa_.patch_id[si],
                                   static_cast<int64_t>(eggs));
             g_state = GonotrophicState::HOST_SEEKING;

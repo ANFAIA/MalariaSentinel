@@ -1,4 +1,4 @@
-"""Composite score: weighted geometric mean of D1..D14."""
+"""Composite score: weighted geometric mean of D1..D15."""
 from __future__ import annotations
 import math
 from scorers.base import ScorerResult
@@ -10,6 +10,7 @@ DEFAULT_WEIGHTS: dict[str, float] = {
     "D11_larval_dynamics": 1.0,
     "D12_host_density": 2.0, "D13_host_seeking_distance": 2.0,
     "D14_mobility_conservation": 2.0,
+    "D15_long_horizon_persistence": 3.0,
 }
 
 def geometric_mean(scores: dict[str, ScorerResult], weights: dict[str, float] | None = None) -> float:
