@@ -34,21 +34,30 @@ class TestModuleFlags:
 
 
 class TestWorkerDefinitions:
-    def test_single_worker(self):
-        """Only one worker type: abm-worker."""
-        assert len(WORKER_DEFINITIONS) == 1
-        assert WORKER_DEFINITIONS[0]["name"] == "abm-worker"
+    def test_workers_exist(self):
+        """Both abm-worker (code-modifying) and research-worker (read-only) are defined."""
+        names = [w["name"] for w in WORKER_DEFINITIONS]
+        assert "abm-worker" in names
+        assert "research-worker" in names
 
-    def test_worker_has_tools(self):
-        """Worker has 3 custom tools: abm_run, abm_test, abm_score."""
-        w = WORKER_DEFINITIONS[0]
-        assert "tools" in w
-        assert len(w["tools"]) == 3
+    def test_abm_worker_has_tools(self):
+        """abm-worker has 3 custom tools: abm_run, abm_test, abm_score."""
+        abm = next(w for w in WORKER_DEFINITIONS if w["name"] == "abm-worker")
+        assert "tools" in abm
+        assert len(abm["tools"]) == 3
+
+    def test_research_worker_is_read_only(self):
+        """research-worker has no code-modifying tools (read-only)."""
+        rw = next(w for w in WORKER_DEFINITIONS if w["name"] == "research-worker")
+        # Empty tools list — uses only deepagents' default filesystem tools
+        assert rw["tools"] == []
+        # System prompt mentions read-only
+        assert "READ-ONLY" in rw["system_prompt"]
 
     def test_worker_system_prompt_is_general(self):
-        """Worker prompt mentions general C++ modification, not just calibration."""
-        w = WORKER_DEFINITIONS[0]
-        sp = w["system_prompt"]
+        """abm-worker prompt mentions general C++ modification, not just calibration."""
+        abm = next(w for w in WORKER_DEFINITIONS if w["name"] == "abm-worker")
+        sp = abm["system_prompt"]
         assert "ANY part" in sp or "any" in sp.lower()
         assert "gitagent propose" in sp
 

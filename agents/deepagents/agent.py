@@ -291,6 +291,27 @@ WORKER_DEFINITIONS = [
         ],
         # Permissions are added dynamically in create_orchestrator() if FilesystemPermission is available
     },
+    {
+        "name": "research-worker",
+        "description": (
+            "Literature and knowledge specialist — READ-ONLY. "
+            "Searches papers, web, and knowledge base for scientific context. "
+            "Use for literature reviews, parameter validation, and biological plausibility checks. "
+            "Does NOT modify code — produces structured findings reports."
+        ),
+        "system_prompt": (
+            "You are a research worker specialized in literature review and scientific synthesis. "
+            "You work in an isolated gitagent worktree but you are READ-ONLY — you do not modify code. "
+            "Your job: gather, synthesize, and report scientific findings. "
+            "Tools you have: opencode_search (web search), memory_recall_kg (knowledge base), "
+            "read_file, glob, grep (read papers, docs, configs). "
+            "DO NOT use write_file, edit_file, abm_run, abm_test, or abm_score — that's the abm-worker's job. "
+            "When done, report back via: "
+            "gitagent propose --feature <name> --agent <your-id> --title '...' --summary '...' --confidence 0.8"
+        ),
+        "tools": [],  # Read-only — uses only deepagents' default filesystem tools
+        # Permissions are added dynamically in create_orchestrator() with strict read-only enforcement
+    },
 ]
 
 
@@ -397,12 +418,21 @@ def create_orchestrator(
     worker_defs = []
     for w in WORKER_DEFINITIONS:
         wd = dict(w)
-        wd["permissions"] = [
-            FilesystemPermission(operations=["read"], paths=["/.env", "/**/.env", "/**/*secret*", "/**/*credential*"], mode="deny"),
-            FilesystemPermission(operations=["write"], paths=["/data/**"], mode="deny"),
-            FilesystemPermission(operations=["write"], paths=["/.gitagent/**", "/.git/**"], mode="deny"),
-            FilesystemPermission(operations=["read", "write"], paths=["/**"], mode="allow"),
-        ]
+        if w["name"] == "research-worker":
+            # Strict read-only: deny ALL writes, allow reads (except secrets)
+            wd["permissions"] = [
+                FilesystemPermission(operations=["read"], paths=["/.env", "/**/.env", "/**/*secret*", "/**/*credential*"], mode="deny"),
+                FilesystemPermission(operations=["write"], paths=["/**"], mode="deny"),
+                FilesystemPermission(operations=["read"], paths=["/**"], mode="allow"),
+            ]
+        else:
+            # abm-worker: deny secrets and data writes, allow writes to code
+            wd["permissions"] = [
+                FilesystemPermission(operations=["read"], paths=["/.env", "/**/.env", "/**/*secret*", "/**/*credential*"], mode="deny"),
+                FilesystemPermission(operations=["write"], paths=["/data/**"], mode="deny"),
+                FilesystemPermission(operations=["write"], paths=["/.gitagent/**", "/.git/**"], mode="deny"),
+                FilesystemPermission(operations=["read", "write"], paths=["/**"], mode="allow"),
+            ]
         worker_defs.append(wd)
 
     return create_deep_agent(
