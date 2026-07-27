@@ -50,21 +50,32 @@ inline float egg_development_rate(float temp_c) {
 //   rate(T) = a * (T - T_L) * (T_H - T)  if T_L < T < T_H
 //   rate(T) = 0                           otherwise
 //
-// Parameters (Mordecai 2013, fitted to total larval duration ~8-12
-// days at 25°C for An. gambiae):
+// Parameters recalibrated against Bayoh & Lindsay (2003) experimental data
+// and validated against Agyekum et al. (2022, Ghana) and Ouédraogo et al.
+// (2024, Burkina Faso). The previous value a = 0.00052 produced a per-instar
+// rate of ~0.117/day at 25°C (8.5 days per instar × 4 instars = 34 days
+// total), which is ~2× too slow vs the measured 13–20 day total.
+//
+// Sources:
+//   - Bayoh & Lindsay 2003 (doi:10.1079/BER2003259): 13–16 days L1→adult at 25°C
+//   - Agyekum et al. 2022 (doi:10.1111/tmi.13732): 20.17 ± 0.75 days at 25°C (Ghana)
+//   - Ouédraogo et al. 2024 (doi:10.1186/s13071-024-06260-2): 11.87 days at 24.5–28.5°C (Burkina Faso)
+//   - Depinay et al. 2004 (doi:10.1186/1475-2875-3-29): fitted to Bayoh data, ~11–13 days
+//
 //   T_L = 10.0°C  (lower developmental threshold)
 //   T_H = 40.0°C  (upper developmental threshold)
-//   a   = 0.00052 (normalised so max rate ≈ 0.117 at 25°C,
-//                   i.e., stage duration ≈ 8.5 days total at 25°C)
+//   a   = 0.001   (calibrated so max rate ≈ 0.225 at 25°C,
+//                   i.e., stage duration ≈ 4.4 days per instar at 25°C,
+//                   total 4 instars ≈ 17.8 days — within the 13–20 day range)
 //
-// Each instar takes ~1/4 of the total larval duration.
-// At 25°C: rate ≈ 0.117 (total larva duration ≈ 8.5 days)
-// At 20°C: rate ≈ 0.075 (total larva duration ≈ 13.3 days)
-// At 30°C: rate ≈ 0.105 (total larva duration ≈ 9.5 days)
+// At 25°C: rate ≈ 0.225 (total larva duration ≈ 17.8 days)
+// At 20°C: rate ≈ 0.200 (total larva duration ≈ 20.0 days)
+// At 28°C: rate ≈ 0.216 (total larva duration ≈ 18.5 days)
+// At 30°C: rate ≈ 0.200 (total larva duration ≈ 20.0 days)
 // ---------------------------------------------------------------------------
 inline constexpr double LARVA_TL = 10.0;
 inline constexpr double LARVA_TH = 40.0;
-inline constexpr double LARVA_A  = 0.00052;
+inline constexpr double LARVA_A  = 0.001;
 
 inline float larva_development_rate(float temp_c) {
     const double T = static_cast<double>(temp_c);

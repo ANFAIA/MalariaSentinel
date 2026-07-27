@@ -79,8 +79,11 @@ TEST(ThermalResponses, EggDevelopmentRateAboveThreshold) {
 
 TEST(ThermalResponses, LarvaDevelopmentRateAt25C) {
     const float rate = mal_abm_fast::larva_development_rate(25.0f);
-    EXPECT_GT(rate, 0.10f);
-    EXPECT_LT(rate, 0.15f);
+    // Recalibrated LARVA_A = 0.001 (was 0.00052).
+    // At 25°C: rate = 0.001 × 15 × 15 = 0.225
+    // Total 4 instars: 4 / 0.225 ≈ 17.8 days (matches Bayoh & Lindsay 2003: 13–20 d)
+    EXPECT_GT(rate, 0.20f);
+    EXPECT_LT(rate, 0.25f);
 }
 
 TEST(ThermalResponses, LarvaDevelopmentRateBelowThreshold) {

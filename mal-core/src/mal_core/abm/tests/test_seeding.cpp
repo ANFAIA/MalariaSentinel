@@ -277,7 +277,7 @@ TEST(MalAbmFastSeeding, ExplicitFallsBackToConfigCounts) {
 // ---------------------------------------------------------------------------
 
 TEST(MalAbmFastSeeding, SubmodelDetConstructorSeedsAdultsAndLarvae) {
-    // 1 detection point: 10 adults + 5 larvae (→ eggs in cohort bank).
+    // 1 detection point: 10 adults + 5 larvae (distributed across stages).
     std::vector<mal_abm_fast::SeedInstruction> instructions;
     mal_abm_fast::SeedInstruction inst;
     inst.patch_id = 7;
@@ -292,9 +292,17 @@ TEST(MalAbmFastSeeding, SubmodelDetConstructorSeedsAdultsAndLarvae) {
     mal_abm_fast::MosquitoSubmodel sub(/*n_patches*/ 100,
                                        /*k_per_patch*/ 1000,
                                        instructions, /*seed*/ 42);
-    // G3: larvae are eggs in cohort bank, only adults in SoA.
+    // Adults in SoA = 10.
     EXPECT_EQ(sub.total_agents(), 10);
-    EXPECT_EQ(sub.cohort_bank().count_by_stage(mal_abm_fast::AquaticStage::EGG), 5);
+    // Larvae distributed across stages (age-structured seeding).
+    // 5 larvae: 1 pupa + 1 L4 + 1 L3 + 1 L2 + 1 L1 + 0 eggs = 5 total.
+    EXPECT_EQ(sub.cohort_bank().total_aquatic(), 5);
+    EXPECT_EQ(sub.cohort_bank().count_by_stage(mal_abm_fast::AquaticStage::PUPA), 1);
+    EXPECT_EQ(sub.cohort_bank().count_by_stage_instar(mal_abm_fast::AquaticStage::LARVA, 4), 1);
+    EXPECT_EQ(sub.cohort_bank().count_by_stage_instar(mal_abm_fast::AquaticStage::LARVA, 3), 1);
+    EXPECT_EQ(sub.cohort_bank().count_by_stage_instar(mal_abm_fast::AquaticStage::LARVA, 2), 1);
+    EXPECT_EQ(sub.cohort_bank().count_by_stage_instar(mal_abm_fast::AquaticStage::LARVA, 1), 1);
+    EXPECT_EQ(sub.cohort_bank().count_by_stage(mal_abm_fast::AquaticStage::EGG), 0);
 
     // Count adults.
     int32_t n_adults = 0;
@@ -316,8 +324,8 @@ TEST(MalAbmFastSeeding, SubmodelDetConstructorSeedsAdultsAndLarvae) {
 }
 
 TEST(MalAbmFastSeeding, SubmodelDetConstructorMultipleDetections) {
-    // 3 detection points, each with 4 adults + 2 larvae (→ eggs).
-    // G3: only adults in SoA = 12 total.
+    // 3 detection points, each with 4 adults + 2 larvae (distributed).
+    // Only adults in SoA = 12 total.
     std::vector<mal_abm_fast::SeedInstruction> instructions;
     for (int32_t i = 0; i < 3; ++i) {
         mal_abm_fast::SeedInstruction inst;
@@ -332,7 +340,11 @@ TEST(MalAbmFastSeeding, SubmodelDetConstructorMultipleDetections) {
     }
     mal_abm_fast::MosquitoSubmodel sub(100, 1000, instructions, 42);
     EXPECT_EQ(sub.total_agents(), 12);  // 3 * 4 adults only
-    EXPECT_EQ(sub.cohort_bank().count_by_stage(mal_abm_fast::AquaticStage::EGG), 6);  // 3 * 2 eggs
+    // 3 * 2 = 6 larvae distributed across stages.
+    // Per detection: 1 pupa + 1 L4 + 0 L3 + 0 L2 + 0 L1 + 0 egg = 2.
+    EXPECT_EQ(sub.cohort_bank().total_aquatic(), 6);
+    EXPECT_EQ(sub.cohort_bank().count_by_stage(mal_abm_fast::AquaticStage::PUPA), 3);
+    EXPECT_EQ(sub.cohort_bank().count_by_stage_instar(mal_abm_fast::AquaticStage::LARVA, 4), 3);
 }
 
 TEST(MalAbmFastSeeding, SubmodelDetConstructorEmptyIsEmpty) {
@@ -367,9 +379,17 @@ TEST(MalAbmFastSeeding, EndToEndRandomViableBuildsSeededSubmodel) {
     ASSERT_EQ(instructions.size(), 4u);
 
     mal_abm_fast::MosquitoSubmodel sub(100, 1000, instructions, 7);
-    // G3: 4 * 25 = 100 adults in SoA; 4 * 15 = 60 eggs in cohort bank.
+    // 4 * 25 = 100 adults in SoA.
     EXPECT_EQ(sub.total_agents(), 100);
-    EXPECT_EQ(sub.cohort_bank().count_by_stage(mal_abm_fast::AquaticStage::EGG), 60);
+    // 4 * 15 = 60 larvae distributed across stages.
+    // Per detection (n=15): 1 pupa + 2 L4 + 3 L3 + 3 L2 + 3 L1 + 3 egg = 15.
+    EXPECT_EQ(sub.cohort_bank().total_aquatic(), 60);
+    EXPECT_EQ(sub.cohort_bank().count_by_stage(mal_abm_fast::AquaticStage::PUPA), 4);
+    EXPECT_EQ(sub.cohort_bank().count_by_stage_instar(mal_abm_fast::AquaticStage::LARVA, 4), 8);
+    EXPECT_EQ(sub.cohort_bank().count_by_stage_instar(mal_abm_fast::AquaticStage::LARVA, 3), 12);
+    EXPECT_EQ(sub.cohort_bank().count_by_stage_instar(mal_abm_fast::AquaticStage::LARVA, 2), 12);
+    EXPECT_EQ(sub.cohort_bank().count_by_stage_instar(mal_abm_fast::AquaticStage::LARVA, 1), 12);
+    EXPECT_EQ(sub.cohort_bank().count_by_stage(mal_abm_fast::AquaticStage::EGG), 12);
 
     // Exactly 4 distinct patch_ids should have adults.
     std::set<int64_t> pids;

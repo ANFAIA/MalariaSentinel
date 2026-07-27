@@ -106,6 +106,24 @@ void AquaticCohortBank::add_eggs(int64_t patch_id, int64_t count) {
 }
 
 // ---------------------------------------------------------------------------
+// seed_stage — age-structured seeding for detection-based constructor
+// ---------------------------------------------------------------------------
+void AquaticCohortBank::seed_stage(
+    int64_t patch_id, AquaticStage stage,
+    uint8_t instar, int64_t count, float development) {
+    if (count <= 0) return;
+    auto& c = find_or_create(patch_id, stage, instar);
+    c.count += count;
+    // Set development progress (weighted average if cohort already exists).
+    if (c.count > 0) {
+        const float old_count = static_cast<float>(c.count - count);
+        c.development = (c.development * old_count +
+                         development * static_cast<float>(count)) /
+                        static_cast<float>(c.count);
+    }
+}
+
+// ---------------------------------------------------------------------------
 // patch_to_cell helper
 // ---------------------------------------------------------------------------
 bool AquaticCohortBank::patch_to_cell(

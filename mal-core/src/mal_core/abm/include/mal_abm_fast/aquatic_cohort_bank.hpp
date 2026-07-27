@@ -60,6 +60,16 @@ public:
     // (patch_id, stage=EGG, instar=0) with development=0.
     void add_eggs(int64_t patch_id, int64_t count);
 
+    // Seed a cohort at an arbitrary stage with a pre-set development
+    // progress. Used by the detection-based constructor to create
+    // age-structured initial populations (staggered seeding).
+    //   stage      — EGG, LARVA (instar 1-4), or PUPA
+    //   instar     — 1-4 for LARVA, ignored for EGG/PUPA
+    //   count      — number of individuals
+    //   development — initial development progress [0, 1)
+    void seed_stage(int64_t patch_id, AquaticStage stage,
+                    uint8_t instar, int64_t count, float development);
+
     // Daily update: advance development, apply mortality, promote
     // through lifecycle stages. Call once per day before
     // collect_emergence().

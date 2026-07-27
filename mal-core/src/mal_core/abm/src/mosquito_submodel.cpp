@@ -248,8 +248,13 @@ MosquitoSubmodel::MosquitoSubmodel(int32_t n_patches, int32_t k_per_patch,
     soa_.feeding_success.reserve(cap);
 
     for (const auto& inst : instructions) {
-        // Adults: ready to disperse immediately.
-        for (int32_t j = 0; j < inst.n_adults; ++j) {
+        // Adults: cap at K_MAX per patch to prevent seeding above
+        // carrying capacity. Adults above K_MAX die faster than they
+        // can reproduce (K_MAX-limited births), causing a population
+        // crash that has nothing to do with biology.
+        const int32_t n_adults_capped = std::min(
+            inst.n_adults, k_per_patch > 0 ? k_per_patch : K_MAX);
+        for (int32_t j = 0; j < n_adults_capped; ++j) {
             soa_.uid.push_back(static_cast<int64_t>(soa_.uid.size()));
             soa_.patch_id.push_back(inst.patch_id);
             soa_.row.push_back(inst.row);
@@ -269,10 +274,47 @@ MosquitoSubmodel::MosquitoSubmodel(int32_t n_patches, int32_t k_per_patch,
             soa_.gonotrophic_timer.push_back(0);
             soa_.feeding_success.push_back(0.0f);
         }
-        // Larvae: seed as eggs in the aquatic cohort bank.
-        // The cohort bank will develop them through Egg→L1→L2→L3→L4→Pupa→Adult.
+        // Larvae: distribute across aquatic stages with pre-set
+        // development progress (age-structured seeding). This creates
+        // a staggered emergence wave over ~35 days, representing a
+        // population that has been breeding at this site for a while.
+        // Without this, a point-source population collapses because
+        // adults die (~9 days) before eggs mature (~36 days).
         if (inst.n_larvae > 0) {
-            cohort_bank_.add_eggs(inst.patch_id, static_cast<int64_t>(inst.n_larvae));
+            const int64_t n = static_cast<int64_t>(inst.n_larvae);
+            // Distribution (% of n_larvae):
+            //   Eggs:  10% — fresh, emerge in ~35 days
+            //   L1:    20% — emerge in ~30 days
+            //   L2:    25% — emerge in ~21 days
+            //   L3:    25% — emerge in ~13 days
+            //   L4:    15% — emerge in ~8 days
+            //   Pupa:   5% — emerge in ~1-2 days
+            const int64_t n_pupa = std::max<int64_t>(1, n * 5 / 100);
+            const int64_t n_l4   = std::max<int64_t>(1, n * 15 / 100);
+            const int64_t n_l3   = n * 25 / 100;
+            const int64_t n_l2   = n * 25 / 100;
+            const int64_t n_l1   = n * 20 / 100;
+            const int64_t n_egg  = n - n_pupa - n_l4 - n_l3 - n_l2 - n_l1;
+            // Development progress: pre-advance within each stage so
+            // emergence is staggered (not all at once).
+            //   Pupa: dev=0.58 → emerges in ~0.5 days (1.2d total)
+            //   L4:   dev=0.47 → pupates in ~4.5 days (8.5d total)
+            //   L3:   dev=0.38 → L4 in ~5.3 days, pupa+adult ~6.5d more
+            //   L2:   dev=0.29 → L3 in ~6.1 days, rest ~12.5d more
+            //   L1:   dev=0.20 → L2 in ~6.8 days, rest ~19d more
+            //   Egg:  dev=0.0  → hatch in ~1 day, then full larval cycle
+            cohort_bank_.seed_stage(
+                inst.patch_id, AquaticStage::PUPA, 0, n_pupa, 0.58f);
+            cohort_bank_.seed_stage(
+                inst.patch_id, AquaticStage::LARVA, 4, n_l4, 0.47f);
+            cohort_bank_.seed_stage(
+                inst.patch_id, AquaticStage::LARVA, 3, n_l3, 0.38f);
+            cohort_bank_.seed_stage(
+                inst.patch_id, AquaticStage::LARVA, 2, n_l2, 0.29f);
+            cohort_bank_.seed_stage(
+                inst.patch_id, AquaticStage::LARVA, 1, n_l1, 0.20f);
+            cohort_bank_.seed_stage(
+                inst.patch_id, AquaticStage::EGG, 0, n_egg, 0.0f);
         }
     }
     soa_.n_alive  = static_cast<int64_t>(soa_.uid.size());
