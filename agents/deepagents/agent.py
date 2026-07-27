@@ -97,27 +97,45 @@ def _import_abm_score():
 ORCHESTRATOR_PROMPT = """\
 You are the MalariaSentinel Centinela orchestrator. You manage ABM development — calibration, new features, bug fixes, behavior changes, code removal, anything the codebase needs.
 
+ORDER OF OPERATIONS (MANDATORY — follow this sequence):
+
+1. READ THE CODE FIRST. Before anything else, read the actual C++ files:
+   - grep/glob to find relevant files in mal-core/src/mal_core/abm/
+   - read_file to understand what the code does
+   - You CANNOT delegate if you haven't read the code yourself
+
+2. THEN check the KB — memory_recall_kg(query="...", k=5)
+   - Use ONLY for: past failures, project structure, architecture decisions
+   - Do NOT use to "understand" the code (you already read it)
+
+3. THEN read papers — papers/ directory
+   - Use ONLY for: biological plausibility, parameter validation
+   - Do NOT use to debug the simulation
+
+4. THEN search web — opencode_search(query="...")
+   - Use ONLY for: field data, scientific literature, parameter ranges
+   - Do NOT use to find "why the simulation crashes"
+
+5. THEN delegate to worker — task(subagent_type="abm-worker", description="...")
+
 YOUR CAPABILITIES:
 - Read any file in the repo (C++, Python, YAML, papers, configs)
-- Search the web for scientific information (opencode_search)
-- Query the project knowledge base (memory_recall_kg)
-- Read papers in the papers/ directory
-- Spawn workers to make code changes (task tool with subagent_type)
+- Search the web for scientific information
+- Query the project knowledge base
+- Spawn workers to make code changes
 - Review and approve/reject changes via gitagent
 
-BEFORE DELEGATING: Understand the problem. Read relevant files. Search for context. Form a hypothesis. Then give the worker a specific, informed task.
-
-CONTEXT SOURCES (use as needed):
-- Knowledge base: memory_recall_kg(query="...", k=5) — past patterns, pitfalls, architecture decisions
-- Papers: papers/ directory has research on ABM, malaria dynamics, spatial analysis
-- Web: opencode_search(query="...") — current scientific literature, field data, parameter ranges
-- Code: read_file/grep/glob to understand the current implementation
+CONTEXT SOURCES (use in this order):
+1. CODE (mal-core/src/mal_core/abm/) — always first
+2. KB (memory_recall_kg) — past patterns and pitfalls only
+3. Papers (papers/) — biological validation only
+4. Web (opencode_search) — scientific literature only
 
 WORKFLOW — for each feature:
 1. gitagent_init (idempotent)
 2. gitagent_start(feature=X) — open session
 3. gitagent_spawn(feature=X, agent_id="worker-X", role="<role>") — get worktree path
-4. task(subagent_type="abm-worker", description="<detailed task with context from your research>")
+4. task(subagent_type="abm-worker", description="<detailed task with code analysis>")
 5. gitagent_proposals(feature=X) — check what worker proposed
 6. gitagent_diff(proposal_id, feature=X) — review the changes
 7. If OK → gitagent_accept; if not → gitagent_revise with feedback → back to step 4
@@ -127,11 +145,11 @@ WORKFLOW — for each feature:
 MULTI-FEATURE: you can manage N features in parallel. Each feature is independent.
 
 CRITICAL RULES:
+- READ CODE BEFORE ANYTHING ELSE. No exceptions.
 - Always pass --feature to every gitagent command
 - Use gitagent_revise (not reject) when you want the worker to iterate
 - Iterations are unlimited — keep revising until the change is correct
 - Before finalize: review proposals and diffs carefully
-- UNDERSTAND before delegating — read files, check papers, search web, then act
 """
 
 WORKER_DEFINITIONS = [
@@ -160,16 +178,7 @@ WORKER_DEFINITIONS = [
             _wrap_with_logging(_import_abm_test()),
             _wrap_with_logging(_import_abm_score()),
         ],
-        "permissions": [
-            # Deny reading secrets
-            FilesystemPermission(operations=["read"], paths=["/.env", "/**/.env", "/**/*secret*", "/**/*credential*"], mode="deny"),
-            # Deny writing to data inputs (read-only)
-            FilesystemPermission(operations=["write"], paths=["/data/**"], mode="deny"),
-            # Deny writing to gitagent metadata
-            FilesystemPermission(operations=["write"], paths=["/.gitagent/**", "/.git/**"], mode="deny"),
-            # Worker can read and write within its worktree (allow-all fallback)
-            FilesystemPermission(operations=["read", "write"], paths=["/**"], mode="allow"),
-        ],
+        # Permissions are added dynamically in create_orchestrator() if FilesystemPermission is available
     },
 ]
 
@@ -272,12 +281,23 @@ def create_orchestrator(
     skills = []
     if PROJECT_SKILLS.is_dir():
         skills.append("agents/skills/")
-    # GLOBAL_SKILLS (~/.agents/skills/) is outside root_dir, skip it
+
+    # Add permissions to worker definitions dynamically
+    worker_defs = []
+    for w in WORKER_DEFINITIONS:
+        wd = dict(w)
+        wd["permissions"] = [
+            FilesystemPermission(operations=["read"], paths=["/.env", "/**/.env", "/**/*secret*", "/**/*credential*"], mode="deny"),
+            FilesystemPermission(operations=["write"], paths=["/data/**"], mode="deny"),
+            FilesystemPermission(operations=["write"], paths=["/.gitagent/**", "/.git/**"], mode="deny"),
+            FilesystemPermission(operations=["read", "write"], paths=["/**"], mode="allow"),
+        ]
+        worker_defs.append(wd)
 
     return create_deep_agent(
         model=llm,
         tools=TOOLS,
-        subagents=WORKER_DEFINITIONS,
+        subagents=worker_defs,
         system_prompt=ORCHESTRATOR_PROMPT,
         backend=backend,
         skills=skills or None,
