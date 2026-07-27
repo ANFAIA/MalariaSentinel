@@ -31,19 +31,19 @@ def test_run_stage_abm(tmp_path):
 
 def test_run_stage_score(tmp_path):
     with patch.object(mal_core.scoring, "run_calibration", return_value={"success": True, "composite": 0.85}):
-        result = run_stage(Stage.SCORE, "ghana", 2024, 1, tmp_path)
+        result = run_stage(Stage.SCORING, "ghana", 2024, 1, tmp_path)
     assert result["success"] is True
 
 
 def test_run_stage_train(tmp_path):
     with patch.object(mal_core.training, "train_unet", return_value=0.75):
-        result = run_stage(Stage.TRAIN, "ghana", 2024, 1, tmp_path)
+        result = run_stage(Stage.TRAINING, "ghana", 2024, 1, tmp_path)
     assert result["best_dice"] == 0.75
 
 
 def test_run_stage_predict(tmp_path):
     with patch.object(mal_core.prediction, "run_prediction", return_value=tmp_path / "pred.tif"):
-        result = run_stage(Stage.PREDICT, "ghana", 2024, 1, tmp_path)
+        result = run_stage(Stage.PREDICTION, "ghana", 2024, 1, tmp_path)
     assert "prediction_path" in result
 
 

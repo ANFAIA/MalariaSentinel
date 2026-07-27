@@ -13,14 +13,17 @@ from mal_core.pipeline.runner import run_pipeline, run_stage
 def test_stage_enum():
     assert Stage.INGEST.value == "ingest"
     assert Stage.ABM.value == "abm"
-    assert Stage.SCORE.value == "score"
-    assert Stage.TRAIN.value == "train"
-    assert Stage.PREDICT.value == "predict"
+    assert Stage.SCORING.value == "scoring"
+    assert Stage.TRAINING.value == "training"
+    assert Stage.PREDICTION.value == "prediction"
 
 
 def test_stage_from_string():
     assert Stage("ingest") == Stage.INGEST
     assert Stage("abm") == Stage.ABM
+    assert Stage("scoring") == Stage.SCORING
+    assert Stage("training") == Stage.TRAINING
+    assert Stage("prediction") == Stage.PREDICTION
 
 
 def test_run_pipeline_returns_structure(tmp_path):

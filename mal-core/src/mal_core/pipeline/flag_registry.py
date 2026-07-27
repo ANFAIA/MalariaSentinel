@@ -3,7 +3,9 @@ from __future__ import annotations
 from importlib import import_module
 from typing import Any
 
-PIPELINE_STAGES = ["ingest", "abm", "scoring", "training", "prediction"]
+from .stages import Stage
+
+PIPELINE_STAGES = [s.value for s in Stage]
 
 def aggregate_flags() -> dict[str, dict[str, dict[str, Any]]]:
     flags: dict[str, dict[str, dict[str, Any]]] = {}

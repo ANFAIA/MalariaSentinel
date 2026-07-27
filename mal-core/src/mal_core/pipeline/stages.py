@@ -5,6 +5,6 @@ from enum import Enum
 class Stage(str, Enum):
     INGEST = "ingest"
     ABM = "abm"
-    SCORE = "score"
-    TRAIN = "train"
-    PREDICT = "predict"
+    SCORING = "scoring"
+    TRAINING = "training"
+    PREDICTION = "prediction"
