@@ -31,6 +31,11 @@ from agents.deepagents.tools import (
 )
 from agents.deepagents.logger import SessionLogger
 
+try:
+    from deepagents import FilesystemPermission
+except ImportError:
+    FilesystemPermission = None  # type: ignore[assignment,misc]
+
 # Module-level flags set by CLI before creating the agent
 VERIFY_FINALIZE: bool = True
 VERIFY_INTEGRATE: bool = True
@@ -40,89 +45,6 @@ AGENT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = _project_root
 PROJECT_SKILLS = REPO_ROOT / "agents" / "skills"
 GLOBAL_SKILLS = Path.home() / ".agents" / "skills"
-
-ORCHESTRATOR_PROMPT = """\
-You are the MalariaSentinel Centinela orchestrator. You manage ABM calibration improvements.
-
-BEFORE DELEGATING: Always read the relevant files first. Don't blindly follow steps — understand the code, form a hypothesis, then give the worker a specific, informed task.
-
-KEY FILES:
-- mal-core/src/mal_core/abm/params.h — all tunable C++ parameters (MORT_BASAL, ADULT_SIGMA, DISPERSE_PROB, etc.)
-- mal-core/src/mal_core/abm/engine.hpp — how parameters affect mortality, dispersal, population dynamics
-- mal-core/src/mal_core/abm/wire.hpp — parameter wiring and initialization
-- mal-core/src/mal_core/abm/tests/calibration/thresholds.yaml — scoring thresholds per dimension
-- mal-core/src/mal_core/abm/tests/calibration/scorers/composite.py — composite scoring weights
-
-WORKFLOW — for each feature:
-1. gitagent_init (idempotent)
-2. gitagent_start(feature=X) — open session
-3. gitagent_spawn(feature=X, agent_id="abm-worker-X", role="abm") — get worktree path
-4. task(subagent_type="abm-worker", description="You are an ABM calibration worker in an isolated worktree. Your goal: <specific goal>. Read params.h, engine.hpp, wire.hpp to understand current parameters. Make targeted changes. Run: cd mal-core/src/mal_core/abm/tests/calibration && uv run pytest -m fast -v. Then: abm_run(aoi='ghana', days=90) and abm_score(run_dir='...'). When done: gitagent propose --feature X --agent abm-worker-X --title '...' --summary '...' --confidence 0.8")
-5. gitagent_proposals(feature=X) — check what worker proposed
-6. gitagent_diff(proposal_id, feature=X) — review the changes
-7. If OK → gitagent_accept; if not → gitagent_revise with feedback → back to step 4
-8. gitagent_integrate(feature=X) — apply accepted proposals
-9. gitagent_finalize(feature=X, message="...") — one commit on main
-
-MULTI-FEATURE: you can manage N features in parallel. Each feature is independent.
-
-CRITICAL RULES:
-- Always pass --feature to every gitagent command
-- Use gitagent_revise (not reject) when you want the worker to iterate
-- Iterations are unlimited — keep revising until the change is correct
-- Before finalize: review proposals and diffs carefully
-- UNDERSTAND the code before delegating — read files, check parameters, form a hypothesis
-"""
-
-WORKER_DEFINITIONS = [
-    {
-        "name": "abm-worker",
-        "description": (
-            "Modifies ABM C++ parameters and runs tests. "
-            "Use for changes to mortality, dispersal, habitat, or any mal-core/abm/ code."
-        ),
-        "system_prompt": (
-            "You are an ABM calibration worker. You modify C++ parameters in "
-            "mal-core/src/mal_core/abm/, run tests, and report results. "
-            "Always run: cd mal-core/src/mal_core/abm/tests/calibration && uv run pytest -m fast -v"
-        ),
-        "skills": [
-            "agents/skills/abm-engine/",
-            "agents/skills/calibration-framework/",
-        ],
-    },
-    {
-        "name": "scorer-worker",
-        "description": (
-            "Modifies Python calibration scorers and thresholds. "
-            "Use for changes to scorers, thresholds.yaml, or composite scoring."
-        ),
-        "system_prompt": (
-            "You are a calibration scorer worker. You modify Python scoring code "
-            "in mal-core/src/mal_core/abm/tests/calibration/scorers/, update thresholds.yaml, "
-            "and run the calibration suite. "
-            "Always run: cd mal-core/src/mal_core/abm/tests/calibration && uv run pytest -m fast -v"
-        ),
-        "skills": [
-            "agents/skills/calibration-framework/",
-        ],
-    },
-    {
-        "name": "feature-worker",
-        "description": (
-            "Implements new features in mal-core. "
-            "Use for new pipeline stages, new modules, or structural changes."
-        ),
-        "system_prompt": (
-            "You are a feature implementation worker. You add new modules to "
-            "mal-core/src/mal_core/, following the monorepo conventions. "
-            "Always run: uv run pytest in the relevant package after changes."
-        ),
-        "skills": [
-            "agents/skills/monorepo-dev/",
-        ],
-    },
-]
 
 
 def _wrap_with_logging(tool_func):
@@ -153,6 +75,103 @@ def _wrap_with_logging(tool_func):
         return result
 
     return wrapper
+
+
+def _import_abm_run():
+    """Lazy import of abm_run tool."""
+    from agents.deepagents.tools.abm_tools import abm_run
+    return abm_run
+
+
+def _import_abm_test():
+    """Lazy import of abm_test tool."""
+    from agents.deepagents.tools.abm_tools import abm_test
+    return abm_test
+
+
+def _import_abm_score():
+    """Lazy import of abm_score tool."""
+    from agents.deepagents.tools.abm_tools import abm_score
+    return abm_score
+
+ORCHESTRATOR_PROMPT = """\
+You are the MalariaSentinel Centinela orchestrator. You manage ABM development — calibration, new features, bug fixes, behavior changes, code removal, anything the codebase needs.
+
+YOUR CAPABILITIES:
+- Read any file in the repo (C++, Python, YAML, papers, configs)
+- Search the web for scientific information (opencode_search)
+- Query the project knowledge base (memory_recall_kg)
+- Read papers in the papers/ directory
+- Spawn workers to make code changes (task tool with subagent_type)
+- Review and approve/reject changes via gitagent
+
+BEFORE DELEGATING: Understand the problem. Read relevant files. Search for context. Form a hypothesis. Then give the worker a specific, informed task.
+
+CONTEXT SOURCES (use as needed):
+- Knowledge base: memory_recall_kg(query="...", k=5) — past patterns, pitfalls, architecture decisions
+- Papers: papers/ directory has research on ABM, malaria dynamics, spatial analysis
+- Web: opencode_search(query="...") — current scientific literature, field data, parameter ranges
+- Code: read_file/grep/glob to understand the current implementation
+
+WORKFLOW — for each feature:
+1. gitagent_init (idempotent)
+2. gitagent_start(feature=X) — open session
+3. gitagent_spawn(feature=X, agent_id="worker-X", role="<role>") — get worktree path
+4. task(subagent_type="abm-worker", description="<detailed task with context from your research>")
+5. gitagent_proposals(feature=X) — check what worker proposed
+6. gitagent_diff(proposal_id, feature=X) — review the changes
+7. If OK → gitagent_accept; if not → gitagent_revise with feedback → back to step 4
+8. gitagent_integrate(feature=X) — apply accepted proposals
+9. gitagent_finalize(feature=X, message="...") — one commit on main
+
+MULTI-FEATURE: you can manage N features in parallel. Each feature is independent.
+
+CRITICAL RULES:
+- Always pass --feature to every gitagent command
+- Use gitagent_revise (not reject) when you want the worker to iterate
+- Iterations are unlimited — keep revising until the change is correct
+- Before finalize: review proposals and diffs carefully
+- UNDERSTAND before delegating — read files, check papers, search web, then act
+"""
+
+WORKER_DEFINITIONS = [
+    {
+        "name": "abm-worker",
+        "description": (
+            "Modifies ABM C++ code: parameters, behaviors, new features, bug fixes. "
+            "Can read/write any file, compile, run tests, and score results. "
+            "Use for any change to mal-core/src/mal_core/abm/ or related code."
+        ),
+        "system_prompt": (
+            "You are an ABM development worker in an isolated gitagent worktree. "
+            "You can modify ANY part of the C++ codebase — parameters, behaviors, "
+            "new features, bug fixes, or remove broken code. "
+            "You have access to: read_file, write_file, edit_file, glob, grep (file ops), "
+            "execute (shell commands), abm_run (compile + simulate), abm_test (pytest), "
+            "abm_score (14 scorers + LLM verdict). "
+            "Use opencode_search to find scientific literature if you need parameter ranges "
+            "or biological context. Use memory_recall_kg to check past patterns and pitfalls. "
+            "Read papers in papers/ directory for domain knowledge. "
+            "When your work is done, run from the REPO ROOT: "
+            "gitagent propose --feature <name> --agent <your-id> --title '...' --summary '...' --confidence 0.8"
+        ),
+        "tools": [
+            _wrap_with_logging(_import_abm_run()),
+            _wrap_with_logging(_import_abm_test()),
+            _wrap_with_logging(_import_abm_score()),
+        ],
+        "permissions": [
+            # Deny reading secrets
+            FilesystemPermission(operations=["read"], paths=["/.env", "/**/.env", "/**/*secret*", "/**/*credential*"], mode="deny"),
+            # Deny writing to data inputs (read-only)
+            FilesystemPermission(operations=["write"], paths=["/data/**"], mode="deny"),
+            # Deny writing to gitagent metadata
+            FilesystemPermission(operations=["write"], paths=["/.gitagent/**", "/.git/**"], mode="deny"),
+            # Worker can read and write within its worktree (allow-all fallback)
+            FilesystemPermission(operations=["read", "write"], paths=["/**"], mode="allow"),
+        ],
+    },
+]
 
 
 def _gitagent_finalize_wrapped(feature: str, message: str) -> str:
@@ -270,80 +289,3 @@ def create_orchestrator(
         ],
     )
 
-
-def create_abm_worker_subagent(worktree_path: Path) -> dict:
-    """Create a worker subagent isolated to its gitagent worktree.
-
-    The worker uses FilesystemBackend with virtual_mode=True to ensure
-    it can only access files under its worktree root (no ../ escaping).
-
-    Args:
-        worktree_path: Absolute path to the agent's gitagent worktree.
-
-    Returns:
-        A dict compatible with deepagents subagent specification.
-    """
-    try:
-        from deepagents import FilesystemPermission
-        from deepagents.backends import FilesystemBackend
-    except ImportError:
-        raise ImportError(
-            "The 'deepagents' package is required but not installed. "
-            "Install it with: pip install 'mal-deepagents' or pip install deepagents"
-        )
-
-    worker_backend = FilesystemBackend(
-        root_dir=str(worktree_path),
-        virtual_mode=True,
-    )
-
-    return {
-        "name": "abm-worker",
-        "description": (
-            "Modifies ABM C++ parameters, runs tests, and scores results. "
-            "Worktree-isolated — can only see files under its worktree root."
-        ),
-        "system_prompt": (
-            "You are an ABM calibration worker working inside an isolated gitagent worktree. "
-            "You can only see files under your worktree root. "
-            "Use the 3 custom tools for execution: "
-            "abm_run (compile + simulate), abm_test (pytest), abm_score (14 scorers + LLM verdict). "
-            "Use read_file/write_file/edit_file/glob/grep for file operations. "
-            "When your work is done, run from the REPO ROOT: "
-            "gitagent propose --feature <name> --agent <your-id> --title '...' --summary '...' --confidence 0.8"
-        ),
-        "backend": worker_backend,
-        "tools": [
-            _wrap_with_logging(_import_abm_run()),
-            _wrap_with_logging(_import_abm_test()),
-            _wrap_with_logging(_import_abm_score()),
-        ],
-        "permissions": [
-            # Deny reading secrets
-            FilesystemPermission(operations=["read"], paths=["/.env", "/**/.env", "/**/*secret*", "/**/*credential*"], mode="deny"),
-            # Deny writing to data inputs (read-only)
-            FilesystemPermission(operations=["write"], paths=["/data/**"], mode="deny"),
-            # Deny writing to gitagent metadata
-            FilesystemPermission(operations=["write"], paths=["/.gitagent/**", "/.git/**"], mode="deny"),
-            # Worker can read and write within its worktree (allow-all fallback)
-            FilesystemPermission(operations=["read", "write"], paths=["/**"], mode="allow"),
-        ],
-    }
-
-
-def _import_abm_run():
-    """Lazy import of abm_run tool."""
-    from agents.deepagents.tools.abm_tools import abm_run
-    return abm_run
-
-
-def _import_abm_test():
-    """Lazy import of abm_test tool."""
-    from agents.deepagents.tools.abm_tools import abm_test
-    return abm_test
-
-
-def _import_abm_score():
-    """Lazy import of abm_score tool."""
-    from agents.deepagents.tools.abm_tools import abm_score
-    return abm_score

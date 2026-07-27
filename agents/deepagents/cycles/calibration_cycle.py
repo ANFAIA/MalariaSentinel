@@ -1,4 +1,4 @@
-"""Calibration improvement cycle — recall, plan, spawn, score, improve."""
+"""ABM improvement cycle — understand, plan, spawn, review, improve."""
 from __future__ import annotations
 
 import json
@@ -7,57 +7,54 @@ import json
 CALIBRATION_PROMPT = """\
 GOAL: {goal}
 
-Run a calibration improvement cycle (max {max_iterations} iterations).
+Run an ABM improvement cycle (max {max_iterations} iterations).
 
 PHASE 1 — UNDERSTAND THE PROBLEM:
-Before doing anything, read the relevant code to understand what you're working with.
-1. memory_recall_kg(query="calibration improvement patterns ABM scoring regression", k=5)
-2. Use read_file to examine the key C++ parameter file: mal-core/src/mal_core/abm/params.h
-   — this contains all tunable parameters (MORT_BASAL, ADULT_SIGMA, DISPERSE_PROB, etc.)
-3. Use grep to find where these parameters are used in the engine: grep(pattern="MORT_BASAL|ADULT_SIGMA|DISPERSE_PROB", path="mal-core/src/mal_core/abm/")
-4. Use read_file to check the current thresholds: mal-core/src/mal_core/abm/tests/calibration/thresholds.yaml
-5. pipeline_run_calibration(seed=1, days=30, n_rollouts=1) — establish baseline
+Before doing anything, gather context. The goal determines what you need to read.
 
-You now have full context: what parameters exist, what values they have, what the thresholds expect, and what the current baseline score is.
+1. memory_recall_kg(query="{goal}", k=5) — check knowledge base for related patterns, pitfalls, architecture
+2. opencode_search(query="{goal} malaria ABM anopheles") — search web for scientific context
+3. Read relevant files in the repo. Use grep/glob to find them. Examples:
+   - If goal is about mortality → grep for MORT_BASAL, ADULT_SIGMA in mal-core/src/mal_core/abm/
+   - If goal is about dispersal → grep for DISPERSE_PROB, MRR in the same directory
+   - If goal is about a new feature → read the relevant .hpp/.cpp files
+   - If goal mentions a specific behavior → find where that behavior is implemented
+4. Read papers/ directory if the goal relates to biological mechanisms
+5. pipeline_run_calibration(seed=1, days=30, n_rollouts=1) — establish baseline (skip if goal is not about calibration)
 
-PHASE 2 — SPAWN WORKER:
-6. gitagent_init()
-7. gitagent_start(feature="calibration-<short-id>")  — pick a unique descriptive name
-8. gitagent_spawn(feature="calibration-<short-id>", agent_id="abm-worker-1", role="abm")
-9. task(subagent_type="abm-worker", description="You are an ABM calibration worker in an isolated worktree.
+You now have context: what the code does, what the science says, what the baseline is.
 
-Your goal: {goal}
+PHASE 2 — PLAN & DELEGATE:
+6. Formulate a specific hypothesis: "To fix <goal>, I need to change <X> because <Y>"
+7. gitagent_init()
+8. gitagent_start(feature="<descriptive-name>")  — pick a unique name
+9. gitagent_spawn(feature="<descriptive-name>", agent_id="worker-1", role="abm")
+10. task(subagent_type="abm-worker", description="<YOUR DETAILED TASK>")
 
-Context you have:
-- Parameters live in mal-core/src/mal_core/abm/params.h
-- Engine logic in mal-core/src/mal_core/abm/engine.hpp and wire.hpp
-- Thresholds in mal-core/src/mal_core/abm/tests/calibration/thresholds.yaml
-- Run tests with: cd mal-core/src/mal_core/abm/tests/calibration && uv run pytest -m fast -v
-
-Steps:
-1. Read params.h to understand current parameter values
-2. Read engine.hpp to understand how parameters affect mortality, dispersal, and population dynamics
-3. Make targeted changes to params.h based on the goal
-4. Compile and test: cd mal-core/src/mal_core/abm/tests/calibration && uv run pytest -m fast -v
-5. If tests pass, run: abm_run(aoi='ghana', year=2024, month=1, days=90, n_rollouts=1, seed=1)
-6. Score the result: abm_score(run_dir='<output_dir>')
-7. When done, propose your changes:
-   gitagent propose --feature calibration-<short-id> --agent abm-worker-1 --title '<what you changed>' --summary '<why>' --confidence 0.8
-
-Report back: what parameters you changed, what the test results were, what the score improved to.")
+The task description should include:
+- What you found in your research (papers, web, knowledge base)
+- What files need to change and why
+- What the expected behavior should be
+- How to verify the change (tests, simulation, scoring)
+- The feature name for gitagent propose
 
 PHASE 3 — REVIEW:
-10. gitagent_proposals(feature="calibration-<short-id>") — if none: STOP
-11. gitagent_diff(proposal_id, feature="calibration-<short-id>") — review changes carefully
-12. Accept if changes make biological sense and improve the score
-13. If revision needed: gitagent_revise(feature="calibration-<short-id>", feedback="specific feedback") → back to step 9
+11. gitagent_proposals(feature="<descriptive-name>") — if none: STOP
+12. gitagent_diff(proposal_id, feature="<descriptive-name>") — review changes carefully
+13. Accept if the change makes sense scientifically and technically
+14. If revision needed: gitagent_revise(feature="<descriptive-name>", feedback="specific feedback") → back to step 10
 
-PHASE 4 — VERIFY & FINALIZE:
-14. pipeline_run_calibration(seed=1, days=30, n_rollouts=1) — verify improvement
-15. If improved: gitagent_integrate(feature="calibration-<short-id>") → gitagent_finalize(feature="calibration-<short-id>", message="calibration: <description>")
-16. If not improved: record what failed with improve_prompt(), try new approach
+PHASE 5 — VERIFY & FINALIZE:
+15. Verify the change: run tests, check simulation, compare scores
+16. If improved: gitagent_integrate(feature="<descriptive-name>") → gitagent_finalize(feature="<descriptive-name>", message="<description>")
+17. If not improved: record what failed, try new approach
 
-IMPORTANT: You must UNDERSTAND the code before delegating. Don't blindly follow steps — read the files, form a hypothesis, then give the worker a specific, informed task."""
+RULES:
+- You are NOT limited to parameter changes. You can modify ANY C++ code.
+- You can add new behaviors, remove broken ones, restructure code.
+- Always verify scientifically: does the change match real biology?
+- Always verify technically: do tests pass? Does the simulation make sense?
+-Iterations unlimited — keep going until the goal is achieved."""
 
 
 def run_calibration_cycle(
