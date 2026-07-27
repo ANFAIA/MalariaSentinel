@@ -195,13 +195,57 @@ std::vector<mal_abm_fast::DetectionPoint> parse_detection_points(
 }  // namespace
 
 int main(int argc, char** argv) {
-    CLI::App app{
-        "mal_abm_fast: M1.5 thin-slice ABM (C++ port of mal_ghana_sim.abm)"
-    };
+    CLI::App app;
+    app.description(R"mal(
+mal_abm_fast — Mosquito ABM for malaria transmission modelling
+
+An agent-based model (ABM) simulating Anopheles gambiae population dynamics,
+dispersal, and transmission potential. The engine is written in C++20 with
+OpenMP parallelism for multi-rollout execution.
+
+ARCHITECTURE
+  Engine
+    ├── ClimateEngine      — daily temperature, rainfall, water_frac grids
+    ├── HabitatEngine      — static habitat patches (gpkg) with K, TWI
+    ├── HostLandscape       — human/livestock density grids (optional)
+    ├── MobilitySchedule   — OD matrices for human/livestock movement
+    ├── CoordinatorModel   — patch activation, state aggregation
+    └── MosquitoSubmodel   — population lifecycle
+          ├── AquaticCohortBank  — egg → larva → pupa development
+          ├── GonotrophicCycle   — female biting/oviposition state machine
+          ├── HostSeekingModel   — spatial host attraction (optional)
+          └── MosquitoSoA       — 17 parallel vectors (SoA layout)
+
+DAILY SIMULATION LOOP (Engine::step)
+  1. coord_->set_climate_day(day)      — select today's climate slice
+  2. coord_->activate_patches()        — enable patches by rain/temp thresholds
+  3. coord_->to_dataframe()            — build PatchState vector (pre-existing
+                                        + dynamic pluvial pool cells)
+  4. sub_->advance_day()               — the 5-step mosquito lifecycle:
+       a. AquaticCohortBank::advance_day()
+          — thermal development (Briere-1 / Quadratic per stage)
+          — Beverton-Holt density-dependent larval mortality
+          — desiccation on inactive patches (grace + daily rate)
+          — stage promotion: EGG→L1→L2→L3→L4→Pupa
+       b. collect_emergence()          — pupa → new adults (TENERAL)
+       c. Gonotrophic cycle (females)
+          — TENERAL → HOST_SEEKING → BLOOD_FEED → GRAVID → OVIPOSITING
+          — host-seeking via HostSeekingModel (if --hosts provided)
+       d. adult_dispersal()            — clipped Gaussian kernel
+       e. adult_mortality()            — Lardeux thermo-dependent model
+  5. divergence check                  — population bounds
+  6. advance date by 1 day
+
+OUTPUT
+  State COG (.tif): 2 bands
+    Band 1 — adult_occupancy (post-dispersal density / K_MAX)
+    Band 2 — host_seeking_pressure (female biting pressure / K_MAX)
+  Sidecar JSON: metadata, rollout info, contract version
+)mal");
     app.set_version_flag("--version", "0.1.0");
 
-    // --run subcommand: thin-slice ABM run.
-    auto* run = app.add_subcommand("run", "Run the ABM for an AOI + month");
+    // --run subcommand
+    auto* run = app.add_subcommand("run", "Run the ABM simulation");
 
     std::string aoi_slug;
     std::string bbox_str;
@@ -220,165 +264,200 @@ int main(int argc, char** argv) {
     std::string habitat_path;
     std::string output_path;
 
-    // Detection-based seeding (default: UNIFORM, legacy behaviour).
-    std::string seeding_mode = "uniform";
+    std::string seeding_mode = "random-viable";
     double      detection_radius_km = 5.0;
     int         n_detections = 3;
     int         n_adults_per_detection = 50;
     int         n_larvae_per_detection = 30;
     std::string detection_points_str;
 
-    run->add_option("--aoi", aoi_slug,
-                    "AOI slug (default 'ghana'). Use --bbox for custom.");
-    run->add_option("--bbox", bbox_str,
-                    "Custom bbox 'W,S,E,N' in degrees (overrides --aoi).");
-    run->add_option("--crs", crs,
-                    "CRS for the AOI (default 'EPSG:4326').");
-    run->add_option("--resolution-m", resolution_m,
-                    "Ground resolution in metres (default 1000).");
-    run->add_option("--scale", scale_str,
-                    "AOI scale: 'regional', 'national', or 'continental' "
-                    "(default 'regional').");
-    run->add_option("--year", year, "Year (1st day of the run).")
-        ->required();
-    run->add_option("--month", month, "Month (1..12).")
-        ->required()
-        ->check(CLI::Range(1, 12));
-    run->add_option("--seed", seed, "RNG seed (default 1).")
-        ->default_val(1);
-    run->add_option("--env", env_path,
-                    "Path to the env COG (.tif) or daily NetCDF (.nc) file.")
-        ->required();
-    run->add_option("--habitat", habitat_path,
-                    "Path to the habitat patches gpkg.")
-        ->required()
-        ->check(CLI::ExistingFile);
-    run->add_option("--output", output_path,
-                    "Path to write the state COG (.tif). When --n-rollouts "
-                    "> 1, the leaf file name is rewritten to "
-                    "<stem>_seed{NNNN}.tif where NNNN is the 0-indexed "
-                    "rollout id zero-padded to 4 digits.")
-        ->required();
-    run->add_option("--days", days, "Days to run (1..730).")
-        ->default_val(30)
-        ->check(CLI::Range(1, 730));
-    run->add_option("--n-rollouts", n_rollouts,
-                    "Number of rollouts to run in this process (1+). "
-                    "Default 1. Each rollout gets a fresh `Prng` instance "
-                    "seeded at `seed + i`; outputs are written to "
-                    "<output>_seed{NNNN}.tif alongside the sidecar JSON.")
-        ->default_val(1)
-        ->check(CLI::PositiveNumber);
-    run->add_option("--snapshot-every", snapshot_every,
-                    "Take intermediate snapshots every N days (0 = "
-                    "only final snapshot, backward compatible). "
-                    "Intermediate files are named <stem>_dayNNN.tif.")
-        ->default_val(0)
-        ->check(CLI::NonNegativeNumber);
-    run->add_option("--max-population", max_population,
-                    "Max safe population before warning (0 = auto: "
-                    "n_patches * K_MAX * 10).")
-        ->default_val(0)
-        ->check(CLI::NonNegativeNumber);
-    run->add_option("--threads", threads,
-                    "OpenMP threads for parallel rollouts (0=auto).")
-        ->default_val(0)
-        ->check(CLI::NonNegativeNumber);
-    run->add_option("--seeding-mode", seeding_mode,
-                    "Seeding mode: 'uniform' (default; init_frac of K "
-                    "in every patch), 'random-viable' (N random "
-                    "patches from the viable set, each seeded with "
-                    "adults + larvae), or 'explicit' (user-provided "
-                    "lat/lon points snapped to the nearest patch "
-                    "within --detection-radius-km).")
-        ->default_val("uniform");
-    run->add_option("--detection-radius-km", detection_radius_km,
-                    "Radius in km for snapping an explicit detection "
-                    "point to its nearest habitat patch (EXPLICIT mode).")
-        ->default_val(5.0)
-        ->check(CLI::PositiveNumber);
-    run->add_option("--n-detections", n_detections,
-                    "Number of detection points in RANDOM_VIABLE mode.")
-        ->default_val(3)
-        ->check(CLI::NonNegativeNumber);
-    run->add_option("--n-adults-per-detection", n_adults_per_detection,
-                    "Adult mosquitoes per detection point "
-                    "(RANDOM_VIABLE / EXPLICIT).")
-        ->default_val(50)
-        ->check(CLI::NonNegativeNumber);
-    run->add_option("--n-larvae-per-detection", n_larvae_per_detection,
-                    "Larvae per detection point "
-                    "(RANDOM_VIABLE / EXPLICIT).")
-        ->default_val(30)
-        ->check(CLI::NonNegativeNumber);
-    run->add_option("--detection-points", detection_points_str,
-                    "Comma-separated 'lat,lon' pairs separated by ';' "
-                    "for EXPLICIT mode "
-                    "(e.g. '5.6,-0.2;9.4,-0.8'). Each point is snapped "
-                    "to the nearest viable patch within "
-                    "--detection-radius-km.");
-
-    bool debug_population = false;
-    run->add_flag("--debug-population", debug_population,
-                  "Emit one stderr line per day with n_alive, n_adults, "
-                  "n_larvae, the Lardeux p_d at the seeding patch, and "
-                  "the per-day n_births / n_deaths / n_maturation. "
-                  "Rate-limited: every day for the first 10 days, then "
-                  "every 5 days. Default off.");
-
-    std::string cohort_log_path;
-    run->add_option("--emit-cohort-log", cohort_log_path,
-                    "Path to write the per-day cohort log JSON. "
-                    "Contains daily n_alive, n_adults, n_larvae, "
-                    "n_births, n_deaths, n_maturation, eip_frac.")
-        ->default_val("");
-
     // Host data (optional; if not provided, no host-seeking).
     std::string hosts_path;
-    run->add_option("--hosts", hosts_path,
-                    "Path to host_static.nc (optional; enables host-seeking)");
-
-    // Mobility matrices (optional; requires --hosts).
     std::string human_mobility_day_path;
     std::string human_mobility_night_path;
     std::string livestock_mobility_path;
-    run->add_option("--human-mobility-day", human_mobility_day_path,
-                    "Path to human_mobility_day.csr (optional)");
-    run->add_option("--human-mobility-night", human_mobility_night_path,
-                    "Path to human_mobility_night.csr (optional)");
-    run->add_option("--livestock-mobility", livestock_mobility_path,
-                    "Path to livestock_mobility_season.csr (optional)");
 
     // Runtime overrides for dispersal and larval parameters.
-    float disperse_prob = mal_abm_fast::ADULT_DISPERSE_PROB;
-    run->add_option("--disperse-prob", disperse_prob,
-                    "Adult dispersal probability per day "
-                    "(default 0.05).")
-        ->default_val(mal_abm_fast::ADULT_DISPERSE_PROB);
-
+    float disperse_prob    = mal_abm_fast::ADULT_DISPERSE_PROB;
     float disperse_sigma_m = mal_abm_fast::ADULT_DISPERSE_SIGMA_M;
+    float disperse_max_m   = mal_abm_fast::ADULT_DISPERSE_MAX_M;
+    float larva_bh_alpha   = mal_abm_fast::LARVA_BH_ALPHA;
+    float birth_fecundity  = mal_abm_fast::BIRTH_FECUNDITY;
+
+    bool debug_population = false;
+    std::string cohort_log_path;
+
+    // ─── Spatial & Temporal ──────────────────────────────────────────────
+    run->add_option("--aoi", aoi_slug,
+                    "Area of Interest slug. Built-in: 'ghana'. "
+                    "Use --bbox for custom regions.")
+        ->group("Spatial & Temporal");
+    run->add_option("--bbox", bbox_str,
+                    "Custom bounding box 'W,S,E,N' in EPSG:4326 degrees. "
+                    "Overrides --aoi. Example: '-3.5,4.5,1.5,11.5'")
+        ->group("Spatial & Temporal");
+    run->add_option("--crs", crs,
+                    "Coordinate Reference System (default 'EPSG:4326').")
+        ->group("Spatial & Temporal");
+    run->add_option("--resolution-m", resolution_m,
+                    "Ground cell resolution in metres (default 1000). "
+                    "Controls patch density: smaller = more patches.")
+        ->group("Spatial & Temporal");
+    run->add_option("--scale", scale_str,
+                    "AOI scale: 'regional' | 'national' | 'continental'.")
+        ->group("Spatial & Temporal");
+    run->add_option("--year", year, "Start year (1st day of run).")
+        ->required()
+        ->group("Spatial & Temporal");
+    run->add_option("--month", month, "Start month (1..12).")
+        ->required()
+        ->check(CLI::Range(1, 12))
+        ->group("Spatial & Temporal");
+    run->add_option("--seed", seed, "RNG seed (default 1). "
+                    "Each rollout gets seed+i.")
+        ->default_val(1)
+        ->group("Spatial & Temporal");
+    run->add_option("--days", days, "Simulation duration (1..730 days).")
+        ->default_val(30)
+        ->check(CLI::Range(1, 730))
+        ->group("Spatial & Temporal");
+    run->add_option("--n-rollouts", n_rollouts,
+                    "Parallel rollouts (1+). Each gets fresh PRNG seeded "
+                    "at seed+i; outputs: <stem>_seed{NNNN}.tif.")
+        ->default_val(1)
+        ->check(CLI::PositiveNumber)
+        ->group("Spatial & Temporal");
+    run->add_option("--threads", threads,
+                    "OpenMP threads for parallel rollouts (0=auto).")
+        ->default_val(0)
+        ->check(CLI::NonNegativeNumber)
+        ->group("Spatial & Temporal");
+
+    // ─── Input Data ──────────────────────────────────────────────────────
+    run->add_option("--env", env_path,
+                    "Climate raster: GeoTIFF (.tif) or NetCDF (.nc). "
+                    "4-band: temperature, rainfall, water_frac, ndvi/twi.")
+        ->required()
+        ->group("Input Data");
+    run->add_option("--habitat", habitat_path,
+                    "Habitat patches GeoPackage (.gpkg). Each feature: "
+                    "row, col, K (carrying capacity), TWI.")
+        ->required()
+        ->check(CLI::ExistingFile)
+        ->group("Input Data");
+    run->add_option("--output", output_path,
+                    "Output state COG path (.tif). When --n-rollouts > 1, "
+                    "leaf is rewritten to <stem>_seed{NNNN}.tif.")
+        ->required()
+        ->group("Input Data");
+    run->add_option("--hosts", hosts_path,
+                    "Host density grid (.nc). Enables host-seeking model "
+                    "with human/cattle/goat/sheep/wildlife density per cell.")
+        ->group("Input Data");
+    run->add_option("--human-mobility-day", human_mobility_day_path,
+                    "Human mobility OD matrix — daytime (.csr). "
+                    "Sparse OD: P(origin→dest) × host_density.")
+        ->group("Input Data");
+    run->add_option("--human-mobility-night", human_mobility_night_path,
+                    "Human mobility OD matrix — nighttime (.csr).")
+        ->group("Input Data");
+    run->add_option("--livestock-mobility", livestock_mobility_path,
+                    "Livestock mobility OD matrix — seasonal (.csr).")
+        ->group("Input Data");
+
+    // ─── Seeding ─────────────────────────────────────────────────────────
+    run->add_option("--seeding-mode", seeding_mode,
+                    "Population initialisation mode:\n"
+                    "  random-viable (default) — N random viable patches, "
+                    "each seeded with adults + larvae\n"
+                    "  uniform — init_frac of K in every patch\n"
+                    "  explicit — user lat/lon points snapped to nearest "
+                    "habitat patch")
+        ->default_val("random-viable")
+        ->group("Seeding");
+    run->add_option("--detection-radius-km", detection_radius_km,
+                    "Max snap distance (km) from explicit point to "
+                    "nearest patch. EXPLICIT mode only.")
+        ->default_val(5.0)
+        ->check(CLI::PositiveNumber)
+        ->group("Seeding");
+    run->add_option("--n-detections", n_detections,
+                    "Number of random viable patches to seed. "
+                    "RANDOM_VIABLE mode only.")
+        ->default_val(3)
+        ->check(CLI::NonNegativeNumber)
+        ->group("Seeding");
+    run->add_option("--n-adults-per-detection", n_adults_per_detection,
+                    "Adult mosquitoes per detection point. "
+                    "RANDOM_VIABLE / EXPLICIT modes.")
+        ->default_val(50)
+        ->check(CLI::NonNegativeNumber)
+        ->group("Seeding");
+    run->add_option("--n-larvae-per-detection", n_larvae_per_detection,
+                    "Larvae per detection point. "
+                    "RANDOM_VIABLE / EXPLICIT modes.")
+        ->default_val(30)
+        ->check(CLI::NonNegativeNumber)
+        ->group("Seeding");
+    run->add_option("--detection-points", detection_points_str,
+                    "Explicit detection points: 'lat,lon;lat,lon;...'. "
+                    "Example: '5.6,-0.2;9.4,-0.8'. EXPLICIT mode only.")
+        ->group("Seeding");
+
+    // ─── Population Dynamics ─────────────────────────────────────────────
+    run->add_option("--disperse-prob", disperse_prob,
+                    "Adult dispersal probability per day (default 0.05). "
+                    "Fraction of adults that attempt to move each day.")
+        ->default_val(mal_abm_fast::ADULT_DISPERSE_PROB)
+        ->group("Population Dynamics");
     run->add_option("--disperse-sigma-m", disperse_sigma_m,
-                    "Dispersal kernel sigma in metres "
-                    "(default 450).")
-        ->default_val(mal_abm_fast::ADULT_DISPERSE_SIGMA_M);
-
-    float disperse_max_m = mal_abm_fast::ADULT_DISPERSE_MAX_M;
+                    "Dispersal kernel sigma in metres (default 450). "
+                    "Gaussian width; controls neighbourhood movement.")
+        ->default_val(mal_abm_fast::ADULT_DISPERSE_SIGMA_M)
+        ->group("Population Dynamics");
     run->add_option("--disperse-max-m", disperse_max_m,
-                    "Dispersal kernel max distance in metres "
-                    "(default 2000).")
-        ->default_val(mal_abm_fast::ADULT_DISPERSE_MAX_M);
-
-    float larva_bh_alpha = mal_abm_fast::LARVA_BH_ALPHA;
-    run->add_option("--larva-bh-alpha", larva_bh_alpha,
-                    "Beverton-Holt competition coefficient "
-                    "(default 0.05).")
-        ->default_val(mal_abm_fast::LARVA_BH_ALPHA);
-
-    float birth_fecundity = mal_abm_fast::BIRTH_FECUNDITY;
+                    "Max dispersal distance in metres (default 2000). "
+                    "Hard cap on kernel; rare long-distance colonisation.")
+        ->default_val(mal_abm_fast::ADULT_DISPERSE_MAX_M)
+        ->group("Population Dynamics");
     run->add_option("--birth-fecundity", birth_fecundity,
-                    "Per-adult per-day fecundity "
-                    "(default 0.25).")
-        ->default_val(mal_abm_fast::BIRTH_FECUNDITY);
+                    "Per-adult per-day fecundity (default 0.25). "
+                    "n_eggs = binomial(n_females, fecundity). "
+                    "Lower = slower population growth.")
+        ->default_val(mal_abm_fast::BIRTH_FECUNDITY)
+        ->group("Population Dynamics");
+    run->add_option("--larva-bh-alpha", larva_bh_alpha,
+                    "Beverton-Holt competition coefficient (default 0.05). "
+                    "Controls density-dependent larval mortality: "
+                    "survival = S0 / (1 + alpha * N_larvae / K). "
+                    "Higher = stronger competition at high density.")
+        ->default_val(mal_abm_fast::LARVA_BH_ALPHA)
+        ->group("Population Dynamics");
+
+    // ─── Output & Debug ──────────────────────────────────────────────────
+    run->add_option("--snapshot-every", snapshot_every,
+                    "Intermediate snapshot interval in days (0 = final "
+                    "only). Intermediate files: <stem>_dayNNN.tif.")
+        ->default_val(0)
+        ->check(CLI::NonNegativeNumber)
+        ->group("Output & Debug");
+    run->add_option("--max-population", max_population,
+                    "Population divergence threshold (0 = auto: "
+                    "n_patches × K_MAX × 10). Aborts if exceeded.")
+        ->default_val(0)
+        ->check(CLI::NonNegativeNumber)
+        ->group("Output & Debug");
+    run->add_flag("--debug-population", debug_population,
+                  "Stderr diagnostics: daily n_alive, n_adults, n_larvae, "
+                  "Lardeux p_d, births/deaths/maturation. "
+                  "Rate-limited: daily for first 10 days, then every 5.")
+        ->group("Output & Debug");
+    run->add_option("--emit-cohort-log", cohort_log_path,
+                    "Path for daily cohort log JSON. Fields: day, n_alive, "
+                    "n_adults, n_larvae, n_births, n_deaths, n_maturation, "
+                    "eip_frac.")
+        ->default_val("")
+        ->group("Output & Debug");
 
     CLI11_PARSE(app, argc, argv);
 
@@ -410,7 +489,7 @@ int main(int argc, char** argv) {
         }
     } else {
         std::cerr << "abm_run: unknown --seeding-mode '" << seeding_mode
-                  << "' (expected 'uniform', 'random-viable', or "
+                  << "' (expected 'random-viable', 'uniform', or "
                      "'explicit')\n";
         return EXIT_FAILURE;
     }
