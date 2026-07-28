@@ -1,6 +1,5 @@
 """Download runner — orchestrates downloads for an AOI via the plugin registry."""
 from __future__ import annotations
-import inspect
 import logging
 from pathlib import Path
 from typing import Any
@@ -29,6 +28,7 @@ def _check_auth(spec: DownloaderSpec) -> bool:
 def run_download(
     aoi: str,
     datasets: list[str] | None = None,
+    outputs: list[str] | None = None,
     years: list[int] | None = None,
     months: list[str] | None = None,
     output_dir: str | Path | None = None,
@@ -55,27 +55,24 @@ def run_download(
 
         try:
             for output_name, func in spec.outputs.items():
-                ext = ".nc" if "download" in func.__name__ else ".tif"
-                out_path = out_dir / f"{aoi}_{output_name}{ext}"
+                if outputs and output_name not in outputs:
+                    continue
 
-                sig = inspect.signature(func)
-                call_kwargs = {}
-                if "years" in sig.parameters or "year" in sig.parameters:
-                    if years:
-                        call_kwargs["years" if "years" in sig.parameters else "year"] = (
-                            years[0] if len(years) == 1 else years
-                        )
-                if "months" in sig.parameters and months:
+                log.info("  %s.%s", name, output_name)
+
+                call_kwargs: dict[str, Any] = {"aoi": aoi}
+                if years:
+                    call_kwargs["years"] = years
+                if months:
                     call_kwargs["months"] = months
-                if "output_path" in sig.parameters:
-                    call_kwargs["output_path"] = str(out_path)
-                elif "aoi" in sig.parameters:
-                    call_kwargs["aoi"] = aoi
+
+                ext = ".nc" if "wind" in output_name else ".tif"
+                call_kwargs["output_path"] = out_dir / f"{aoi}_{output_name}{ext}"
 
                 func(**call_kwargs)
 
                 manifest_key = spec.manifest_keys.get(output_name, output_name)
-                update_manifest(aoi, manifest_key, out_path.name)
+                update_manifest(aoi, manifest_key, Path(call_kwargs["output_path"]).name)
 
             results[name] = {"status": "ok"}
         except Exception as e:

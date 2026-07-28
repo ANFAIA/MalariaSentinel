@@ -113,7 +113,7 @@ def _load_with_fallback(
     try:
         if channel_name == "elevation":
             return loader(aoi)
-        return loader(aoi, year, month)
+        return loader(aoi, year=year, month=month)
     except (RuntimeError, FileNotFoundError, OSError, requests.RequestException) as exc:
         typer.echo(
             f"WARNING: {channel_name} loader failed: {exc!r}. "

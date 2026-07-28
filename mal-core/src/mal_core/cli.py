@@ -146,6 +146,7 @@ def run(
 def download(
     aoi: str = typer.Option("ghana", "--aoi", help="AOI slug"),
     datasets: str = typer.Option("", "--datasets", help="Comma-separated dataset names (empty = all registered)"),
+    outputs: str = typer.Option("", "--outputs", help="Comma-separated output names (empty = all)"),
     years: str = typer.Option("", "--years", help="Comma-separated years"),
     months: str = typer.Option("", "--months", help="Comma-separated months"),
     output_dir: Path = typer.Option(Path("data"), "--output-dir", help="Output root directory"),
@@ -157,18 +158,20 @@ def download(
 
     Examples:
       malariasim download --aoi ghana --datasets era5
-      malariasim download --aoi ghana --datasets era5,chirps --years 2024 2025
+      malariasim download --aoi ghana --datasets era5 --outputs wind_6hourly --years 2024,2025
       malariasim download --aoi ghana --all
     """
     from .download import run_download
 
     ds_list = [s.strip() for s in datasets.split(",") if s.strip()] if datasets else None
+    out_list = [s.strip() for s in outputs.split(",") if s.strip()] if outputs else None
     year_list = [int(y.strip()) for y in years.split(",") if y.strip()] if years else None
     month_list = [m.strip() for m in months.split(",") if m.strip()] if months else None
 
     result = run_download(
         aoi=aoi,
         datasets=ds_list,
+        outputs=out_list,
         years=year_list,
         months=month_list,
         output_dir=output_dir / aoi,

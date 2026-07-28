@@ -15,11 +15,13 @@ def run_stage(stage: Stage, aoi: str, year: int, month: int, output_dir: Path, s
         from mal_core.download import run_download
         ds = extra.pop("datasets", "")
         datasets = [s.strip() for s in ds.split(",") if s.strip()] if ds else None
+        os = extra.pop("outputs", "")
+        out_list = [s.strip() for s in os.split(",") if s.strip()] if os else None
         ys = extra.pop("years", "")
         years = [int(y.strip()) for y in ys.split(",") if y.strip()] if ys else None
         ms = extra.pop("months", "")
         months = [m.strip() for m in ms.split(",") if m.strip()] if ms else None
-        return run_download(aoi=aoi, datasets=datasets, years=years, months=months, output_dir=output_dir / "download", **extra)
+        return run_download(aoi=aoi, datasets=datasets, outputs=out_list, years=years, months=months, output_dir=output_dir / "download", **extra)
     elif stage == Stage.INGEST:
         from mal_core.ingest import build_environment
         return build_environment(aoi=aoi, year=year, month=month, output_dir=output_dir / "ingest", **extra)

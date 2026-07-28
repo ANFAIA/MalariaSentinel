@@ -113,7 +113,7 @@ def test_era5_requires_cds_auth(
 
     monkeypatch.setattr(cdsapi, "Client", _raise_on_init)
     with pytest.raises(RuntimeError, match="CDS auth"):
-        load_era5_temp_suitability(ghana_aoi, 2024, 6)
+        load_era5_temp_suitability(ghana_aoi, year=2024, month=6)
 
 
 def test_sharpe_demichele_growth_known_values() -> None:
@@ -175,7 +175,7 @@ def test_era5_dry_run_no_network(
     monkeypatch.setattr(cdsapi, "Client", _make_mock_client)
 
     out = load_era5_temp_suitability(
-        ghana_aoi, 2024, 6, cache_dir=tmp_path / "era5-cache"
+        ghana_aoi, year=2024, month=6, cache_dir=tmp_path / "era5-cache"
     )
 
     h, w = ghana_aoi.cells_per_side()
@@ -205,7 +205,7 @@ def test_era5_invalid_month_rejected(ghana_aoi: AOI) -> None:
     # months surface as ValueError. In-range months without CDS auth
     # surface as RuntimeError (see ``test_era5_requires_cds_auth``).
     with pytest.raises(ValueError, match="month"):
-        load_era5_temp_suitability(ghana_aoi, 2024, 13)
+        load_era5_temp_suitability(ghana_aoi, year=2024, month=13)
 
 
 def test_monthly_mean_reduces_valid_time() -> None:
