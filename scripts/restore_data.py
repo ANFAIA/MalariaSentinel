@@ -10,7 +10,7 @@ It will restore, in order:
   2. Moua et al. 2016 paper (HAL)   -> data/moua_2016.pdf
   3. SRTM DEM tiles + map PNGs      -> terrain/srtm_maps/, terrain/srtm_guf/
   4. WorldClim + JRC env layers      -> runs/layers/  (+ runs/env_stack.npz)
-  5. ERA5 wind data                  -> data/ghana/wind_era5_6hourly_*.nc
+  5. ERA5 wind data                  -> data/ghana/ghana_wind_*.nc
 
 Steps 3-4 require ``OPENTOPO_API_KEY`` in the environment; if absent, the script
 prints the exact commands to run manually.
@@ -231,7 +231,7 @@ def restore_env_layers() -> None:
 def restore_wind() -> None:
     print("\n=== ERA5 wind data ===")
     wind_dir = DATA / "ghana"
-    wind_files = list(wind_dir.glob("wind_era5_6hourly_*.nc")) if wind_dir.exists() else []
+    wind_files = list(wind_dir.glob("ghana_wind_*.nc")) if wind_dir.exists() else []
     if wind_files:
         total_mb = sum(f.stat().st_size for f in wind_files) / 1e6
         print(f"  already present ({len(wind_files)} files, {total_mb:.1f} MB) -> skip")
