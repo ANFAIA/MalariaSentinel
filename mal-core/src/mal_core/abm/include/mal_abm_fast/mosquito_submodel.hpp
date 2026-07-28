@@ -119,6 +119,7 @@ public:
     // Wind field setter (M7.6 — windborne migration).
     void set_wind_field(const WindField* w) { wind_field_ = w; }
     void set_current_month(int m) { current_month_ = m; }
+    void set_current_hour(int h) { current_hour_ = h; }
 
     // Total live agent count (= soa().n_alive).
     int64_t total_agents() const { return soa_.n_alive; }
@@ -203,6 +204,7 @@ private:
     // Wind field (M7.6 — non-owning pointer; Engine owns it).
     const WindField*        wind_field_        = nullptr;
     int                     current_month_     = 1;  // 1-12, set daily by Engine
+    int                     current_hour_      = 20; // 0-23, set daily by Engine (default 8pm)
 
     // -- debug instrumentation state (see set_debug_population) -----
     bool     debug_population_      = false;

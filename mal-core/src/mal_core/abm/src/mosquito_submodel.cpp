@@ -605,7 +605,8 @@ void MosquitoSubmodel::advance_day(const AOI& aoi,
 
 void MosquitoSubmodel::adult_dispersal(const AOI& aoi) {
     const bool wind_active = wind_field_ &&
-        WindField::is_migration_season(current_month_);
+        WindField::is_migration_season(current_month_) &&
+        (current_hour_ >= 18 || current_hour_ < 6);  // night-only flight
 
     for (int64_t i = 0; i < soa_.n_alive; ++i) {
         const size_t si = static_cast<size_t>(i);
@@ -622,7 +623,7 @@ void MosquitoSubmodel::adult_dispersal(const AOI& aoi) {
                     const WindVector w = wind_field_->wind_at(
                         static_cast<double>(soa_.lon[si]),
                         static_cast<double>(soa_.lat[si]),
-                        current_month_);
+                        current_hour_);
 
                     const double ws =
                         std::sqrt(static_cast<double>(w.u * w.u + w.v * w.v));

@@ -368,9 +368,9 @@ OUTPUT
                     "Livestock mobility OD matrix — seasonal (.csr).")
         ->group("Input Data");
     run->add_option("--wind-field", wind_field_path,
-                    "ERA5 monthly mean wind field GeoTIFF (24 bands: "
-                    "u100 x 12 months, v100 x 12). Enables windborne "
-                    "long-range migration (M7.6).")
+                    "ERA5 6-hourly wind field NetCDF (u100, v100). Enables "
+                    "windborne long-range migration with night-only flight "
+                    "(18-06h) during monsoon/Harmattan season (M7.6).")
         ->group("Input Data");
 
     // ─── Seeding ─────────────────────────────────────────────────────────

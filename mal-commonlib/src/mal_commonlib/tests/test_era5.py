@@ -14,6 +14,7 @@ Three tests:
 """
 from __future__ import annotations
 
+import calendar
 import pathlib
 from typing import Any
 
@@ -244,3 +245,88 @@ def test_monthly_mean_reduces_no_time_dim() -> None:
     assert out.shape == (h, w)
     np.testing.assert_allclose(out.values, 25.0, atol=1e-4)
     assert out.dtype == np.float32
+
+
+# -- ERA5 6-hourly wind download tests (M7.6 Phase 2) --
+
+
+def _make_wind_dataset(year: int, month: int, n_days: int) -> xr.Dataset:
+    """Build a synthetic ERA5 6-hourly wind dataset."""
+    n_times = n_days * 4  # 4 slots per day
+    times = np.arange(n_times, dtype=np.int64) * 6 * 3600  # 6-hourly offsets
+    lats = np.linspace(11.5, 4.5, 29)
+    lons = np.linspace(-3.5, 1.5, 21)
+    u = np.random.default_rng(42).standard_normal((n_times, 29, 21)).astype(np.float32)
+    v = np.random.default_rng(43).standard_normal((n_times, 29, 21)).astype(np.float32)
+    return xr.Dataset(
+        data_vars={"u100": (("valid_time", "latitude", "longitude"), u),
+                    "v100": (("valid_time", "latitude", "longitude"), v)},
+        coords={"valid_time": times, "latitude": lats, "longitude": lons},
+    )
+
+
+def test_download_era5_wind_6hourly_mock(
+    tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Mock CDS client: verifies download_era5_wind_6hourly calls CDS
+    for each migration month and merges into a single NetCDF."""
+    import cdsapi
+
+    call_months: list[str] = []
+
+    class _MockClient:
+        def retrieve(self, name: str, request: dict, target: str | None = None) -> _MockCdsResult:
+            assert target is not None
+            month = request["month"][0]
+            call_months.append(month)
+            year = int(request["year"])
+            m_int = int(month)
+            n_days = calendar.monthrange(year, m_int)[1]
+            pathlib.Path(target).parent.mkdir(parents=True, exist_ok=True)
+            _MockCdsResult(target, lambda: _make_wind_dataset(year, m_int, n_days)).download(target)
+            return _MockCdsResult(target, lambda: _make_wind_dataset(year, m_int, n_days))
+
+    monkeypatch.setattr(cdsapi, "Client", lambda: _MockClient())
+
+    from mal_commonlib.data.loaders.era5 import download_era5_wind_6hourly
+
+    out_path = str(tmp_path / "wind_6h_2024.nc")
+    result = download_era5_wind_6hourly(2024, out_path, cache_dir=tmp_path / "cache")
+
+    assert result == out_path
+    # Migration months for 2024: Jul, Aug, Sep, Oct, Dec
+    assert call_months == ["07", "08", "09", "10", "12"]
+
+    ds = xr.open_dataset(out_path)
+    assert "u100" in ds.data_vars
+    assert "v100" in ds.data_vars
+    # 5 months: 31+31+30+31+31 = 154 days × 4 slots = 616
+    assert ds.dims["valid_time"] == 616
+    # Sorted by time
+    assert (ds.valid_time.diff("valid_time") >= 0).all()
+    ds.close()
+
+
+def test_download_era5_wind_6hourly_auth_error(
+    tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Missing CDS auth raises RuntimeError."""
+    import cdsapi
+
+    def _raise(*_a, **_kw):
+        raise RuntimeError("no auth")
+
+    monkeypatch.setattr(cdsapi, "Client", _raise)
+
+    from mal_commonlib.data.loaders.era5 import download_era5_wind_6hourly
+
+    with pytest.raises(RuntimeError, match="CDS auth"):
+        download_era5_wind_6hourly(2024, str(tmp_path / "out.nc"))
+
+
+def test_download_era5_wind_6hourly_invalid_year() -> None:
+    """Unsupported year raises ValueError."""
+    from mal_commonlib.data.loaders.era5 import download_era5_wind_6hourly
+
+    with pytest.raises(ValueError, match="not supported"):
+        download_era5_wind_6hourly(2023, "/tmp/out.nc")

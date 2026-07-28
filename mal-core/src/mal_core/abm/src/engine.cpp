@@ -169,10 +169,11 @@ Engine::Engine(AOI aoi,
     if (!wind_field_path.empty()) {
         wind_field_ = std::make_unique<WindField>();
         try {
-            wind_field_->load_from_tif(wind_field_path);
+            wind_field_->load_from_nc(wind_field_path);
             std::cout << "Engine: loaded WindField from " << wind_field_path
                       << " (" << wind_field_->nlat() << "x"
-                      << wind_field_->nlon() << " grid)\n";
+                      << wind_field_->nlon() << " grid, "
+                      << wind_field_->n_times() << " time steps)\n";
         } catch (const std::exception& e) {
             throw std::runtime_error(
                 "Engine: WindField load failed for '" +
@@ -267,10 +268,11 @@ Engine::Engine(AOI aoi,
     if (!wind_field_path.empty()) {
         wind_field_ = std::make_unique<WindField>();
         try {
-            wind_field_->load_from_tif(wind_field_path);
+            wind_field_->load_from_nc(wind_field_path);
             std::cout << "Engine: loaded WindField from " << wind_field_path
                       << " (" << wind_field_->nlat() << "x"
-                      << wind_field_->nlon() << " grid)\n";
+                      << wind_field_->nlon() << " grid, "
+                      << wind_field_->n_times() << " time steps)\n";
         } catch (const std::exception& e) {
             throw std::runtime_error(
                 "Engine: WindField load failed for '" +
@@ -296,6 +298,9 @@ void Engine::step() {
     if (wind_field_) {
         const auto ymd = std::chrono::year_month_day{current_date_};
         sub_->set_current_month(static_cast<int>(unsigned{ymd.month()}));
+        // Phase 2: 6-hourly wind with night-only flight.
+        // Default to 20:00 (8pm) — typical mosquito flight start hour.
+        sub_->set_current_hour(20);
     }
     sub_->advance_day(aoi_, coord_->patch_states_today());
 

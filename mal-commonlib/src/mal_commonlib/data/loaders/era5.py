@@ -421,13 +421,116 @@ def load_era5_water_temp(
     return out_da
 
 
+# -- ERA5 100m wind (M7.6 Phase 2: 6-hourly windborne migration) --
+
+ERA5_WIND_DATASET: str = "reanalysis-era5-single-levels"
+ERA5_WIND_VARIABLES: list[str] = [
+    "100m_u_component_of_wind",
+    "100m_v_component_of_wind",
+]
+ERA5_WIND_TIMES: list[str] = ["00:00", "06:00", "12:00", "18:00"]
+ERA5_WIND_GHANA_AOI: list[float] = [11.5, -3.5, 4.5, 1.5]  # [W, S, E, N]
+
+# Migration season months per year (monsoon Jul-Oct + Harmattan Dec-Mar).
+MIGRATION_SEASON_MONTHS: dict[int, list[str]] = {
+    2024: ["07", "08", "09", "10", "12"],
+    2025: ["01", "02", "03"],
+}
+
+
+def download_era5_wind_6hourly(
+    year: int,
+    output_path: str,
+    *,
+    cache_dir: pathlib.Path | None = None,
+) -> str:
+    """Download ERA5 6-hourly 100m wind for Ghana migration season.
+
+    Downloads ``100m_u_component_of_wind`` and ``100m_v_component_of_wind``
+    from the ``reanalysis-era5-single-levels`` dataset at 6-hourly resolution
+    (00/06/12/18 UTC) for migration season months (Jul-Oct monsoon +
+    Dec-Mar Harmattan). One CDS request per month (API limitation: unique
+    day list), then merges with xarray.
+
+    Args:
+        year: year to download (must be in :data:`MIGRATION_SEASON_MONTHS`).
+        output_path: path for the merged NetCDF output.
+        cache_dir: optional per-month cache directory.
+
+    Returns:
+        The ``output_path``.
+
+    Raises:
+        RuntimeError: if CDS auth is missing.
+        ValueError: if ``year`` is not supported.
+    """
+    months = MIGRATION_SEASON_MONTHS.get(year)
+    if months is None:
+        raise ValueError(
+            f"Year {year} not supported; use {list(MIGRATION_SEASON_MONTHS.keys())}"
+        )
+
+    import cdsapi
+
+    try:
+        client = cdsapi.Client()
+    except Exception as e:
+        raise RuntimeError(
+            "ERA5 wind requires CDS auth. Configure ~/.cdsapirc or "
+            "CDSAPI_URL/KEY env vars. See op-m1-3a-data-layer-auth for "
+            f"details. (cdsapi raised: {e})"
+        ) from e
+
+    cdir = cache_dir if cache_dir is not None else _default_cache_dir()
+    cdir.mkdir(parents=True, exist_ok=True)
+
+    monthly_files: list[str] = []
+    for month_str in months:
+        m_int = int(month_str)
+        n_days = calendar.monthrange(year, m_int)[1]
+        days = [f"{d:02d}" for d in range(1, n_days + 1)]
+
+        target = cdir / f"era5_wind_6h_{year}_{month_str}.nc"
+        if not target.exists():
+            client.retrieve(
+                ERA5_WIND_DATASET,
+                {
+                    "product_type": "reanalysis",
+                    "variable": ERA5_WIND_VARIABLES,
+                    "year": str(year),
+                    "month": [month_str],
+                    "day": days,
+                    "time": ERA5_WIND_TIMES,
+                    "area": ERA5_WIND_GHANA_AOI,
+                    "format": "netcdf",
+                },
+                str(target),
+            )
+        monthly_files.append(str(target))
+
+    # Merge monthly files and sort by time.
+    datasets = [xr.open_dataset(f) for f in monthly_files]
+    merged = xr.concat(datasets, dim="valid_time").sortby("valid_time")
+    merged.to_netcdf(output_path)
+    for ds in datasets:
+        ds.close()
+
+    return output_path
+
+
 __all__ = [
     "load_era5_temp_suitability",
     "load_era5_water_temp",
+    "download_era5_wind_6hourly",
     "sharpe_demichele_growth",
     "T_OPT",
     "T_HALF_WIDTH",
     "ERA5_NODATA",
     "ERA5_DATASET",
     "ERA5_VARIABLE",
+    "ERA5_WIND_DATASET",
+    "ERA5_WIND_VARIABLES",
+    "ERA5_WIND_TIMES",
+    "ERA5_WIND_GHANA_AOI",
+    "MIGRATION_SEASON_MONTHS",
 ]
