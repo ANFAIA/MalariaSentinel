@@ -19,9 +19,7 @@ dependencies = [
 openrouter = ["langchain-openai>=0.3"]
 
 [project.scripts]
-# Entry point doesn't work from workspace root (agents/ not on sys.path).
-# Use: uv run python -m agents.deepagents <command> [options]
-# Or:  python agents/deepagents/run.py <command> [options]
+deepagents = "agents.deepagents.cli:app"
 
 [tool.hatch.build.targets.wheel]
 packages = ["."]
