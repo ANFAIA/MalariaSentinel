@@ -119,6 +119,61 @@ class SessionLogger:
             ],
         })
 
+    def log_llm_call(
+        self,
+        step: int,
+        model_name: str,
+        message_count: int,
+        latency_s: float,
+        prompt_tokens: int,
+        completion_tokens: int,
+        response_preview: str = "",
+    ) -> None:
+        """Log a single LLM call with token usage."""
+        self._append({
+            "event": "llm_call",
+            "ts": self._now_iso(),
+            "step": step,
+            "model": model_name,
+            "message_count": message_count,
+            "latency_s": round(latency_s, 3),
+            "prompt_tokens": prompt_tokens,
+            "completion_tokens": completion_tokens,
+            "response_preview": _truncate(response_preview, max_chars=500),
+        })
+
+    def log_agent_event(self, event_type: str, detail: str = "") -> None:
+        """Log agent lifecycle event (start, end, error)."""
+        self._append({
+            "event": f"agent_{event_type}",
+            "ts": self._now_iso(),
+            "detail": detail,
+        })
+
+    def log_token_summary(
+        self,
+        total_prompt: int,
+        total_completion: int,
+        llm_calls: int,
+    ) -> None:
+        """Log cumulative token usage at session end."""
+        self._append({
+            "event": "token_summary",
+            "ts": self._now_iso(),
+            "total_prompt_tokens": total_prompt,
+            "total_completion_tokens": total_completion,
+            "total_llm_calls": llm_calls,
+        })
+
+    def log_graph_steps(self, steps: list[dict]) -> None:
+        """Log graph node execution steps from streaming."""
+        self._append({
+            "event": "graph_steps",
+            "ts": self._now_iso(),
+            "step_count": len(steps),
+            "steps": steps,
+        })
+
     def close(self) -> None:
         """Write session end marker."""
         elapsed = time.monotonic() - self._session_start

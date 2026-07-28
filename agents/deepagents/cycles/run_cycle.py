@@ -278,20 +278,31 @@ def run_cycle(
     try:
         agent = agent_mod.create_orchestrator(provider=provider, model=model, thread_id=thread_id)
 
-        # Use stream to capture full conversation including LLM reasoning
+        # Capture both messages (LLM reasoning) and graph updates (node execution)
         full_messages = []
+        graph_steps = []
+
         for event in agent.stream(
             {"messages": [{"role": "user", "content": prompt}]},
-            stream_mode="messages",
+            stream_mode="updates",
         ):
-            if isinstance(event, tuple) and len(event) == 2:
-                msg, _metadata = event
-                if hasattr(msg, "content") and msg.content:
-                    full_messages.append({
-                        "type": type(msg).__name__,
-                        "content": msg.content if isinstance(msg.content, str) else str(msg.content),
+            # stream_mode="updates" yields {node_name: state_delta} dicts
+            if isinstance(event, dict):
+                for node_name, delta in event.items():
+                    graph_steps.append({
+                        "node": node_name,
+                        "delta_keys": list(delta.keys()) if isinstance(delta, dict) else str(type(delta)),
                     })
+                    # Extract messages from the delta
+                    if isinstance(delta, dict) and "messages" in delta:
+                        for msg in delta["messages"]:
+                            if hasattr(msg, "content") and msg.content:
+                                full_messages.append({
+                                    "type": type(msg).__name__,
+                                    "content": msg.content if isinstance(msg.content, str) else str(msg.content),
+                                })
 
+        logger.log_graph_steps(graph_steps)
         logger.log_conversation(full_messages)
         final_content = full_messages[-1]["content"] if full_messages else "No response"
         logger.log_summary(final_content)

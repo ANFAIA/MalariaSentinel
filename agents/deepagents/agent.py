@@ -31,6 +31,7 @@ from agents.deepagents.tools import (
     ask_user,
 )
 from agents.deepagents.logger import SessionLogger
+from agents.deepagents.observability import ObservabilityMiddleware
 
 try:
     from deepagents import FilesystemPermission
@@ -49,30 +50,48 @@ GLOBAL_SKILLS = Path.home() / ".agents" / "skills"
 
 
 def _wrap_with_logging(tool_func):
-    """Wrap a tool function to add structured logging."""
+    """Wrap a tool function to add structured logging + error capture."""
     import functools
 
     @functools.wraps(tool_func)
     def wrapper(*args, **kwargs):
         import time
         start = time.monotonic()
-        result = tool_func(*args, **kwargs)
+        error = None
+        result = None
+        try:
+            result = tool_func(*args, **kwargs)
+        except Exception as e:
+            error = e
         elapsed = time.monotonic() - start
 
         if SESSION_LOGGER is not None:
-            # Build input dict from args + kwargs
             import inspect
             sig = inspect.signature(tool_func)
             bound = sig.bind(*args, **kwargs)
             bound.apply_defaults()
             input_dict = {k: v for k, v in bound.arguments.items()}
 
-            SESSION_LOGGER.log_tool(
-                tool_name=tool_func.__name__,
-                tool_input=input_dict,
-                output=result,
-                latency_s=elapsed,
-            )
+            if error:
+                SESSION_LOGGER._append({
+                    "event": "tool_error",
+                    "ts": SESSION_LOGGER._now_iso(),
+                    "tool": tool_func.__name__,
+                    "input": input_dict,
+                    "error": str(error),
+                    "error_type": type(error).__name__,
+                    "latency_s": round(elapsed, 3),
+                })
+            else:
+                SESSION_LOGGER.log_tool(
+                    tool_name=tool_func.__name__,
+                    tool_input=input_dict,
+                    output=result,
+                    latency_s=elapsed,
+                )
+
+        if error:
+            raise error
         return result
 
     return wrapper
@@ -432,6 +451,11 @@ def create_orchestrator(
         virtual_mode=True,
     )
 
+    # Build observability middleware if logger is active
+    middleware = []
+    if SESSION_LOGGER is not None:
+        middleware.append(ObservabilityMiddleware(SESSION_LOGGER))
+
     skills = []
     if PROJECT_SKILLS.is_dir():
         skills.append("agents/skills/")
@@ -465,6 +489,7 @@ def create_orchestrator(
         backend=backend,
         skills=skills or None,
         name="centinela-orchestrator",
+        middleware=middleware,
         permissions=[
             FilesystemPermission(operations=["read"], paths=["/.env", "/**/.env", "/**/*secret*", "/**/*credential*"], mode="deny"),
             FilesystemPermission(operations=["write"], paths=["/**"], mode="deny"),
