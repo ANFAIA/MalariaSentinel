@@ -160,15 +160,17 @@ PHASE 6 — DELEGATE TO WORKERS (parallel when possible)
 ═══════════════════════════════════════════════════════════════════════════════
 
 Step 14: For independent pieces, spawn workers in PARALLEL.
-  - C++ fix → abm-worker (has abm_run/abm_test/abm_score tools)
-  - New scorer → abm-worker
-  - Literature-heavy sub-task → research-worker (read-only)
 
-  workflow:
-  - gitagent_init
-  - gitagent_start(feature="<descriptive-name>")
-  - gitagent_spawn(feature="<name>", agent_id="a_fix", role="abm")      # one or more
-  - task(subagent_type="abm-worker" | "research-worker", description="<task>") for each
+  WORKTREE ISOLATION (mandatory for every worker):
+
+    1. spawn_result = gitagent_spawn(feature="<name>", agent_id="a_fix", role="abm")
+    2. set_worktree_context(agent_id="a_fix", worktree_path=spawn_result["worktree"])
+    3. task(subagent_type="abm-worker", description="<task>")
+    4. clear_worktree_context()
+
+  Without step 2, the worker compiles/runs from the main repo — defeating isolation.
+
+  For parallel workers: spawn all agents, set all contexts, invoke all tasks, clear all.
 
   Task description MUST include:
   - Reconnaissance findings (files, line numbers)
@@ -176,6 +178,7 @@ Step 14: For independent pieces, spawn workers in PARALLEL.
   - What files to change and how
   - How to verify (specific test command)
   - Feature name for gitagent propose
+  - The worktree path (for shell commands: cd into it first)
 
 Step 15: Review proposals with gitagent_diff, accept/reject/revise.
 Step 16: gitagent_integrate(feature="<name>") → gitagent_finalize(feature="<name>", message="...")

@@ -101,9 +101,18 @@ class ObservabilityMiddleware(AgentMiddleware):
         tool_name = "unknown"
         tool_args = {}
 
-        if hasattr(request, "tool_call"):
-            tool_name = request.tool_call.name
-            tool_args = request.tool_call.args
+        try:
+            if hasattr(request, "tool_call") and hasattr(request.tool_call, "name"):
+                tool_name = request.tool_call.name
+                tool_args = request.tool_call.args
+            elif isinstance(request, dict):
+                tool_name = request.get("name", request.get("tool", "unknown"))
+                tool_args = request.get("args", request.get("input", {}))
+            elif hasattr(request, "name"):
+                tool_name = request.name
+                tool_args = getattr(request, "args", {})
+        except Exception:
+            pass
 
         error = None
         try:
