@@ -1,6 +1,7 @@
 """MalariaSentinel DeepAgent orchestrator — create_orchestrator() factory."""
 from __future__ import annotations
 
+import json
 import os
 import sys
 from pathlib import Path
@@ -29,6 +30,12 @@ from agents.deepagents.tools import (
     memory_recall_kg,
     improve_prompt,
     ask_user,
+)
+from agents.deepagents.tools.abm_tools import (
+    register_worktree,
+    unregister_worktree,
+    set_current_agent,
+    clear_current_agent,
 )
 from agents.deepagents.logger import SessionLogger
 from agents.deepagents.observability import ObservabilityMiddleware
@@ -260,16 +267,17 @@ PHASE 6 — DELEGATE TO WORKERS (parallel when possible)
 ═══════════════════════════════════════════════════════════════════════════════
 
 Step 14: For each independent piece of work, spawn a worker in PARALLEL.
-  - C++ fix → one worker
-  - New scorer → another worker
-  - Both can run in parallel (independent files)
 
-  workflow:
-  - gitagent_init
-  - gitagent_start(feature="<name>")
-  - gitagent_spawn(feature="<name>", agent_id="a_fix", role="abm")      # C++ fix
-  - gitagent_spawn(feature="<name>", agent_id="a_scorer", role="scorer") # scorer
-  - task(subagent_type="abm-worker", description="<detailed task>") for each
+  WORKTREE ISOLATION (mandatory for every worker):
+
+    1. spawn_result = gitagent_spawn(feature="<name>", agent_id="a_fix", role="abm")
+    2. set_worktree_context(agent_id="a_fix", worktree_path=spawn_result["worktree"])
+    3. task(subagent_type="abm-worker", description="<task>")
+    4. clear_worktree_context()
+
+  Without step 2, the worker compiles/runs from the main repo — defeating isolation.
+
+  For parallel workers: spawn all agents, set all contexts, invoke all tasks, clear all.
 
   The task description MUST include:
   - Reconnaissance findings (specific files, line numbers)
@@ -277,6 +285,7 @@ Step 14: For each independent piece of work, spawn a worker in PARALLEL.
   - What files to change and how
   - How to verify (specific test command)
   - Feature name for gitagent propose
+  - The worktree path (for shell commands: cd into it first)
 
 Step 15: Wait for proposals, review with gitagent_diff, accept/reject/revise.
 
@@ -318,6 +327,9 @@ WORKER_DEFINITIONS = [
             "You have access to: read_file, write_file, edit_file, glob, grep (file ops), "
             "execute (shell commands), abm_run (compile + simulate), abm_test (pytest), "
             "abm_score (14 scorers + LLM verdict). "
+            "abm_run and abm_test AUTOMATICALLY resolve paths relative to your worktree. "
+            "For shell commands (git, ls, cat, etc.), cd into your worktree FIRST — "
+            "the worktree path is in your task description. "
             "Use opencode_search to find scientific literature if you need parameter ranges "
             "or biological context. Use memory_recall_kg to check past patterns and pitfalls. "
             "Read papers in papers/ directory for domain knowledge. "
@@ -365,6 +377,29 @@ def _gitagent_integrate_wrapped(feature: str) -> str:
     return gitagent_integrate(feature, verify=VERIFY_INTEGRATE)
 
 
+# ── Worktree context tools ──────────────────────────────────────────
+
+def set_worktree_context(agent_id: str, worktree_path: str) -> str:
+    """Set the worktree path for a subagent BEFORE calling task().
+
+    The abm_run/abm_test tools resolve paths relative to this worktree.
+    Call this after gitagent_spawn and before task(subagent_type="abm-worker").
+    """
+    register_worktree(agent_id, worktree_path)
+    set_current_agent(agent_id)
+    return json.dumps({
+        "status": "ok",
+        "agent_id": agent_id,
+        "worktree": worktree_path,
+    })
+
+
+def clear_worktree_context() -> str:
+    """Clear the current worktree context. Call AFTER task() returns."""
+    clear_current_agent()
+    return json.dumps({"status": "ok"})
+
+
 TOOLS = [
     _wrap_with_logging(opencode_search),
     _wrap_with_logging(gitagent_init),
@@ -384,6 +419,8 @@ TOOLS = [
     _wrap_with_logging(memory_recall_kg),
     _wrap_with_logging(improve_prompt),
     _wrap_with_logging(ask_user),
+    _wrap_with_logging(set_worktree_context),
+    _wrap_with_logging(clear_worktree_context),
 ]
 
 MEMORY_FILES = [str(AGENT_DIR / "AGENTS.md")]
@@ -472,12 +509,16 @@ def create_orchestrator(
                 FilesystemPermission(operations=["read"], paths=["/**"], mode="allow"),
             ]
         else:
-            # abm-worker: deny secrets and data writes, allow writes to code
+            # abm-worker: deny secrets, data, git internals.
+            # Allow writes ONLY inside .gitagent worktrees (where isolated work lives).
+            # The main repo code is read-only for workers — changes go via gitagent propose.
             wd["permissions"] = [
                 FilesystemPermission(operations=["read"], paths=["/.env", "/**/.env", "/**/*secret*", "/**/*credential*"], mode="deny"),
                 FilesystemPermission(operations=["write"], paths=["/data/**"], mode="deny"),
-                FilesystemPermission(operations=["write"], paths=["/.gitagent/**", "/.git/**"], mode="deny"),
-                FilesystemPermission(operations=["read", "write"], paths=["/**"], mode="allow"),
+                FilesystemPermission(operations=["write"], paths=["/.git/**"], mode="deny"),
+                FilesystemPermission(operations=["write"], paths=["/.gitagent/features/*/agents/*/worktree/**"], mode="allow"),
+                FilesystemPermission(operations=["write"], paths=["/**"], mode="deny"),
+                FilesystemPermission(operations=["read"], paths=["/**"], mode="allow"),
             ]
         worker_defs.append(wd)
 
