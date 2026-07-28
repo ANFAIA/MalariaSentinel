@@ -1,10 +1,13 @@
 """CppAbmWrapper — thin Python wrapper around the compiled C++ ABM binary."""
 from __future__ import annotations
+import logging
 import re
 import subprocess
 import sys
 from pathlib import Path
 from typing import Any
+
+log = logging.getLogger(__name__)
 
 class CppAbmWrapper:
     def __init__(self, binary_path: Path | None = None):
@@ -56,3 +59,89 @@ class CppAbmWrapper:
         if self._flags_schema is None:
             self._flags_schema = self._introspect_flags()
         return self._flags_schema
+
+
+def run_abm_from_manifest(
+    aoi: str,
+    year: int = 2024,
+    month: int = 1,
+    days: int = 30,
+    seed: int = 1,
+    n_rollouts: int = 1,
+    output_dir: str | Path | None = None,
+    **kwargs,
+) -> dict[str, Any]:
+    """Run ABM using manifest to resolve data paths.
+
+    Reads manifest, validates completeness, resolves paths,
+    then calls the C++ binary via CppAbmWrapper.
+    """
+    from mal_core.download.manifest import read_manifest, validate_completeness
+
+    missing = validate_completeness(aoi)
+    if missing:
+        raise FileNotFoundError(
+            f"Missing data files for AOI '{aoi}': {missing}. "
+            f"Run: malariasim download --aoi {aoi} --all"
+        )
+
+    manifest = read_manifest(aoi)
+    data_dir = Path("data") / aoi
+
+    env_path = None
+    habitat_path = None
+    hosts_path = None
+    wind_path = None
+
+    for ds_name, ds in manifest.get("datasets", {}).items():
+        files = ds.get("files", {})
+        if ds_name == "env":
+            fname = files.get(str(year)) or next(iter(files.values()), None)
+            if fname:
+                env_path = str(data_dir / fname)
+        elif ds_name == "habitat":
+            fname = next(iter(files.values()), None)
+            if fname:
+                habitat_path = str(data_dir / fname)
+        elif ds_name == "host_static":
+            fname = next(iter(files.values()), None)
+            if fname:
+                hosts_path = str(data_dir / fname)
+        elif ds_name == "wind":
+            fname = files.get(str(year)) or next(iter(files.values()), None)
+            if fname:
+                wind_path = str(data_dir / fname)
+
+    if not env_path:
+        raise FileNotFoundError(f"No env data found for AOI '{aoi}', year {year}")
+    if not habitat_path:
+        raise FileNotFoundError(f"No habitat data found for AOI '{aoi}'")
+
+    if output_dir is None:
+        output_dir = Path("runs") / aoi
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    output_path = output_dir / f"{aoi}_abm_seed{seed:04d}.tif"
+
+    flags: dict[str, Any] = {
+        "aoi": aoi,
+        "env": env_path,
+        "habitat": habitat_path,
+        "year": year,
+        "month": month,
+        "days": days,
+        "seed": seed,
+        "n_rollouts": n_rollouts,
+        "output": str(output_path),
+    }
+    if hosts_path:
+        flags["hosts"] = hosts_path
+    if wind_path:
+        flags["wind_field"] = wind_path
+    flags.update(kwargs)
+
+    log.info("Running ABM for %s (year=%d, seed=%d)", aoi, year, seed)
+    wrapper = CppAbmWrapper()
+    result = wrapper.run(**flags)
+
+    return {"output_path": str(output_path), **result}

@@ -26,8 +26,8 @@ def run_stage(stage: Stage, aoi: str, year: int, month: int, output_dir: Path, s
         from mal_core.ingest import build_environment
         return build_environment(aoi=aoi, year=year, month=month, output_dir=output_dir / "ingest", **extra)
     elif stage == Stage.ABM:
-        from mal_core.abm import run_abm
-        return run_abm(aoi=aoi, year=year, month=month, seed=seed, days=days, n_rollouts=n_rollouts, output_dir=output_dir / "abm", **extra)
+        from mal_core.abm.wrapper import run_abm_from_manifest
+        return run_abm_from_manifest(aoi=aoi, year=year, month=month, days=days, seed=seed, n_rollouts=n_rollouts, output_dir=output_dir / "abm", **extra)
     elif stage == Stage.SCORING:
         from mal_core.scoring import run_calibration
         return run_calibration(run_dir=output_dir / "abm", output_dir=output_dir / "scoring", **extra)
