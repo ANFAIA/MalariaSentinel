@@ -2,7 +2,7 @@
 
 Public surface
 --------------
-``load_modis_ndvi(aoi, year, month, *, cache_dir=None) -> xr.DataArray``
+``load_modis_ndvi(aoi, *, year, month, output_path=None, cache_dir=None) -> xr.DataArray``
 
 The MOD13A3 product (MODIS/Terra Vegetation Indices Monthly L3 Global 1 km SIN
 Grid, v061) is hosted by NASA LP DAAC and accessible via ``earthaccess``. We
@@ -328,9 +328,10 @@ def _merge_and_reproject(
 
 def load_modis_ndvi(
     aoi: AOI,
+    *,
     year: int,
     month: int,
-    *,
+    output_path: str | pathlib.Path | None = None,
     cache_dir: pathlib.Path | None = None,
 ) -> xr.DataArray:
     """Load MODIS MOD13A3 v061 monthly NDVI for the AOI (env channel 3 — ``ndvi``).
@@ -349,6 +350,7 @@ def load_modis_ndvi(
     Args:
         aoi: the AOI.
         year, month: 1-indexed month.
+        output_path: optional path to write the result (reserved for future use).
         cache_dir: optional local cache for downloaded HDFs. If absent, a temp
             directory under the system temp dir is used.
 

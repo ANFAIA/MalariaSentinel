@@ -265,10 +265,10 @@ def _make_wind_dataset(year: int, month: int, n_days: int) -> xr.Dataset:
     )
 
 
-def test_download_era5_wind_6hourly_mock(
+def test_load_era5_wind_6hourly_mock(
     tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Mock CDS client: verifies download_era5_wind_6hourly calls CDS
+    """Mock CDS client: verifies load_era5_wind_6hourly calls CDS
     for each migration month and merges into a single NetCDF."""
     import cdsapi
 
@@ -288,30 +288,29 @@ def test_download_era5_wind_6hourly_mock(
 
     monkeypatch.setattr(cdsapi, "Client", lambda: _MockClient())
 
-    from mal_commonlib.data.loaders.era5 import download_era5_wind_6hourly, MIGRATION_SEASON_MONTHS
+    from mal_commonlib.data.loaders.era5 import load_era5_wind_6hourly, MIGRATION_SEASON_MONTHS
 
     out_path = str(tmp_path / "wind_6h_2024.nc")
-    result = download_era5_wind_6hourly(
-        2024, out_path,
+    result = load_era5_wind_6hourly(
+        "ghana", 2024,
         months=MIGRATION_SEASON_MONTHS[2024],
+        output_path=out_path,
         cache_dir=tmp_path / "cache",
     )
 
-    assert result == out_path
+    assert isinstance(result, xr.Dataset)
+    assert "u100" in result.data_vars
+    assert "v100" in result.data_vars
     # Migration months for 2024: Jul, Aug, Sep, Oct, Dec
     assert call_months == ["07", "08", "09", "10", "12"]
-
-    ds = xr.open_dataset(out_path)
-    assert "u100" in ds.data_vars
-    assert "v100" in ds.data_vars
     # 5 months: 31+31+30+31+31 = 154 days × 4 slots = 616
-    assert ds.dims["valid_time"] == 616
+    assert result.dims["valid_time"] == 616
     # Sorted by time
-    assert (ds.valid_time.diff("valid_time") >= 0).all()
-    ds.close()
+    assert (result.valid_time.diff("valid_time") >= 0).all()
+    result.close()
 
 
-def test_download_era5_wind_6hourly_full_year_mock(
+def test_load_era5_wind_6hourly_full_year_mock(
     tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Full year download: all 12 months requested."""
@@ -333,21 +332,23 @@ def test_download_era5_wind_6hourly_full_year_mock(
 
     monkeypatch.setattr(cdsapi, "Client", lambda: _MockClient())
 
-    from mal_commonlib.data.loaders.era5 import download_era5_wind_6hourly
+    from mal_commonlib.data.loaders.era5 import load_era5_wind_6hourly
 
     out_path = str(tmp_path / "wind_6h_2024_full.nc")
     # months=None → all 12 months
-    result = download_era5_wind_6hourly(2024, out_path, cache_dir=tmp_path / "cache")
+    result = load_era5_wind_6hourly(
+        "ghana", 2024,
+        output_path=out_path,
+        cache_dir=tmp_path / "cache",
+    )
 
-    assert result == out_path
+    assert isinstance(result, xr.Dataset)
     assert call_months == [f"{m:02d}" for m in range(1, 13)]
-
-    ds = xr.open_dataset(out_path)
-    assert ds.dims["valid_time"] == 366 * 4  # 2024 is a leap year
-    ds.close()
+    assert result.dims["valid_time"] == 366 * 4  # 2024 is a leap year
+    result.close()
 
 
-def test_download_era5_wind_6hourly_auth_error(
+def test_load_era5_wind_6hourly_auth_error(
     tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Missing CDS auth raises RuntimeError."""
@@ -358,15 +359,15 @@ def test_download_era5_wind_6hourly_auth_error(
 
     monkeypatch.setattr(cdsapi, "Client", _raise)
 
-    from mal_commonlib.data.loaders.era5 import download_era5_wind_6hourly
+    from mal_commonlib.data.loaders.era5 import load_era5_wind_6hourly
 
     with pytest.raises(RuntimeError, match="CDS auth"):
-        download_era5_wind_6hourly(2024, str(tmp_path / "out.nc"))
+        load_era5_wind_6hourly("ghana", 2024, output_path=str(tmp_path / "out.nc"))
 
 
-def test_download_era5_wind_6hourly_empty_years() -> None:
+def test_load_era5_wind_6hourly_empty_years() -> None:
     """Empty years list raises ValueError."""
-    from mal_commonlib.data.loaders.era5 import download_era5_wind_6hourly
+    from mal_commonlib.data.loaders.era5 import load_era5_wind_6hourly
 
     with pytest.raises(ValueError, match="must not be empty"):
-        download_era5_wind_6hourly([], "/tmp/out.nc")
+        load_era5_wind_6hourly("ghana", [], output_path="/tmp/out.nc")

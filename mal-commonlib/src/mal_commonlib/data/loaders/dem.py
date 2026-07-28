@@ -2,7 +2,7 @@
 
 Public surface
 --------------
-``load_merit_dem(aoi, *, cache_dir=None) -> xr.DataArray``
+``load_merit_dem(aoi, *, output_path=None, cache_dir=None) -> xr.DataArray``
 
 MERIT DEM (Multi-Error-Removed Improved-Terrain DEM) is a 90 m hydrologically
 conditioned global DEM derived from SRTM v3.0 / AW3D-30m / GMTED2010 / VFP.
@@ -441,6 +441,7 @@ def _load_openlandmap_merit(
 def load_merit_dem(
     aoi: AOI,
     *,
+    output_path: str | pathlib.Path | None = None,
     cache_dir: pathlib.Path | None = None,
 ) -> xr.DataArray:
     """Load MERIT DEM 90 m for the AOI, reprojected to the AOI's grid.
@@ -453,6 +454,7 @@ def load_merit_dem(
 
     Args:
         aoi: the AOI.
+        output_path: optional path to write the result (reserved for future use).
         cache_dir: optional local cache for downloaded tiles.
 
     Returns:

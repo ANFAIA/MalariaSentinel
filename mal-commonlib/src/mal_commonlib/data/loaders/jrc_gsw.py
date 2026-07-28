@@ -2,8 +2,8 @@
 
 Public surface
 --------------
-``load_jrc_gsw_water_frac(aoi, year=2021, month=None, *, cache_dir=None,
-water_classes=None, threshold_pct=80) -> xr.DataArray``
+``load_jrc_gsw_water_frac(aoi, *, year=2021, month=None, output_path=None,
+cache_dir=None, water_classes=None, threshold_pct=80) -> xr.DataArray``
 
 The ``month`` parameter is accepted for signature uniformity with the other
 M1.3a loaders (``build_env`` calls every loader as ``loader(aoi, year,
@@ -274,9 +274,10 @@ def _load_jrc_gsw_pc(
 
 def load_jrc_gsw_water_frac(
     aoi: AOI,
+    *,
     year: int = 2021,
     month: int | None = None,
-    *,
+    output_path: str | pathlib.Path | None = None,
     cache_dir: pathlib.Path | None = None,
     water_classes: Iterable[int] | None = None,
     threshold_pct: int = DEFAULT_THRESHOLD_PCT,
@@ -301,6 +302,7 @@ def load_jrc_gsw_water_frac(
             ``monthly_recurrence`` band. The JRC GSW monthly product
             is reserved for a future M+ enhancement (e.g. seasonal
             water detection).
+        output_path: optional path to write the result (reserved for future use).
         cache_dir: optional local cache (currently unused — the STAC
             signed URLs stream directly).
         water_classes: not used by the JRC GSW loader. The JRC GSW

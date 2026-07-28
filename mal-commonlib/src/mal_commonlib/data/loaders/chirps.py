@@ -1,7 +1,7 @@
 """CHIRPS v2.0 daily precipitation loader (M1.3a, channel: rainfall).
 
 Public surface:
-    load_chirps_rainfall(aoi, year, month, *, cache_dir=None) -> xr.DataArray
+    load_chirps_rainfall(aoi, *, year, month, output_path=None, cache_dir=None) -> xr.DataArray
 
 Source: UCSB Climate Hazards Center CHIRPS v2.0 (public, no auth).
 Format: daily gzipped GeoTIFFs at 0.05° (~5 km) resolution; one file per day.
@@ -223,9 +223,10 @@ def _normalize_rainfall(rain_mm: np.ndarray) -> tuple[np.ndarray, float]:
 
 def load_chirps_rainfall(
     aoi: AOI,
+    *,
     year: int,
     month: int,
-    *,
+    output_path: str | pathlib.Path | None = None,
     cache_dir: pathlib.Path | None = None,
     _fetch_daily: Callable[[int, int, int], xr.DataArray] | None = None,
 ) -> xr.DataArray:
@@ -246,6 +247,7 @@ def load_chirps_rainfall(
     Args:
         aoi: the AOI (bbox, CRS, resolution_m, slug).
         year, month: 1-indexed month.
+        output_path: optional path to write the result (reserved for future use).
         cache_dir: optional local cache for downloaded GeoTIFFs. If None,
                    uses ``$XDG_CACHE_HOME/mal_commonlib/chirps`` (or
                    ``~/.cache/mal_commonlib/chirps``).
@@ -324,9 +326,10 @@ def load_chirps_rainfall(
 
 def load_chirps_rainfall_daily(
     aoi: AOI,
+    *,
     year: int,
     month: int,
-    *,
+    output_path: str | pathlib.Path | None = None,
     cache_dir: pathlib.Path | None = None,
     _fetch_daily: Callable[[int, int, int], xr.DataArray] | None = None,
 ) -> xr.DataArray:
@@ -340,6 +343,7 @@ def load_chirps_rainfall_daily(
     Args:
         aoi: the AOI (bbox, CRS, resolution_m, slug).
         year, month: 1-indexed month.
+        output_path: optional path to write the result (reserved for future use).
         cache_dir: optional local cache for downloaded GeoTIFFs.
         _fetch_daily: testing hook.
 

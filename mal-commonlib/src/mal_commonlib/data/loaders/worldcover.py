@@ -2,7 +2,7 @@
 
 Public surface
 --------------
-``load_worldcover_water_frac(aoi, year=2021, month=None, *, cache_dir=None, water_classes=None) -> xr.DataArray``
+``load_worldcover_water_frac(aoi, *, year=2021, month=None, output_path=None, cache_dir=None, water_classes=None) -> xr.DataArray``
 
 The ``month`` parameter is accepted for signature uniformity with the other
 M1.3a loaders (``build_env`` calls every loader as ``loader(aoi, year, month)``)
@@ -356,9 +356,10 @@ def _stitch_class_bands(
 
 def load_worldcover_water_frac(
     aoi: AOI,
+    *,
     year: int = 2021,
     month: int | None = None,
-    *,
+    output_path: str | pathlib.Path | None = None,
     cache_dir: pathlib.Path | None = None,
     water_classes: tuple[int, ...] | None = None,
 ) -> xr.DataArray:
@@ -378,6 +379,7 @@ def load_worldcover_water_frac(
         year: WorldCover product year (2020 or 2021 are the public versions).
         month: accepted for ``build_env`` signature uniformity; ignored.
             WorldCover 10 m is an annual product, not monthly.
+        output_path: optional path to write the result (reserved for future use).
         cache_dir: optional local cache (currently unused — the STAC
             signed URLs stream directly).
         water_classes: override the set of class codes considered "water". By

@@ -2,6 +2,8 @@
 
 Public surface:
     load_era5_temp_suitability(aoi, year, month, *, cache_dir=None) -> xr.DataArray
+    load_era5_water_temp(aoi, year, month, *, cache_dir=None) -> xr.DataArray
+    load_era5_wind_6hourly(aoi, years, *, months, output_path, cache_dir) -> xr.Dataset
     sharpe_demichele_growth(T_celsius: xr.DataArray) -> xr.DataArray
 
 Source: Copernicus CDS — ``derived-era5-land-daily-statistics`` dataset.
@@ -440,7 +442,7 @@ MIGRATION_SEASON_MONTHS: dict[int, list[str]] = {
 ALL_MONTHS: list[str] = [f"{m:02d}" for m in range(1, 13)]
 
 
-def download_era5_wind_6hourly(
+def _download_era5_wind(
     years: int | list[int],
     output_path: str,
     *,
@@ -524,32 +526,49 @@ def download_era5_wind_6hourly(
     return output_path
 
 
-def download_era5_wind_migration_season(
+def load_era5_wind_6hourly(
+    aoi: AOI | str,
     years: int | list[int],
-    output_path: str,
     *,
+    months: list[str] | None = None,
+    output_path: str | pathlib.Path | None = None,
     cache_dir: pathlib.Path | None = None,
-) -> str:
-    """Convenience wrapper: download only migration-season months.
+) -> xr.Dataset | pathlib.Path:
+    """Load-or-download ERA5 6-hourly 100m wind data.
 
-    For each year in ``years``, selects the months from
-    :data:`MIGRATION_SEASON_MONTHS`.  Years not in that dict get all 12
-    months as a fallback.
+    If ``output_path`` exists on disk, opens and returns ``xr.Dataset``.
+    Otherwise downloads from CDS, saves to ``output_path``, then returns
+    ``xr.Dataset``.
 
     Args:
+        aoi: AOI slug or AOI object (used for grid reprojection).
         years: single year or list of years.
-        output_path: merged NetCDF output path.
-        cache_dir: optional per-month cache.
+        months: month strings ``["01", ..., "12"]``. ``None`` = all 12.
+        output_path: where to save/read. ``None`` = use default cache.
+        cache_dir: cache directory. Default ``~/.cache/mal_commonlib/era5``.
 
     Returns:
-        The ``output_path``.
+        ``xr.Dataset`` if ``output_path`` is ``None``, else ``Path`` to saved file.
     """
     if isinstance(years, int):
         years = [years]
-    months: list[str] = []
-    for y in sorted(years):
-        months.extend(MIGRATION_SEASON_MONTHS.get(y, ALL_MONTHS))
-    return download_era5_wind_6hourly(years, output_path, months=months, cache_dir=cache_dir)
+    if not years:
+        raise ValueError("years must not be empty")
+
+    if output_path is None:
+        cdir = cache_dir or _default_cache_dir()
+        cdir.mkdir(parents=True, exist_ok=True)
+        year_str = "_".join(str(y) for y in sorted(years))
+        output_path = cdir / f"wind_6hourly_{year_str}.nc"
+    else:
+        output_path = pathlib.Path(output_path)
+
+    if output_path.exists() and output_path.stat().st_size > 0:
+        return xr.open_dataset(output_path)
+
+    _download_era5_wind(years, str(output_path), months=months, cache_dir=cache_dir)
+
+    return xr.open_dataset(output_path)
 
 
 DOWNLOADER = {
@@ -559,14 +578,12 @@ DOWNLOADER = {
     "outputs": {
         "temp_suitability": load_era5_temp_suitability,
         "water_temp": load_era5_water_temp,
-        "wind_6hourly": download_era5_wind_6hourly,
-        "wind_migration": download_era5_wind_migration_season,
+        "wind_6hourly": load_era5_wind_6hourly,
     },
     "manifest_keys": {
         "temp_suitability": "era5_temp",
         "water_temp": "era5_water_temp",
         "wind_6hourly": "wind",
-        "wind_migration": "wind_migration",
     },
 }
 
@@ -574,8 +591,7 @@ __all__ = [
     "DOWNLOADER",
     "load_era5_temp_suitability",
     "load_era5_water_temp",
-    "download_era5_wind_6hourly",
-    "download_era5_wind_migration_season",
+    "load_era5_wind_6hourly",
     "sharpe_demichele_growth",
     "T_OPT",
     "T_HALF_WIDTH",
