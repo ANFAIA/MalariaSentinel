@@ -54,6 +54,18 @@ inline constexpr float  ADULT_DISPERSE_PROB         = 0.05f;
 inline constexpr float  ADULT_DISPERSE_SIGMA_M      = 450.0f;
 inline constexpr float  ADULT_DISPERSE_MAX_M        = 2000.0f;
 
+// Windborne long-range migration (M7.6 Phase 1).
+// Huestis et al. 2019 (Nature Communications): Sahel aerial sampling
+//   + ERA5/HYSPLIT. Mean nightly displacement: 30km (2h) / 120km (9h).
+//   90% females, 90% blood-fed. Jul-Oct (monsoon) + Dec-Mar (Harmattan).
+// Faiman et al. 2020: survival at altitude 70-90%.
+// North & Godfray 2018: d_M = 0.01-0.05/day, without wind 0% colonization,
+//   with wind 100% colonization of Sahel.
+inline constexpr float  WIND_MIGRATION_PROB    = 0.05f;  // per GRAVID female/day
+inline constexpr float  WIND_FLIGHT_HOURS      = 4.0f;   // hours of wind advection
+inline constexpr float  WIND_SURVIVAL          = 0.85f;  // flight survival
+inline constexpr float  WIND_FLIGHT_SPEED_MS   = 1.0f;   // self-propelled speed
+
 // Per-adult per-day fecundity: binomial(n_adults/2, BIRTH_FECUNDITY) new larvae.
 // Tuned so the population stays near the initial seeded count on the
 // 30k-patch, 30-day M1.5 perf budget. The M1.5 perf baseline; raising

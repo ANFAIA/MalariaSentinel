@@ -26,6 +26,7 @@
 #include "prng.hpp"
 #include "seeding.hpp"
 #include "wire.hpp"
+#include "wind_field.hpp"
 
 namespace mal_abm_fast {
 
@@ -67,7 +68,8 @@ public:
            SeedingConfig seeding_config = SeedingConfig{},
            RuntimeOverrides overrides = {},
            const std::string& hosts_path = "",
-           const std::string& mobility_dir = "");
+           const std::string& mobility_dir = "",
+           const std::string& wind_field_path = "");
 
     // Optimized constructor: accepts a pre-loaded shared ClimateEngine.
     // Used by multi-rollout simulations to share climate data across
@@ -82,7 +84,8 @@ public:
            SeedingConfig seeding_config = SeedingConfig{},
            RuntimeOverrides overrides = {},
            const std::string& hosts_path = "",
-           const std::string& mobility_dir = "");
+           const std::string& mobility_dir = "",
+           const std::string& wind_field_path = "");
 
     // Advance the model by one day. Mirrors `AnophelesABM.step()`:
     //   1. coord_->activate_patches()
@@ -165,6 +168,9 @@ private:
     std::unique_ptr<HostLandscape>          host_landscape_;
     std::unique_ptr<MobilitySchedule>       mobility_schedule_;
     std::unique_ptr<HostSeekingModel>       host_seeking_model_;
+
+    // Optional wind field (M7.6 — loaded when --wind-field is provided).
+    std::unique_ptr<WindField>              wind_field_;
 };
 
 }  // namespace mal_abm_fast

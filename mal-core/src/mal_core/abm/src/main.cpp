@@ -277,6 +277,9 @@ OUTPUT
     std::string human_mobility_night_path;
     std::string livestock_mobility_path;
 
+    // Wind field (optional; M7.6 windborne migration).
+    std::string wind_field_path;
+
     // Runtime overrides for dispersal and larval parameters.
     float disperse_prob    = mal_abm_fast::ADULT_DISPERSE_PROB;
     float disperse_sigma_m = mal_abm_fast::ADULT_DISPERSE_SIGMA_M;
@@ -363,6 +366,11 @@ OUTPUT
         ->group("Input Data");
     run->add_option("--livestock-mobility", livestock_mobility_path,
                     "Livestock mobility OD matrix — seasonal (.csr).")
+        ->group("Input Data");
+    run->add_option("--wind-field", wind_field_path,
+                    "ERA5 monthly mean wind field GeoTIFF (24 bands: "
+                    "u100 x 12 months, v100 x 12). Enables windborne "
+                    "long-range migration (M7.6).")
         ->group("Input Data");
 
     // ─── Seeding ─────────────────────────────────────────────────────────
@@ -593,7 +601,8 @@ OUTPUT
         try {
             engine_ptr = std::make_unique<mal_abm_fast::Engine>(
                 aoi, thread_climate, habitat_path, rng, start_date,
-                seeding_config, overrides, hosts_path, mobility_dir);
+                seeding_config, overrides, hosts_path, mobility_dir,
+                wind_field_path);
         } catch (const std::exception& e) {
             std::cerr << "abm_run: rollout " << i
                       << " failed to build engine: " << e.what() << "\n";

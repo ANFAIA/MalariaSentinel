@@ -43,7 +43,8 @@ Engine::Engine(AOI aoi,
                SeedingConfig seeding_config,
                RuntimeOverrides overrides,
                const std::string& hosts_path,
-               const std::string& mobility_dir)
+               const std::string& mobility_dir,
+               const std::string& wind_field_path)
     : aoi_(std::move(aoi)),
       current_date_(start_date),
       start_date_(start_date),
@@ -163,6 +164,22 @@ Engine::Engine(AOI aoi,
         host_seeking_model_ = std::make_unique<HostSeekingModel>();
         sub_->set_host_seeking_model(host_seeking_model_.get());
     }
+
+    // -- Optional wind field (M7.6) -----------------------------------------
+    if (!wind_field_path.empty()) {
+        wind_field_ = std::make_unique<WindField>();
+        try {
+            wind_field_->load_from_tif(wind_field_path);
+            std::cout << "Engine: loaded WindField from " << wind_field_path
+                      << " (" << wind_field_->nlat() << "x"
+                      << wind_field_->nlon() << " grid)\n";
+        } catch (const std::exception& e) {
+            throw std::runtime_error(
+                "Engine: WindField load failed for '" +
+                wind_field_path + "': " + e.what());
+        }
+        sub_->set_wind_field(wind_field_.get());
+    }
 }
 
 Engine::Engine(AOI aoi,
@@ -173,7 +190,8 @@ Engine::Engine(AOI aoi,
                SeedingConfig seeding_config,
                RuntimeOverrides overrides,
                const std::string& hosts_path,
-               const std::string& mobility_dir)
+               const std::string& mobility_dir,
+               const std::string& wind_field_path)
     : aoi_(std::move(aoi)),
       climate_(std::move(shared_climate)),
       current_date_(start_date),
@@ -244,6 +262,22 @@ Engine::Engine(AOI aoi,
         host_seeking_model_ = std::make_unique<HostSeekingModel>();
         sub_->set_host_seeking_model(host_seeking_model_.get());
     }
+
+    // -- Optional wind field (M7.6) -----------------------------------------
+    if (!wind_field_path.empty()) {
+        wind_field_ = std::make_unique<WindField>();
+        try {
+            wind_field_->load_from_tif(wind_field_path);
+            std::cout << "Engine: loaded WindField from " << wind_field_path
+                      << " (" << wind_field_->nlat() << "x"
+                      << wind_field_->nlon() << " grid)\n";
+        } catch (const std::exception& e) {
+            throw std::runtime_error(
+                "Engine: WindField load failed for '" +
+                wind_field_path + "': " + e.what());
+        }
+        sub_->set_wind_field(wind_field_.get());
+    }
 }
 
 void Engine::step() {
@@ -258,6 +292,11 @@ void Engine::step() {
     // 3. Submodel advances one day using the cached per-patch
     //    state. This calls the 5 per-day ops in order (larva
     //    mortality, growth, EIP, dispersal, birth).
+    // M7.6: set current month for wind migration season check.
+    if (wind_field_) {
+        const auto ymd = std::chrono::year_month_day{current_date_};
+        sub_->set_current_month(static_cast<int>(unsigned{ymd.month()}));
+    }
     sub_->advance_day(aoi_, coord_->patch_states_today());
 
     // Divergence checks

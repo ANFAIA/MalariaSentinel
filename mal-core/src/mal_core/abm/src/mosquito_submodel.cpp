@@ -37,6 +37,7 @@
 #include "mal_abm_fast/gonotrophic_cycle.hpp"
 #include "mal_abm_fast/bite_ledger.hpp"
 #include "mal_abm_fast/multirate_scheduler.hpp"
+#include "mal_abm_fast/wind_field.hpp"
 
 namespace mal_abm_fast {
 
@@ -599,13 +600,75 @@ void MosquitoSubmodel::advance_day(const AOI& aoi,
 }
 
 // ---------------------------------------------------------------------------
-// Adult dispersal (Op 4 — unchanged from F1.b)
+// Adult dispersal (Op 4) + M7.6 windborne migration
 // ---------------------------------------------------------------------------
 
 void MosquitoSubmodel::adult_dispersal(const AOI& aoi) {
+    const bool wind_active = wind_field_ &&
+        WindField::is_migration_season(current_month_);
+
     for (int64_t i = 0; i < soa_.n_alive; ++i) {
         const size_t si = static_cast<size_t>(i);
         if (soa_.stage[si] != 1) continue;
+
+        // --- M7.6: Windborne migration for GRAVID females ---
+        if (wind_active && soa_.sex[si] == 1) {
+            const auto gs = static_cast<GonotrophicState>(
+                soa_.gonotrophic_state[si]);
+            if (gs == GonotrophicState::GRAVID ||
+                gs == GonotrophicState::OVIPOSITION_SEEKING) {
+                if (rng_.uniform_double() <
+                    static_cast<double>(WIND_MIGRATION_PROB)) {
+                    const WindVector w = wind_field_->wind_at(
+                        static_cast<double>(soa_.lon[si]),
+                        static_cast<double>(soa_.lat[si]),
+                        current_month_);
+
+                    const double ws =
+                        std::sqrt(static_cast<double>(w.u * w.u + w.v * w.v));
+                    const double flight_s =
+                        static_cast<double>(WIND_FLIGHT_HOURS) * 3600.0;
+                    double dx_m = 0.0, dy_m = 0.0;
+                    if (ws > 0.1) {
+                        const double total_speed =
+                            ws + static_cast<double>(WIND_FLIGHT_SPEED_MS);
+                        const double dist_m = total_speed * flight_s;
+                        dx_m = (static_cast<double>(w.u) / ws) * dist_m;
+                        dy_m = (static_cast<double>(w.v) / ws) * dist_m;
+                    }
+
+                    if (rng_.uniform_double() <
+                        static_cast<double>(WIND_SURVIVAL)) {
+                        const double lat_rad =
+                            static_cast<double>(soa_.lat[si]) *
+                            (kPi / 180.0);
+                        const double safe_cos = std::cos(lat_rad);
+                        const double ccos =
+                            (safe_cos > 1e-6) ? safe_cos : 1e-6;
+                        const double dlon =
+                            dx_m / (kMetresPerDegLat * ccos);
+                        const double dlat = dy_m / kMetresPerDegLat;
+
+                        soa_.lon[si] = static_cast<float>(
+                            static_cast<double>(soa_.lon[si]) + dlon);
+                        soa_.lat[si] = static_cast<float>(
+                            static_cast<double>(soa_.lat[si]) + dlat);
+
+                        // Reset to OVIPOSITION_SEEKING at destination
+                        soa_.gonotrophic_state[si] = static_cast<uint8_t>(
+                            GonotrophicState::OVIPOSITION_SEEKING);
+                        soa_.gonotrophic_timer[si] = 0;
+                    } else {
+                        // Died during migration — remove
+                        swap_with_last(soa_, i, soa_.n_alive);
+                        --soa_.n_alive;
+                        continue;
+                    }
+                }
+            }
+        }
+
+        // --- Standard local dispersal (Gaussian kernel) ---
         const double u = rng_.uniform_double();
         if (u < static_cast<double>(overrides_.disperse_prob)) {
             const DispOffset off = offset_m(
@@ -614,11 +677,14 @@ void MosquitoSubmodel::adult_dispersal(const AOI& aoi) {
                 static_cast<double>(soa_.lat[si]),
                 static_cast<double>(overrides_.disperse_sigma_m),
                 static_cast<double>(overrides_.disperse_max_m));
-            soa_.lon[si] = static_cast<float>(static_cast<double>(soa_.lon[si]) + off.dlon);
-            soa_.lat[si] = static_cast<float>(static_cast<double>(soa_.lat[si]) + off.dlat);
+            soa_.lon[si] = static_cast<float>(
+                static_cast<double>(soa_.lon[si]) + off.dlon);
+            soa_.lat[si] = static_cast<float>(
+                static_cast<double>(soa_.lat[si]) + off.dlat);
         }
-        auto [r, c] = LonLatToCell(static_cast<double>(soa_.lon[si]),
-                                    static_cast<double>(soa_.lat[si]), aoi);
+        auto [r, c] = LonLatToCell(
+            static_cast<double>(soa_.lon[si]),
+            static_cast<double>(soa_.lat[si]), aoi);
         soa_.row[si] = r;
         soa_.col[si] = c;
     }

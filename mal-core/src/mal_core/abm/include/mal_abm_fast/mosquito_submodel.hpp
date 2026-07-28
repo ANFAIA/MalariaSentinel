@@ -40,6 +40,7 @@
 #include "mal_abm_fast/host_landscape.hpp"
 #include "mal_abm_fast/mobility_schedule.hpp"
 #include "mal_abm_fast/host_seeking.hpp"
+#include "mal_abm_fast/wind_field.hpp"
 
 namespace mal_abm_fast {
 
@@ -114,6 +115,10 @@ public:
     void set_host_landscape(const HostLandscape* h) { host_landscape_ = h; }
     void set_mobility_schedule(const MobilitySchedule* m) { mobility_schedule_ = m; }
     void set_host_seeking_model(const HostSeekingModel* h) { host_seeking_ = h; }
+
+    // Wind field setter (M7.6 — windborne migration).
+    void set_wind_field(const WindField* w) { wind_field_ = w; }
+    void set_current_month(int m) { current_month_ = m; }
 
     // Total live agent count (= soa().n_alive).
     int64_t total_agents() const { return soa_.n_alive; }
@@ -194,6 +199,10 @@ private:
     const HostLandscape*    host_landscape_    = nullptr;
     const MobilitySchedule* mobility_schedule_ = nullptr;
     const HostSeekingModel* host_seeking_      = nullptr;
+
+    // Wind field (M7.6 — non-owning pointer; Engine owns it).
+    const WindField*        wind_field_        = nullptr;
+    int                     current_month_     = 1;  // 1-12, set daily by Engine
 
     // -- debug instrumentation state (see set_debug_population) -----
     bool     debug_population_      = false;
