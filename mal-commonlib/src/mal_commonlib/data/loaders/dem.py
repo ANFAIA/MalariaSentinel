@@ -529,5 +529,18 @@ def load_merit_dem(
         return _load_nasadem_dem(aoi)
 
 
-__all__ = ["load_merit_dem", "NODATA_OUT"]
+DOWNLOADER = {
+    "name": "dem",
+    "description": "MERIT-DEM elevation: 100m resolution",
+    "requires_auth": ["none"],
+    "outputs": {
+        "elevation": load_merit_dem,
+    },
+    "manifest_keys": {
+        "elevation": "dem",
+    },
+}
+
+
+__all__ = ["load_merit_dem", "NODATA_OUT", "DOWNLOADER"]
 NODATA_OUT = _NODATA_OUT_SCALAR

@@ -383,9 +383,23 @@ def load_jrc_gsw_water_frac(
     return out
 
 
+DOWNLOADER = {
+    "name": "jrc_gsw",
+    "description": "JRC Global Surface Water: water occurrence and seasonality",
+    "requires_auth": ["none"],
+    "outputs": {
+        "water_occurrence": load_jrc_gsw_water_frac,
+    },
+    "manifest_keys": {
+        "water_occurrence": "jrc_water",
+    },
+}
+
+
 __all__ = [
     "load_jrc_gsw_water_frac",
     "DEFAULT_THRESHOLD_PCT",
     "NODATA_OUT",
+    "DOWNLOADER",
 ]
 NODATA_OUT = _NODATA_OUT_SCALAR

@@ -404,5 +404,18 @@ def load_modis_ndvi(
     return out
 
 
-__all__ = ["load_modis_ndvi", "NODATA_OUT"]
+DOWNLOADER = {
+    "name": "modis",
+    "description": "MODIS NDVI: vegetation index",
+    "requires_auth": ["earthdata"],
+    "outputs": {
+        "ndvi": load_modis_ndvi,
+    },
+    "manifest_keys": {
+        "ndvi": "modis_ndvi",
+    },
+}
+
+
+__all__ = ["load_modis_ndvi", "NODATA_OUT", "DOWNLOADER"]
 NODATA_OUT = _NODATA_OUT_SCALAR

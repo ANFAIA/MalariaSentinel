@@ -446,5 +446,18 @@ def load_worldcover_water_frac(
     return out
 
 
-__all__ = ["load_worldcover_water_frac", "DEFAULT_WATER_CLASSES", "NODATA_OUT"]
+DOWNLOADER = {
+    "name": "worldcover",
+    "description": "ESA WorldCover: land cover and water fraction",
+    "requires_auth": ["none"],
+    "outputs": {
+        "water_frac": load_worldcover_water_frac,
+    },
+    "manifest_keys": {
+        "water_frac": "worldcover_water",
+    },
+}
+
+
+__all__ = ["load_worldcover_water_frac", "DEFAULT_WATER_CLASSES", "NODATA_OUT", "DOWNLOADER"]
 NODATA_OUT = _NODATA_OUT_SCALAR

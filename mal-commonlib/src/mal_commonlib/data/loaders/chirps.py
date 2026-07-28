@@ -400,4 +400,19 @@ def load_chirps_rainfall_daily(
     return stacked
 
 
-__all__ = ["load_chirps_rainfall", "load_chirps_rainfall_daily", "CHIRPS_NODATA"]
+DOWNLOADER = {
+    "name": "chirps",
+    "description": "CHIRPS rainfall: daily and monthly precipitation",
+    "requires_auth": ["none"],
+    "outputs": {
+        "rainfall": load_chirps_rainfall,
+        "rainfall_daily": load_chirps_rainfall_daily,
+    },
+    "manifest_keys": {
+        "rainfall": "chirps_rainfall",
+        "rainfall_daily": "chirps_rainfall_daily",
+    },
+}
+
+
+__all__ = ["load_chirps_rainfall", "load_chirps_rainfall_daily", "CHIRPS_NODATA", "DOWNLOADER"]

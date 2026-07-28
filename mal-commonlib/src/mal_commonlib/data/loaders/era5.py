@@ -552,7 +552,26 @@ def download_era5_wind_migration_season(
     return download_era5_wind_6hourly(years, output_path, months=months, cache_dir=cache_dir)
 
 
+DOWNLOADER = {
+    "name": "era5",
+    "description": "ERA5 reanalysis: temperature, wind, humidity",
+    "requires_auth": ["cds"],
+    "outputs": {
+        "temp_suitability": load_era5_temp_suitability,
+        "water_temp": load_era5_water_temp,
+        "wind_6hourly": download_era5_wind_6hourly,
+        "wind_migration": download_era5_wind_migration_season,
+    },
+    "manifest_keys": {
+        "temp_suitability": "era5_temp",
+        "water_temp": "era5_water_temp",
+        "wind_6hourly": "wind",
+        "wind_migration": "wind_migration",
+    },
+}
+
 __all__ = [
+    "DOWNLOADER",
     "load_era5_temp_suitability",
     "load_era5_water_temp",
     "download_era5_wind_6hourly",
