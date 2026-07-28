@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from .registry import discover_downloaders, DownloaderSpec
-from .manifest import update_manifest
+from .manifest import update_dataset, validate_completeness
 
 log = logging.getLogger(__name__)
 
@@ -25,6 +25,23 @@ def _check_auth(spec: DownloaderSpec) -> bool:
                 return False
     return True
 
+def _standard_path(aoi: str, product: str, year: int | None, ext: str) -> Path:
+    """Determine standard file path per data-format-spec.md naming convention."""
+    data_dir = _REPO_ROOT / "data" / aoi
+    if year:
+        return data_dir / f"{aoi}_{product}_{year}.{ext}"
+    return data_dir / f"{aoi}_{product}.{ext}"
+
+def _is_time_series(spec: DownloaderSpec, output_name: str) -> bool:
+    """Check if a dataset is time-series (needs year in filename)."""
+    # Heuristic: if the function accepts 'years' or 'year', it's time-series
+    import inspect
+    func = spec.outputs.get(output_name)
+    if func is None:
+        return False
+    sig = inspect.signature(func)
+    return "years" in sig.parameters or "year" in sig.parameters
+
 def run_download(
     aoi: str,
     datasets: list[str] | None = None,
@@ -34,6 +51,7 @@ def run_download(
     output_dir: str | Path | None = None,
     **kwargs,
 ) -> dict[str, Any]:
+    """Download datasets for an AOI, using standard naming + manifest registration."""
     registry = discover_downloaders()
     if not registry:
         return {"error": "No downloaders registered"}
@@ -60,19 +78,31 @@ def run_download(
 
                 log.info("  %s.%s", name, output_name)
 
-                call_kwargs: dict[str, Any] = {"aoi": aoi}
-                if years:
-                    call_kwargs["years"] = years
-                if months:
-                    call_kwargs["months"] = months
+                # Determine if time-series or static
+                is_ts = _is_time_series(spec, output_name)
+                ext = "nc" if "wind" in output_name or "env" in output_name else "tif"
 
-                ext = ".nc" if "wind" in output_name else ".tif"
-                call_kwargs["output_path"] = out_dir / f"{aoi}_{output_name}{ext}"
-
-                func(**call_kwargs)
-
-                manifest_key = spec.manifest_keys.get(output_name, output_name)
-                update_manifest(aoi, manifest_key, Path(call_kwargs["output_path"]).name)
+                if is_ts and years:
+                    # Loop over years — one file per year
+                    for year in years:
+                        path = _standard_path(aoi, output_name, year, ext)
+                        call_kwargs = {"aoi": aoi, "years": [year]}
+                        if months:
+                            call_kwargs["months"] = months
+                        call_kwargs["output_path"] = str(path)
+                        func(**call_kwargs)
+                        # Register in manifest
+                        update_dataset(aoi, output_name, year, path.name)
+                        log.info("    %s → %s", year, path.name)
+                else:
+                    # Static or no year — single file
+                    path = _standard_path(aoi, output_name, None, ext)
+                    call_kwargs = {"aoi": aoi}
+                    call_kwargs["output_path"] = str(path)
+                    func(**call_kwargs)
+                    # Register in manifest
+                    update_dataset(aoi, output_name, None, path.name)
+                    log.info("    → %s", path.name)
 
             results[name] = {"status": "ok"}
         except Exception as e:
