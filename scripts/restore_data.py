@@ -10,6 +10,7 @@ It will restore, in order:
   2. Moua et al. 2016 paper (HAL)   -> data/moua_2016.pdf
   3. SRTM DEM tiles + map PNGs      -> terrain/srtm_maps/, terrain/srtm_guf/
   4. WorldClim + JRC env layers      -> runs/layers/  (+ runs/env_stack.npz)
+  5. ERA5 wind data                  -> data/ghana/wind_era5_6hourly_*.nc
 
 Steps 3-4 require ``OPENTOPO_API_KEY`` in the environment; if absent, the script
 prints the exact commands to run manually.
@@ -224,6 +225,36 @@ def restore_env_layers() -> None:
 
 
 # ---------------------------------------------------------------------------
+# Step 5: ERA5 wind data (delegates to mal_core download pipeline)
+# ---------------------------------------------------------------------------
+
+def restore_wind() -> None:
+    print("\n=== ERA5 wind data ===")
+    wind_dir = DATA / "ghana"
+    wind_files = list(wind_dir.glob("wind_era5_6hourly_*.nc")) if wind_dir.exists() else []
+    if wind_files:
+        total_mb = sum(f.stat().st_size for f in wind_files) / 1e6
+        print(f"  already present ({len(wind_files)} files, {total_mb:.1f} MB) -> skip")
+        return
+    cdsapirc = pathlib.Path.home() / ".cdsapirc"
+    if not cdsapirc.exists():
+        print("  CDS API auth not found (~/.cdsapirc) -> skip")
+        print("  To download: uv run python -m mal_core.cli download --aoi ghana --datasets era5 --years 2024 2025")
+        return
+    print("  downloading via mal_core download pipeline...")
+    r = subprocess.run(
+        [sys.executable, "-m", "mal_core.cli", "download",
+         "--aoi", "ghana", "--datasets", "era5", "--years", "2024", "2025"],
+        cwd=str(REPO), env=os.environ.copy(), capture_output=True, text=True,
+    )
+    if r.returncode != 0:
+        print(f"  FAIL: {r.stderr.strip()[:300]}")
+    else:
+        for line in r.stdout.strip().splitlines()[-6:]:
+            print(f"    {line}")
+
+
+# ---------------------------------------------------------------------------
 
 def main() -> int:
     targets = sys.argv[1:] if len(sys.argv) > 1 else None
@@ -240,6 +271,8 @@ def main() -> int:
             restore_terrain()
         if "env" in targets:
             restore_env_layers()
+        if "wind" in targets:
+            restore_wind()
         return 0
 
     for ds in GBIF_DATASETS:
@@ -250,6 +283,7 @@ def main() -> int:
     restore_moua()
     restore_terrain()
     restore_env_layers()
+    restore_wind()
 
     print("\n--- next: regenerate runs/ (model weights + result PNGs) ---")
     print("  uv run python mal-ghana-sim/scripts/02_suitability.py")
