@@ -288,10 +288,14 @@ def test_download_era5_wind_6hourly_mock(
 
     monkeypatch.setattr(cdsapi, "Client", lambda: _MockClient())
 
-    from mal_commonlib.data.loaders.era5 import download_era5_wind_6hourly
+    from mal_commonlib.data.loaders.era5 import download_era5_wind_6hourly, MIGRATION_SEASON_MONTHS
 
     out_path = str(tmp_path / "wind_6h_2024.nc")
-    result = download_era5_wind_6hourly(2024, out_path, cache_dir=tmp_path / "cache")
+    result = download_era5_wind_6hourly(
+        2024, out_path,
+        months=MIGRATION_SEASON_MONTHS[2024],
+        cache_dir=tmp_path / "cache",
+    )
 
     assert result == out_path
     # Migration months for 2024: Jul, Aug, Sep, Oct, Dec
@@ -304,6 +308,42 @@ def test_download_era5_wind_6hourly_mock(
     assert ds.dims["valid_time"] == 616
     # Sorted by time
     assert (ds.valid_time.diff("valid_time") >= 0).all()
+    ds.close()
+
+
+def test_download_era5_wind_6hourly_full_year_mock(
+    tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Full year download: all 12 months requested."""
+    import cdsapi
+
+    call_months: list[str] = []
+
+    class _MockClient:
+        def retrieve(self, name: str, request: dict, target: str | None = None) -> _MockCdsResult:
+            assert target is not None
+            month = request["month"][0]
+            call_months.append(month)
+            year = int(request["year"])
+            m_int = int(month)
+            n_days = calendar.monthrange(year, m_int)[1]
+            pathlib.Path(target).parent.mkdir(parents=True, exist_ok=True)
+            _MockCdsResult(target, lambda: _make_wind_dataset(year, m_int, n_days)).download(target)
+            return _MockCdsResult(target, lambda: _make_wind_dataset(year, m_int, n_days))
+
+    monkeypatch.setattr(cdsapi, "Client", lambda: _MockClient())
+
+    from mal_commonlib.data.loaders.era5 import download_era5_wind_6hourly
+
+    out_path = str(tmp_path / "wind_6h_2024_full.nc")
+    # months=None → all 12 months
+    result = download_era5_wind_6hourly(2024, out_path, cache_dir=tmp_path / "cache")
+
+    assert result == out_path
+    assert call_months == [f"{m:02d}" for m in range(1, 13)]
+
+    ds = xr.open_dataset(out_path)
+    assert ds.dims["valid_time"] == 366 * 4  # 2024 is a leap year
     ds.close()
 
 
@@ -324,9 +364,9 @@ def test_download_era5_wind_6hourly_auth_error(
         download_era5_wind_6hourly(2024, str(tmp_path / "out.nc"))
 
 
-def test_download_era5_wind_6hourly_invalid_year() -> None:
-    """Unsupported year raises ValueError."""
+def test_download_era5_wind_6hourly_empty_years() -> None:
+    """Empty years list raises ValueError."""
     from mal_commonlib.data.loaders.era5 import download_era5_wind_6hourly
 
-    with pytest.raises(ValueError, match="not supported"):
-        download_era5_wind_6hourly(2023, "/tmp/out.nc")
+    with pytest.raises(ValueError, match="must not be empty"):
+        download_era5_wind_6hourly([], "/tmp/out.nc")

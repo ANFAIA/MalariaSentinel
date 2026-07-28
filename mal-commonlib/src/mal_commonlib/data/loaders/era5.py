@@ -437,24 +437,29 @@ MIGRATION_SEASON_MONTHS: dict[int, list[str]] = {
     2025: ["01", "02", "03"],
 }
 
+ALL_MONTHS: list[str] = [f"{m:02d}" for m in range(1, 13)]
+
 
 def download_era5_wind_6hourly(
-    year: int,
+    years: int | list[int],
     output_path: str,
     *,
+    months: list[str] | None = None,
     cache_dir: pathlib.Path | None = None,
 ) -> str:
-    """Download ERA5 6-hourly 100m wind for Ghana migration season.
+    """Download ERA5 6-hourly 100m wind, year(s) × month(s).
 
     Downloads ``100m_u_component_of_wind`` and ``100m_v_component_of_wind``
-    from the ``reanalysis-era5-single-levels`` dataset at 6-hourly resolution
-    (00/06/12/18 UTC) for migration season months (Jul-Oct monsoon +
-    Dec-Mar Harmattan). One CDS request per month (API limitation: unique
-    day list), then merges with xarray.
+    from ``reanalysis-era5-single-levels`` at 6-hourly resolution
+    (00/06/12/18 UTC). One CDS request per (year, month) pair, then
+    merges all into a single NetCDF sorted by time.
 
     Args:
-        year: year to download (must be in :data:`MIGRATION_SEASON_MONTHS`).
+        years: single year or list of years to download.
         output_path: path for the merged NetCDF output.
+        months: list of month strings (``["01", ..., "12"]``).
+            ``None`` = all 12 months (full year).  Pass
+            ``MIGRATION_SEASON_MONTHS[year]`` for migration-only.
         cache_dir: optional per-month cache directory.
 
     Returns:
@@ -462,13 +467,12 @@ def download_era5_wind_6hourly(
 
     Raises:
         RuntimeError: if CDS auth is missing.
-        ValueError: if ``year`` is not supported.
+        ValueError: if ``years`` is empty.
     """
-    months = MIGRATION_SEASON_MONTHS.get(year)
-    if months is None:
-        raise ValueError(
-            f"Year {year} not supported; use {list(MIGRATION_SEASON_MONTHS.keys())}"
-        )
+    if isinstance(years, int):
+        years = [years]
+    if not years:
+        raise ValueError("years must not be empty")
 
     import cdsapi
 
@@ -485,28 +489,30 @@ def download_era5_wind_6hourly(
     cdir.mkdir(parents=True, exist_ok=True)
 
     monthly_files: list[str] = []
-    for month_str in months:
-        m_int = int(month_str)
-        n_days = calendar.monthrange(year, m_int)[1]
-        days = [f"{d:02d}" for d in range(1, n_days + 1)]
+    for year in sorted(years):
+        year_months = months if months is not None else ALL_MONTHS
+        for month_str in year_months:
+            m_int = int(month_str)
+            n_days = calendar.monthrange(year, m_int)[1]
+            days = [f"{d:02d}" for d in range(1, n_days + 1)]
 
-        target = cdir / f"era5_wind_6h_{year}_{month_str}.nc"
-        if not target.exists():
-            client.retrieve(
-                ERA5_WIND_DATASET,
-                {
-                    "product_type": "reanalysis",
-                    "variable": ERA5_WIND_VARIABLES,
-                    "year": str(year),
-                    "month": [month_str],
-                    "day": days,
-                    "time": ERA5_WIND_TIMES,
-                    "area": ERA5_WIND_GHANA_AOI,
-                    "format": "netcdf",
-                },
-                str(target),
-            )
-        monthly_files.append(str(target))
+            target = cdir / f"era5_wind_6h_{year}_{month_str}.nc"
+            if not target.exists():
+                client.retrieve(
+                    ERA5_WIND_DATASET,
+                    {
+                        "product_type": "reanalysis",
+                        "variable": ERA5_WIND_VARIABLES,
+                        "year": str(year),
+                        "month": [month_str],
+                        "day": days,
+                        "time": ERA5_WIND_TIMES,
+                        "area": ERA5_WIND_GHANA_AOI,
+                        "format": "netcdf",
+                    },
+                    str(target),
+                )
+            monthly_files.append(str(target))
 
     # Merge monthly files and sort by time.
     datasets = [xr.open_dataset(f) for f in monthly_files]
@@ -518,10 +524,39 @@ def download_era5_wind_6hourly(
     return output_path
 
 
+def download_era5_wind_migration_season(
+    years: int | list[int],
+    output_path: str,
+    *,
+    cache_dir: pathlib.Path | None = None,
+) -> str:
+    """Convenience wrapper: download only migration-season months.
+
+    For each year in ``years``, selects the months from
+    :data:`MIGRATION_SEASON_MONTHS`.  Years not in that dict get all 12
+    months as a fallback.
+
+    Args:
+        years: single year or list of years.
+        output_path: merged NetCDF output path.
+        cache_dir: optional per-month cache.
+
+    Returns:
+        The ``output_path``.
+    """
+    if isinstance(years, int):
+        years = [years]
+    months: list[str] = []
+    for y in sorted(years):
+        months.extend(MIGRATION_SEASON_MONTHS.get(y, ALL_MONTHS))
+    return download_era5_wind_6hourly(years, output_path, months=months, cache_dir=cache_dir)
+
+
 __all__ = [
     "load_era5_temp_suitability",
     "load_era5_water_temp",
     "download_era5_wind_6hourly",
+    "download_era5_wind_migration_season",
     "sharpe_demichele_growth",
     "T_OPT",
     "T_HALF_WIDTH",
@@ -533,4 +568,5 @@ __all__ = [
     "ERA5_WIND_TIMES",
     "ERA5_WIND_GHANA_AOI",
     "MIGRATION_SEASON_MONTHS",
+    "ALL_MONTHS",
 ]
