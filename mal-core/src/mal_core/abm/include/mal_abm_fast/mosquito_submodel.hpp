@@ -120,6 +120,7 @@ public:
     void set_wind_field(const WindField* w) { wind_field_ = w; }
     void set_current_month(int m) { current_month_ = m; }
     void set_current_hour(int h) { current_hour_ = h; }
+    void set_current_day_index(int d) { current_day_index_ = d; }
 
     // Total live agent count (= soa().n_alive).
     int64_t total_agents() const { return soa_.n_alive; }
@@ -205,6 +206,7 @@ private:
     const WindField*        wind_field_        = nullptr;
     int                     current_month_     = 1;  // 1-12, set daily by Engine
     int                     current_hour_      = 20; // 0-23, set daily by Engine (default 8pm)
+    int                     current_day_index_ = 0;  // 0-based simulation day for wind lookup
 
     // -- debug instrumentation state (see set_debug_population) -----
     bool     debug_population_      = false;

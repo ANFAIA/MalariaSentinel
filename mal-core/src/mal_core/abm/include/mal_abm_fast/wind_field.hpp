@@ -5,7 +5,12 @@
 // Loads a 6-hourly NetCDF (u100, v100 variables with valid_time,
 // latitude, longitude dimensions) via GDAL. Provides spatial
 // nearest-neighbor lookup with temporal linear interpolation at
-// (lon, lat, hour_of_day).
+// (lon, lat, day_index, hour_of_day).
+//
+// The NetCDF stores N time steps at 6-hourly intervals (4 per day).
+// day_index is the 0-based simulation day; it maps to the first
+// time step of that day (slot 0 = 00:00 UTC). hour_of_day (0-23)
+// selects which 6-hourly slot to interpolate within.
 //
 // Reference: Huestis et al. 2019 (Nature Communications) — windborne
 // migration of Anopheles in the Sahel, ERA5 + HYSPLIT trajectories.
@@ -32,17 +37,22 @@ public:
     void load_from_nc(const std::string& path);
 
     // Deprecated: load 24-band monthly mean GeoTIFF.
-    // Internally converts to 48 synthetic 6-hourly time steps.
+    // Internally converts to synthetic 6-hourly time steps.
     void load_from_tif(const std::string& path);
 
-    // Query wind at (lon, lat) for hour_of_day 0-23.
-    // Temporal linear interpolation between 6-hourly slots.
-    // Returns {0, 0} if out of bounds.
-    WindVector wind_at(double lon, double lat, int hour_of_day) const;
+    // Query wind at (lon, lat) for simulation day_index (0-based)
+    // and hour_of_day (0-23). Temporal linear interpolation between
+    // the two bracketing 6-hourly slots within the day.
+    // Returns {0, 0} if out of bounds or day_index exceeds data.
+    WindVector wind_at(double lon, double lat,
+                       int day_index, int hour_of_day) const;
 
     // Is the given month in the migration season?
     // Monsoon: Jul-Oct (7-10), Harmattan: Dec-Mar (12, 1-3).
     static bool is_migration_season(int month) noexcept;
+
+    // Total number of days available in the dataset.
+    int32_t n_days() const { return n_times_ / 4; }
 
     // Grid info (for diagnostics).
     int32_t nlat() const { return nlat_; }

@@ -294,13 +294,12 @@ void Engine::step() {
     // 3. Submodel advances one day using the cached per-patch
     //    state. This calls the 5 per-day ops in order (larva
     //    mortality, growth, EIP, dispersal, birth).
-    // M7.6: set current month for wind migration season check.
+    // M7.6: set current month/DayIndex for wind migration.
     if (wind_field_) {
         const auto ymd = std::chrono::year_month_day{current_date_};
         sub_->set_current_month(static_cast<int>(unsigned{ymd.month()}));
-        // Phase 2: 6-hourly wind with night-only flight.
-        // Default to 20:00 (8pm) — typical mosquito flight start hour.
-        sub_->set_current_hour(20);
+        sub_->set_current_hour(20);  // 8pm — typical mosquito flight start
+        sub_->set_current_day_index(day_index);
     }
     sub_->advance_day(aoi_, coord_->patch_states_today());
 

@@ -623,6 +623,7 @@ void MosquitoSubmodel::adult_dispersal(const AOI& aoi) {
                     const WindVector w = wind_field_->wind_at(
                         static_cast<double>(soa_.lon[si]),
                         static_cast<double>(soa_.lat[si]),
+                        current_day_index_,
                         current_hour_);
 
                     const double ws =
