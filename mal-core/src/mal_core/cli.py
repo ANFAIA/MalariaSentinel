@@ -1,7 +1,8 @@
 """Typer CLI — command-line interface to the SDSS.
 
 Commands:
-    malariasim run --aoi {aoi} --stages abm,scoring --stage-flags "abm.days=60"
+    malariasim run --aoi {aoi} --stages download,ingest,abm,scoring --stage-flags "abm.days=60"
+    malariasim download --aoi {aoi} --datasets era5,chirps
     malariasim ingest --aoi {aoi} --year {year} --month {month}
     malariasim abm --aoi {aoi} --days 30
     malariasim score --run-dir {dir} --tier fast
@@ -110,19 +111,19 @@ def run(
     seed: int = typer.Option(1, "--seed", help="Random seed"),
     days: int = typer.Option(30, "--days", help="ABM simulation days"),
     n_rollouts: int = typer.Option(1, "--n-rollouts", help="Number of ABM rollouts"),
-    stages: str = typer.Option("ingest,abm,scoring,training,prediction", "--stages", help="Comma-separated stages"),
+    stages: str = typer.Option("download,ingest,abm,scoring,training,prediction", "--stages", help="Comma-separated stages"),
     output_dir: Path = typer.Option(Path("runs/pipeline"), "--output-dir", help="Output directory"),
     resume: bool = typer.Option(True, "--resume/--no-resume", help="Skip completed stages"),
     stage_flags: str | None = typer.Option(None, "--stage-flags", help="Stage-specific params as comma-separated key=value pairs (e.g. 'abm.days=60,training.epochs=100')"),
 ) -> None:
     """Run the full SDSS pipeline or selected stages.
 
-    Stages run in order: ingest → abm → scoring → training → prediction.
+    Stages run in order: download → ingest → abm → scoring → training → prediction.
     Use --stages to run a subset, and --stage-flags to pass parameters
     to specific stages.
 
     Key parameters:
-      --stages: Comma-separated stage names (ingest,abm,scoring,training,prediction)
+      --stages: Comma-separated stage names (download,ingest,abm,scoring,training,prediction)
       --stage-flags: Stage-specific overrides as 'stage.key=value' pairs
       --resume: Skip stages whose output directory is non-empty
       --output-dir: Root directory for all stage outputs
@@ -139,6 +140,43 @@ def run(
         stage_flags=parsed_flags if parsed_flags else None,
     )
     typer.echo(f"Pipeline result: {result}")
+
+
+@app.command()
+def download(
+    aoi: str = typer.Option("ghana", "--aoi", help="AOI slug"),
+    datasets: str = typer.Option("", "--datasets", help="Comma-separated dataset names (empty = all registered)"),
+    years: str = typer.Option("", "--years", help="Comma-separated years"),
+    months: str = typer.Option("", "--months", help="Comma-separated months"),
+    output_dir: Path = typer.Option(Path("data"), "--output-dir", help="Output root directory"),
+) -> None:
+    """Download datasets for an AOI via the plugin registry.
+
+    Auto-discovers all registered downloaders and invokes them.
+    Updates data/<aoi>/manifest.json after each successful download.
+
+    Examples:
+      malariasim download --aoi ghana --datasets era5
+      malariasim download --aoi ghana --datasets era5,chirps --years 2024 2025
+      malariasim download --aoi ghana --all
+    """
+    from .download import run_download
+
+    ds_list = [s.strip() for s in datasets.split(",") if s.strip()] if datasets else None
+    year_list = [int(y.strip()) for y in years.split(",") if y.strip()] if years else None
+    month_list = [m.strip() for m in months.split(",") if m.strip()] if months else None
+
+    result = run_download(
+        aoi=aoi,
+        datasets=ds_list,
+        years=year_list,
+        months=month_list,
+        output_dir=output_dir / aoi,
+    )
+    for name, info in result.items():
+        status = info.get("status", "unknown")
+        typer.echo(f"  {name}: {status}")
+    typer.echo(f"Download complete: {len(result)} datasets processed")
 
 
 @app.command()
