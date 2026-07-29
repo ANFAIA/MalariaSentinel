@@ -136,8 +136,9 @@ def run_abm_from_manifest(
     }
     if hosts_path:
         flags["hosts"] = hosts_path
-    if wind_path:
-        flags["wind_field"] = wind_path
+    # NOTE: --wind-field not yet supported by compiled binary; skip for now
+    # if wind_path:
+    #     flags["wind_field"] = wind_path
     flags.update(kwargs)
 
     log.info("Running ABM for %s (year=%d, seed=%d)", aoi, year, seed)

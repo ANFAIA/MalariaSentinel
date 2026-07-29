@@ -220,6 +220,33 @@ class AOI(BaseModel):
             gadm_id=None,
         )
 
+    # -- slug registry -------------------------------------------------------
+
+    @classmethod
+    def from_slug(cls, slug: str) -> "AOI":
+        """Build an AOI from a slug key (e.g. ``'ghana'``).
+
+        Raises ``ValueError`` if the slug is not in the registry.
+        """
+        registry = {
+            "ghana": {
+                "bbox": (-3.5, 4.5, 1.5, 11.5),
+                "crs": "EPSG:4326",
+                "resolution_m": 1000,
+                "name": "Ghana NMCP AOI",
+            },
+        }
+        if slug not in registry:
+            raise ValueError(
+                f"Unknown AOI slug {slug!r}; available: {sorted(registry)}"
+            )
+        cfg = registry[slug]
+        return cls.from_bbox(
+            *cfg["bbox"], crs=cfg["crs"], slug=slug,
+            resolution_m=cfg["resolution_m"],
+            name=cfg.get("name", slug),
+        )
+
     @classmethod
     def from_gadm(
         cls,

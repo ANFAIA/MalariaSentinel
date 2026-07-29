@@ -19,9 +19,16 @@ def run_stage(stage: Stage, aoi: str, year: int, month: int, output_dir: Path, s
         out_list = [s.strip() for s in os.split(",") if s.strip()] if os else None
         ys = extra.pop("years", "")
         years = [int(y.strip()) for y in ys.split(",") if y.strip()] if ys else None
+        # Fix: fall back to year/month pipeline params when years/months not provided
+        if not years and year is not None:
+            years = [year]
         ms = extra.pop("months", "")
         months = [m.strip() for m in ms.split(",") if m.strip()] if ms else None
-        return run_download(aoi=aoi, datasets=datasets, outputs=out_list, years=years, months=months, output_dir=output_dir / "download", **extra)
+        if not months and month is not None:
+            months = [str(month)]
+        output_dir = output_dir / "download"
+        output_dir.mkdir(parents=True, exist_ok=True)
+        return run_download(aoi=aoi, datasets=datasets, outputs=out_list, years=years, months=months, output_dir=output_dir, **extra)
     elif stage == Stage.INGEST:
         from mal_core.ingest import build_env_tensor
         return build_env_tensor(aoi=aoi, year=year, month=month, output_dir=output_dir / "ingest", **extra)

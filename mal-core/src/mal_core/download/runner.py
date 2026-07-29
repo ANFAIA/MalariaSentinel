@@ -1,5 +1,6 @@
 """Download runner — orchestrates downloads for an AOI via the plugin registry."""
 from __future__ import annotations
+import inspect
 import logging
 from pathlib import Path
 from typing import Any
@@ -85,25 +86,33 @@ def run_download(
                 is_ts = _is_time_series(spec, output_name)
                 ext = "nc" if "wind" in output_name or "env" in output_name else "tif"
 
+                # Build all possible kwargs, then filter to what the loader accepts
+                sig = inspect.signature(func)
+                accepted = set(sig.parameters.keys())
+
                 if is_ts and years:
-                    # Loop over years — one file per year
                     for year in years:
                         path = _standard_path(aoi, output_name, year, ext)
-                        call_kwargs = {"aoi": aoi_obj, "years": [year]}
-                        if months:
-                            call_kwargs["months"] = months
-                        call_kwargs["output_path"] = str(path)
+                        all_kwargs = {
+                            "aoi": aoi_obj,
+                            "year": year,
+                            "years": [year],
+                            "month": int(months[0]) if months else None,
+                            "months": months,
+                            "output_path": str(path),
+                        }
+                        call_kwargs = {k: v for k, v in all_kwargs.items() if k in accepted and v is not None}
                         func(**call_kwargs)
-                        # Register in manifest
                         update_dataset(aoi, output_name, year, path.name)
                         log.info("    %s → %s", year, path.name)
                 else:
-                    # Static or no year — single file
                     path = _standard_path(aoi, output_name, None, ext)
-                    call_kwargs = {"aoi": aoi_obj}
-                    call_kwargs["output_path"] = str(path)
+                    all_kwargs = {
+                        "aoi": aoi_obj,
+                        "output_path": str(path),
+                    }
+                    call_kwargs = {k: v for k, v in all_kwargs.items() if k in accepted and v is not None}
                     func(**call_kwargs)
-                    # Register in manifest
                     update_dataset(aoi, output_name, None, path.name)
                     log.info("    → %s", path.name)
 
