@@ -52,6 +52,9 @@ def run_download(
     **kwargs,
 ) -> dict[str, Any]:
     """Download datasets for an AOI, using standard naming + manifest registration."""
+    from mal_commonlib.aoi import AOI
+
+    aoi_obj = AOI.from_slug(aoi)
     registry = discover_downloaders()
     if not registry:
         return {"error": "No downloaders registered"}
@@ -86,7 +89,7 @@ def run_download(
                     # Loop over years — one file per year
                     for year in years:
                         path = _standard_path(aoi, output_name, year, ext)
-                        call_kwargs = {"aoi": aoi, "years": [year]}
+                        call_kwargs = {"aoi": aoi_obj, "years": [year]}
                         if months:
                             call_kwargs["months"] = months
                         call_kwargs["output_path"] = str(path)
@@ -97,7 +100,7 @@ def run_download(
                 else:
                     # Static or no year — single file
                     path = _standard_path(aoi, output_name, None, ext)
-                    call_kwargs = {"aoi": aoi}
+                    call_kwargs = {"aoi": aoi_obj}
                     call_kwargs["output_path"] = str(path)
                     func(**call_kwargs)
                     # Register in manifest

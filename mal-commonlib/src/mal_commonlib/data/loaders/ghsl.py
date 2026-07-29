@@ -229,8 +229,9 @@ def _read_clip(aoi: AOI, tif_path: pathlib.Path) -> xr.DataArray:
 def load_ghsl_urban_class(
     aoi: AOI | str,
     *,
+    output_path: str | pathlib.Path | None = None,
     cache_dir: pathlib.Path | None = None,
-) -> xr.DataArray:
+) -> xr.DataArray | pathlib.Path:
     """Load GHSL settlement classification (SMOD) for the AOI.
 
     Downloads the ZIP from JRC FTP, extracts the TIF, and clips
@@ -263,7 +264,13 @@ def load_ghsl_urban_class(
     _extract_tif_from_zip(zip_path, _GHSL_TIF_NAME, tif_path)
 
     # Step 3: read, reproject, clip
-    return _read_clip(aoi, tif_path)
+    da = _read_clip(aoi, tif_path)
+    if output_path is not None:
+        out = pathlib.Path(output_path)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        da.rio.to_raster(str(out))
+        return out
+    return da
 
 
 class GHSLLoader:

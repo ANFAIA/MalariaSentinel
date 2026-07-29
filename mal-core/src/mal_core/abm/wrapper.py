@@ -42,7 +42,7 @@ class CppAbmWrapper:
     def run(self, **flags) -> dict[str, Any]:
         if self._flags_schema is None:
             self._flags_schema = self._introspect_flags()
-        cmd = [str(self.binary)]
+        cmd = [str(self.binary), "run"]
         for name, value in flags.items():
             if value is None:
                 continue

@@ -268,8 +268,9 @@ def load_wildlife_host_proxy(
     aoi: AOI | str,
     *,
     year: int = 2021,
+    output_path: str | pathlib.Path | None = None,
     cache_dir: pathlib.Path | None = None,
-) -> xr.DataArray:
+) -> xr.DataArray | pathlib.Path:
     """Load wildlife host proxy suitability for the AOI.
 
     Computes a [0,1] suitability score from ESA WorldCover habitat
@@ -367,6 +368,11 @@ def load_wildlife_host_proxy(
         inplace=True,
     )
     da.rio.write_nodata(_NODATA_OUT_SCALAR, inplace=True)
+    if output_path is not None:
+        out = pathlib.Path(output_path)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        da.rio.to_raster(str(out))
+        return out
     return da
 
 

@@ -290,7 +290,7 @@ def _write_habitat_patches_gpkg(
 
 
 def build_env_tensor(
-    aoi: AOI,
+    aoi,
     year: int,
     month: int,
     output_dir: pathlib.Path,
@@ -306,7 +306,7 @@ def build_env_tensor(
     """Build the env tensor + habitat patches for an AOI + month.
 
     Args:
-        aoi: the AOI object.
+        aoi: the AOI object or a string slug.
         year: year (e.g. 2024).
         month: month 1-12.
         output_dir: directory for outputs.
@@ -321,7 +321,10 @@ def build_env_tensor(
     Returns:
         dict with 'env_path', 'habitat_path', and other metadata.
     """
-    scale_obj = Scale(scale)
+    if isinstance(aoi, str):
+        aoi = AOI.from_slug(aoi)
+    if isinstance(scale, str):
+        scale = Scale(scale)
     h, w = aoi.cells_per_side()
     suffix = f"{aoi.slug}_{aoi.scale.value}_{year:04d}_{month:02d}"
     ext = "nc" if output_format == "nc" else "tif"

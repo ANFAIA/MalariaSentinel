@@ -206,8 +206,9 @@ def _rasterize_footprints(
 def load_buildings_fraction(
     aoi: AOI | str,
     *,
+    output_path: str | pathlib.Path | None = None,
     cache_dir: pathlib.Path | None = None,
-) -> xr.DataArray:
+) -> xr.DataArray | pathlib.Path:
     """Load building footprint fraction for the AOI.
 
     Args:
@@ -248,6 +249,11 @@ def load_buildings_fraction(
     da.rio.write_crs(aoi.crs_obj, inplace=True)
     da.rio.write_transform(from_bounds(*aoi.bbox, *aoi.cells_per_side()[::-1]), inplace=True)
     da.rio.write_nodata(-9999.0, inplace=True)
+    if output_path is not None:
+        out = pathlib.Path(output_path)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        da.rio.to_raster(str(out))
+        return out
     return da
 
 
