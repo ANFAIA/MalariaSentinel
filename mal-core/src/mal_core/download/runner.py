@@ -13,7 +13,7 @@ from .writer import save_product
 
 log = logging.getLogger(__name__)
 
-_REPO_ROOT = Path(__file__).resolve().parents[3]
+_REPO_ROOT = Path(__file__).resolve().parents[4]
 
 def _check_auth(spec: DownloaderSpec) -> bool:
     for auth in spec.requires_auth:
@@ -37,15 +37,16 @@ def _standard_path(aoi: str, product: str, year: int | None, ext: str) -> Path:
     return data_dir / f"{aoi}_{product}.{ext}"
 
 def _is_time_series(spec: DownloaderSpec, output_name: str) -> bool:
-    """A loader output is time-series if `year` is a REQUIRED param (no default)."""
+    """A loader output is time-series if `year` or `years` is a REQUIRED param (no default)."""
     func = spec.outputs.get(output_name)
     if func is None:
         return False
     sig = inspect.signature(func)
     params = sig.parameters
-    if "year" not in params:
-        return False
-    return params["year"].default is inspect.Parameter.empty
+    for key in ("year", "years"):
+        if key in params and params[key].default is inspect.Parameter.empty:
+            return True
+    return False
 
 def run_download(
     aoi: str,

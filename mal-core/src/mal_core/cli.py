@@ -203,11 +203,13 @@ def ingest(
     from .ingest import build_env_tensor, build_host_dataset, build_mobility_dataset
 
     results = {}
+    from mal_commonlib.aoi import AOI as _AOI
+    aoi_obj = _AOI.from_slug(aoi) if isinstance(aoi, str) else aoi
     if what in ("env", "all"):
         result = build_env_tensor(aoi=aoi, year=year, month=month, output_dir=output_dir, scale=scale)
         results["env"] = result
     if what in ("hosts", "all"):
-        result = build_host_dataset(aoi=aoi, output_dir=output_dir)
+        result = build_host_dataset(aoi=aoi_obj, output_dir=output_dir)
         results["hosts"] = result
     if what in ("mobility", "all"):
         from pathlib import Path as P
@@ -215,7 +217,7 @@ def ingest(
         if not hosts_path.exists():
             hosts_path = P("data") / aoi / f"{aoi}_host_static.nc"
         if hosts_path.exists():
-            result = build_mobility_dataset(aoi=aoi, hosts_path=hosts_path, output_dir=output_dir)
+            result = build_mobility_dataset(hosts_path=hosts_path, output_dir=output_dir, aoi_slug=aoi)
             results["mobility"] = result
         else:
             typer.echo(f"Warning: host_static.nc not found, skipping mobility build", err=True)
