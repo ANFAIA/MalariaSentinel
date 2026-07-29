@@ -18,13 +18,13 @@ from mal_core.pipeline.runner import run_stage
 
 
 def test_run_stage_ingest(tmp_path):
-    with patch.object(mal_core.ingest, "build_environment", return_value={"success": True}):
+    with patch.object(mal_core.ingest, "build_env_tensor", return_value={"success": True}):
         result = run_stage(Stage.INGEST, "ghana", 2024, 1, tmp_path)
     assert result["success"] is True
 
 
 def test_run_stage_abm(tmp_path):
-    with patch.object(mal_core.abm, "run_abm", return_value={"stdout": "ok", "returncode": 0}):
+    with patch("mal_core.abm.wrapper.run_abm_from_manifest", return_value={"stdout": "ok", "returncode": 0}):
         result = run_stage(Stage.ABM, "ghana", 2024, 1, tmp_path, days=7)
     assert result["returncode"] == 0
 
