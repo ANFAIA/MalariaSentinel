@@ -8,8 +8,8 @@ from typing import Any, Callable
 log = logging.getLogger(__name__)
 
 LOADER_MODULES = [
-    "era5", "chirps", "dem", "jrc_gsw", "modis", "worldcover",
-    "ghsl", "glw", "wildlife", "buildings",
+    "era5", "chirps", "dem", "jrc_gsw", "modis",
+    "worldpop", "glw", "ghsl", "wildlife", "buildings",
 ]
 
 @dataclass

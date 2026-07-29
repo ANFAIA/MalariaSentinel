@@ -189,21 +189,38 @@ def ingest(
     month: int = typer.Option(6, "--month", help="Month"),
     output_dir: Path = typer.Option(Path("runs/ingest"), "--output-dir"),
     scale: str = typer.Option("regional", "--scale"),
+    what: str = typer.Option("all", "--what", help="What to build: env, hosts, mobility, all"),
 ) -> None:
-    """Build environmental tensors for an AOI.
+    """Build ABM-ready artifacts for an AOI.
 
-    Ingests terrain, climate, and land-cover data to produce the
-    multi-band raster stack used by the ABM and prediction stages.
+    Builds environmental tensors, host density grids, and mobility matrices.
+    Use --what to build a specific component.
 
     Key parameters:
-      --aoi: Area of interest slug
-      --year/--month: Time window for the environmental data
-      --scale: regional, national, or continental resolution
+      --what: env (4-band tensor + habitat), hosts (host_static.nc),
+              mobility (CSR OD matrices), or all (default)
     """
-    from .ingest import build_environment
+    from .ingest import build_env_tensor, build_host_dataset, build_mobility_dataset
 
-    result = build_environment(aoi=aoi, year=year, month=month, output_dir=output_dir, scale=scale)
-    typer.echo(f"Ingest result: {result}")
+    results = {}
+    if what in ("env", "all"):
+        result = build_env_tensor(aoi=aoi, year=year, month=month, output_dir=output_dir, scale=scale)
+        results["env"] = result
+    if what in ("hosts", "all"):
+        result = build_host_dataset(aoi=aoi, output_dir=output_dir)
+        results["hosts"] = result
+    if what in ("mobility", "all"):
+        from pathlib import Path as P
+        hosts_path = output_dir / f"{aoi}_host_static.nc"
+        if not hosts_path.exists():
+            hosts_path = P("data") / aoi / f"{aoi}_host_static.nc"
+        if hosts_path.exists():
+            result = build_mobility_dataset(aoi=aoi, hosts_path=hosts_path, output_dir=output_dir)
+            results["mobility"] = result
+        else:
+            typer.echo(f"Warning: host_static.nc not found, skipping mobility build", err=True)
+
+    typer.echo(f"Ingest results: {list(results.keys())}")
 
 
 @app.command()

@@ -23,8 +23,17 @@ def run_stage(stage: Stage, aoi: str, year: int, month: int, output_dir: Path, s
         months = [m.strip() for m in ms.split(",") if m.strip()] if ms else None
         return run_download(aoi=aoi, datasets=datasets, outputs=out_list, years=years, months=months, output_dir=output_dir / "download", **extra)
     elif stage == Stage.INGEST:
-        from mal_core.ingest import build_environment
-        return build_environment(aoi=aoi, year=year, month=month, output_dir=output_dir / "ingest", **extra)
+        from mal_core.ingest import build_env_tensor
+        return build_env_tensor(aoi=aoi, year=year, month=month, output_dir=output_dir / "ingest", **extra)
+    elif stage == Stage.BUILD_HOSTS:
+        from mal_core.ingest.hosts import build_host_dataset
+        return build_host_dataset(aoi=aoi, output_dir=output_dir / "hosts", **extra)
+    elif stage == Stage.BUILD_MOBILITY:
+        from mal_core.ingest.mobility import build_mobility_dataset
+        hosts_path = output_dir / "hosts" / f"{aoi}_host_static.nc"
+        if not hosts_path.exists():
+            hosts_path = output_dir / "abm" / "hosts" / f"{aoi}_host_static.nc"
+        return build_mobility_dataset(aoi_slug=aoi, hosts_path=hosts_path, output_dir=output_dir / "mobility", **extra)
     elif stage == Stage.ABM:
         from mal_core.abm.wrapper import run_abm_from_manifest
         return run_abm_from_manifest(aoi=aoi, year=year, month=month, days=days, seed=seed, n_rollouts=n_rollouts, output_dir=output_dir / "abm", **extra)

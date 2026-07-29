@@ -11,8 +11,8 @@ import pytest
 
 # All loader module names that may have DOWNLOADER dicts
 LOADER_MODULES = [
-    "era5", "chirps", "dem", "jrc_gsw", "modis", "worldcover",
-    "ghsl", "glw", "wildlife", "buildings",
+    "era5", "chirps", "dem", "jrc_gsw", "modis",
+    "worldpop", "glw", "ghsl", "wildlife", "buildings",
 ]
 
 VALID_AUTH = {"cds", "earthdata", "planetary_computer", "none"}
@@ -131,8 +131,7 @@ class TestDownloaderDiscovery:
 
     def test_six_loaders_registered(self):
         downloaders = _discover_downloaders()
-        # At minimum: era5, chirps, dem, jrc_gsw, modis, worldcover
-        expected = {"era5", "chirps", "dem", "jrc_gsw", "modis", "worldcover"}
+        expected = {"era5", "chirps", "dem", "jrc_gsw", "modis", "worldpop"}
         found = set(downloaders.keys())
         missing = expected - found
         assert not missing, f"Missing downloaders: {missing}. Found: {found}"
