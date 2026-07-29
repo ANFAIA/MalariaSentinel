@@ -202,9 +202,8 @@ def load_glw_livestock(
     aoi: AOI | str,
     *,
     species: str = "cattle",
-    output_path: str | pathlib.Path | None = None,
     cache_dir: pathlib.Path | None = None,
-) -> xr.DataArray | pathlib.Path:
+) -> xr.DataArray:
     """Load FAO GLW4 livestock density for the AOI.
 
     Args:
@@ -236,11 +235,6 @@ def load_glw_livestock(
     _download_to(cfg["url"], tif_path)
 
     da = _read_clip(aoi, tif_path, species, cfg["long_name"])
-    if output_path is not None:
-        out = pathlib.Path(output_path)
-        out.parent.mkdir(parents=True, exist_ok=True)
-        da.rio.to_raster(str(out))
-        return out
     return da
 
 

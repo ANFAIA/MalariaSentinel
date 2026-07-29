@@ -1,6 +1,7 @@
 """Shared helpers for the ingest stage."""
 from __future__ import annotations
 
+import inspect
 import logging
 from pathlib import Path
 from typing import Any, Callable
@@ -63,12 +64,18 @@ def safe_load(
 ) -> Any:
     """Call a loader; on auth/network failure, return a NoData-filled channel."""
     try:
-        if year is not None and month is not None:
-            return loader_fn(aoi, year=year, month=month, **kwargs)
-        elif year is not None:
-            return loader_fn(aoi, year=year, **kwargs)
-        else:
-            return loader_fn(aoi, **kwargs)
+        sig = inspect.signature(loader_fn)
+        accepted = set(sig.parameters.keys())
+        call_kwargs: dict[str, Any] = {}
+        if "aoi" in accepted:
+            call_kwargs["aoi"] = aoi
+        if "year" in accepted and year is not None:
+            call_kwargs["year"] = year
+        if "month" in accepted and month is not None:
+            call_kwargs["month"] = month
+        if "cache_dir" in accepted:
+            call_kwargs["cache_dir"] = kwargs.get("cache_dir")
+        return loader_fn(**call_kwargs)
     except (RuntimeError, FileNotFoundError, OSError, requests.RequestException) as exc:
         log.warning(
             "%s loader failed: %r. Filling with NoData (%s).",

@@ -159,9 +159,8 @@ def load_worldpop_population(
     aoi: AOI | str,
     *,
     year: int = 2019,
-    output_path: str | pathlib.Path | None = None,
     cache_dir: pathlib.Path | None = None,
-) -> xr.DataArray | pathlib.Path:
+) -> xr.DataArray:
     """Load WorldPop constrained population density for the AOI.
 
     Args:
@@ -191,13 +190,7 @@ def load_worldpop_population(
     tif_path = cache / file_name
     url = _WORLDPOP_URL_TEMPLATE.format(year=year, iso3="GHA")
     _download_to(url, tif_path)
-
-    if output_path is not None:
-        out = pathlib.Path(output_path)
-        out.parent.mkdir(parents=True, exist_ok=True)
-        da.rio.to_raster(str(out))
-        return out
-    return da
+    return _read_clip(aoi, tif_path, year)
 
 
 class WorldPopLoader:

@@ -3,7 +3,7 @@
 Public surface:
     load_era5_temp_suitability(aoi, year, month, *, cache_dir=None) -> xr.DataArray
     load_era5_water_temp(aoi, year, month, *, cache_dir=None) -> xr.DataArray
-    load_era5_wind_6hourly(aoi, years, *, months, output_path, cache_dir) -> xr.Dataset
+    load_era5_wind_6hourly(aoi, years, *, months, cache_dir) -> xr.Dataset
     sharpe_demichele_growth(T_celsius: xr.DataArray) -> xr.DataArray
 
 Source: Copernicus CDS — ``derived-era5-land-daily-statistics`` dataset.
@@ -444,28 +444,26 @@ ALL_MONTHS: list[str] = [f"{m:02d}" for m in range(1, 13)]
 
 def _download_era5_wind(
     years: int | list[int],
-    output_path: str,
     *,
     months: list[str] | None = None,
     cache_dir: pathlib.Path | None = None,
-) -> str:
+) -> xr.Dataset:
     """Download ERA5 6-hourly 100m wind, year(s) × month(s).
 
     Downloads ``100m_u_component_of_wind`` and ``100m_v_component_of_wind``
     from ``reanalysis-era5-single-levels`` at 6-hourly resolution
     (00/06/12/18 UTC). One CDS request per (year, month) pair, then
-    merges all into a single NetCDF sorted by time.
+    merges all into a single Dataset sorted by time.
 
     Args:
         years: single year or list of years to download.
-        output_path: path for the merged NetCDF output.
         months: list of month strings (``["01", ..., "12"]``).
             ``None`` = all 12 months (full year).  Pass
             ``MIGRATION_SEASON_MONTHS[year]`` for migration-only.
         cache_dir: optional per-month cache directory.
 
     Returns:
-        The ``output_path``.
+        ``xr.Dataset`` with merged 6-hourly wind data.
 
     Raises:
         RuntimeError: if CDS auth is missing.
@@ -519,11 +517,10 @@ def _download_era5_wind(
     # Merge monthly files and sort by time.
     datasets = [xr.open_dataset(f) for f in monthly_files]
     merged = xr.concat(datasets, dim="valid_time").sortby("valid_time")
-    merged.to_netcdf(output_path)
     for ds in datasets:
         ds.close()
 
-    return output_path
+    return merged
 
 
 def load_era5_wind_6hourly(
@@ -531,44 +528,38 @@ def load_era5_wind_6hourly(
     years: int | list[int],
     *,
     months: list[str] | None = None,
-    output_path: str | pathlib.Path | None = None,
     cache_dir: pathlib.Path | None = None,
-) -> xr.Dataset | pathlib.Path:
+) -> xr.Dataset:
     """Load-or-download ERA5 6-hourly 100m wind data.
 
-    If ``output_path`` exists on disk, opens and returns ``xr.Dataset``.
-    Otherwise downloads from CDS, saves to ``output_path``, then returns
+    Downloads from CDS, caches monthly files, merges, and returns
     ``xr.Dataset``.
 
     Args:
         aoi: AOI slug or AOI object (used for grid reprojection).
         years: single year or list of years.
         months: month strings ``["01", ..., "12"]``. ``None`` = all 12.
-        output_path: where to save/read. ``None`` = use default cache.
         cache_dir: cache directory. Default ``~/.cache/mal_commonlib/era5``.
 
     Returns:
-        ``xr.Dataset`` if ``output_path`` is ``None``, else ``Path`` to saved file.
+        ``xr.Dataset`` with merged 6-hourly wind data.
     """
     if isinstance(years, int):
         years = [years]
     if not years:
         raise ValueError("years must not be empty")
 
-    if output_path is None:
-        cdir = cache_dir or _default_cache_dir()
-        cdir.mkdir(parents=True, exist_ok=True)
-        year_str = "_".join(str(y) for y in sorted(years))
-        output_path = cdir / f"wind_6hourly_{year_str}.nc"
-    else:
-        output_path = pathlib.Path(output_path)
+    cdir = cache_dir or _default_cache_dir()
+    cdir.mkdir(parents=True, exist_ok=True)
+    year_str = "_".join(str(y) for y in sorted(years))
+    merged_path = cdir / f"wind_6hourly_{year_str}.nc"
 
-    if output_path.exists() and output_path.stat().st_size > 0:
-        return xr.open_dataset(output_path)
+    if merged_path.exists() and merged_path.stat().st_size > 0:
+        return xr.open_dataset(merged_path)
 
-    _download_era5_wind(years, str(output_path), months=months, cache_dir=cache_dir)
-
-    return xr.open_dataset(output_path)
+    ds = _download_era5_wind(years, months=months, cache_dir=cache_dir)
+    ds.to_netcdf(merged_path)
+    return ds
 
 
 DOWNLOADER = {

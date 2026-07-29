@@ -5,8 +5,11 @@ import logging
 from pathlib import Path
 from typing import Any
 
+import xarray as xr
+
 from .registry import discover_downloaders, DownloaderSpec
 from .manifest import update_dataset, validate_completeness
+from .writer import save_product
 
 log = logging.getLogger(__name__)
 
@@ -34,14 +37,15 @@ def _standard_path(aoi: str, product: str, year: int | None, ext: str) -> Path:
     return data_dir / f"{aoi}_{product}.{ext}"
 
 def _is_time_series(spec: DownloaderSpec, output_name: str) -> bool:
-    """Check if a dataset is time-series (needs year in filename)."""
-    # Heuristic: if the function accepts 'years' or 'year', it's time-series
-    import inspect
+    """A loader output is time-series if `year` is a REQUIRED param (no default)."""
     func = spec.outputs.get(output_name)
     if func is None:
         return False
     sig = inspect.signature(func)
-    return "years" in sig.parameters or "year" in sig.parameters
+    params = sig.parameters
+    if "year" not in params:
+        return False
+    return params["year"].default is inspect.Parameter.empty
 
 def run_download(
     aoi: str,
@@ -84,7 +88,6 @@ def run_download(
 
                 # Determine if time-series or static
                 is_ts = _is_time_series(spec, output_name)
-                ext = "nc" if "wind" in output_name or "env" in output_name else "tif"
 
                 # Build all possible kwargs, then filter to what the loader accepts
                 sig = inspect.signature(func)
@@ -92,29 +95,35 @@ def run_download(
 
                 if is_ts and years:
                     for year in years:
-                        path = _standard_path(aoi, output_name, year, ext)
                         all_kwargs = {
                             "aoi": aoi_obj,
                             "year": year,
                             "years": [year],
                             "month": int(months[0]) if months else None,
                             "months": months,
-                            "output_path": str(path),
                         }
                         call_kwargs = {k: v for k, v in all_kwargs.items() if k in accepted and v is not None}
-                        func(**call_kwargs)
-                        update_dataset(aoi, output_name, year, path.name)
-                        log.info("    %s → %s", year, path.name)
+                        result = func(**call_kwargs)
+                        if result is not None:
+                            ext = ".nc" if isinstance(result, xr.Dataset) else ".tif"
+                            path = _standard_path(aoi, output_name, year, ext.lstrip("."))
+                            save_product(result, path)
+                            manifest_key = spec.manifest_keys[output_name]
+                            update_dataset(aoi, manifest_key, year, path.name)
+                            log.info("    %s → %s", year, path.name)
                 else:
-                    path = _standard_path(aoi, output_name, None, ext)
                     all_kwargs = {
                         "aoi": aoi_obj,
-                        "output_path": str(path),
                     }
                     call_kwargs = {k: v for k, v in all_kwargs.items() if k in accepted and v is not None}
-                    func(**call_kwargs)
-                    update_dataset(aoi, output_name, None, path.name)
-                    log.info("    → %s", path.name)
+                    result = func(**call_kwargs)
+                    if result is not None:
+                        ext = ".nc" if isinstance(result, xr.Dataset) else ".tif"
+                        path = _standard_path(aoi, output_name, None, ext.lstrip("."))
+                        save_product(result, path)
+                        manifest_key = spec.manifest_keys[output_name]
+                        update_dataset(aoi, manifest_key, None, path.name)
+                        log.info("    → %s", path.name)
 
             results[name] = {"status": "ok"}
         except Exception as e:

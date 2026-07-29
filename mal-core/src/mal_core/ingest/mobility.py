@@ -104,9 +104,9 @@ def build_mobility_dataset(
     output_dir.mkdir(parents=True, exist_ok=True)
 
     csr_files = {
-        "human_mobility_day.csr": (rp_hday, ci_hday, v_hday),
-        "human_mobility_night.csr": (rp_hnight, ci_hnight, v_hnight),
-        "livestock_mobility_season.csr": (rp_live, ci_live, v_live),
+        f"{aoi_slug}_mobility_day.csr": (rp_hday, ci_hday, v_hday),
+        f"{aoi_slug}_mobility_night.csr": (rp_hnight, ci_hnight, v_hnight),
+        f"{aoi_slug}_livestock_mobility.csr": (rp_live, ci_live, v_live),
     }
     written_paths: list[str] = []
     for name, (rp, ci, vl) in csr_files.items():
@@ -131,9 +131,14 @@ def build_mobility_dataset(
     manifest_path.write_text(json.dumps(manifest, indent=2) + "\n")
 
     # Register in central manifest
-    for csr_name in csr_files:
+    manifest_keys = {
+        f"{aoi_slug}_mobility_day.csr": "mobility_day",
+        f"{aoi_slug}_mobility_night.csr": "mobility_night",
+        f"{aoi_slug}_livestock_mobility.csr": "livestock_mobility",
+    }
+    for csr_name, manifest_key in manifest_keys.items():
         register_dataset(
-            aoi_slug, f"mobility_{csr_name.replace('.csr', '')}", None,
+            aoi_slug, manifest_key, None,
             csr_name,
             required_for_abm=True,
         )

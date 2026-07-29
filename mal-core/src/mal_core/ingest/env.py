@@ -422,13 +422,13 @@ def build_env_tensor(
 
     # Register in manifest
     register_dataset(
-        aoi.slug, "env_tensor", year,
+        aoi.slug, "env", year,
         str(env_path.name),
         variables=list(ENV_BAND_NAMES),
         format=ext,
     )
     register_dataset(
-        aoi.slug, "habitat_patches", year,
+        aoi.slug, "habitat", year,
         str(habitat_path.name),
     )
 

@@ -18,9 +18,9 @@ from mal_commonlib.data.host_utils import (
     build_host_static_nc,
     write_manifest,
 )
-from mal_commonlib.data.loaders.ghsl import GHSLLoader
-from mal_commonlib.data.loaders.glw import GLWLoader
-from mal_commonlib.data.loaders.worldpop import WorldPopLoader
+from mal_commonlib.data.loaders.ghsl import load_ghsl_urban_class
+from mal_commonlib.data.loaders.glw import load_glw_livestock
+from mal_commonlib.data.loaders.worldpop import load_worldpop_population
 
 from ._shared import register_dataset
 
@@ -64,8 +64,7 @@ def build_host_dataset(
     }
 
     # 1. Human population (WorldPop, ~100m) — sum-preserving aggregation
-    wp = WorldPopLoader()
-    pop_da = wp.load(aoi, year=worldpop_year, cache_dir=cache_dir)
+    pop_da = load_worldpop_population(aoi, year=worldpop_year, cache_dir=cache_dir)
     human = aggregate_to_grid(
         pop_da.values,
         pop_da.rio.transform(),
@@ -79,11 +78,10 @@ def build_host_dataset(
     results["human_total"] = human_total
 
     # 2. Livestock (GLW4, ~10km) — sum-preserving aggregation
-    glw = GLWLoader()
     livestock_totals: dict[str, np.ndarray] = {}
 
     for species in LIVESTOCK_SPECIES:
-        livestock_da = glw.load(aoi, species=species, cache_dir=cache_dir)
+        livestock_da = load_glw_livestock(aoi, species=species, cache_dir=cache_dir)
         livestock_arr = aggregate_to_grid(
             livestock_da.values,
             livestock_da.rio.transform(),
@@ -102,8 +100,7 @@ def build_host_dataset(
 
     # 3. Urban/rural classification (GHSL, 250m) — nearest-neighbour
     try:
-        ghsl = GHSLLoader()
-        smod_da = ghsl.load(aoi, cache_dir=cache_dir)
+        smod_da = load_ghsl_urban_class(aoi, cache_dir=cache_dir)
         urban_class = aggregate_to_grid(
             smod_da.values.astype(np.float32),
             smod_da.rio.transform(),
@@ -136,10 +133,9 @@ def build_host_dataset(
         building_frac = np.where(urban_class == 30, 0.6, 0.1).astype(np.float32)
     else:
         try:
-            from mal_commonlib.data.loaders.buildings import BuildingsLoader
+            from mal_commonlib.data.loaders.buildings import load_buildings_fraction
 
-            bld = BuildingsLoader()
-            bld_da = bld.load(aoi, cache_dir=cache_dir)
+            bld_da = load_buildings_fraction(aoi, cache_dir=cache_dir)
             building_frac = aggregate_to_grid(
                 bld_da.values,
                 bld_da.rio.transform(),
@@ -160,10 +156,9 @@ def build_host_dataset(
         wildlife_proxy = np.full((h, w), 0.3, dtype=np.float32)
     else:
         try:
-            from mal_commonlib.data.loaders.wildlife import WildlifeLoader
+            from mal_commonlib.data.loaders.wildlife import load_wildlife_host_proxy
 
-            wl = WildlifeLoader()
-            wl_da = wl.load(aoi, cache_dir=cache_dir)
+            wl_da = load_wildlife_host_proxy(aoi, cache_dir=cache_dir)
             wildlife_proxy = aggregate_to_grid(
                 wl_da.values,
                 wl_da.rio.transform(),
@@ -180,7 +175,7 @@ def build_host_dataset(
 
     # 6. Write NetCDF + manifest
     output_dir.mkdir(parents=True, exist_ok=True)
-    nc_path = output_dir / "host_static.nc"
+    nc_path = output_dir / f"{aoi.slug}_host_static.nc"
     build_host_static_nc(
         human=human,
         cattle=livestock_totals["cattle"],
