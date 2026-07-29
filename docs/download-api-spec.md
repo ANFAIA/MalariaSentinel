@@ -6,46 +6,46 @@ Canonical reference for the MalariaSentinel data download plugin system.
 
 Plugin-based download system at `mal-commonlib/src/mal_commonlib/data/loaders/`.
 
-> **Note (2026-07-29)**: The `worldcover` loader is deprecated (replaced by `jrc_gsw` in M2). The class-style loaders (`ghsl`, `glw`, `wildlife`, `buildings`, `worldpop`) are being refactored to function-style and will be registered in the downloader registry in Phase 2 of the unify-download-ingest-build initiative.
-
 How it works:
 - Each loader module exposes a `DOWNLOADER` dict.
 - Registry (`mal-core/src/mal_core/download/registry.py`) discovers all `DOWNLOADER` dicts via `importlib`.
-- Runner (`mal-core/src/mal_core/download/runner.py`) calls each output callable with unified kwargs.
-- Manifest (`mal-core/src/mal_core/download/manifest.py`) auto-updates `data/<aoi>/manifest.json` after each successful download.
+- Runner (`mal-core/src/mal_core/download/runner.py`) inspects each output callable's signature to detect time-series vs static, calls it with filtered kwargs, then saves the returned `xr.DataArray` / `xr.Dataset` via `save_product()` from `mal_core.download.writer`.
+- Manifest (`mal-core/src/mal_core/download/manifest.py`) auto-updates `data/<aoi>/manifest.json` after each successful save.
 - CLI command `malariasim download` invokes the runner.
 
-Registered loaders:
+> **Loaders do NOT accept `output_path`.** The runner is the single save point — loaders return data in memory, the runner persists to disk.
 
-| Loader | Auth | Outputs | Status |
-|--------|------|---------|--------|
-| `era5` | `cds` | `temp_suitability`, `water_temp`, `wind_6hourly` | Active |
-| `chirps` | `none` | `rainfall`, `rainfall_daily` | Active |
-| `dem` | `none` | `elevation` | Active |
-| `jrc_gsw` | `none` | `water_occurrence` | Active |
-| `modis` | `earthdata` | `ndvi` | Active |
-| `worldcover` | `none` | `water_frac` | **DEPRECATED** (replaced by `jrc_gsw` in M2) |
-| `ghsl` | `none` | `urban_class` | Pending Phase 2 |
-| `glw` | `none` | `livestock` | Pending Phase 2 |
-| `wildlife` | `none` | `wildlife_host_proxy` | Pending Phase 2 |
-| `buildings` | `none` | `building_fraction` | Pending Phase 2 |
-| `worldpop` | `none` | `population` | Pending Phase 2 |
+Registered loaders (all function-style, all registered):
+
+| Loader | Auth | Outputs | Manifest Keys |
+|--------|------|---------|---------------|
+| `era5` | `cds` | `temp_suitability`, `water_temp`, `wind_6hourly` | `era5_temp`, `era5_water_temp`, `wind` |
+| `chirps` | `none` | `rainfall`, `rainfall_daily` | `chirps_rainfall`, `chirps_rainfall_daily` |
+| `dem` | `none` | `elevation` | `dem` |
+| `jrc_gsw` | `none` | `water_occurrence` | `jrc_water` |
+| `modis` | `earthdata` | `ndvi` | `modis_ndvi` |
+| `worldpop` | `none` | `population` | `worldpop` |
+| `glw` | `none` | `cattle`, `goats`, `sheep`, `pigs`, `chickens` | `glw_cattle`, `glw_goats`, `glw_sheep`, `glw_pigs`, `glw_chickens` |
+| `ghsl` | `none` | `urban_class` | `ghsl_urban` |
+| `wildlife` | `none` | `wildlife_host_proxy` | `wildlife_proxy` |
+| `buildings` | `none` | `building_fraction` | `buildings` |
+
+> **`worldcover` is DEPRECATED.** Use `jrc_gsw` for the `water_frac` channel. Archived to `mal-commonlib/.../loaders/_legacy/worldcover.py`.
 
 ## 2. Unified API — Load-or-Download
 
-Every public function follows this pattern:
+Every public function returns data in memory. The runner is the single save point.
+
+### Canonical signature
 
 ```python
 def load_<dataset>_<product>(
-    aoi: AOI | str,                              # REQUIRED, always first
+    aoi: AOI,                                  # REQUIRED, always first
     *,
-    year: int | list[int] | None = None,         # singular for load
-    month: int | list[int] | None = None,        # singular for load
-    years: int | list[int] | None = None,        # plural for download
-    months: int | str | list[int | str] | None = None,  # plural for download
-    output_path: str | Path | None = None,       # None = in-memory
-    cache_dir: Path | None = None,               # default: ~/.cache/mal_commonlib/<dataset>
-) -> xr.DataArray | xr.Dataset | Path:
+    year: int | None = None,                   # REQUIRED for time-series
+    month: int | None = None,                  # REQUIRED for some time-series
+    cache_dir: pathlib.Path | None = None,     # default: ~/.cache/mal_commonlib/<dataset>
+) -> xr.DataArray | xr.Dataset:
 ```
 
 ### Rules
@@ -53,48 +53,37 @@ def load_<dataset>_<product>(
 - `aoi` is always the first positional arg.
 - Time-invariant products (dem): `year=None, month=None` — both optional, ignored.
 - Time-series products (chirps, era5 temp): `year` required, `month` required.
-- Annual products (jrc_gsw, worldcover): `year` optional, `month` optional.
-- Download-heavy products (era5 wind): `years` required (multi-year), `month`/`months` optional.
-- If `output_path` is given: save to disk, return `Path`.
-- If `output_path` is `None`: return in-memory (`xr.DataArray` or `xr.Dataset`).
+- Annual products (jrc_gsw, modis): `year` optional, `month` optional.
+- The runner detects time-series by inspecting whether `year` is a required param (no default).
+- Loaders **do NOT** accept `output_path` — the runner calls `save_product()` to persist.
 
-### Internal implementation
+### How the runner uses loaders
 
-Each loader has two private functions:
-
-- `_download_<product>(...)` — fetch from remote, save to cache.
-- `_load_from_cache(...)` — read cached file, reproject to AOI grid.
-
-Public function decides:
-```
-if cached → _load_from_cache
-else → _download → cache → _load_from_cache
-```
-
-### Current vs target signatures
-
-| Loader | Current | Target |
-|--------|---------|--------|
-| `load_chirps_rainfall` | `(aoi, year, month)` | `(aoi, *, year, month)` |
-| `load_merit_dem` | `(aoi)` | `(aoi)` — already correct |
-| `load_era5_temp_suitability` | `(aoi, year, month)` | `(aoi, *, year, month)` |
-| `download_era5_wind_6hourly` | `(years, output_path)` | `(aoi, *, years, output_path)` |
-| `load_jrc_gsw_water_frac` | `(aoi, year=None, month=None)` | `(aoi, *, year=None, month=None)` — already correct |
+1. Runner inspects each output callable's signature via `inspect.signature`.
+2. If `year` is required (no default) → time-series: loops over years, calls per year.
+3. If `year` is optional or absent → static: calls once.
+4. Passes only kwargs the loader accepts (filters by `accepted = set(sig.parameters.keys())`).
+5. Saves the returned `xr.DataArray` or `xr.Dataset` via `save_product(data, path)`.
+6. Registers in manifest via `update_dataset(aoi, manifest_key, year, path.name)`.
 
 ## 3. DOWNLOADER dict convention
 
-Every loader module must export a `DOWNLOADER` dict:
+Every loader module must export a `DOWNLOADER` dict. Example (era5):
 
 ```python
 DOWNLOADER = {
-    "name": "era5",                           # unique string
-    "description": "ERA5 reanalysis...",      # human-readable
-    "requires_auth": ["cds"],                 # auth mechanisms
+    "name": "era5",
+    "description": "ERA5 reanalysis: temperature, wind, humidity",
+    "requires_auth": ["cds"],
     "outputs": {
-        "temp_suitability": load_era5_temp_suitability,  # callable
+        "temp_suitability": load_era5_temp_suitability,
+        "water_temp": load_era5_water_temp,
+        "wind_6hourly": load_era5_wind_6hourly,
     },
     "manifest_keys": {
-        "temp_suitability": "era5_temp",      # key in manifest.json
+        "temp_suitability": "era5_temp",
+        "water_temp": "era5_water_temp",
+        "wind_6hourly": "wind",
     },
 }
 ```
@@ -123,52 +112,46 @@ Maps output names to keys in `data/<aoi>/manifest.json`. Used by the runner to u
 1. **Discover** all `DOWNLOADER` dicts via `importlib` (registry).
 2. **Filter** by `--datasets` and `--outputs` CLI flags.
 3. **Check auth** for each selected downloader. Skip if auth missing.
-4. **Call** each output callable with unified kwargs (`aoi`, `years`, `months`, `output_path`).
-5. **Update manifest** after each successful download.
-
-### Runner signature
-
-```python
-def run_download(
-    aoi: str,
-    datasets: list[str] | None = None,
-    years: list[int] | None = None,
-    months: list[str] | None = None,
-    output_dir: str | Path | None = None,
-    **kwargs,
-) -> dict[str, Any]:
-```
-
-### Auth check logic
-
-```python
-def _check_auth(spec: DownloaderSpec) -> bool:
-    for auth in spec.requires_auth:
-        if auth == "cds":
-            # check ~/.cdsapirc exists
-        elif auth == "earthdata":
-            # check EARTHDATA_TOKEN env var
-    return True
-```
+4. **For each output**, inspect the callable's signature:
+   - If `year` is required (no default) → **time-series**: loop over years, call per year.
+   - If `year` is optional or absent → **static**: call once.
+5. **Filter kwargs** to only those the loader accepts (`inspect.signature`).
+6. **Call** the loader — it returns `xr.DataArray` or `xr.Dataset` in memory.
+7. **Save** via `save_product(data, path)` from `mal_core.download.writer` (DataArray → GeoTIFF, Dataset → NetCDF).
+8. **Register** in manifest via `update_dataset(aoi, manifest_key, year, path.name)`.
 
 ### Output path convention
 
 ```
-data/<aoi>/<aoi>_<output_name>.<ext>
+data/<aoi>/<aoi>_<product>_<year>.<ext>   # time-series
+data/<aoi>/<aoi>_<product>.<ext>          # static
 ```
 
-Extension: `.nc` for download-heavy products, `.tif` for raster products.
+Extension: `.tif` for raster DataArrays, `.nc` for Datasets (e.g., wind).
 
-### Manifest update
+## 5. Manifest key mapping
 
-After each successful download, runner calls:
-```python
-update_manifest(aoi, manifest_key, filename)
-```
+| Loader | Output | Manifest Key |
+|--------|--------|-------------|
+| era5 | temp_suitability | era5_temp |
+| era5 | water_temp | era5_water_temp |
+| era5 | wind_6hourly | wind |
+| chirps | rainfall | chirps_rainfall |
+| chirps | rainfall_daily | chirps_rainfall_daily |
+| dem | elevation | dem |
+| modis | ndvi | modis_ndvi |
+| jrc_gsw | water_occurrence | jrc_water |
+| worldpop | population | worldpop |
+| glw | cattle | glw_cattle |
+| glw | goats | glw_goats |
+| glw | sheep | glw_sheep |
+| glw | pigs | glw_pigs |
+| glw | chickens | glw_chickens |
+| ghsl | urban_class | ghsl_urban |
+| wildlife | wildlife_host_proxy | wildlife_proxy |
+| buildings | building_fraction | buildings |
 
-Where `manifest_key` comes from `DOWNLOADER["manifest_keys"][output_name]`.
-
-## 5. Adding a new dataset
+## 6. Adding a new dataset
 
 Step-by-step guide.
 
@@ -240,8 +223,8 @@ Add `"<dataset>"` to `LOADER_MODULES` in `mal-core/src/mal_core/download/registr
 
 ```python
 LOADER_MODULES = [
-    "era5", "chirps", "dem", "jrc_gsw", "modis", "worldcover",
-    "ghsl", "glw", "wildlife", "buildings",
+    "era5", "chirps", "dem", "jrc_gsw", "modis",
+    "worldpop", "glw", "ghsl", "wildlife", "buildings",
     "<dataset>",  # new
 ]
 ```
@@ -266,57 +249,22 @@ malariasim download --aoi <aoi> --datasets <dataset> --years <years>
 
 ## 6. Migration notes
 
-What's changing.
+The refactoring is complete. All loaders now follow the canonical signature (function-style, no `output_path`, `aoi` as first arg).
 
-### Current state (inconsistent signatures)
+### What changed
 
-```python
-load_chirps_rainfall(aoi, year, month)          # required all
-load_merit_dem(aoi)                              # time-invariant
-load_era5_temp_suitability(aoi, year, month)     # required all
-download_era5_wind_6hourly(years, output_path)   # NO aoi, plural
-load_jrc_gsw_water_frac(aoi, year=None, month=None)  # optional time
-```
-
-### Migration plan
-
-| Change | What | Why |
-|--------|------|-----|
-| `load_*` functions | Keep signatures, add `aoi` as first arg where missing | Unified API |
-| `download_era5_wind_*` | Rename to `_download_era5_wind` (private), add public `load_era5_wind_6hourly` | Public = load-or-download |
-| `download_era5_wind_migration_season` | Delete | Use `months=MIGRATION_SEASON_MONTHS[year]` instead |
-| `class WorldPopLoader` etc. | Refactored to `load_worldpop_population()` (function-style) | Spec §2 compliance |
-| All loaders | Internalize download logic into `_download_*` private functions | Clean public surface |
-
-### Detailed changes
-
-**`download_era5_wind_6hourly(years, output_path)` → `load_era5_wind_6hourly(aoi, *, years, output_path)`**
-
-- Add `aoi` as first arg (currently missing).
-- Rename from `download_*` to `load_*` (public = load-or-download).
-- Move current implementation to `_download_era5_wind(aoi, years, months, cache)`.
-- Add `_load_from_cache(cache, aoi, years)` to read cached NetCDF.
-- Public function: if cached → load, else → download → cache → load.
-
-**`download_era5_wind_migration_season(years, output_path)` → delete**
-
-- Convenience wrapper. Replace with:
-  ```python
-  load_era5_wind_6hourly(aoi, years=years, months=MIGRATION_SEASON_MONTHS[year])
-  ```
-- Or pass `months` as a CLI arg: `--months 07,08,09,10,12`.
-
-**All `load_*` functions: internalize download logic**
-
-- Extract download logic into `_download_<product>()`.
-- Extract cache-read logic into `_load_from_cache()`.
-- Public function: cache check → download if needed → load.
+| Before | After |
+|--------|-------|
+| `download_era5_wind_6hourly(years, output_path)` | `load_era5_wind_6hourly(aoi, *, years)` — runner saves |
+| `class WorldPopLoader` etc. | `load_worldpop_population()` (function-style) |
+| Loaders accepted `output_path` | Loaders return data; runner calls `save_product()` |
+| `worldcover` loader | **Deprecated** — use `jrc_gsw` |
+| Class-style loaders (ghsl, glw, wildlife, buildings, worldpop) | Function-style, registered in downloader registry |
 
 ### Backward compatibility
 
-- Old call sites (`load_chirps_rainfall(aoi, year, month)`) continue to work.
 - `download_era5_wind_*` callers must switch to `load_era5_wind_6hourly`.
-- Runner (`run_download`) uses `inspect.signature` to adapt kwargs — no changes needed.
+- Runner (`run_download`) uses `inspect.signature` to adapt kwargs — no changes needed at call sites.
 
 ## 7. Examples
 
@@ -362,9 +310,10 @@ print(da.attrs["nodata"])  # -9999.0
 from mal_commonlib.data.loaders.era5 import load_era5_wind_6hourly, MIGRATION_SEASON_MONTHS
 
 aoi = AOI.from_slug("ghana")
-path = load_era5_wind_6hourly(
+ds = load_era5_wind_6hourly(
     aoi,
     years=[2024, 2025],
     months=MIGRATION_SEASON_MONTHS[2024] + MIGRATION_SEASON_MONTHS[2025],
 )
+# Runner saves to data/ghana/ghana_wind_2024.nc, etc.
 ```

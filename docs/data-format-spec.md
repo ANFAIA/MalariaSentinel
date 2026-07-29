@@ -194,18 +194,18 @@ Flat filename dict (v1 compatibility shim). Aggregates all `files` entries acros
 
 ## 6. Loader contract
 
-Every public loader function follows load-or-download semantics.
+Every public loader function returns data in memory. The runner is the single save point.
 
 ### Signature
 
 ```python
 def load_<dataset>_<product>(
-    aoi: AOI | str,
+    aoi: AOI,
     *,
-    year: int | None = None,        # time-series only
-    month: int | None = None,       # time-series only
-    output_path: str | Path | None = None,
-) -> xr.DataArray | Path:
+    year: int | None = None,        # REQUIRED for time-series
+    month: int | None = None,       # REQUIRED for some time-series
+    cache_dir: pathlib.Path | None = None,
+) -> xr.DataArray | xr.Dataset:
 ```
 
 ### Behavior
@@ -213,8 +213,7 @@ def load_<dataset>_<product>(
 1. Resolve path from manifest (`get_dataset_files`).
 2. If file exists on disk → load and return.
 3. If missing → download → save to standard path → register in manifest (`update_dataset`) → load and return.
-4. If `output_path` given: save to that path, return `Path`.
-5. If `output_path=None`: return in-memory `xr.DataArray`.
+4. **No `output_path` param** — loaders return data; the runner calls `save_product()` to persist.
 
 ### Loader ↔ manifest interaction
 
@@ -324,8 +323,8 @@ DOWNLOADER = {
     },
 }
 
-def load_<dataset>_<product>(aoi, *, year=None, output_path=None):
-    # Load-or-download implementation
+def load_<dataset>_<product>(aoi, *, year=None, month=None, cache_dir=None):
+    # Load-or-download: return xr.DataArray or xr.Dataset
     ...
 ```
 
