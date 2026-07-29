@@ -6,6 +6,8 @@ Canonical reference for the MalariaSentinel data download plugin system.
 
 Plugin-based download system at `mal-commonlib/src/mal_commonlib/data/loaders/`.
 
+> **Note (2026-07-29)**: The `worldcover` loader is deprecated (replaced by `jrc_gsw` in M2). The class-style loaders (`ghsl`, `glw`, `wildlife`, `buildings`, `worldpop`) are being refactored to function-style and will be registered in the downloader registry in Phase 2 of the unify-download-ingest-build initiative.
+
 How it works:
 - Each loader module exposes a `DOWNLOADER` dict.
 - Registry (`mal-core/src/mal_core/download/registry.py`) discovers all `DOWNLOADER` dicts via `importlib`.
@@ -15,18 +17,19 @@ How it works:
 
 Registered loaders:
 
-| Loader | Auth | Outputs |
-|--------|------|---------|
-| `era5` | `cds` | `temp_suitability`, `water_temp`, `wind_6hourly`, `wind_migration` |
-| `chirps` | `none` | `rainfall`, `rainfall_daily` |
-| `dem` | `none` | `elevation` |
-| `jrc_gsw` | `none` | `water_occurrence` |
-| `modis` | `earthdata` | `ndvi` |
-| `worldcover` | `none` | `water_frac` |
-| `ghsl` | `none` | built-up density |
-| `glw` | `none` | livestock density |
-| `wildlife` | `none` | wildlife reservoir |
-| `buildings` | `none` | building density |
+| Loader | Auth | Outputs | Status |
+|--------|------|---------|--------|
+| `era5` | `cds` | `temp_suitability`, `water_temp`, `wind_6hourly` | Active |
+| `chirps` | `none` | `rainfall`, `rainfall_daily` | Active |
+| `dem` | `none` | `elevation` | Active |
+| `jrc_gsw` | `none` | `water_occurrence` | Active |
+| `modis` | `earthdata` | `ndvi` | Active |
+| `worldcover` | `none` | `water_frac` | **DEPRECATED** (replaced by `jrc_gsw` in M2) |
+| `ghsl` | `none` | `urban_class` | Pending Phase 2 |
+| `glw` | `none` | `livestock` | Pending Phase 2 |
+| `wildlife` | `none` | `wildlife_host_proxy` | Pending Phase 2 |
+| `buildings` | `none` | `building_fraction` | Pending Phase 2 |
+| `worldpop` | `none` | `population` | Pending Phase 2 |
 
 ## 2. Unified API — Load-or-Download
 
@@ -282,6 +285,7 @@ load_jrc_gsw_water_frac(aoi, year=None, month=None)  # optional time
 | `load_*` functions | Keep signatures, add `aoi` as first arg where missing | Unified API |
 | `download_era5_wind_*` | Rename to `_download_era5_wind` (private), add public `load_era5_wind_6hourly` | Public = load-or-download |
 | `download_era5_wind_migration_season` | Delete | Use `months=MIGRATION_SEASON_MONTHS[year]` instead |
+| `class WorldPopLoader` etc. | Refactored to `load_worldpop_population()` (function-style) | Spec §2 compliance |
 | All loaders | Internalize download logic into `_download_*` private functions | Clean public surface |
 
 ### Detailed changes

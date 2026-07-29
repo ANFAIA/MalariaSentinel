@@ -63,6 +63,8 @@ Migration script: `scripts/migrate_data_format.py` (idempotent).
 | `mobility_night` | static | CSR | — | `<aoi>_mobility_night.csr` | OD matrix (nighttime) | no |
 | `livestock_mobility` | static | CSR | — | `<aoi>_livestock_mobility.csr` | OD matrix (livestock) | no |
 
+> **Deprecated**: The `worldcover` dataset is deprecated; use `jrc_gsw` for the `water_frac` channel.
+
 ### Type semantics
 
 - **time-series**: one file per year (or multi-year). ABM loads by year. Manifest tracks per-year file mapping.

@@ -2,7 +2,7 @@
 
 Public surface
 --------------
-``BuildingsLoader.load(aoi, *, cache_dir=None) -> xr.DataArray``
+``load_buildings_fraction(aoi, *, cache_dir=None) -> xr.DataArray``
 
 Downloads Overture Maps building footprints for the AOI and rasterizes
 them to a building-fraction layer (fraction of each ABM cell covered by
@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import os
 import pathlib
-import shutil
+import warnings
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -34,6 +34,9 @@ from rasterio.transform import from_bounds
 
 if TYPE_CHECKING:
     from mal_commonlib.aoi import AOI
+
+
+__all__ = ["load_buildings_fraction", "BuildingsLoader", "DOWNLOADER"]
 
 
 def _default_cache_dir() -> pathlib.Path:
@@ -200,14 +203,56 @@ def _rasterize_footprints(
     return fraction
 
 
-class BuildingsLoader:
-    """Download and rasterize Overture Maps building footprints.
+def load_buildings_fraction(
+    aoi: AOI | str,
+    *,
+    cache_dir: pathlib.Path | None = None,
+) -> xr.DataArray:
+    """Load building footprint fraction for the AOI.
 
-    Usage::
+    Args:
+        aoi: the AOI (bbox, CRS, resolution_m, slug) or string slug.
+        cache_dir: local cache for downloaded data.
 
-        loader = BuildingsLoader()
-        building_frac = loader.load(aoi)
+    Returns:
+        xr.DataArray with dims (y, x), dtype float32, CRS = aoi.crs.
+        Values in [0, 1] (fraction of cell covered by buildings).
+        ``-9999.0`` for cells with no data.
     """
+    if isinstance(aoi, str):
+        from mal_commonlib.aoi import AOI
+        aoi = AOI.from_slug(aoi)
+
+    cdir = pathlib.Path(cache_dir) if cache_dir is not None else _default_cache_dir()
+    bbox_wgs84 = _aoi_to_src_bbox(aoi)
+
+    # Try overturemaestro first, fall back to pyarrow
+    try:
+        geojson_path = _download_buildings_overturemaestro(bbox_wgs84, cdir)
+    except ImportError:
+        geojson_path = _download_buildings_parquet(bbox_wgs84, cdir)
+
+    fraction = _rasterize_footprints(geojson_path, aoi, bbox_wgs84)
+
+    da = xr.DataArray(
+        fraction,
+        dims=("y", "x"),
+        name="building_fraction",
+        attrs={
+            "long_name": "Building footprint fraction",
+            "units": "fraction [0, 1]",
+            "source": "Overture Maps Foundation",
+            "nodata": -9999.0,
+        },
+    )
+    da.rio.write_crs(aoi.crs_obj, inplace=True)
+    da.rio.write_transform(from_bounds(*aoi.bbox, *aoi.cells_per_side()[::-1]), inplace=True)
+    da.rio.write_nodata(-9999.0, inplace=True)
+    return da
+
+
+class BuildingsLoader:
+    """DEPRECATED: Use load_buildings_fraction() instead."""
 
     def load(
         self,
@@ -215,40 +260,22 @@ class BuildingsLoader:
         *,
         cache_dir: pathlib.Path | None = None,
     ) -> xr.DataArray:
-        """Load building fraction for the AOI.
-
-        Args:
-            aoi: the AOI (bbox, CRS, resolution_m, slug).
-            cache_dir: local cache for downloaded data.
-
-        Returns:
-            xr.DataArray with dims (y, x), dtype float32, CRS = aoi.crs.
-            Values in [0, 1] (fraction of cell covered by buildings).
-            ``-9999.0`` for cells with no data.
-        """
-        cdir = cache_dir if cache_dir is not None else _default_cache_dir()
-        bbox_wgs84 = _aoi_to_src_bbox(aoi)
-
-        # Try overturemaestro first, fall back to pyarrow
-        try:
-            geojson_path = _download_buildings_overturemaestro(bbox_wgs84, cdir)
-        except ImportError:
-            geojson_path = _download_buildings_parquet(bbox_wgs84, cdir)
-
-        fraction = _rasterize_footprints(geojson_path, aoi, bbox_wgs84)
-
-        da = xr.DataArray(
-            fraction,
-            dims=("y", "x"),
-            name="building_fraction",
-            attrs={
-                "long_name": "Building footprint fraction",
-                "units": "fraction [0, 1]",
-                "source": "Overture Maps Foundation",
-                "nodata": -9999.0,
-            },
+        warnings.warn(
+            "BuildingsLoader is deprecated; use load_buildings_fraction()",
+            DeprecationWarning,
+            stacklevel=2,
         )
-        da.rio.write_crs(aoi.crs_obj, inplace=True)
-        da.rio.write_transform(from_bounds(*aoi.bbox, *aoi.cells_per_side()[::-1]), inplace=True)
-        da.rio.write_nodata(-9999.0, inplace=True)
-        return da
+        return load_buildings_fraction(aoi, cache_dir=cache_dir)
+
+
+DOWNLOADER = {
+    "name": "buildings",
+    "description": "Overture Maps building footprint fraction",
+    "requires_auth": ["none"],
+    "outputs": {
+        "building_fraction": load_buildings_fraction,
+    },
+    "manifest_keys": {
+        "building_fraction": "buildings",
+    },
+}

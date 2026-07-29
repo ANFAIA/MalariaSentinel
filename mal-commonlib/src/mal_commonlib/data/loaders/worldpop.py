@@ -2,7 +2,7 @@
 
 Public surface
 --------------
-``WorldPopLoader.load(aoi, year=2019, *, cache_dir=None) -> xr.DataArray``
+``load_worldpop_population(aoi, year=2019, *, cache_dir=None) -> xr.DataArray``
 
 Downloads the WorldPop Ghana 2019 v2.0 constrained UN-adjusted population
 estimate (~100 m resolution) and clips it to the AOI bounding box.
@@ -23,6 +23,7 @@ import hashlib
 import os
 import pathlib
 import shutil
+import warnings
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -41,6 +42,8 @@ _WORLDPOP_URL_TEMPLATE = (
     "{year}/GHA/{iso3}_ppp_{year}_constrained.tif"
 )
 _WORLDPOP_FILE_NAME = "gha_ppp_2019_constrained.tif"
+
+__all__ = ["load_worldpop_population", "WorldPopLoader", "DOWNLOADER"]
 
 
 def _default_cache_dir() -> pathlib.Path:
@@ -79,14 +82,120 @@ def _aoi_to_src_bbox(aoi: AOI) -> tuple[float, float, float, float]:
     return (float(w), float(s), float(e), float(n))
 
 
-class WorldPopLoader:
-    """Download and clip WorldPop Ghana population estimates.
+def _read_clip(aoi: AOI, tif_path: pathlib.Path, year: int = 2019) -> xr.DataArray:
+    """Read the cached GeoTIFF and clip to the AOI bbox."""
+    import rasterio.windows
 
-    Usage::
+    bbox_wgs84 = _aoi_to_src_bbox(aoi)
+    w, s, e, n = bbox_wgs84
 
-        loader = WorldPopLoader()
-        pop_da = loader.load(aoi, year=2019)
+    with rasterio.open(str(tif_path)) as src:
+        src_crs = src.crs
+        # If AOI is not in WGS-84, transform the bbox into source CRS
+        if not str(aoi.crs_obj).upper() in {"EPSG:4326", "WGS84", "4326"}:
+            import pyproj
+
+            t = pyproj.Transformer.from_crs(aoi.crs, src_crs, always_xy=True)
+            w_t, s_t = t.transform(w, s)
+            e_t, n_t = t.transform(e, n)
+            win = rasterio.windows.from_bounds(w_t, s_t, e_t, n_t, src.transform)
+        else:
+            win = rasterio.windows.from_bounds(w, s, e, n, src.transform)
+
+        win = win.intersection(
+            rasterio.windows.Window(0, 0, src.width, src.height)
+        )
+        if win.width <= 0 or win.height <= 0:
+            raise ValueError(
+                f"AOI bbox {aoi.bbox} does not overlap WorldPop raster bounds "
+                f"({src.bounds})"
+            )
+        arr = src.read(1, window=win)
+        win_transform = src.window_transform(win)
+        nodata = src.nodata
+
+    # Mask nodata
+    sentinel = nodata if nodata is not None else -9999.0
+    arr_f = np.asarray(arr, dtype=np.float32)
+    arr_f = np.where(arr_f == sentinel, np.float32(-9999.0), arr_f)
+
+    # Build output DataArray on the AOI grid
+    h, w_cells = aoi.cells_per_side()
+    dst_transform = from_bounds(*aoi.bbox, w_cells, h)
+    out = np.zeros((h, w_cells), dtype=np.float32)
+    out[:] = -9999.0
+
+    from rasterio.warp import reproject
+
+    reproject(
+        source=arr_f,
+        destination=out,
+        src_transform=win_transform,
+        src_crs=src_crs,
+        dst_transform=dst_transform,
+        dst_crs=aoi.crs_obj,
+        resampling=Resampling.nearest,
+    )
+
+    da = xr.DataArray(
+        out,
+        dims=("y", "x"),
+        name="worldpop_population",
+        attrs={
+            "long_name": "WorldPop Ghana population count",
+            "units": "persons/pixel",
+            "source": f"WorldPop GHA_ppp_{year}_constrained",
+            "year": year,
+            "nodata": -9999.0,
+        },
+    )
+    da.rio.write_crs(aoi.crs_obj, inplace=True)
+    da.rio.write_transform(dst_transform, inplace=True)
+    da.rio.write_nodata(-9999.0, inplace=True)
+    return da
+
+
+def load_worldpop_population(
+    aoi: AOI | str,
+    *,
+    year: int = 2019,
+    cache_dir: pathlib.Path | None = None,
+) -> xr.DataArray:
+    """Load WorldPop constrained population density for the AOI.
+
+    Args:
+        aoi: the AOI (bbox, CRS, resolution_m, slug) or a slug string.
+        year: WorldPop product year (default 2019, only Ghana constrained available).
+        cache_dir: local cache for downloaded GeoTIFFs.
+
+    Returns:
+        xr.DataArray with dims (y, x), dtype float32, CRS = aoi.crs.
+        Values are population count per cell (persons/pixel).
+        -9999.0 for cells with no data.
     """
+    if isinstance(aoi, str):
+        from mal_commonlib.aoi import AOI
+        aoi = AOI.from_slug(aoi)
+
+    if not (2000 <= year <= 2020):
+        raise ValueError(
+            f"WorldPop constrained years are 2000–2020; got {year}"
+        )
+
+    cache = cache_dir if cache_dir is not None else _default_cache_dir()
+    cache = pathlib.Path(cache)
+    cache.mkdir(parents=True, exist_ok=True)
+
+    file_name = f"gha_ppp_{year}_constrained.tif"
+    tif_path = cache / file_name
+    url = _WORLDPOP_URL_TEMPLATE.format(year=year, iso3="GHA")
+    _download_to(url, tif_path)
+
+    return _read_clip(aoi, tif_path, year)
+
+
+class WorldPopLoader:
+    """DEPRECATED: Use load_worldpop_population() instead."""
 
     def load(
         self,
@@ -96,100 +205,22 @@ class WorldPopLoader:
         country_iso3: str = "gha",
         cache_dir: pathlib.Path | None = None,
     ) -> xr.DataArray:
-        """Load WorldPop population for the AOI.
-
-        Args:
-            aoi: the AOI (bbox, CRS, resolution_m, slug).
-            year: 2000–2020 (constrained UN-adjusted product).
-            country_iso3: lowercase ISO3 country code (default "gha").
-            cache_dir: local cache for the downloaded GeoTIFF.
-
-        Returns:
-            xr.DataArray with dims (y, x), dtype float32, CRS = aoi.crs.
-            Values are population counts per cell (persons/pixel).
-            ``-9999.0`` for cells with no data.
-        """
-        if not (2000 <= year <= 2020):
-            raise ValueError(
-                f"WorldPop constrained years are 2000–2020; got {year}"
-            )
-
-        cdir = cache_dir if cache_dir is not None else _default_cache_dir()
-        file_name = f"{country_iso3}_ppp_{year}_constrained.tif"
-        tif_path = cdir / file_name
-        url = _WORLDPOP_URL_TEMPLATE.format(year=year, iso3=country_iso3)
-        _download_to(url, tif_path)
-
-        return self._read_clip(aoi, tif_path, year)
-
-    def _read_clip(self, aoi: AOI, tif_path: pathlib.Path, year: int = 2019) -> xr.DataArray:
-        """Read the cached GeoTIFF and clip to the AOI bbox."""
-        import rasterio.windows
-
-        bbox_wgs84 = _aoi_to_src_bbox(aoi)
-        w, s, e, n = bbox_wgs84
-
-        with rasterio.open(str(tif_path)) as src:
-            src_crs = src.crs
-            # If AOI is not in WGS-84, transform the bbox into source CRS
-            if not str(aoi.crs_obj).upper() in {"EPSG:4326", "WGS84", "4326"}:
-                import pyproj
-
-                t = pyproj.Transformer.from_crs(aoi.crs, src_crs, always_xy=True)
-                w_t, s_t = t.transform(w, s)
-                e_t, n_t = t.transform(e, n)
-                win = rasterio.windows.from_bounds(w_t, s_t, e_t, n_t, src.transform)
-            else:
-                win = rasterio.windows.from_bounds(w, s, e, n, src.transform)
-
-            win = win.intersection(
-                rasterio.windows.Window(0, 0, src.width, src.height)
-            )
-            if win.width <= 0 or win.height <= 0:
-                raise ValueError(
-                    f"AOI bbox {aoi.bbox} does not overlap WorldPop raster bounds "
-                    f"({src.bounds})"
-                )
-            arr = src.read(1, window=win)
-            win_transform = src.window_transform(win)
-            nodata = src.nodata
-
-        # Mask nodata
-        sentinel = nodata if nodata is not None else -9999.0
-        arr_f = np.asarray(arr, dtype=np.float32)
-        arr_f = np.where(arr_f == sentinel, np.float32(-9999.0), arr_f)
-
-        # Build output DataArray on the AOI grid
-        h, w_cells = aoi.cells_per_side()
-        dst_transform = from_bounds(*aoi.bbox, w_cells, h)
-        out = np.zeros((h, w_cells), dtype=np.float32)
-        out[:] = -9999.0
-
-        from rasterio.warp import reproject
-
-        reproject(
-            source=arr_f,
-            destination=out,
-            src_transform=win_transform,
-            src_crs=src_crs,
-            dst_transform=dst_transform,
-            dst_crs=aoi.crs_obj,
-            resampling=Resampling.nearest,
+        warnings.warn(
+            "WorldPopLoader is deprecated; use load_worldpop_population() instead",
+            DeprecationWarning,
+            stacklevel=2,
         )
+        return load_worldpop_population(aoi, year=year, cache_dir=cache_dir)
 
-        da = xr.DataArray(
-            out,
-            dims=("y", "x"),
-            name="worldpop_population",
-            attrs={
-                "long_name": "WorldPop Ghana population count",
-                "units": "persons/pixel",
-                "source": f"WorldPop GHA_ppp_{year}_constrained",
-                "year": year,
-                "nodata": -9999.0,
-            },
-        )
-        da.rio.write_crs(aoi.crs_obj, inplace=True)
-        da.rio.write_transform(dst_transform, inplace=True)
-        da.rio.write_nodata(-9999.0, inplace=True)
-        return da
+
+DOWNLOADER = {
+    "name": "worldpop",
+    "description": "WorldPop constrained population density",
+    "requires_auth": ["none"],
+    "outputs": {
+        "population": load_worldpop_population,
+    },
+    "manifest_keys": {
+        "population": "worldpop",
+    },
+}

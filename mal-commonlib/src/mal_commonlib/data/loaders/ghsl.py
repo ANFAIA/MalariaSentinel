@@ -2,7 +2,7 @@
 
 Public surface
 --------------
-``GHSLLoader.load(aoi, *, cache_dir=None) -> xr.DataArray``
+``load_ghsl_urban_class(aoi, *, cache_dir=None) -> xr.DataArray``
 
 Downloads the GHS-SMOD settlement classification from the JRC FTP
 archive (ZIP), extracts the TIF, and clips it to the AOI bounding box.
@@ -39,6 +39,7 @@ import io
 import os
 import pathlib
 import shutil
+import warnings
 import zipfile
 from typing import TYPE_CHECKING
 
@@ -141,124 +142,163 @@ def _aoi_to_src_bbox(aoi: AOI) -> tuple[float, float, float, float]:
     return (float(w), float(s), float(e), float(n))
 
 
-class GHSLLoader:
-    """Download and clip GHS-SMOD settlement classification data.
+def _read_clip(aoi: AOI, tif_path: pathlib.Path) -> xr.DataArray:
+    """Read the extracted GeoTIFF, reproject, and clip to the AOI bbox."""
+    import rasterio.windows
+    from rasterio.warp import reproject as rio_reproject
 
-    Usage::
+    bbox_wgs84 = _aoi_to_src_bbox(aoi)
+    w, s, e, n = bbox_wgs84
 
-        loader = GHSLLoader()
-        smod = loader.load(aoi)
-    """
+    with rasterio.open(str(tif_path)) as src:
+        src_crs = src.crs
+        # The source is ESRI:54009 (Mollweide).  Convert the
+        # AOI's WGS-84 bbox into the source CRS for the window.
+        src_crs_str = str(src_crs)
+        if "54009" in src_crs_str:
+            import pyproj
 
-    def load(
-        self,
-        aoi: AOI,
-        *,
-        cache_dir: pathlib.Path | None = None,
-    ) -> xr.DataArray:
-        """Load GHS-SMOD settlement classification for the AOI.
+            t = pyproj.Transformer.from_crs("EPSG:4326", src_crs, always_xy=True)
+            w_t, s_t = t.transform(w, s)
+            e_t, n_t = t.transform(e, n)
+        elif str(aoi.crs_obj).upper() not in {"EPSG:4326", "WGS84", "4326"}:
+            import pyproj
 
-        Downloads the ZIP from JRC FTP, extracts the TIF, and clips
-        to the AOI bounding box.  The source raster is in EPSG:54009
-        (World Mollweide) at ~1 km; it is reprojected on-the-fly to
-        the AOI's CRS via nearest-neighbour resampling (categorical data).
+            t = pyproj.Transformer.from_crs(aoi.crs, src_crs, always_xy=True)
+            w_t, s_t = t.transform(w, s)
+            e_t, n_t = t.transform(e, n)
+        else:
+            w_t, s_t, e_t, n_t = w, s, e, n
 
-        Args:
-            aoi: the AOI (bbox, CRS, resolution_m, slug).
-            cache_dir: local cache for the downloaded/extracted raster.
-
-        Returns:
-            xr.DataArray with dims (y, x), dtype int32, CRS = aoi.crs.
-            Values are integer class codes: 30 (urban), 50 (rural), 20 (water).
-        """
-        cdir = cache_dir if cache_dir is not None else _default_cache_dir()
-        zip_path = cdir / "GHS_SMOD_E2030_R2023A_54009_1000.zip"
-        tif_path = cdir / _GHSL_CACHE_TIF
-
-        # Step 1: download ZIP (cached)
-        _download_zip(_GHSL_ZIP_URL, zip_path)
-
-        # Step 2: extract TIF from ZIP (cached)
-        _extract_tif_from_zip(zip_path, _GHSL_TIF_NAME, tif_path)
-
-        # Step 3: read, reproject, clip
-        return self._read_clip(aoi, tif_path)
-
-    def _read_clip(self, aoi: AOI, tif_path: pathlib.Path) -> xr.DataArray:
-        """Read the extracted GeoTIFF, reproject, and clip to the AOI bbox."""
-        import rasterio.windows
-        from rasterio.warp import reproject as rio_reproject
-
-        bbox_wgs84 = _aoi_to_src_bbox(aoi)
-        w, s, e, n = bbox_wgs84
-
-        with rasterio.open(str(tif_path)) as src:
-            src_crs = src.crs
-            # The source is ESRI:54009 (Mollweide).  Convert the
-            # AOI's WGS-84 bbox into the source CRS for the window.
-            src_crs_str = str(src_crs)
-            if "54009" in src_crs_str:
-                import pyproj
-
-                t = pyproj.Transformer.from_crs("EPSG:4326", src_crs, always_xy=True)
-                w_t, s_t = t.transform(w, s)
-                e_t, n_t = t.transform(e, n)
-            elif str(aoi.crs_obj).upper() not in {"EPSG:4326", "WGS84", "4326"}:
-                import pyproj
-
-                t = pyproj.Transformer.from_crs(aoi.crs, src_crs, always_xy=True)
-                w_t, s_t = t.transform(w, s)
-                e_t, n_t = t.transform(e, n)
-            else:
-                w_t, s_t, e_t, n_t = w, s, e, n
-
-            win = rasterio.windows.from_bounds(w_t, s_t, e_t, n_t, src.transform)
-            win = win.intersection(
-                rasterio.windows.Window(0, 0, src.width, src.height)
+        win = rasterio.windows.from_bounds(w_t, s_t, e_t, n_t, src.transform)
+        win = win.intersection(
+            rasterio.windows.Window(0, 0, src.width, src.height)
+        )
+        if win.width <= 0 or win.height <= 0:
+            raise ValueError(
+                f"AOI bbox {aoi.bbox} does not overlap GHSL raster bounds "
+                f"({src.bounds})"
             )
-            if win.width <= 0 or win.height <= 0:
-                raise ValueError(
-                    f"AOI bbox {aoi.bbox} does not overlap GHSL raster bounds "
-                    f"({src.bounds})"
-                )
-            arr = src.read(1, window=win)
-            win_transform = src.window_transform(win)
-            nodata = src.nodata
+        arr = src.read(1, window=win)
+        win_transform = src.window_transform(win)
+        nodata = src.nodata
 
-        sentinel = nodata if nodata is not None else -9999.0
-        arr_i = np.asarray(arr, dtype=np.int32)
-        if nodata is not None:
-            arr_i = np.where(arr == nodata, -9999, arr_i)
+    sentinel = nodata if nodata is not None else -9999.0
+    arr_i = np.asarray(arr, dtype=np.int32)
+    if nodata is not None:
+        arr_i = np.where(arr == nodata, -9999, arr_i)
 
-        h, w_cells = aoi.cells_per_side()
-        dst_transform = from_bounds(*aoi.bbox, w_cells, h)
-        out_f = np.full((h, w_cells), -9999.0, dtype=np.float32)
+    h, w_cells = aoi.cells_per_side()
+    dst_transform = from_bounds(*aoi.bbox, w_cells, h)
+    out_f = np.full((h, w_cells), -9999.0, dtype=np.float32)
 
-        rio_reproject(
-            source=arr_i.astype(np.float32),
-            destination=out_f,
-            src_transform=win_transform,
-            src_crs=src_crs,
-            dst_transform=dst_transform,
-            dst_crs=aoi.crs_obj,
-            resampling=Resampling.nearest,
+    rio_reproject(
+        source=arr_i.astype(np.float32),
+        destination=out_f,
+        src_transform=win_transform,
+        src_crs=src_crs,
+        dst_transform=dst_transform,
+        dst_crs=aoi.crs_obj,
+        resampling=Resampling.nearest,
+    )
+    out = out_f.astype(np.int32)
+
+    da = xr.DataArray(
+        out,
+        dims=("y", "x"),
+        name="ghsl_smod",
+        attrs={
+            "long_name": "GHS-SMOD settlement classification",
+            "units": "class code (30=urban, 50=rural, 20=water)",
+            "source": "GHS-SMOD E2030 R2023A (JRC FTP)",
+            "nodata": -9999,
+            "urban_class": GHSL_URBAN,
+            "rural_class": GHSL_RURAL,
+        },
+    )
+    da.rio.write_crs(aoi.crs_obj, inplace=True)
+    da.rio.write_transform(dst_transform, inplace=True)
+    da.rio.write_nodata(-9999, inplace=True)
+    return da
+
+
+# ---------------------------------------------------------------------------
+# Public API
+# ---------------------------------------------------------------------------
+
+def load_ghsl_urban_class(
+    aoi: AOI | str,
+    *,
+    cache_dir: pathlib.Path | None = None,
+) -> xr.DataArray:
+    """Load GHSL settlement classification (SMOD) for the AOI.
+
+    Downloads the ZIP from JRC FTP, extracts the TIF, and clips
+    to the AOI bounding box.  The source raster is in EPSG:54009
+    (World Mollweide) at ~1 km; it is reprojected on-the-fly to
+    the AOI's CRS via nearest-neighbour resampling (categorical data).
+
+    Args:
+        aoi: the AOI (bbox, CRS, resolution_m, slug) or a string slug.
+        cache_dir: local cache for the downloaded/extracted raster.
+
+    Returns:
+        xr.DataArray with dims (y, x), dtype int32, CRS = aoi.crs.
+        Values are integer class codes: 30 (urban), 50 (rural), 20 (water).
+    """
+    from mal_commonlib.aoi import AOI as AOIType
+    if isinstance(aoi, str):
+        from mal_commonlib.aoi import AOI
+        aoi = AOI.from_slug(aoi)
+
+    cdir = pathlib.Path(cache_dir) if cache_dir is not None else _default_cache_dir()
+    cdir.mkdir(parents=True, exist_ok=True)
+    zip_path = cdir / "GHS_SMOD_E2030_R2023A_54009_1000.zip"
+    tif_path = cdir / _GHSL_CACHE_TIF
+
+    # Step 1: download ZIP (cached)
+    _download_zip(_GHSL_ZIP_URL, zip_path)
+
+    # Step 2: extract TIF from ZIP (cached)
+    _extract_tif_from_zip(zip_path, _GHSL_TIF_NAME, tif_path)
+
+    # Step 3: read, reproject, clip
+    return _read_clip(aoi, tif_path)
+
+
+class GHSLLoader:
+    """DEPRECATED: Use load_ghsl_urban_class() instead."""
+
+    def load(self, aoi, *, cache_dir=None):
+        warnings.warn(
+            "GHSLLoader is deprecated; use load_ghsl_urban_class()",
+            DeprecationWarning,
+            stacklevel=2,
         )
-        out = out_f.astype(np.int32)
+        return load_ghsl_urban_class(aoi, cache_dir=cache_dir)
 
-        da = xr.DataArray(
-            out,
-            dims=("y", "x"),
-            name="ghsl_smod",
-            attrs={
-                "long_name": "GHS-SMOD settlement classification",
-                "units": "class code (30=urban, 50=rural, 20=water)",
-                "source": "GHS-SMOD E2030 R2023A (JRC FTP)",
-                "nodata": -9999,
-                "urban_class": GHSL_URBAN,
-                "rural_class": GHSL_RURAL,
-            },
-        )
-        da.rio.write_crs(aoi.crs_obj, inplace=True)
-        da.rio.write_transform(dst_transform, inplace=True)
-        da.rio.write_nodata(-9999, inplace=True)
-        return da
+
+DOWNLOADER = {
+    "name": "ghsl",
+    "description": "GHSL settlement classification (SMOD) for urban/rural classification",
+    "requires_auth": ["none"],
+    "outputs": {
+        "urban_class": load_ghsl_urban_class,
+    },
+    "manifest_keys": {
+        "urban_class": "ghsl_urban",
+    },
+}
+
+
+__all__ = [
+    "load_ghsl_urban_class",
+    "GHSLLoader",
+    "GHSL_URBAN",
+    "GHSL_RURAL",
+    "GHSL_RURAL_LOW",
+    "GHSL_RURAL_MED",
+    "GHSL_RURAL_HIGH",
+    "GHSL_WATER",
+    "DOWNLOADER",
+]

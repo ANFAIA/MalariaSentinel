@@ -2,7 +2,7 @@
 
 Public surface
 --------------
-``WildlifeLoader.load(aoi, *, year=2021, cache_dir=None) -> xr.DataArray``
+``load_wildlife_host_proxy(aoi, *, year=2021, cache_dir=None) -> xr.DataArray``
 
 Estimates spatial suitability for non-human, non-livestock blood hosts
 (antelopes, rodents, other wild mammals) as a ``[0, 1]`` score derived
@@ -34,6 +34,7 @@ from __future__ import annotations
 import logging
 import pathlib
 import tempfile
+import warnings
 
 import numpy as np
 import rasterio
@@ -263,17 +264,114 @@ def _remoteness(building_frac: np.ndarray) -> np.ndarray:
 # -- Public API ----------------------------------------------------------
 
 
-class WildlifeLoader:
-    """Raster-based wildlife host proxy (no GBIF dependency).
+def load_wildlife_host_proxy(
+    aoi: AOI | str,
+    *,
+    year: int = 2021,
+    cache_dir: pathlib.Path | None = None,
+) -> xr.DataArray:
+    """Load wildlife host proxy suitability for the AOI.
 
-    Computes a [0, 1] suitability score from ESA WorldCover habitat
+    Computes a [0,1] suitability score from ESA WorldCover habitat
     classes, JRC GSW water proximity, and building remoteness.
 
-    Usage::
+    Args:
+        aoi: the AOI (bbox, CRS, resolution_m, slug).
+        year: WorldCover product year (2020 or 2021).
+        cache_dir: optional local cache for downloaded data.
 
-        loader = WildlifeLoader()
-        proxy = loader.load(aoi)
+    Returns:
+        xr.DataArray with dims (y, x), dtype float32, CRS = aoi.crs.
+        Values in [0, 1]. ``-9999.0`` for NoData.
     """
+    if isinstance(aoi, str):
+        from mal_commonlib.aoi import AOI as AOIType
+        aoi = AOI.from_slug(aoi)
+
+    _ensure_cache_dir(cache_dir)
+    H, W = aoi.cells_per_side()
+    H, W = int(H), int(W)
+
+    # --- 1. Habitat suitability from WorldCover ----------------------
+    try:
+        habitat, profile = _load_worldcover_habitat_pc(aoi, year)
+        log.info("wildlife: WorldCover habitat loaded successfully")
+    except Exception as exc:
+        log.warning("wildlife: WorldCover failed (%s), using neutral 0.5", exc)
+        habitat = np.full((H, W), 0.5, dtype=np.float32)
+        profile = {
+            "crs": aoi.crs_obj,
+            "transform": from_bounds(*aoi.bbox, W, H),
+            "height": H,
+            "width": W,
+        }
+
+    # --- 2. Water proximity from JRC GSW -----------------------------
+    try:
+        from mal_commonlib.data.loaders.jrc_gsw import load_jrc_gsw_water_frac
+
+        water_da = load_jrc_gsw_water_frac(aoi, year=year, cache_dir=cache_dir)
+        water_frac = water_da.values.astype(np.float32)
+        log.info("wildlife: JRC GSW water loaded successfully")
+    except Exception as exc:
+        log.warning("wildlife: JRC GSW failed (%s), using neutral 0.5", exc)
+        water_frac = np.full((H, W), 0.5 / 3.0, dtype=np.float32)
+
+    water = _water_proximity(water_frac)
+
+    # --- 3. Remoteness from buildings ---------------------------------
+    try:
+        from mal_commonlib.data.loaders.buildings import BuildingsLoader
+
+        bld = BuildingsLoader()
+        bld_da = bld.load(aoi, cache_dir=cache_dir)
+        bld_frac = bld_da.values.astype(np.float32)
+        # Replace nodata with 0 (no buildings → remote)
+        bld_frac[bld_frac == _NODATA_OUT_SCALAR] = 0.0
+        log.info("wildlife: Buildings loaded successfully")
+    except Exception as exc:
+        log.warning("wildlife: Buildings failed (%s), assuming remote", exc)
+        bld_frac = np.zeros((H, W), dtype=np.float32)
+
+    remote = _remoteness(bld_frac)
+
+    # --- 4. Compute composite ----------------------------------------
+    proxy = _W_HABITAT * habitat + _W_WATER * water + _W_REMOTE * remote
+    proxy = np.clip(proxy, 0.0, 1.0).astype(np.float32)
+
+    # Propagate nodata: cells where WorldCover had no data
+    nodata_mask = habitat == _NODATA_OUT_SCALAR
+    proxy[nodata_mask] = _NODATA_OUT_SCALAR
+
+    # --- 5. Wrap and return -------------------------------------------
+    da = xr.DataArray(
+        proxy,
+        dims=("y", "x"),
+        name="wildlife_host_proxy",
+        attrs={
+            "long_name": "Wildlife host proxy suitability",
+            "units": "suitability [0, 1]",
+            "source": (
+                f"ESA WorldCover {year} + JRC GSW + Overture Maps buildings"
+            ),
+            "formula": (
+                "0.5 * habitat_suitability + 0.3 * water_proximity "
+                "+ 0.2 * remoteness"
+            ),
+            "nodata": _NODATA_OUT_SCALAR,
+        },
+    )
+    da.rio.write_crs(aoi.crs_obj, inplace=True)
+    da.rio.write_transform(
+        from_bounds(*aoi.bbox, W, H),
+        inplace=True,
+    )
+    da.rio.write_nodata(_NODATA_OUT_SCALAR, inplace=True)
+    return da
+
+
+class WildlifeLoader:
+    """DEPRECATED: Use load_wildlife_host_proxy() instead."""
 
     def load(
         self,
@@ -282,97 +380,24 @@ class WildlifeLoader:
         year: int = 2021,
         cache_dir: pathlib.Path | None = None,
     ) -> xr.DataArray:
-        """Load wildlife host proxy for the AOI.
-
-        Args:
-            aoi: the AOI (bbox, CRS, resolution_m, slug).
-            year: WorldCover product year (2020 or 2021).
-            cache_dir: optional local cache for downloaded data.
-
-        Returns:
-            xr.DataArray with dims (y, x), dtype float32, CRS = aoi.crs.
-            Values in [0, 1]. ``-9999.0`` for NoData.
-        """
-        _ensure_cache_dir(cache_dir)
-        H, W = aoi.cells_per_side()
-        H, W = int(H), int(W)
-
-        # --- 1. Habitat suitability from WorldCover ----------------------
-        try:
-            habitat, profile = _load_worldcover_habitat_pc(aoi, year)
-            log.info("WildlifeLoader: WorldCover habitat loaded successfully")
-        except Exception as exc:
-            log.warning("WildlifeLoader: WorldCover failed (%s), using neutral 0.5", exc)
-            habitat = np.full((H, W), 0.5, dtype=np.float32)
-            profile = {
-                "crs": aoi.crs_obj,
-                "transform": from_bounds(*aoi.bbox, W, H),
-                "height": H,
-                "width": W,
-            }
-
-        # --- 2. Water proximity from JRC GSW -----------------------------
-        try:
-            from mal_commonlib.data.loaders.jrc_gsw import load_jrc_gsw_water_frac
-
-            water_da = load_jrc_gsw_water_frac(aoi, year=year, cache_dir=cache_dir)
-            water_frac = water_da.values.astype(np.float32)
-            log.info("WildlifeLoader: JRC GSW water loaded successfully")
-        except Exception as exc:
-            log.warning("WildlifeLoader: JRC GSW failed (%s), using neutral 0.5", exc)
-            water_frac = np.full((H, W), 0.5 / 3.0, dtype=np.float32)
-
-        water = _water_proximity(water_frac)
-
-        # --- 3. Remoteness from buildings ---------------------------------
-        try:
-            from mal_commonlib.data.loaders.buildings import BuildingsLoader
-
-            bld = BuildingsLoader()
-            bld_da = bld.load(aoi, cache_dir=cache_dir)
-            bld_frac = bld_da.values.astype(np.float32)
-            # Replace nodata with 0 (no buildings → remote)
-            bld_frac[bld_frac == _NODATA_OUT_SCALAR] = 0.0
-            log.info("WildlifeLoader: Buildings loaded successfully")
-        except Exception as exc:
-            log.warning("WildlifeLoader: Buildings failed (%s), assuming remote", exc)
-            bld_frac = np.zeros((H, W), dtype=np.float32)
-
-        remote = _remoteness(bld_frac)
-
-        # --- 4. Compute composite ----------------------------------------
-        proxy = _W_HABITAT * habitat + _W_WATER * water + _W_REMOTE * remote
-        proxy = np.clip(proxy, 0.0, 1.0).astype(np.float32)
-
-        # Propagate nodata: cells where WorldCover had no data
-        nodata_mask = habitat == _NODATA_OUT_SCALAR
-        proxy[nodata_mask] = _NODATA_OUT_SCALAR
-
-        # --- 5. Wrap and return -------------------------------------------
-        da = xr.DataArray(
-            proxy,
-            dims=("y", "x"),
-            name="wildlife_host_proxy",
-            attrs={
-                "long_name": "Wildlife host proxy suitability",
-                "units": "suitability [0, 1]",
-                "source": (
-                    f"ESA WorldCover {year} + JRC GSW + Overture Maps buildings"
-                ),
-                "formula": (
-                    "0.5 * habitat_suitability + 0.3 * water_proximity "
-                    "+ 0.2 * remoteness"
-                ),
-                "nodata": _NODATA_OUT_SCALAR,
-            },
+        warnings.warn(
+            "WildlifeLoader is deprecated; use load_wildlife_host_proxy()",
+            DeprecationWarning,
+            stacklevel=2,
         )
-        da.rio.write_crs(aoi.crs_obj, inplace=True)
-        da.rio.write_transform(
-            from_bounds(*aoi.bbox, W, H),
-            inplace=True,
-        )
-        da.rio.write_nodata(_NODATA_OUT_SCALAR, inplace=True)
-        return da
+        return load_wildlife_host_proxy(aoi, year=year, cache_dir=cache_dir)
 
 
-__all__ = ["WildlifeLoader", "HABITAT_SUITABILITY"]
+DOWNLOADER = {
+    "name": "wildlife",
+    "description": "Wildlife host proxy suitability from WorldCover + JRC GSW + buildings",
+    "requires_auth": ["none"],
+    "outputs": {
+        "wildlife_host_proxy": load_wildlife_host_proxy,
+    },
+    "manifest_keys": {
+        "wildlife_host_proxy": "wildlife_proxy",
+    },
+}
+
+__all__ = ["load_wildlife_host_proxy", "WildlifeLoader", "HABITAT_SUITABILITY", "DOWNLOADER"]
