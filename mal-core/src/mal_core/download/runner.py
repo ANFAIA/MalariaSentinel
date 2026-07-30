@@ -1,7 +1,6 @@
 """Download runner — orchestrates downloads for an AOI via the plugin registry."""
 from __future__ import annotations
 
-import importlib
 import logging
 from pathlib import Path
 from typing import Any
@@ -38,12 +37,6 @@ def _standard_path(aoi: str, product: str, year: int | None, ext: str) -> Path:
         return data_dir / f"{aoi}_{product}_{year}.{ext}"
     return data_dir / f"{aoi}_{product}.{ext}"
 
-
-def _get_raw_downloader(spec: DownloaderSpec) -> dict:
-    """Get the raw DOWNLOADER dict from the loader module.
-    TODO: remove once DownloaderSpec includes is_time_series / required_for_abm."""
-    mod = importlib.import_module(f"mal_commonlib.data.loaders.{spec.module_name}")
-    return getattr(mod, "DOWNLOADER", {})
 
 
 def run_download(
@@ -87,9 +80,8 @@ def run_download(
                     continue
 
                 log.info("  %s.%s", name, output_name)
-                _raw = _get_raw_downloader(spec)
-                is_ts = _raw.get("is_time_series", False)
-                required_for_abm = _raw.get("required_for_abm", True)
+                is_ts = spec.is_time_series
+                required_for_abm = True  # TODO: propagate from DownloaderSpec in future
 
                 if is_ts:
                     if not years:
@@ -101,25 +93,42 @@ def run_download(
                     if result is None:
                         continue
 
-                    time_dim = "valid_time" if "valid_time" in result.dims else "time"
-
-                    for year in years:
-                        sel = result.sel({time_dim: result[time_dim].dt.year == year})
-                        for month in (months or range(1, 13)):
-                            month_int = int(month)
-                            slc = sel.sel({time_dim: sel[time_dim].dt.month == month_int})
-                            ext = ".nc" if isinstance(result, xr.Dataset) else ".tif"
-                            path = _standard_path(aoi, output_name, year, ext.lstrip("."))
-                            save_product(slc, path)
-                            update_dataset(
-                                aoi,
-                                spec.manifest_keys[output_name],
-                                year,
-                                path.name,
-                                type="time-series",
-                                required_for_abm=required_for_abm,
-                            )
-                            log.info("    %s/%02d → %s", year, month_int, path.name)
+                    # Handle 2D (single month) vs 3D (multi-month) results
+                    has_time = "time" in result.dims or "valid_time" in result.dims
+                    if has_time:
+                        time_dim = "valid_time" if "valid_time" in result.dims else "time"
+                        for yr in years:
+                            sel = result.sel({time_dim: result[time_dim].dt.year == yr})
+                            for mo in (months or range(1, 13)):
+                                month_int = int(mo)
+                                slc = sel.sel({time_dim: sel[time_dim].dt.month == month_int})
+                                ext = ".nc" if isinstance(slc, xr.Dataset) else ".tif"
+                                path = _standard_path(aoi, output_name, yr, ext.lstrip("."))
+                                save_product(slc, path)
+                                update_dataset(
+                                    aoi,
+                                    spec.manifest_keys[output_name],
+                                    yr,
+                                    path.name,
+                                    type="time-series",
+                                    required_for_abm=required_for_abm,
+                                )
+                                log.info("    %s/%02d → %s", yr, month_int, path.name)
+                    else:
+                        # Single (year, month) — 2D result, no time dim
+                        yr = years[0]
+                        ext = ".nc" if isinstance(result, xr.Dataset) else ".tif"
+                        path = _standard_path(aoi, output_name, yr, ext.lstrip("."))
+                        save_product(result, path)
+                        update_dataset(
+                            aoi,
+                            spec.manifest_keys[output_name],
+                            yr,
+                            path.name,
+                            type="time-series",
+                            required_for_abm=required_for_abm,
+                        )
+                        log.info("    %s → %s", yr, path.name)
                 else:
                     result = func(aoi=aoi_obj, cache_dir=cache)
 
