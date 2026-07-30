@@ -73,10 +73,20 @@ class TestWorkerPermissions:
         result = self._create_orchestrator_with_mock()
         assert result is not None
         perms = result.get("permissions", [])
+
+        # .git/ must be denied (git internals protection)
         deny_write = [
             p for p in perms
             if hasattr(p, 'mode') and p.mode == "deny" and "write" in p.operations
         ]
         all_deny_paths = [path for p in deny_write for path in p.paths]
-        assert any(".gitagent" in p for p in all_deny_paths)
-        assert any(".git/" in p for p in all_deny_paths)
+        assert any(".git/" in p for p in all_deny_paths), ".git/ should be in deny paths"
+
+        # .gitagent worktree paths must be explicitly ALLOWED (overrides catch-all deny)
+        allow_write = [
+            p for p in perms
+            if hasattr(p, 'mode') and p.mode == "allow" and "write" in p.operations
+        ]
+        all_allow_paths = [path for p in allow_write for path in p.paths]
+        assert any(".gitagent" in p and "worktree" in p for p in all_allow_paths), \
+            ".gitagent worktree paths should be in allow paths"

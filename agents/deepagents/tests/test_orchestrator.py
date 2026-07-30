@@ -24,8 +24,10 @@ class TestModuleFlags:
         assert len(TOOLS) > 0
 
     def test_orchestrator_prompt_mentions_workflow(self):
-        assert "gitagent_init" in ORCHESTRATOR_PROMPT
-        assert "gitagent_start" in ORCHESTRATOR_PROMPT
+        assert "set_worktree_context" in ORCHESTRATOR_PROMPT
+        assert "clear_worktree_context" in ORCHESTRATOR_PROMPT
+        assert "gitagent_spawn" in ORCHESTRATOR_PROMPT
+        assert "gitagent_integrate" in ORCHESTRATOR_PROMPT
         assert "RECONNAISSANCE" in ORCHESTRATOR_PROMPT
         assert "HYPOTHESES" in ORCHESTRATOR_PROMPT
         assert "DIAGNOSTICS" in ORCHESTRATOR_PROMPT
