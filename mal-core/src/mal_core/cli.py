@@ -166,7 +166,7 @@ def download(
     ds_list = [s.strip() for s in datasets.split(",") if s.strip()] if datasets else None
     out_list = [s.strip() for s in outputs.split(",") if s.strip()] if outputs else None
     year_list = [int(y.strip()) for y in years.split(",") if y.strip()] if years else None
-    month_list = [m.strip() for m in months.split(",") if m.strip()] if months else None
+    month_list = [int(m.strip()) for m in months.split(",") if m.strip()] if months else None
 
     result = run_download(
         aoi=aoi,

@@ -23,9 +23,9 @@ def run_stage(stage: Stage, aoi: str, year: int, month: int, output_dir: Path, s
         if not years and year is not None:
             years = [year]
         ms = extra.pop("months", "")
-        months = [m.strip() for m in ms.split(",") if m.strip()] if ms else None
+        months = [int(m.strip()) for m in ms.split(",") if m.strip()] if ms else None
         if not months and month is not None:
-            months = [str(month)]
+            months = [month]
         output_dir = output_dir / "download"
         output_dir.mkdir(parents=True, exist_ok=True)
         return run_download(aoi=aoi, datasets=datasets, outputs=out_list, years=years, months=months, output_dir=output_dir, **extra)
