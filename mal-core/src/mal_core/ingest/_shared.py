@@ -66,13 +66,18 @@ def safe_load(
     try:
         sig = inspect.signature(loader_fn)
         accepted = set(sig.parameters.keys())
-        call_kwargs: dict[str, Any] = {}
-        if "aoi" in accepted:
-            call_kwargs["aoi"] = aoi
-        if "year" in accepted and year is not None:
+        call_kwargs: dict[str, Any] = {"aoi": aoi}
+
+        if "years" in accepted and year is not None:
+            call_kwargs["years"] = [year]
+        elif "year" in accepted and year is not None:
             call_kwargs["year"] = year
-        if "month" in accepted and month is not None:
+
+        if "months" in accepted and month is not None:
+            call_kwargs["months"] = [month]
+        elif "month" in accepted and month is not None:
             call_kwargs["month"] = month
+
         if "cache_dir" in accepted:
             call_kwargs["cache_dir"] = kwargs.get("cache_dir")
         return loader_fn(**call_kwargs)
@@ -116,6 +121,7 @@ def register_dataset(
     year: int | str | None,
     filename: str,
     *,
+    type: str = "static",
     required_for_abm: bool = False,
     variables: list[str] | None = None,
     format: str | None = None,
@@ -125,7 +131,7 @@ def register_dataset(
 
     from mal_core.download.manifest import read_manifest, update_dataset
 
-    update_dataset(aoi_slug, dataset_name, year, filename)
+    update_dataset(aoi_slug, dataset_name, year, filename, type=type, required_for_abm=required_for_abm, variables=variables, format=format)
 
     manifest = read_manifest(aoi_slug)
     ds = manifest.get("datasets", {}).get(dataset_name, {})

@@ -424,12 +424,14 @@ def build_env_tensor(
     register_dataset(
         aoi.slug, "env", year,
         str(env_path.name),
+        type="time-series",
         variables=list(ENV_BAND_NAMES),
         format=ext,
     )
     register_dataset(
         aoi.slug, "habitat", year,
         str(habitat_path.name),
+        type="time-series",
     )
 
     return results
