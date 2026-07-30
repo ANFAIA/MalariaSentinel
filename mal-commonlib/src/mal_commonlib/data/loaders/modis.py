@@ -2,7 +2,7 @@
 
 Public surface
 --------------
-``load_modis_ndvi(aoi, *, year, month, cache_dir=None) -> xr.DataArray``
+``load_modis_ndvi(aoi, *, years, months=None, cache_dir=None) -> xr.DataArray``
 
 The MOD13A3 product (MODIS/Terra Vegetation Indices Monthly L3 Global 1 km SIN
 Grid, v061) is hosted by NASA LP DAAC and accessible via ``earthaccess``. We
@@ -39,6 +39,7 @@ import os
 import pathlib
 import re
 import tempfile
+from collections.abc import Sequence
 from typing import Iterable
 
 import numpy as np
@@ -326,40 +327,16 @@ def _merge_and_reproject(
     return _rescale_ndvi(out)
 
 
-def load_modis_ndvi(
+def _load_modis_ndvi_single(
     aoi: AOI,
-    *,
     year: int,
     month: int,
-    cache_dir: pathlib.Path | None = None,
+    cache: pathlib.Path,
 ) -> xr.DataArray:
-    """Load MODIS MOD13A3 v061 monthly NDVI for the AOI (env channel 3 — ``ndvi``).
-
-    Uses earthaccess to authenticate via the ``EARTHDATA_TOKEN`` env var and
-    download the MOD13A3 tile(s) that intersect the AOI. The 1 km NDVI is
-    rescaled from the raw [-1, 1] to [0, 1] for the env tensor.
-
-    The MODIS Sinusoidal grid extent is converted to WGS-84 lon/lat (in
-    **degrees**) via ``_sinusoidal_to_lonlat`` before being fed to
-    ``rasterio.transform.from_bounds`` and the AOI ``reproject_match``.
-    The helper previously returned radians by mistake — see
-    ``_sinusoidal_to_lonlat`` for the bug note (fixed 2026-07-14,
-    GitHub issue #13).
-
-    Args:
-        aoi: the AOI.
-        year, month: 1-indexed month.
-        cache_dir: optional local cache for downloaded HDFs. If absent, a temp
-            directory under the system temp dir is used.
-
-    Returns:
-        xr.DataArray with dims (y, x), dtype ``float32``, CRS = ``aoi.crs``.
-        Values in [0, 1]. ``-9999.0`` for NoData.
-    """
+    """Load a single (year, month) of MODIS NDVI for the AOI."""
     _earthaccess_login()
     import earthaccess
 
-    cache = _ensure_cache_dir(cache_dir)
     start, end = _search_window(year, month)
     bbox = _aoi_bbox_for_earthaccess(aoi)
 
@@ -396,6 +373,8 @@ def load_modis_ndvi(
             "source": "MOD13A3 v061",
             "units": "unitless [0, 1]",
             "nodata": _NODATA_OUT_SCALAR,
+            "year": year,
+            "month": month,
         },
     )
     out.rio.write_crs(aoi.crs, inplace=True)
@@ -404,10 +383,60 @@ def load_modis_ndvi(
     return out
 
 
+def load_modis_ndvi(
+    aoi: AOI,
+    *,
+    years: Sequence[int],
+    months: Sequence[int] | None = None,
+    cache_dir: pathlib.Path | None = None,
+) -> xr.DataArray:
+    """Load MODIS MOD13A3 v061 monthly NDVI for year(s) × month(s).
+
+    Args:
+        aoi: the AOI.
+        years: sequence of years to load.
+        months: sequence of 1-indexed months. None = all 12.
+        cache_dir: optional local cache for downloaded HDFs.
+
+    Returns:
+        xr.DataArray with dtype ``float32``, CRS = ``aoi.crs``.
+        2-D (y, x) if single month, 3-D (time, y, x) if multiple.
+        Values in [0, 1]. ``-9999.0`` for NoData.
+    """
+    if months is None:
+        months = list(range(1, 13))
+
+    cache = _ensure_cache_dir(cache_dir)
+
+    results: list[xr.DataArray] = []
+    time_coords: list[np.datetime64] = []
+
+    for year in sorted(years):
+        for month in sorted(months):
+            da = _load_modis_ndvi_single(aoi, year, month, cache)
+            results.append(da)
+            time_coords.append(np.datetime64(f"{year:04d}-{month:02d}-01"))
+
+    if len(results) == 1:
+        return results[0]
+
+    stacked = xr.concat(results, dim="time")
+    stacked = stacked.assign_coords(time=time_coords)
+    stacked.attrs.update({
+        "long_name": "1 km monthly NDVI (rescaled)",
+        "source": "MOD13A3 v061",
+        "units": "unitless [0, 1]",
+        "nodata": _NODATA_OUT_SCALAR,
+    })
+    stacked.rio.write_crs(aoi.crs, inplace=True)
+    return stacked
+
+
 DOWNLOADER = {
     "name": "modis",
     "description": "MODIS NDVI: vegetation index",
     "requires_auth": ["earthdata"],
+    "is_time_series": True,
     "outputs": {
         "ndvi": load_modis_ndvi,
     },

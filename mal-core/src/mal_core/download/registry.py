@@ -1,5 +1,4 @@
 """Download plugin registry — discovers DOWNLOADER dicts from mal_commonlib loaders."""
-from __future__ import annotations
 import importlib
 import logging
 from dataclasses import dataclass
@@ -20,6 +19,7 @@ class DownloaderSpec:
     outputs: dict[str, Callable]
     manifest_keys: dict[str, str]
     module_name: str
+    is_time_series: bool = False
 
 def discover_downloaders() -> dict[str, DownloaderSpec]:
     registry: dict[str, DownloaderSpec] = {}
@@ -36,6 +36,7 @@ def discover_downloaders() -> dict[str, DownloaderSpec]:
                 outputs=raw.get("outputs", {}),
                 manifest_keys=raw.get("manifest_keys", {}),
                 module_name=mod_name,
+                is_time_series=raw.get("is_time_series", False),
             )
             registry[spec.name] = spec
             log.debug("Registered downloader: %s (%d outputs)", spec.name, len(spec.outputs))

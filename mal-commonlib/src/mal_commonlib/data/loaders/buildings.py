@@ -272,6 +272,7 @@ DOWNLOADER = {
     "name": "buildings",
     "description": "Overture Maps building footprint fraction",
     "requires_auth": ["none"],
+    "is_time_series": False,
     "outputs": {
         "building_fraction": load_buildings_fraction,
     },

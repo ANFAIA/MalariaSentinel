@@ -2,8 +2,7 @@
 
 Public surface
 --------------
-``load_jrc_gsw_water_frac(aoi, *, year=2021, month=None,
-cache_dir=None, water_classes=None, threshold_pct=80) -> xr.DataArray``
+``load_jrc_gsw_water_frac(aoi, *, year=2021, cache_dir=None) -> xr.DataArray``
 
 The ``month`` parameter is accepted for signature uniformity with the other
 M1.3a loaders (``build_env`` calls every loader as ``loader(aoi, year,
@@ -276,10 +275,7 @@ def load_jrc_gsw_water_frac(
     aoi: AOI,
     *,
     year: int = 2021,
-    month: int | None = None,
     cache_dir: pathlib.Path | None = None,
-    water_classes: Iterable[int] | None = None,
-    threshold_pct: int = DEFAULT_THRESHOLD_PCT,
 ) -> xr.DataArray:
     """Load JRC Global Surface Water (GSW) 30 m ``occurrence`` for the AOI,
     produce a ``water_frac`` raster in [0, 1] by computing the fraction
@@ -287,44 +283,25 @@ def load_jrc_gsw_water_frac(
 
     The loader goes through the Microsoft Planetary Computer STAC catalog
     (``jrc-gsw`` collection) and reads only the AOI bbox window from
-    each intersecting tile. This avoids reading the full 30 m tiles into
-    memory (the 3°x3° tiles are ~900 MB at 30 m) and unblocks the M2
-    real-data validation.
+    each intersecting tile.
 
     Args:
         aoi: the AOI.
-        year: JRC GSW product year. The annual ``occurrence`` band is
-            available for 1984-2021 inclusive. The default is 2021 (the
-            latest available year at the time of writing).
-        month: accepted for ``build_env`` signature uniformity; ignored.
-            We use the annual ``occurrence`` band, not the monthly
-            ``monthly_recurrence`` band. The JRC GSW monthly product
-            is reserved for a future M+ enhancement (e.g. seasonal
-            water detection).
+        year: JRC GSW product year (snapshot selector). The annual
+            ``occurrence`` band is available for 1984-2021 inclusive.
+            Default is 2021 (the latest available year).
         cache_dir: optional local cache (currently unused — the STAC
             signed URLs stream directly).
-        water_classes: not used by the JRC GSW loader. The JRC GSW
-            ``occurrence`` band is a single-band uint8 percentage; we
-            binarise at ``threshold_pct`` rather than mapping a set of
-            class codes. Kept in the signature for parity with
-            ``load_worldcover_water_frac``.
-        threshold_pct: the percentage cut-off for "permanent water"
-            (default 80, per Pekel et al., 2016 / JRC GSW standard).
-            Must be in [0, 100].
 
     Returns:
         xr.DataArray with dims (y, x), dtype ``float32``, CRS = ``aoi.crs``.
-        Values in [0, 1] (a 1 km AOI cell whose 30 m pixels are all
-        ``occurrence >= threshold_pct`` is 1.0; a cell with no permanent
-        water is 0.0). ``-9999.0`` for NoData (no tile covered the cell).
+        Values in [0, 1]. ``-9999.0`` for NoData.
     """
+    threshold_pct = DEFAULT_THRESHOLD_PCT
+
     if not (_MIN_YEAR <= int(year) <= _MAX_YEAR):
         raise ValueError(
             f"JRC GSW year must be in [{_MIN_YEAR}, {_MAX_YEAR}]; got {year}"
-        )
-    if not (0 <= int(threshold_pct) <= 100):
-        raise ValueError(
-            f"JRC GSW threshold_pct must be in [0, 100]; got {threshold_pct}"
         )
 
     bbox = _aoi_bbox_wgs84(aoi)
@@ -348,9 +325,6 @@ def load_jrc_gsw_water_frac(
     da.rio.write_crs(profile["crs"], inplace=True)
     da.rio.write_transform(profile["transform"], inplace=True)
 
-    # The streaming loader produces an AOI-grid-shaped array in the AOI's
-    # CRS — skip the second reproject_match (it would be a no-op and
-    # would double the memory traffic for no benefit).
     if str(profile.get("crs")) == str(aoi.crs_obj):
         rep = da.astype(np.float32)
     else:
@@ -358,9 +332,6 @@ def load_jrc_gsw_water_frac(
         rep = da.rio.reproject_match(ref, resampling=Resampling.average)
         rep = rep.astype(np.float32)
     rep = rep.rio.write_nodata(_NODATA_OUT_SCALAR)
-    # If the source mosaic is all zero (no water in the bbox), arr is all
-    # zero and the average remains zero — that is a valid result, NOT
-    # nodata.
     values = rep.values
     values = np.where(values == _NODATA_OUT_SCALAR, values, np.clip(values, 0.0, 1.0))
     values = values.astype(np.float32)
@@ -387,6 +358,7 @@ DOWNLOADER = {
     "name": "jrc_gsw",
     "description": "JRC Global Surface Water: water occurrence and seasonality",
     "requires_auth": ["none"],
+    "is_time_series": False,
     "outputs": {
         "water_occurrence": load_jrc_gsw_water_frac,
     },

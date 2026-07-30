@@ -1,9 +1,9 @@
 """ERA5-Land daily statistics loader (M1.3a, channel: temp_suitability).
 
 Public surface:
-    load_era5_temp_suitability(aoi, year, month, *, cache_dir=None) -> xr.DataArray
-    load_era5_water_temp(aoi, year, month, *, cache_dir=None) -> xr.DataArray
-    load_era5_wind_6hourly(aoi, years, *, months, cache_dir) -> xr.Dataset
+    load_era5_temp_suitability(aoi, *, years, months=None, cache_dir=None) -> xr.DataArray
+    load_era5_water_temp(aoi, *, years, months=None, cache_dir=None) -> xr.DataArray
+    load_era5_wind_6hourly(aoi, *, years, months=None, cache_dir=None) -> xr.Dataset
     sharpe_demichele_growth(T_celsius: xr.DataArray) -> xr.DataArray
 
 Source: Copernicus CDS — ``derived-era5-land-daily-statistics`` dataset.
@@ -33,6 +33,7 @@ from __future__ import annotations
 import calendar
 import os
 import pathlib
+from collections.abc import Sequence
 
 import numpy as np
 import rasterio
@@ -176,40 +177,15 @@ def _cds_request(year: int, month: int, bbox_wsen: tuple[float, float, float, fl
 # -- public API -------------------------------------------------------------
 
 
-def load_era5_temp_suitability(
+def _load_era5_temp_suitability_single(
     aoi: AOI,
     year: int,
     month: int,
-    *,
-    cache_dir: pathlib.Path | None = None,
+    cache_dir: pathlib.Path,
 ) -> xr.DataArray:
-    """Load ERA5-Land daily stats ``2m_temperature``, aggregate to monthly
-    mean, apply the Sharpe-DeMichele growth response, return temp_suitability.
-
-    Args:
-        aoi: the AOI.
-        year, month: 1-indexed month.
-        cache_dir: optional local cache for downloaded NetCDFs.
-
-    Returns:
-        xr.DataArray with dims (y, x), dtype float32, CRS = aoi.crs.
-        Values in [0, 1] (``temp_suitability``). ``-9999.0`` for NoData.
-
-    Raises:
-        RuntimeError: if CDS auth is missing (no ``~/.cdsapirc`` or
-            ``CDSAPI_URL``/``CDSAPI_KEY`` env vars). The message points at
-            ``op-m1-3a-data-layer-auth`` in the knowledge graph.
-    """
-    if not (1 <= month <= 12):
-        raise ValueError(f"month must be in 1..12; got {month}")
-    if year < 1950:
-        raise ValueError(f"ERA5 starts in 1950; got year={year}")
-
+    """Load a single (year, month) of ERA5 temp suitability for the AOI."""
     import cdsapi
 
-    # Auth check. cdsapi.Client() raises a plain Exception when the config
-    # file is missing/incomplete; convert to RuntimeError with a clear
-    # pointer to the runbook.
     try:
         client = cdsapi.Client()
     except Exception as e:
@@ -219,15 +195,11 @@ def load_era5_temp_suitability(
             f"details. (cdsapi raised: {e})"
         ) from e
 
-    cdir = cache_dir if cache_dir is not None else _default_cache_dir()
-    cdir.mkdir(parents=True, exist_ok=True)
-    target = cdir / f"era5_{ERA5_VARIABLE}_{year:04d}_{month:02d}.nc"
+    target = cache_dir / f"era5_{ERA5_VARIABLE}_{year:04d}_{month:02d}.nc"
 
     if not target.exists():
         request = _cds_request(year, month, aoi.bbox)
         result = client.retrieve(ERA5_DATASET, request, target=str(target))
-        # cdsapi's Result.download() will only re-download if ``target`` is
-        # not already on disk. Force a download path for clarity.
         if not target.exists():
             result.download(str(target))
 
@@ -240,7 +212,6 @@ def load_era5_temp_suitability(
     ):
         var_name = ERA5_VARIABLE_NETCDF_ALIAS[ERA5_VARIABLE]
     else:
-        # Some products use capitalisation; fall back to first 2m_temperature-like var.
         candidates = [v for v in ds.data_vars if "temper" in v.lower() and "2m" in v.lower()]
         if not candidates:
             raise KeyError(
@@ -250,16 +221,12 @@ def load_era5_temp_suitability(
         var_name = candidates[0]
     da_K = ds[var_name]
     if "expver" in da_K.dims:
-        # CDS sometimes ships both ecmwf versions on the same axis; pick the
-        # latest (the most recent dataset version) and average.
         da_K = da_K.sel(expver=da_K.coords["expver"].max())
 
     monthly_C = _monthly_mean_K_to_C(da_K, year, month)
     suit = sharpe_demichele_growth(monthly_C)
 
-    # Drop dims that aren't (y, x) so reproject_match has a clean 2-D array.
     suit_2d = suit.squeeze(drop=True)
-    # Make sure it has a CRS; ERA5 is in EPSG:4326 by default.
     if suit_2d.rio.crs is None:
         suit_2d.rio.write_crs("EPSG:4326", inplace=True)
 
@@ -289,37 +256,68 @@ def load_era5_temp_suitability(
     return da
 
 
-def load_era5_water_temp(
+def load_era5_temp_suitability(
     aoi: AOI,
-    year: int,
-    month: int,
     *,
+    years: Sequence[int],
+    months: Sequence[int] | None = None,
     cache_dir: pathlib.Path | None = None,
 ) -> xr.DataArray:
-    """Load ERA5-Land daily ``2m_temperature`` as a 3-D (time, y, x) array in °C.
-
-    Unlike :func:`load_era5_temp_suitability` which aggregates to a
-    monthly mean and applies Sharpe-DeMichele, this function preserves
-    per-day values in degrees Celsius for writing into a daily NetCDF
-    env file.
+    """Load ERA5-Land daily stats temp suitability for year(s) × month(s).
 
     Args:
         aoi: the AOI.
-        year, month: 1-indexed month.
+        years: sequence of years to load.
+        months: sequence of 1-indexed months. None = all 12.
         cache_dir: optional local cache for downloaded NetCDFs.
 
     Returns:
-        xr.DataArray with dims (time, y, x), dtype float32, CRS = aoi.crs.
-        Values in degrees Celsius. ``-9999.0`` for NoData.
-
-    Raises:
-        RuntimeError: if CDS auth is missing.
+        xr.DataArray with dtype float32, CRS = aoi.crs.
+        2-D (y, x) if single month, 3-D (time, y, x) if multiple.
+        Values in [0, 1]. ``-9999.0`` for NoData.
     """
-    if not (1 <= month <= 12):
-        raise ValueError(f"month must be in 1..12; got {month}")
-    if year < 1950:
-        raise ValueError(f"ERA5 starts in 1950; got year={year}")
+    if months is None:
+        months = list(range(1, 13))
 
+    cdir = cache_dir if cache_dir is not None else _default_cache_dir()
+    cdir.mkdir(parents=True, exist_ok=True)
+
+    results: list[xr.DataArray] = []
+    time_coords: list[np.datetime64] = []
+
+    for year in sorted(years):
+        for month in sorted(months):
+            if not (1 <= month <= 12):
+                raise ValueError(f"month must be in 1..12; got {month}")
+            if year < 1950:
+                raise ValueError(f"ERA5 starts in 1950; got year={year}")
+            da = _load_era5_temp_suitability_single(aoi, year, month, cdir)
+            results.append(da)
+            time_coords.append(np.datetime64(f"{year:04d}-{month:02d}-01"))
+
+    if len(results) == 1:
+        return results[0]
+
+    stacked = xr.concat(results, dim="time")
+    stacked = stacked.assign_coords(time=time_coords)
+    stacked.attrs.update({
+        "long_name": "temp_suitability (Sharpe-DeMichele growth response)",
+        "units": "normalized (parabolic, T_OPT=25, T_HALF_WIDTH=8)",
+        "source": f"ERA5-Land daily stats {ERA5_VARIABLE} {ERA5_DAILY_STATISTIC}",
+        "aoi_slug": aoi.slug,
+        "nodata": ERA5_NODATA,
+    })
+    stacked.rio.write_crs(aoi.crs_obj, inplace=True)
+    return stacked
+
+
+def _load_era5_water_temp_single(
+    aoi: AOI,
+    year: int,
+    month: int,
+    cache_dir: pathlib.Path,
+) -> xr.DataArray:
+    """Load a single (year, month) of ERA5 daily water temp for the AOI."""
     import cdsapi
 
     try:
@@ -331,9 +329,7 @@ def load_era5_water_temp(
             f"details. (cdsapi raised: {e})"
         ) from e
 
-    cdir = cache_dir if cache_dir is not None else _default_cache_dir()
-    cdir.mkdir(parents=True, exist_ok=True)
-    target = cdir / f"era5_{ERA5_VARIABLE}_{year:04d}_{month:02d}.nc"
+    target = cache_dir / f"era5_{ERA5_VARIABLE}_{year:04d}_{month:02d}.nc"
 
     if not target.exists():
         request = _cds_request(year, month, aoi.bbox)
@@ -361,7 +357,6 @@ def load_era5_water_temp(
     if "expver" in da_K.dims:
         da_K = da_K.sel(expver=da_K.coords["expver"].max())
 
-    # Convert K -> °C and keep per-day (do NOT aggregate to monthly mean).
     SPATIAL_DIMS = {"y", "x", "latitude", "longitude", "lat", "lon", "rlat", "rlon"}
     TIME_LIKE = {"time", "valid_time", "date", "datetime", "lead_time", "forecast_hour"}
     time_dim = next((d for d in da_K.dims if d in TIME_LIKE), None)
@@ -373,12 +368,10 @@ def load_era5_water_temp(
     if time_dim is not None:
         da_C = da_C.rename({time_dim: "time"})
 
-    # Drop non-spatial non-time dims.
     drop_dims = [d for d in da_C.dims if d not in ("time", "y", "x", "latitude", "longitude")]
     if drop_dims:
         da_C = da_C.squeeze(drop_dims, drop=True)
 
-    # Reproject per-day to the AOI grid.
     ref = _ref_grid_for_aoi(aoi)
     daily_arrays: list[np.ndarray] = []
     if "time" in da_C.dims:
@@ -423,6 +416,57 @@ def load_era5_water_temp(
     return out_da
 
 
+def load_era5_water_temp(
+    aoi: AOI,
+    *,
+    years: Sequence[int],
+    months: Sequence[int] | None = None,
+    cache_dir: pathlib.Path | None = None,
+) -> xr.DataArray:
+    """Load ERA5-Land daily 2m temperature in °C for year(s) × month(s).
+
+    Args:
+        aoi: the AOI.
+        years: sequence of years to load.
+        months: sequence of 1-indexed months. None = all 12.
+        cache_dir: optional local cache for downloaded NetCDFs.
+
+    Returns:
+        xr.DataArray with dims (time, y, x), dtype float32, CRS = aoi.crs.
+        Values in degrees Celsius. ``-9999.0`` for NoData.
+    """
+    if months is None:
+        months = list(range(1, 13))
+
+    cdir = cache_dir if cache_dir is not None else _default_cache_dir()
+    cdir.mkdir(parents=True, exist_ok=True)
+
+    all_arrays: list[xr.DataArray] = []
+
+    for year in sorted(years):
+        for month in sorted(months):
+            if not (1 <= month <= 12):
+                raise ValueError(f"month must be in 1..12; got {month}")
+            if year < 1950:
+                raise ValueError(f"ERA5 starts in 1950; got year={year}")
+            da = _load_era5_water_temp_single(aoi, year, month, cdir)
+            all_arrays.append(da)
+
+    if len(all_arrays) == 1:
+        return all_arrays[0]
+
+    merged = xr.concat(all_arrays, dim="time")
+    merged.attrs.update({
+        "long_name": "ERA5-Land 2m temperature (daily mean)",
+        "units": "degC",
+        "source": f"ERA5-Land daily stats {ERA5_VARIABLE} {ERA5_DAILY_STATISTIC}",
+        "aoi_slug": aoi.slug,
+        "nodata": ERA5_NODATA,
+    })
+    merged.rio.write_crs(aoi.crs_obj, inplace=True)
+    return merged
+
+
 # -- ERA5 100m wind (M7.6 Phase 2: 6-hourly windborne migration) --
 
 ERA5_WIND_DATASET: str = "reanalysis-era5-single-levels"
@@ -443,9 +487,9 @@ ALL_MONTHS: list[str] = [f"{m:02d}" for m in range(1, 13)]
 
 
 def _download_era5_wind(
-    years: int | list[int],
+    years: Sequence[int],
     *,
-    months: list[str] | None = None,
+    months: Sequence[int] | None = None,
     cache_dir: pathlib.Path | None = None,
 ) -> xr.Dataset:
     """Download ERA5 6-hourly 100m wind, year(s) × month(s).
@@ -456,10 +500,8 @@ def _download_era5_wind(
     merges all into a single Dataset sorted by time.
 
     Args:
-        years: single year or list of years to download.
-        months: list of month strings (``["01", ..., "12"]``).
-            ``None`` = all 12 months (full year).  Pass
-            ``MIGRATION_SEASON_MONTHS[year]`` for migration-only.
+        years: sequence of years to download.
+        months: sequence of 1-indexed months. None = all 12.
         cache_dir: optional per-month cache directory.
 
     Returns:
@@ -469,10 +511,12 @@ def _download_era5_wind(
         RuntimeError: if CDS auth is missing.
         ValueError: if ``years`` is empty.
     """
-    if isinstance(years, int):
-        years = [years]
     if not years:
         raise ValueError("years must not be empty")
+    if months is None:
+        months_int = list(range(1, 13))
+    else:
+        months_int = list(months)
 
     import cdsapi
 
@@ -490,9 +534,8 @@ def _download_era5_wind(
 
     monthly_files: list[str] = []
     for year in sorted(years):
-        year_months = months if months is not None else ALL_MONTHS
-        for month_str in year_months:
-            m_int = int(month_str)
+        for m_int in sorted(months_int):
+            month_str = f"{m_int:02d}"
             n_days = calendar.monthrange(year, m_int)[1]
             days = [f"{d:02d}" for d in range(1, n_days + 1)]
 
@@ -514,7 +557,6 @@ def _download_era5_wind(
                 )
             monthly_files.append(str(target))
 
-    # Merge monthly files and sort by time.
     datasets = [xr.open_dataset(f) for f in monthly_files]
     merged = xr.concat(datasets, dim="valid_time").sortby("valid_time")
     for ds in datasets:
@@ -524,28 +566,23 @@ def _download_era5_wind(
 
 
 def load_era5_wind_6hourly(
-    aoi: AOI | str,
-    years: int | list[int],
+    aoi: AOI,
     *,
-    months: list[str] | None = None,
+    years: Sequence[int],
+    months: Sequence[int] | None = None,
     cache_dir: pathlib.Path | None = None,
 ) -> xr.Dataset:
     """Load-or-download ERA5 6-hourly 100m wind data.
 
-    Downloads from CDS, caches monthly files, merges, and returns
-    ``xr.Dataset``.
-
     Args:
-        aoi: AOI slug or AOI object (used for grid reprojection).
-        years: single year or list of years.
-        months: month strings ``["01", ..., "12"]``. ``None`` = all 12.
+        aoi: AOI object (used for grid reprojection).
+        years: sequence of years.
+        months: sequence of 1-indexed months. None = all 12.
         cache_dir: cache directory. Default ``~/.cache/mal_commonlib/era5``.
 
     Returns:
         ``xr.Dataset`` with merged 6-hourly wind data.
     """
-    if isinstance(years, int):
-        years = [years]
     if not years:
         raise ValueError("years must not be empty")
 
@@ -566,6 +603,7 @@ DOWNLOADER = {
     "name": "era5",
     "description": "ERA5 reanalysis: temperature, wind, humidity",
     "requires_auth": ["cds"],
+    "is_time_series": True,
     "outputs": {
         "temp_suitability": load_era5_temp_suitability,
         "water_temp": load_era5_water_temp,

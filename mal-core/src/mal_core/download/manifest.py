@@ -59,13 +59,17 @@ def update_manifest(aoi: str, key: str, filename: str) -> Path:
     return update_dataset(aoi, key, None, filename)
 
 
-def update_dataset(aoi: str, dataset_name: str, year: int | str | None, filename: str) -> Path:
-    """Update a specific dataset entry in the manifest."""
+def update_dataset(aoi: str, dataset_name: str, year: int | str | None, filename: str, **kwargs) -> Path:
+    """Update a specific dataset entry in the manifest.
+
+    kwargs accepted (forward-compat for Phase 3): type, required_for_abm, variables, format.
+    Currently ignored; will be used when manifest v3 lands.
+    """
     path = DATA_ROOT / aoi / "manifest.json"
     manifest = read_manifest(aoi)
     if dataset_name not in manifest.get("datasets", {}):
         manifest.setdefault("datasets", {})[dataset_name] = {
-            "type": "time-series",
+            "type": kwargs.get("type", "time-series"),
             "format": filename.rsplit(".", 1)[-1],
             "files": {},
         }

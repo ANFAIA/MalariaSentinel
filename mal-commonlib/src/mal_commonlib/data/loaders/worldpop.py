@@ -216,6 +216,7 @@ DOWNLOADER = {
     "name": "worldpop",
     "description": "WorldPop constrained population density",
     "requires_auth": ["none"],
+    "is_time_series": False,
     "outputs": {
         "population": load_worldpop_population,
     },

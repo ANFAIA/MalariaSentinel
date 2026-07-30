@@ -392,6 +392,7 @@ DOWNLOADER = {
     "name": "wildlife",
     "description": "Wildlife host proxy suitability from WorldCover + JRC GSW + buildings",
     "requires_auth": ["none"],
+    "is_time_series": False,
     "outputs": {
         "wildlife_host_proxy": load_wildlife_host_proxy,
     },

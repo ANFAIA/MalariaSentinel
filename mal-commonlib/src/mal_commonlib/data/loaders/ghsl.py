@@ -283,6 +283,7 @@ DOWNLOADER = {
     "name": "ghsl",
     "description": "GHSL settlement classification (SMOD) for urban/rural classification",
     "requires_auth": ["none"],
+    "is_time_series": False,
     "outputs": {
         "urban_class": load_ghsl_urban_class,
     },

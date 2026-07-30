@@ -260,6 +260,7 @@ DOWNLOADER = {
     "name": "glw",
     "description": "FAO GLW4 global livestock density",
     "requires_auth": ["none"],
+    "is_time_series": False,
     "outputs": {
         "cattle": lambda aoi, **kw: load_glw_livestock(aoi, species="cattle", **kw),
         "goats": lambda aoi, **kw: load_glw_livestock(aoi, species="goats", **kw),

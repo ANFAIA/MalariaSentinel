@@ -533,6 +533,7 @@ DOWNLOADER = {
     "name": "dem",
     "description": "MERIT-DEM elevation: 100m resolution",
     "requires_auth": ["none"],
+    "is_time_series": False,
     "outputs": {
         "elevation": load_merit_dem,
     },

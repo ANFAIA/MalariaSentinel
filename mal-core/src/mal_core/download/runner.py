@@ -1,19 +1,21 @@
 """Download runner — orchestrates downloads for an AOI via the plugin registry."""
 from __future__ import annotations
-import inspect
+
+import importlib
 import logging
 from pathlib import Path
 from typing import Any
 
 import xarray as xr
 
-from .registry import discover_downloaders, DownloaderSpec
+from .registry import DownloaderSpec, discover_downloaders
 from .manifest import update_dataset, validate_completeness
 from .writer import save_product
 
 log = logging.getLogger(__name__)
 
 _REPO_ROOT = Path(__file__).resolve().parents[4]
+
 
 def _check_auth(spec: DownloaderSpec) -> bool:
     for auth in spec.requires_auth:
@@ -29,24 +31,20 @@ def _check_auth(spec: DownloaderSpec) -> bool:
                 return False
     return True
 
+
 def _standard_path(aoi: str, product: str, year: int | None, ext: str) -> Path:
-    """Determine standard file path per data-format-spec.md naming convention."""
     data_dir = _REPO_ROOT / "data" / aoi
     if year:
         return data_dir / f"{aoi}_{product}_{year}.{ext}"
     return data_dir / f"{aoi}_{product}.{ext}"
 
-def _is_time_series(spec: DownloaderSpec, output_name: str) -> bool:
-    """A loader output is time-series if `year` or `years` is a REQUIRED param (no default)."""
-    func = spec.outputs.get(output_name)
-    if func is None:
-        return False
-    sig = inspect.signature(func)
-    params = sig.parameters
-    for key in ("year", "years"):
-        if key in params and params[key].default is inspect.Parameter.empty:
-            return True
-    return False
+
+def _get_raw_downloader(spec: DownloaderSpec) -> dict:
+    """Get the raw DOWNLOADER dict from the loader module.
+    TODO: remove once DownloaderSpec includes is_time_series / required_for_abm."""
+    mod = importlib.import_module(f"mal_commonlib.data.loaders.{spec.module_name}")
+    return getattr(mod, "DOWNLOADER", {})
+
 
 def run_download(
     aoi: str,
@@ -55,6 +53,7 @@ def run_download(
     years: list[int] | None = None,
     months: list[str] | None = None,
     output_dir: str | Path | None = None,
+    cache_dir: str | Path | None = None,
     **kwargs,
 ) -> dict[str, Any]:
     """Download datasets for an AOI, using standard naming + manifest registration."""
@@ -73,7 +72,9 @@ def run_download(
     out_dir = Path(output_dir) if output_dir else (_REPO_ROOT / "data" / aoi)
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    results = {}
+    cache = Path(cache_dir) if cache_dir else None
+
+    results: dict[str, Any] = {}
     for name, spec in selected.items():
         log.info("Downloading: %s", name)
         if not _check_auth(spec):
@@ -86,45 +87,57 @@ def run_download(
                     continue
 
                 log.info("  %s.%s", name, output_name)
+                _raw = _get_raw_downloader(spec)
+                is_ts = _raw.get("is_time_series", False)
+                required_for_abm = _raw.get("required_for_abm", True)
 
-                # Determine if time-series or static
-                is_ts = _is_time_series(spec, output_name)
+                if is_ts:
+                    if not years:
+                        log.warning("    %s is time-series but no years specified — skipping", output_name)
+                        continue
 
-                # Build all possible kwargs, then filter to what the loader accepts
-                sig = inspect.signature(func)
-                accepted = set(sig.parameters.keys())
+                    result = func(aoi=aoi_obj, years=years, months=months, cache_dir=cache)
 
-                if is_ts and years:
+                    if result is None:
+                        continue
+
+                    time_dim = "valid_time" if "valid_time" in result.dims else "time"
+
                     for year in years:
-                        all_kwargs = {
-                            "aoi": aoi_obj,
-                            "year": year,
-                            "years": [year],
-                            "month": int(months[0]) if months else None,
-                            "months": months,
-                        }
-                        call_kwargs = {k: v for k, v in all_kwargs.items() if k in accepted and v is not None}
-                        result = func(**call_kwargs)
-                        if result is not None:
+                        sel = result.sel({time_dim: result[time_dim].dt.year == year})
+                        for month in (months or range(1, 13)):
+                            month_int = int(month)
+                            slc = sel.sel({time_dim: sel[time_dim].dt.month == month_int})
                             ext = ".nc" if isinstance(result, xr.Dataset) else ".tif"
                             path = _standard_path(aoi, output_name, year, ext.lstrip("."))
-                            save_product(result, path)
-                            manifest_key = spec.manifest_keys[output_name]
-                            update_dataset(aoi, manifest_key, year, path.name)
-                            log.info("    %s → %s", year, path.name)
+                            save_product(slc, path)
+                            update_dataset(
+                                aoi,
+                                spec.manifest_keys[output_name],
+                                year,
+                                path.name,
+                                type="time-series",
+                                required_for_abm=required_for_abm,
+                            )
+                            log.info("    %s/%02d → %s", year, month_int, path.name)
                 else:
-                    all_kwargs = {
-                        "aoi": aoi_obj,
-                    }
-                    call_kwargs = {k: v for k, v in all_kwargs.items() if k in accepted and v is not None}
-                    result = func(**call_kwargs)
-                    if result is not None:
-                        ext = ".nc" if isinstance(result, xr.Dataset) else ".tif"
-                        path = _standard_path(aoi, output_name, None, ext.lstrip("."))
-                        save_product(result, path)
-                        manifest_key = spec.manifest_keys[output_name]
-                        update_dataset(aoi, manifest_key, None, path.name)
-                        log.info("    → %s", path.name)
+                    result = func(aoi=aoi_obj, cache_dir=cache)
+
+                    if result is None:
+                        continue
+
+                    ext = ".nc" if isinstance(result, xr.Dataset) else ".tif"
+                    path = _standard_path(aoi, output_name, None, ext.lstrip("."))
+                    save_product(result, path)
+                    update_dataset(
+                        aoi,
+                        spec.manifest_keys[output_name],
+                        None,
+                        path.name,
+                        type="static",
+                        required_for_abm=required_for_abm,
+                    )
+                    log.info("    → %s", path.name)
 
             results[name] = {"status": "ok"}
         except Exception as e:
