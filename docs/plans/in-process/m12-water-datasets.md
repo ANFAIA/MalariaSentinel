@@ -2,7 +2,7 @@
 
 > **Status**: Stub (2026-07-30). Full plan to be drafted when M11 ships.
 >
-> **Predecessor**: M11 — Data Pipeline Unification (`docs/plan-unificacion-pipeline-de-datos.md`).
+> **Predecessor**: M11 — Data Pipeline Unification (`docs/plans/completed/m11-pipeline-unification.md`).
 >
 > **Scope (preview only)**: 4 new water loaders + composite `load_water_stack()` + D12 calibration scorer. Detail deferred to M12 full plan when M11 acceptance criteria are met.
 
@@ -97,7 +97,7 @@ M12 is **done** when:
 
 ## 9. References
 
-- `docs/plan-unificacion-pipeline-de-datos.md` — M11 plan (predecessor).
+- `docs/plans/completed/m11-pipeline-unification.md` — M11 plan (predecessor).
 - KG `Operational` node: `op-m11-data-pipeline-unification`.
 - KG `Operational` node: `op-m12-water-datasets` (this plan, stub).
 - Datasets surveyed: JRC GSW, Copernicus WB 100m, OPERA DSWX-S1, Sentinel-1 RTC (HyP3), HydroLAKES, HydroRIVERS, ESA WorldCover 2021 v200. Excluded: Copernicus WB (too coarse), HyP3 RTC (not a water product).

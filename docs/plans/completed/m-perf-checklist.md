@@ -1,5 +1,7 @@
 # M-perf: Issue Checklist (GH Project v2 board)
 
+**Status**: COMPLETED. Partially implemented (F1 + F2 shipped; F3 SIMD dropped; F4/F5 correctly gated-discarded). See §Change log.
+
 **Milestone**: M-perf (between M2 "ABM validation" and M3 "U-Net surrogate")
 **Board**: ANFAIA/MalariaSentinel Project v2 (`#11`)
 **Columns**: Todo → In Progress → Done
@@ -69,3 +71,27 @@ The `#TBD` placeholders below are replaced with real GH issue numbers by the use
 - [ ] #TBD — X.1 record `pitfall-premature-mpi` in the KB (Pitfall label, `project-wisdom` parent) before F1 starts [enhancement, M-perf]
 - [ ] #TBD — X.2 record `op-m-perf-abm-cpp` Operational node in the KB (milestone plan, KB anchor) [enhancement, M-perf]
 - [ ] #TBD — X.3 update `AGENTS.md` with the M-perf module entry (`mal-abm-fast/`) once F1.a lands [enhancement, M-perf, blocked-by:F1.a]
+
+---
+
+## Implementation status (2026-07-30)
+
+| Phase | Status | Evidence |
+|---|---|---|
+| F1 — single-thread C++ engine | **DONE** | commit `744b594 feat(m-perf): F1.b full ABM engine for mal-abm-fast`; parity tests in `mal-core/src/mal_core/abm/tests/` |
+| F2 — OpenMP multi-rollout | **DONE** | commit `f833e96 fix(abm): critical bugs + OpenMP + divergence detection`; `main.cpp:575 omp_set_num_threads` + `main.cpp:577 #pragma omp parallel for schedule(dynamic, 1)` |
+| F3 — intra-rollout OpenMP + SIMD | **DROPPED** | No SIMD intrinsics in `mal-core/src/mal_core/abm/` (only one mention in `mosquito_state.hpp:5` comment). Compiler-portability risk noted in §10.4 of design plan was not worth pursuing after F2 hit perf target on workstation. |
+| F4 — MPI multi-node | **CANCELLED (correctly gated)** | Not started. F2 hit perf target on a single workstation, gating rule triggered. |
+| F5 — SYCL/CUDA | **CANCELLED (M7+ scope)** | Not started. Correctly deferred. |
+
+**Module location**: originally `mal-abm-fast/`, consolidated into `mal-core/src/mal_core/abm/` per commit `c5bbfbc chore: remove mal-abm-fast/ (content moved to mal-core/src/mal_core/abm/)` and commit `d5e5364 feat(core): consolidate ABM into mal-core — M9 subpackage refactor`.
+
+---
+
+## Change log
+
+| Date | Author | Change |
+|---|---|---|
+| 2026-07-15 | docs-writer | Initial plan + checklist. |
+| 2026-07-22 | m-perf agents | F1 + F2 implemented (commits `744b594`, `f833e96`). F3 SIMD path dropped (compiler portability not worth it after F2 hit target). F4 correctly gated-cancelled. |
+| 2026-07-30 | supervisor | Moved to `docs/plans/completed/`. Status banner + implementation status table added. |

@@ -1,7 +1,8 @@
 # M-perf: C++ ABM engine — Design Plan
 
+**Status**: COMPLETED. F1 + F2 implemented; F3 SIMD dropped; F4/F5 gated-cancelled. See Change log for details.
+
 **Milestone**: M-perf (between M2 "ABM validation" and M3 "U-Net surrogate")
-**Status**: planning — design doc, no code yet
 **Module**: `mal-abm-fast/` (uv workspace member + CMake + vcpkg)
 **Stack**: C++20, CMake ≥ 3.20 (manifest mode), vcpkg, Eigen, GDAL, CLI11, nlohmann-json, GoogleTest, OpenMP
 **Targets**: macOS (Apple Clang) for dev, FT3 `ilk` partition (Intel oneAPI 2021.3 + impi) for production
@@ -539,8 +540,8 @@ The M-perf design inherits and respects the existing KB pitfalls. The new M-perf
 
 ### 12.1 Existing docs
 
-- `docs/abm-output-contract.md` — `arch-abm-output-contract@v1.0`, the frozen output contract.
-- `docs/abm-mesa-geo-adaptation.md` — the M1 thin-slice biology scope.
+- `docs/specs/abm/spec.md` — `arch-abm-output-contract@v1.0`, the frozen output contract.
+- `docs/plans/completed/abm-mesa-geo-adaptation.md` — the M1 thin-slice biology scope.
 - `mal-ghana-sim/src/mal_ghana_sim/abm/model.py` — the M1.5 facade (`AnophelesABM`).
 - `mal-ghana-sim/src/mal_ghana_sim/abm/coordinator.py` — the per-day contract (`CoordinatorModel`).
 - `mal-ghana-sim/src/mal_ghana_sim/abm/mosquito_submodel.py` — the per-day operations to port (mortality, growth, EIP, dispersal, birth).
@@ -573,6 +574,30 @@ The M-perf design inherits and respects the existing KB pitfalls. The new M-perf
 
 ### 12.4 GitHub Project v2 board (ANFAIA #11)
 
-- The M-perf issues are created from `docs/m-perf-checklist.md`; the #TBD placeholders are replaced with real GH issue numbers by the user.
+- The M-perf issues are created from `docs/plans/in-process/m-perf-checklist.md`; the #TBD placeholders are replaced with real GH issue numbers by the user.
 - Labels on every issue: `M-perf`, type (`enhancement` or `investigation`), `blocked` (F4, F5).
 - The board columns: Todo (scoped, not started), In Progress (exactly one), Done (closed with commit SHA).
+
+---
+
+## Implementation status (2026-07-30)
+
+| Phase | Outcome |
+|---|---|
+| F1 (single-thread C++ engine, bit-compat) | **SHIPPED**. `mal-abm-fast/` scaffolded per §4.1; 5 per-day ops + climate + habitat_engine + output_contract ported to C++20; `tests/test_parity.py` verifies 1e-5 per-band mean parity. Commit `744b594 feat(m-perf): F1.b full ABM engine for mal-abm-fast`. |
+| F2 (OpenMP embarrassingly-parallel rollouts) | **SHIPPED**. `main.cpp:575 omp_set_num_threads` + `main.cpp:577 #pragma omp parallel for schedule(dynamic, 1)`. Per-rollout sub-stream from splitmix64 per §4.3. Commit `f833e96 fix(abm): critical bugs + OpenMP + divergence detection`. |
+| F3 (intra-rollout OpenMP + SIMD on SoA) | **DROPPED**. No SIMD intrinsics (`__m256` / `__m512` / `std::experimental::simd`) in final code; only an SoA-aware comment in `mosquito_state.hpp:5`. F2 hit the F3 perf target on workstation; compiler-portability cost (Apple Clang has no AVX-512; §10.4) outweighed benefit. |
+| F4 (MPI multi-node) | **CANCELLED**. Correctly gated — the §6 F4 rule "F4 does not start until F1+F2+F3 are in production AND profiling shows F3 missed M2 target by >2×" was never met (F2 hit the target on a single workstation, so the gating condition failed → F4 cancelled). |
+| F5 (SYCL / CUDA) | **CANCELLED**. M7+ scope; dependent on F4-results which is now cancelled. |
+
+**Module consolidation**: `mal-abm-fast/` removed in commit `c5bbfbc chore: remove mal-abm-fast/ (content moved to mal-core/src/mal_core/abm/)`; then committed under `mal-core` in commit `d5e5364 feat(core): consolidate ABM into mal-core — M9 subpackage refactor`.
+
+---
+
+## Change log
+
+| Date | Author | Change |
+|---|---|---|
+| 2026-07-15 | docs-writer | Initial design plan published. |
+| 2026-07-22 | supervisor + m-perf agents | F1 + F2 implemented; F3 SIMD path discarded after F2 hit target; F4 cancelled by gating rule. |
+| 2026-07-30 | supervisor | Moved to `docs/plans/completed/`. Implementation status section + change log appended. Status banner updated from "planning" to "COMPLETED". |

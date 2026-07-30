@@ -157,7 +157,7 @@ Key design decisions:
 ## See also
 
 - [docs/wire-spec.md](docs/wire-spec.md) — data contracts and module signatures
-- [docs/perf-cpp-abm-plan.md](../perf-cpp-abm-plan.md) — full M-perf design
-- [docs/m-perf-checklist.md](../m-perf-checklist.md) — F1–F5 issue checklist
+- [docs/plans/in-process/perf-cpp-abm-plan.md](../../../../docs/plans/in-process/perf-cpp-abm-plan.md) — full M-perf design
+- [docs/plans/in-process/m-perf-checklist.md](../../../../docs/plans/in-process/m-perf-checklist.md) — F1–F5 issue checklist
 - `agents/skills/cesga/SKILL.md` — CESGA FT3 conventions
 - `mal-execution/scripts/cesga-run/` — reference SLURM scripts for the Python ABM

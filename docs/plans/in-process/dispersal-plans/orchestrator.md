@@ -7,7 +7,7 @@
 | **Status** | proposed |
 | **Goal** | Spawn 3 gitagent worktrees (A, B, C), compare their composite scores + D16 spatial metrics on identical inputs, pick a winner by objective criteria, integrate to `main` as one commit. |
 | **Owner** | supervisor (this session) |
-| **Pre-req** | The 3 plan files in `docs/agents-plans/plan-{A,B,C}-*.md` exist on `main`. |
+| **Pre-req** | The 3 plan files in `docs/plans/completed/dispersal-plans/plan-{A,B,C}-*.md` exist on `main`. |
 
 ---
 
@@ -17,9 +17,9 @@ The current ABM dispersal produces too-narrow a spatial front against the empiri
 
 | Plan | File | Mechanism | Sessions | Risk |
 |---|---|---|---|---|
-| **A** | [`docs/agents-plans/plan-A-windborne.md`](./plan-A-windborne.md) | Tune existing windborne + viability gate | 1.5 | Low |
-| **B** | [`docs/agents-plans/plan-B-host-seeking.md`](./plan-B-host-seeking.md) | Wire directed host-seeking flight | 3.0 | Med |
-| **C** | [`docs/agents-plans/plan-C-oviposition-seeking.md`](./plan-C-oviposition-seeking.md) | Natal patch fidelity + oviposition walk | 2.0 | Med |
+| **A** | [`./plan-A-windborne.md`](./plan-A-windborne.md) | Tune existing windborne + viability gate | 1.5 | Low |
+| **B** | [`./plan-B-host-seeking.md`](./plan-B-host-seeking.md) | Wire directed host-seeking flight | 3.0 | Med |
+| **C** | [`./plan-C-oviposition-seeking.md`](./plan-C-oviposition-seeking.md) | Natal patch fidelity + oviposition walk | 2.0 | Med |
 
 Rather than pick blind, the supervisor spawns 3 isolated worktrees, lets each implement their plan in parallel, then chooses the winner on **measured metrics** (composite score + D16 spread metrics) rather than on **theoretical preference**.
 
@@ -59,7 +59,7 @@ Each agent receives the same template, with the `<<PLAN>>` slot replaced:
 You are agent `<<ID>>` in feature `abm-dispersal-plans`.
 Your worktree: .gitagent/features/abm-dispersal-plans/agents/<<ID>>/worktree
 
-Read your plan in full: docs/agents-plans/<<PLAN>>.md
+Read your plan in full: docs/plans/completed/dispersal-plans/<<PLAN>>.md
 
 Mandatory order of operations:
   1. F1.e parity removal (delete test_abm_fast_parity.py in both
@@ -175,7 +175,7 @@ gitagent integrate --feature abm-dispersal-plans
 
 ```bash
 gitagent finalize --feature abm-dispersal-plans \
-    --message "feat(abm): evolve dispersal per Plan X (winner) — see docs/agents-plans/plan-X-*.md"
+    --message "feat(abm): evolve dispersal per Plan X (winner) — see docs/plans/completed/dispersal-plans/plan-X-*.md"
 ```
 
 This produces **one** commit on `main`.
@@ -213,7 +213,7 @@ memory_node \
     --uuid comp-abm-dispersal-M7-evolved \
     --name "M7: ABM dispersal evolved (3-plan comparison)" \
     --type Operational \
-    --summary "On 2026-XX-XX we ran 3 competing ABM dispersal plans (A=windborne, B=host-seeking, C=oviposition-site). Winner: Plan X with composite=Y.YY, D16=0.7Z, p90=WW km. See docs/agents-plans/orchestrator.md for the comparison table. Code lives in commit <sha>."
+    --summary "On 2026-XX-XX we ran 3 competing ABM dispersal plans (A=windborne, B=host-seeking, C=oviposition-site). Winner: Plan X with composite=Y.YY, D16=0.7Z, p90=WW km. See ./orchestrator.md for the comparison table. Code lives in commit <sha>."
 
 memory_rel \
     --src comp-abm-dispersal-M7-evolved \
@@ -309,11 +309,11 @@ gitagent does **not** create or use these branches. They exist only for the agen
 
 ## 8. References
 
-- [`docs/agents-plans/plan-A-windborne.md`](./plan-A-windborne.md)
-- [`docs/agents-plans/plan-B-host-seeking.md`](./plan-B-host-seeking.md)
-- [`docs/agents-plans/plan-C-oviposition-seeking.md`](./plan-C-oviposition-seeking.md)
-- `docs/perf-cpp-abm-plan.md` (F1.e language, to be updated by every plan)
-- `docs/m7-6-wind-dispersal-plan.md` (the M7.6 windborne baseline being evolved)
+- [`./plan-A-windborne.md`](./plan-A-windborne.md)
+- [`./plan-B-host-seeking.md`](./plan-B-host-seeking.md)
+- [`./plan-C-oviposition-seeking.md`](./plan-C-oviposition-seeking.md)
+- `../../in-process/perf-cpp-abm-plan.md` (F1.e language, to be updated by every plan)
+- `../m7-6-wind-dispersal-plan.md` (the M7.6 windborne baseline being evolved)
 - `docs/dispersal-kernel-calibration.md` (Yang 2009 94% reduction reference)
 - `papers/anopheles-dynamics/costantini-1996-anopheles-density-survival-dispersal.md`
 - `papers/anopheles-dynamics/thomas-2013-anopheles-gambiae-gambia-dispersal.md`

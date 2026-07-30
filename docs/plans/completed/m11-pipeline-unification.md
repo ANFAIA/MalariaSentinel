@@ -1,10 +1,10 @@
 # M11 — Data Pipeline Unification
 
-> **Status**: Planned (2026-07-30). Scope supersedes the prior `docs/unify-download-plan.md` state-of-the-union (which now lives in the KG `Operational` node `op-m11-data-pipeline-unification`).
+> **Status**: Planned (2026-07-30). Scope supersedes the prior `docs/plans/in-process/unify-download-plan.md` state-of-the-union (which now lives in the KG `Operational` node `op-m11-data-pipeline-unification`).
 >
 > **Supersedes**: M9 "Pipeline (consolidated in mal-core)" — M11 is the unification of the data pipeline stage (download → ingest → build), which was partially completed in M9.
 >
-> **Followed by**: M12 — Water Datasets (`docs/plan-water-datasets-m12.md`).
+> **Followed by**: M12 — Water Datasets (`docs/plans/in-process/m12-water-datasets.md`).
 
 ## 1. Context
 
@@ -155,7 +155,7 @@ Configurability rationale: when WorldPop 2024 ships, `load_worldpop_population(a
 - Pipeline stages: `BUILD_HOSTS`, `BUILD_MOBILITY` added.
 - Ingest modules created: `env.py`, `hosts.py`, `mobility.py` in `mal-core/src/mal_core/ingest/`.
 - Writer module created: `mal-core/src/mal_core/download/writer.py` (DataArray→COG, Dataset→NC).
-- Spec docs updated: `download-api-spec.md`, `data-format-spec.md`.
+- Spec docs updated: `docs/specs/download/spec.md`, `docs/specs/data/spec.md`.
 - Integration bugs fixed: AOI object pass-through, ABM wrapper `run` subcommand, env.py string resolution.
 - Manifest keys fixed: `env`/`habitat`, `mobility_day`/`mobility_night`/`livestock_mobility`.
 
@@ -238,7 +238,7 @@ Runner vectorized           →     +water stack assembly
 ```
 
 **Explicit references:**
-- §5 (Phase 5) points to `docs/plan-water-datasets-m12.md` for water layer scope.
+- §5 (Phase 5) points to `docs/plans/in-process/m12-water-datasets.md` for water layer scope.
 - Phase 4 (manifest v3 stability) is a prerequisite for M12's water stack assembly.
 - §2.4 `is_time_series` flag is designed to accommodate DSWX-S1 climatology (one product, two views).
 
@@ -275,10 +275,10 @@ M11 is **done** when:
 
 ## 8. References
 
-- `docs/data-format-spec.md` — manifest schema reference (to be updated to v3).
-- `docs/download-api-spec.md` — loader API reference (to be updated for `is_time_series`).
-- `docs/unify-download-plan.md` — prior state-of-the-union (superseded by this plan).
-- `docs/plan-water-datasets-m12.md` — M12 stub, link to this plan.
+- `docs/specs/data/spec.md` — manifest schema reference (to be updated to v3).
+- `docs/specs/download/spec.md` — loader API reference (to be updated for `is_time_series`).
+- `docs/plans/in-process/unify-download-plan.md` — prior state-of-the-union (superseded by this plan).
+- `docs/plans/in-process/m12-water-datasets.md` — M12 stub, link to this plan.
 - KG `Operational` node: `op-m11-data-pipeline-unification` (this plan).
 - KG `Operational` node: `op-m9-pipeline-consolidated` (prior state, partially complete).
 - KG `Operational` node: `op-m12-water-datasets` (next milestone, stub).

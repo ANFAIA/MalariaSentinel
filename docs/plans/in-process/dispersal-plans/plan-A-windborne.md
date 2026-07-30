@@ -23,7 +23,7 @@ We hypothesise that the **long-distance tail of the dispersal kernel is correct 
 |---|---|---|
 | **Costantini et al. 1996** | `papers/anopheles-dynamics/costantini-1996-anopheles-density-survival-dispersal.md` | 350–650 m/day outward displacement in MRR; daily survival ~0.85; supports 6 h flight. |
 | **Thomas et al. 2013** | `papers/anopheles-dynamics/thomas-2013-anopheles-gambiae-gambia-dispersal.md` | Negative-exponential kernel: median 386 m, p90 1.28 km, p95 1.67 km. Half-Cauchy alt: 295 m / 1.64 km / 2.83 km. These are the targets for D16. |
-| **Huestis & Lehmann 2019** | `docs/m7-6-wind-dispersal-plan.md` | Windborne *Anopheles* can move 100s of km in 6–11 h sustained flight; supports 6 h default and 0.90 in-flight survival. |
+| **Huestis & Lehmann 2019** | `../m7-6-wind-dispersal-plan.md` | Windborne *Anopheles* can move 100s of km in 6–11 h sustained flight; supports 6 h default and 0.90 in-flight survival. |
 | **Depinay et al. 2004** | `papers/anopheles-dynamics/depinay-2004-anopheles-simulation-model.md` | Site fidelity to natal habitat is a real behaviour; wind overrides it for the long tail. |
 | **North & Godfray 2018** | (cited in dispersal-kernel-calibration.md) | Settlement-to-settlement dispersal with d=0.01 sets the lower bound for D16. |
 | **Yang et al. 2009** | `docs/dispersal-kernel-calibration.md` | 300 m habitat removal → 94 % reduction in local *Anopheles* density; supports the destination viability check. |
@@ -107,7 +107,7 @@ And add to `scorers/composite.py::DEFAULT_WEIGHTS` as `"D16": 0.15` (rebalance e
 |---|---|---|
 | `mal-core/src/mal_core/abm/README.md` | 19–22 | Remove "F1.e parity" bullet; replace with "F1.e is the calibration metric (10 scorers + D16)". |
 | `mal-core/src/mal_core/abm/README.md` | 137–139 | Drop the sentence "Behavioural parity is enforced by `test_abm_fast_parity.py`". |
-| `docs/perf-cpp-abm-plan.md` | 14, 68, 89, 152, 201, 266, 289, 431, 446–448, 499, 501 | Grep `parity` and `F1.e`; update each to refer to the calibration suite instead. |
+| `../../in-process/perf-cpp-abm-plan.md` | 14, 68, 89, 152, 201, 266, 289, 431, 446–448, 499, 501 | Grep `parity` and `F1.e`; update each to refer to the calibration suite instead. |
 | `mal-core/src/mal_core/abm/tests/test_abm_fast_parity.py` | whole file | Delete. |
 | `mal-ghana-sim/tests/test_abm_fast_parity.py` | whole file | Delete. |
 
@@ -130,7 +130,7 @@ The implementing agent must complete the F1.e removal **first**, then run the fa
 - `mal-core/src/mal_core/abm/tests/calibration/thresholds.yaml` (1 entry)
 - `mal-core/src/mal_core/abm/tests/calibration/scorers/composite.py` (1 weight)
 - `mal-core/src/mal_core/abm/README.md` (F1.e language)
-- `docs/perf-cpp-abm-plan.md` (F1.e language)
+- `../../in-process/perf-cpp-abm-plan.md` (F1.e language)
 - `mal-core/src/mal_core/abm/tests/test_abm_fast_parity.py` (delete)
 - `mal-ghana-sim/tests/test_abm_fast_parity.py` (delete)
 

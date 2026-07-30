@@ -28,7 +28,7 @@ We hypothesise that adding a per-mosquito `natal_patch_id`, sampling a return-de
 | **Yang et al. 2009** | `docs/dispersal-kernel-calibration.md` | 300 m habitat removal → 94 % density reduction; supports the strong patch-bound signature D18 should match. |
 | **Costantini 1996** | `papers/anopheles-dynamics/costantini-1996-anopheles-density-survival-dispersal.md` | 350–650 m/day outward displacement — a returning female walking 200 m × 3–4 days is consistent. |
 | **Thomas 2013** | `papers/anopheles-dynamics/thomas-2013-anopheles-gambiae-gambia-dispersal.md` | p90 1.28 km — the return walk should not exceed this for a single gonotrophic cycle. |
-| **Huestis 2019** | `docs/m7-6-wind-dispersal-plan.md` | 6–11 h flight — 200 m per day (one step) is conservative but consistent with the multi-day return. |
+| **Huestis 2019** | `../m7-6-wind-dispersal-plan.md` | 6–11 h flight — 200 m per day (one step) is conservative but consistent with the multi-day return. |
 
 ## 3. Code changes
 
@@ -155,7 +155,7 @@ D17 (host-clustering, Plan B's signature) is **not** added here — Plan C's spa
 | File | Lines | Action |
 |---|---|---|
 | `mal-core/src/mal_core/abm/README.md` | 19–22, 137–139 | Update F1.e language |
-| `docs/perf-cpp-abm-plan.md` | 14, 68, 89, 152, 201, 266, 289, 431, 446–448, 499, 501 | Update F1.e language |
+| `../../in-process/perf-cpp-abm-plan.md` | 14, 68, 89, 152, 201, 266, 289, 431, 446–448, 499, 501 | Update F1.e language |
 | `mal-core/src/mal_core/abm/tests/test_abm_fast_parity.py` | whole | Delete |
 | `mal-ghana-sim/tests/test_abm_fast_parity.py` | whole | Delete |
 
@@ -179,7 +179,7 @@ D17 (host-clustering, Plan B's signature) is **not** added here — Plan C's spa
 - `mal-core/src/mal_core/abm/tests/calibration/thresholds.yaml` (D16, D18)
 - `mal-core/src/mal_core/abm/tests/calibration/scorers/composite.py` (weights)
 - `mal-core/src/mal_core/abm/README.md` (F1.e)
-- `docs/perf-cpp-abm-plan.md` (F1.e)
+- `../../in-process/perf-cpp-abm-plan.md` (F1.e)
 - `mal-core/src/mal_core/abm/tests/test_abm_fast_parity.py` (delete)
 - `mal-ghana-sim/tests/test_abm_fast_parity.py` (delete)
 

@@ -192,19 +192,19 @@ Promotion moves stable, useful code from an experiment into the core tier. It is
 
 ## Data format conventions
 
-The manifest (`data/<aoi>/manifest.json`) is the **single source of truth** for an AOI's data inventory. Full spec: `docs/data-format-spec.md`.
+The manifest (`data/<aoi>/manifest.json`) is the **single source of truth** for an AOI's data inventory. Full spec: `docs/specs/data/spec.md`.
 
 **Standard naming**:
 - Time-series: `<aoi>_<product>_<year>.<ext>` (one file per year)
 - Static: `<aoi>_<product>.<ext>` (one file per AOI)
 
-**DOWNLOADER dict**: every loader module exports a `DOWNLOADER` dict with `name`, `outputs` (callable map), and `manifest_keys` (output→manifest key map). See `docs/download-api-spec.md`.
+**DOWNLOADER dict**: every loader module exports a `DOWNLOADER` dict with `name`, `outputs` (callable map), and `manifest_keys` (output→manifest key map). See `docs/specs/download/spec.md`.
 
 **Load-or-download API**: public functions (`load_<dataset>_<product>`) check manifest → load if exists → download+register if missing. Never hardcode paths; resolve from manifest.
 
 **ABM manifest mode**: `run_abm_from_manifest()` reads manifest, validates completeness, resolves paths, calls C++ binary. Pipeline dispatches via `malariasim run --stages abm --aoi <aoi>`.
 
-**Adding a new dataset**: create loader module with `DOWNLOADER` dict → register in `registry.py` → run `malariasim download` → mark `required_for_abm` if ABM needs it. See `docs/data-format-spec.md` §9.
+**Adding a new dataset**: create loader module with `DOWNLOADER` dict → register in `registry.py` → run `malariasim download` → mark `required_for_abm` if ABM needs it. See `docs/specs/data/spec.md` §6.3.
 
 ## Calibration framework conventions
 
