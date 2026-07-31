@@ -21,7 +21,7 @@ Single entry point for any agent starting from scratch on MalariaSentinel. Follo
 | Use the knowledge graph | `project-memory` |
 | Deploy to HPC | `cesga` |
 | Use shared utilities | `mal-commonlib-api` |
-| Use core pipeline | `mal-core-api` |
+| Use core API | `mal-core-api` |
 | Work across packages | `monorepo-dev` |
 | Set up memory module | `memory-setup` |
 | Use subagents/loops | `subagents-loops` |
@@ -102,7 +102,7 @@ Then load these skills for deeper context:
 | `sdss-reference` | Kelly 2012 SDSS framework — the domain theory behind the Centinela |
 | `monorepo-dev` | 6-package layout, dependency rules, experiment vs core tiers, promotion flow |
 | `mal-commonlib-api` | Shared config, paths, data utilities |
-| `mal-core-api` | Stable pipeline logic API |
+| `mal-core-api` | Stable mal-core API |
 
 **Key insight**: MalariaSentinel has two tiers — **core** (the Centinela: `mal-commonlib`, `mal-core`, `mal-execution`) and **experiments** (`mal-ghana-sim`, `mal-data-explorer`). Experiments either die or promote stable code into core. Nothing depends on experiments.
 

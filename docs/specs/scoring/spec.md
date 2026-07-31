@@ -15,10 +15,6 @@ affects:
     direction: upstream
     reason: scoring runs pytest against ABM rollouts; scorers consume ABM state tensors
     severity: breaking
-  - target: pipeline
-    direction: bidirectional
-    reason: pipeline dispatches Stage.SCORING → run_calibration
-    severity: breaking
   - target: data
     direction: upstream
     reason: scoring reads ABM output paths and sidecars via data spec naming
@@ -67,6 +63,7 @@ promoting.
 - The feedback report (`get_feedback(scorecard, baseline=None) -> str`).
 - Tier markers (`fast`, `full`).
 - Flag schema (`SCORING_FLAGS_SCHEMA`, `ScoringFlags`).
+- Pipeline position: stage 4 (after abm).
 
 ## 3. Out of scope
 

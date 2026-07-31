@@ -1,15 +1,15 @@
 ---
 name: mal-core-api
-description: API reference for the mal-core subpackages — training (UNet model, dataset, trainer, wrapper), prediction (predictor, registry, env/state loaders, AOI aggregator), ABM simulation wrapper, pipeline orchestrator, scoring/calibration, and FastAPI/CLI entrypoints. Use when working with mal-core stable modules, writing code that imports from mal_core, or needing to understand what public APIs are available in the promoted core.
+description: API reference for the mal-core subpackages — training (UNet model, dataset, trainer, wrapper), prediction (predictor, registry, env/state loaders, AOI aggregator), ABM simulation wrapper, scoring/calibration, and FastAPI/CLI entrypoints. Use when working with mal-core stable modules, writing code that imports from mal_core, or needing to understand what public APIs are available in the promoted core.
 ---
 
 # mal-core-api
 
-**Use this skill when:** working with the mal-core promoted modules — UNet training, prediction pipelines, model registry, scenario configuration, AOI/scale definitions, environmental data loading, ABM state loading, C++ ABM wrapper, pipeline orchestration, scoring/calibration, or the FastAPI/CLI entrypoints. This covers the stable, production-grade Centinela core.
+**Use this skill when:** working with the mal-core promoted modules — UNet training, prediction pipelines, model registry, scenario configuration, AOI/scale definitions, environmental data loading, ABM state loading, C++ ABM wrapper, scoring/calibration, or the FastAPI/CLI entrypoints. This covers the stable, production-grade Centinela core.
 
 ## Overview
 
-`mal-core` is the stable pipeline logic of MalariaSentinel (the Centinela). It contains promoted, tested modules organised into six subpackages: `abm/` (C++ simulation wrapper), `training/` (UNet model, dataset, trainer, wrapper), `prediction/` (predictor, registry, env/state loaders, AOI aggregator/resolver), `ingest/` (environment builder), `scoring/` (calibration runner, feedback generator), and `pipeline/` (orchestrator, stages, flag registry). Packages in the experiment tier (`mal-ghana-sim`, `mal-data-explorer`) may depend on these modules; `mal-core` itself depends only on `mal-commonlib`.
+`mal-core` is the stable pipeline logic of MalariaSentinel (the Centinela). It contains promoted, tested modules organised into five subpackages: `abm/` (C++ simulation wrapper), `training/` (UNet model, dataset, trainer, wrapper), `prediction/` (predictor, registry, env/state loaders, AOI aggregator/resolver), `ingest/` (environment builder), and `scoring/` (calibration runner, feedback generator). Packages in the experiment tier (`mal-ghana-sim`, `mal-data-explorer`) may depend on these modules; `mal-core` itself depends only on `mal-commonlib`.
 
 ```python
 import mal_core
@@ -48,9 +48,6 @@ import mal_core
 | `interventions_to_params` | `scenario` | function | Scenario → model parameter dict |
 | `CppAbmWrapper` | `abm.wrapper` | class | Python wrapper for C++ ABM binary |
 | `run_abm` | `abm.runner` | function | Run ABM simulation via wrapper |
-| `run_pipeline` | `pipeline.runner` | function | Run full SDSS pipeline |
-| `Stage` | `pipeline.stages` | Enum | Pipeline stage identifiers |
-| `aggregate_flags` | `pipeline.flag_registry` | function | Auto-aggregate flags from subpackages |
 | `run_calibration` | `scoring.runner` | function | Run calibration scorers |
 | `get_feedback` | `scoring.feedback` | function | Generate feedback from scorecard |
 | `build_environment` | `ingest.env_builder` | function | Build env tensor for AOI |
@@ -316,9 +313,6 @@ from mal_core.server import fastapi_app
 ### `cli.py` — Typer CLI
 
 ```bash
-# Pipeline
-malariasim run --aoi ghana --stages abm,score --days 90
-
 # Individual stages
 malariasim ingest --aoi ghana --year 2024 --month 6
 malariasim abm --aoi ghana --days 30
@@ -384,48 +378,6 @@ rollout = run_abm(
     params=None,  # optional overrides
 )
 # Returns path to rollout directory
-```
-
----
-
-### `pipeline/runner.py` — Pipeline orchestrator
-
-Runs the full SDSS pipeline across selected stages.
-
-```python
-from mal_core.pipeline.runner import run_pipeline
-from mal_core.pipeline.stages import Stage
-
-result = run_pipeline(
-    aoi_slug="ghana",
-    stages=[Stage.INGEST, Stage.ABM, Stage.SCORE],
-    days=90,
-    seed=0,
-)
-```
-
-**Parameters:**
-- `run_pipeline(aoi_slug, stages, days=90, seed=0)` → `dict` — results keyed by stage
-
----
-
-### `pipeline/stages.py` — Pipeline stage identifiers
-
-```python
-from mal_core.pipeline.stages import Stage
-
-# Stage.INGEST, Stage.ABM, Stage.SCORE, Stage.TRAIN, Stage.PREDICT, Stage.FEEDBACK
-```
-
----
-
-### `pipeline/flag_registry.py` — Auto-aggregate flags
-
-```python
-from mal_core.pipeline.flag_registry import aggregate_flags
-
-flags = aggregate_flags("ghana")
-# Merges flags from abm, training, prediction subpackages
 ```
 
 ---

@@ -68,6 +68,7 @@ pins is the load-bearing wall: every downstream spec (`training`,
 - ABM runner (`runner.py`), flag schema (`flags.py`), and the Python wrapper around the binary (`wrapper.py`).
 - **Output contract** (§5–§7 below): state tensor, env tensor, file naming, sidecar, NoData, tile rules, `K_max`, `H/W`.
 - Calibration scorers and the calibration test framework (`abm/tests/calibration/`).
+- Pipeline position: stage 3 (after ingest). Reads manifest for env/habitat/hosts paths.
 
 ## 3. Out of scope
 

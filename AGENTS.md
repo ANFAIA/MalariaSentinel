@@ -202,7 +202,7 @@ The manifest (`data/<aoi>/manifest.json`) is the **single source of truth** for 
 
 **Load-or-download API**: public functions (`load_<dataset>_<product>`) check manifest → load if exists → download+register if missing. Never hardcode paths; resolve from manifest.
 
-**ABM manifest mode**: `run_abm_from_manifest()` reads manifest, validates completeness, resolves paths, calls C++ binary. Pipeline dispatches via `malariasim run --stages abm --aoi <aoi>`.
+**ABM manifest mode**: `run_abm_from_manifest()` reads manifest, validates completeness, resolves paths, calls C++ binary. Run `malariasim abm --aoi <aoi>` directly (CLI subcommand per stage).
 
 **Adding a new dataset**: create loader module with `DOWNLOADER` dict → register in `registry.py` → run `malariasim download` → mark `required_for_abm` if ABM needs it. See `docs/specs/data/spec.md` §6.3.
 

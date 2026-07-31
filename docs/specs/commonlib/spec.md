@@ -75,7 +75,6 @@ imported by everything else.
 
 - Manifest schema → `docs/specs/data/spec.md`.
 - DOWNLOADER dict convention → `docs/specs/download/spec.md`.
-- Pipeline orchestration and stages → `docs/specs/pipeline/spec.md`.
 - ABM C++ engine + Mesa-Geo adapter → `docs/specs/abm/spec.md`.
 
 ## 4. Public API

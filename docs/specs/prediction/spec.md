@@ -31,10 +31,6 @@ affects:
     direction: upstream
     reason: AOI, Scale, RUNS_DIR come from commonlib
     severity: non-breaking
-  - target: pipeline
-    direction: bidirectional
-    reason: pipeline dispatches Stage.PREDICTION → run_prediction (hardcodes scale=REGIONAL, see §5.4)
-    severity: breaking
 # Cross-references to the knowledge graph (names only, no UUIDs — survives KG migrations).
 kg_refs:
   adrs: [adr-spec-design-2026-07-30]
@@ -75,6 +71,7 @@ SDSS multi-scale.
 - `get_latest_prediction(aoi_slug)`, `get_prediction_metadata(aoi_slug)`.
 - `load_env_stack(aoi)` and `load_abm_state(aoi, month)` (state and env loaders).
 - Flag schema (`PREDICTION_FLAGS_SCHEMA`, `PredictionFlags`).
+- Pipeline position: stage 6 (after training).
 
 ## 3. Out of scope
 

@@ -31,10 +31,6 @@ affects:
     direction: upstream
     reason: training reads paths under RUNS_DIR defined in commonlib
     severity: non-breaking
-  - target: pipeline
-    direction: bidirectional
-    reason: pipeline dispatches Stage.TRAINING → train_unet
-    severity: breaking
 # Cross-references to the knowledge graph (names only, no UUIDs — survives KG migrations).
 kg_refs:
   adrs: [adr-spec-design-2026-07-30]
@@ -95,6 +91,7 @@ zeros (`DummyModel`).
 | `train_unet(run_dir, output_dir, *, epochs=50, batch_size=16, lr=1e-3, device=None, subsample=1.0, preload=False) -> float` | `mal_core.training.trainer` | Returns best `val_dice`. |
 | `UNetWrapper(ckpt_path)` | `mal_core.training.wrapper` | `ModelProtocol` for `prediction.spec.md`. `predict(state, env) -> (1, H, W)`. |
 | `TRAINING_FLAGS_SCHEMA` | `mal_core.training.flags` | Pydantic-style flag dict. |
+- Pipeline position: stage 5 (after scoring).
 
 ## 5. Invariants
 

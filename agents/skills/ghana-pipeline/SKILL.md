@@ -7,20 +7,36 @@ description: Run the Ghana malaria simulation pipeline end-to-end. Covers enviro
 
 End-to-end guide for running the MalariaSentinel Ghana malaria spread simulation and U-Net surrogate pipeline. The pipeline ingests satellite environmental rasters, builds a habitat-suitability field, runs a mechanistic reaction-diffusion simulator, trains a U-Net transition surrogate, and produces risk-expansion maps.
 
-## New: Unified Pipeline (M9)
+## Running the ABM pipeline
 
-As of M9, the primary way to run ABM simulations is through the unified pipeline in `mal-core`:
+As of M9, each stage is invoked directly via its CLI subcommand. There is no orchestrator.
+
+### Sequential run
 
 ```bash
-# Run the full pipeline (ingest → ABM → score → train → predict)
-malariasim run --aoi ghana --stages ingest,abm,score --days 90 --seed 1
+# 1. Download raw data
+malariasim download --aoi ghana --years 2024,2025
 
-# Run individual stages
+# 2. Build env tensor (daily NetCDF)
 malariasim ingest --aoi ghana --year 2024 --month 6
-malariasim abm --aoi ghana --year 2024 --month 1 --days 90 --seed 1
-malariasim score --run-dir runs/pipeline/
-malariasim train --run-dir runs/abm/ --epochs 50
-malariasim feedback --run-dir runs/pipeline/
+
+# 3. Build host density
+malariasim ingest --aoi ghana --stage hosts
+
+# 4. Build mobility matrices
+malariasim ingest --aoi ghana --stage mobility
+
+# 5. Run ABM simulation
+malariasim abm --aoi ghana --year 2024 --month 6 --days 90 --seed 1
+
+# 6. Score calibration
+malariasim score --run-dir runs/ghana/abm/
+
+# 7. Train U-Net
+malariasim train --run-dir runs/ghana/abm/ --epochs 50
+
+# 8. Predict risk
+malariasim predict --aoi ghana --scale regional --year 2024
 ```
 
 ### Data organization

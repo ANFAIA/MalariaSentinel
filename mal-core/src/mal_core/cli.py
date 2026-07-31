@@ -1,7 +1,6 @@
 """Typer CLI — command-line interface to the SDSS.
 
 Commands:
-    malariasim run --aoi {aoi} --stages download,ingest,abm,scoring --stage-flags "abm.days=60"
     malariasim download --aoi {aoi} --datasets era5,chirps
     malariasim ingest --aoi {aoi} --year {year} --month {month}
     malariasim abm --aoi {aoi} --days 30
@@ -101,45 +100,6 @@ def predict(
         scenario=scenario,
     )
     typer.echo(f"Prediction saved: {out}")
-
-
-@app.command()
-def run(
-    aoi: str = typer.Option(..., "--aoi", help="AOI slug (e.g. ghana)"),
-    year: int = typer.Option(2024, "--year", help="Simulation year"),
-    month: int = typer.Option(1, "--month", help="Simulation month"),
-    seed: int = typer.Option(1, "--seed", help="Random seed"),
-    days: int = typer.Option(30, "--days", help="ABM simulation days"),
-    n_rollouts: int = typer.Option(1, "--n-rollouts", help="Number of ABM rollouts"),
-    stages: str = typer.Option("download,ingest,abm,scoring,training,prediction", "--stages", help="Comma-separated stages"),
-    output_dir: Path = typer.Option(Path("runs/pipeline"), "--output-dir", help="Output directory"),
-    resume: bool = typer.Option(True, "--resume/--no-resume", help="Skip completed stages"),
-    stage_flags: str | None = typer.Option(None, "--stage-flags", help="Stage-specific params as comma-separated key=value pairs (e.g. 'abm.days=60,training.epochs=100')"),
-) -> None:
-    """Run the full SDSS pipeline or selected stages.
-
-    Stages run in order: download → ingest → abm → scoring → training → prediction.
-    Use --stages to run a subset, and --stage-flags to pass parameters
-    to specific stages.
-
-    Key parameters:
-      --stages: Comma-separated stage names (download,ingest,abm,scoring,training,prediction)
-      --stage-flags: Stage-specific overrides as 'stage.key=value' pairs
-      --resume: Skip stages whose output directory is non-empty
-      --output-dir: Root directory for all stage outputs
-    """
-    from .pipeline.runner import run_pipeline
-    from .pipeline.stages import Stage
-
-    stage_list = [Stage(s.strip()) for s in stages.split(",")]
-    parsed_flags = _parse_stage_flags(stage_flags)
-    result = run_pipeline(
-        aoi=aoi, year=year, month=month, seed=seed,
-        days=days, n_rollouts=n_rollouts,
-        stages=stage_list, output_dir=output_dir, resume=resume,
-        stage_flags=parsed_flags if parsed_flags else None,
-    )
-    typer.echo(f"Pipeline result: {result}")
 
 
 @app.command()

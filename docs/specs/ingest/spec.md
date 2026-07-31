@@ -36,10 +36,6 @@ affects:
     direction: upstream
     reason: ingest imports AOI, Scale, TWI, host_utils, mobility helpers from commonlib
     severity: non-breaking
-  - target: pipeline
-    direction: bidirectional
-    reason: pipeline dispatches the three ingest sub-stages (ingest, build_hosts, build_mobility)
-    severity: breaking
 # Cross-references to the knowledge graph (names only, no UUIDs — survives KG migrations).
 kg_refs:
   adrs: [adr-spec-design-2026-07-30]
@@ -85,6 +81,7 @@ shape per AOI.
 - `safe_load` (graceful loader wrapper that fills with NoData on auth/network failure).
 - `empty_channel` (NoData-fill helper).
 - `register_dataset` (writes through to manifest).
+- Pipeline position: stage 2 (after download). Three builders: build_env_tensor, build_host_dataset, build_mobility_dataset.
 
 ## 3. Out of scope
 
@@ -92,7 +89,7 @@ shape per AOI.
 - ABM consumption semantics → `docs/specs/abm/spec.md`.
 - File naming on disk → `docs/specs/data/spec.md`.
 - AOI definition → `docs/specs/commonlib/spec.md`.
-- Pipeline orchestration → `docs/specs/pipeline/spec.md`.
+- No orchestrator in mal-core; GUI/agent layer may add one.
 - TWI computation itself → `docs/specs/commonlib/spec.md` (ingest only consumes `compute_twi`).
 
 ## 4. Public API
