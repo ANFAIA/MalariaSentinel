@@ -76,7 +76,7 @@ registry/auth/manifest plumbing, and the manifest would diverge.
 
 | Symbol | Where | Notes |
 |---|---|---|
-| `run_download(aoi, datasets=None, outputs=None, years=None, months=None, output_dir=None, **kwargs)` | `mal_core.download.runner` | Returns `dict[downloader_name, {"status": "ok"|"skipped"|"error", ...}]`. |
+| `run_download(aoi, datasets=None, outputs=None, years=None, months=None, output_dir=None, **kwargs)` | `mal_core.download.runner` | Returns `dict[str, dict]` where keys are downloader names and values are `{"status": "ok"|"skipped"|"error", ...}`. |
 | `discover_downloaders()` | `mal_core.download.registry` | Returns `dict[name, DownloaderSpec]`. |
 | `list_downloaders()` | `mal_core.download.registry` | Returns `list[{name, description, outputs}]`. |
 | `LOADER_MODULES` | `mal_core.download.registry` | Hardcoded list of loader module names to import. Adding a name here is the only step required after creating the loader module. |
@@ -87,7 +87,10 @@ registry/auth/manifest plumbing, and the manifest would diverge.
 
 ### §5.1 Loader signature
 
-- **INV-1.** Public loader function: `load_<dataset>_<product>(aoi: AOI, *, year: int | None = None, month: int | None = None, cache_dir: Path | None = None) -> xr.DataArray | xr.Dataset`.
+- **INV-1.** Public loader function signature depends on `is_time_series`:
+  - **Time-series** (`is_time_series=True`): `load_<dataset>_<product>(aoi: AOI, *, years: Sequence[int], months: Sequence[int] | None = None, cache_dir: Path | None = None) -> xr.DataArray | xr.Dataset`.
+  - **Static** (`is_time_series=False`): `load_<dataset>_<product>(aoi: AOI, *, cache_dir: Path | None = None) -> xr.DataArray`. Some static loaders accept an optional `year: int` (e.g. worldpop) but it is not required.
+  - Runner calls `func(aoi=aoi_obj, years=years, months=months, cache_dir=cache)` for time-series and `func(aoi=aoi_obj, cache_dir=cache)` for static.
 - **INV-2.** `aoi` is the first positional arg, no exceptions.
 - **INV-3.** Time-series loaders declare `year` (and often `month`) without defaults. Static loaders omit them.
 - **INV-4.** Loaders **never** accept `output_path`. They return data in memory; the runner calls `save_product()`.
@@ -101,7 +104,7 @@ registry/auth/manifest plumbing, and the manifest would diverge.
 
 - **INV-7.** Runner discovers `DOWNLOADER`s via `importlib` from `LOADER_MODULES` (no hardcoded registry; one source of truth in `registry.py`).
 - **INV-8.** Runner filters by `--datasets` (match `name`) and `--outputs` (match output key inside the dict).
-- **INV-9.** Runner inspects each callable's signature via `inspect.signature` to decide time-series vs static: `year` required (no default) ⇒ time-series.
+- **INV-9.** Runner uses `spec.is_time_series` (from the DOWNLOADER dict) to branch: time-series loaders get `years` + `months`; static loaders get only `aoi` + `cache_dir`. Signature inspection is not used.
 - **INV-10.** Runner passes only kwargs the loader accepts (`accepted = set(sig.parameters)`); unknown kwargs are silently dropped (logged).
 - **INV-11.** Runner saves `xr.DataArray` → GeoTIFF, `xr.Dataset` → NetCDF. The runner is the **only** save point.
 - **INV-12.** After each successful save, runner calls `update_dataset(aoi, manifest_key, year, path.name)` — see `data/spec.md` §4.
@@ -163,16 +166,18 @@ extra = on_disk - registered - {'_legacy'}
 assert not extra, f'unregistered loader modules: {extra}'
 "
 
-# INV-9: signature-based time-series detection
+# INV-9: is_time_series flag matches loader signature
 uv run python -c "
 import inspect
 from mal_core.download.registry import discover_downloaders
 for name, spec in discover_downloaders().items():
     for out_name, fn in spec.outputs.items():
         sig = inspect.signature(fn)
-        has_year_param = 'year' in sig.parameters
+        has_years = 'years' in sig.parameters
         if spec.is_time_series:
-            assert has_year_param, f'{name}.{out_name}: is_time_series=True but no year param'
+            assert has_years, f'{name}.{out_name}: is_time_series=True but no years param'
+        else:
+            assert not has_years, f'{name}.{out_name}: is_time_series=False but has years param'
 "
 ```
 
@@ -196,7 +201,7 @@ from mal_commonlib.data.loaders.era5 import load_era5_temp_suitability
 from mal_commonlib.aoi import AOI
 
 aoi = AOI.from_slug("ghana")
-da = load_era5_temp_suitability(aoi, year=2024, month=7)
+da = load_era5_temp_suitability(aoi, years=[2024], months=[7])
 assert da.shape == aoi.cells_per_side()
 ```
 
