@@ -12,13 +12,13 @@ uv sync --all-packages
 export OPENROUTER_API_KEY="sk-or-..."
 
 # Run a calibration cycle (interactive)
-uv run python -m agents.janus calibration
+uv run python -m agents_janus calibration
 
 # Run with a goal + no human-in-the-loop
-uv run python -m agents.janus calibration -g "Fix D2 scorer regression" --no-verify
+uv run python -m agents_janus calibration -g "Fix D2 scorer regression" --no-verify
 
 # Dry run (print prompt, don't execute)
-uv run python -m agents.janus calibration -g "Improve spatial scorers" --dry-run
+uv run python -m agents_janus calibration -g "Improve spatial scorers" --dry-run
 ```
 
 ## Architecture
@@ -55,7 +55,7 @@ Each feature gets its own isolated worktree. The orchestrator reviews diffs and 
 ### `calibration` — ABM calibration improvement
 
 ```bash
-uv run python -m agents.janus calibration [OPTIONS]
+uv run python -m agents_janus calibration [OPTIONS]
 ```
 
 | Flag | Default | Description |
@@ -71,7 +71,7 @@ uv run python -m agents.janus calibration [OPTIONS]
 ### `feature` — Feature development
 
 ```bash
-uv run python -m agents.janus feature <name> <description> [OPTIONS]
+uv run python -m agents_janus feature <name> <description> [OPTIONS]
 ```
 
 | Flag | Default | Description |
@@ -85,7 +85,7 @@ uv run python -m agents.janus feature <name> <description> [OPTIONS]
 ### `research` — Research + improvement
 
 ```bash
-uv run python -m agents.janus research <topic> [OPTIONS]
+uv run python -m agents_janus research <topic> [OPTIONS]
 ```
 
 | Flag | Default | Description |
@@ -111,9 +111,9 @@ When `--no-verify` is NOT set (default):
 ## Project structure
 
 ```
-agents/janus/
+agents_janus/
 ├── __init__.py
-├── __main__.py              # python -m agents.janus
+├── __main__.py              # python -m agents_janus
 ├── agent.py                 # create_orchestrator(), create_abm_worker_subagent()
 ├── cli.py                   # Typer CLI (calibration, feature, research)
 ├── logger.py                # SessionLogger — JSONL append-only logs
@@ -222,7 +222,7 @@ Every run creates a JSONL log at `runs/deepagent-<timestamp>/session.jsonl`:
 
 ```bash
 # DeepAgents E2E tests (all mocked, no LLM/gitagent needed)
-uv run pytest agents/janus/tests/ -v
+uv run pytest agents_janus/tests/ -v
 
 # ABM calibration tests (1 seed, fast tier)
 cd mal-core/src/mal_core/abm/tests/calibration
@@ -243,13 +243,13 @@ export OPENROUTER_KEY="sk-or-..."
 
 ```bash
 # Anthropic
-uv run python -m agents.janus calibration -p anthropic -m claude-sonnet-4-20250514
+uv run python -m agents_janus calibration -p anthropic -m claude-sonnet-4-20250514
 
 # OpenAI
-uv run python -m agents.janus calibration -p openai -m gpt-4o
+uv run python -m agents_janus calibration -p openai -m gpt-4o
 
 # Google
-uv run python -m agents.janus calibration -p google_genai -m gemini-2.0-flash
+uv run python -m agents_janus calibration -p google_genai -m gemini-2.0-flash
 ```
 
 ## Dependencies

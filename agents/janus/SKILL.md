@@ -11,16 +11,16 @@ Multi-agent orchestrator for MalariaSentinel ABM calibration improvement.
 
 ```bash
 # Calibration improvement cycle
-uv run python -m agents.janus calibration --max-iterations 10
+uv run python -m agents_janus calibration --max-iterations 10
 
 # Feature development cycle
-uv run python -m agents.janus feature "name" "description"
+uv run python -m agents_janus feature "name" "description"
 
 # Research + improvement cycle
-uv run python -m agents.janus research "topic" --cycles 3
+uv run python -m agents_janus research "topic" --cycles 3
 
 # Dry-run (prints prompt without executing)
-uv run python -m agents.janus calibration --dry-run
+uv run python -m agents_janus calibration --dry-run
 ```
 
 ## Workers
