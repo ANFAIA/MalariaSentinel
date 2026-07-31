@@ -1,11 +1,14 @@
 """Typer CLI — command-line interface to the SDSS.
 
-Commands:
-    malariasim download --aoi {aoi} --datasets era5,chirps
-    malariasim ingest --aoi {aoi} --year {year} --month {month}
-    malariasim abm --aoi {aoi} --days 30
-    malariasim score --run-dir {dir} --tier fast
-    malariasim predict --aoi {aoi} --scale {regional|national|continental} --year {year}
+Pipeline order (each stage reads artefacts from the previous one):
+    1. malariasim download --aoi {aoi} --datasets era5,chirps
+    2. malariasim ingest --aoi {aoi} --year {year} --month {month}
+    3. malariasim abm --aoi {aoi} --days 30
+    4. malariasim score --run-dir {dir} --tier fast
+    5. malariasim train --run-dir {dir} --epochs 50
+    6. malariasim predict --aoi {aoi} --scale {regional|national|continental} --year {year}
+
+Standalone commands (no ordering required):
     malariasim feedback --run-dir {dir}
     malariasim status --aoi {aoi}
     malariasim serve --host {host} --port {port}
@@ -22,7 +25,13 @@ from mal_commonlib.aoi import Scale
 from .prediction.predictor import get_prediction_metadata, run_prediction
 from .scenario import load_scenario
 
-app = typer.Typer(name="malariasim", help="MalariaSentinel SDSS CLI", no_args_is_help=True)
+app = typer.Typer(
+    name="malariasim",
+    help="MalariaSentinel SDSS CLI\n\n"
+         "Pipeline order: download → ingest → abm → score → train → predict\n"
+         "Each stage reads artefacts written by the previous one.",
+    no_args_is_help=True,
+)
 
 
 class Tier(str, Enum):
