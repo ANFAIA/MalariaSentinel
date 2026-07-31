@@ -44,7 +44,7 @@ kg_refs:
 | Field | Value |
 |---|---|
 | Component | `mal-core/src/mal_core/abm/` (Python) + `mal-core/src/mal_core/abm/` (C++/CMake/vcpkg) |
-| Version | `v1.0` (output contract) |
+| Version | `v2.0` (output contract); `v1.0` (scorer suite) |
 | Status | `stable` |
 | Owner | David Flórez-Mazuera |
 | Last drift check | `2026-07-30` |
@@ -87,7 +87,7 @@ pins is the load-bearing wall: every downstream spec (`training`,
 | Calibration scorers | `mal_core.abm.tests.calibration.scorers.D<id>_<name>` | Each scorer is a `D<id>_<name>.py` module exporting `score(rollout) -> dict`. Adding a scorer is non-breaking. |
 | `run_calibration_from_manifest(...)` | `mal_core.scoring.runner` (called by pipeline) | Cross-spec: ABM owns the rollout files consumed. |
 
-## 5. Invariants — Output contract (frozen at v1.0)
+## 5. Invariants — Output contract (frozen at v2.0)
 
 ### §5.1 State tensor
 
@@ -99,19 +99,19 @@ pins is the load-bearing wall: every downstream spec (`training`,
 
 ### §5.2 Env tensor
 
-- **INV-6.** Shape `(C_env=4, H, W)`; `dtype = float32`. Channels: `water_frac ∈ [0,1]`, `rainfall` raw mm, `temp_suitability ∈ [0,1]`, `ndvi ∈ [0,1]`.
-- **INV-7.** Env file naming: `{aoi_slug}_{scale}_{year}_{month:02d}_env.tif` — no seed (deterministic per month).
+- **INV-6.** Env input has two formats. **Current**: CF-1.8 daily NetCDF (`.nc`), dims `(time, y, x)`, vars `rainfall` (mm/day), `water_temp_c` (°C), `water_frac` ∈ [0,1], `ndvi` ∈ [0,1], `_FillValue = -9999.0`. **Deprecated**: monthly COG GeoTIFF (`.tif`), shape `(C_env=4, H, W)`, bands `water_frac, rainfall, temp_suitability, ndvi`. The TIF format is deprecated because it cannot represent daily data, which is required for the PLUVIAL_POOL dynamic breeding-site rule (`rain_d > 15 mm/day`).
+- **INV-7.** Env file naming: NC `{aoi}_{product}_{year_start}_{year_end}_env.nc` (multi-year daily) or `{aoi}_{scale}_{year}_{month:02d}_env.nc` (single-month daily). TIF (deprecated): `{aoi_slug}_{scale}_{year}_{month:02d}_env.tif`. No seed (deterministic per month).
 
 ### §5.3 Sidecar JSON
 
 - **INV-8.** Every `.tif` ships a same-basename `.json` sidecar with required keys: `crs`, `transform`, `aoi_slug`, `scale`, `year`, `month`, `seed` (state only), `generator_version`, `abm_params_hash`.
-- **INV-9.** Optional keys: `rainfall_cap_mm` (env), `k_max` (state), `contract_version` (string `"1.0"`). Unknown keys must be ignored by readers.
+- **INV-9.** Optional keys: `rainfall_cap_mm` (env TIF only), `k_max` (state), `contract_version` (string `"2.0"`). Unknown keys must be ignored by readers.
 - **INV-10.** Sidecar `transform` is the affine 6-tuple `[a, b, c, d, e, f]` in `rasterio`-row-major order: `(a, b)` = pixel size, `(c, f)` = upper-left corner.
 
 ### §5.4 CRS and band descriptions
 
 - **INV-11.** CRS ∈ `EPSG:4326` or UTM (`EPSG:326xx` / `EPSG:327xx`). The writer **must** auto-reproject; silent mis-CRS is forbidden.
-- **INV-12.** Band descriptions set via `rasterio.set_band_description`: state `[density, suitability]`, env `[water_frac, rainfall, temp_suitability, ndvi]`.
+- **INV-12.** Band descriptions: state COG bands set via `rasterio.set_band_description` or GDAL: `["adult_occupancy", "host_seeking_pressure"]` (C++ `STATE_BAND_NAMES` in `wire.hpp:172`). **Legacy alias**: `["density", "suitability"]` used in older Python code and some docs — both names refer to the same two bands. Env TIF (deprecated): `[water_frac, rainfall, temp_suitability, ndvi]`. Env NC: variable names `rainfall, water_temp_c, water_frac, ndvi` (no band descriptions — NetCDF variables).
 
 ### §5.5 Tile rules
 
@@ -120,17 +120,18 @@ pins is the load-bearing wall: every downstream spec (`training`,
 
 ### §5.6 Versioning
 
-- **INV-15.** The contract is pinned at `v1.0`. Changes to shape, dtype, channel order, naming, NoData, `K_max`, `H/W` bump MAJOR. Additive changes (new optional sidecar key, new env channel) bump MINOR.
+- **INV-15.** The contract is pinned at `v2.0` (C++ `CONTRACT_VERSION` in `wire.hpp:181`). Previous versions: `v1.0` (M1 thin slice), `v1.1` (F1.c `n_rollouts`/`rollout_index` addition). Changes to shape, dtype, channel order, naming, NoData, `K_max`, `H/W` bump MAJOR. Additive changes (new optional sidecar key, new env channel) bump MINOR.
 - **INV-16.** Readers read by **band name**, not by index. Readers **must** refuse a sidecar whose `contract_version` major > `MAX_SUPPORTED_CONTRACT_VERSION`. Silent fallback is forbidden.
 
 ## 6. Data contracts
 
-- Output: GeoTIFF + sidecar JSON (rules pinned in §5).
-- Input: env tensor file + mobility + host layers, all produced by `ingest`. The ABM does not validate the manifest — that's the pipeline's job (`pipeline/spec.md` §5 INV-3).
+- Output: GeoTIFF state COG + sidecar JSON per §5.1, §5.3, §5.4.
+- Input env: CF-1.8 daily NetCDF (current, per §5.2 INV-6) or monthly COG GeoTIFF (deprecated). Env format is chosen at ingest time (`output_format="nc"` or `"tif"`). The ABM C++ engine has two readers: `read_env_tif` (legacy) and `read_env_nc` (current). The PLUVIAL_POOL rule **requires** the NC path.
+- Input mobility + host layers: produced by `ingest`. The ABM does not validate the manifest — that's the pipeline's job (`pipeline/spec.md` §5 INV-3).
 
 ## 7. Migration & deprecation
 
-- Bumping the output contract to `v2.0` requires:
+- Bumping the output contract to `v3.0` requires:
   1. New spec version here.
   2. A reader feature flag (`MAX_SUPPORTED_CONTRACT_VERSION`) bumped in `training` and `prediction` specs.
   3. A migration script for old rasters (or an explicit decision to drop them).
@@ -147,8 +148,21 @@ uv run python -c "
 from pathlib import Path
 import re
 state = re.compile(r'^[a-z0-9-]+_[a-z0-9-]+_\d{4}_\d{2}_seed\d{4}(_r\d{4}_c\d{4})?\.tif$')
-env   = re.compile(r'^[a-z0-9-]+_[a-z0-9-]+_\d{4}_\d{2}_env\.tif$')
-# walk runs/ and verify each .tif matches state|env
+env_nc = re.compile(r'^[a-z0-9-]+_[a-z0-9-]+_\d{4}_\d{2}_env\.nc$')
+env_tif = re.compile(r'^[a-z0-9-]+_[a-z0-9-]+_\d{4}_\d{2}_env\.tif$')  # deprecated
+# walk runs/ and verify each state .tif matches state pattern
+# walk data/ and verify each env file matches nc (current) or tif (deprecated)
+"
+
+# INV-6: NC env has daily rainfall (not monthly aggregate)
+uv run python -c "
+import xarray as xr
+from pathlib import Path
+for p in Path('data/ghana').glob('*_env.nc'):
+    ds = xr.open_dataset(p)
+    assert 'rainfall' in ds.data_vars, f'{p}: missing rainfall'
+    assert 'time' in ds.dims, f'{p}: missing time dim (not daily?)'
+    assert ds.dims['time'] > 1, f'{p}: time dim is not daily (only {ds.dims[time]} steps)'
 "
 
 # INV-8, INV-9: sidecar required keys
@@ -169,7 +183,8 @@ import json
 from pathlib import Path
 for p in Path('runs/').rglob('*.json'):
     sidecar = json.loads(p.read_text())
-    assert sidecar.get('contract_version','1.0').startswith('1.'), f'unexpected major: {p}'
+    cv = sidecar.get('contract_version', '2.0')
+    assert cv.startswith('2.'), f'unexpected major: {p} has contract_version={cv}'
 "
 ```
 
@@ -190,15 +205,15 @@ def write_month(aoi_slug, scale, year, month, seed, density, suitability, transf
     return path
 ```
 
-Reader (training, reads by band name):
+Reader (training, reads by band name — uses C++ band names):
 
 ```python
 import rasterio
 def read_state_by_name(path):
     with rasterio.open(path) as src:
         names = src.descriptions
-        density      = src.read(names.index("density") + 1)
-        suitability  = src.read(names.index("suitability") + 1)
+        density      = src.read(names.index("adult_occupancy") + 1)   # band 1
+        suitability  = src.read(names.index("host_seeking_pressure") + 1)  # band 2
     return density, suitability
 ```
 
