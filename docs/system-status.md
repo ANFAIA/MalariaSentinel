@@ -72,7 +72,7 @@ MalariaSentinel/
   mal-core/               # Logica estable + ABM C++ (M9 consolidated)
   mal-execution/          # CLI batch, scripts CESGA/Hetzner
   mal-data-explorer/      # Visualizacion de datasets, analisis de sesgo
-  agents/                 # Infraestructura de agentes, memoria, loops, deepagents
+  agents/                 # Infraestructura de agentes, memoria, loops, janus
   social-networks/        # Deep Agent para contenido social (carousel, LinkedIn, video)
   mal-ghana-sim/          # [DEPRECATED] Experimento original
   data/                   # Datasets (gitignored raw data)
@@ -923,8 +923,8 @@ graph TB
         IA["improvement-agent<br/>ask: auto-aplica"]
     end
 
-    subgraph DEEPAGENTS["DeepAgent orchestrator (M10)"]
-        DA["agents/deepagents/<br/>LangChain deepagents"]
+    subgraph DEEPAGENTS["Janus orchestrator (M10)"]
+        DA["agents/janus/<br/>LangChain deepagents"]
         DA_CYCLES["3 cycles:<br/>calibration, feature, research"]
         DA_TOOLS["5 tools:<br/>gitagent, pipeline,<br/>kg, improve, opencode"]
     end
@@ -975,13 +975,13 @@ graph TB
 | `security-auditor` | Auditoria OWASP (solo lectura) | ask |
 | `memory-curator` | Unico writer al knowledge graph | ask |
 | `improvement-agent` | Revisa + aplica mejoras | ask |
-| `deepagent-orchestrator` | LangChain deepagents: calibracion ABM via ciclos | primary |
+| `janus-orchestrator` | LangChain deepagents: calibracion ABM via ciclos | primary |
 
-### DeepAgent orchestrator (M10)
+### Janus orchestrator (M10)
 
-**Ubicacion**: `agents/deepagents/`
+**Ubicacion**: `agents/janus/`
 **Dependencias**: deepagents, langgraph, langchain-core, typer, rich
-**CLI**: `deepagents` (entry point) o `uv run python -m agents.deepagents`
+**CLI**: `janus` (entry point) o `uv run python -m agents.janus`
 
 Orquestador LangChain DeepAgents para calibracion automatica del ABM. Usa gitagent para aislamiento en worktrees, OpenCode/Exa para busqueda web, y el pipeline de mal-core para scoring.
 
@@ -1158,7 +1158,7 @@ graph LR
 | M6 | Operational | Pendiente |
 | M7 | Biology v2 | **En progreso** (M7.2: gonotrophic cycle, host-seeking, mobility, host data) |
 | M9 | Unified SDSS pipeline + ABM→core consolidation | Completado |
-| M10 | DeepAgent orchestrator (LangChain deepagents) | **En progreso** (skeleton + calibration cycle + session logger) |
+| M10 | Janus orchestrator (LangChain deepagents) | **En progreso** (skeleton + calibration cycle + session logger) |
 
 ---
 
@@ -1199,7 +1199,7 @@ graph LR
 
 **Pipeline SDSS (mal-core v0.2.0)**: U-Net 32-64-128-256, CLI `malariasim` (9 commands), FastAPI REST API, model registry, scenario config, AOI-driven data resolution. Subpackages: `pipeline/`, `prediction/`, `training/`, `scoring/`, `ingest/`, `abm/`. 26 Python tests.
 
-**DeepAgent orchestrator (M10, skeleton)**: LangChain deepagents-based orchestrator para calibracion ABM. 3 cycles (calibration, feature, research), 5 tools (gitagent, pipeline, kg, improve, opencode), session logger, `--goal` flag. Registered en opencode.json como `deepagent-orchestrator`.
+**Janus orchestrator (M10, skeleton)**: LangChain deepagents-based orchestrator para calibracion ABM. 3 cycles (calibration, feature, research), 5 tools (gitagent, pipeline, kg, improve, opencode), session logger, `--goal` flag. Registered en opencode.json como `janus-orchestrator`.
 
 ### Siguientes pasos
 

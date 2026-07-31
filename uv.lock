@@ -17,9 +17,9 @@ members = [
     "mal-commonlib",
     "mal-core",
     "mal-data-explorer",
-    "mal-deepagents",
     "mal-execution",
     "mal-ghana-sim",
+    "mal-janus",
     "malaria-sentinel",
     "social-networks-agent",
 ]
@@ -2087,34 +2087,6 @@ requires-dist = [
 ]
 
 [[package]]
-name = "mal-deepagents"
-version = "0.1.0"
-source = { editable = "agents/deepagents" }
-dependencies = [
-    { name = "deepagents" },
-    { name = "langchain-core" },
-    { name = "langgraph" },
-    { name = "rich" },
-    { name = "typer" },
-]
-
-[package.optional-dependencies]
-openrouter = [
-    { name = "langchain-openai" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "deepagents", specifier = ">=0.6" },
-    { name = "langchain-core", specifier = ">=0.3" },
-    { name = "langchain-openai", marker = "extra == 'openrouter'", specifier = ">=0.3" },
-    { name = "langgraph", specifier = ">=0.4" },
-    { name = "rich", specifier = ">=13.0.0" },
-    { name = "typer", specifier = ">=0.9.0" },
-]
-provides-extras = ["openrouter"]
-
-[[package]]
 name = "mal-execution"
 version = "0.1.0"
 source = { virtual = "mal-execution" }
@@ -2181,6 +2153,34 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 dev = [{ name = "pytest", specifier = ">=8.0" }]
+
+[[package]]
+name = "mal-janus"
+version = "0.1.0"
+source = { editable = "agents/janus" }
+dependencies = [
+    { name = "deepagents" },
+    { name = "langchain-core" },
+    { name = "langgraph" },
+    { name = "rich" },
+    { name = "typer" },
+]
+
+[package.optional-dependencies]
+openrouter = [
+    { name = "langchain-openai" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "deepagents", specifier = ">=0.6" },
+    { name = "langchain-core", specifier = ">=0.3" },
+    { name = "langchain-openai", marker = "extra == 'openrouter'", specifier = ">=0.3" },
+    { name = "langgraph", specifier = ">=0.4" },
+    { name = "rich", specifier = ">=13.0.0" },
+    { name = "typer", specifier = ">=0.9.0" },
+]
+provides-extras = ["openrouter"]
 
 [[package]]
 name = "malaria-sentinel"

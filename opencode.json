@@ -302,14 +302,14 @@
         "question": "allow"
       }
     },
-    "deepagent-orchestrator": {
+    "janus-orchestrator": {
       "description": "LangChain deepagents-based orchestrator for multi-agent ABM calibration improvement. Uses gitagent for worktree isolation, OpenCode/Exa for web search, and the mal-core pipeline for scoring.",
       "mode": "primary",
-      "prompt": "Run improvement cycles via: uv run python -m agents.deepagents calibration",
+      "prompt": "Run improvement cycles via: uv run python -m agents.janus calibration",
       "permission": {
         "bash": {
           "*": "ask",
-          "uv run python -m agents.deepagents *": "allow",
+          "uv run python -m agents.janus *": "allow",
           "gitagent *": "allow",
           "uv run pytest *": "allow",
           "git diff *": "allow",
