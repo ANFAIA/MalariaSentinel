@@ -141,5 +141,84 @@ def research(
     typer.echo(result)
 
 
+@app.command()
+def onboard(
+    provider: str = typer.Option("openrouter", "--provider", "-p", help="LLM provider."),
+    model: str = typer.Option("xiaomi/mimo-v2.5", "--model", help="Model identifier."),
+):
+    """Interactive onboarding menu. Walks you through common tasks."""
+    from agents.deepagents.onboarding import run_onboarding
+    result = run_onboarding(provider=provider, model=model)
+    typer.echo(result)
+
+
+@app.command()
+def improve(
+    goal: str = typer.Option(None, "--goal", "-g", help="Goal for improvement."),
+    plan: str = typer.Option(None, "--plan", help="Path to a plan file to use as context."),
+    provider: str = typer.Option("openrouter", "--provider", "-p", help="LLM provider."),
+    model: str = typer.Option("xiaomi/mimo-v2.5", "--model", help="Model identifier."),
+    thread_id: str = typer.Option("improvement-session", "--thread-id", "-t", help="Thread ID."),
+    no_verify: bool = typer.Option(False, "--no-verify", help="Skip approval prompts."),
+):
+    """Run the improvement orchestrator for a goal."""
+    if not goal:
+        goal = typer.prompt("What is your goal?")
+    _setup_module_flags(no_verify)
+    from agents.deepagents.improvement import run_improvement
+    result = run_improvement(
+        goal=goal,
+        plan_path=plan,
+        provider=provider,
+        model=model,
+        thread_id=thread_id,
+    )
+    typer.echo(result)
+
+
+@app.command()
+def status():
+    """Show current session status: scorecards, plans, subagents."""
+    from agents.deepagents.onboarding import _show_status
+    typer.echo(_show_status())
+
+
+# Subagent group
+agents_app = typer.Typer(help="Manage subagents.")
+app.add_typer(agents_app, name="agents")
+
+
+@agents_app.command("list")
+def agents_list():
+    """List all registered subagents."""
+    from agents.deepagents.onboarding import _list_components
+    typer.echo(_list_components())
+
+
+@agents_app.command("show")
+def agents_show(name: str = typer.Argument(..., help="Subagent name.")):
+    """Show details for a specific subagent."""
+    import json as _json
+    from agents.deepagents.subagents.registry import load_registry
+    try:
+        reg = load_registry()
+        spec = reg.get(name)
+        result = {
+            "name": spec.name,
+            "description": spec.description,
+            "model": f"{spec.provider}/{spec.model}",
+            "skills": list(spec.skills),
+            "plugins": list(spec.plugins),
+            "edits_allow": list(spec.edits_allow),
+            "mailbox_inbox": spec.mailbox_inbox,
+            "spec": str(spec.spec_path) if spec.spec_path else None,
+            "thread_id_prefix": spec.thread_id_prefix,
+        }
+        typer.echo(_json.dumps(result, indent=2))
+    except KeyError as e:
+        typer.echo(f"Error: {e}", err=True)
+        raise typer.Exit(1)
+
+
 if __name__ == "__main__":
     app()

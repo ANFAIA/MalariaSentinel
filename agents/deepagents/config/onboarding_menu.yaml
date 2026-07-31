@@ -1,0 +1,65 @@
+greeting: |
+  Hola — soy el orquestador de onboarding. Te ayudo a decidir qué quieres
+  ejecutar y cómo. Te haré unas preguntas y, si algo falla, se lo paso
+  al orquestador de mejora.
+
+menu:
+  - key: run_abm
+    label: "Ejecutar ABM"
+    description: "Recorrer el ciclo del ABM con datos reales."
+    follow_up:
+      - { question: "¿AOI?", options: [ghana, niger, tanzania, custom], key: aoi }
+      - { question: "¿Cuántos años?", default: "1", key: years }
+    handoff: { orchestrator: improve,
+               goal_template: "Run ABM for AOI={aoi} over {years} years end-to-end" }
+
+  - key: full_pipeline
+    label: "Ejecutar las 6 etapas en orden"
+    description: "download → ingest → abm → score → train → predict (secuencial)."
+    follow_up:
+      - { question: "¿AOI?", options: [ghana, niger, tanzania, custom], key: aoi }
+    handoff: { orchestrator: improve,
+               goal_template: "Run stages 1-6 in order for AOI={aoi}: download, ingest, abm, score, train, predict. Stop on first failure and report." }
+
+  - key: run_one_stage
+    label: "Ejecutar una sola etapa"
+    description: "download, ingest, abm, score, train o predict."
+    follow_up:
+      - { question: "¿Etapa?",
+          options: [download, ingest, abm, score, train, predict],
+          key: stage }
+      - { question: "¿AOI?", options: [ghana, niger, tanzania, custom], key: aoi }
+    handoff: { orchestrator: improve,
+               goal_template: "Run only stage '{stage}' for AOI={aoi}" }
+
+  - key: run_a_plan
+    label: "Ejecutar un plan"
+    description: "Lee un plan de docs/plans/in-process/ y lo lleva a cabo."
+    follow_up:
+      - { question: "¿Plan?",
+          options_from: "list_in_process_plans()",
+          key: plan_path }
+    handoff: { orchestrator: improve,
+               goal_template: "Execute the plan at {plan_path}" }
+
+  - key: diagnose
+    label: "Diagnosticar un fallo"
+    description: "Contéstame qué falla y reproduzco el síntoma."
+    follow_up:
+      - { question: "¿Qué ha fallado?", free_text: true, key: symptom }
+    handoff: { orchestrator: improve,
+               goal_template: "Diagnose and fix: {symptom}" }
+
+  - key: status
+    label: "Ver estado actual"
+    description: "Scorecards, plans abiertos, investigaciones activas."
+    no_handoff: true
+
+  - key: list_components
+    label: "Ver componentes y subagentes"
+    description: "Lista de subagentes, specs editables, modelos asignados."
+    no_handoff: true
+
+  - key: quit
+    label: "Salir"
+    no_handoff: true

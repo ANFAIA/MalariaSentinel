@@ -1,0 +1,71 @@
+defaults:
+  provider: openrouter
+  model: xiaomi/mimo-v2.5
+  thread_id_prefix: "sub-"
+
+subagents:
+  abm:
+    description: "ABM C++ engine + Mesa-Geo adapter + runner"
+    spec: docs/specs/abm/spec.md
+    skills: [abm-engine, calibration-framework]
+    mailbox_inbox: inbox-abm
+    edits_allow:
+      - mal-core/src/mal_core/abm/**
+      - mal-core/src/mal_core/abm/tests/calibration/**
+    plugins: [scoring]
+  scoring:
+    description: "Calibration scorers + composite"
+    spec: docs/specs/scoring/spec.md
+    skills: [calibration-framework]
+    mailbox_inbox: inbox-scoring
+    edits_allow:
+      - mal-core/src/mal_core/abm/tests/calibration/**
+      - mal-core/src/mal_core/scoring/**
+    plugins: []
+  ingest:
+    description: "Env tensor + host density + mobility builder"
+    spec: docs/specs/ingest/spec.md
+    mailbox_inbox: inbox-ingest
+    edits_allow: [mal-core/src/mal_core/ingest/**]
+    plugins: [ingest]
+  download:
+    description: "Plugin-based data fetcher (loaders, registry, runner)"
+    spec: docs/specs/download/spec.md
+    mailbox_inbox: inbox-download
+    edits_allow:
+      - mal-core/src/mal_core/download/**
+      - mal-commonlib/src/mal_commonlib/data/loaders/**
+    plugins: [download]
+  prediction:
+    description: "Risk raster predictor"
+    spec: docs/specs/prediction/spec.md
+    mailbox_inbox: inbox-prediction
+    edits_allow: [mal-core/src/mal_core/prediction/**]
+    plugins: [prediction]
+  training:
+    description: "U-Net model, dataset, trainer"
+    spec: docs/specs/training/spec.md
+    mailbox_inbox: inbox-training
+    edits_allow: [mal-core/src/mal_core/training/**]
+    plugins: [training]
+  data:
+    description: "Manifest + naming + completeness validation"
+    spec: docs/specs/data/spec.md
+    mailbox_inbox: inbox-data
+    edits_allow:
+      - mal-commonlib/src/mal_commonlib/data/**
+      - docs/specs/data/**
+    plugins: [data]
+  commonlib:
+    description: "Shared config + paths + AOI primitives"
+    spec: docs/specs/commonlib/spec.md
+    mailbox_inbox: inbox-commonlib
+    edits_allow: [mal-commonlib/**]
+    plugins: [commonlib]
+  research:
+    description: "Read-only literature synthesist"
+    spec: null
+    skills: [sdss-reference]
+    mailbox_inbox: inbox-research
+    edits_allow: []
+    plugins: [research]
