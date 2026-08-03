@@ -59,11 +59,24 @@ def update_manifest(aoi: str, key: str, filename: str) -> Path:
     return update_dataset(aoi, key, None, filename)
 
 
-def update_dataset(aoi: str, dataset_name: str, year: int | str | None, filename: str, **kwargs) -> Path:
+def update_dataset(
+    aoi: str,
+    dataset_name: str,
+    year: int | str | None,
+    filename: str,
+    period: dict[str, str] | None = None,
+    **kwargs,
+) -> Path:
     """Update a specific dataset entry in the manifest.
 
+    Parameters
+    ----------
+    period:
+        Optional dict with ``"start"`` and ``"end"`` keys (ISO date strings)
+        for multi-year entries where ``year`` is ``None``.
+        Example: ``{"start": "2024-01-01", "end": "2025-12-31"}``.
+
     kwargs accepted (forward-compat for Phase 3): type, required_for_abm, variables, format.
-    Currently ignored; will be used when manifest v3 lands.
     """
     path = DATA_ROOT / aoi / "manifest.json"
     manifest = read_manifest(aoi)
@@ -74,10 +87,16 @@ def update_dataset(aoi: str, dataset_name: str, year: int | str | None, filename
             "files": {},
         }
     ds = manifest["datasets"][dataset_name]
+
+    # Store period metadata when provided (multi-year / daily outputs)
+    if period is not None:
+        ds["period"] = period
+
     if year:
         ds.setdefault("files", {})[str(year)] = filename
     else:
         ds.setdefault("files", {})[dataset_name] = filename
+
     all_files = []
     for d in manifest.get("datasets", {}).values():
         all_files.extend(d.get("files", {}).values())
