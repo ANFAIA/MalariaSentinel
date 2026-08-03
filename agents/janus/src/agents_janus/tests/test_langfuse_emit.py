@@ -76,9 +76,9 @@ def test_no_langfuse_when_disabled():
     mw.wrap_model_call(request, lambda req: response)
     mw.after_model(state, runtime)
 
+    # Use dict-style tool_call (matches real ToolCallRequest.tool_call TypedDict)
     request2 = MagicMock()
-    request2.tool_call.name = "x"
-    request2.tool_call.args = {}
+    request2.tool_call = {"name": "x", "args": {}, "id": "call_x"}
     mw.wrap_tool_call(request2, lambda req: {"ok": True})
 
     mw.after_agent(state, runtime)
@@ -150,9 +150,9 @@ def test_tool_call_emits_span(mock_langfuse):
     runtime.model_name = "m"
     mw.before_agent(state, runtime)
 
+    # Use dict-style tool_call (matches real ToolCallRequest.tool_call TypedDict)
     request = MagicMock()
-    request.tool_call.name = "abm_run"
-    request.tool_call.args = {"seed": 1, "days": 365}
+    request.tool_call = {"name": "abm_run", "args": {"seed": 1, "days": 365}, "id": "call_1"}
     response = MagicMock()
     response.content = "ok 4802 rows"
     mw.wrap_tool_call(request, lambda req: response)
@@ -181,9 +181,9 @@ def test_tool_error_marks_span_as_failed(mock_langfuse):
     def failing_handler(req):
         raise RuntimeError("kaboom")
 
+    # Use dict-style tool_call (matches real ToolCallRequest.tool_call TypedDict)
     request = MagicMock()
-    request.tool_call.name = "broken"
-    request.tool_call.args = {}
+    request.tool_call = {"name": "broken", "args": {}, "id": "call_err"}
 
     with pytest.raises(RuntimeError):
         mw.wrap_tool_call(request, failing_handler)
@@ -264,3 +264,78 @@ def test_no_langfuse_flush_when_disabled():
     mw.after_agent(state, runtime)
     # No exceptions, no langfuse calls (no client to call).
     sl.log_token_summary.assert_called_once()
+
+
+# ----------------------------------------------------------------------
+# _extract_content_preview
+# ----------------------------------------------------------------------
+
+def test_extract_content_preview_string():
+    from agents_janus.observability import _extract_content_preview
+    result = MagicMock()
+    result.content = "hello world"
+    assert _extract_content_preview(result) == "hello world"
+
+
+def test_extract_content_preview_list_blocks():
+    from agents_janus.observability import _extract_content_preview
+    result = MagicMock()
+    result.content = [{"type": "text", "text": "block1"}, {"type": "text", "text": "block2"}]
+    assert "block1" in _extract_content_preview(result)
+    assert "block2" in _extract_content_preview(result)
+
+
+def test_extract_content_preview_no_content():
+    from agents_janus.observability import _extract_content_preview
+    # Object without .content — falls back to str()
+    result = "plain string result"
+    assert _extract_content_preview(result) == "plain string result"
+
+
+def test_extract_content_preview_dict():
+    from agents_janus.observability import _extract_content_preview
+    result = {"content": "dict content", "other": "field"}
+    assert _extract_content_preview(result) == "dict content"
+
+
+def test_extract_content_preview_dict_output_key():
+    from agents_janus.observability import _extract_content_preview
+    result = {"output": "output value"}
+    assert _extract_content_preview(result) == "output value"
+
+
+# ----------------------------------------------------------------------
+# Dict-style tool_call extraction (real ToolCallRequest shape)
+# ----------------------------------------------------------------------
+
+def test_dict_tool_call_extracts_name_and_args(mock_langfuse):
+    """ToolCallRequest.tool_call is a ToolCall TypedDict (dict), not an object.
+
+    The middleware must extract name/args via dict.get(), not attribute access.
+    """
+    sl = MagicMock()
+    sl.session_dir.name = "janus-test"
+    mw = ObservabilityMiddleware(sl, langfuse_client=mock_langfuse)
+    state = {"messages": []}
+    runtime = MagicMock()
+    mw.before_agent(state, runtime)
+
+    # Real shape: tool_call is a dict
+    request = MagicMock()
+    request.tool_call = {
+        "name": "gitagent_status",
+        "args": {"aoi": "ghana"},
+        "id": "call_abc123",
+        "type": "tool_call",
+    }
+    response = MagicMock()
+    response.content = "status: ready"
+    mw.wrap_tool_call(request, lambda req: response)
+
+    mw.after_agent(state, runtime)
+
+    # Verify span was created with correct tool name
+    calls = mock_langfuse.start_observation.call_args_list
+    span_calls = [c for c in calls if c.kwargs.get("as_type") == "span" and "tool:" in c.kwargs.get("name", "")]
+    assert len(span_calls) == 1
+    assert span_calls[0].kwargs["name"] == "tool:gitagent_status"

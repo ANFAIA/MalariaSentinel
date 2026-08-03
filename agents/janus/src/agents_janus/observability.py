@@ -305,18 +305,22 @@ class ObservabilityMiddleware(AgentMiddleware):
     def wrap_tool_call(self, request, handler):
         start = time.monotonic()
         tool_name = "unknown"
-        tool_args = {}
+        tool_args: dict = {}
 
+        # Extract tool name and args from the request.
+        # request.tool_call is a ToolCall TypedDict (dict), not an object.
+        # Access via .get() for safety; fall back to attribute access for
+        # any non-dict tool_call implementations.
         try:
-            if hasattr(request, "tool_call") and hasattr(request.tool_call, "name"):
-                tool_name = request.tool_call.name
-                tool_args = request.tool_call.args
-            elif isinstance(request, dict):
-                tool_name = request.get("name", request.get("tool", "unknown"))
-                tool_args = request.get("args", request.get("input", {}))
-            elif hasattr(request, "name"):
-                tool_name = request.name
-                tool_args = getattr(request, "args", {})
+            tc = getattr(request, "tool_call", None)
+            if tc is None and isinstance(request, dict):
+                tc = request.get("tool_call")
+            if isinstance(tc, dict):
+                tool_name = tc.get("name", "unknown")
+                tool_args = tc.get("args", {}) or {}
+            elif tc is not None:
+                tool_name = getattr(tc, "name", "unknown")
+                tool_args = getattr(tc, "args", {}) or {}
         except Exception:
             pass
 
@@ -370,10 +374,9 @@ class ObservabilityMiddleware(AgentMiddleware):
 
             raise error
 
-        # Log successful tool call
-        output_preview = ""
-        if hasattr(result, "content") and result.content:
-            output_preview = result.content[:500] if isinstance(result.content, str) else str(result.content)[:500]
+        # Extract output preview — result may be ToolMessage (str or list
+        # content blocks), a plain string, or something else entirely.
+        output_preview = _extract_content_preview(result)
 
         self.logger._append({
             "event": "tool_call_detailed",
@@ -407,3 +410,34 @@ def _safe_repr(value: Any, max_len: int = 2000) -> str:
     if len(s) > max_len:
         s = s[:max_len] + f"... ({len(s) - max_len} chars truncated)"
     return s
+
+
+def _extract_content_preview(result: Any, max_len: int = 500) -> str:
+    """Extract a human-readable preview from a tool result.
+
+    Handles: ToolMessage (str or list content blocks), plain strings,
+    dicts with common keys, and anything with a .content attribute.
+    """
+    try:
+        # ToolMessage or anything with .content
+        content = getattr(result, "content", None)
+        if content is None and isinstance(result, dict):
+            content = result.get("content") or result.get("output") or result.get("result")
+        if content is None:
+            content = str(result)[:max_len]
+
+        # Normalize to string
+        if isinstance(content, str):
+            return content[:max_len]
+        if isinstance(content, list):
+            # List of content blocks — extract text parts
+            parts = []
+            for block in content:
+                if isinstance(block, dict):
+                    parts.append(block.get("text", str(block)))
+                else:
+                    parts.append(str(block))
+            return " ".join(parts)[:max_len]
+        return str(content)[:max_len]
+    except Exception:
+        return ""
