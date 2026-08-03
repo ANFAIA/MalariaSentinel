@@ -20,6 +20,34 @@ app = typer.Typer(
 )
 
 
+def _load_dotenv() -> None:
+    """Load .env from cwd or any parent dir into os.environ (no override).
+
+    Searches upward from cwd, stopping at the first .env found. Does not
+    overwrite already-set env vars (existing shell exports win).
+    """
+    for parent in [Path.cwd(), *Path.cwd().parents]:
+        candidate = parent / ".env"
+        if candidate.is_file():
+            try:
+                for raw in candidate.read_text().splitlines():
+                    line = raw.strip()
+                    if not line or line.startswith("#"):
+                        continue
+                    if "=" not in line:
+                        continue
+                    key, _, value = line.partition("=")
+                    key = key.strip()
+                    value = value.strip().strip('"').strip("'")
+                    os.environ.setdefault(key, value)
+            except OSError:
+                pass
+            return
+
+
+_load_dotenv()
+
+
 def _setup_module_flags(no_verify: bool) -> None:
     """Configure module-level flags based on CLI options."""
     import agents_janus.agent as agent_mod
