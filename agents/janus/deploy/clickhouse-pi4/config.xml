@@ -49,10 +49,31 @@
     <max_session_timeout>3600</max_session_timeout>
     <default_session_timeout>60</default_session_timeout>
 
+    <!-- Langfuse v3 migration hardcodes 'ON CLUSTER default' with
+         ReplicatedMergeTree. Requires Zookeeper + cluster + macros.
+         We use a single-shard, single-replica cluster (effectively
+         standalone) but with the replication machinery enabled. -->
     <remote_servers>
-        <!-- Single-node Pi4 setup: no <default> cluster. Langfuse v3
-             migration script uses ReplicatedMergeTree when a cluster
-             is defined, which requires Zookeeper. Without cluster, it
-             falls back to MergeTree (single-node safe). -->
+        <default>
+            <shard>
+                <internal_replication>true</internal_replication>
+                <replica>
+                    <host>localhost</host>
+                    <port>9000</port>
+                </replica>
+            </shard>
+        </default>
     </remote_servers>
+
+    <zookeeper>
+        <node>
+            <host>zookeeper</host>
+            <port>2181</port>
+        </node>
+    </zookeeper>
+
+    <macros>
+        <shard>01</shard>
+        <replica>01</replica>
+    </macros>
 </clickhouse>
