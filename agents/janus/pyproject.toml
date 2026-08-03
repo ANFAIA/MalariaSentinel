@@ -17,6 +17,7 @@ dependencies = [
 
 [project.optional-dependencies]
 openrouter = ["langchain-openai>=0.3"]
+observability = ["langfuse>=3.0"]
 
 [project.scripts]
 janus = "agents_janus.cli:app"
