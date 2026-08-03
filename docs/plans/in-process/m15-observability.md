@@ -1,6 +1,6 @@
 # M15 — Janus Observability (Live Panel + Langfuse)
 
-> **Status**: Drafting (2026-08-03). Awaiting first commit.
+> **Status**: Completed (2026-08-03). Commits `aedfcab`, `524defa`, `ad6bb52`, `e92d318`. 13 files, +1546 lines. 37 unit tests pass (8 subagent + 19 live panel + 10 langfuse emit). Live panel verified via 3 manual smoke tests (render, watchdog, Ctrl-C).
 >
 > **Predecessor**: M14 — Two-Tier Orchestrator + Specialised Subagents (`docs/plans/completed/m14-orchestrator-plugin-system.md` — was `in-process`, now complete after commit `46fadfb`).
 >
