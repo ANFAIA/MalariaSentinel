@@ -21,6 +21,8 @@ services:
       context: ./clickhouse-pi4
       dockerfile: Dockerfile
     restart: unless-stopped
+    mem_limit: 2g
+    mem_reservation: 1g
     volumes:
       - clickhouse_data:/var/lib/clickhouse
     environment:
@@ -38,6 +40,8 @@ services:
   langfuse-postgres:
     image: postgres:16-alpine
     restart: unless-stopped
+    mem_limit: 1g
+    mem_reservation: 512m
     volumes:
       - langfuse_pg:/var/lib/postgresql/data
     environment:
@@ -53,6 +57,7 @@ services:
   langfuse-redis:
     image: redis:7-alpine
     restart: unless-stopped
+    mem_limit: 256m
     volumes:
       - langfuse_redis:/data
     healthcheck:
@@ -64,6 +69,8 @@ services:
   langfuse-worker:
     image: langfuse/langfuse-worker:3
     restart: unless-stopped
+    mem_limit: 1g
+    mem_reservation: 512m
     depends_on:
       langfuse-postgres:
         condition: service_healthy
@@ -83,6 +90,8 @@ services:
   langfuse-web:
     image: langfuse/langfuse:3
     restart: unless-stopped
+    mem_limit: 1g
+    mem_reservation: 512m
     ports:
       - "3001:3000"
     depends_on:
