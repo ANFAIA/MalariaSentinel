@@ -50,13 +50,14 @@ def _build_langfuse_client(tracing: str):
         )
         return None
 
-    host = os.environ.get("LANGFUSE_HOST")
+    host = os.environ.get("LANGFUSE_HOST") or os.environ.get("LANGFUSE_BASE_URL")
     public_key = os.environ.get("LANGFUSE_PUBLIC_KEY")
     secret_key = os.environ.get("LANGFUSE_SECRET_KEY")
     if not (host and public_key and secret_key):
         typer.echo(
-            "⚠ --tracing langfuse requires LANGFUSE_HOST, LANGFUSE_PUBLIC_KEY, "
-            "LANGFUSE_SECRET_KEY env vars. Continuing without langfuse.",
+            "⚠ --tracing langfuse requires LANGFUSE_HOST (or LANGFUSE_BASE_URL), "
+            "LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY env vars. "
+            "Continuing without langfuse.",
             err=True,
         )
         return None
