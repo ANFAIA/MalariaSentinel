@@ -30,6 +30,7 @@ services:
       CLICKHOUSE_USER: ${LANGFUSE_CLICKHOUSE_USER:-langfuse}
       CLICKHOUSE_PASSWORD: ${LANGFUSE_CLICKHOUSE_PASSWORD:-langfuse_pw}
       CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+      CLICKHOUSE_ALWAYS_RUN_INITDB_SCRIPTS: "1"
     healthcheck:
       test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://127.0.0.1:8123/ping || exit 1"]
       interval: 10s
@@ -86,7 +87,7 @@ services:
       CLICKHOUSE_USER: ${LANGFUSE_CLICKHOUSE_USER:-langfuse}
       CLICKHOUSE_PASSWORD: ${LANGFUSE_CLICKHOUSE_PASSWORD:-langfuse_pw}
       CLICKHOUSE_DB: ${LANGFUSE_CLICKHOUSE_DB:-langfuse}
-      LANGFUSE_S3_EVENT_UPLOAD_BUCKET: ${LANGFUSE_S3_EVENT_UPLOAD_BUCKET:-}
+      LANGFUSE_S3_EVENT_UPLOAD_BUCKET: ""
       SALT: ${LANGFUSE_SALT:-change-me-in-production-please-32-chars}
       TELEMETRY_ENABLED: "false"
       LANGFUSE_LOG_LEVEL: info
@@ -115,7 +116,7 @@ services:
       CLICKHOUSE_USER: ${LANGFUSE_CLICKHOUSE_USER:-langfuse}
       CLICKHOUSE_PASSWORD: ${LANGFUSE_CLICKHOUSE_PASSWORD:-langfuse_pw}
       CLICKHOUSE_DB: ${LANGFUSE_CLICKHOUSE_DB:-langfuse}
-      LANGFUSE_S3_EVENT_UPLOAD_BUCKET: ${LANGFUSE_S3_EVENT_UPLOAD_BUCKET:-}
+      LANGFUSE_S3_EVENT_UPLOAD_BUCKET: ""
       SALT: ${LANGFUSE_SALT:-change-me-in-production-please-32-chars}
       NEXTAUTH_SECRET: ${LANGFUSE_NEXTAUTH_SECRET:?NEXTAUTH_SECRET is required (32+ char random)}
       NEXTAUTH_URL: ${LANGFUSE_NEXTAUTH_URL:-http://localhost:3001}
