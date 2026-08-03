@@ -6,6 +6,7 @@ Reads auto-migrate v1 → v2 in memory; writes always produce v2.
 from __future__ import annotations
 import json
 import logging
+from datetime import date
 from pathlib import Path
 
 log = logging.getLogger(__name__)
@@ -118,14 +119,51 @@ def list_files(aoi: str) -> dict[str, str]:
     return flat
 
 
-def validate_completeness(aoi: str) -> list[str]:
-    """Return list of missing expected files. Empty = complete."""
+def validate_completeness(aoi: str, years: list[int] | None = None) -> list[str]:
+    """Return list of missing expected files and period coverage issues.
+
+    Parameters
+    ----------
+    aoi:
+        Area of interest identifier.
+    years:
+        Optional list of years to check period coverage for. When provided,
+        datasets with a ``period`` key are validated to ensure the period
+        covers the requested year range. When ``None`` (default), period
+        checks are skipped — backward compatible.
+
+    Returns
+    -------
+    list[str]
+        Empty list means complete. Otherwise contains missing filenames
+        and/or ``period_coverage:`` entries for datasets whose period
+        does not cover the requested years.
+    """
     manifest = read_manifest(aoi)
     data_dir = DATA_ROOT / aoi
     missing = []
+
+    # Phase 1: file-existence check (original behavior)
     for f in manifest.get("expected_files", []):
         if not (data_dir / f).exists():
             missing.append(f)
+
+    # Phase 2: period-coverage check (only when years are provided)
+    if years:
+        requested_start = date(min(years), 1, 1)
+        requested_end = date(max(years), 12, 31)
+        for ds_name, ds in manifest.get("datasets", {}).items():
+            period = ds.get("period")
+            if not period:
+                continue
+            period_start = date.fromisoformat(period["start"])
+            period_end = date.fromisoformat(period["end"])
+            if not (period_start <= requested_start and period_end >= requested_end):
+                missing.append(
+                    f"period_coverage:{ds_name}(period {period['start']}..{period['end']} "
+                    f"does not cover {min(years)}-{max(years)})"
+                )
+
     return missing
 
 
