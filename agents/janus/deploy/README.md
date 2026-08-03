@@ -50,7 +50,7 @@ Optional (defaults shown):
 
 The langfuse-web container runs DB migrations against postgres on startup.
 Watch the logs in Dockploy. Once `langfuse-web` reports it's serving
-on :3000, it's ready.
+on :3001, it's ready.
 
 ### 4. Configure Cloudflare tunnel
 
@@ -63,7 +63,7 @@ credentials-file: /path/to/credentials.json
 
 ingress:
   - hostname: langfuse.your-domain.example.com
-    service: http://langfuse-web:3000
+    service: http://langfuse-web:3001
   - service: http_status:404
 ```
 
@@ -160,7 +160,7 @@ Pi 4 8GB has 6GB+ headroom. No swap, no special tuning needed.
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
-| Mac can't reach `LANGFUSE_HOST` | Cloudflare tunnel not pointing at `langfuse-web:3000` | Check `cloudflared` config + Cloudflare DNS |
+| Mac can't reach `LANGFUSE_HOST` | Cloudflare tunnel not pointing at `langfuse-web:3001` | Check `cloudflared` config + Cloudflare DNS |
 | `langfuse-web` keeps restarting | Postgres not ready or port conflict | Wait 30s, restart web manually. Check Dockploy port mapping. |
 | Auth callback fails on signup | `NEXTAUTH_URL` still set to `localhost:3000` | Override with public tunnel URL, restart `langfuse-web` |
 | `LANGFUSE_PUBLIC_KEY` invalid | Wrong project keys | Re-copy from Project Settings → API Keys |
