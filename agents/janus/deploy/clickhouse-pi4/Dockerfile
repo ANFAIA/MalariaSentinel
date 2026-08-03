@@ -44,7 +44,9 @@ ARG DEFAULT_GID="101"
 RUN addgroup -S -g "${DEFAULT_GID}" clickhouse && \
   adduser -S -h "/var/lib/clickhouse" -s /bin/bash -G clickhouse -g "ClickHouse server" -u "${DEFAULT_UID}" clickhouse
 
-RUN cd /tmp \
+ARG TARGETARCH
+RUN arch=${TARGETARCH:-arm64} \
+  && cd /tmp \
   && for package in clickhouse-common-static; do \
   echo "Get https://packages.clickhouse.com/tgz/stable/${package}-24.8.2.3-${arch}.tgz" \
   && wget -c -q "https://packages.clickhouse.com/tgz/stable/${package}-24.8.2.3-${arch}.tgz" \
