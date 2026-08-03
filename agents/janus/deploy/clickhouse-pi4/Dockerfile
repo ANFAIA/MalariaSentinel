@@ -1,8 +1,4 @@
 # ClickHouse for Raspberry Pi 4 — ARMv8.0 compatible build.
-#
-# Based on: https://github.com/sqooid/docker-clickhouse-pi4
-# The official image needs ARMv8.2-A. Pi 4 has ARMv8.0-A (Cortex-A72).
-# This uses the ARMv8.0 compat binary from builds.clickhouse.com.
 
 FROM curlimages/curl AS downloader
 WORKDIR /app
@@ -63,6 +59,8 @@ RUN arch=${TARGETARCH:-arm64} \
   && cp /usr/share/zoneinfo/UTC /etc/localtime \
   && echo "UTC" > /etc/timezone
 
+# Copy the compat binary — it self-extracts on first run ("Decompressing...")
+# This is normal and takes ~30-60s on Pi4 first boot.
 COPY --from=downloader /app/clickhouse /usr/bin/clickhouse
 RUN chmod +x /usr/bin/clickhouse
 

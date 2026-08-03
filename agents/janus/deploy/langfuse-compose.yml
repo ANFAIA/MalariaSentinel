@@ -29,11 +29,11 @@ services:
       CLICKHOUSE_PASSWORD: ${LANGFUSE_CLICKHOUSE_PASSWORD:-langfuse_pw}
       CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8123/ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 60s
+      test: ["CMD-SHELL", "clickhouse-client --query 'SELECT 1' || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+      start_period: 180s
 
   langfuse-postgres:
     image: postgres:16-alpine
