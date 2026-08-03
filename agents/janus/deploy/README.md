@@ -10,12 +10,16 @@ is set in `.env`).
 
 ## Files
 
-- `langfuse-compose.yml` — 3-service stack (web, worker, postgres, redis).
+- `langfuse-compose.yml` — 5-service stack (clickhouse, postgres, redis, worker, web).
   Copy this into Dockploy as a new app on your Pi.
+- `clickhouse-pi4/` — Custom ClickHouse Dockerfile + entrypoint for Pi 4.
+  Uses the ARMv8.0 compatibility binary from `builds.clickhouse.com`.
 
-**ClickHouse removed** — the official Docker image requires ARMv8.2-A but
-Pi 4 is ARMv8.0-A (Cortex-A72). Langfuse falls back to Postgres for trace
-storage, which is fine for single-user janus use.
+**Why a custom ClickHouse**: The official Docker image requires ARMv8.2-A
+(Load-Acquire RCpc register) but Pi 4's Cortex-A72 only implements ARMv8.0-A.
+The custom build downloads the ARMv8.0 compat binary and runs on Alpine with
+a glibc donor from Ubuntu 20.04. First deploy takes ~5 min for the binary
+download + image build. Subsequent deploys use the Docker cache.
 
 ## Deploy steps (on the Pi via Dockploy)
 
@@ -128,58 +132,62 @@ with nested observations:
 
 ## Persistence
 
-Langfuse data lives in 2 named Docker volumes on the Pi (ClickHouse removed):
+Langfuse data lives in 3 named Docker volumes on the Pi:
 
 | Volume | Contents | Approx size after 1 week |
 |---|---|---|
-| `langfuse_pg` | Users, projects, API keys + trace observations | ~100MB |
+| `clickhouse_data` | Trace observations (the bulk) | ~500MB |
+| `langfuse_pg` | Users, projects, API keys | ~50MB |
 | `langfuse_redis` | Job queue (transient) | ~10MB |
 
-Total: ~110MB for a typical week. The 8GB Pi has plenty of room.
+Total: ~560MB for a typical week. The 8GB Pi has plenty of room.
 
 ## Backups
 
-If you want to back up langfuse state, snapshot the two named volumes. The
-`langfuse_pg` volume is the most critical — it has your users, API keys,
-and all trace data.
+If you want to back up langfuse state, snapshot the three named volumes. The
+`langfuse_pg` volume is the most critical (users + API keys). The
+`clickhouse_data` volume has the trace data — losing it loses history but not auth.
 
-## Pi 4 8GB sizing (without ClickHouse)
+## Pi 4 8GB sizing
 
 | Service | Idle RAM | Under load |
 |---|---|---|
+| langfuse-clickhouse | ~500MB | ~1.5GB |
 | langfuse-postgres | ~150MB | ~400MB |
 | langfuse-redis | ~30MB | ~100MB |
 | langfuse-worker | ~250MB | ~500MB |
 | langfuse-web | ~300MB | ~700MB |
-| **Total** | **~730MB** | **~1.7GB** |
+| **Total** | **~1.2GB** | **~3.2GB** |
 
-Pi 4 8GB has 6GB+ headroom. No swap, no special tuning needed.
-~700MB RAM saved compared to the 5-service stack with ClickHouse.
+Pi 4 8GB has 4-5GB headroom even at peak. No swap, no special tuning needed.
 
 ## Troubleshooting
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
 | Mac can't reach `LANGFUSE_HOST` | Cloudflare tunnel not pointing at `langfuse-web:3001` | Check `cloudflared` config + Cloudflare DNS |
-| `langfuse-web` keeps restarting | Postgres not ready or port conflict | Wait 30s, restart web manually. Check Dockploy port mapping. |
-| Auth callback fails on signup | `NEXTAUTH_URL` still set to `localhost:3000` | Override with public tunnel URL, restart `langfuse-web` |
+| `langfuse-clickhouse` build fails | Pi has no Docker buildx or insufficient disk | Check `docker info` for buildx; free disk with `docker system prune` |
+| `langfuse-clickhouse` keeps restarting | ClickHouse binary incompatible or port conflict | Wait 60s (first boot is slow). Check `docker logs` for "Illegal instruction" |
+| `langfuse-web` keeps restarting | ClickHouse not ready when web starts | Wait for clickhouse healthcheck to pass, then restart web |
+| Auth callback fails on signup | `NEXTAUTH_URL` still set to `localhost:3001` | Override with public tunnel URL, restart `langfuse-web` |
 | `LANGFUSE_PUBLIC_KEY` invalid | Wrong project keys | Re-copy from Project Settings → API Keys |
 | Traces not appearing in UI | `langfuse.flush()` not called | Already handled in `ObservabilityMiddleware.after_agent`; check `runs/<session>/session.jsonl` for `langfuse_error` events |
 
-## Why ClickHouse was removed
+## Why a custom ClickHouse
 
-The official ClickHouse Docker image (`clickhouse/clickhouse-server`) requires
-ARMv8.2-A with the Load-Acquire RCpc register. The Raspberry Pi 4's Cortex-A72
-only implements ARMv8.0-A. The container crashes on startup with "Illegal
-instruction" — this is a known limitation documented in:
+The official `clickhouse/clickhouse-server` Docker image requires ARMv8.2-A
+with the Load-Acquire RCpc register. The Raspberry Pi 4's Cortex-A72 only
+implements ARMv8.0-A. The official container crashes with "Illegal instruction".
+
+The `clickhouse-pi4/` directory uses the ARMv8.0 compatibility binary from
+`builds.clickhouse.com/master/aarch64v80compat/clickhouse` on an Alpine base
+with a glibc donor from Ubuntu 20.04. Based on:
+- [sqooid/docker-clickhouse-pi4](https://github.com/sqooid/docker-clickhouse-pi4)
 - [ClickHouse/ClickHouse#50852](https://github.com/ClickHouse/ClickHouse/issues/50852)
-- [Docker Hub clickhouse-server README](https://hub.docker.com/_/clickhouse)
-
-Langfuse works without ClickHouse by falling back to Postgres for trace storage.
-For a single-user janus workflow, the performance difference is negligible.
 
 ## When you're done with M15
 
 The langfuse stack on the Pi runs independently of janus on the Mac. You can
-leave it running 24/7 (~730MB idle RAM). Restart only when you bump the langfuse
-image version (e.g. `langfuse/langfuse:3` → `:3.1`).
+leave it running 24/7 (~1.2GB idle RAM). Restart only when you bump the langfuse
+image version (e.g. `langfuse/langfuse:3` → `:3.1`). The ClickHouse image is
+built locally — no remote image to pull.
