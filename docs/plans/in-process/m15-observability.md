@@ -284,35 +284,22 @@ This plan does **not** edit `agents/memory/runtime/docker-compose.yml`. Instead,
 2. Make langfuse deploy lifecycle (restart on Pi) coupled to memory subsystem lifecycle
 3. Hide the deployment instruction from `agents/janus/` where janus users will look for it
 
-### 6.2 Compose artifact (5 services)
+### 6.2 Compose artifact (3 services — ClickHouse removed for Pi 4)
+
+ClickHouse official Docker image requires ARMv8.2-A but Pi 4 is ARMv8.0-A
+(Cortex-A72). The container crashes with "Illegal instruction". Langfuse falls
+back to Postgres for trace storage, which is fine for single-user janus use.
 
 ```yaml
 # agents/janus/deploy/langfuse-compose.yml
 # Copy this into Dockploy as a new app on the Pi (Raspberry Pi 4 8GB).
-# Pi 4 8GB is comfortable: ~2GB idle, ~4GB under load.
+# Pi 4 8GB is comfortable: ~730MB idle, ~1.7GB under load.
 #
 # First boot: open https://<your-cloudflared-tunnel>, sign up, create a project,
 # copy LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY into your Mac's .env file.
 # Cloudflared config is separate — point at langfuse-web:3000.
 
 services:
-  langfuse-clickhouse:
-    image: clickhouse/clickhouse-server:24.3
-    restart: unless-stopped
-    volumes:
-      - clickhouse_data:/var/lib/clickhouse
-    environment:
-      CLICKHOUSE_DB: langfuse
-      CLICKHOUSE_USER: ${LANGFUSE_CLICKHOUSE_USER:-langfuse}
-      CLICKHOUSE_PASSWORD: ${LANGFUSE_CLICKHOUSE_PASSWORD:-langfuse_pw}
-      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
-    healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8123/ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 30s
-
   langfuse-postgres:
     image: postgres:16-alpine
     restart: unless-stopped
@@ -347,13 +334,9 @@ services:
         condition: service_healthy
       langfuse-redis:
         condition: service_healthy
-      langfuse-clickhouse:
-        condition: service_healthy
     environment:
       DATABASE_URL: postgresql://${LANGFUSE_PG_USER:-langfuse}:${LANGFUSE_PG_PASSWORD:-langfuse_pw}@langfuse-postgres:5432/${LANGFUSE_PG_DB:-langfuse}
       REDIS_URL: redis://langfuse-redis:6379
-      CLICKHOUSE_URL: clickhouse://${LANGFUSE_CLICKHOUSE_USER:-langfuse}:${LANGFUSE_CLICKHOUSE_PASSWORD:-langfuse_pw}@langfuse-clickhouse:8123/${LANGFUSE_CLICKHOUSE_DB:-langfuse}
-      CLICKHOUSE_MIGRATION_URL: clickhouse://${LANGFUSE_CLICKHOUSE_USER:-langfuse}:${LANGFUSE_CLICKHOUSE_PASSWORD:-langfuse_pw}@langfuse-clickhouse:8123/${LANGFUSE_CLICKHOUSE_DB:-langfuse}
       SALT: ${LANGFUSE_SALT:-change-me-in-production-please-32-chars}
       TELEMETRY_ENABLED: "false"
       LANGFUSE_LOG_LEVEL: info
@@ -368,15 +351,11 @@ services:
         condition: service_healthy
       langfuse-redis:
         condition: service_healthy
-      langfuse-clickhouse:
-        condition: service_healthy
       langfuse-worker:
         condition: service_started
     environment:
       DATABASE_URL: postgresql://${LANGFUSE_PG_USER:-langfuse}:${LANGFUSE_PG_PASSWORD:-langfuse_pw}@langfuse-postgres:5432/${LANGFUSE_PG_DB:-langfuse}
       REDIS_URL: redis://langfuse-redis:6379
-      CLICKHOUSE_URL: clickhouse://${LANGFUSE_CLICKHOUSE_USER:-langfuse}:${LANGFUSE_CLICKHOUSE_PASSWORD:-langfuse_pw}@langfuse-clickhouse:8123/${LANGFUSE_CLICKHOUSE_DB:-langfuse}
-      CLICKHOUSE_MIGRATION_URL: clickhouse://${LANGFUSE_CLICKHOUSE_USER:-langfuse}:${LANGFUSE_CLICKHOUSE_PASSWORD:-langfuse_pw}@langfuse-clickhouse:8123/${LANGFUSE_CLICKHOUSE_DB:-langfuse}
       SALT: ${LANGFUSE_SALT:-change-me-in-production-please-32-chars}
       NEXTAUTH_SECRET: ${LANGFUSE_NEXTAUTH_SECRET}
       NEXTAUTH_URL: ${LANGFUSE_NEXTAUTH_URL:-http://localhost:3000}
@@ -392,7 +371,6 @@ services:
       LANGFUSE_LOG_LEVEL: info
 
 volumes:
-  clickhouse_data:
   langfuse_pg:
   langfuse_redis:
 ```
@@ -414,18 +392,21 @@ The `LANGFUSE_INIT_*` env vars are **optional** (only set if you want langfuse t
    ```
 6. Cloudflared config (separate from this plan): `cloudflared tunnel route <tunnel> langfuse-web:3000`.
 
-### 6.4 Pi 4 8GB sizing
+### 6.4 Pi 4 8GB sizing (without ClickHouse)
+
+ClickHouse removed — official Docker image requires ARMv8.2-A, Pi 4 is ARMv8.0-A.
+Langfuse falls back to Postgres for trace storage.
 
 | Service | Idle RAM | Under load |
 |---|---|---|
-| langfuse-clickhouse | ~500MB | ~1.5GB |
 | langfuse-postgres | ~150MB | ~400MB |
 | langfuse-redis | ~30MB | ~100MB |
 | langfuse-worker | ~250MB | ~500MB |
 | langfuse-web (Next.js) | ~300MB | ~700MB |
-| **Total** | **~1.2GB** | **~3.2GB** |
+| **Total** | **~730MB** | **~1.7GB** |
 
-Pi 4 8GB has 4-5GB headroom even at load. No swap, no special tuning needed.
+Pi 4 8GB has 6GB+ headroom. No swap, no special tuning needed.
+~700MB RAM saved compared to the 5-service stack with ClickHouse.
 
 ## 7. pyproject.toml changes
 

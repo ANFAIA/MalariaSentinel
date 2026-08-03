@@ -10,8 +10,12 @@ is set in `.env`).
 
 ## Files
 
-- `langfuse-compose.yml` — 5-service stack (web, worker, postgres, redis, clickhouse).
+- `langfuse-compose.yml` — 3-service stack (web, worker, postgres, redis).
   Copy this into Dockploy as a new app on your Pi.
+
+**ClickHouse removed** — the official Docker image requires ARMv8.2-A but
+Pi 4 is ARMv8.0-A (Cortex-A72). Langfuse falls back to Postgres for trace
+storage, which is fine for single-user janus use.
 
 ## Deploy steps (on the Pi via Dockploy)
 
@@ -29,7 +33,6 @@ Optional (defaults shown):
 | Var | Default |
 |---|---|
 | `LANGFUSE_PG_USER` / `_PASSWORD` / `_DB` | `langfuse` / `langfuse_pw` / `langfuse` |
-| `LANGFUSE_CLICKHOUSE_USER` / `_PASSWORD` / `_DB` | `langfuse` / `langfuse_pw` / `langfuse` |
 | `LANGFUSE_INIT_ORG_ID` | `malaria-sentinel` |
 | `LANGFUSE_INIT_PROJECT_ID` | `janus` |
 | `LANGFUSE_INIT_PROJECT_NAME` | `Janus` |
@@ -45,8 +48,8 @@ Optional (defaults shown):
 
 ### 3. Wait for first-boot migrations (~2-3 min)
 
-The langfuse-web container runs DB migrations against postgres + clickhouse on
-startup. Watch the logs in Dockploy. Once `langfuse-web` reports it's serving
+The langfuse-web container runs DB migrations against postgres on startup.
+Watch the logs in Dockploy. Once `langfuse-web` reports it's serving
 on :3000, it's ready.
 
 ### 4. Configure Cloudflare tunnel
@@ -125,47 +128,58 @@ with nested observations:
 
 ## Persistence
 
-Langfuse data lives in 3 named Docker volumes on the Pi:
+Langfuse data lives in 2 named Docker volumes on the Pi (ClickHouse removed):
 
-| Volume | Contents | Approx size after 1 week of typical janus use |
+| Volume | Contents | Approx size after 1 week |
 |---|---|---|
-| `clickhouse_data` | Trace observations (the bulk) | ~500MB |
-| `langfuse_pg` | Users, projects, API keys | ~50MB |
+| `langfuse_pg` | Users, projects, API keys + trace observations | ~100MB |
 | `langfuse_redis` | Job queue (transient) | ~10MB |
 
-Total: ~600MB for a typical week. The 8GB Pi has plenty of room.
+Total: ~110MB for a typical week. The 8GB Pi has plenty of room.
 
 ## Backups
 
-If you want to back up langfuse state, snapshot the three named volumes. The
-`postgres` volume is the most critical (it has your users + API keys). The
-`clickhouse` volume has the trace data — losing it loses history but not auth.
+If you want to back up langfuse state, snapshot the two named volumes. The
+`langfuse_pg` volume is the most critical — it has your users, API keys,
+and all trace data.
 
-## Pi 4 8GB sizing
+## Pi 4 8GB sizing (without ClickHouse)
 
 | Service | Idle RAM | Under load |
 |---|---|---|
-| langfuse-clickhouse | ~500MB | ~1.5GB |
 | langfuse-postgres | ~150MB | ~400MB |
 | langfuse-redis | ~30MB | ~100MB |
 | langfuse-worker | ~250MB | ~500MB |
 | langfuse-web | ~300MB | ~700MB |
-| **Total** | **~1.2GB** | **~3.2GB** |
+| **Total** | **~730MB** | **~1.7GB** |
 
-Pi 4 8GB has 4-5GB headroom even at peak. No swap, no special tuning needed.
+Pi 4 8GB has 6GB+ headroom. No swap, no special tuning needed.
+~700MB RAM saved compared to the 5-service stack with ClickHouse.
 
 ## Troubleshooting
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
 | Mac can't reach `LANGFUSE_HOST` | Cloudflare tunnel not pointing at `langfuse-web:3000` | Check `cloudflared` config + Cloudflare DNS |
-| `langfuse-web` keeps restarting | Clickhouse not ready when web starts | Wait 30s, restart web manually |
+| `langfuse-web` keeps restarting | Postgres not ready or port conflict | Wait 30s, restart web manually. Check Dockploy port mapping. |
 | Auth callback fails on signup | `NEXTAUTH_URL` still set to `localhost:3000` | Override with public tunnel URL, restart `langfuse-web` |
 | `LANGFUSE_PUBLIC_KEY` invalid | Wrong project keys | Re-copy from Project Settings → API Keys |
 | Traces not appearing in UI | `langfuse.flush()` not called | Already handled in `ObservabilityMiddleware.after_agent`; check `runs/<session>/session.jsonl` for `langfuse_error` events |
 
+## Why ClickHouse was removed
+
+The official ClickHouse Docker image (`clickhouse/clickhouse-server`) requires
+ARMv8.2-A with the Load-Acquire RCpc register. The Raspberry Pi 4's Cortex-A72
+only implements ARMv8.0-A. The container crashes on startup with "Illegal
+instruction" — this is a known limitation documented in:
+- [ClickHouse/ClickHouse#50852](https://github.com/ClickHouse/ClickHouse/issues/50852)
+- [Docker Hub clickhouse-server README](https://hub.docker.com/_/clickhouse)
+
+Langfuse works without ClickHouse by falling back to Postgres for trace storage.
+For a single-user janus workflow, the performance difference is negligible.
+
 ## When you're done with M15
 
 The langfuse stack on the Pi runs independently of janus on the Mac. You can
-leave it running 24/7 (~1.2GB idle RAM). Restart only when you bump the langfuse
+leave it running 24/7 (~730MB idle RAM). Restart only when you bump the langfuse
 image version (e.g. `langfuse/langfuse:3` → `:3.1`).

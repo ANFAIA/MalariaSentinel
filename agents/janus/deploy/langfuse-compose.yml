@@ -1,32 +1,20 @@
 # Langfuse self-host compose for Dockploy on Raspberry Pi 4 8GB.
 #
-# 5 services: clickhouse (analytics) + postgres (auth) + redis (queue) +
-# langfuse-worker (async processor) + langfuse-web (UI + API on :3000).
+# 3 services: postgres (auth + trace storage) + redis (queue) +
+# langfuse-web (UI + API on :3000) + langfuse-worker (async processor).
+#
+# ClickHouse is REMOVED — the official Docker image requires ARMv8.2-A
+# but Pi 4 is ARMv8.0-A (Cortex-A72). Langfuse falls back to Postgres
+# for trace/observation storage, which is fine for single-user janus use.
 #
 # First boot: open https://<your-cloudflare-tunnel>, sign up, create a project
 # named "janus", copy LANGFUSE_PUBLIC_KEY + LANGFUSE_SECRET_KEY into your Mac's
 # .env file. Cloudflared config is separate — point at langfuse-web:3000.
 #
-# Pi 4 8GB sizing: ~1.2GB idle, ~3.2GB under load. Plenty of headroom.
+# Pi 4 8GB sizing (without ClickHouse): ~600MB idle, ~1.5GB under load.
+# Plenty of headroom. No ClickHouse = ~700MB RAM saved.
 
 services:
-  langfuse-clickhouse:
-    image: clickhouse/clickhouse-server:24.3
-    restart: unless-stopped
-    volumes:
-      - clickhouse_data:/var/lib/clickhouse
-    environment:
-      CLICKHOUSE_DB: ${LANGFUSE_CLICKHOUSE_DB:-langfuse}
-      CLICKHOUSE_USER: ${LANGFUSE_CLICKHOUSE_USER:-langfuse}
-      CLICKHOUSE_PASSWORD: ${LANGFUSE_CLICKHOUSE_PASSWORD:-langfuse_pw}
-      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
-    healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8123/ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 30s
-
   langfuse-postgres:
     image: postgres:16-alpine
     restart: unless-stopped
@@ -61,13 +49,9 @@ services:
         condition: service_healthy
       langfuse-redis:
         condition: service_healthy
-      langfuse-clickhouse:
-        condition: service_healthy
     environment:
       DATABASE_URL: postgresql://${LANGFUSE_PG_USER:-langfuse}:${LANGFUSE_PG_PASSWORD:-langfuse_pw}@langfuse-postgres:5432/${LANGFUSE_PG_DB:-langfuse}
       REDIS_URL: redis://langfuse-redis:6379
-      CLICKHOUSE_URL: clickhouse://${LANGFUSE_CLICKHOUSE_USER:-langfuse}:${LANGFUSE_CLICKHOUSE_PASSWORD:-langfuse_pw}@langfuse-clickhouse:8123/${LANGFUSE_CLICKHOUSE_DB:-langfuse}
-      CLICKHOUSE_MIGRATION_URL: clickhouse://${LANGFUSE_CLICKHOUSE_USER:-langfuse}:${LANGFUSE_CLICKHOUSE_PASSWORD:-langfuse_pw}@langfuse-clickhouse:8123/${LANGFUSE_CLICKHOUSE_DB:-langfuse}
       SALT: ${LANGFUSE_SALT:-change-me-in-production-please-32-chars-min}
       TELEMETRY_ENABLED: "false"
       LANGFUSE_LOG_LEVEL: info
@@ -82,15 +66,11 @@ services:
         condition: service_healthy
       langfuse-redis:
         condition: service_healthy
-      langfuse-clickhouse:
-        condition: service_healthy
       langfuse-worker:
         condition: service_started
     environment:
       DATABASE_URL: postgresql://${LANGFUSE_PG_USER:-langfuse}:${LANGFUSE_PG_PASSWORD:-langfuse_pw}@langfuse-postgres:5432/${LANGFUSE_PG_DB:-langfuse}
       REDIS_URL: redis://langfuse-redis:6379
-      CLICKHOUSE_URL: clickhouse://${LANGFUSE_CLICKHOUSE_USER:-langfuse}:${LANGFUSE_CLICKHOUSE_PASSWORD:-langfuse_pw}@langfuse-clickhouse:8123/${LANGFUSE_CLICKHOUSE_DB:-langfuse}
-      CLICKHOUSE_MIGRATION_URL: clickhouse://${LANGFUSE_CLICKHOUSE_USER:-langfuse}:${LANGFUSE_CLICKHOUSE_PASSWORD:-langfuse_pw}@langfuse-clickhouse:8123/${LANGFUSE_CLICKHOUSE_DB:-langfuse}
       SALT: ${LANGFUSE_SALT:-change-me-in-production-please-32-chars-min}
       NEXTAUTH_SECRET: ${LANGFUSE_NEXTAUTH_SECRET:?NEXTAUTH_SECRET is required (32+ char random)}
       NEXTAUTH_URL: ${LANGFUSE_NEXTAUTH_URL:-http://localhost:3000}
@@ -106,6 +86,5 @@ services:
       LANGFUSE_LOG_LEVEL: info
 
 volumes:
-  clickhouse_data:
   langfuse_pg:
   langfuse_redis:
