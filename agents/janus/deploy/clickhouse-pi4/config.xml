@@ -50,13 +50,9 @@
     <default_session_timeout>60</default_session_timeout>
 
     <remote_servers>
-        <default>
-            <shard>
-                <replica>
-                    <host>localhost</host>
-                    <port>9000</port>
-                </replica>
-            </shard>
-        </default>
+        <!-- Single-node Pi4 setup: no <default> cluster. Langfuse v3
+             migration script uses ReplicatedMergeTree when a cluster
+             is defined, which requires Zookeeper. Without cluster, it
+             falls back to MergeTree (single-node safe). -->
     </remote_servers>
 </clickhouse>
