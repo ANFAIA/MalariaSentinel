@@ -105,7 +105,7 @@ services:
       CLICKHOUSE_USER: ${LANGFUSE_CLICKHOUSE_USER:-langfuse}
       CLICKHOUSE_PASSWORD: ${LANGFUSE_CLICKHOUSE_PASSWORD:-langfuse_pw}
       CLICKHOUSE_DB: ${LANGFUSE_CLICKHOUSE_DB:-langfuse}
-      LANGFUSE_S3_EVENT_UPLOAD_BUCKET: ""
+      LANGFUSE_S3_EVENT_UPLOAD_BUCKET: "disabled"
       SALT: ${LANGFUSE_SALT:-change-me-in-production-please-32-chars}
       TELEMETRY_ENABLED: "false"
       LANGFUSE_LOG_LEVEL: info
@@ -134,7 +134,7 @@ services:
       CLICKHOUSE_USER: ${LANGFUSE_CLICKHOUSE_USER:-langfuse}
       CLICKHOUSE_PASSWORD: ${LANGFUSE_CLICKHOUSE_PASSWORD:-langfuse_pw}
       CLICKHOUSE_DB: ${LANGFUSE_CLICKHOUSE_DB:-langfuse}
-      LANGFUSE_S3_EVENT_UPLOAD_BUCKET: ""
+      LANGFUSE_S3_EVENT_UPLOAD_BUCKET: "disabled"
       SALT: ${LANGFUSE_SALT:-change-me-in-production-please-32-chars}
       NEXTAUTH_SECRET: ${LANGFUSE_NEXTAUTH_SECRET:?NEXTAUTH_SECRET is required (32+ char random)}
       NEXTAUTH_URL: ${LANGFUSE_NEXTAUTH_URL:-http://localhost:3001}

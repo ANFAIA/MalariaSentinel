@@ -72,6 +72,10 @@
         </node>
     </zookeeper>
 
+    <distributed_ddl>
+        <path>/clickhouse/task_queue/ddl</path>
+    </distributed_ddl>
+
     <macros>
         <shard>01</shard>
         <replica>01</replica>
