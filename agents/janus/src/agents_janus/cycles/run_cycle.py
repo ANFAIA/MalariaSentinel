@@ -233,6 +233,8 @@ def run_cycle(
     model: str = "xiaomi/mimo-v2.5",
     thread_id: str = "centinela-session",
     dry_run: bool = False,
+    quiet: bool = False,
+    langfuse_client=None,
 ) -> str:
     """Run a unified ABM improvement cycle.
 
@@ -247,6 +249,8 @@ def run_cycle(
         model: Model identifier.
         thread_id: Thread ID for checkpointing.
         dry_run: If True, print the prompt without executing.
+        quiet: If True, suppress the live terminal panel. JSONL + langfuse still emit.
+        langfuse_client: Optional pre-configured langfuse.Langfuse instance.
 
     Returns:
         The final agent response after the cycle completes.
@@ -272,38 +276,56 @@ def run_cycle(
         })
 
     import agents_janus.agent as agent_mod
+    from agents_janus.live_panel import LivePanel
     from agents_janus.logger import SessionLogger
 
     logger = SessionLogger()
     agent_mod.SESSION_LOGGER = logger
     logger.log_decision("session_start", f"cycle (mode={detected_mode}), goal={goal}, max_iterations={max_iterations}")
 
+    def _on_abort() -> None:
+        logger.log_decision("aborted_by_user", "Ctrl-C during cycle stream")
+        if langfuse_client is not None:
+            try:
+                langfuse_client.flush()
+            except Exception:
+                pass
+
     try:
-        agent = agent_mod.create_orchestrator(provider=provider, model=model, thread_id=thread_id)
+        agent = agent_mod.create_orchestrator(
+            provider=provider, model=model, thread_id=thread_id,
+            langfuse_client=langfuse_client,
+        )
 
         # Capture both messages (LLM reasoning) and graph updates (node execution)
         full_messages = []
         graph_steps = []
 
-        for event in agent.stream(
-            {"messages": [{"role": "user", "content": prompt}]},
-            stream_mode="updates",
-        ):
-            # stream_mode="updates" yields {node_name: state_delta} dicts
-            if isinstance(event, dict):
-                for node_name, delta in event.items():
-                    graph_steps.append({
-                        "node": node_name,
-                        "delta_keys": list(delta.keys()) if isinstance(delta, dict) else str(type(delta)),
-                    })
-                    # Extract messages from the delta
-                    if isinstance(delta, dict) and "messages" in delta:
-                        for msg in delta["messages"]:
-                            if hasattr(msg, "content") and msg.content:
-                                full_messages.append({
-                                    "type": type(msg).__name__,
-                                    "content": msg.content if isinstance(msg.content, str) else str(msg.content),
-                                })
+        with LivePanel(
+            session_id=logger.session_dir.name,
+            quiet=quiet,
+            on_abort=_on_abort,
+        ) as panel:
+            for event in agent.stream(
+                {"messages": [{"role": "user", "content": prompt}]},
+                stream_mode="updates",
+            ):
+                panel.on_event(event)
+                # stream_mode="updates" yields {node_name: state_delta} dicts
+                if isinstance(event, dict):
+                    for node_name, delta in event.items():
+                        graph_steps.append({
+                            "node": node_name,
+                            "delta_keys": list(delta.keys()) if isinstance(delta, dict) else str(type(delta)),
+                        })
+                        # Extract messages from the delta
+                        if isinstance(delta, dict) and "messages" in delta:
+                            for msg in delta["messages"]:
+                                if hasattr(msg, "content") and msg.content:
+                                    full_messages.append({
+                                        "type": type(msg).__name__,
+                                        "content": msg.content if isinstance(msg.content, str) else str(msg.content),
+                                    })
 
         logger.log_graph_steps(graph_steps)
         logger.log_conversation(full_messages)
@@ -311,6 +333,11 @@ def run_cycle(
         logger.log_summary(final_content)
         return final_content
     finally:
+        if langfuse_client is not None:
+            try:
+                langfuse_client.flush()
+            except Exception:
+                pass
         logger.close()
         agent_mod.SESSION_LOGGER = None
 

@@ -1,6 +1,7 @@
 """CLI entry point for the MalariaSentinel DeepAgent system."""
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
@@ -26,6 +27,47 @@ def _setup_module_flags(no_verify: bool) -> None:
     agent_mod.VERIFY_INTEGRATE = not no_verify
 
 
+def _resolve_tracing(tracing: str | None) -> str:
+    """Resolve tracing backend from CLI flag or JANUS_TRACING env var."""
+    return tracing or os.environ.get("JANUS_TRACING", "")
+
+
+def _build_langfuse_client(tracing: str):
+    """Build a langfuse.Langfuse client if tracing=langfuse and env is set.
+
+    Returns None for any other value, missing env vars, or import errors.
+    Logs a warning to stderr if langfuse is requested but unavailable.
+    """
+    if tracing != "langfuse":
+        return None
+    try:
+        from langfuse import Langfuse
+    except ImportError:
+        typer.echo(
+            "⚠ --tracing langfuse requested but langfuse is not installed. "
+            "Install with: uv pip install -e 'agents/janus[observability]'",
+            err=True,
+        )
+        return None
+
+    host = os.environ.get("LANGFUSE_HOST")
+    public_key = os.environ.get("LANGFUSE_PUBLIC_KEY")
+    secret_key = os.environ.get("LANGFUSE_SECRET_KEY")
+    if not (host and public_key and secret_key):
+        typer.echo(
+            "⚠ --tracing langfuse requires LANGFUSE_HOST, LANGFUSE_PUBLIC_KEY, "
+            "LANGFUSE_SECRET_KEY env vars. Continuing without langfuse.",
+            err=True,
+        )
+        return None
+
+    return Langfuse(
+        public_key=public_key,
+        secret_key=secret_key,
+        host=host,
+    )
+
+
 @app.command()
 def run(
     goal: str = typer.Option(None, "--goal", "-g", help="Goal for this run. If not set, you'll be prompted."),
@@ -36,6 +78,8 @@ def run(
     thread_id: str = typer.Option("centinela-session", "--thread-id", "-t", help="Thread ID for checkpointing."),
     dry_run: bool = typer.Option(False, "--dry-run", help="Print the prompt without executing."),
     no_verify: bool = typer.Option(False, "--no-verify", help="Skip approval prompts before integrate/finalize."),
+    quiet: bool = typer.Option(False, "--quiet", "-q", help="Disable the live terminal panel. JSONL + langfuse still emit."),
+    tracing: str = typer.Option("", "--tracing", help="Tracing backend: 'langfuse' (requires langfuse SDK + env vars)."),
 ):
     """Run the unified ABM improvement cycle.
 
@@ -54,6 +98,8 @@ def run(
         raise typer.Exit(1)
 
     _setup_module_flags(no_verify)
+    resolved_tracing = _resolve_tracing(tracing)
+    langfuse_client = _build_langfuse_client(resolved_tracing)
 
     from agents_janus.cycles.run_cycle import run_cycle
 
@@ -65,6 +111,8 @@ def run(
         model=model,
         thread_id=thread_id,
         dry_run=dry_run,
+        quiet=quiet,
+        langfuse_client=langfuse_client,
     )
     typer.echo(result)
 
@@ -160,18 +208,26 @@ def improve(
     model: str = typer.Option("xiaomi/mimo-v2.5", "--model", help="Model identifier."),
     thread_id: str = typer.Option("improvement-session", "--thread-id", "-t", help="Thread ID."),
     no_verify: bool = typer.Option(False, "--no-verify", help="Skip approval prompts."),
+    quiet: bool = typer.Option(False, "--quiet", "-q", help="Disable the live terminal panel. JSONL + langfuse still emit."),
+    tracing: str = typer.Option("", "--tracing", help="Tracing backend: 'langfuse' (requires langfuse SDK + env vars)."),
 ):
     """Run the improvement orchestrator for a goal."""
     if not goal:
         goal = typer.prompt("What is your goal?")
     _setup_module_flags(no_verify)
+    resolved_tracing = _resolve_tracing(tracing)
+    langfuse_client = _build_langfuse_client(resolved_tracing)
+
     from agents_janus.improvement import run_improvement
+
     result = run_improvement(
         goal=goal,
         plan_path=plan,
         provider=provider,
         model=model,
         thread_id=thread_id,
+        quiet=quiet,
+        langfuse_client=langfuse_client,
     )
     typer.echo(result)
 

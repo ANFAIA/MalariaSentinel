@@ -11,6 +11,8 @@ def run_improvement(
     model: str = "xiaomi/mimo-v2.5",
     thread_id: str = "improvement-session",
     context: dict | None = None,
+    quiet: bool = False,
+    langfuse_client=None,
 ) -> str:
     """Run the improvement orchestrator for a given goal.
 
@@ -21,6 +23,9 @@ def run_improvement(
         model: Model identifier.
         thread_id: Thread ID for checkpointing.
         context: Additional context from onboarding (answers, menu_key, etc.).
+        quiet: If True, suppress the live terminal panel. JSONL + langfuse still emit.
+        langfuse_client: Optional pre-configured langfuse.Langfuse instance. If set,
+            the orchestrator's LLM/tool events are also streamed to langfuse.
 
     Returns:
         The orchestrator's final response.
@@ -58,33 +63,56 @@ def run_improvement(
 
     # Delegate to the existing orchestrator with the built prompt
     import agents_janus.agent as agent_mod
+    from agents_janus.live_panel import LivePanel
     from agents_janus.logger import SessionLogger
 
     logger = SessionLogger()
     agent_mod.SESSION_LOGGER = logger
     logger.log_decision("improvement_start", f"goal={goal}, plan={plan_path}")
 
-    try:
-        agent = agent_mod.create_orchestrator(provider=provider, model=model, thread_id=thread_id)
+    def _on_abort() -> None:
+        logger.log_decision("aborted_by_user", "Ctrl-C during improvement stream")
+        if langfuse_client is not None:
+            try:
+                langfuse_client.flush()
+            except Exception:
+                pass
 
-        full_messages = []
-        for event in agent.stream(
-            {"messages": [{"role": "user", "content": prompt}]},
-            stream_mode="updates",
-        ):
-            if isinstance(event, dict):
-                for node_name, delta in event.items():
-                    if isinstance(delta, dict) and "messages" in delta:
-                        for msg in delta["messages"]:
-                            if hasattr(msg, "content") and msg.content:
-                                full_messages.append({
-                                    "type": type(msg).__name__,
-                                    "content": msg.content if isinstance(msg.content, str) else str(msg.content),
-                                })
+    try:
+        agent = agent_mod.create_orchestrator(
+            provider=provider, model=model, thread_id=thread_id,
+            langfuse_client=langfuse_client,
+        )
+
+        with LivePanel(
+            session_id=logger.session_dir.name,
+            quiet=quiet,
+            on_abort=_on_abort,
+        ) as panel:
+            full_messages = []
+            for event in agent.stream(
+                {"messages": [{"role": "user", "content": prompt}]},
+                stream_mode="updates",
+            ):
+                panel.on_event(event)
+                if isinstance(event, dict):
+                    for node_name, delta in event.items():
+                        if isinstance(delta, dict) and "messages" in delta:
+                            for msg in delta["messages"]:
+                                if hasattr(msg, "content") and msg.content:
+                                    full_messages.append({
+                                        "type": type(msg).__name__,
+                                        "content": msg.content if isinstance(msg.content, str) else str(msg.content),
+                                    })
 
         final_content = full_messages[-1]["content"] if full_messages else "No response"
         logger.log_summary(final_content)
         return final_content
     finally:
+        if langfuse_client is not None:
+            try:
+                langfuse_client.flush()
+            except Exception:
+                pass
         logger.close()
         agent_mod.SESSION_LOGGER = None

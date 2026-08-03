@@ -464,6 +464,7 @@ def create_orchestrator(
     provider: str = "openrouter",
     model: str = "xiaomi/mimo-v2.5",
     thread_id: str = "centinela-session",
+    langfuse_client=None,
 ):
     """Create the main orchestrator agent using deepagents.
 
@@ -471,6 +472,9 @@ def create_orchestrator(
         provider: LLM provider ("openrouter", "anthropic", "openai", "google_genai").
         model: Model identifier.
         thread_id: Thread ID for checkpointing.
+        langfuse_client: Optional pre-configured `langfuse.Langfuse` instance. When
+            set, the ObservabilityMiddleware also streams LLM/tool events to langfuse
+            alongside the JSONL sink.
 
     Returns:
         A compiled agent graph ready to invoke.
@@ -484,7 +488,7 @@ def create_orchestrator(
     except ImportError:
         raise ImportError(
             "The 'deepagents' package is required but not installed. "
-            "Install it with: pip install 'mal-deepagents' or pip install deepagents"
+            "Install it with: pip install 'mal-janus' or pip install deepagents"
         )
 
     llm = _resolve_provider(provider, model)
@@ -497,7 +501,7 @@ def create_orchestrator(
     # Build observability middleware if logger is active
     middleware = []
     if SESSION_LOGGER is not None:
-        middleware.append(ObservabilityMiddleware(SESSION_LOGGER))
+        middleware.append(ObservabilityMiddleware(SESSION_LOGGER, langfuse_client=langfuse_client))
 
     skills = []
     if PROJECT_SKILLS.is_dir():
