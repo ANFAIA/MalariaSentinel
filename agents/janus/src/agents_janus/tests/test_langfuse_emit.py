@@ -14,8 +14,10 @@ from agents_janus.observability import ObservabilityMiddleware, _safe_call
 
 class _FakeLangfuseSpan:
     """Mock span object that records update/end calls."""
-    def __init__(self, name):
+    def __init__(self, name, trace_id="fake-trace-id"):
         self.name = name
+        self.trace_id = trace_id
+        self.id = f"span-{name}"
         self.updates = []
         self.ended = False
 
@@ -24,6 +26,13 @@ class _FakeLangfuseSpan:
 
     def end(self):
         self.ended = True
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        self.ended = True
+        return False
 
 
 # ----------------------------------------------------------------------
@@ -85,13 +94,20 @@ def test_no_langfuse_when_disabled():
 @pytest.fixture
 def mock_langfuse():
     lf = MagicMock()
-    lf.span.return_value = _FakeLangfuseSpan("tool:x")
-    lf.generation.return_value = _FakeLangfuseSpan("llm_call")
+    # v4 API: start_observation returns a span-like object
+    lf.start_observation.return_value = _FakeLangfuseSpan("child")
+    # v4 API: start_as_current_observation returns a context manager
+    root_span = _FakeLangfuseSpan("root")
+    cm = MagicMock()
+    cm.__enter__ = MagicMock(return_value=root_span)
+    cm.__exit__ = MagicMock(return_value=False)
+    lf.start_as_current_observation.return_value = cm
     return lf
 
 
 def test_llm_call_emits_generation(mock_langfuse):
     sl = MagicMock()
+    sl.session_dir.name = "janus-test"
     mw = ObservabilityMiddleware(sl, langfuse_client=mock_langfuse)
     state = {"messages": []}
     runtime = MagicMock()
@@ -113,16 +129,21 @@ def test_llm_call_emits_generation(mock_langfuse):
     mw.after_model(state, runtime)
     mw.after_agent(state, runtime)
 
-    mock_langfuse.generation.assert_called_once()
-    kwargs = mock_langfuse.generation.call_args.kwargs
+    # v4: start_observation called with as_type="generation"
+    calls = mock_langfuse.start_observation.call_args_list
+    gen_calls = [c for c in calls if c.kwargs.get("as_type") == "generation"]
+    assert len(gen_calls) == 1
+    kwargs = gen_calls[0].kwargs
     assert kwargs["name"] == "llm_call"
     assert kwargs["model"] == "mimo"
-    assert kwargs["usage"] == {"input": 100, "output": 20, "total": 120}
+    assert kwargs["usage_details"]["input"] == 100
+    assert kwargs["usage_details"]["output"] == 20
     mock_langfuse.flush.assert_called_once()
 
 
 def test_tool_call_emits_span(mock_langfuse):
     sl = MagicMock()
+    sl.session_dir.name = "janus-test"
     mw = ObservabilityMiddleware(sl, langfuse_client=mock_langfuse)
     state = {"messages": []}
     runtime = MagicMock()
@@ -138,16 +159,19 @@ def test_tool_call_emits_span(mock_langfuse):
 
     mw.after_agent(state, runtime)
 
-    mock_langfuse.span.assert_called_once()
-    span_kwargs = mock_langfuse.span.call_args.kwargs
-    assert span_kwargs["name"] == "tool:abm_run"
+    # v4: start_observation called with as_type="span" for tool calls
+    calls = mock_langfuse.start_observation.call_args_list
+    span_calls = [c for c in calls if c.kwargs.get("as_type") == "span" and "tool:" in c.kwargs.get("name", "")]
+    assert len(span_calls) == 1
+    assert span_calls[0].kwargs["name"] == "tool:abm_run"
     # span.end() was called by the middleware
-    span_obj = mock_langfuse.span.return_value
+    span_obj = mock_langfuse.start_observation.return_value
     assert span_obj.ended is True
 
 
 def test_tool_error_marks_span_as_failed(mock_langfuse):
     sl = MagicMock()
+    sl.session_dir.name = "janus-test"
     mw = ObservabilityMiddleware(sl, langfuse_client=mock_langfuse)
     state = {"messages": []}
     runtime = MagicMock()
@@ -164,7 +188,7 @@ def test_tool_error_marks_span_as_failed(mock_langfuse):
     with pytest.raises(RuntimeError):
         mw.wrap_tool_call(request, failing_handler)
 
-    span_obj = mock_langfuse.span.return_value
+    span_obj = mock_langfuse.start_observation.return_value
     # update was called with error info
     assert span_obj.updates, "span.update should have been called"
     update = span_obj.updates[0]
@@ -176,7 +200,8 @@ def test_tool_error_marks_span_as_failed(mock_langfuse):
 def test_langfuse_error_does_not_crash(mock_langfuse):
     """A failing langfuse SDK must not abort the orchestrator run."""
     sl = MagicMock()
-    mock_langfuse.generation.side_effect = RuntimeError("network down")
+    sl.session_dir.name = "janus-test"
+    mock_langfuse.start_as_current_observation.side_effect = RuntimeError("network down")
 
     mw = ObservabilityMiddleware(sl, langfuse_client=mock_langfuse)
     state = {"messages": []}
@@ -192,7 +217,7 @@ def test_langfuse_error_does_not_crash(mock_langfuse):
     response.result = [
         MagicMock(usage_metadata={"input_tokens": 1, "output_tokens": 1}, content="hi")
     ]
-    # Should NOT raise despite langfuse.generation() failing
+    # Should NOT raise despite langfuse failing
     result = mw.wrap_model_call(request, lambda req: response)
     assert result is response
 
@@ -222,8 +247,9 @@ def test_before_agent_writes_session_id_metadata(mock_langfuse):
     runtime = MagicMock()
     runtime.model_name = "m"
     mw.before_agent(state, runtime)
-    mock_langfuse.update_current_observation.assert_called_once()
-    kwargs = mock_langfuse.update_current_observation.call_args.kwargs
+    # v4: start_as_current_observation called with session_id metadata
+    mock_langfuse.start_as_current_observation.assert_called_once()
+    kwargs = mock_langfuse.start_as_current_observation.call_args.kwargs
     assert kwargs["metadata"]["session_id"] == "janus-20260803-123456"
 
 
