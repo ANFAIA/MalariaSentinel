@@ -51,7 +51,7 @@ VERIFY_INTEGRATE: bool = True
 SESSION_LOGGER: SessionLogger | None = None
 
 AGENT_DIR = Path(__file__).resolve().parent
-REPO_ROOT = _project_root
+REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent.parent  # monorepo root (5 levels up from agent.py)
 PROJECT_SKILLS = REPO_ROOT / "agents" / "skills"
 GLOBAL_SKILLS = Path.home() / ".agents" / "skills"
 
