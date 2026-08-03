@@ -8,6 +8,14 @@ Sinks (fan-out):
 2. langfuse.Langfuse → self-hosted langfuse UI (opt-in via --tracing langfuse)
 
 A sink failure never aborts the run — errors are logged to JSONL and ignored.
+
+Langfuse SDK: tested against langfuse>=4.0. We use `start_as_current_observation`
+to open a top-level span in `before_agent`, capture its `trace_id` and `id`,
+then pass `trace_context=TraceContext(trace_id=..., parent_span_id=...)` to
+every child observation in `wrap_model_call` / `wrap_tool_call`. This is more
+robust than relying on OpenTelemetry context propagation across the langchain
+middleware hook boundaries (which doesn't survive the agent's internal
+state-machine transitions).
 """
 from __future__ import annotations
 
@@ -59,6 +67,15 @@ class ObservabilityMiddleware(AgentMiddleware):
         self._lf_trace_id: str | None = None
         self._lf_open_generations: dict[int, Any] = {}
         self._lf_open_tool_spans: dict[int, Any] = {}
+        # v4: a top-level span IS the trace. We enter it as a context manager
+        # in before_agent so we get a stable trace_id, then pass that trace_id
+        # + the root span's id to every child observation via trace_context.
+        # We exit the context manager in after_agent.
+        self._lf_root_cm: Any = None
+        self._lf_root_span: Any = None
+        self._lf_trace_id: str | None = None
+        self._lf_root_span_id: str | None = None
+        self._trace_context: Any = None
 
     # ------------------------------------------------------------------
     # Helpers
@@ -81,13 +98,13 @@ class ObservabilityMiddleware(AgentMiddleware):
         """Return a fresh span context if langfuse is active, else None."""
         if not self.langfuse:
             return None
-        # langfuse v3: span() returns the span object whose context manager is
-        # the span itself; we don't actually use the cm — we call .end()
-        # explicitly on the returned handle. Keeping the call shape simple.
+        # Langfuse v4: use start_observation(as_type=...). Returns a span
+        # object with .update() and .end() — we don't enter a cm, we call
+        # .end() explicitly when the corresponding tool event lands.
         try:
-            return self.langfuse.span(name="tool_call")
+            return self.langfuse.start_observation(as_type="span", name="tool_call")
         except Exception as e:
-            self._log_langfuse_error("span()", _LangfuseErrorMarker(e))
+            self._log_langfuse_error("start_observation(span)", _LangfuseErrorMarker(e))
             return None
 
     # ------------------------------------------------------------------
@@ -109,16 +126,37 @@ class ObservabilityMiddleware(AgentMiddleware):
                 if messages and hasattr(messages[-1], "content"):
                     content = messages[-1].content
                     initial_content = content if isinstance(content, str) else str(content)
-                # Update the current trace with metadata. Langfuse v3 creates a
-                # trace implicitly on first observation; we don't pre-create it.
-                self.langfuse.update_current_observation(
+                # Open the top-level span as a context manager. We need
+                # the trace_id and root span id to attach children explicitly
+                # — OTel context doesn't propagate reliably across the
+                # langchain middleware hook boundaries.
+                self._lf_root_cm = self.langfuse.start_as_current_observation(
+                    as_type="span",
+                    name="janus_session",
                     metadata={
                         "session_id": session_id,
                         "initial_message_preview": initial_content[:500],
                     },
                 )
+                self._lf_root_span = self._lf_root_cm.__enter__()
+                self._lf_trace_id = getattr(self._lf_root_span, "trace_id", None)
+                self._lf_root_span_id = getattr(self._lf_root_span, "id", None)
+                # Pre-build a TraceContext so children can attach without
+                # re-resolving on every call. Import here to keep import
+                # cost off the hot path when langfuse is disabled.
+                if self._lf_trace_id:
+                    from langfuse.types import TraceContext
+                    self._trace_context = TraceContext(
+                        trace_id=self._lf_trace_id,
+                        parent_span_id=self._lf_root_span_id,
+                    )
             except Exception as e:
-                self._log_langfuse_error("before_agent.update", _LangfuseErrorMarker(e))
+                self._log_langfuse_error("before_agent.root_span", _LangfuseErrorMarker(e))
+                self._lf_root_span = None
+                self._lf_root_cm = None
+                self._lf_trace_id = None
+                self._lf_root_span_id = None
+                self._trace_context = None
 
     def after_agent(self, state, runtime):
         elapsed = time.monotonic() - self._agent_start_time if self._agent_start_time else 0
@@ -140,15 +178,19 @@ class ObservabilityMiddleware(AgentMiddleware):
 
         if self.langfuse:
             try:
-                self.langfuse.update_current_observation(
-                    metadata={
-                        "llm_calls": self._llm_call_count,
-                        "tool_calls": self._tool_call_count,
-                        "total_prompt_tokens": self._total_prompt_tokens,
-                        "total_completion_tokens": self._total_completion_tokens,
-                        "elapsed_s": round(elapsed, 1),
-                    },
-                )
+                if self._lf_root_span is not None:
+                    self._lf_root_span.update(
+                        metadata={
+                            "llm_calls": self._llm_call_count,
+                            "tool_calls": self._tool_call_count,
+                            "total_prompt_tokens": self._total_prompt_tokens,
+                            "total_completion_tokens": self._total_completion_tokens,
+                            "elapsed_s": round(elapsed, 1),
+                        },
+                    )
+                # Exit the root span context (also calls .end() on the span).
+                if self._lf_root_cm is not None:
+                    self._lf_root_cm.__exit__(None, None, None)
                 # CRITICAL: ship buffered spans before the run ends.
                 self.langfuse.flush()
             except Exception as e:
@@ -206,16 +248,20 @@ class ObservabilityMiddleware(AgentMiddleware):
             response_preview=response_preview,
         )
 
-        # Langfuse: emit a generation observation for this LLM call
-        if self.langfuse:
+        # Langfuse: emit a generation observation for this LLM call.
+        # Pass trace_context explicitly so this observation nests under the
+        # root span from before_agent — OTel context is unreliable across
+        # the langchain middleware boundaries.
+        if self.langfuse and self._trace_context is not None:
             try:
-                gen = self.langfuse.generation(
+                gen = self.langfuse.start_observation(
+                    as_type="generation",
                     name="llm_call",
                     model=model_name,
                     input=[{"role": "user", "content": str(m.content)[:300]}
                            for m in request.messages[-3:] if hasattr(m, "content")],
                     output=response_preview,
-                    usage={
+                    usage_details={
                         "input": prompt_tokens,
                         "output": completion_tokens,
                         "total": prompt_tokens + completion_tokens,
@@ -224,6 +270,7 @@ class ObservabilityMiddleware(AgentMiddleware):
                         "latency_s": round(elapsed, 3),
                         "step": self._llm_call_count,
                     },
+                    trace_context=self._trace_context,
                 )
                 # end the generation explicitly so timing is captured
                 try:
@@ -231,7 +278,7 @@ class ObservabilityMiddleware(AgentMiddleware):
                 except Exception:
                     pass
             except Exception as e:
-                self._log_langfuse_error("generation()", _LangfuseErrorMarker(e))
+                self._log_langfuse_error("start_observation(generation)", _LangfuseErrorMarker(e))
 
         return response
 
@@ -273,16 +320,20 @@ class ObservabilityMiddleware(AgentMiddleware):
         except Exception:
             pass
 
-        # Langfuse: open a span for this tool call (closed on success/error below)
+        # Langfuse: open a span for this tool call (closed on success/error below).
+        # trace_context forces the span under the root — context propagation
+        # is unreliable across the middleware hook boundary.
         tool_span = None
-        if self.langfuse:
+        if self.langfuse and self._trace_context is not None:
             try:
-                tool_span = self.langfuse.span(
+                tool_span = self.langfuse.start_observation(
+                    as_type="span",
                     name=f"tool:{tool_name}",
                     input={"args": _safe_repr(tool_args)},
+                    trace_context=self._trace_context,
                 )
             except Exception as e:
-                self._log_langfuse_error("tool.span", _LangfuseErrorMarker(e))
+                self._log_langfuse_error("tool.start_observation(span)", _LangfuseErrorMarker(e))
 
         error = None
         try:
