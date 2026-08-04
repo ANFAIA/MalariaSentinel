@@ -15,9 +15,16 @@ import typer
 app = typer.Typer(
     name="janus",
     help="MalariaSentinel DeepAgent System — multi-agent ABM orchestrator. "
-         "Single `run` command handles calibration, features, research, and bug fixes.",
-    no_args_is_help=True,
+         "Running `janus` with no arguments starts the conversational assistant.",
 )
+
+
+@app.callback(invoke_without_command=True)
+def _main(ctx: typer.Context) -> None:
+    """Default: start the conversational onboarding assistant."""
+    if ctx.invoked_subcommand is None:
+        from agents_janus.onboarding import run_onboarding
+        run_onboarding()
 
 
 def _load_dotenv() -> None:
