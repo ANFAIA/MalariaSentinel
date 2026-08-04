@@ -6,7 +6,6 @@ Reads auto-migrate v1 → v2 in memory; writes always produce v2.
 from __future__ import annotations
 import json
 import logging
-from datetime import date
 from pathlib import Path
 
 log = logging.getLogger(__name__)
@@ -60,24 +59,11 @@ def update_manifest(aoi: str, key: str, filename: str) -> Path:
     return update_dataset(aoi, key, None, filename)
 
 
-def update_dataset(
-    aoi: str,
-    dataset_name: str,
-    year: int | str | None,
-    filename: str,
-    period: dict[str, str] | None = None,
-    **kwargs,
-) -> Path:
+def update_dataset(aoi: str, dataset_name: str, year: int | str | None, filename: str, **kwargs) -> Path:
     """Update a specific dataset entry in the manifest.
 
-    Parameters
-    ----------
-    period:
-        Optional dict with ``"start"`` and ``"end"`` keys (ISO date strings)
-        for multi-year entries where ``year`` is ``None``.
-        Example: ``{"start": "2024-01-01", "end": "2025-12-31"}``.
-
     kwargs accepted (forward-compat for Phase 3): type, required_for_abm, variables, format.
+    Currently ignored; will be used when manifest v3 lands.
     """
     path = DATA_ROOT / aoi / "manifest.json"
     manifest = read_manifest(aoi)
@@ -88,16 +74,10 @@ def update_dataset(
             "files": {},
         }
     ds = manifest["datasets"][dataset_name]
-
-    # Store period metadata when provided (multi-year / daily outputs)
-    if period is not None:
-        ds["period"] = period
-
     if year:
         ds.setdefault("files", {})[str(year)] = filename
     else:
         ds.setdefault("files", {})[dataset_name] = filename
-
     all_files = []
     for d in manifest.get("datasets", {}).values():
         all_files.extend(d.get("files", {}).values())
@@ -119,51 +99,14 @@ def list_files(aoi: str) -> dict[str, str]:
     return flat
 
 
-def validate_completeness(aoi: str, years: list[int] | None = None) -> list[str]:
-    """Return list of missing expected files and period coverage issues.
-
-    Parameters
-    ----------
-    aoi:
-        Area of interest identifier.
-    years:
-        Optional list of years to check period coverage for. When provided,
-        datasets with a ``period`` key are validated to ensure the period
-        covers the requested year range. When ``None`` (default), period
-        checks are skipped — backward compatible.
-
-    Returns
-    -------
-    list[str]
-        Empty list means complete. Otherwise contains missing filenames
-        and/or ``period_coverage:`` entries for datasets whose period
-        does not cover the requested years.
-    """
+def validate_completeness(aoi: str) -> list[str]:
+    """Return list of missing expected files. Empty = complete."""
     manifest = read_manifest(aoi)
     data_dir = DATA_ROOT / aoi
     missing = []
-
-    # Phase 1: file-existence check (original behavior)
     for f in manifest.get("expected_files", []):
         if not (data_dir / f).exists():
             missing.append(f)
-
-    # Phase 2: period-coverage check (only when years are provided)
-    if years:
-        requested_start = date(min(years), 1, 1)
-        requested_end = date(max(years), 12, 31)
-        for ds_name, ds in manifest.get("datasets", {}).items():
-            period = ds.get("period")
-            if not period:
-                continue
-            period_start = date.fromisoformat(period["start"])
-            period_end = date.fromisoformat(period["end"])
-            if not (period_start <= requested_start and period_end >= requested_end):
-                missing.append(
-                    f"period_coverage:{ds_name}(period {period['start']}..{period['end']} "
-                    f"does not cover {min(years)}-{max(years)})"
-                )
-
     return missing
 
 
