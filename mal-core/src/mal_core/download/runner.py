@@ -38,6 +38,12 @@ def _standard_path(aoi: str, product: str, year: int | None, ext: str) -> Path:
     return data_dir / f"{aoi}_{product}.{ext}"
 
 
+def _standard_path_daily(aoi: str, product: str, year_start: int, year_end: int) -> Path:
+    """Path for multi-year daily NC output: data/<aoi>/<aoi>_<product>_<start>_<end>_daily.nc"""
+    data_dir = _REPO_ROOT / "data" / aoi
+    return data_dir / f"{aoi}_{product}_{year_start}_{year_end}_daily.nc"
+
+
 
 def run_download(
     aoi: str,
@@ -88,47 +94,76 @@ def run_download(
                         log.warning("    %s is time-series but no years specified — skipping", output_name)
                         continue
 
-                    result = func(aoi=aoi_obj, years=years, months=months, cache_dir=cache)
+                    # Determine format for this output (default: "monthly" for backward compat)
+                    output_format = "monthly"
+                    if spec.formats and output_name in spec.formats:
+                        output_format = spec.formats[output_name]
 
-                    if result is None:
-                        continue
-
-                    # Handle 2D (single month) vs 3D (multi-month) results
-                    has_time = "time" in result.dims or "valid_time" in result.dims
-                    if has_time:
-                        time_dim = "valid_time" if "valid_time" in result.dims else "time"
-                        for yr in years:
-                            sel = result.sel({time_dim: result[time_dim].dt.year == yr})
-                            for mo in (months or range(1, 13)):
-                                month_int = int(mo)
-                                slc = sel.sel({time_dim: sel[time_dim].dt.month == month_int})
-                                ext = ".nc" if isinstance(slc, xr.Dataset) else ".tif"
-                                path = _standard_path(aoi, output_name, yr, ext.lstrip("."))
-                                save_product(slc, path)
-                                update_dataset(
-                                    aoi,
-                                    spec.manifest_keys[output_name],
-                                    yr,
-                                    path.name,
-                                    type="time-series",
-                                    required_for_abm=required_for_abm,
-                                )
-                                log.info("    %s/%02d → %s", yr, month_int, path.name)
-                    else:
-                        # Single (year, month) — 2D result, no time dim
-                        yr = years[0]
-                        ext = ".nc" if isinstance(result, xr.Dataset) else ".tif"
-                        path = _standard_path(aoi, output_name, yr, ext.lstrip("."))
-                        save_product(result, path)
+                    if output_format == "daily":
+                        # Daily path: write entire 3D time-series as ONE multi-year NC
+                        result = func(aoi=aoi_obj, years=years, months=months, cache_dir=cache)
+                        if result is None:
+                            continue
+                        # 3D DataArray → NC via xarray.to_netcdf()
+                        path = _standard_path_daily(aoi, output_name, min(years), max(years))
+                        path.parent.mkdir(parents=True, exist_ok=True)
+                        save_product(result, path, format="nc")
+                        # Register with period metadata
+                        time_dim = "time" if "time" in result.dims else "valid_time"
+                        t0 = str(result[time_dim].values[0])[:10]
+                        t1 = str(result[time_dim].values[-1])[:10]
                         update_dataset(
                             aoi,
                             spec.manifest_keys[output_name],
-                            yr,
+                            None,  # year=None for multi-year NC
                             path.name,
                             type="time-series",
                             required_for_abm=required_for_abm,
+                            format="nc",
+                            period={"start": t0, "end": t1},
                         )
-                        log.info("    %s → %s", yr, path.name)
+                        log.info("    daily NC → %s (period %s to %s)", path.name, t0, t1)
+                    else:
+                        # Monthly path: existing M11 logic (per-month TIF slicing)
+                        result = func(aoi=aoi_obj, years=years, months=months, cache_dir=cache)
+                        if result is None:
+                            continue
+
+                        has_time = "time" in result.dims or "valid_time" in result.dims
+                        if has_time:
+                            time_dim = "valid_time" if "valid_time" in result.dims else "time"
+                            for yr in years:
+                                sel = result.sel({time_dim: result[time_dim].dt.year == yr})
+                                for mo in (months or range(1, 13)):
+                                    month_int = int(mo)
+                                    slc = sel.sel({time_dim: sel[time_dim].dt.month == month_int})
+                                    path = _standard_path(aoi, output_name, yr, "tif")
+                                    save_product(slc, path, format="tif")
+                                    update_dataset(
+                                        aoi,
+                                        spec.manifest_keys[output_name],
+                                        yr,
+                                        path.name,
+                                        type="time-series",
+                                        required_for_abm=required_for_abm,
+                                        format="tif",
+                                    )
+                                    log.info("    %s/%02d → %s", yr, month_int, path.name)
+                        else:
+                            # Single (year, month) — 2D result, no time dim
+                            yr = years[0]
+                            path = _standard_path(aoi, output_name, yr, "tif")
+                            save_product(result, path, format="tif")
+                            update_dataset(
+                                aoi,
+                                spec.manifest_keys[output_name],
+                                yr,
+                                path.name,
+                                type="time-series",
+                                required_for_abm=required_for_abm,
+                                format="tif",
+                            )
+                            log.info("    %s → %s", yr, path.name)
                 else:
                     result = func(aoi=aoi_obj, cache_dir=cache)
 
