@@ -1,7 +1,7 @@
 """Auto-managed AOI manifest — updates data/<aoi>/manifest.json after downloads.
 
-Supports v1 (flat files dict) and v2 (datasets block) schemas.
-Reads auto-migrate v1 → v2 in memory; writes always produce v2.
+Supports v1 (flat files dict), v2 (datasets block), and v3.1 schemas.
+Reads auto-migrate v1 → v2 in memory; writes always produce v3.1.
 """
 from __future__ import annotations
 import json
@@ -59,25 +59,56 @@ def update_manifest(aoi: str, key: str, filename: str) -> Path:
     return update_dataset(aoi, key, None, filename)
 
 
-def update_dataset(aoi: str, dataset_name: str, year: int | str | None, filename: str, **kwargs) -> Path:
+def update_dataset(
+    aoi: str,
+    dataset_name: str,
+    year: int | str | None,
+    filename: str,
+    *,
+    type: str = "time-series",
+    required_for_abm: bool = False,
+    variables: list[str] | None = None,
+    format: str | None = None,
+    period: dict[str, str] | None = None,
+) -> Path:
     """Update a specific dataset entry in the manifest.
 
-    kwargs accepted (forward-compat for Phase 3): type, required_for_abm, variables, format.
-    Currently ignored; will be used when manifest v3 lands.
+    Args:
+        aoi: AOI slug.
+        dataset_name: dataset key (e.g. "chirps_rainfall_daily").
+        year: year for per-year entries, or None for multi-year NC.
+        filename: output filename.
+        type: "static" | "time-series".
+        required_for_abm: whether this dataset is required for ABM runs.
+        variables: list of variable names in the file.
+        format: file format ("tif" | "nc" | "gpkg" | "csr").
+        period: for multi-year NC, {"start": "YYYY-MM-DD", "end": "YYYY-MM-DD"}.
     """
     path = DATA_ROOT / aoi / "manifest.json"
     manifest = read_manifest(aoi)
     if dataset_name not in manifest.get("datasets", {}):
         manifest.setdefault("datasets", {})[dataset_name] = {
-            "type": kwargs.get("type", "time-series"),
-            "format": filename.rsplit(".", 1)[-1],
+            "type": type,
+            "format": format or filename.rsplit(".", 1)[-1],
+            "required_for_abm": required_for_abm,
             "files": {},
         }
     ds = manifest["datasets"][dataset_name]
+    # Update metadata fields
+    ds["type"] = type
+    if format:
+        ds["format"] = format
+    ds["required_for_abm"] = required_for_abm
+    if variables:
+        ds["variables"] = variables
+    if period:
+        ds["period"] = period
+
     if year:
         ds.setdefault("files", {})[str(year)] = filename
     else:
         ds.setdefault("files", {})[dataset_name] = filename
+
     all_files = []
     for d in manifest.get("datasets", {}).values():
         all_files.extend(d.get("files", {}).values())
@@ -99,15 +130,54 @@ def list_files(aoi: str) -> dict[str, str]:
     return flat
 
 
-def validate_completeness(aoi: str) -> list[str]:
-    """Return list of missing expected files. Empty = complete."""
+def validate_completeness(aoi: str, *, years: list[int] | None = None) -> list[str]:
+    """Return list of missing expected files. Empty = complete.
+
+    For daily NC entries with a ``period`` field, checks that the
+    period covers the requested years rather than individual file existence.
+    """
     manifest = read_manifest(aoi)
     data_dir = DATA_ROOT / aoi
     missing = []
+
+    for ds_name, ds in manifest.get("datasets", {}).items():
+        period = ds.get("period")
+        if period and years:
+            # Daily NC entry: check period covers requested years
+            period_start = period.get("start", "")
+            period_end = period.get("end", "")
+            if period_start and period_end:
+                start_year = int(period_start[:4])
+                end_year = int(period_end[:4])
+                for y in years:
+                    if y < start_year or y > end_year:
+                        missing.append(
+                            f"{ds_name}: period {period_start}..{period_end} "
+                            f"does not cover year {y}"
+                        )
+                # Also check that at least one file exists
+                files = ds.get("files", {})
+                if not any((data_dir / f).exists() for f in files.values()):
+                    for f in files.values():
+                        if not (data_dir / f).exists():
+                            missing.append(f)
+            else:
+                # Incomplete period metadata
+                for f in ds.get("files", {}).values():
+                    if not (data_dir / f).exists():
+                        missing.append(f)
+        else:
+            # Standard per-file check
+            for f in ds.get("files", {}).values():
+                if not (data_dir / f).exists():
+                    missing.append(f)
+
+    # Also check legacy expected_files list
     for f in manifest.get("expected_files", []):
-        if not (data_dir / f).exists():
+        if f not in missing and not (data_dir / f).exists():
             missing.append(f)
-    return missing
+
+    return sorted(set(missing))
 
 
 def get_dataset_files(aoi: str, dataset_name: str, year: int | str | None = None) -> list[Path]:
