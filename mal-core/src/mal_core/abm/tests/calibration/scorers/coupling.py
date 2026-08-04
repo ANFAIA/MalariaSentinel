@@ -6,20 +6,12 @@ from typing import Any
 import numpy as np
 import rasterio
 
-from scorers.base import Scorer, ScorerResult
+from scorers.base import Scorer, ScorerResult, find_state_files
 
 
 def _final_state_file(run_dir: Path) -> Path | None:
-    seeds = sorted(run_dir.glob("state_seed*.tif"))
-    if seeds:
-        return seeds[-1]
-    days = sorted(run_dir.glob("state_day*.tif"))
-    if days:
-        return days[-1]
-    state = run_dir / "state.tif"
-    if state.exists():
-        return state
-    return None
+    files = find_state_files(run_dir)
+    return files[-1] if files else None
 
 
 class CouplingScorer(Scorer):

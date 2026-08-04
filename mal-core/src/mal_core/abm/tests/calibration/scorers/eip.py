@@ -4,7 +4,7 @@ import json
 import math
 from pathlib import Path
 from typing import Any
-from scorers.base import Scorer, ScorerResult
+from scorers.base import Scorer, ScorerResult, find_cohort_file
 
 class EIPScorer(Scorer):
     @property
@@ -13,15 +13,16 @@ class EIPScorer(Scorer):
     def weight(self) -> float: return 2.0
 
     def score(self, run_dir: Path, experiment: dict[str, Any]) -> ScorerResult:
-        cohort_path = run_dir / "cohort.json"
-        if not cohort_path.exists():
-            cohort_files = sorted(run_dir.glob("cohort_seed*.json"))
-            if not cohort_files:
-                return ScorerResult(score=0.0, value=0.0, target="0.20-0.50",
-                                  diagnostics={"error": "cohort.json not found"}, passed=False)
-            cohort_path = cohort_files[0]
+        cohort_path = find_cohort_file(run_dir)
+        if cohort_path is None:
+            return ScorerResult(score=0.0, value=0.0, target="0.20-0.50",
+                              diagnostics={"error": "cohort.json not found"}, passed=False)
         data = json.loads(cohort_path.read_text())
         daily = data.get("daily", [])
+        if not daily:
+            # Aquatic JSON has different structure — not a cohort file
+            return ScorerResult(score=0.0, value=0.0, target="0.20-0.50",
+                              diagnostics={"error": "no daily cohort data"}, passed=False)
         # Find the entry closest to day 30
         day30 = None
         for entry in daily:

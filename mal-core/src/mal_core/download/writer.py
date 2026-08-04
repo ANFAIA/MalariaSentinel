@@ -9,7 +9,7 @@ import rioxarray  # noqa: F401 — registers .rio accessor
 log = logging.getLogger(__name__)
 
 
-def save_product(data: xr.DataArray | xr.Dataset, path: Path, format: str | None = None) -> Path:
+def save_product(data: xr.DataArray | xr.Dataset, path: Path, format: str | None = None, var_name: str | None = None) -> Path:
     """Save a loader return value to disk.
 
     Args:
@@ -17,6 +17,8 @@ def save_product(data: xr.DataArray | xr.Dataset, path: Path, format: str | None
         path: output file path.
         format: explicit format hint ("tif" | "nc"). If None, infers from
                 isinstance(data, xr.Dataset) → nc, else → tif.
+        var_name: variable name for NetCDF DataArray (e.g. "rainfall").
+                  If None, uses path.stem.
 
     Returns the path that was written.
 
@@ -41,7 +43,8 @@ def save_product(data: xr.DataArray | xr.Dataset, path: Path, format: str | None
             data.to_netcdf(path)
         else:
             # DataArray → Dataset for NetCDF
-            ds = data.to_dataset(name=path.stem)
+            name = var_name or path.stem
+            ds = data.to_dataset(name=name)
             ds.to_netcdf(path)
         log.info("Saved dataset → %s", path)
     else:

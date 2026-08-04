@@ -7,7 +7,7 @@ from typing import Any
 import numpy as np
 import rasterio
 
-from scorers.base import Scorer, ScorerResult
+from scorers.base import Scorer, ScorerResult, find_day_files
 
 
 class ActivationScorer(Scorer):
@@ -20,11 +20,7 @@ class ActivationScorer(Scorer):
         return 1.0
 
     def score(self, run_dir: Path, experiment: dict[str, Any]) -> ScorerResult:
-        day_files = sorted(run_dir.glob("state_day*.tif")) + sorted(run_dir.glob("state_seed*_day*.tif"))
-        if not day_files:
-            state = run_dir / "state.tif"
-            if state.exists():
-                day_files = [state]
+        day_files = find_day_files(run_dir)
         if not day_files:
             return ScorerResult(score=0.0, value=0.0, target="0.05-0.30",
                                 diagnostics={"error": "no day files"}, passed=False)

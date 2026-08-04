@@ -15,7 +15,7 @@ from typing import Any
 import numpy as np
 import rasterio
 
-from scorers.base import Scorer, ScorerResult
+from scorers.base import Scorer, ScorerResult, find_state_files, find_day0_file
 
 
 def _haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
@@ -29,22 +29,11 @@ def _haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
 
 
 def _seed_files(run_dir: Path) -> list[Path]:
-    files = sorted(run_dir.glob("state_seed*.tif"))
-    if not files:
-        state = run_dir / "state.tif"
-        if state.exists():
-            files = [state]
-    return files
+    return find_state_files(run_dir)
 
 
 def _day0_file(run_dir: Path) -> Path | None:
-    candidates = sorted(run_dir.glob("state_day000*.tif"))
-    if candidates:
-        return candidates[0]
-    state = run_dir / "state.tif"
-    if state.exists():
-        return state
-    return None
+    return find_day0_file(run_dir)
 
 
 def _seed_cell(run_dir: Path, transform) -> tuple[int, int]:

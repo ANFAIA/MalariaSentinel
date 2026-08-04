@@ -6,7 +6,7 @@ from typing import Any
 import numpy as np
 import rasterio
 
-from scorers.base import Scorer, ScorerResult
+from scorers.base import Scorer, ScorerResult, find_state_files
 
 
 class MassScorer(Scorer):
@@ -19,11 +19,7 @@ class MassScorer(Scorer):
         return 2.0
 
     def score(self, run_dir: Path, experiment: dict[str, Any]) -> ScorerResult:
-        tifs = sorted(run_dir.glob("state_*.tif"))
-        if not tifs:
-            state = run_dir / "state.tif"
-            if state.exists():
-                tifs = [state]
+        tifs = find_state_files(run_dir)
         if not tifs:
             return ScorerResult(score=0.0, value=0.0, target="1.00",
                                 diagnostics={"error": "no tifs"}, passed=False)

@@ -105,9 +105,12 @@ def run_download(
                         if result is None:
                             continue
                         # 3D DataArray → NC via xarray.to_netcdf()
+                        # Variable name: strip "_daily" suffix for ABM compatibility
+                        # (e.g. "rainfall_daily" → "rainfall")
+                        nc_var_name = output_name.removesuffix("_daily")
                         path = _standard_path_daily(aoi, output_name, min(years), max(years))
                         path.parent.mkdir(parents=True, exist_ok=True)
-                        save_product(result, path, format="nc")
+                        save_product(result, path, format="nc", var_name=nc_var_name)
                         # Register with period metadata
                         time_dim = "time" if "time" in result.dims else "valid_time"
                         t0 = str(result[time_dim].values[0])[:10]

@@ -62,6 +62,69 @@ def _default_cache_dir() -> pathlib.Path:
     return pathlib.Path(base) / "mal_commonlib" / "chirps"
 
 
+def _cache_path_aoi(cdir: pathlib.Path, aoi_slug: str, year: int, month: int, day: int) -> pathlib.Path:
+    """Cache path for AOI-clipped CHIRPS daily TIF: ``<cdir>/<aoi_slug>/chirps-v2.0.YYYY.MM.DD.tif``."""
+    return cdir / aoi_slug / f"chirps-v2.0.{year:04d}.{month:02d}.{day:02d}.tif"
+
+
+def _download_and_clip_to_aoi(
+    url: str,
+    aoi: AOI,
+    dest: pathlib.Path,
+    *,
+    timeout: int = 120,
+) -> xr.DataArray:
+    """Download global CHIRPS .gz, extract, clip to AOI, cache clipped TIF, clean up global."""
+    import tempfile
+
+    dest.parent.mkdir(parents=True, exist_ok=True)
+
+    # If already cached (AOI-clipped), just read it
+    if dest.exists() and dest.stat().st_size > 0:
+        return _read_chirps_tif_gz(dest, aoi)
+
+    # Download global .gz to temp
+    with tempfile.TemporaryDirectory(prefix="chirps_dl_") as tmpdir:
+        gz_path = pathlib.Path(tmpdir) / "global.tif.gz"
+        tif_path = pathlib.Path(tmpdir) / "global.tif"
+
+        _download_to(url, gz_path)
+        with gzip.open(gz_path, "rb") as f_in, open(tif_path, "wb") as f_out:
+            shutil.copyfileobj(f_in, f_out)
+        # .gz no longer needed
+        gz_path.unlink(missing_ok=True)
+
+        # Read global, clip to AOI, write clipped to cache
+        da = _read_chirps_tif_gz(tif_path, aoi)
+        # Write clipped AOI TIF to cache (float32, with CRS)
+        _write_aoi_tif(dest, da, aoi)
+        return da
+
+
+def _write_aoi_tif(path: pathlib.Path, da: xr.DataArray, aoi: AOI) -> None:
+    """Write an AOI-clipped DataArray as a GeoTIFF for caching."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    h, w = da.shape
+    transform = rasterio.transform.from_bounds(*aoi.bbox, w, h)
+    profile = {
+        "driver": "GTiff",
+        "dtype": "float32",
+        "count": 1,
+        "height": h,
+        "width": w,
+        "crs": aoi.crs,
+        "transform": transform,
+        "nodata": CHIRPS_NODATA,
+        "tiled": True,
+        "compress": "deflate",
+    }
+    arr = np.asarray(da.values, dtype=np.float32)
+    # Replace NaN with nodata sentinel for writing
+    arr = np.where(~np.isfinite(arr), np.float32(CHIRPS_NODATA), arr)
+    with rasterio.open(path, "w", **profile) as dst:
+        dst.write(arr, 1)
+
+
 def _days_in_month(year: int, month: int) -> list[int]:
     n = calendar.monthrange(year, month)[1]
     return list(range(1, n + 1))
@@ -256,13 +319,8 @@ def load_chirps_rainfall(
 
     def _default_fetch(y: int, m: int, d: int) -> xr.DataArray:
         url = _daily_url_for(y, m, d)
-        gz = cdir / f"chirps-v2.0.{y:04d}.{m:02d}.{d:02d}.tif.gz"
-        tif = gz.with_suffix("")  # drop .gz
-        if not tif.exists():
-            _download_to(url, gz)
-            with gzip.open(gz, "rb") as f_in, open(tif, "wb") as f_out:
-                shutil.copyfileobj(f_in, f_out)
-        return _read_chirps_tif_gz(tif, aoi)
+        dest = _cache_path_aoi(cdir, aoi.slug, y, m, d)
+        return _download_and_clip_to_aoi(url, aoi, dest)
 
     results: list[xr.DataArray] = []
     time_coords: list[np.datetime64] = []
@@ -354,13 +412,8 @@ def load_chirps_rainfall_daily(
 
         def _default_fetch(y: int, m: int, d: int) -> xr.DataArray:
             url = _daily_url_for(y, m, d)
-            gz = cdir / f"chirps-v2.0.{y:04d}.{m:02d}.{d:02d}.tif.gz"
-            tif = gz.with_suffix("")  # drop .gz
-            if not tif.exists():
-                _download_to(url, gz)
-                with gzip.open(gz, "rb") as f_in, open(tif, "wb") as f_out:
-                    shutil.copyfileobj(f_in, f_out)
-            return _read_chirps_tif_gz(tif, aoi)
+            dest = _cache_path_aoi(cdir, aoi.slug, y, m, d)
+            return _download_and_clip_to_aoi(url, aoi, dest)
 
         fetch = _default_fetch
     else:
