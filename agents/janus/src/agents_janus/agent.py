@@ -266,30 +266,41 @@ Step 13: ASK THE USER to confirm or revise before iterating.
 PHASE 6 — DELEGATE TO WORKERS (parallel when possible)
 ═══════════════════════════════════════════════════════════════════════════════
 
-Step 14: For each independent piece of work, spawn a worker in PARALLEL.
+Step 14: For EACH independent piece of work, spawn a worker.
 
-  WORKTREE ISOLATION (mandatory for every worker):
+  WORKFLOW FOR EACH WORKER:
 
-    1. spawn_result = gitagent_spawn(feature="<name>", agent_id="a_fix", role="abm")
-    2. set_worktree_context(agent_id="a_fix", worktree_path=spawn_result["worktree"])
-    3. task(subagent_type="abm-worker", description="<task>")
-    4. clear_worktree_context()
+    1. gitagent_start(feature="<name>")  — once per feature
+    2. gitagent_spawn(feature="<name>", agent_id="<id>", role="<role>")
+    3. set_worktree_context(agent_id="<id>", worktree_path=result["worktree"])
+    4. task(subagent_type="abm-worker", description="<detailed task>")
+       → The subagent edits files, runs tests, and calls gitagent propose
+    5. clear_worktree_context()
+    6. gitagent_proposals(feature="<name>")  — list the proposals
+    7. gitagent_diff(feature="<name>", proposal_id="<pid>")  — review the diff
+    8. DECIDE:
+       - If diff looks good: gitagent_accept(feature="<name>", proposal_id="<pid>")
+       - If diff has issues: gitagent_revise(feature="<name>", proposal_id="<pid>", feedback="<what to fix>")
+       - If diff is wrong: gitagent_reject(feature="<name>", proposal_id="<pid>", reason="<why>")
+    9. If revised: goto step 2 with same agent_id (re-spawn in same worktree)
+    10. After all proposals accepted: gitagent_integrate(feature="<name>")
+    11. gitagent_finalize(feature="<name>", message="<commit message>")
 
-  Without step 2, the worker compiles/runs from the main repo — defeating isolation.
-
-  For parallel workers: spawn all agents, set all contexts, invoke all tasks, clear all.
+  FOR PARALLEL WORKERS (independent tasks):
+    - Spawn ALL agents first (steps 1-4 for each)
+    - Set ALL worktree contexts
+    - Invoke ALL tasks (they run in parallel)
+    - Then review ALL proposals
+    - Then integrate ALL
 
   The task description MUST include:
-  - Reconnaissance findings (specific files, line numbers)
-  - Hypothesis (what you think is wrong)
   - What files to change and how
   - How to verify (specific test command)
-  - Feature name for gitagent propose
-  - The worktree path (for shell commands: cd into it first)
+  - Feature name and agent_id
+  - The worktree path (for cd into it)
 
-Step 15: Wait for proposals, review with gitagent_diff, accept/reject/revise.
-
-Step 16: gitagent_integrate(feature="<name>") → gitagent_finalize(feature="<name>", message="...")
+  DO NOT skip steps 6-11. The subagent writes code but YOU must capture,
+  review, and integrate the proposal.
 
 ═══════════════════════════════════════════════════════════════════════════════
 PHASE 7 — VALIDATE END-TO-END
@@ -310,6 +321,8 @@ CRITICAL RULES:
 - PARALLEL WORKERS — spawn independent fixes in parallel
 - Always pass --feature to every gitagent command
 - Iterations unlimited — keep revising until the change is correct
+- ALWAYS CAPTURE PROPOSALS — after every task(), call gitagent_proposals + gitagent_diff + accept/reject
+- NEVER SKIP INTEGRATE — after accepting, always gitagent_integrate + gitagent_finalize
 """
 
 WORKER_DEFINITIONS = [
@@ -339,8 +352,10 @@ WORKER_DEFINITIONS = [
             "Use opencode_search to find scientific literature if you need parameter ranges "
             "or biological context. Use memory_recall_kg to check past patterns and pitfalls. "
             "Read papers in papers/ directory for domain knowledge. "
-            "When your work is done, run from the REPO ROOT: "
-            "gitagent propose --feature <name> --agent <your-id> --title '...' --summary '...' --confidence 0.8"
+            "When your work is done, you MUST call gitagent propose to capture your changes. "
+            "Run from the REPO ROOT (not from inside the worktree): "
+            "gitagent propose --feature <feature_name> --agent <your_agent_id> --title '<short title>' --summary '<one paragraph>' --confidence 0.8"
+            "Without this call, your work is LOST — the orchestrator cannot see or integrate your changes."
         ),
         "tools": [
             _wrap_with_logging(_import_abm_run()),

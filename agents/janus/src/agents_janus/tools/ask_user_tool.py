@@ -11,6 +11,7 @@ the LLM having the user's input.
 from __future__ import annotations
 
 import json
+import os
 import sys
 
 
@@ -42,6 +43,17 @@ def ask_user(
         JSON string with {"question", "answer", "options"} so the LLM
         can use the answer in its next step.
     """
+    # No-ask mode: auto-proceed with default when JANUS_NO_ASK_USER=1
+    if os.environ.get("JANUS_NO_ASK_USER") == "1":
+        auto_answer = default or "auto-proceed"
+        print(f"   [no-ask mode] {question} → {auto_answer}", file=sys.stderr)
+        return json.dumps({
+            "question": question,
+            "answer": auto_answer,
+            "options": options,
+            "auto": True,
+        })
+
     print("\n" + "═" * 70, file=sys.stderr)
     print("🤔 AGENT ASKS:", file=sys.stderr)
     print(f"   {question}", file=sys.stderr)

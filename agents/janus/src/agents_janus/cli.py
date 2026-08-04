@@ -107,6 +107,7 @@ def run(
     thread_id: str = typer.Option("centinela-session", "--thread-id", "-t", help="Thread ID for checkpointing."),
     dry_run: bool = typer.Option(False, "--dry-run", help="Print the prompt without executing."),
     no_verify: bool = typer.Option(False, "--no-verify", help="Skip approval prompts before integrate/finalize."),
+    no_ask: bool = typer.Option(False, "--no-ask", help="Skip user prompts (auto-proceed with defaults)."),
     quiet: bool = typer.Option(False, "--quiet", "-q", help="Disable the live terminal panel. JSONL + langfuse still emit."),
     tracing: str = typer.Option("", "--tracing", help="Tracing backend: 'langfuse' (requires langfuse SDK + env vars)."),
 ):
@@ -125,6 +126,9 @@ def run(
     if mode and mode not in ("calibration", "feature", "research", "general"):
         typer.echo(f"Invalid mode: {mode}. Use calibration, feature, research, or general.")
         raise typer.Exit(1)
+
+    if no_ask:
+        os.environ["JANUS_NO_ASK_USER"] = "1"
 
     _setup_module_flags(no_verify)
     resolved_tracing = _resolve_tracing(tracing)
@@ -237,12 +241,17 @@ def improve(
     model: str = typer.Option("xiaomi/mimo-v2.5", "--model", help="Model identifier."),
     thread_id: str = typer.Option("improvement-session", "--thread-id", "-t", help="Thread ID."),
     no_verify: bool = typer.Option(False, "--no-verify", help="Skip approval prompts."),
+    no_ask: bool = typer.Option(False, "--no-ask", help="Skip user prompts (auto-proceed with defaults)."),
     quiet: bool = typer.Option(False, "--quiet", "-q", help="Disable the live terminal panel. JSONL + langfuse still emit."),
     tracing: str = typer.Option("", "--tracing", help="Tracing backend: 'langfuse' (requires langfuse SDK + env vars)."),
 ):
     """Run the improvement orchestrator for a goal."""
     if not goal:
         goal = typer.prompt("What is your goal?")
+
+    if no_ask:
+        os.environ["JANUS_NO_ASK_USER"] = "1"
+
     _setup_module_flags(no_verify)
     resolved_tracing = _resolve_tracing(tracing)
     langfuse_client = _build_langfuse_client(resolved_tracing)
