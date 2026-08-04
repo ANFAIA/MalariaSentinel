@@ -18,6 +18,7 @@ from agents_janus.tools import (
     gitagent_spawn,
     gitagent_list_agents,
     gitagent_kill,
+    gitagent_propose,
     gitagent_proposals,
     gitagent_diff,
     gitagent_accept,
@@ -352,15 +353,16 @@ WORKER_DEFINITIONS = [
             "Use opencode_search to find scientific literature if you need parameter ranges "
             "or biological context. Use memory_recall_kg to check past patterns and pitfalls. "
             "Read papers in papers/ directory for domain knowledge. "
-            "When your work is done, you MUST call gitagent propose to capture your changes. "
-            "Run from the REPO ROOT (not from inside the worktree): "
-            "gitagent propose --feature <feature_name> --agent <your_agent_id> --title '<short title>' --summary '<one paragraph>' --confidence 0.8"
+            "When your work is done, you MUST call gitagent_propose to capture your changes. "
+            "This is a tool call, not a shell command. Just call: "
+            "gitagent_propose(feature='<feature_name>', agent_id='<your_agent_id>', title='<short title>', summary='<one paragraph>', confidence=0.8)"
             "Without this call, your work is LOST — the orchestrator cannot see or integrate your changes."
         ),
         "tools": [
             _wrap_with_logging(_import_abm_run()),
             _wrap_with_logging(_import_abm_test()),
             _wrap_with_logging(_import_abm_score()),
+            _wrap_with_logging(gitagent_propose),
         ],
         # Permissions are added dynamically in create_orchestrator() if FilesystemPermission is available
     },
@@ -428,6 +430,7 @@ TOOLS = [
     _wrap_with_logging(gitagent_spawn),
     _wrap_with_logging(gitagent_list_agents),
     _wrap_with_logging(gitagent_kill),
+    _wrap_with_logging(gitagent_propose),
     _wrap_with_logging(gitagent_proposals),
     _wrap_with_logging(gitagent_diff),
     _wrap_with_logging(gitagent_accept),

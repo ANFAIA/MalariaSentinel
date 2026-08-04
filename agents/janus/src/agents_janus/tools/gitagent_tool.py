@@ -105,6 +105,39 @@ def gitagent_kill(agent_id: str, feature: str) -> str:
 
 # ── Proposals ───────────────────────────────────────────────────────
 
+def gitagent_propose(feature: str, agent_id: str, title: str, summary: str = "", confidence: float = 0.8) -> str:
+    """Capture an agent's worktree changes as a proposal.
+
+    Runs 'gitagent propose' from the REPO ROOT (not the worktree).
+    The worktree path is resolved from the agent's registered worktree.
+    """
+    # Resolve worktree path from the agent registry
+    try:
+        from agents_janus.tools.abm_tools import _WORKTREE_REGISTRY
+        wt = _WORKTREE_REGISTRY.get(agent_id)
+        if wt:
+            worktree = str(wt)
+        else:
+            worktree = None
+    except ImportError:
+        worktree = None
+
+    args = ["propose", "--feature", feature, "--agent", agent_id,
+            "--title", title, "--confidence", str(confidence)]
+    if summary:
+        args.extend(["--summary", summary])
+
+    result = _run_gitagent(args)
+    if result["returncode"] != 0:
+        return json.dumps({"error": result["stderr"], "status": "failed", "agent_id": agent_id})
+    return json.dumps({
+        "agent_id": agent_id,
+        "feature": feature,
+        "title": title,
+        "status": "proposed",
+        "raw": result["stdout"],
+    })
+
 def gitagent_proposals(feature: str) -> str:
     """List all proposals for a feature. Uses --json."""
     result = _run_gitagent(["proposals", "--feature", feature, "--json"])
@@ -166,9 +199,11 @@ def gitagent_integrate(feature: str, *, verify: bool = True) -> str:
     Args:
         feature: The feature name.
         verify: If True (default), show proposals and require user confirmation
-            before applying. Pass False to skip.
+            before applying. Pass False to skip. Respects JANUS_NO_ASK_USER.
     """
-    if verify:
+    import os
+    no_ask = os.environ.get("JANUS_NO_ASK_USER") == "1"
+    if verify and not no_ask:
         # Show what will be integrated
         proposals_result = _run_gitagent(["proposals", "--feature", feature, "--json"])
         summary = proposals_result.get("stdout", "No proposals found.")
@@ -214,9 +249,11 @@ def gitagent_finalize(feature: str, message: str, *, verify: bool = True) -> str
         feature: The feature name.
         message: The commit message.
         verify: If True (default), show proposals and require user confirmation.
-            If False, skip the approval prompt.
+            If False, skip the approval prompt. Respects JANUS_NO_ASK_USER.
     """
-    if verify:
+    import os
+    no_ask = os.environ.get("JANUS_NO_ASK_USER") == "1"
+    if verify and not no_ask:
         # Show what will be finalized
         proposals_result = _run_gitagent(["proposals", "--feature", feature, "--json"])
         summary = proposals_result.get("stdout", "No proposals found.")

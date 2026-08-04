@@ -44,10 +44,10 @@ class TestWorkerDefinitions:
         assert "research-worker" in names
 
     def test_abm_worker_has_tools(self):
-        """abm-worker has 3 custom tools: abm_run, abm_test, abm_score."""
+        """abm-worker has 4 custom tools: abm_run, abm_test, abm_score, gitagent_propose."""
         abm = next(w for w in WORKER_DEFINITIONS if w["name"] == "abm-worker")
         assert "tools" in abm
-        assert len(abm["tools"]) == 3
+        assert len(abm["tools"]) == 4
 
     def test_research_worker_is_read_only(self):
         """research-worker has no code-modifying tools (read-only)."""
@@ -62,7 +62,7 @@ class TestWorkerDefinitions:
         abm = next(w for w in WORKER_DEFINITIONS if w["name"] == "abm-worker")
         sp = abm["system_prompt"]
         assert "ANY part" in sp or "any" in sp.lower()
-        assert "gitagent propose" in sp
+        assert "gitagent_propose" in sp or "gitagent propose" in sp
 
 
 class TestCreateOrchestrator:
