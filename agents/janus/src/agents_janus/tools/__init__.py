@@ -22,6 +22,15 @@ from .pipeline_tool import (
 from .kg_tool import memory_recall_kg
 from .improve_tool import improve_prompt
 from .ask_user_tool import ask_user
+from .onboard_tools import (
+    onboard_run_abm,
+    onboard_run_stage,
+    onboard_run_pipeline,
+    onboard_status,
+    onboard_diagnose,
+    onboard_list_components,
+    onboard_delegate,
+)
 
 __all__ = [
     "opencode_search",
@@ -43,4 +52,11 @@ __all__ = [
     "memory_recall_kg",
     "improve_prompt",
     "ask_user",
+    "onboard_run_abm",
+    "onboard_run_stage",
+    "onboard_run_pipeline",
+    "onboard_status",
+    "onboard_diagnose",
+    "onboard_list_components",
+    "onboard_delegate",
 ]

@@ -226,10 +226,11 @@ def research(
 def onboard(
     provider: str = typer.Option("openrouter", "--provider", "-p", help="LLM provider."),
     model: str = typer.Option("xiaomi/mimo-v2.5", "--model", help="Model identifier."),
+    quiet: bool = typer.Option(False, "--quiet", "-q", help="Suppress technical output. Clean conversational experience."),
 ):
-    """Interactive onboarding menu. Walks you through common tasks."""
+    """Conversational onboarding agent. Ask questions, run tasks, get help."""
     from agents_janus.onboarding import run_onboarding
-    result = run_onboarding(provider=provider, model=model)
+    result = run_onboarding(provider=provider, model=model, quiet=quiet)
     typer.echo(result)
 
 

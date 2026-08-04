@@ -1,169 +1,217 @@
-"""Onboarding orchestrator — read-mostly, YAML-menu-driven."""
+"""Onboarding agent — conversational REPL for the MalariaSentinel SDSS.
+
+Replaces the old numbered-menu onboarding with an interactive agent that
+understands natural language and executes tools directly. Bilingual (es/en).
+"""
 from __future__ import annotations
+
 import json
 import sys
 from pathlib import Path
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent
-_MENU_PATH = Path(__file__).resolve().parent / "config" / "onboarding_menu.yaml"
+_AGENT_DIR = Path(__file__).resolve().parent
+_PROJECT_SKILLS = _REPO_ROOT / "agents" / "skills"
+
+ONBOARD_SYSTEM_PROMPT = """\
+You are the MalariaSentinel Centinela assistant. You help users interact with the SDSS (Spatial Decision Support System) for malaria elimination.
+
+LANGUAGE: Respond in the same language the user uses. If they write in Spanish, respond in Spanish. If English, respond in English. Be natural and conversational.
+
+YOUR CAPABILITIES (use your tools):
+- Run ABM simulations (onboard_run_abm)
+- Run individual pipeline stages (onboard_run_stage: download, ingest, abm, score, train, predict)
+- Run the full 6-stage pipeline (onboard_run_pipeline)
+- Check system status: scorecards, plans, subagents (onboard_status)
+- Diagnose simulation issues with trajectory data (onboard_diagnose)
+- List available subagents and components (onboard_list_components)
+- Delegate complex code-editing tasks to the improvement orchestrator (onboard_delegate)
+- Recall past patterns and pitfalls from the knowledge base (memory_recall_kg)
+
+PIPELINE STAGES (order matters):
+1. download — fetch raw data (ERA5, CHIRPS, etc.)
+2. ingest — build env tensor, host density, mobility matrices
+3. abm — run agent-based mosquito simulation
+4. score — run calibration scorers (D1-D14 + composite)
+5. train — train U-Net surrogate model
+6. predict — generate risk predictions
+
+HOW TO BEHAVE:
+- When the user says something vague (e.g. "run the simulation"), ask a clarifying question before acting. Which AOI? How many days?
+- When the user asks about status or results, use onboard_status first.
+- When the user reports a problem (e.g. "the population goes extinct"), use onboard_diagnose to get data, then analyze and explain.
+- When the user wants code changes (new features, parameter fixes, bug fixes), explain what you'll do, then delegate via onboard_delegate.
+- Always explain results in plain language, not raw JSON. Summarize key findings.
+- If a tool returns an error, explain what went wrong and suggest next steps.
+
+EXAMPLES:
+- "Ejecuta el ABM para Ghana" → onboard_run_abm(aoi="ghana")
+- "¿Cuál es el estado?" → onboard_status()
+- "Run stage 3 for Ghana" → onboard_run_stage(stage="abm", aoi="ghana")
+- "La población se extingue" → onboard_diagnose(symptom="population extinction"), then analyze
+- "Añade un scorer para el ciclo gonotrófico" → onboard_delegate(goal="Add gonotrophic cycle scorer D15")
+
+When you don't know what the user wants, ask. Don't guess.
+"""
 
 
-def load_menu() -> dict:
-    """Load the onboarding menu from YAML."""
-    import yaml
-    if not _MENU_PATH.exists():
-        return {"greeting": "Hola — no hay menú configurado.", "menu": []}
-    return yaml.safe_load(_MENU_PATH.read_text())
+def _build_agent(provider: str, model: str, langfuse_client=None):
+    """Build the onboarding deepagent with onboard tools."""
+    try:
+        from deepagents import create_deep_agent, FilesystemPermission
+        from deepagents.backends import FilesystemBackend
+    except ImportError:
+        raise ImportError(
+            "The 'deepagents' package is required. "
+            "Install with: pip install 'mal-janus' or pip install deepagents"
+        )
+
+    # Resolve LLM
+    if provider == "openrouter":
+        try:
+            from langchain_openai import ChatOpenAI
+        except ImportError:
+            raise ImportError("langchain-openai is required for OpenRouter.")
+        import os
+        api_key = os.environ.get("OPENROUTER_API_KEY") or os.environ.get("OPENROUTER_KEY")
+        if not api_key:
+            raise ValueError("OPENROUTER_API_KEY env var required for OpenRouter")
+        llm = ChatOpenAI(
+            model=model,
+            base_url="https://openrouter.ai/api/v1",
+            api_key=api_key,
+        )
+    else:
+        try:
+            from langchain.chat_models import init_chat_model
+        except ImportError:
+            raise ImportError("langchain-core is required.")
+        llm = init_chat_model(model=model, model_provider=provider)
+
+    backend = FilesystemBackend(root_dir=str(_REPO_ROOT), virtual_mode=True)
+
+    # Import onboard tools
+    from agents_janus.tools.onboard_tools import (
+        onboard_run_abm,
+        onboard_run_stage,
+        onboard_run_pipeline,
+        onboard_status,
+        onboard_diagnose,
+        onboard_list_components,
+        onboard_delegate,
+    )
+    from agents_janus.tools.kg_tool import memory_recall_kg
+
+    tools = [
+        onboard_run_abm,
+        onboard_run_stage,
+        onboard_run_pipeline,
+        onboard_status,
+        onboard_diagnose,
+        onboard_list_components,
+        onboard_delegate,
+        memory_recall_kg,
+    ]
+
+    skills = []
+    if _PROJECT_SKILLS.is_dir():
+        skills.append("agents/skills/")
+
+    return create_deep_agent(
+        model=llm,
+        tools=tools,
+        system_prompt=ONBOARD_SYSTEM_PROMPT,
+        backend=backend,
+        skills=skills or None,
+        name="centinela-onboarding",
+        permissions=[
+            FilesystemPermission(operations=["read"], paths=["/**"], mode="allow"),
+            FilesystemPermission(operations=["write"], paths=["/**"], mode="deny"),
+        ],
+    )
 
 
 def run_onboarding(
     provider: str = "openrouter",
     model: str = "xiaomi/mimo-v2.5",
+    quiet: bool = False,
 ) -> str:
-    """Run the interactive onboarding menu.
+    """Run the conversational onboarding agent.
 
-    Shows menu items, collects user input, and either handles locally
-    or hands off to the improvement orchestrator.
+    Creates a deepagent with onboard tools and enters a REPL loop.
+    The agent responds in the user's language and executes tools directly.
+
+    Args:
+        provider: LLM provider.
+        model: Model identifier.
+        quiet: If True, suppress technical output (tool calls, etc.).
+
+    Returns:
+        Final status message when the user exits.
     """
-    menu_data = load_menu()
-    greeting = menu_data.get("greeting", "Hola.")
-    items = menu_data.get("menu", [])
+    agent = _build_agent(provider=provider, model=model)
 
-    print("\n" + "=" * 70, file=sys.stderr)
-    print(greeting, file=sys.stderr)
-    print("=" * 70, file=sys.stderr)
+    print("\n" + "=" * 60, file=sys.stderr)
+    print("  Centinela — MalariaSentinel SDSS Assistant", file=sys.stderr)
+    print("  Escribe tu pregunta o tarea. 'salir' para terminar.", file=sys.stderr)
+    print("=" * 60 + "\n", file=sys.stderr)
 
-    for i, item in enumerate(items, 1):
-        print(f"  {i}. {item['label']} — {item.get('description', '')}", file=sys.stderr)
+    # Conversation history for multi-turn
+    messages: list[dict] = []
 
-    print("\nElige una opción (número):", file=sys.stderr)
+    while True:
+        try:
+            user_input = input("you> ").strip()
+        except (EOFError, KeyboardInterrupt):
+            print("\n¡Hasta luego!", file=sys.stderr)
+            return json.dumps({"status": "quit"})
 
-    try:
-        choice = input("   > ").strip()
-    except (EOFError, KeyboardInterrupt):
-        return json.dumps({"status": "interrupted"})
+        if not user_input:
+            continue
+        if user_input.lower() in ("quit", "exit", "salir", "q"):
+            print("¡Hasta luego!", file=sys.stderr)
+            return json.dumps({"status": "quit"})
 
-    try:
-        idx = int(choice) - 1
-        if 0 <= idx < len(items):
-            selected = items[idx]
-        else:
-            return json.dumps({"error": f"Opción fuera de rango: {choice}", "status": "error"})
-    except ValueError:
-        return json.dumps({"error": f"Entrada inválida: {choice}", "status": "error"})
+        # Add user message to history
+        messages.append({"role": "user", "content": user_input})
 
-    # Handle no_handoff items locally
-    if selected.get("no_handoff"):
-        return _handle_local(selected, provider, model)
+        # Stream agent response
+        try:
+            full_response = ""
+            for event in agent.stream(
+                {"messages": messages},
+                stream_mode="updates",
+            ):
+                if not quiet and isinstance(event, dict):
+                    for node_name, delta in event.items():
+                        if isinstance(delta, dict) and "messages" in delta:
+                            for msg in delta["messages"]:
+                                if hasattr(msg, "content") and msg.content:
+                                    content = msg.content if isinstance(msg.content, str) else str(msg.content)
+                                    if content and not content.startswith("{"):
+                                        full_response = content
 
-    # Collect follow-up answers
-    answers = {}
-    for follow_up in selected.get("follow_up", []):
-        question = follow_up["question"]
-        key = follow_up["key"]
+            if full_response:
+                # Add assistant response to history
+                messages.append({"role": "assistant", "content": full_response})
+                print(f"\n{full_response}\n", file=sys.stderr)
+            else:
+                print("\n(no response)\n", file=sys.stderr)
 
-        if follow_up.get("free_text"):
-            print(f"\n{question}", file=sys.stderr)
-            try:
-                answers[key] = input("   > ").strip()
-            except (EOFError, KeyboardInterrupt):
-                return json.dumps({"status": "interrupted"})
-        elif follow_up.get("options_from"):
-            # Dynamic options — call the function
-            func_name = follow_up["options_from"]
-            print(f"\n{question}", file=sys.stderr)
-            # For now, show placeholder
-            print("  (cargando opciones...)", file=sys.stderr)
-            answers[key] = input("   > ").strip()
-        else:
-            options = follow_up.get("options", [])
-            print(f"\n{question}", file=sys.stderr)
-            for j, opt in enumerate(options, 1):
-                print(f"  {j}. {opt}", file=sys.stderr)
-            try:
-                ans = input("   > ").strip()
-                try:
-                    answers[key] = options[int(ans) - 1]
-                except (ValueError, IndexError):
-                    answers[key] = ans
-            except (EOFError, KeyboardInterrupt):
-                return json.dumps({"status": "interrupted"})
-
-    # Build goal from template
-    handoff = selected.get("handoff", {})
-    goal_template = handoff.get("goal_template", "")
-    goal = goal_template.format(**answers) if goal_template else ""
-
-    if not goal:
-        return json.dumps({"error": "No goal generated", "status": "error"})
-
-    # Hand off to improver
-    from agents_janus.tools.subagent_invoke import handoff_to_improver
-    result = handoff_to_improver(goal=goal, context={"answers": answers, "menu_key": selected["key"]})
-    return result
+        except KeyboardInterrupt:
+            print("\n(interrupted — continuing conversation)\n", file=sys.stderr)
+        except Exception as e:
+            print(f"\nError: {e}\n", file=sys.stderr)
 
 
-def _handle_local(item: dict, provider: str, model: str) -> str:
-    """Handle items that don't hand off to the improver."""
-    key = item.get("key", "")
-
-    if key == "status":
-        return _show_status()
-    elif key == "list_components":
-        return _list_components()
-    elif key == "quit":
-        return json.dumps({"status": "quit"})
-    else:
-        return json.dumps({"error": f"Unknown local action: {key}", "status": "error"})
-
-
+# Keep helpers for backwards compat (used by cli.py status command)
 def _show_status() -> str:
     """Show current status: scorecards, open plans, active investigations."""
-    from agents_janus.subagents.registry import load_registry
-
-    info = {"scorecards": [], "plans": [], "subagents": []}
-
-    # Scorecards
-    best_path = Path("runs/scorecards/best_history.json")
-    if best_path.exists():
-        try:
-            best = json.loads(best_path.read_text())
-            info["best_composite"] = best.get("composite")
-            info["best_ts"] = best.get("ts")
-        except (json.JSONDecodeError, OSError):
-            pass
-
-    # Plans
-    plans_dir = Path("docs/plans/in-process")
-    if plans_dir.exists():
-        info["plans"] = [f.name for f in plans_dir.glob("*.md")]
-
-    # Subagents
-    try:
-        reg = load_registry()
-        info["subagents"] = list(reg.all().keys())
-    except (FileNotFoundError, Exception):
-        info["subagents"] = ["registry not available"]
-
-    return json.dumps(info, indent=2)
+    from agents_janus.tools.onboard_tools import onboard_status
+    return onboard_status()
 
 
 def _list_components() -> str:
     """List all subagents with their specs."""
-    try:
-        from agents_janus.subagents.registry import load_registry
-        reg = load_registry()
-        result = []
-        for name, spec in reg.all().items():
-            result.append({
-                "name": name,
-                "description": spec.description,
-                "model": f"{spec.provider}/{spec.model}",
-                "plugins": list(spec.plugins),
-                "edits_allow": list(spec.edits_allow),
-                "mailbox_inbox": spec.mailbox_inbox,
-                "spec": str(spec.spec_path) if spec.spec_path else None,
-            })
-        return json.dumps(result, indent=2)
-    except Exception as e:
-        return json.dumps({"error": str(e)})
+    from agents_janus.tools.onboard_tools import onboard_list_components
+    return onboard_list_components()
