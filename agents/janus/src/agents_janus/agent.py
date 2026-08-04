@@ -445,6 +445,7 @@ TOOLS = [
     _wrap_with_logging(ask_user),
     _wrap_with_logging(set_worktree_context),
     _wrap_with_logging(clear_worktree_context),
+    _wrap_with_logging(_import_abm_score()),
 ]
 
 MEMORY_FILES = [str(AGENT_DIR / "AGENTS.md")]
@@ -561,8 +562,9 @@ def create_orchestrator(
         middleware=middleware,
         permissions=[
             FilesystemPermission(operations=["read"], paths=["/.env", "/**/.env", "/**/*secret*", "/**/*credential*"], mode="deny"),
-            FilesystemPermission(operations=["write"], paths=["/**"], mode="deny"),
-            FilesystemPermission(operations=["read"], paths=["/**"], mode="allow"),
+            FilesystemPermission(operations=["write"], paths=["/data/**"], mode="deny"),
+            FilesystemPermission(operations=["write"], paths=["/.git/**"], mode="deny"),
+            FilesystemPermission(operations=["read", "write"], paths=["/**"], mode="allow"),
         ],
     )
 
