@@ -322,8 +322,8 @@ def load_chirps_rainfall(
 def load_chirps_rainfall_daily(
     aoi: AOI,
     *,
-    year: int,
-    month: int,
+    years: Sequence[int],
+    months: Sequence[int] | None = None,
     cache_dir: pathlib.Path | None = None,
     _fetch_daily: Callable[[int, int, int], xr.DataArray] | None = None,
 ) -> xr.DataArray:
@@ -336,19 +336,18 @@ def load_chirps_rainfall_daily(
 
     Args:
         aoi: the AOI (bbox, CRS, resolution_m, slug).
-        year, month: 1-indexed month.
+        years: sequence of years to load.
+        months: sequence of 1-indexed months. None = all 12.
         cache_dir: optional local cache for downloaded GeoTIFFs.
-        _fetch_daily: testing hook.
+        _fetch_daily: testing hook (kw-only).
 
     Returns:
         xr.DataArray with dims (time, y, x), dtype float32, CRS = aoi.crs.
-        Values in mm/day. Time coordinate is a ``cftime.DatetimeGregorian``
-        for each day of the month.
+        Values in mm/day. Time coordinate uses ``np.datetime64`` for each
+        day across all requested year x month combinations.
     """
-    if not (1 <= month <= 12):
-        raise ValueError(f"month must be in 1..12; got {month}")
-    if year < 1981:
-        raise ValueError(f"CHIRPS starts in 1981; got year={year}")
+    if months is None:
+        months = list(range(1, 13))
 
     if _fetch_daily is None:
         cdir = cache_dir if cache_dir is not None else _default_cache_dir()
@@ -367,30 +366,40 @@ def load_chirps_rainfall_daily(
     else:
         fetch = _fetch_daily
 
-    days = _days_in_month(year, month)
     daily_arrays: list[xr.DataArray] = []
-    for d in days:
-        raw = fetch(year, month, d)
-        reproj = _reproject_to_aoi_grid(raw, aoi)
-        nodata_mask = (~np.isfinite(reproj)) | (reproj == CHIRPS_NODATA)
-        reproj = np.where(nodata_mask, np.float32(CHIRPS_NODATA), reproj.astype(np.float32))
-        da = xr.DataArray(
-            reproj.astype(np.float32)[np.newaxis, :, :],  # (1, y, x)
-            dims=("time", "y", "x"),
-        )
-        daily_arrays.append(da)
+    time_coords: list[np.datetime64] = []
+
+    for year in sorted(years):
+        for month in sorted(months):
+            if not (1 <= month <= 12):
+                raise ValueError(f"month must be in 1..12; got {month}")
+            if year < 1981:
+                raise ValueError(f"CHIRPS starts in 1981; got year={year}")
+
+            days = _days_in_month(year, month)
+            for d in days:
+                raw = fetch(year, month, d)
+                reproj = _reproject_to_aoi_grid(raw, aoi)
+                nodata_mask = (~np.isfinite(reproj)) | (reproj == CHIRPS_NODATA)
+                reproj = np.where(
+                    nodata_mask, np.float32(CHIRPS_NODATA), reproj.astype(np.float32)
+                )
+                da = xr.DataArray(
+                    reproj.astype(np.float32)[np.newaxis, :, :],  # (1, y, x)
+                    dims=("time", "y", "x"),
+                )
+                daily_arrays.append(da)
+                time_coords.append(
+                    np.datetime64(f"{year:04d}-{month:02d}-{d:02d}")
+                )
 
     stacked = xr.concat(daily_arrays, dim="time")
-    stacked = stacked.assign_coords(time=[
-        np.datetime64(f"{year:04d}-{month:02d}-{d:02d}") for d in days
-    ])
+    stacked = stacked.assign_coords(time=time_coords)
     stacked.attrs.update({
         "long_name": "CHIRPS v2.0 daily precipitation",
         "units": "mm/day",
         "source": "CHIRPS v2.0 daily 0.05°",
         "aoi_slug": aoi.slug,
-        "year": year,
-        "month": month,
         "nodata": CHIRPS_NODATA,
     })
     stacked.rio.write_crs(aoi.crs_obj, inplace=True)
@@ -405,6 +414,10 @@ DOWNLOADER = {
     "outputs": {
         "rainfall": load_chirps_rainfall,
         "rainfall_daily": load_chirps_rainfall_daily,
+    },
+    "formats": {
+        "rainfall": "monthly",
+        "rainfall_daily": "daily",
     },
     "manifest_keys": {
         "rainfall": "chirps_rainfall",

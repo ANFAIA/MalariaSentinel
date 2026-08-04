@@ -20,6 +20,7 @@ class DownloaderSpec:
     manifest_keys: dict[str, str]
     module_name: str
     is_time_series: bool = False
+    formats: dict[str, str] | None = None
 
 def discover_downloaders() -> dict[str, DownloaderSpec]:
     registry: dict[str, DownloaderSpec] = {}
@@ -37,6 +38,7 @@ def discover_downloaders() -> dict[str, DownloaderSpec]:
                 manifest_keys=raw.get("manifest_keys", {}),
                 module_name=mod_name,
                 is_time_series=raw.get("is_time_series", False),
+                formats=raw.get("formats", None),
             )
             registry[spec.name] = spec
             log.debug("Registered downloader: %s (%d outputs)", spec.name, len(spec.outputs))
