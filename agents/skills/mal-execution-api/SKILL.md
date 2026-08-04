@@ -13,7 +13,7 @@ description: CLI entrypoints, training scripts, and HPC/cloud automation in mal-
 
 | Layer | Contents |
 |---|---|
-| `src/mal_cli/` | Minimal Python module (`__init__.py` only — version string) |
+| `src/mal_cli/` | Minimal Python module (`__init__.py` only -- version string) |
 | `scripts/` | All the real value: training scripts, data builders, CESGA/Hetzner automation |
 
 **Key dependency**: `mal-execution` scripts call into `mal_core` (training loops, model classes) and `mal_commonlib` (AOI, data loaders, config).
@@ -32,15 +32,15 @@ malariasim predict --scenario scenario.yaml
 
 | Flag | Required | Default | Description |
 |---|---|---|---|
-| `--aoi` | Yes | — | AOI slug (e.g. `ghana`) |
+| `--aoi` | Yes | -- | AOI slug (e.g. `ghana`) |
 | `--scale` | No | `regional` | Aggregation scale: `regional`, `national`, `continental` |
-| `--year` | Yes | — | Target year |
-| `--month` | Yes | — | Target month (1–12) |
+| `--year` | Yes | -- | Target year |
+| `--month` | Yes | -- | Target month (1-12) |
 | `--model` | No | latest | Model name from registry |
-| `--scenario` | No | — | Path to scenario YAML (overrides `--aoi/--scale/--year/--month`) |
+| `--scenario` | No | -- | Path to scenario YAML (overrides `--aoi/--scale/--year/--month`) |
 | `--output-dir` | No | `runs/predictions/` | Where to write the prediction COG |
 
-Runs the full pipeline: load env data → load model → infer → save prediction COG + sidecar JSON.
+Runs the full pipeline: load env data -> load model -> infer -> save prediction COG + sidecar JSON.
 
 ### `malariasim status`
 
@@ -78,15 +78,15 @@ uv run python mal-execution/scripts/train_unet.py <run_dir> <output_dir> [--epoc
 
 | Arg | Required | Default | Description |
 |---|---|---|---|
-| `run_dir` | Yes | — | Directory containing ABM rollout `.npy` files |
-| `output_dir` | Yes | — | Where to save `best_model.pt` |
+| `run_dir` | Yes | -- | Directory containing ABM rollout `.npy` files |
+| `output_dir` | Yes | -- | Where to save `best_model.pt` |
 | `--epochs` | No | `50` | Training epochs |
-| `--subsample` | No | `1.0` | Fraction of data to use (0.0–1.0) |
+| `--subsample` | No | `1.0` | Fraction of data to use (0.0-1.0) |
 | `--preload` | No | `False` | Preload all data into memory |
 
 **Output**: `output_dir/best_model.pt` (best validation Dice) + `final_model.pt`.
 
-**Device**: auto-detects CUDA → MPS → CPU.
+**Device**: auto-detects CUDA -> MPS -> CPU.
 
 ### `train_unet_subsample.py`
 
@@ -98,8 +98,8 @@ uv run python mal-execution/scripts/train_unet_subsample.py <npy_dir> <output_di
 
 | Arg | Required | Default | Description |
 |---|---|---|---|
-| `npy_dir` | Yes | — | Directory with `state_seed*_day*.npy` files |
-| `output_dir` | Yes | — | Where to save models |
+| `npy_dir` | Yes | -- | Directory with `state_seed*_day*.npy` files |
+| `output_dir` | Yes | -- | Where to save models |
 | `--epochs` | No | `50` | Training epochs |
 | `--max-rollouts` | No | all | Limit number of rollouts loaded |
 
@@ -135,26 +135,38 @@ uv run python mal-execution/scripts/build_environment.py \
 | Flag | Required | Default | Description |
 |---|---|---|---|
 | `--aoi` | No* | `ghana` | AOI slug from registry |
-| `--bbox` | No* | — | Custom bbox `"W,S,E,N"` (overrides slug) |
-| `--year` | Yes | — | Year |
-| `--month` | Yes | — | Month (1–12) |
-| `--output-dir` | Yes | — | Output directory |
+| `--bbox` | No* | -- | Custom bbox `"W,S,E,N"` (overrides slug) |
+| `--year` | Yes | -- | Year |
+| `--month` | Yes | -- | Month (1-12) |
+| `--output-dir` | Yes | -- | Output directory |
 | `--scale` | No | `regional` | Aggregation scale |
 | `--crs` | No | `EPSG:4326` | CRS for custom bbox |
 | `--resolution-m` | No | `1000` | Ground resolution in metres |
-| `--format` | No | `tif` | Output: `tif` (COG) or `nc` (daily NetCDF-4) |
+| `--format` | No | `tif` | Output format. `nc` is **deprecated since M13** -- see migration note below. |
 | `--skip-era5` | No | `False` | Skip ERA5 (channel becomes NoData) |
 | `--skip-modis` | No | `False` | Skip MODIS (channel becomes NoData) |
 | `--skip-jrc-gsw` | No | `False` | Skip JRC GSW (water_frac becomes NoData) |
 
 \* Either `--aoi` or `--bbox` is required.
 
-**Output files** (for `--format tif`):
-- `<aoi>_<scale>_<YYYY>_<MM>_env.tif` — 4-band COG (water_frac, rainfall, temp_suitability, ndvi)
-- `<aoi>_<scale>_<YYYY>_<MM>_env.json` — sidecar metadata
-- `<aoi>_<scale>_<YYYY>_<MM>_habitat_patches.gpkg` — pluvial pool points
+**Output files**:
+- `<aoi>_<scale>_<YYYY>_<MM>_env.tif` -- 4-band COG (water_frac, rainfall, temp_suitability, ndvi)
+- `<aoi>_<scale>_<YYYY>_<MM>_env.json` -- sidecar metadata
+- `<aoi>_<scale>_<YYYY>_<MM>_habitat_patches.gpkg` -- pluvial pool points
 
 **Auth policy**: CHIRPS, MERIT-DEM, JRC GSW work without credentials. ERA5 (CDS) and MODIS (EARTHDATA_TOKEN) are auto-skipped with a warning if credentials are missing.
+
+### M13 Migration: Daily NC Output
+
+**Deprecated**: `env.py --format nc` / `output_format='nc'` in `build_env_tensor()`.
+
+**New way**: Use the download runner to produce daily NC files:
+```bash
+malariasim download --datasets chirps --outputs rainfall_daily --years 2024 2025 --aoi ghana
+```
+This produces `data/ghana/ghana_chirps_rainfall_daily_2024_2025_daily.nc` consumable by the C++ ABM's `read_env_nc()`.
+
+The legacy `_write_env_nc()` function is removed. The download runner writes daily NC via `xarray.to_netcdf()` with period metadata in the manifest.
 
 ### `build_hosts.py`
 
@@ -168,7 +180,7 @@ uv run python mal-execution/scripts/build_hosts.py [--output-dir DIR] [--bbox "W
 |---|---|---|---|
 | `--output-dir` | No | `hosts/` | Output directory |
 | `--aoi` | No | Ghana default | Path to AOI JSON file |
-| `--bbox` | No | — | Custom bbox (overrides `--aoi`) |
+| `--bbox` | No | -- | Custom bbox (overrides `--aoi`) |
 | `--worldpop-year` | No | `2019` | WorldPop vintage |
 | `--skip-buildings` | No | `False` | Skip Overture Maps (use urban heuristic) |
 | `--skip-wildlife` | No | `False` | Skip wildlife proxy (use constant 0.3) |
@@ -189,7 +201,7 @@ uv run python mal-execution/scripts/build_mobility.py \
 
 | Flag | Required | Default | Description |
 |---|---|---|---|
-| `--hosts` | Yes | — | Path to `host_static.nc` |
+| `--hosts` | Yes | -- | Path to `host_static.nc` |
 | `--output-dir` | No | same as `--hosts` | Output directory |
 | `--cell-size-km` | No | `1.0` | Grid cell size in km |
 | `--beta-day` | No | `0.05` | Human daytime friction |
@@ -243,7 +255,7 @@ Source this file; do not execute directly. Key variables:
 |---|---|---|
 | `setup_env.sh` | Install uv, create venv, sync workspace | Login node (once) |
 | `prepare_data.sh` | Validate/rebuild env COGs + habitat patches | Login node |
-| `run_abm.sh` | SLURM batch script — runs N months sequentially | `sbatch` from login |
+| `run_abm.sh` | SLURM batch script -- runs N months sequentially | `sbatch` from login |
 | `manage_jobs.sh submit` | Submit a single ABM run | Login node |
 | `manage_jobs.sh submit_array S N` | Submit array of N jobs starting at seed S | Login node |
 | `manage_jobs.sh status` | Show running/pending jobs | Login node |
@@ -265,12 +277,12 @@ sbatch --export="ABM_SEED=5,ABM_START_MONTH=7,ABM_NUM_MONTHS=12" run_abm.sh
 
 ## Hetzner automation
 
-All scripts in `mal-execution/scripts/hetzner-run/`. Pure bash — no Python dependency.
+All scripts in `mal-execution/scripts/hetzner-run/`. Pure bash -- no Python dependency.
 
 ### Quick start
 
 ```bash
-# Dry run — see what would happen
+# Dry run -- see what would happen
 hetzner-run --dry-run sim-run
 
 # Actually run (boots VM, pushes repo, runs sim, pulls results, destroys VM)
@@ -292,9 +304,9 @@ hetzner-run cost --type ccx33 --hours 2
 | `destroy <name>` | Delete VM + remove local cache |
 | `status [<name>]` | VM status (one or all `ms-*`) |
 | `exec <name> <cmd>` | SSH into VM and run command |
-| `push <name> <local> <remote>` | rsync local → VM |
-| `pull <name> <remote> <local>` | rsync VM → local |
-| `sim-run [--keep-vm]` | High-level: boot → push → run → pull → destroy |
+| `push <name> <local> <remote>` | rsync local -> VM |
+| `pull <name> <remote> <local>` | rsync VM -> local |
+| `sim-run [--keep-vm]` | High-level: boot -> push -> run -> pull -> destroy |
 | `train [--keep-vm]` | Like `sim-run` but runs U-Net training |
 | `cost --type T --hours H` | Print cost estimate |
 
@@ -315,11 +327,11 @@ hetzner-run cost --type ccx33 --hours 2
 
 ### Default VM type
 
-`ccx33`: 8 dedicated AMD EPYC cores, 32 GB RAM, 240 GB SSD — €0.030/h. A typical 1-hour run costs ~€0.030.
+`ccx33`: 8 dedicated AMD EPYC cores, 32 GB RAM, 240 GB SSD -- EUR 0.030/h. A typical 1-hour run costs ~EUR 0.030.
 
 ## Common patterns
 
-### Full pipeline: build → train → validate → predict
+### Full pipeline: build -> train -> validate -> predict
 
 ```bash
 # 1. Build environment for multiple months
@@ -364,7 +376,7 @@ bash mal-execution/scripts/cesga-run/manage_jobs.sh status
 ### Deploy on Hetzner
 
 ```bash
-# One-liner: boot → push → train → pull → destroy
+# One-liner: boot -> push -> train -> pull -> destroy
 hetzner-run train --config my-config.yaml
 
 # Keep VM alive for debugging

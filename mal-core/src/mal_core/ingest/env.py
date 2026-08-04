@@ -1,13 +1,13 @@
-"""Ingest stage — build the env tensor + habitat patches for an AOI.
+"""Ingest stage - build the env tensor + habitat patches for an AOI.
 
 Extracted from mal-execution/scripts/build_environment.py.
 Core logic preserved; CLI layer removed.
 """
 from __future__ import annotations
 
-import calendar
 import json
 import pathlib
+import warnings
 from typing import Mapping
 
 import geopandas as gpd
@@ -18,15 +18,9 @@ from rasterio.transform import from_bounds
 from shapely.geometry import Point
 
 from mal_commonlib.aoi import AOI, Scale
-from mal_commonlib.data.loaders.chirps import (
-    load_chirps_rainfall,
-    load_chirps_rainfall_daily,
-)
+from mal_commonlib.data.loaders.chirps import load_chirps_rainfall
 from mal_commonlib.data.loaders.dem import load_merit_dem
-from mal_commonlib.data.loaders.era5 import (
-    load_era5_temp_suitability,
-    load_era5_water_temp,
-)
+from mal_commonlib.data.loaders.era5 import load_era5_temp_suitability
 from mal_commonlib.data.loaders.jrc_gsw import load_jrc_gsw_water_frac
 from mal_commonlib.data.loaders.modis import load_modis_ndvi
 from mal_commonlib.terrain.twi import compute_twi
@@ -38,7 +32,7 @@ from ._shared import (
     safe_load,
 )
 
-# Per docs/abm-output-contract.md §2: four band names in order.
+# Per docs/abm-output-contract.md S2: four band names in order.
 ENV_BAND_NAMES: tuple[str, ...] = (
     "water_frac",
     "rainfall",
@@ -146,105 +140,6 @@ def _write_env_cog(
     return path
 
 
-def _write_env_nc(
-    path: pathlib.Path,
-    rainfall_daily: xr.DataArray,
-    water_temp_c_daily: xr.DataArray,
-    water_frac: xr.DataArray,
-    ndvi: xr.DataArray,
-    aoi: AOI,
-    year: int,
-    month: int,
-) -> pathlib.Path:
-    """Write env data as a CF-1.8 daily NetCDF-4 file."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    h, w = aoi.cells_per_side()
-    n_days = calendar.monthrange(year, month)[1]
-
-    if "time" in rainfall_daily.dims:
-        rainfall_arr = np.asarray(rainfall_daily.values, dtype=np.float32)
-    else:
-        rainfall_arr = np.broadcast_to(
-            np.asarray(rainfall_daily.values, dtype=np.float32),
-            (n_days, h, w),
-        )
-
-    if "time" in water_temp_c_daily.dims:
-        water_temp_arr = np.asarray(water_temp_c_daily.values, dtype=np.float32)
-    else:
-        water_temp_arr = np.broadcast_to(
-            np.asarray(water_temp_c_daily.values, dtype=np.float32),
-            (n_days, h, w),
-        )
-
-    wf_2d = np.asarray(water_frac.values, dtype=np.float32)
-    ndvi_2d = np.asarray(ndvi.values, dtype=np.float32)
-    water_frac_arr = np.broadcast_to(wf_2d, (n_days, h, w)).copy()
-    ndvi_arr = np.broadcast_to(ndvi_2d, (n_days, h, w)).copy()
-
-    time_coords = np.array([
-        np.datetime64(f"{year:04d}-{month:02d}-{d:02d}")
-        for d in range(1, n_days + 1)
-    ])
-
-    w_s, s_s, e_s, n_s = aoi.bbox
-    lats = np.linspace(n_s, s_s, h, dtype=np.float32)
-    lons = np.linspace(w_s, e_s, w, dtype=np.float32)
-
-    ds = xr.Dataset(
-        {
-            "rainfall": (["time", "y", "x"], rainfall_arr,
-                         {"long_name": "CHIRPS v2.0 daily precipitation",
-                          "units": "mm/day", "_FillValue": np.float32(NODATA_SENTINEL)}),
-            "water_temp_c": (["time", "y", "x"], water_temp_arr,
-                             {"long_name": "ERA5-Land 2m temperature (daily mean)",
-                              "units": "degC", "_FillValue": np.float32(NODATA_SENTINEL)}),
-            "water_frac": (["time", "y", "x"], water_frac_arr,
-                           {"long_name": "JRC GSW open water fraction",
-                            "units": "1", "_FillValue": np.float32(NODATA_SENTINEL)}),
-            "ndvi": (["time", "y", "x"], ndvi_arr,
-                     {"long_name": "MODIS NDVI",
-                      "units": "1", "_FillValue": np.float32(NODATA_SENTINEL)}),
-        },
-        coords={
-            "time": time_coords,
-            "y": lats,
-            "x": lons,
-        },
-        attrs={
-            "Conventions": "CF-1.8",
-            "title": f"MalariaSentinel daily env tensor — {aoi.slug} {year}-{month:02d}",
-            "aoi_slug": aoi.slug,
-            "scale": aoi.scale.value,
-            "year": int(year),
-            "month": int(month),
-            "contract_version": "2.0",
-            "generator_version": "m2-daily-0.1.0",
-            "crs": aoi.crs,
-            "source_url": "https://github.com/davidflorezmazuera/MalariaSentinel",
-        },
-    )
-
-    ds["latitude"] = xr.DataArray(lats, dims="y",
-                                  attrs={"units": "degrees_north", "axis": "Y"})
-    ds["longitude"] = xr.DataArray(lons, dims="x",
-                                   attrs={"units": "degrees_east", "axis": "X"})
-    ds["time"].attrs.update({
-        "axis": "T",
-        "long_name": "time",
-        "standard_name": "time",
-    })
-
-    encoding = {
-        "rainfall": {"dtype": "float32", "zlib": True, "complevel": 4},
-        "water_temp_c": {"dtype": "float32", "zlib": True, "complevel": 4},
-        "water_frac": {"dtype": "float32", "zlib": True, "complevel": 4},
-        "ndvi": {"dtype": "float32", "zlib": True, "complevel": 4},
-    }
-    ds.to_netcdf(path, encoding=encoding)
-    return path
-
-
 def _write_habitat_patches_gpkg(
     path: pathlib.Path,
     dem: xr.DataArray,
@@ -314,21 +209,32 @@ def build_env_tensor(
         skip_era5: skip ERA5 (channel becomes NoData).
         skip_modis: skip MODIS (channel becomes NoData).
         skip_jrc_gsw: skip JRC GSW (water_frac becomes NoData).
-        output_format: 'tif' (COG) or 'nc' (daily NetCDF).
+        output_format: 'tif' (COG) -- only format supported. 'nc' is
+            deprecated (see M13 migration notes).
         name: optional human-readable AOI name.
         twi_threshold: TWI threshold for habitat patch detection.
 
     Returns:
         dict with 'env_path', 'habitat_path', and other metadata.
     """
+    if output_format == "nc":
+        warnings.warn(
+            "output_format='nc' is deprecated since M13. Daily NC output is now "
+            "produced by the download runner via: "
+            "malariasim download --datasets chirps --outputs rainfall_daily "
+            "--years YYYY1 YYYY2 --aoi <slug>. "
+            "The nc branch will be removed in M14+.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+
     if isinstance(aoi, str):
         aoi = AOI.from_slug(aoi)
     if isinstance(scale, str):
         scale = Scale(scale)
     h, w = aoi.cells_per_side()
     suffix = f"{aoi.slug}_{aoi.scale.value}_{year:04d}_{month:02d}"
-    ext = "nc" if output_format == "nc" else "tif"
-    env_path = output_dir / f"{suffix}_env.{ext}"
+    env_path = output_dir / f"{suffix}_env.tif"
     habitat_path = output_dir / f"{suffix}_habitat_patches.gpkg"
 
     results: dict = {
@@ -349,69 +255,37 @@ def build_env_tensor(
             load_jrc_gsw_water_frac, aoi, "water_frac", year=2021, month=month,
         )
 
-    if output_format == "nc":
-        # Daily NetCDF: use daily loaders
-        if skip_era5:
-            h_, w_ = aoi.cells_per_side()
-            n_days = calendar.monthrange(year, month)[1]
-            water_temp_c = xr.DataArray(
-                np.full((n_days, h_, w_), NODATA_SENTINEL, dtype=np.float32),
-                dims=("time", "y", "x"),
-                attrs={"units": "degC", "nodata": NODATA_SENTINEL},
-            )
-        else:
-            water_temp_c = safe_load(
-                load_era5_water_temp, aoi, "water_temp_c", year=year, month=month,
-            )
-
-        rainfall = safe_load(
-            load_chirps_rainfall_daily, aoi, "rainfall", year=year, month=month,
-        )
-
-        if skip_modis:
-            ndvi = empty_channel(aoi, value=NODATA_SENTINEL, band_name="ndvi")
-        else:
-            ndvi = safe_load(
-                load_modis_ndvi, aoi, "ndvi", year=year, month=month,
-            )
-
-        _write_env_nc(
-            env_path, rainfall, water_temp_c, water_frac, ndvi,
-            aoi, year, month,
-        )
-        results["env_path"] = str(env_path)
+    # COG/TIF path
+    if skip_era5:
+        temp_suitability = empty_channel(aoi, value=NODATA_SENTINEL, band_name="temp_suitability")
     else:
-        # COG/TIF path
-        if skip_era5:
-            temp_suitability = empty_channel(aoi, value=NODATA_SENTINEL, band_name="temp_suitability")
-        else:
-            temp_suitability = safe_load(
-                load_era5_temp_suitability, aoi, "temp_suitability",
-                year=year, month=month,
-            )
-
-        rainfall = safe_load(
-            load_chirps_rainfall, aoi, "rainfall", year=year, month=month,
+        temp_suitability = safe_load(
+            load_era5_temp_suitability, aoi, "temp_suitability",
+            year=year, month=month,
         )
 
-        if skip_modis:
-            ndvi = empty_channel(aoi, value=NODATA_SENTINEL, band_name="ndvi")
-        else:
-            ndvi = safe_load(
-                load_modis_ndvi, aoi, "ndvi", year=year, month=month,
-            )
+    rainfall = safe_load(
+        load_chirps_rainfall, aoi, "rainfall", year=year, month=month,
+    )
 
-        env = _stack_env_channels(
-            {
-                "water_frac": water_frac,
-                "rainfall": rainfall,
-                "temp_suitability": temp_suitability,
-                "ndvi": ndvi,
-            },
-            aoi,
+    if skip_modis:
+        ndvi = empty_channel(aoi, value=NODATA_SENTINEL, band_name="ndvi")
+    else:
+        ndvi = safe_load(
+            load_modis_ndvi, aoi, "ndvi", year=year, month=month,
         )
-        _write_env_cog(env_path, env, aoi, year, month)
-        results["env_path"] = str(env_path)
+
+    env = _stack_env_channels(
+        {
+            "water_frac": water_frac,
+            "rainfall": rainfall,
+            "temp_suitability": temp_suitability,
+            "ndvi": ndvi,
+        },
+        aoi,
+    )
+    _write_env_cog(env_path, env, aoi, year, month)
+    results["env_path"] = str(env_path)
 
     dem = safe_load(load_merit_dem, aoi, "elevation", year=year, month=month)
 
@@ -426,7 +300,7 @@ def build_env_tensor(
         str(env_path.name),
         type="time-series",
         variables=list(ENV_BAND_NAMES),
-        format=ext,
+        format="tif",
     )
     register_dataset(
         aoi.slug, "habitat", year,
