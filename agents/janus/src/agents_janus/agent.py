@@ -438,6 +438,9 @@ TOOLS = [
     _wrap_with_logging(gitagent_revise),
     _wrap_with_logging(_gitagent_integrate_wrapped),
     _wrap_with_logging(_gitagent_finalize_wrapped),
+    _wrap_with_logging(_import_abm_run()),
+    _wrap_with_logging(_import_abm_test()),
+    _wrap_with_logging(_import_abm_score()),
     _wrap_with_logging(pipeline_run_calibration),
     _wrap_with_logging(pipeline_compare_scorecards),
     _wrap_with_logging(memory_recall_kg),
@@ -445,7 +448,6 @@ TOOLS = [
     _wrap_with_logging(ask_user),
     _wrap_with_logging(set_worktree_context),
     _wrap_with_logging(clear_worktree_context),
-    _wrap_with_logging(_import_abm_score()),
 ]
 
 MEMORY_FILES = [str(AGENT_DIR / "AGENTS.md")]

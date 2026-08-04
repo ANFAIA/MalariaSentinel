@@ -79,9 +79,9 @@ def run_abm_from_manifest(
     from mal_core.download.manifest import read_manifest, validate_completeness
 
     complete = validate_completeness(aoi)
-    if not complete:
+    if complete:  # non-empty list = missing files
         raise FileNotFoundError(
-            f"Missing required ABM data for AOI '{aoi}'. "
+            f"Missing required ABM data for AOI '{aoi}': {complete}. "
             f"Run: malariasim download --aoi {aoi} --all"
         )
 

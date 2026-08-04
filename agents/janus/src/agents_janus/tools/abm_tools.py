@@ -27,7 +27,7 @@ _lock = threading.Lock()
 _WORKTREE_REGISTRY: dict[str, Path] = {}
 _thread_local = threading.local()
 
-REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent
+REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent.parent.parent  # 6 levels: tools → agents_janus → src → janus → agents → MalariaSentinel
 
 
 def register_worktree(agent_id: str, worktree_path: str) -> None:
@@ -83,6 +83,8 @@ def abm_run(
     """Build (if needed) and run an ABM simulation.
 
     Paths are resolved relative to the current agent's gitagent worktree.
+    Uses run_abm_from_manifest() to resolve env/habitat/hosts/wind paths
+    from the manifest automatically.
     Returns JSON with run metadata including the output directory.
     """
     import time
@@ -106,11 +108,10 @@ def abm_run(
             })
 
     try:
-        from mal_core.abm.runner import run_abm
-        result = run_abm(
+        from mal_core.abm.wrapper import run_abm_from_manifest
+        result = run_abm_from_manifest(
             aoi=aoi, year=year, month=month, days=days,
             n_rollouts=n_rollouts, seed=seed,
-            snapshot_every=snapshot_every,
         )
         elapsed = time.monotonic() - start
         return json.dumps({
@@ -162,10 +163,26 @@ def abm_score(run_dir: str, include_llm_verdict: bool = True) -> str:
     Returns JSON with scorecard (D1-D14 + composite + optional LLM verdict).
     """
     try:
-        from mal_core.abm.tests.calibration.scorers.score import score_run
-        from mal_core.abm.tests.calibration.scorers.llm_scorer import score_with_llm
+        run_path = Path(run_dir)
+        if not run_path.exists():
+            return json.dumps({"status": "error", "error": f"Run directory not found: {run_dir}"})
 
-        report = score_run(Path(run_dir))
+        # Add calibration dir to sys.path — scorers/__init__.py uses
+        # `from scorers.score import ...` (absolute-style) which needs it
+        cal_dir = str(REPO_ROOT / "mal-core" / "src" / "mal_core" / "abm" / "tests" / "calibration")
+        if cal_dir not in sys.path:
+            sys.path.insert(0, cal_dir)
+
+        from scorers.score import score_run
+
+        experiment = {
+            "name": run_path.name,
+            "params": {},
+            "n_days": 90,
+            "n_seeds": 1,
+        }
+
+        report = score_run(run_path, experiment)
         scores = report.get("scores", {})
 
         result = {
@@ -176,6 +193,7 @@ def abm_score(run_dir: str, include_llm_verdict: bool = True) -> str:
 
         if include_llm_verdict:
             try:
+                from scorers.llm_scorer import score_with_llm
                 llm_result = score_with_llm(report)
                 result["llm_verdict"] = llm_result
             except Exception as e:
