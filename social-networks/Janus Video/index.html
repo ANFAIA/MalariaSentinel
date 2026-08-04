@@ -1,0 +1,409 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>JANUS — LinkedIn</title>
+  <style>
+    @font-face {
+      font-family: "Space Grotesk";
+      font-style: normal;
+      font-weight: 300 700;
+      font-display: block;
+      src: url("fonts/space-grotesk-latin.woff2") format("woff2");
+    }
+    :root {
+      --bg: #2F404F;
+      --bg-deep: #283845;
+      --surface: #3A4D5C;
+      --surface-2: #455A6A;
+      --fg: #F0F1EE;
+      --muted: #C7DAD3;
+      --dim: #B0BCC2;
+      --accent: #3894A1;
+      --bright: #6EC8D4;
+      --sage: #C7DAD3;
+      --rule: rgba(240,241,238,.12);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      width: 1080px; height: 1350px; overflow: hidden;
+      background: var(--bg); color: var(--fg);
+      font-family: "Space Grotesk", sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    [data-composition-id="root"] { position: relative; width: 1080px; height: 1350px; overflow: hidden; background: var(--bg); }
+    .grid { position: absolute; inset: 0; opacity: .5; background-image: linear-gradient(rgba(240,241,238,.025) 1px, transparent 1px), linear-gradient(90deg, rgba(240,241,238,.025) 1px, transparent 1px); background-size: 80px 80px; }
+    .glow { position: absolute; width: 720px; height: 720px; border-radius: 50%; background: radial-gradient(circle, rgba(56,148,161,.24), rgba(56,148,161,0) 68%); pointer-events: none; }
+    .ghost { position: absolute; right: -30px; bottom: 100px; font-size: 190px; line-height: .8; letter-spacing: -.08em; font-weight: 700; color: var(--fg); opacity: .045; pointer-events: none; }
+    .header, .footer { position: absolute; left: 80px; right: 80px; z-index: 20; display: flex; justify-content: space-between; align-items: center; font: 500 17px/1 monospace; letter-spacing: .15em; color: var(--dim); text-transform: uppercase; }
+    .header { top: 62px; }
+    .footer { bottom: 62px; font-size: 14px; letter-spacing: .11em; }
+    .header .mark::before { content: ""; display: inline-block; width: 7px; height: 7px; margin: 0 12px 2px 0; border-radius: 50%; background: #6EC8D4; }
+    .header .scene { color: var(--bright); }
+    .rule { position: absolute; left: 80px; right: 80px; height: 1px; background: var(--rule); z-index: 20; }
+    .rule.top { top: 100px; } .rule.bottom { bottom: 100px; }
+    .scene { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; z-index: 2; }
+    .content { position: relative; width: 100%; height: 100%; padding: 138px 80px 130px; display: flex; flex-direction: column; gap: 22px; }
+    .label { color: var(--bright); font: 500 17px/1 monospace; letter-spacing: .17em; text-transform: uppercase; }
+    h1, h2 { font-weight: 700; letter-spacing: -.045em; line-height: .98; }
+    h1 { font-size: 116px; } h2 { font-size: 60px; max-width: 880px; }
+
+    /* SCENE 1 — HARNESS */
+    .scene1 .content { justify-content: center; padding-top: 100px; padding-bottom: 100px; }
+    .scene1 h1 { font-size: 230px; letter-spacing: -.09em; margin-left: -10px; }
+    .scene1 .sub { max-width: 680px; color: var(--muted); font-size: 34px; line-height: 1.2; }
+    .scene1 .tagline { font-size: 48px; font-weight: 600; letter-spacing: -.04em; color: var(--bright); font-style: italic; margin-top: 18px; }
+    .scene1 .meta-box { position: absolute; right: 80px; top: 480px; padding-left: 20px; border-left: 2px solid var(--accent); color: var(--muted); font: 16px/1.7 monospace; letter-spacing: .12em; }
+    .scene1 .pulse { margin-top: 24px; display: flex; align-items: center; gap: 14px; color: var(--muted); font: 18px monospace; letter-spacing: .12em; text-transform: uppercase; }
+    .scene1 .pulse .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--bright); box-shadow: 0 0 14px var(--bright); }
+
+    /* SCENE 2 — ORCHESTRATOR ANATOMY */
+    .scene2 .content { justify-content: center; padding-top: 80px; padding-bottom: 100px; }
+    .anatomy { display: flex; flex-direction: column; gap: 10px; width: 880px; margin-top: 4px; }
+    .anatomy .row { position: relative; display: grid; grid-template-columns: 70px 200px 1fr; align-items: center; min-height: 92px; padding: 14px 22px; background: rgba(58,77,92,.92); border: 1px solid var(--rule); border-left: 5px solid var(--accent); }
+    .anatomy .row .num { color: var(--sage); font: 22px monospace; }
+    .anatomy .row strong { font-size: 25px; letter-spacing: .04em; display: block; }
+    .anatomy .row span { color: var(--muted); font-size: 20px; display: block; margin-top: 3px; }
+    .anatomy .row .code { color: var(--bright); font: 16px monospace; }
+    .scene2 .quote { margin-top: 16px; padding: 22px 28px; background: rgba(58,77,92,.7); border-left: 4px solid var(--accent); color: var(--fg); font-size: 28px; line-height: 1.25; max-width: 780px; }
+    .scene2 .quote small { display: block; margin-top: 12px; color: var(--bright); font: 14px monospace; letter-spacing: .12em; text-transform: uppercase; }
+
+    /* SCENE 3 — TWO ORCHESTRATORS */
+    .scene3 .content { padding-top: 110px; padding-bottom: 100px; }
+    .scene3 h2 { font-size: 54px; }
+    .dual { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 8px; }
+    .dual .col { padding: 22px 24px; background: rgba(58,77,92,.85); border: 1px solid var(--rule); border-top: 5px solid var(--bright); }
+    .dual .col h3 { font-size: 26px; font-weight: 700; letter-spacing: -.02em; color: var(--fg); margin-bottom: 4px; }
+    .dual .col .mode { color: var(--bright); font: 14px monospace; letter-spacing: .12em; text-transform: uppercase; margin-bottom: 14px; }
+    .dual .col ul { list-style: none; color: var(--muted); font-size: 19px; line-height: 1.45; }
+    .dual .col ul li { padding: 5px 0; border-bottom: 1px solid var(--rule); display: flex; justify-content: space-between; gap: 12px; }
+    .dual .col ul li:last-child { border-bottom: none; }
+    .dual .col ul li code { color: var(--bright); font: 16px monospace; }
+    .handoff { display: flex; align-items: center; justify-content: center; gap: 14px; margin-top: 18px; padding: 14px 22px; background: rgba(56,148,161,.18); border: 1px solid var(--bright); color: var(--bright); font: 18px monospace; letter-spacing: .12em; text-transform: uppercase; }
+    .handoff .arrow { font-size: 22px; }
+    .scene3 .diagram-note { color: var(--muted); font-size: 22px; max-width: 820px; margin-top: 4px; }
+
+    /* SCENE 4 — 8 SUBAGENTS */
+    .scene4 .content { padding-top: 110px; padding-bottom: 110px; }
+    .scene4 h2 { font-size: 52px; }
+    .grid-sa { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 4px; }
+    .sa { padding: 14px 18px; background: rgba(58,77,92,.86); border: 1px solid var(--rule); border-left: 4px solid var(--accent); display: flex; flex-direction: column; gap: 4px; }
+    .sa .top { display: flex; justify-content: space-between; align-items: baseline; }
+    .sa .name { color: var(--bright); font: 700 21px monospace; letter-spacing: -.01em; }
+    .sa .plugin { color: var(--dim); font: 12px monospace; letter-spacing: .1em; text-transform: uppercase; }
+    .sa .role { color: var(--fg); font-size: 16px; line-height: 1.2; }
+    .sa .scope { color: var(--sage); font: 13px monospace; letter-spacing: -.01em; margin-top: 2px; word-break: break-all; }
+    .scene4 .diagram-note { color: var(--muted); font-size: 21px; max-width: 820px; margin-top: 8px; }
+
+    /* SCENE 5 — WORKTREES */
+    .scene5 .content { padding-top: 110px; padding-bottom: 110px; }
+    .scene5 h2 { font-size: 52px; }
+    .orchestrator-bar { display: grid; grid-template-columns: 90px 1fr 90px; align-items: center; padding: 14px 20px; background: rgba(56,148,161,.2); border: 1px solid var(--bright); border-left: 5px solid var(--bright); margin-top: 4px; }
+    .orchestrator-bar .lbl { color: var(--bright); font: 18px monospace; letter-spacing: .14em; text-transform: uppercase; }
+    .orchestrator-bar .center { color: var(--fg); font-size: 22px; text-align: center; }
+    .orchestrator-bar .right { color: var(--sage); font: 14px monospace; text-align: right; letter-spacing: .12em; text-transform: uppercase; }
+    .wt-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 14px; }
+    .wt { padding: 12px 12px; background: rgba(58,77,92,.82); border: 1px solid var(--rule); border-top: 4px solid var(--sage); }
+    .wt .name { color: var(--bright); font: 15px monospace; letter-spacing: -.01em; margin-bottom: 4px; }
+    .wt .path { color: var(--sage); font: 11px monospace; line-height: 1.25; word-break: break-all; }
+    .scene5 .deny { margin-top: 12px; display: flex; gap: 14px; flex-wrap: wrap; color: var(--muted); font: 14px monospace; letter-spacing: .08em; }
+    .scene5 .deny span { padding: 4px 10px; background: rgba(176,188,194,.08); border: 1px solid var(--rule); }
+    .scene5 .diagram-note { color: var(--muted); font-size: 21px; max-width: 820px; margin-top: 8px; }
+
+    /* SCENE 6 — METHOD */
+    .scene6 .content { padding-top: 110px; padding-bottom: 110px; }
+    .scene6 h2 { font-size: 52px; }
+    .timeline { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; width: 880px; }
+    .step { position: relative; display: grid; grid-template-columns: 70px 220px 1fr; align-items: center; min-height: 70px; padding: 12px 20px; background: rgba(58,77,92,.82); border: 1px solid var(--rule); border-left: 4px solid var(--accent); }
+    .step::after { content: "↓"; position: absolute; left: 35px; bottom: -16px; color: var(--bright); font: 16px monospace; z-index: 3; }
+    .step:last-child::after { display: none; }
+    .step .n { color: var(--bright); font: 18px monospace; }
+    .step .name { color: var(--fg); font: 600 20px monospace; letter-spacing: .04em; }
+    .step .desc { color: var(--muted); font-size: 19px; }
+    .step .desc code { color: var(--bright); font: 16px monospace; }
+    .scene6 .diagram-note { color: var(--muted); font-size: 21px; max-width: 820px; margin-top: 8px; }
+
+    /* SCENE 7 — GLUE */
+    .scene7 .content { padding-top: 110px; padding-bottom: 110px; }
+    .scene7 h2 { font-size: 52px; }
+    .glue { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 4px; }
+    .glue-card { padding: 18px 22px; background: rgba(58,77,92,.86); border: 1px solid var(--rule); border-top: 5px solid var(--bright); }
+    .glue-card .icon { display: inline-block; padding: 3px 9px; color: var(--bright); font: 13px monospace; letter-spacing: .14em; text-transform: uppercase; border: 1px solid var(--bright); margin-bottom: 10px; }
+    .glue-card h3 { color: var(--fg); font-size: 24px; font-weight: 700; letter-spacing: -.02em; margin-bottom: 6px; }
+    .glue-card p { color: var(--muted); font-size: 17px; line-height: 1.3; }
+    .glue-card code { color: var(--bright); font: 14px monospace; }
+    .scene7 .diagram-note { color: var(--muted); font-size: 21px; max-width: 820px; margin-top: 6px; }
+
+    /* SCENE 8 — STATE + ANFAIA */
+    .scene8 .content { padding-top: 110px; padding-bottom: 110px; }
+    .scene8 h2 { font-size: 50px; }
+    .status { width: 880px; margin-top: 4px; }
+    .status-row { display: grid; grid-template-columns: 80px 1fr 110px; align-items: center; min-height: 56px; border-bottom: 1px solid var(--rule); font-size: 21px; }
+    .status-row .code { color: var(--bright); font: 500 18px monospace; }
+    .status-row .label { color: var(--fg); }
+    .status-row .state { color: var(--sage); font: 14px monospace; letter-spacing: .12em; text-align: right; text-transform: uppercase; }
+    .status-row.pending .state { color: var(--dim); }
+    .scene8 .closing { margin-top: 18px; padding: 22px 24px; background: rgba(56,148,161,.18); border: 1px solid var(--bright); border-left: 5px solid var(--bright); }
+    .scene8 .closing .lead { color: var(--bright); font: 14px monospace; letter-spacing: .14em; text-transform: uppercase; margin-bottom: 6px; }
+    .scene8 .closing .org { color: var(--fg); font-size: 24px; font-weight: 700; letter-spacing: -.02em; line-height: 1.15; }
+    .scene8 .closing .tag { margin-top: 6px; color: var(--muted); font-size: 16px; font-style: italic; }
+    .scene8 .closing .github { margin-top: 10px; color: var(--sage); font: 14px monospace; letter-spacing: .08em; }
+    .scene8 .honest { margin-top: 8px; color: var(--muted); font-size: 19px; font-style: italic; }
+
+    .transition { position: absolute; inset: 0; z-index: 30; background: var(--bg-deep); opacity: 0; pointer-events: none; }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+</head>
+<body>
+  <div data-composition-id="root" data-width="1080" data-height="1350" data-duration="60" data-start="0" data-track-index="0">
+    <div class="grid"></div>
+    <div class="header"><span class="mark">JANUS · AGENTS</span><span class="scene">01 / 08</span></div>
+    <div class="footer"><span>MALARIASENTINEL · OPEN SOURCE · 2026</span><span>ANFAIA</span></div>
+    <div class="rule top"></div><div class="rule bottom"></div>
+
+    <section id="s1" class="scene scene1 clip" data-start="0" data-duration="7" data-track-index="1">
+      <div class="glow" style="right:-180px;top:100px"></div>
+      <div class="ghost">HARNESS</div>
+      <div class="content">
+        <span class="label">01 · SYSTEM</span>
+        <h1>JANUS</h1>
+        <p class="sub">Multi-agent harness for the abstract layer of the MalariaSentinel repository.</p>
+        <p class="tagline">Stop coding. Start planning.</p>
+        <div class="pulse"><span class="dot"></span>v0.1 · 2026 · AGENTS</div>
+      </div>
+    </section>
+
+    <section id="s2" class="scene scene2 clip" data-start="7" data-duration="7" data-track-index="1">
+      <div class="glow" style="left:-250px;bottom:-160px"></div>
+      <div class="ghost">ORCHESTRATOR</div>
+      <div class="content">
+        <span class="label">02 · THE ORCHESTRATOR</span>
+        <h2>One deepagent. One method. One job.</h2>
+        <div class="anatomy">
+          <div class="row"><span class="num">01</span><div><strong>GOAL</strong><span>what you give it</span></div></div>
+          <div class="row"><span class="num">02</span><div><strong>ORCHESTRATOR</strong><span>one deepagent · agents/janus</span></div></div>
+          <div class="row"><span class="num">03</span><div><strong>METHOD</strong><span>7 phases · recon → validate</span></div></div>
+          <div class="row"><span class="num">04</span><div><strong>TOOLS</strong><span><span class="code">gitagent · pipeline · kg · search · improve · ask_user</span></span></div></div>
+          <div class="row"><span class="num">05</span><div><strong>SUBAGENTS</strong><span>8 specialized + 1 read-only research</span></div></div>
+        </div>
+        <div class="quote">It reads the goal. Runs the phases. Delegates to specialists. Reviews the patches.<small>— orchestrator · cycle</small></div>
+      </div>
+    </section>
+
+    <section id="s3" class="scene scene3 clip" data-start="14" data-duration="8" data-track-index="1">
+      <div class="glow" style="right:-300px;bottom:50px"></div>
+      <div class="ghost">ORCHESTRATORS</div>
+      <div class="content">
+        <span class="label">03 · TWO ORCHESTRATORS</span>
+        <h2>Janus. One orchestrator. Two entries.</h2>
+        <div class="dual">
+          <div class="col">
+            <h3>Onboarding</h3>
+            <div class="mode">REPL · read-only</div>
+            <ul>
+              <li><span>run_abm</span><code>run</code></li>
+              <li><span>run_stage</span><code>stage</code></li>
+              <li><span>run_pipeline</span><code>6-stage</code></li>
+              <li><span>status · diagnose</span><code>kg</code></li>
+              <li><span>delegate →</span><code>improver</code></li>
+            </ul>
+          </div>
+          <div class="col">
+            <h3>Improvement</h3>
+            <div class="mode">goal-driven · edit</div>
+            <ul>
+              <li><span>gitagent_*</span><code>12 tools</code></li>
+              <li><span>pipeline_run</span><code>scorers</code></li>
+              <li><span>memory_recall_kg</span><code>Neo4j</code></li>
+              <li><span>opencode_search</span><code>web</code></li>
+              <li><span>improve_prompt</span><code>self</code></li>
+            </ul>
+          </div>
+        </div>
+        <div class="handoff"><span>handoff</span><span class="arrow">↔</span><span>shared context</span></div>
+        <p class="diagram-note">Same deepagent. Two entry modes. Bilingual REPL routes complex goals to the improver.</p>
+      </div>
+    </section>
+
+    <section id="s4" class="scene scene4 clip" data-start="22" data-duration="8" data-track-index="1">
+      <div class="glow" style="left:-200px;top:320px"></div>
+      <div class="ghost">SUBAGENTS</div>
+      <div class="content">
+        <span class="label">04 · REGISTRY</span>
+        <h2>Eight specialists. One registry.</h2>
+        <div class="grid-sa">
+          <div class="sa"><div class="top"><span class="name">abm</span><span class="plugin">plugin: scoring</span></div><span class="role">C++ engine + runner</span><span class="scope">mal-core/abm/**</span></div>
+          <div class="sa"><div class="top"><span class="name">scoring</span><span class="plugin">none</span></div><span class="role">Calibration scorers + composite</span><span class="scope">abm/tests/calibration/**</span></div>
+          <div class="sa"><div class="top"><span class="name">ingest</span><span class="plugin">plugin: ingest</span></div><span class="role">Env tensor + host density</span><span class="scope">mal-core/ingest/**</span></div>
+          <div class="sa"><div class="top"><span class="name">download</span><span class="plugin">plugin: download</span></div><span class="role">Plugin-based data fetcher</span><span class="scope">mal-core/download/**</span></div>
+          <div class="sa"><div class="top"><span class="name">prediction</span><span class="plugin">plugin: prediction</span></div><span class="role">Risk raster predictor</span><span class="scope">mal-core/prediction/**</span></div>
+          <div class="sa"><div class="top"><span class="name">training</span><span class="plugin">plugin: training</span></div><span class="role">U-Net model + dataset + trainer</span><span class="scope">mal-core/training/**</span></div>
+          <div class="sa"><div class="top"><span class="name">data</span><span class="plugin">plugin: data</span></div><span class="role">Manifest + naming + validation</span><span class="scope">mal-commonlib/data/**</span></div>
+          <div class="sa"><div class="top"><span class="name">commonlib</span><span class="plugin">plugin: commonlib</span></div><span class="role">Shared config + paths + AOI</span><span class="scope">mal-commonlib/**</span></div>
+        </div>
+        <p class="diagram-note">Each subagent: spec, skills, mailbox_inbox, edits_allow, plugins. Loaded from config/subagents.yaml.</p>
+      </div>
+    </section>
+
+    <section id="s5" class="scene scene5 clip" data-start="30" data-duration="8" data-track-index="1">
+      <div class="glow" style="right:-160px;top:-130px"></div>
+      <div class="ghost">WORKTREES</div>
+      <div class="content">
+        <span class="label">05 · ISOLATION</span>
+        <h2>Each subagent gets its own worktree.</h2>
+        <div class="orchestrator-bar">
+          <span class="lbl">ORCH</span>
+          <span class="center">gitagent_init → start → spawn → propose → integrate → finalize</span>
+          <span class="right">1 commit / main</span>
+        </div>
+        <div class="wt-grid">
+          <div class="wt"><div class="name">abm</div><div class="path">.gitagent/<br>features/.../<br>agents/a_abm/<br>worktree/</div></div>
+          <div class="wt"><div class="name">scoring</div><div class="path">.gitagent/<br>features/.../<br>agents/a_scr/<br>worktree/</div></div>
+          <div class="wt"><div class="name">ingest</div><div class="path">.gitagent/<br>features/.../<br>agents/a_ing/<br>worktree/</div></div>
+          <div class="wt"><div class="name">download</div><div class="path">.gitagent/<br>features/.../<br>agents/a_dl/<br>worktree/</div></div>
+          <div class="wt"><div class="name">prediction</div><div class="path">.gitagent/<br>features/.../<br>agents/a_pr/<br>worktree/</div></div>
+          <div class="wt"><div class="name">training</div><div class="path">.gitagent/<br>features/.../<br>agents/a_tr/<br>worktree/</div></div>
+          <div class="wt"><div class="name">data</div><div class="path">.gitagent/<br>features/.../<br>agents/a_dt/<br>worktree/</div></div>
+          <div class="wt"><div class="name">commonlib</div><div class="path">.gitagent/<br>features/.../<br>agents/a_cl/<br>worktree/</div></div>
+        </div>
+        <div class="deny">
+          <span>deny: /data/**</span>
+          <span>deny: /.git/**</span>
+          <span>deny: .env · secrets</span>
+          <span>allow: own worktree</span>
+        </div>
+      </div>
+    </section>
+
+    <section id="s6" class="scene scene6 clip" data-start="38" data-duration="8" data-track-index="1">
+      <div class="glow" style="left:-280px;bottom:-200px"></div>
+      <div class="ghost">METHOD</div>
+      <div class="content">
+        <span class="label">06 · METHODOLOGY</span>
+        <h2>Seven phases of a reasoned decision.</h2>
+        <div class="timeline">
+          <div class="step"><span class="n">01</span><span class="name">RECON</span><span class="desc">git log, read code, hunt TODOs</span></div>
+          <div class="step"><span class="n">02</span><span class="name">DIAGNOSE</span><span class="desc">trajectory · run scorers · get data</span></div>
+          <div class="step"><span class="n">03</span><span class="name">HYPOTHESIZE</span><span class="desc">rank causes · file:line evidence</span></div>
+          <div class="step"><span class="n">04</span><span class="name">CONTEXT</span><span class="desc">memory_recall_kg · papers · web</span></div>
+          <div class="step"><span class="n">05</span><span class="name">ASK</span><span class="desc">ask_user when uncertain</span></div>
+          <div class="step"><span class="n">06</span><span class="name">DELEGATE</span><span class="desc">spawn N workers in parallel</span></div>
+          <div class="step"><span class="n">07</span><span class="name">VALIDATE</span><span class="desc">re-run · compare · finalize</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="s7" class="scene scene7 clip" data-start="46" data-duration="6" data-track-index="1">
+      <div class="glow" style="left:180px;top:-280px"></div>
+      <div class="ghost">GLUE</div>
+      <div class="content">
+        <span class="label">07 · INTEGRATION GLUE</span>
+        <h2>Mailbox. Plugins. Scope. Score.</h2>
+        <div class="glue">
+          <div class="glue-card"><span class="icon">MAILBOX</span><h3>File-based inbox</h3><p>Runs/<session>/mailbox/<br>inbox-&lt;name&gt;/<br>3 tools: send, check, resolve</p></div>
+          <div class="glue-card"><span class="icon">PLUGINS</span><h3>Subagent chains</h3><p>EditPlugin + ReadOnlyPlugin +<br>per-subagent (scoring, download,<br>ingest, training, prediction, ...)</p></div>
+          <div class="glue-card"><span class="icon">SCOPE</span><h3>Plain-code validator</h3><p>Runs after proposals. Validates<br>paths against <code>edits_allow</code> globs.<br>Cross-scope → block + mailbox.</p></div>
+          <div class="glue-card"><span class="icon">SCORER</span><h3>after_task hook</h3><p>ScorerPlugin.after_task auto-runs<br>score_then_compare on any ABM task.<br>Writes scorecard, diffs vs best.</p></div>
+        </div>
+        <p class="diagram-note">The orchestrator never edits. The plugin chain never interprets. The scope validator never lies.</p>
+      </div>
+    </section>
+
+    <section id="s8" class="scene scene8 clip" data-start="52" data-duration="8" data-track-index="1">
+      <div class="glow" style="right:-200px;top:-150px"></div>
+      <div class="ghost">TODAY</div>
+      <div class="content">
+        <span class="label">08 · STATUS</span>
+        <h2>Today we have something. Not what we want yet.</h2>
+        <div class="status">
+          <div class="status-row"><span class="code">M10</span><span class="label">Orchestrator skeleton</span><span class="state">DONE</span></div>
+          <div class="status-row"><span class="code">M14</span><span class="label">Plugin system + registry</span><span class="state">DONE</span></div>
+          <div class="status-row"><span class="code">M15</span><span class="label">Live panel + observability</span><span class="state">DONE</span></div>
+          <div class="status-row pending"><span class="code">M16</span><span class="label">Full session replay</span><span class="state">PENDING</span></div>
+          <div class="status-row pending"><span class="code">M17</span><span class="label">Goal language</span><span class="state">PENDING</span></div>
+        </div>
+        <p class="honest">Still in development. Still rough. Plenty to improve.</p>
+        <div class="closing">
+          <div class="lead">Made possible by</div>
+          <div class="org">ANFAIA</div>
+          <div class="tag">Asociación Nacional Faro, para la Aceleración de la Inteligencia Artificial</div>
+          <div class="github">github.com/ANFAIA/MalariaSentinel</div>
+        </div>
+      </div>
+    </section>
+
+    <div class="transition" id="transition"></div>
+  </div>
+  <script>
+    window.__timelines = window.__timelines || {};
+    const tl = gsap.timeline({ paused: true });
+    const sceneStarts = [0, 7, 14, 22, 30, 38, 46, 52];
+    const scenes = ["#s1","#s2","#s3","#s4","#s5","#s6","#s7","#s8"];
+    const transitionAt = [6.55, 13.55, 21.55, 29.55, 37.55, 45.55, 51.55];
+    const transitionTypes = ["slide","fade","fade","fade","fade","fade","fade"];
+
+    tl.set(".scene", { opacity: 0 });
+    scenes.forEach((selector, index) => {
+      const start = sceneStarts[index];
+      tl.to(selector, { opacity: 1, duration: .55, ease: "power3.out" }, start + .16);
+      tl.from(`${selector} .ghost`, { x: 65, opacity: 0, duration: .8, ease: "power2.out" }, start + .2);
+      tl.from(`${selector} .glow`, { scale: .82, opacity: 0, duration: 1, ease: "power2.out" }, start + .1);
+      tl.from(`${selector} .label`, { y: 26, opacity: 0, duration: .5, ease: "power3.out" }, start + .28);
+      if (index !== 0) tl.from(`${selector} h2`, { y: 34, opacity: 0, duration: .62, ease: "power3.out" }, start + .4);
+
+      if (index === 0) {
+        tl.from(`${selector} h1`, { y: 50, opacity: 0, duration: .7, ease: "power3.out" }, start + .35);
+        tl.from(`${selector} .sub`, { y: 24, opacity: 0, duration: .55, ease: "power3.out" }, start + .75);
+        tl.from(`${selector} .tagline`, { y: 24, opacity: 0, duration: .55, ease: "power3.out" }, start + 1.0);
+        tl.from(`${selector} .pulse`, { y: 18, opacity: 0, duration: .5, ease: "power3.out" }, start + 1.25);
+      }
+      if (index === 1) {
+        tl.from(`${selector} .row`, { y: 30, opacity: 0, scale: .97, duration: .5, stagger: .15, ease: "back.out(1.4)" }, start + 1.0);
+        tl.from(`${selector} .quote`, { y: 24, opacity: 0, duration: .55, ease: "power3.out" }, start + 1.85);
+      }
+      if (index === 2) {
+        tl.from(`${selector} .col`, { y: 28, opacity: 0, duration: .55, stagger: .14, ease: "expo.out" }, start + 1.05);
+        tl.from(`${selector} .handoff`, { scale: .9, opacity: 0, duration: .5, ease: "back.out(1.5)" }, start + 2.0);
+        tl.from(`${selector} .diagram-note`, { y: 16, opacity: 0, duration: .5, ease: "power3.out" }, start + 2.45);
+      }
+      if (index === 3) {
+        tl.from(`${selector} .sa`, { y: 24, opacity: 0, scale: .96, duration: .42, stagger: .05, ease: "power3.out" }, start + 1.05);
+        tl.from(`${selector} .diagram-note`, { y: 16, opacity: 0, duration: .5, ease: "power3.out" }, start + 2.4);
+      }
+      if (index === 4) {
+        tl.from(`${selector} .orchestrator-bar`, { y: 24, opacity: 0, duration: .5, ease: "power3.out" }, start + 1.05);
+        tl.from(`${selector} .wt`, { y: 30, opacity: 0, duration: .42, stagger: .05, ease: "back.out(1.6)" }, start + 1.4);
+        tl.from(`${selector} .deny`, { y: 16, opacity: 0, duration: .5, ease: "power3.out" }, start + 2.6);
+      }
+      if (index === 5) {
+        tl.from(`${selector} .step`, { x: -34, opacity: 0, duration: .42, stagger: .08, ease: "power2.out" }, start + 1.05);
+      }
+      if (index === 6) {
+        tl.from(`${selector} .glue-card`, { y: 28, opacity: 0, scale: .96, duration: .48, stagger: .12, ease: "expo.out" }, start + 1.05);
+        tl.from(`${selector} .diagram-note`, { y: 16, opacity: 0, duration: .5, ease: "power3.out" }, start + 2.4);
+      }
+      if (index === 7) {
+        tl.from(`${selector} .status-row`, { x: -30, opacity: 0, duration: .42, stagger: .1, ease: "power2.out" }, start + 1.05);
+        tl.from(`${selector} .honest`, { y: 14, opacity: 0, duration: .5, ease: "power3.out" }, start + 1.85);
+        tl.from(`${selector} .closing`, { y: 24, opacity: 0, duration: .6, ease: "back.out(1.4)" }, start + 2.1);
+      }
+    });
+    transitionAt.forEach((at, index) => {
+      if (transitionTypes[index] === "slide") {
+        tl.fromTo("#transition", { y: 1350, opacity: 1 }, { y: 0, duration: .42, ease: "power3.inOut" }, at);
+        tl.to("#transition", { y: -1350, duration: .42, ease: "power3.inOut" }, at + .42);
+      } else {
+        tl.to("#transition", { opacity: .45, duration: .16, ease: "power2.in" }, at);
+        tl.to("#transition", { opacity: 0, duration: .28, ease: "power2.out" }, at + .16);
+      }
+    });
+    tl.to("#s8 .status-row", { opacity: 0, x: 20, duration: .4, ease: "power2.in" }, 58.5);
+    tl.to("#s8 .honest", { opacity: 0, y: -10, duration: .4, ease: "power2.in" }, 58.7);
+    tl.to("#s8 .closing", { opacity: 0, y: 16, duration: .45, ease: "power2.in" }, 58.9);
+    tl.to("#s8 .label", { opacity: 0, duration: .4, ease: "power2.in" }, 58.5);
+    tl.to("#s8 h2", { opacity: 0, y: -16, duration: .5, ease: "power2.in" }, 58.6);
+    tl.to("#transition", { opacity: 1, duration: .6, ease: "power2.inOut" }, 59.3);
+    window.__timelines.root = tl;
+  </script>
+</body>
+</html>
