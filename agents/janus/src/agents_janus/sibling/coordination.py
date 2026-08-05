@@ -88,3 +88,14 @@ def _current_sibling_id() -> str:
     """Get the current sibling's ID from thread-local or default."""
     import threading
     return getattr(threading.current_thread(), "_sibling_id", "unknown")
+
+
+class SiblingCoordinatorMiddleware:
+    """Middleware stub for sibling coordination hooks."""
+    
+    def __init__(self, registry=None):
+        self.registry = registry
+    
+    def wrap_tool_call(self, request, handler, *, tool_name: str = ""):
+        """Wrap tool calls for sibling coordination."""
+        return handler(request)

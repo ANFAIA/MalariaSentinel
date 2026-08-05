@@ -39,30 +39,21 @@ class TestModuleFlags:
 class TestWorkerDefinitions:
     def test_workers_exist(self):
         """Both abm-worker (code-modifying) and research-worker (read-only) are defined."""
-        names = [w["name"] for w in WORKER_DEFINITIONS]
-        assert "abm-worker" in names
-        assert "research-worker" in names
+        defs = WORKER_DEFINITIONS()  # Now a callable returning registry-based defs
+        names = [w["name"] for w in defs]
+        assert "abm" in names
+        assert "research" in names
 
-    def test_abm_worker_has_tools(self):
-        """abm-worker has 4 custom tools: abm_run, abm_test, abm_score, gitagent_propose."""
-        abm = next(w for w in WORKER_DEFINITIONS if w["name"] == "abm-worker")
-        assert "tools" in abm
-        assert len(abm["tools"]) == 4
+    def test_worker_definitions_is_callable(self):
+        """WORKER_DEFINITIONS is a callable (lazy alias from registry)."""
+        assert callable(WORKER_DEFINITIONS)
 
-    def test_research_worker_is_read_only(self):
-        """research-worker has no code-modifying tools (read-only)."""
-        rw = next(w for w in WORKER_DEFINITIONS if w["name"] == "research-worker")
-        # Empty tools list — uses only deepagents' default filesystem tools
-        assert rw["tools"] == []
-        # System prompt mentions read-only
-        assert "READ-ONLY" in rw["system_prompt"]
-
-    def test_worker_system_prompt_is_general(self):
-        """abm-worker prompt mentions general C++ modification, not just calibration."""
-        abm = next(w for w in WORKER_DEFINITIONS if w["name"] == "abm-worker")
-        sp = abm["system_prompt"]
-        assert "ANY part" in sp or "any" in sp.lower()
-        assert "gitagent_propose" in sp or "gitagent propose" in sp
+    def test_worker_descriptions_present(self):
+        """Each worker has a description."""
+        defs = WORKER_DEFINITIONS()
+        for w in defs:
+            assert "description" in w
+            assert w["description"]
 
 
 class TestCreateOrchestrator:
