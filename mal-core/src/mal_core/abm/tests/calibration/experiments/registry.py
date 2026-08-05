@@ -17,6 +17,11 @@ def get_default_experiment(aoi: str = DEFAULT_AOI) -> Experiment:
 
     files = resolve_aoi(aoi)
 
+    env_files = files.get_files("env")
+    habitat_files = files.get_files("habitat")
+    env_path = str(env_files[0]) if env_files else ""
+    habitat_path = str(habitat_files[0]) if habitat_files else ""
+
     return Experiment(
         name=f"{aoi}-default",
         params={
@@ -33,8 +38,8 @@ def get_default_experiment(aoi: str = DEFAULT_AOI) -> Experiment:
             "K_MAX": 1000,
             "BIRTH_FECUNDITY": 0.10,
         },
-        env_path=str(files.env) if files.env else "",
-        habitat_path=str(files.habitat) if files.habitat else "",
+        env_path=env_path,
+        habitat_path=habitat_path,
         n_days=90,
         seeds=[1, 2, 3, 4, 5],
         seeding_mode="uniform",

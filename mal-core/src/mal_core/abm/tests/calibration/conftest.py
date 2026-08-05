@@ -41,8 +41,10 @@ takes us back to the repo root."""
 
 MAL_ABM_FAST_DIR = _REPO_ROOT / "mal-core" / "src" / "mal_core" / "abm"
 CPP_BINARY_DEFAULT = MAL_ABM_FAST_DIR / "build" / "src" / "mal_abm_fast"
-GHANA_ENV_PATH = _REPO_ROOT / "data" / "runs" / "ghana" / "ghana_regional_2024_06_env.tif"
-GHANA_HABITAT_PATH = _REPO_ROOT / "data" / "runs" / "ghana" / "ghana_regional_2024_06_habitat_patches.gpkg"
+# Use manifest-based resolution instead of hardcoded paths.
+# The NC file is the primary env; the old TIF is a fallback.
+GHANA_ENV_PATH = _REPO_ROOT / "data" / "ghana" / "ghana_regional_2024_2025_env.nc"
+GHANA_HABITAT_PATH = _REPO_ROOT / "data" / "ghana" / "ghana_regional_2018_06_habitat_patches.gpkg"
 
 CALIBRATION_TIER_ENV = "CALIBRATION_TIER"
 """Env var selecting the test tier: ``fast`` (default) or ``full``."""
@@ -93,8 +95,12 @@ def cpp_binary() -> Path:
 
 @pytest.fixture(scope="session")
 def ghana_env_path() -> Path:
-    """Path to the Ghana 2024-06 4-band env GeoTIFF (or skip if missing)."""
+    """Path to the Ghana env file (NC or TIF)."""
     if not GHANA_ENV_PATH.is_file():
+        # Fallback to the old TIF
+        alt = _REPO_ROOT / "data" / "ghana" / "ghana_regional_2018_06_env.tif"
+        if alt.is_file():
+            return alt
         pytest.skip(f"Ghana env fixture not found at {GHANA_ENV_PATH}")
     return GHANA_ENV_PATH
 

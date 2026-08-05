@@ -79,6 +79,9 @@ def abm_run(
     n_rollouts: int = 1,
     seed: int = 1,
     snapshot_every: int = 7,
+    force_rebuild: bool = False,
+    debug_population: bool = True,
+    extra_args: str = "",
 ) -> str:
     """Build (if needed) and run an ABM simulation.
 
@@ -86,6 +89,11 @@ def abm_run(
     Uses run_abm_from_manifest() to resolve env/habitat/hosts/wind paths
     from the manifest automatically.
     Returns JSON with run metadata including the output directory.
+
+    Args:
+        force_rebuild: If True, rebuild the C++ binary even if it exists.
+        debug_population: If True, pass --debug-population to get daily diagnostics.
+        extra_args: Additional CLI args to pass to the binary (space-separated).
     """
     import time
     start = time.monotonic()
@@ -95,7 +103,7 @@ def abm_run(
     build_script = pkg_dir / "build.sh"
     build_dir = pkg_dir / "build" / "src" / "mal_abm_fast"
 
-    if not build_dir.exists() and build_script.exists():
+    if force_rebuild or (not build_dir.exists() and build_script.exists()):
         build_result = subprocess.run(
             ["bash", str(build_script)],
             capture_output=True, text=True, timeout=300,
@@ -109,14 +117,24 @@ def abm_run(
 
     try:
         from mal_core.abm.wrapper import run_abm_from_manifest
+        kwargs = {}
+        if debug_population:
+            kwargs["debug_population"] = True
+        if extra_args:
+            import shlex
+            for arg in shlex.split(extra_args):
+                if arg.startswith("--"):
+                    key = arg[2:].replace("-", "_")
+                    kwargs[key] = True
         result = run_abm_from_manifest(
             aoi=aoi, year=year, month=month, days=days,
-            n_rollouts=n_rollouts, seed=seed,
+            n_rollouts=n_rollouts, seed=seed, **kwargs,
         )
         elapsed = time.monotonic() - start
         return json.dumps({
             "status": "ok" if result.get("returncode", -1) == 0 else "run_failed",
             "returncode": result.get("returncode"),
+            "output_path": result.get("output_path", ""),
             "stdout_tail": result.get("stdout", "")[-500:],
             "stderr_tail": result.get("stderr", "")[-500:],
             "duration_s": round(elapsed, 1),
@@ -160,10 +178,19 @@ def abm_test() -> str:
 def abm_score(run_dir: str, include_llm_verdict: bool = True) -> str:
     """Run calibration scorers on a run directory.
 
+    Accepts either:
+    - A directory containing TIF files (scans for *_seed*.tif)
+    - A direct path to a TIF file
+
     Returns JSON with scorecard (D1-D14 + composite + optional LLM verdict).
     """
     try:
         run_path = Path(run_dir)
+
+        # If it's a TIF file, use its parent directory
+        if run_path.is_file() and run_path.suffix == '.tif':
+            run_path = run_path.parent
+
         if not run_path.exists():
             return json.dumps({"status": "error", "error": f"Run directory not found: {run_dir}"})
 
