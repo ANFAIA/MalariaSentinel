@@ -35,3 +35,27 @@ def get_affected_specs(spec_path: Path, all_spec_paths: list[Path]) -> list[Path
         if sp.parent.name in affected_names:
             result.append(sp)
     return result
+
+
+# ── Compose notifications (M16) ──────────────────────────────────────
+
+def compose_affected_notifications(changed_spec: str, registry) -> list[dict]:
+    """When docs/specs/X/spec.md changes, find all specs that declare
+    affects: [X] and return mailbox messages for them."""
+    all_spec_paths = []
+    for name, spec in registry.all().items():
+        if spec.spec_path:
+            all_spec_paths.append(Path(spec.spec_path))
+
+    affected = get_affected_specs(Path(changed_spec), all_spec_paths)
+    return [
+        {
+            "to": spec.name if hasattr(spec, "name") else str(sp.parent.name),
+            "from": "affects-watcher",
+            "re": f"spec {changed_spec} changed",
+            "severity": "non-breaking",
+            "ask": "ack",
+        }
+        for sp in affected
+        for spec in [registry.get(sp.parent.name)] if hasattr(registry, 'get')
+    ]

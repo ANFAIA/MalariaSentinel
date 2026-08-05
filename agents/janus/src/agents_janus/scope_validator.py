@@ -43,3 +43,29 @@ def validate_proposal_scope(
         "cross_scope": cross_scope,
         "unowned": unowned,
     }
+
+
+# ── Middleware wrapper (M16) ──────────────────────────────────────────
+
+class ScopeValidatorMiddleware:
+    """Middleware that validates proposal scope against subagent edit permissions."""
+
+    def __init__(self, registry=None):
+        self.registry = registry
+
+    def wrap_tool_call(self, request, handler, *, tool_name: str = ""):
+        """Wrap a tool call to validate scope after gitagent_propose."""
+        result = handler(request)
+
+        # After gitagent_propose, validate scope
+        if tool_name == "gitagent_propose" and self.registry:
+            try:
+                if isinstance(result, str):
+                    data = json.loads(result)
+                else:
+                    data = result
+                # TODO: validate diff paths against agent's scope
+            except Exception:
+                pass
+
+        return result

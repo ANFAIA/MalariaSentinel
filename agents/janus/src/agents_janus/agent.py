@@ -40,6 +40,9 @@ from agents_janus.tools.abm_tools import (
 )
 from agents_janus.logger import SessionLogger
 from agents_janus.observability import ObservabilityMiddleware
+from agents_janus.plugins import PLUGIN_REGISTRY
+from agents_janus.plugins.edit import EditPlugin
+from agents_janus.plugins.readonly import ReadOnlyPlugin
 
 try:
     from deepagents import FilesystemPermission
@@ -326,68 +329,22 @@ CRITICAL RULES:
 - NEVER SKIP INTEGRATE — after accepting, always gitagent_integrate + gitagent_finalize
 """
 
-WORKER_DEFINITIONS = [
-    {
-        "name": "abm-worker",
-        "description": (
-            "Modifies ABM C++ code: parameters, behaviors, new features, bug fixes. "
-            "Can read/write any file, compile, run tests, and score results. "
-            "Use for any change to mal-core/src/mal_core/abm/ or related code."
-        ),
-        "system_prompt": (
-            "You are an ABM development worker in an isolated gitagent worktree. "
-            "You can modify ANY part of the C++ codebase — parameters, behaviors, "
-            "new features, bug fixes, or remove broken code. "
-            "You have access to: read_file, write_file, edit_file, glob, grep (file ops), "
-            "execute (shell commands), abm_run (compile + simulate), abm_test (pytest), "
-            "abm_score (14 scorers + LLM verdict). "
-            "abm_run and abm_test AUTOMATICALLY resolve paths relative to your worktree. "
-            "CRITICAL for write_file/edit_file: The filesystem uses virtual_mode — all paths "
-            "are RELATIVE to the repo root. To write inside your worktree, use a path like: "
-            "'.gitagent/features/<feature>/agents/<id>/worktree/file.cpp'. "
-            "NEVER use absolute paths (e.g. /Users/...) — they get resolved under the repo root. "
-            "The worktree path from your task description is ABSOLUTE — strip the repo root prefix "
-            "to get the relative path for write_file. "
-            "For shell commands (git, ls, cat, etc.), cd into your worktree FIRST — "
-            "the worktree path is in your task description. "
-            "Use opencode_search to find scientific literature if you need parameter ranges "
-            "or biological context. Use memory_recall_kg to check past patterns and pitfalls. "
-            "Read papers in papers/ directory for domain knowledge. "
-            "When your work is done, you MUST call gitagent_propose to capture your changes. "
-            "This is a tool call, not a shell command. Just call: "
-            "gitagent_propose(feature='<feature_name>', agent_id='<your_agent_id>', title='<short title>', summary='<one paragraph>', confidence=0.8)"
-            "Without this call, your work is LOST — the orchestrator cannot see or integrate your changes."
-        ),
-        "tools": [
-            _wrap_with_logging(_import_abm_run()),
-            _wrap_with_logging(_import_abm_test()),
-            _wrap_with_logging(_import_abm_score()),
-            _wrap_with_logging(gitagent_propose),
-        ],
-        # Permissions are added dynamically in create_orchestrator() if FilesystemPermission is available
-    },
-    {
-        "name": "research-worker",
-        "description": (
-            "Literature and knowledge specialist — READ-ONLY. "
-            "Searches papers, web, and knowledge base for scientific context. "
-            "Use for literature reviews, parameter validation, and biological plausibility checks. "
-            "Does NOT modify code — produces structured findings reports."
-        ),
-        "system_prompt": (
-            "You are a research worker specialized in literature review and scientific synthesis. "
-            "You work in an isolated gitagent worktree but you are READ-ONLY — you do not modify code. "
-            "Your job: gather, synthesize, and report scientific findings. "
-            "Tools you have: opencode_search (web search), memory_recall_kg (knowledge base), "
-            "read_file, glob, grep (read papers, docs, configs). "
-            "DO NOT use write_file, edit_file, abm_run, abm_test, or abm_score — that's the abm-worker's job. "
-            "When done, report back via: "
-            "gitagent propose --feature <name> --agent <your-id> --title '...' --summary '...' --confidence 0.8"
-        ),
-        "tools": [],  # Read-only — uses only deepagents' default filesystem tools
-        # Permissions are added dynamically in create_orchestrator() with strict read-only enforcement
-    },
-]
+# Lazy alias — loads from subagents.yaml via registry
+def _get_worker_definitions():
+    """Load worker definitions from the registry (backwards compat)."""
+    from agents_janus.subagents.registry import load_registry
+    reg = load_registry()
+    defs = []
+    for name, spec in reg.all().items():
+        defs.append({
+            "name": name,
+            "description": spec.description,
+            "system_prompt": spec.description,
+            "tools": [],
+        })
+    return defs
+
+WORKER_DEFINITIONS = _get_worker_definitions
 
 
 def _gitagent_finalize_wrapped(feature: str, message: str) -> str:
@@ -486,6 +443,7 @@ def create_orchestrator(
     model: str = "xiaomi/mimo-v2.5",
     thread_id: str = "centinela-session",
     langfuse_client=None,
+    tier: str = "improve",  # "improve" or "onboarding"
 ):
     """Create the main orchestrator agent using deepagents.
 
@@ -496,6 +454,7 @@ def create_orchestrator(
         langfuse_client: Optional pre-configured `langfuse.Langfuse` instance. When
             set, the ObservabilityMiddleware also streams LLM/tool events to langfuse
             alongside the JSONL sink.
+        tier: "improve" (edit-capable) or "onboarding" (read-only).
 
     Returns:
         A compiled agent graph ready to invoke.
@@ -528,21 +487,43 @@ def create_orchestrator(
     if PROJECT_SKILLS.is_dir():
         skills.append("agents/skills/")
 
-    # Add permissions to worker definitions dynamically
+    # Build subagent definitions from registry
+    from agents_janus.subagents.registry import load_registry
+
+    registry = load_registry()
     worker_defs = []
-    for w in WORKER_DEFINITIONS:
-        wd = dict(w)
-        if w["name"] == "research-worker":
-            # Strict read-only: deny ALL writes, allow reads (except secrets)
+    for name, spec in registry.all().items():
+        # Build plugin chain
+        plugin_chain = [PLUGIN_REGISTRY[p]() for p in spec.plugins]
+        if tier == "improve":
+            plugin_chain.insert(0, EditPlugin())
+        elif tier == "onboarding":
+            plugin_chain.insert(0, ReadOnlyPlugin())
+
+        # Collect tools from plugins
+        all_tools = []
+        for plugin in plugin_chain:
+            all_tools.extend(plugin.tools(spec))
+
+        # Add wrapped tools
+        wrapped_tools = [_wrap_with_logging(t) for t in all_tools]
+
+        wd = {
+            "name": name,
+            "description": spec.description,
+            "system_prompt": spec.description,  # will be built by builder
+            "tools": wrapped_tools,
+        }
+
+        # Add permissions based on tier
+        if tier == "onboarding":
             wd["permissions"] = [
-                FilesystemPermission(operations=["read"], paths=["/.env", "/**/.env", "/**/*secret*", "/**/*credential*"], mode="deny"),
-                FilesystemPermission(operations=["write"], paths=["/**"], mode="deny"),
                 FilesystemPermission(operations=["read"], paths=["/**"], mode="allow"),
+                FilesystemPermission(operations=["write"], paths=["/**"], mode="deny"),
             ]
         else:
-            # abm-worker: deny secrets, data, git internals.
-            # Allow writes ONLY inside .gitagent worktrees (where isolated work lives).
-            # The main repo code is read-only for workers — changes go via gitagent propose.
+            # Improver: allow writes in worktrees only
+            edit_patterns = list(spec.edits_allow) if spec.edits_allow else []
             wd["permissions"] = [
                 FilesystemPermission(operations=["read"], paths=["/.env", "/**/.env", "/**/*secret*", "/**/*credential*"], mode="deny"),
                 FilesystemPermission(operations=["write"], paths=["/data/**"], mode="deny"),
@@ -551,7 +532,14 @@ def create_orchestrator(
                 FilesystemPermission(operations=["write"], paths=["/**"], mode="deny"),
                 FilesystemPermission(operations=["read"], paths=["/**"], mode="allow"),
             ]
+
         worker_defs.append(wd)
+
+    # M16: scope validator + sibling coordinator middleware
+    from agents_janus.scope_validator import ScopeValidatorMiddleware
+    from agents_janus.sibling.coordination import SiblingCoordinatorMiddleware
+    middleware.append(ScopeValidatorMiddleware(registry=registry))
+    middleware.append(SiblingCoordinatorMiddleware(registry=registry))
 
     return create_deep_agent(
         model=llm,

@@ -11,6 +11,7 @@ from agents_janus.plugins.training import TrainingPlugin
 from agents_janus.plugins.prediction import PredictionPlugin
 from agents_janus.plugins.data import DataPlugin
 from agents_janus.plugins.commonlib import CommonlibPlugin
+from agents_janus.plugins.sibling import SiblingPlugin
 
 PLUGIN_REGISTRY: dict[str, type[Plugin]] = {
     "edit": EditPlugin,
@@ -23,6 +24,7 @@ PLUGIN_REGISTRY: dict[str, type[Plugin]] = {
     "prediction": PredictionPlugin,
     "data": DataPlugin,
     "commonlib": CommonlibPlugin,
+    "sibling": SiblingPlugin,
 }
 
 __all__ = [
@@ -37,5 +39,6 @@ __all__ = [
     "PredictionPlugin",
     "DataPlugin",
     "CommonlibPlugin",
+    "SiblingPlugin",
     "PLUGIN_REGISTRY",
 ]

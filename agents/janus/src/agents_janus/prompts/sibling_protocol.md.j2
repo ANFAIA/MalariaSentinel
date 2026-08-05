@@ -1,0 +1,15 @@
+# Sibling Coordination Protocol
+
+When working in a shared worktree with siblings:
+
+1. **Claim files** before editing: `claim_file(path, description)`.
+2. **Check inbox** periodically for peer messages.
+3. **On overlap warning**: run SCAN protocol, decide: adapt / counter-propose / block.
+4. **Frame stack**: push current frame before forking, pop after merge.
+5. **Max depth**: 5 frames. Exceeding raises StackOverflowError.
+
+## Peer message types
+- `file_overlap`: another sibling edited the same file
+- `symbol_overlap`: another sibling edited the same function/class
+- `merge_conflict`: git merge-tree detected a conflict
+- `completion`: a sibling finished its task
