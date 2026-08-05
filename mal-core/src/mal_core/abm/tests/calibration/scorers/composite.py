@@ -11,6 +11,7 @@ DEFAULT_WEIGHTS: dict[str, float] = {
     "D12_host_density": 2.0, "D13_host_seeking_distance": 2.0,
     "D14_mobility_conservation": 2.0,
     "D15_long_horizon_persistence": 3.0,
+    "D16_suitability_auc": 2.0,
 }
 
 def geometric_mean(scores: dict[str, ScorerResult], weights: dict[str, float] | None = None) -> float:

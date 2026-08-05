@@ -92,3 +92,9 @@ D15_long_horizon_persistence:
   max_delta: -0.30
   hard_floor: 0.40
   source: "Population must survive 365 days without extinction (day-90 regression fix)"
+
+D16_suitability_auc:
+  min_score: 0.70
+  max_delta: -0.25
+  hard_floor: 0.40
+  source: "Mordecai 2013 thermal response + MCE weighted overlay; AUC lower CI > 0.65 vs larval sites"

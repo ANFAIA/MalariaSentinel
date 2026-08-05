@@ -21,6 +21,7 @@ from scorers.determinism import DeterminismScorer
 from scorers.coupling import CouplingScorer
 from scorers.activation import ActivationScorer
 from scorers.performance import PerformanceScorer
+from scorers.suitability_auc import SuitabilityAUCScorer
 
 ALL_SCORERS = [
     ExpansionScorer(),      # D1
@@ -33,6 +34,7 @@ ALL_SCORERS = [
     CouplingScorer(),       # D8
     ActivationScorer(),     # D9
     PerformanceScorer(),    # D10
+    SuitabilityAUCScorer(), # D16
 ]
 
 def score_run(run_dir: Path, experiment: dict[str, Any]) -> dict[str, Any]:

@@ -19,13 +19,13 @@
 # Sync the workspace
 uv sync --all-packages
 
-# Run the Ghana simulation
-cd mal-ghana-sim
-uv run python scripts/01_ingest.py --download
-uv run python scripts/02_suitability.py
-uv run python scripts/03_simulate.py
-uv run python scripts/05_train.py [n_rollouts] [epochs]
-uv run python scripts/06_predict_and_map.py
+# Run the Ghana simulation (via mal-core CLI)
+malariasim download --aoi ghana --datasets era5 --outputs wind_6hourly --years 2024 2025
+malariasim ingest --aoi ghana --year 2024 --month 6
+malariasim abm --aoi ghana --days 30
+malariasim score --run-dir runs/abm --tier fast
+malariasim train --run-dir runs/abm --epochs 50
+malariasim predict --aoi ghana --year 2026
 
 # Run dataset exploration
 cd mal-data-explorer
@@ -44,9 +44,6 @@ malariasim download --aoi ghana --datasets era5 --outputs wind_6hourly --years 2
 
 # Validate data completeness
 uv run python -c "from mal_core.download.manifest import validate_completeness; print(validate_completeness('ghana'))"
-
-# Run migration (old format → new format)
-uv run python scripts/migrate_data_format.py
 
 # Run the calibration scorers (Phase 1+2: 10 scorers + LLM verdict)
 cd mal-core/src/mal_core/abm/tests/calibration
@@ -178,7 +175,7 @@ Promotion moves stable, useful code from an experiment into the core tier. It is
 |---|---|---|
 | Add a stable helper (reusable, no domain) | Put it in `mal-commonlib/`. | Don't put it in `mal-ghana-sim/` (experiment) or `mal-core/` if it's not stable yet. |
 | Add a CLI script | Put it in `mal-execution/scripts/`. | Don't put a batch job in `mal-core/` (core is library, not scripts). |
-| Run a Ghana-specific experiment | Put it in `mal-ghana-sim/scripts/`. | Don't run it inline in `mal-execution/`; that tier is for production. |
+| Run a Ghana-specific experiment | Put it in `mal-ghana-sim/` (experiment tier). | Don't run it inline in `mal-execution/`; that tier is for production. |
 | Run a dataset visualisation / bias analysis | Put it in `mal-data-explorer/`. | Don't put it in `mal-core/`; that's for reusable pipeline logic. |
 | Promote stable code from an experiment to core | Follow the "Promotion flow" above. | Don't copy-and-tweak — refactor + tests + delete the original. |
 | Record a project fact | Use `memory_node` / `memory_rel`. | Don't paste it into `AGENTS.md` (one-off facts bloat the file). |
@@ -223,7 +220,7 @@ dynamics:
 5. **The diff report** shows if the new feature improved or regressed
    the composite vs the previous run AND vs the best historical run.
 
-Scorer naming: `D<id>_<name>.py` where `<id>` is the next number (D11, D12, ...).
+Scorer naming: `D<id>_<name>.py` where `<id>` is the next number (D17, D18, ...).
 The composite handles variable dimensions automatically via the geometric mean.
 
 Delta comparison: every scorecard is compared against both the **previous run**

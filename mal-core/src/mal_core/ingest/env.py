@@ -194,11 +194,11 @@ def build_env_tensor(
     skip_era5: bool = False,
     skip_modis: bool = False,
     skip_jrc_gsw: bool = False,
-    output_format: str = "tif",
+    output_format: str = "nc",
     name: str | None = None,
     twi_threshold: float = 8.0,
 ) -> dict:
-    """Build the env tensor + habitat patches for an AOI + month.
+    """Build the env tensor + habitat patches for an AOI.
 
     Args:
         aoi: the AOI object or a string slug.
@@ -209,27 +209,35 @@ def build_env_tensor(
         skip_era5: skip ERA5 (channel becomes NoData).
         skip_modis: skip MODIS (channel becomes NoData).
         skip_jrc_gsw: skip JRC GSW (water_frac becomes NoData).
-        output_format: 'tif' (COG) -- only format supported. 'nc' is
-            deprecated (see M13 migration notes).
+        output_format: 'nc' (default, daily multi-year NetCDF consumed by
+            the C++ ABM) or 'tif' (legacy 4-band monthly COG).
         name: optional human-readable AOI name.
         twi_threshold: TWI threshold for habitat patch detection.
 
     Returns:
         dict with 'env_path', 'habitat_path', and other metadata.
     """
-    if output_format == "nc":
-        warnings.warn(
-            "output_format='nc' is deprecated since M13. Daily NC output is now "
-            "produced by the download runner via: "
-            "malariasim download --datasets chirps --outputs rainfall_daily "
-            "--years YYYY1 YYYY2 --aoi <slug>. "
-            "The nc branch will be removed in M14+.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-
     if isinstance(aoi, str):
         aoi = AOI.from_slug(aoi)
+
+    # NC path: daily multi-year NetCDF (M13+ default). Delegates to the
+    # canonical builder in daily_nc.py. This is the input format the C++
+    # ABM actually reads via read_env_nc() in env_reader.cpp.
+    if output_format == "nc":
+        from .daily_nc import build_daily_env_nc
+        nc_result = build_daily_env_nc(
+            aoi=aoi.slug,
+            data_dir=output_dir,
+        )
+        register_dataset(
+            aoi.slug, "env", year,
+            pathlib.Path(nc_result["env_path"]).name,
+            type="time-series",
+            variables=nc_result["variables"],
+            format="nc",
+        )
+        return nc_result
+
     if isinstance(scale, str):
         scale = Scale(scale)
     h, w = aoi.cells_per_side()
