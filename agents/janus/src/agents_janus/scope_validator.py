@@ -3,6 +3,7 @@ from __future__ import annotations
 import fnmatch
 import json
 from agents_janus.subagents.registry import Registry
+from langchain.agents.middleware.types import AgentMiddleware
 
 def validate_proposal_scope(
     diff_paths: list[str],
@@ -47,8 +48,10 @@ def validate_proposal_scope(
 
 # ── Middleware wrapper (M16) ──────────────────────────────────────────
 
-class ScopeValidatorMiddleware:
+class ScopeValidatorMiddleware(AgentMiddleware):
     """Middleware that validates proposal scope against subagent edit permissions."""
+
+    name = "scope_validator"
 
     def __init__(self, registry=None):
         self.registry = registry

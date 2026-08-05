@@ -6,6 +6,7 @@ from pathlib import Path
 
 from agents_janus.sibling import intent, peer_message, ast_index
 from agents_janus.sibling.merge_preflight import merge_preflight_check, preflight_to_dict
+from langchain.agents.middleware.types import AgentMiddleware
 
 # Module-level coordinator instance (set by init)
 _coordinator: SiblingCoordinator | None = None
@@ -90,9 +91,11 @@ def _current_sibling_id() -> str:
     return getattr(threading.current_thread(), "_sibling_id", "unknown")
 
 
-class SiblingCoordinatorMiddleware:
+class SiblingCoordinatorMiddleware(AgentMiddleware):
     """Middleware stub for sibling coordination hooks."""
-    
+
+    name = "sibling_coordinator"
+
     def __init__(self, registry=None):
         self.registry = registry
     
