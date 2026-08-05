@@ -27,6 +27,7 @@ clean shutdown signals.
 from __future__ import annotations
 
 import signal
+import threading
 import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -316,6 +317,8 @@ class LivePanel:
     # ------------------------------------------------------------------
 
     def _install_sigint_handler(self) -> None:
+        if threading.current_thread() is not threading.main_thread():
+            return  # signal.signal only works in main thread
         self._prev_sigint_handler = signal.getsignal(signal.SIGINT)
 
         def _handler(signum: int, frame: Any) -> None:
@@ -340,6 +343,8 @@ class LivePanel:
         signal.signal(signal.SIGINT, _handler)
 
     def _restore_sigint_handler(self) -> None:
+        if threading.current_thread() is not threading.main_thread():
+            return  # no handler was installed, nothing to restore
         if self._prev_sigint_handler is not None:
             try:
                 signal.signal(signal.SIGINT, self._prev_sigint_handler)
