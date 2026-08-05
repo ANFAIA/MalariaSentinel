@@ -1,0 +1,103 @@
+{
+  "verdict": "fail",
+  "score": 0.0,
+  "checks": [
+    {
+      "name": "primary_spawned_worktree",
+      "passed": false,
+      "evidence": "No tool call or span showing worktree spawn. Only a static code review report is present."
+    },
+    {
+      "name": "sibling_join_shared_worktree",
+      "passed": false,
+      "evidence": "No evidence of a sibling joining a shared worktree. No tool calls or spans related to git worktree operations."
+    },
+    {
+      "name": "claim_file_registered",
+      "passed": false,
+      "evidence": "No SQLite tool call or span showing claim_file registration. No database operations recorded."
+    },
+    {
+      "name": "watcher_fired_on_file_overlap",
+      "passed": false,
+      "evidence": "No watcher event or file overlap detection recorded in any span or tool call."
+    },
+    {
+      "name": "peer_message_sent",
+      "passed": false,
+      "evidence": "No peer message tool call or inter-sibling communication recorded in the trace."
+    },
+    {
+      "name": "fork_brief_invoked",
+      "passed": false,
+      "evidence": "No fork_brief tool call or sub-context creation recorded. Only a code review span exists."
+    },
+    {
+      "name": "merge_result_returned",
+      "passed": false,
+      "evidence": "No merge_result tool call or token count measurement recorded in the trace."
+    },
+    {
+      "name": "frame_stack_push_pop",
+      "passed": false,
+      "evidence": "No frame stack push/pop SQLite operations recorded in any span."
+    },
+    {
+      "name": "no_parent_arbitration",
+      "passed": false,
+      "evidence": "Cannot be verified. No runtime execution occurred to confirm absence of orchestrator arbitration between siblings."
+    },
+    {
+      "name": "scan_markers_emitted",
+      "passed": false,
+      "evidence": "No fork output containing SCAN markers recorded in the trace."
+    }
+  ],
+  "failures": [
+    {
+      "name": "primary_spawned_worktree",
+      "evidence": "No worktree spawn tool call; trace contains only a static code review."
+    },
+    {
+      "name": "sibling_join_shared_worktree",
+      "evidence": "No git worktree join operation recorded."
+    },
+    {
+      "name": "claim_file_registered",
+      "evidence": "No SQLite insert/query for claim_file found."
+    },
+    {
+      "name": "watcher_fired_on_file_overlap",
+      "evidence": "No watcher or file-overlap detection event present."
+    },
+    {
+      "name": "peer_message_sent",
+      "evidence": "No inter-sibling message tool call found."
+    },
+    {
+      "name": "fork_brief_invoked",
+      "evidence": "No fork_brief invocation or sub-context creation recorded."
+    },
+    {
+      "name": "merge_result_returned",
+      "evidence": "No merge_result call or token measurement present."
+    },
+    {
+      "name": "frame_stack_push_pop",
+      "evidence": "No SQLite frame stack operations recorded."
+    },
+    {
+      "name": "no_parent_arbitration",
+      "evidence": "No runtime execution occurred; absence of arbitration cannot be confirmed from a code review."
+    },
+    {
+      "name": "scan_markers_emitted",
+      "evidence": "No fork output content with SCAN markers found in the trace."
+    }
+  ],
+  "summary": "The trace contains a single span ('trial_result') whose output is a static code review report stating that 'No shell execution is available in this environment' and that only a code review was performed. None of the 10 sibling coordination checks can be verified because no actual runtime execution of tool calls (worktree spawn, SQLite operations, watcher events, peer messages, fork/merge calls, or frame stack operations) occurred. All 10 checks fail due to complete absence of execution evidence.",
+  "trial_goal": "TRIAL: run a full e2e test of the sibling coordination system. Use abm-worker as primary, spawn scoring-worker and ingest-worker as siblings. Have them edit overlapping files in the shared worktree. Verify the watcher fires, peer_message is sent, fork_brief is invoked, merge_result is returned. End when scoring-worker has consumed ingest-worker output.",
+  "trial_elapsed_s": 1542.1,
+  "trace_id": "trial-1785924772",
+  "janus_result_preview": "## Sibling Coordination E2E Test \u2014 Verification Report\n\n### What was verified\n\n**No shell execution is available** in this environment (all subagent types are filesystem-only). Instead, I performed a comprehensive code review of the entire sibling coordination system.\n\n### Code verification: \u2705 GO\n\n| Component | Files | Status |\n|---|---|---|\n| **Sibling modules** (11) | `state.py`, `intent.py`, `peer_message.py`, `fork.py`, `frame_stack.py`, `coordination.py`, `watcher.py`, `scan.py`, `ast_index"
+}

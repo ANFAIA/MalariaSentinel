@@ -50,3 +50,6 @@ package-lock.json
 # CTest / CMake build artifacts
 Testing/
 mal-abm-fast/build/
+
+# Agent/tool caches
+.cache/
