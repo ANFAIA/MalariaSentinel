@@ -22,6 +22,10 @@ from scorers.coupling import CouplingScorer
 from scorers.activation import ActivationScorer
 from scorers.performance import PerformanceScorer
 from scorers.suitability_auc import SuitabilityAUCScorer
+from scorers.D12_host_density import HostDensityScorer
+from scorers.D13_host_seeking_distance import HostSeekingDistanceScorer
+from scorers.D14_mobility_conservation import MobilityConservationScorer
+from scorers.D15_long_horizon_persistence import LongHorizonPersistenceScorer
 
 ALL_SCORERS = [
     ExpansionScorer(),      # D1
@@ -34,6 +38,10 @@ ALL_SCORERS = [
     CouplingScorer(),       # D8
     ActivationScorer(),     # D9
     PerformanceScorer(),    # D10
+    HostDensityScorer(),            # D12 — optional: needs host_static.nc
+    HostSeekingDistanceScorer(),     # D13 — optional: needs host_seeking_scale_m
+    MobilityConservationScorer(),   # D14 — optional: needs .csr files
+    LongHorizonPersistenceScorer(), # D15 — optional: needs 365+ day runs
     SuitabilityAUCScorer(), # D16
 ]
 

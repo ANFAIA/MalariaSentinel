@@ -47,7 +47,7 @@ kg_refs:
 | Version | `v1.1` (output contract); `v1.0` (model registry) |
 | Status | `stable` |
 | Owner | David Flórez-Mazuera |
-| Last drift check | `2026-07-30` |
+| Last drift check | `2026-08-05` |
 
 ## 1. Objective
 
@@ -65,11 +65,12 @@ SDSS multi-scale.
 ## 2. In scope
 
 - `run_prediction(aoi_slug, scale, year, month=1, *, model_name="dummy", model_version=None, scenario=None, output_dir=None) -> Path`.
-- Model registry (`ModelRegistry`, `ModelManifest`, `RegistryEntry`, `DummyModel`, `UNetWrapper`).
+- Model registry (`ModelRegistry`, `ModelManifest`, `RegistryEntry`, `DummyModel`, `UNetWrapper` imported from `mal_core.training.wrapper`).
 - Per-scale aggregators: `RegionalAggregator` (passthrough), `NationalAggregator` (10×10 mean-pool), `ContinentalAggregator` (GADM-0 scalar).
 - `make_aoi(slug, scale)`, `get_aggregator(scale)`, `grid_shape(aoi)`.
 - `get_latest_prediction(aoi_slug)`, `get_prediction_metadata(aoi_slug)`.
 - `load_env_stack(aoi)` and `load_abm_state(aoi, month)` (state and env loaders).
+- AOI data resolver (`resolve_aoi(aoi_slug)`, `AOIFiles`): maps AOI slugs to data file paths via `data/<aoi>/manifest.json`.
 - Flag schema (`PREDICTION_FLAGS_SCHEMA`, `PredictionFlags`).
 - Pipeline position: stage 6 (after training).
 
@@ -85,7 +86,7 @@ SDSS multi-scale.
 
 | Symbol | Where | Notes |
 |---|---|---|
-| `run_prediction(...)` | `mal_core.prediction.predictor` | Returns `Path` of the written `_risk.tif`. |
+| `run_prediction(...)` | `mal_core.prediction.predictor` | Returns `Path` of the written `_risk.tif`. `scenario: ScenarioConfig | None` param accepts intervention scenarios (currently converted to params but not passed to model — see §6.2). |
 | `get_latest_prediction(aoi_slug)` | `mal_core.prediction.predictor` | Returns `Path | None` of the most recent `_risk.tif` for the AOI. |
 | `get_prediction_metadata(aoi_slug)` | `mal_core.prediction.predictor` | Returns `dict | None` from the sidecar. |
 | `ModelRegistry()` | `mal_core.prediction.registry` | Scans `runs/models/` (default) for `model.yaml` manifests. |
@@ -97,6 +98,8 @@ SDSS multi-scale.
 | `SCALE_GRIDS`, `AOI_CATALOGUE` | `mal_core.prediction.aggregator` | Per-scale grid definitions and slug catalog (currently just `ghana`). |
 | `load_env_stack(aoi)` | `mal_core.prediction.env_loader` | Loads `runs/env_stack.npz`, selects the 4 env channels, reprojects to AOI grid. Returns `(4, H, W)`. |
 | `load_abm_state(aoi, month, rollout_dir=None, seed=0)` | `mal_core.prediction.state_loader` | Picks the snapshot closest to `month*30` (clamped to `[7, 360]`). Returns `(2, H, W)`. |
+| `resolve_aoi(aoi_slug)` | `mal_core.prediction.aoi_resolver` | Maps AOI slug to data file paths via `data/<aoi>/manifest.json`. Returns `AOIFiles`. |
+| `AOIFiles` | `mal_core.prediction.aoi_resolver` | Dataclass: resolved file paths for an AOI. Methods: `get_files(dataset_name, year)`, `exists(key)`, `required_args()`. |
 
 ## 5. Invariants
 
@@ -109,7 +112,7 @@ SDSS multi-scale.
 ### §5.2 Model registry
 
 - **INV-4.** Models live under `runs/models/<name>_<version>/model.yaml`. The YAML schema: `name, version, contract_version, in_channels, out_channels, checkpoint, description`.
-- **INV-5.** `ModelRegistry.load(name, version=None)` returns the model instance. If `version=None`, picks the lexicographically latest `<name>@<version>`. If `checkpoint=""` → returns `DummyModel()`. Otherwise instantiates `UNetWrapper(<entry_path>/<checkpoint>)`.
+- **INV-5.** `ModelRegistry.load(name, version=None)` returns the model instance. If `version=None`, picks the lexicographically latest `<name>@<version>`. If `checkpoint=""` → returns `DummyModel()`. Otherwise instantiates `UNetWrapper(<entry_path>/<checkpoint>)` (imported from `mal_core.training.wrapper`).
 - **INV-6.** `ModelManifest.contract_version` defaults to `"1.1"` (the prediction output contract). Models trained before this default must declare their version explicitly.
 
 ### §5.3 Aggregators (per `Scale`)
@@ -145,6 +148,9 @@ SDSS multi-scale.
 | Env loader source | NetCDF written by ingest | `runs/env_stack.npz` (legacy M5 stack) | **P1 drift** — the M5 stack pre-dates the M11 ingest. Predictions against the current AOI bbox use hardcoded bounds `(-3.0, 4.0, 2.0, 12.0)` (line 93). |
 | `in_channels` | 6 (state + env) per `training/spec.md` | 5 default in `ModelManifest` | **P1 drift** — placeholder default; real models must set 6. |
 | Sidecar suffix | `.json` (per `abm/spec.md` §5.3) | `.tif.json` (line 126 of `predictor.py`) | **P0 drift** — prediction sidecars are not picked up by the ABM-side readers that expect `.json`. |
+| Scenario integration | Spec §4 lists `scenario` param | `predictor.py:68-69` converts to `params` via `interventions_to_params` but `params` is never passed to `model.predict()` | **P1 drift** — scenario param accepted but ignored. |
+| `aoi_resolver` module | Not documented | `prediction/aoi_resolver.py`: `resolve_aoi()`, `AOIFiles`, manifest v1→v2 migration | **Doc gap** — implemented but undocumented in spec. |
+| `UNetWrapper` location | Spec §4 implies `prediction.registry` | Actual import: `mal_core.training.wrapper.UNetWrapper` | **Doc gap** — spec misleading about module origin. |
 
 These must be reconciled before the next MAJOR bump. Tracked here until fixed.
 
@@ -208,6 +214,14 @@ n = NationalAggregator().aggregate(r, aoi)
 assert n.ndim == 3
 c = ContinentalAggregator().aggregate(r, aoi)
 assert c.shape == (1,)
+"
+
+# aoi_resolver: resolve_aoi returns AOIFiles
+uv run python -c "
+from mal_core.prediction.aoi_resolver import resolve_aoi, AOIFiles
+result = resolve_aoi('ghana')
+assert isinstance(result, AOIFiles)
+assert result.aoi == 'ghana'
 "
 ```
 

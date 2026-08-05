@@ -43,11 +43,11 @@ kg_refs:
 
 | Field | Value |
 |---|---|
-| Component | `mal-core/src/mal_core/abm/` (Python) + `mal-core/src/mal_core/abm/` (C++/CMake/vcpkg) |
+| Component | `mal-core/src/mal_core/abm/` (Python) + C++ engine (`wire.hpp`, CMake) |
 | Version | `v2.0` (output contract); `v1.0` (scorer suite) |
 | Status | `stable` |
 | Owner | David Flórez-Mazuera |
-| Last drift check | `2026-07-30` |
+| Last drift check | `2026-08-05` |
 
 ## 1. Objective
 
@@ -64,10 +64,13 @@ pins is the load-bearing wall: every downstream spec (`training`,
 
 ## 2. In scope
 
-- C++ ABM engine (`mal-abm-fast/`) and the Mesa-Geo adapter for the thin slice.
+- C++ ABM engine (`wire.hpp`, CMake build) and the Mesa-Geo adapter for the thin slice.
 - ABM runner (`runner.py`), flag schema (`flags.py`), and the Python wrapper around the binary (`wrapper.py`).
+- CLI subcommands (`cli/run.py`, `cli/score.py`, `cli/test.py`) for running, scoring, and testing ABM simulations.
 - **Output contract** (§5–§7 below): state tensor, env tensor, file naming, sidecar, NoData, tile rules, `K_max`, `H/W`.
 - Calibration scorers and the calibration test framework (`abm/tests/calibration/`).
+- Calibration infrastructure: experiment registry (`experiments/`), scorecard diffing (`diff.py`), best-score tracking (`best.py`), report rendering (`report.py`).
+- Visualization script (`scripts/visualize_state.py`).
 - Pipeline position: stage 3 (after ingest). Reads manifest for env/habitat/hosts paths.
 
 ## 3. Out of scope
@@ -82,11 +85,13 @@ pins is the load-bearing wall: every downstream spec (`training`,
 
 | Symbol | Where | Notes |
 |---|---|---|
-| `abm.run(...)` | `mal_core.abm.runner` | Runs the C++ binary for one `(aoi, scale, year, month, seed)` and writes state rasters + sidecars. |
-| `ABM_FLAGS_SCHEMA`, `AbmFlags` | `mal_core.abm.flags` | Pydantic schema for ABM CLI flags. New flags bump MINOR. |
-| `arch-abm-output-contract` constants | `mal_core.abm` (module) | Channel names, dtypes, NoData sentinel, `K_max`, `H/W`. |
-| Calibration scorers | `mal_core.abm.tests.calibration.scorers.D<id>_<name>` | Each scorer is a `D<id>_<name>.py` module exporting `score(rollout) -> dict`. Adding a scorer is non-breaking. |
-| `run_calibration_from_manifest(...)` | `mal_core.scoring.runner` (called by pipeline) | Cross-spec: ABM owns the rollout files consumed. |
+| `run_abm(...)` | `mal_core.abm.runner` | Runs the C++ binary for one `(aoi, year, month, seed)` and writes state rasters + sidecars. |
+| `CppAbmWrapper` | `mal_core.abm.wrapper` | Thin Python wrapper around the compiled C++ binary. Resolves binary path, introspects flags, runs `subprocess`. |
+| `run_abm_from_manifest(...)` | `mal_core.abm.wrapper` | Reads manifest, validates completeness, resolves data paths, calls `CppAbmWrapper`. |
+| `ABM_FLAGS_SCHEMA`, `AbmFlags` | `mal_core.abm.flags` | `TypedDict` schema for ABM CLI flags. New flags bump MINOR. |
+| Calibration scorers | `mal_core.abm.tests.calibration.scorers.D<id>_<name>` | Each scorer is a `D<id>_<name>.py` module exporting a class with `score(run_dir, experiment) -> ScorerResult`. Active scorers: D1-D10 + D16 (11 total). D11-D15 exist as files but are not registered in `ALL_SCORERS`. Adding a scorer is non-breaking. |
+| `run_calibration(...)` | `mal_core.scoring.runner` (called by pipeline) | Runs calibration pytest suite against a run directory. Cross-spec: ABM owns the rollout files consumed. |
+| CLI subcommands | `mal_core.abm.cli.{run,score,test}` | Typer CLI entry points: `run` (execute ABM), `score` (score a run dir), `test` (run calibration pytest). |
 
 ## 5. Invariants — Output contract (frozen at v2.0)
 
@@ -128,7 +133,7 @@ pins is the load-bearing wall: every downstream spec (`training`,
 
 - Output: GeoTIFF state COG + sidecar JSON per §5.1, §5.3, §5.4.
 - Input env: CF-1.8 daily NetCDF (current, per §5.2 INV-6) or monthly COG GeoTIFF (deprecated). Env format is chosen at ingest time (`output_format="nc"` or `"tif"`). The ABM C++ engine has two readers: `read_env_tif` (legacy) and `read_env_nc` (current). The PLUVIAL_POOL rule **requires** the NC path.
-- Input mobility + host layers: produced by `ingest`. The ABM does not validate the manifest — that's the pipeline's job (`pipeline/spec.md` §5 INV-3).
+- Input mobility + host layers: produced by `ingest`. `run_abm_from_manifest` validates manifest completeness and resolves paths; the pipeline-level `pipeline/spec.md` §5 INV-3 is the authoritative validation point for the full pipeline.
 
 ## 7. Migration & deprecation
 
@@ -142,7 +147,7 @@ pins is the load-bearing wall: every downstream spec (`training`,
 
 ```bash
 # INV-1, INV-4: dtype + NoData on a fresh rollout
-uv run pytest mal-core/tests/test_abm_output_contract.py -v
+uv run pytest mal-core/tests/test_abm_wrapper.py -v
 
 # INV-5, INV-7: file naming
 uv run python -c "
@@ -163,7 +168,7 @@ for p in Path('data/ghana').glob('*_env.nc'):
     ds = xr.open_dataset(p)
     assert 'rainfall' in ds.data_vars, f'{p}: missing rainfall'
     assert 'time' in ds.dims, f'{p}: missing time dim (not daily?)'
-    assert ds.dims['time'] > 1, f'{p}: time dim is not daily (only {ds.dims[time]} steps)'
+    assert ds.dims['time'] > 1, f'{p}: time dim is not daily (only {ds.dims["time"]} steps)'
 "
 
 # INV-8, INV-9: sidecar required keys
@@ -187,23 +192,42 @@ for p in Path('runs/').rglob('*.json'):
     cv = sidecar.get('contract_version', '2.0')
     assert cv.startswith('2.'), f'unexpected major: {p} has contract_version={cv}'
 "
+
+# Calibration scorers: verify 11 active scorers in ALL_SCORERS
+uv run python -c "
+from mal_core.abm.tests.calibration.scorers.score import ALL_SCORERS
+print(f'Active scorers: {len(ALL_SCORERS)}')
+names = [s.name for s in ALL_SCORERS]
+print(names)
+assert len(ALL_SCORERS) == 11, f'Expected 11, got {len(ALL_SCORERS)}'
+"
+
+# Calibration composite: verify all 16 weights defined
+uv run python -c "
+from mal_core.abm.tests.calibration.scorers.composite import DEFAULT_WEIGHTS
+print(f'Weights defined: {len(DEFAULT_WEIGHTS)}')
+assert len(DEFAULT_WEIGHTS) == 16, f'Expected 16, got {len(DEFAULT_WEIGHTS)}'
+"
 ```
 
 ## 9. Examples
 
-Writer (M1.4, illustrative):
+Writer (via C++ binary, typical pipeline path):
 
 ```python
-import numpy as np, rasterio
-from rasterio.transform import Affine
-from mal_core.abm import write_state_tick, K_MAX, H_W
+from mal_core.abm import run_abm
 
-def write_month(aoi_slug, scale, year, month, seed, density, suitability, transform):
-    assert density.shape == (H_W, H_W) and suitability.shape == (H_W, H_W)
-    arr = np.stack([density / K_MAX, suitability], axis=0).astype(np.float32)
-    path = f"runs/{aoi_slug}_{scale}_{year}_{month:02d}_seed{seed:04d}.tif"
-    write_state_tick(path, arr, transform, crs="EPSG:4326", nodata=-9999.0)
-    return path
+result = run_abm(aoi="ghana", year=2024, month=6, seed=1, days=30)
+# result = {"stdout": ..., "stderr": ..., "returncode": 0}
+```
+
+Writer (manifest-resolved):
+
+```python
+from mal_core.abm.wrapper import run_abm_from_manifest
+
+result = run_abm_from_manifest(aoi="ghana", year=2024, month=6, seed=1, days=30)
+# result = {"output_path": "runs/ghana/ghana_abm_seed0001.tif", ...}
 ```
 
 Reader (training, reads by band name — uses C++ band names):
@@ -216,6 +240,16 @@ def read_state_by_name(path):
         density      = src.read(names.index("adult_occupancy") + 1)   # band 1
         suitability  = src.read(names.index("host_seeking_pressure") + 1)  # band 2
     return density, suitability
+```
+
+Scoring a run directory:
+
+```python
+from mal_core.abm.tests.calibration.scorers.score import score_run
+from pathlib import Path
+
+scorecard = score_run(Path("runs/ghana/"), {"name": "default", "params": {}, "n_days": 90, "n_seeds": 1})
+print(f"Composite: {scorecard['composite']}")
 ```
 
 ## 10. References

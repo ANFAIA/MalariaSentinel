@@ -1,4 +1,4 @@
-"""Composite score: weighted geometric mean of D1..D15."""
+"""Composite score: weighted geometric mean of D1..D16."""
 from __future__ import annotations
 import math
 from scorers.base import ScorerResult

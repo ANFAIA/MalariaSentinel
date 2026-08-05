@@ -52,7 +52,7 @@ kg_refs:
 | Version | `v1.0` (env COG); `v1.0` (env NetCDF); `v1.0` (hosts); `v1.0` (mobility) |
 | Status | `stable` |
 | Owner | David Flórez-Mazuera |
-| Last drift check | `2026-07-30` |
+| Last drift check | `2026-08-05` |
 
 ## 1. Objective
 
@@ -73,14 +73,19 @@ shape per AOI.
 
 ## 2. In scope
 
-- `build_env_tensor(aoi, year, month, output_dir, *, scale="regional", output_format="tif"|"nc", twi_threshold=8.0, skip_era5=False, skip_modis=False, skip_jrc_gsw=False) -> dict` — writes env raster/NC + habitat patches.
+- `build_env_tensor(aoi, year, month, output_dir, *, scale="regional", output_format="nc"|"tif", twi_threshold=8.0, skip_era5=False, skip_modis=False, skip_jrc_gsw=False) -> dict` — writes env raster/NC + habitat patches. Default format is `"nc"` (daily multi-year NetCDF). When `output_format="nc"`, delegates to `build_daily_env_nc` in `daily_nc.py`.
+- `build_daily_env_nc(aoi, data_dir, output_dir=None, rainfall_file=None, water_frac_file=None, water_temp_file=None, ndvi_file=None) -> dict` — builds the daily multi-year NetCDF consumed by the C++ ABM. Reads pre-downloaded input files from `data_dir` by convention (`{aoi}_rainfall_daily_{years}_daily.nc`, `{aoi}_water_occurrence.tif`, `{aoi}_water_temp_{year}.tif`, `{aoi}_ndvi_{year}.tif`). Returns `{"env_path", "format", "aoi_slug", "n_days", "n_viable_cells", "grid", "variables"}`.
 - `build_host_dataset(aoi, *, output_dir, worldpop_year=2019, skip_buildings=False, skip_wildlife=False) -> dict` — writes host_static.nc + host_manifest.json.
 - `build_mobility_dataset(hosts_path, *, output_dir, aoi_slug, cell_size_km=1.0, beta_day=0.05, beta_night=0.5, beta_livestock=0.1, max_distance_km=50.0) -> dict` — writes 3 CSR files + mobility_manifest.json.
+- `resolve_aoi(aoi, bbox, crs, resolution_m, scale, name) -> AOI` — resolves an AOI from the slug registry or an explicit bbox string.
+- `build_environment(aoi, year, month, output_dir, scale, **kwargs) -> dict` — thin wrapper in `env_builder.py` over `build_env_tensor`. Convenience for scripts.
 - Flag schema (`INGEST_FLAGS_SCHEMA`, `IngestFlags`) covering env + hosts + mobility.
 - Slug registry in `_shared._DEFAULT_REGISTRY` (currently just `ghana`).
 - `safe_load` (graceful loader wrapper that fills with NoData on auth/network failure).
 - `empty_channel` (NoData-fill helper).
 - `register_dataset` (writes through to manifest).
+- Helpers in `daily_nc.py`: `read_static_tif(path, target_shape)` (reads single-band TIF with bilinear resampling), `_find_chirps_daily(data_dir)` (glob fallback for CHIRPS daily NC).
+- Constant `WATER_FRAC_VIABILITY_THRESHOLD = 0.05` in `daily_nc.py` — minimum water_frac for a cell to count as viable habitat.
 - Pipeline position: stage 2 (after download). Three builders: build_env_tensor, build_host_dataset, build_mobility_dataset.
 
 ## 3. Out of scope
@@ -98,7 +103,7 @@ shape per AOI.
 
 ```python
 def build_env_tensor(
-    aoi: str | AOI,
+    aoi,
     year: int,
     month: int,
     output_dir: Path,
@@ -107,11 +112,52 @@ def build_env_tensor(
     skip_era5: bool = False,
     skip_modis: bool = False,
     skip_jrc_gsw: bool = False,
-    output_format: str = "tif",     # "tif" (COG) or "nc" (CF-1.8 daily)
+    output_format: str = "nc",     # "nc" (daily multi-year, default) or "tif" (legacy 4-band monthly COG)
     name: str | None = None,
     twi_threshold: float = 8.0,
 ) -> dict:
-    """Returns {"env_path", "habitat_path", "aoi_slug", "scale", "grid", "year", "month", "format"}."""
+    """Returns {"env_path", "habitat_path", "aoi_slug", "scale", "grid", "year", "month", "format"}.
+    When output_format="nc", delegates to build_daily_env_nc in daily_nc.py.
+    The NC path returns additional keys: "n_days", "n_viable_cells", "variables".
+    """
+```
+
+### `build_daily_env_nc`
+
+```python
+def build_daily_env_nc(
+    aoi: str,
+    data_dir: Path,
+    output_dir: Path | None = None,
+    rainfall_file: Path | None = None,
+    water_frac_file: Path | None = None,
+    water_temp_file: Path | None = None,
+    ndvi_file: Path | None = None,
+) -> dict:
+    """Build the daily multi-year NetCDF consumed by the C++ ABM.
+
+    Reads pre-downloaded input files from data_dir by convention:
+      - {aoi}_rainfall_daily_{years}_daily.nc  (or glob fallback)
+      - {aoi}_water_occurrence.tif
+      - {aoi}_water_temp_{year}.tif
+      - {aoi}_ndvi_{year}.tif
+
+    Returns {"env_path", "format", "aoi_slug", "n_days", "n_viable_cells", "grid", "variables"}.
+    """
+```
+
+### `resolve_aoi`
+
+```python
+def resolve_aoi(
+    aoi: str | None,
+    bbox: str | None,
+    crs: str,
+    resolution_m: int,
+    scale: Scale,
+    name: str | None,
+) -> AOI:
+    """Resolve an AOI from the slug registry or an explicit bbox string."""
 ```
 
 ### `build_host_dataset`
@@ -157,12 +203,14 @@ def build_mobility_dataset(
 - **INV-5.** File naming: `{aoi_slug}_{scale}_{year:04d}_{month:02d}_env.tif`.
 - **INV-6.** Habitat patches: `(TWI > twi_threshold) ∧ (water_frac > 0) ∧ isfinite(TWI)` → GeoPackage with columns `twi_value, water_frac_value, row, col, aoi_slug, geometry`. CRS = AOI CRS.
 
-### §5.2 Env tensor (NetCDF)
+### §5.2 Env tensor (NetCDF) — daily multi-year
 
-- **INV-7.** CF-1.8 conventions, dims `(time, y, x)`, vars `rainfall, water_temp_c, water_frac, ndvi` with `_FillValue = -9999.0`, `dtype = float32`, `zlib=True, complevel=4`.
-- **INV-8.** `time` axis covers the full month (`calendar.monthrange(year, month)[1]` days), with explicit CF time units.
-- **INV-9.** `contract_version: "2.0"`, `generator_version: "m2-daily-0.1.0"`. **Differs from COG INV-4** — see §7.
-- **INV-10.** File naming: `{aoi_slug}_{scale}_{year:04d}_{month:02d}_env.nc`.
+- **INV-7.** CF-1.8 conventions, dims `(time, y, x)`, vars `rainfall, water_temp_c, water_frac, ndvi` with `dtype = float32`, `zlib=True, complevel=4`. `_FillValue` is not explicitly set (xarray default NaN for float32).
+- **INV-8.** `time` axis covers the full multi-year range from the CHIRPS daily rainfall input (e.g. 2024-2025 = 731 days). Not per-month — the ABM reads multi-year slices.
+- **INV-9.** `contract_version: "2.0"`, `generator_version: "m2-daily-0.4.0"`. **Differs from COG INV-4** — see §7.
+- **INV-10.** File naming: `{aoi}_regional_{start}_{end}_env.nc` (e.g. `ghana_regional_2024_2025_env.nc`). Scale is hardcoded to `"regional"` in the NC builder; start/end years are inferred from the CHIRPS input.
+- **INV-20.** `WATER_FRAC_VIABILITY_THRESHOLD = 0.05` — minimum water_frac for a cell to count as viable habitat. Zero viable cells raises `RuntimeError`.
+- **INV-21.** Static layers (water_frac, water_temp_c, ndvi) are broadcast to every day. Only rainfall varies per day.
 
 ### §5.3 Host dataset
 
@@ -194,6 +242,8 @@ def build_mobility_dataset(
 ## 7. Migration & deprecation
 
 - **Env COG vs NC `contract_version` mismatch** (COG = 1.0, NC = 2.0): this is **deliberate** today (the NC is a richer surface). Bumping the COG requires updating `abm/spec.md` §5.2 readers and `prediction/spec.md` env loaders. Recorded as drift until a single contract_version unifies them (post-M11).
+- **NC generator_version evolution** (m2-daily-0.1.0 → m2-daily-0.4.0): the NC builder shifted from per-month to multi-year output in M13. The `generator_version` was bumped accordingly. Per-month NC output (INV-10 old naming `{aoi}_{scale}_{year}_{month}_env.nc`) is deprecated; the C++ ABM now reads only the multi-year format.
+- **NC `_FillValue` change**: earlier NC versions used `_FillValue = -9999.0`; current code relies on xarray's NaN default for float32. The ABM's `env_reader.cpp` treats NaN as "no data" for aquatic dynamics.
 - **GHSL SMOD reclassification** (§5.3 INV-13) is hardcoded. Adding a new SMOD version (R2024A, …) is a MINOR change.
 - Adding a new env band → MAJOR (training and prediction read by band name, but the band order is part of the contract).
 - Deprecation policy: 1 MINOR spec version carries the warning; removed in the next MAJOR.
@@ -212,16 +262,23 @@ for p in Path('data/ghana').glob('*_env.tif'):
         assert src.dtypes[0] == 'float32'
 "
 
-# INV-7/8: NC env tensor CF-1.8 + fill value
+# INV-7/8: NC env tensor CF-1.8 + multi-year time axis
 uv run python -c "
 import xarray as xr
 from pathlib import Path
 for p in Path('data/ghana').glob('*_env.nc'):
     ds = xr.open_dataset(p)
-    assert ds.attrs.get('Conventions') == 'CF-1.8'
-    assert 'time' in ds.dims
+    assert ds.attrs.get('Conventions') == 'CF-1.8', f'{p}: missing CF-1.8'
+    assert 'time' in ds.dims, f'{p}: no time dim'
+    assert ds.dims['time'] >= 365, f'{p}: time axis too short for multi-year'
     for v in ('rainfall','water_temp_c','water_frac','ndvi'):
-        assert float(ds[v].encoding['_FillValue']) == -9999.0
+        assert v in ds.data_vars, f'{p}: missing var {v}'
+    assert ds.attrs.get('contract_version') == '2.0', f'{p}: contract_version={ds.attrs.get(\"contract_version\")}'
+    assert ds.attrs.get('generator_version') == 'm2-daily-0.4.0', f'{p}: generator_version={ds.attrs.get(\"generator_version\")}'
+    # _FillValue should NOT be -9999.0 (uses xarray NaN default)
+    for v in ds.data_vars:
+        fv = ds[v].encoding.get('_FillValue')
+        assert fv is None or fv != -9999.0, f'{p}: {v} has _FillValue=-9999.0'
 "
 
 # INV-11/12: host_static.nc has all expected vars + manifest exists
@@ -252,11 +309,27 @@ rg "[-]?9999\.0|255" mal-core/src/mal_core/ingest/ | grep -v _shared.py | grep -
 ## 9. Examples
 
 ```python
-# Build env + habitat for a single AOI/month
+# Build daily multi-year env NC (default format)
+from pathlib import Path
+from mal_core.ingest import build_env_tensor
+build_env_tensor("ghana", 2024, 7, Path("runs/ingest"))
+# -> writes runs/ingest/ghana_regional_2024_2025_env.nc (multi-year daily)
+```
+
+```python
+# Build legacy 4-band monthly COG (tif)
 from pathlib import Path
 from mal_core.ingest import build_env_tensor
 build_env_tensor("ghana", 2024, 7, Path("runs/ingest"), output_format="tif")
 # -> writes runs/ingest/ghana_regional_2024_07_env.tif + ..._habitat_patches.gpkg
+```
+
+```python
+# Build env NC directly via daily_nc module
+from pathlib import Path
+from mal_core.ingest.daily_nc import build_daily_env_nc
+build_daily_env_nc(aoi="ghana", data_dir=Path("data/ghana"))
+# -> writes data/ghana/ghana_regional_2024_2025_env.nc
 ```
 
 ```python

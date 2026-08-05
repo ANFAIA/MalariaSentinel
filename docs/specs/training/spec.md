@@ -47,7 +47,7 @@ kg_refs:
 | Version | `v1.0` |
 | Status | `stable` |
 | Owner | David Flórez-Mazuera |
-| Last drift check | `2026-07-30` |
+| Last drift check | `2026-08-05` |
 
 ## 1. Objective
 
@@ -89,9 +89,14 @@ zeros (`DummyModel`).
 | `RolloutDataset(run_dir, split, patch_size=128, subsample=1.0, preload=False)` | `mal_core.training.dataset` | `torch.utils.data.Dataset`. |
 | `get_dataloaders(run_dir, batch_size=16, num_workers=0, subsample=1.0, preload=False)` | `mal_core.training.dataset` | Returns `(train_loader, val_loader)`. |
 | `train_unet(run_dir, output_dir, *, epochs=50, batch_size=16, lr=1e-3, device=None, subsample=1.0, preload=False) -> float` | `mal_core.training.trainer` | Returns best `val_dice`. |
-| `UNetWrapper(ckpt_path)` | `mal_core.training.wrapper` | `ModelProtocol` for `prediction.spec.md`. `predict(state, env) -> (1, H, W)`. |
-| `TRAINING_FLAGS_SCHEMA` | `mal_core.training.flags` | Pydantic-style flag dict. |
+| `UNetWrapper(ckpt_path)` | `mal_core.training.wrapper` | `ModelProtocol` for `prediction.spec.md`. `predict(state, env) -> (2, H, W)`. |
+| `TRAINING_FLAGS_SCHEMA` | `mal_core.training.flags` | TypedDict + schema dict for CLI flag defaults. |
 - Pipeline position: stage 5 (after scoring).
+
+**Supporting CLI scripts** (in `mal-execution/scripts/`, not part of core API):
+- `train_unet.py` — CLI wrapper around `train_unet()` with `--epochs`, `--subsample`, `--preload` flags.
+- `train_unet_subsample.py` — Standalone training script with `PreloadedRolloutDataset` for faster iteration; accepts `--max-rollouts` to limit rollout count. Uses `mal_core.unet` (older import path).
+- `validate_unet.py` — Evaluates a trained checkpoint on the val split; prints mean Dice and writes `validation_results.txt`.
 
 ## 5. Invariants
 
@@ -119,14 +124,14 @@ zeros (`DummyModel`).
 
 ### §5.4 UNetWrapper contract
 
-- **INV-14.** `UNetWrapper(ckpt_path).predict(state: (2,H,W) float32, env: (4,H,W) float32) -> (1,H,W) float32`. The wrapper is the contract for `prediction/spec.md` §4.
-- **INV-15.** The wrapper is initialised with a checkpoint path; loading is lazy (inside `predict`). A missing checkpoint raises `FileNotFoundError` at first `predict()` call.
+- **INV-14.** `UNetWrapper(ckpt_path).predict(state: (2,H,W) float32, env: (4,H,W) float32) -> (2,H,W) float32`. The wrapper is the contract for `prediction/spec.md` §4. Output channels = `STATE_CHANNELS = 2` (density + suitability).
+- **INV-15.** The wrapper loads the checkpoint eagerly in `__init__` (not lazily). A missing checkpoint raises `FileNotFoundError` at construction time.
 
 ## 6. Data contracts
 
 - **Input:** ABM rollouts under `run_dir` matching `state_seed*_day*.{tif,npy}`. GeoTIFF sidecars (`.json`) carry `seed`, `transform`, etc.
 - **Env tensor:** produced by `ingest/spec.md` §5.1 (COG). The trainer's `RolloutDataset.__getitem__` currently zeros all env channels (known limitation — see §7).
-- **Output:** PyTorch checkpoints (`.pt`) under `output_dir`. Architecture is implicit in `model.state_dict()` shape; consumers must use the matching `UNet` definition.
+- **Output:** PyTorch checkpoints (`.pt`) under `output_dir`. Architecture is implicit in `model.state_dict()` shape; consumers must use the matching `UNet` definition. `UNetWrapper.predict()` returns `(2, H, W)` — channel 0 is density, channel 1 is suitability.
 
 ## 7. Migration & deprecation
 
@@ -178,6 +183,19 @@ from pathlib import Path
 out = Path('runs/training')
 assert (out / 'final_model.pt').exists()
 "
+
+# INV-14/15: UNetWrapper loads eagerly, predict returns (2,H,W)
+uv run python -c "
+import numpy as np
+from pathlib import Path
+from mal_core.training.wrapper import UNetWrapper
+# Missing checkpoint should raise at construction, not at predict()
+try:
+    w = UNetWrapper(Path('/nonexistent/model.pt'))
+    assert False, 'should have raised FileNotFoundError'
+except FileNotFoundError:
+    pass
+"
 ```
 
 ## 9. Examples
@@ -203,7 +221,7 @@ from mal_core.training import UNetWrapper
 model = UNetWrapper(Path("runs/training/best_model.pt"))
 state = ...  # (2, H, W) float32 from ABM
 env = ...    # (4, H, W) float32 from ingest
-risk = model.predict(state, env)  # (1, H, W)
+risk = model.predict(state, env)  # (2, H, W)
 ```
 
 ## 10. References

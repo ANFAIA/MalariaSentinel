@@ -50,10 +50,10 @@ kg_refs:
 | Field | Value |
 |---|---|
 | Component | `mal-core/src/mal_core/download/manifest.py` + `data/<aoi>/` |
-| Version | `v2` (manifest schema); `v2.0` (file naming); `v2.0` (env NetCDF) |
-| Status | `stable` (naming); `stable` (manifest v2 schema); `draft` (manifest v3 schema fields — see §6.2) |
+| Version | `v3.1` (manifest schema); `v2.0` (file naming); `v2.0` (env NetCDF) |
+| Status | `stable` (naming); `stable` (manifest v3.1 schema) |
 | Owner | David Flórez-Mazuera |
-| Last drift check | `2026-07-30` |
+| Last drift check | `2026-08-05` |
 
 ## 1. Objective
 
@@ -68,7 +68,7 @@ string in 12 places and any rename would silently break the pipeline.
 ## 2. In scope
 
 - File naming convention for `data/<aoi>/`.
-- Manifest schema (v2) at `data/<aoi>/manifest.json`.
+- Manifest schema (v3.1) at `data/<aoi>/manifest.json`.
 - Dataset type semantics (`time-series` vs `static`).
 - Manifest API (`read_manifest`, `update_dataset`, `validate_completeness`, `get_dataset_files`, `list_files`).
 - Env NetCDF format (CF-1.8 daily) and env COG/TIF format.
@@ -87,8 +87,9 @@ string in 12 places and any rename would silently break the pipeline.
 | Symbol | Where | Notes |
 |---|---|---|
 | `read_manifest(aoi)` | `mal_core.download.manifest` | Returns the full manifest dict. Auto-migrates v1 → v2 in memory. Empty skeleton if file missing. |
-| `update_dataset(aoi, dataset_name, year, filename, **kwargs)` | `mal_core.download.manifest` | Updates one dataset entry, rebuilds `expected_files`, writes v2. **`kwargs` are accepted but currently ignored** — see §6.2. |
-| `validate_completeness(aoi)` | `mal_core.download.manifest` | Returns `list[str]` of missing filenames (empty = complete). |
+| `update_dataset(aoi, dataset_name, year, filename, *, type, required_for_abm, variables, format, period)` | `mal_core.download.manifest` | Updates one dataset entry, rebuilds `expected_files`, writes v3.1. All kwargs are written to disk. |
+| `update_manifest(aoi, key, filename)` | `mal_core.download.manifest` | Legacy compat wrapper — delegates to `update_dataset`. |
+| `validate_completeness(aoi, *, years=None)` | `mal_core.download.manifest` | Returns `list[str]` of missing filenames (empty = complete). When `years` is provided, period-based NC entries are checked for year coverage. |
 | `get_dataset_files(aoi, dataset_name, year=None)` | `mal_core.download.manifest` | Returns resolved `list[Path]` (empty if not found). |
 | `list_files(aoi)` | `mal_core.download.manifest` | Flat dict (v1 compat). |
 | `register_dataset(...)` | `mal_core.ingest._shared` | Thin wrapper around `update_dataset` used by ingest builders. |
@@ -102,12 +103,12 @@ string in 12 places and any rename would silently break the pipeline.
 - **INV-3.** `<aoi>` matches `[a-z0-9]+(-[a-z0-9]+)*` (delegated to `AOI.slug` validator).
 - **INV-4.** Manifest entries live under `data/<aoi>/manifest.json`.
 
-### §5.2 Manifest schema v2
+### §5.2 Manifest schema v3.1
 
 - **INV-5.** Top-level keys: `aoi` (required), `name` (optional), `grid` (optional), `datasets` (required), `expected_files` (required).
-- **INV-6.** Each dataset entry: `type` ∈ `{"time-series","static"}`, `format` ∈ `{nc,gpkg,csr,json,tif}`, `files` map (`year → filename` for time-series, `key → filename` for static), `required_for_abm` (bool, defaults to false), `variables` (list, optional).
+- **INV-6.** Each dataset entry: `type` ∈ `{"time-series","static"}`, `format` ∈ `{nc,gpkg,csr,json,tif}`, `files` map (`year → filename` for time-series, `key → filename` for static), `required_for_abm` (bool, defaults to false), `variables` (list, optional), `period` (dict, optional — see §6.2).
 - **INV-7.** `expected_files` is the flat sorted union of all `files` values. `validate_completeness` checks each against `data/<aoi>/`.
-- **INV-8.** Reader auto-migrates v1 (flat `files` dict) to v2 in memory. **Writes always produce v2.** Migration script: `scripts/migrate_data_format.py`.
+- **INV-8.** Reader auto-migrates v1 (flat `files` dict) to v2 in memory. **Writes always produce v3.1.** Migration script: `scripts/migrate_data_format.py`.
 - **INV-9.** A dataset missing from the manifest is **not** available to consumers (the ABM raises `FileNotFoundError`).
 
 ### §5.3 Env tensor formats
@@ -125,12 +126,12 @@ string in 12 places and any rename would silently break the pipeline.
 ### §5.4 Loader contract
 
 - **INV-13.** Every loader function returns `xr.DataArray | xr.Dataset` **in memory**. No `output_path` param.
-- **INV-14.** Canonical signature: `load_<dataset>_<product>(aoi: AOI, *, year: int | None = None, month: int | None = None, cache_dir: Path | None = None)`.
+- **INV-14.** Canonical signature: `load_<dataset>_<product>(aoi: AOI, *, years: Sequence[int], months: Sequence[int] | None = None, cache_dir: Path | None = None)`. Some loaders (e.g. `jrc_gsw`) use `year: int` instead of `years: Sequence[int]` for static annual products.
 - **INV-15.** Load-or-download semantics: try manifest first, return cached; if missing, download, save via runner, register, return.
 
 ## 6. Data contracts
 
-### §6.1 Manifest schema (full example)
+### §6.1 Manifest schema (full example — v3.1)
 
 ```json
 {
@@ -152,8 +153,9 @@ string in 12 places and any rename would silently break the pipeline.
         "2024": "ghana_regional_2024_2025_env.nc",
         "2025": "ghana_regional_2024_2025_env.nc"
       },
-      "variables": ["rainfall", "water_temp_c", "water_frac", "ndvi"],
-      "required_for_abm": true
+      "variables": ["water_frac", "rainfall", "water_temp_c", "ndvi"],
+      "required_for_abm": true,
+      "period": { "start": "2024-01-01", "end": "2025-12-31" }
     },
     "habitat": {
       "type": "static",
@@ -166,44 +168,55 @@ string in 12 places and any rename would silently break the pipeline.
 }
 ```
 
-### §6.2 Known drift (must be fixed in v3)
+### §6.2 Manifest v3.1 (kwargs now honoured)
 
 The `update_dataset()` function in `mal_core/download/manifest.py:62`
-currently **accepts but ignores** the kwargs `type`, `required_for_abm`,
-`variables`, `format`. The `_shared.register_dataset` helper passes
-them through but they never reach disk. This is a v3 schema gap:
+now honours every kwarg (`type`, `required_for_abm`, `variables`,
+`format`, `period`). The v3.1 schema adds:
 
-| Field | Expected | Actual |
+| Field | Type | Notes |
 |---|---|---|
-| `required_for_abm` | written from kwargs | always written from the caller’s hardcoded `True` for hosts/mobility/env |
-| `variables` | written from kwargs | lost on the next `update_dataset` call |
-| `format` | written from kwargs | lost |
+| `period` | `{"start": "YYYY-MM-DD", "end": "YYYY-MM-DD"}` | Optional. For multi-year NC entries (e.g. daily rainfall across 2024–2025). Used by `validate_completeness` to check year coverage instead of individual file existence. |
+| `schema_version` | `str` | Reserved for future migration. Not yet written by v3.1. |
 
-The v3 schema (planned in `docs/plans/in-process/m11-pipeline-unification.md`) must:
-1. Make `update_dataset` honour every kwarg.
-2. Validate `required_for_abm` against the ABM wrapper's required dataset set at write time (fail fast on missing).
-3. Add a `schema_version: 3` field and a one-shot migration.
-
-**This drift check exposes it on every run until v3 lands.** See drift check §8.
+**Historical note**: §6.2 previously documented a drift where `update_dataset` accepted but ignored kwargs. This was fixed — all kwargs are now written to disk. The `register_dataset` helper in `_shared.py` calls `update_dataset` with kwargs directly.
 
 ### §6.3 Dataset types and registered loaders
 
 | Type | Format | Frequency | Pattern | Registered loader | `required_for_abm` |
 |---|---|---|---|---|---|
-| `env` | NetCDF4 | daily | `<aoi>_env_<year>.nc` | ingest (uses chirps/era5/jrc_gsw/modis) | yes |
+| `env` | NetCDF4 | daily | `<aoi>_regional_<start>_<end>_env.nc` | `daily_nc` (assembles chirps+jrc_gsw+era5+modis) | yes |
 | `env` (COG variant) | GeoTIFF | monthly | `<aoi>_<scale>_<year>_<month:02d>_env.tif` | ingest (`output_format="tif"`) | yes |
-| `wind` | NetCDF4 | 6-hourly | `<aoi>_wind_<year>.nc` | `era5` | no |
-| `habitat` | GeoPackage | static | `<aoi>_habitat.gpkg` | ingest (built from DEM+TWI) | yes |
+| `chirps_rainfall` | GeoTIFF | monthly | `<aoi>_rainfall_<year>.tif` | `chirps` | no |
+| `chirps_rainfall_daily` | NetCDF4 | daily | `<aoi>_rainfall_daily_<start>_<end>_daily.nc` | `chirps` (`load_chirps_rainfall_daily`) | yes |
+| `era5_temp` | GeoTIFF | monthly | `<aoi>_temp_suitability_<year>.tif` | `era5` (`load_era5_temp_suitability`) | no |
+| `era5_water_temp` | GeoTIFF | monthly | `<aoi>_water_temp_<year>.tif` | `era5` (`load_era5_water_temp`) | no |
+| `wind` | NetCDF4 | 6-hourly | `<aoi>_wind_6hourly_<year>.nc` | `era5` (`load_era5_wind_6hourly`) | no |
+| `modis_ndvi` | GeoTIFF | monthly | `<aoi>_ndvi_<year>.tif` | `modis` | no |
+| `habitat` | GeoPackage | static/time-series | `<aoi>_regional_<year>_<month>_habitat_patches.gpkg` | ingest (built from DEM+TWI) | yes |
+| `dem` | GeoTIFF | static | `<aoi>_elevation.tif` | `dem` (`load_merit_dem`) | no |
+| `jrc_water` | GeoTIFF | static | `<aoi>_water_occurrence.tif` | `jrc_gsw` | no |
+| `worldpop` | GeoTIFF | static | `<aoi>_population.tif` | `worldpop` | no |
+| `glw_cattle` | GeoTIFF | static | `<aoi>_cattle.tif` | `glw` (`load_glw_livestock`) | no |
+| `glw_goats` | GeoTIFF | static | `<aoi>_goats.tif` | `glw` | no |
+| `glw_sheep` | GeoTIFF | static | `<aoi>_sheep.tif` | `glw` | no |
+| `glw_pigs` | GeoTIFF | static | `<aoi>_pigs.tif` | `glw` | no |
+| `glw_chickens` | GeoTIFF | static | `<aoi>_chickens.tif` | `glw` | no |
+| `ghsl_urban` | GeoTIFF | static | `<aoi>_urban_class.tif` | `ghsl` | no |
 | `host_static` | NetCDF4 | static | `<aoi>_host_static.nc` | ingest (built from WorldPop+GLW+GHSL+buildings+wildlife) | yes |
 | `host_manifest` | JSON | static | `<aoi>_host_manifest.json` | ingest | yes |
+| `wildlife_proxy` | GeoTIFF | static | `<aoi>_wildlife_host_proxy.tif` | `wildlife` | no |
+| `buildings` | GeoTIFF | static | `<aoi>_building_fraction.tif` | `buildings` (Overture Maps) | no |
 | `mobility_day` | CSR | static | `<aoi>_mobility_day.csr` | ingest (built from host_static) | no |
 | `mobility_night` | CSR | static | `<aoi>_mobility_night.csr` | ingest | no |
 | `livestock_mobility` | CSR | static | `<aoi>_livestock_mobility.csr` | ingest | no |
 
+**Deprecated**: `worldcover` — archived to `mal-commonlib/.../loaders/_legacy/worldcover.py`. Use `jrc_gsw` for `water_frac`.
+
 ## 7. Migration & deprecation
 
 - **Manifest v1 → v2**: auto on read, manual via `scripts/migrate_data_format.py` on disk. No further writes should produce v1.
-- **Manifest v2 → v3** (planned, M11): see §6.2. Adds `schema_version` field and honours all kwargs in `update_dataset`.
+- **Manifest v2 → v3.1**: writes always produce v3.1 (all kwargs honoured, `period` field supported). Reads auto-migrate v1/v2 in memory.
 - **Env COG `contract_version: "1.0"` vs NetCDF `contract_version: "2.0"`**: the COG path is the M1/M2 contract pinned in `abm/spec.md` §5.2; the NetCDF path is a richer daily CF-1.8 surface used by some consumers. Bumping either without bumping the other is a P1 bug — see drift check.
 - **Deprecated**: `worldcover` dataset — archived to `mal-commonlib/.../loaders/_legacy/worldcover.py`. Use `jrc_gsw` for `water_frac`.
 - Deprecation policy: 1 MINOR spec version carries the warning; removed in the next MAJOR.
@@ -234,14 +247,6 @@ for m in Path('data').glob('*/manifest.json'):
 
 # INV-8: no v1 manifests survive
 rg '"files"\s*:\s*\{[^}]*"ghana' data/ && echo "FAIL: v1 manifest found" || echo "OK"
-
-# §6.2 drift: update_dataset kwargs are ignored
-uv run python -c "
-from mal_core.download.manifest import update_dataset, read_manifest
-import os, tempfile
-# This must round-trip `required_for_abm=False` after a write+read cycle
-"
-# (Marked PASS only when the §6.2 fix lands. Until then, record as a Pitfall.)
 
 # INV-10..12: env tensors honour NoData and band order
 uv run python -c "
@@ -282,7 +287,7 @@ assert not missing, f"missing: {missing}"
 ```python
 # Loader returns in-memory data — never writes to disk
 from mal_commonlib.data.loaders.era5 import load_era5_temp_suitability
-da = load_era5_temp_suitability(AOI.from_slug("ghana"), year=2024, month=7)
+da = load_era5_temp_suitability(AOI.from_slug("ghana"), years=[2024], months=[7])
 assert da.dtype == "float32"
 ```
 
@@ -290,5 +295,4 @@ assert da.dtype == "float32"
 
 - KG ADR: `adr-spec-design-2026-07-30`.
 - Specs (by folder): `commonlib`, `download`, `ingest`, `abm`, `training`, `prediction`, `pipeline`, `scoring`.
-- Plan: `m11-pipeline-unification` (covers manifest v3 migration).
 - External: CF-1.8 conventions (NetCDF); GeoTIFF spec.

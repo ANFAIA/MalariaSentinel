@@ -92,6 +92,9 @@ def run_abm_from_manifest(
     habitat_path = None
     hosts_path = None
     wind_path = None
+    mobility_day_path = None
+    mobility_night_path = None
+    livestock_mobility_path = None
 
     for ds_name, ds in manifest.get("datasets", {}).items():
         files = ds.get("files", {})
@@ -111,6 +114,10 @@ def run_abm_from_manifest(
             fname = files.get(str(year)) or next(iter(files.values()), None)
             if fname:
                 wind_path = str(data_dir / fname)
+        elif ds_name == "mobility_manifest":
+            mobility_day_path = str(data_dir / files.get("mobility_day", ""))
+            mobility_night_path = str(data_dir / files.get("mobility_night", ""))
+            livestock_mobility_path = str(data_dir / files.get("livestock_mobility", ""))
 
     if not env_path:
         raise FileNotFoundError(f"No env data found for AOI '{aoi}', year {year}")
@@ -136,6 +143,12 @@ def run_abm_from_manifest(
     }
     if hosts_path:
         flags["hosts"] = hosts_path
+    if mobility_day_path:
+        flags["human_mobility_day"] = mobility_day_path
+    if mobility_night_path:
+        flags["human_mobility_night"] = mobility_night_path
+    if livestock_mobility_path:
+        flags["livestock_mobility"] = livestock_mobility_path
     # NOTE: --wind-field not yet supported by compiled binary; skip for now
     # if wind_path:
     #     flags["wind_field"] = wind_path
