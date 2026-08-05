@@ -16,6 +16,40 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 
 # ---------------------------------------------------------------------------
+# LLM helper — builds a ChatOpenAI client from env vars
+# ---------------------------------------------------------------------------
+
+def _resolve_llm():
+    """Resolve an LLM client from environment variables.
+
+    Uses the same pattern as onboarding.py: reads OPENROUTER_API_KEY (or
+    OPENROUTER_KEY), falls back to OPENAI_API_KEY for local models.
+    Returns a langchain ChatOpenAI instance.
+    """
+    try:
+        from langchain_openai import ChatOpenAI
+    except ImportError:
+        raise ImportError("langchain-openai is required for LLM calls.")
+
+    api_key = os.environ.get("OPENROUTER_API_KEY") or os.environ.get("OPENROUTER_KEY")
+    if api_key:
+        model = os.environ.get("ONBOARDING_MODEL", "xiaomi/mimo-v2.5")
+        return ChatOpenAI(
+            model=model,
+            base_url="https://openrouter.ai/api/v1",
+            api_key=api_key,
+        )
+
+    openai_key = os.environ.get("OPENAI_API_KEY")
+    if openai_key:
+        model = os.environ.get("ONBOARDING_MODEL", "gpt-4o-mini")
+        return ChatOpenAI(model=model, api_key=openai_key)
+
+    raise ValueError(
+        "No LLM API key found. Set OPENROUTER_API_KEY or OPENAI_API_KEY."
+    )
+
+# ---------------------------------------------------------------------------
 # Stage definitions for the malariasim CLI pipeline
 # ---------------------------------------------------------------------------
 STAGES = ("download", "ingest", "abm", "score", "train", "predict")
@@ -264,3 +298,75 @@ def onboard_delegate(goal: str, context: str = "{}") -> str:
     from agents_janus.tools.subagent_invoke import handoff_to_improver
     result = handoff_to_improver(goal=goal, context=ctx)
     return result
+
+
+def onboard_ask_subagent(name: str, question: str) -> str:
+    """Ask a specialist subagent a read-only question about the system.
+
+    Spawns the specialist inline (no worktree, no gitagent) with read-only
+    permissions. The specialist answers from its domain knowledge.
+
+    Args:
+        name: Subagent name (abm, scoring, ingest, download, prediction,
+              training, data, commonlib, research).
+        question: The question to ask.
+
+    Returns:
+        JSON with the specialist's response.
+    """
+    try:
+        from agents_janus.subagents.registry import load_registry
+        from agents_janus.subagents.builder import build_subagent_prompt
+        from agents_janus.plugins.readonly import ReadOnlyPlugin
+    except ImportError as e:
+        return json.dumps({"status": "error", "error": f"Import failed: {e}"})
+
+    # Load registry and validate subagent name
+    try:
+        registry = load_registry()
+        spec = registry.get(name)
+    except (FileNotFoundError, KeyError) as e:
+        return json.dumps({
+            "status": "error",
+            "error": str(e),
+            "available": list(registry.all().keys()) if "registry" in dir() else [],
+        })
+
+    # Build prompt with ReadOnlyPlugin only
+    plugins = [ReadOnlyPlugin()]
+    system_prompt = build_subagent_prompt(spec, plugins, all_specs=registry.all())
+
+    # Resolve LLM and invoke
+    try:
+        llm = _resolve_llm()
+    except (ImportError, ValueError) as e:
+        return json.dumps({"status": "error", "error": str(e)})
+
+    try:
+        from langchain_core.messages import SystemMessage, HumanMessage
+        messages = [
+            SystemMessage(content=system_prompt),
+            HumanMessage(content=question),
+        ]
+    except ImportError:
+        # Fallback: use dict-based messages (works with ChatOpenAI)
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": question},
+        ]
+
+    try:
+        response = llm.invoke(messages)
+        answer = response.content if hasattr(response, "content") else str(response)
+        return json.dumps({
+            "status": "ok",
+            "subagent": name,
+            "question": question,
+            "response": answer,
+        })
+    except Exception as e:
+        return json.dumps({
+            "status": "error",
+            "subagent": name,
+            "error": str(e),
+        })

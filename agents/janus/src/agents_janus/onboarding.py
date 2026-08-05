@@ -26,6 +26,7 @@ YOUR CAPABILITIES (use your tools):
 - Diagnose simulation issues with trajectory data (onboard_diagnose)
 - List available subagents and components (onboard_list_components)
 - Delegate complex code-editing tasks to the improvement orchestrator (onboard_delegate)
+- Ask specialists about their domain: onboard_ask_subagent(name, question)
 - Recall past patterns and pitfalls from the knowledge base (memory_recall_kg)
 
 PIPELINE STAGES (order matters):
@@ -99,6 +100,7 @@ def _build_agent(provider: str, model: str, langfuse_client=None):
         onboard_diagnose,
         onboard_list_components,
         onboard_delegate,
+        onboard_ask_subagent,
     )
     from agents_janus.tools.kg_tool import memory_recall_kg
 
@@ -110,6 +112,7 @@ def _build_agent(provider: str, model: str, langfuse_client=None):
         onboard_diagnose,
         onboard_list_components,
         onboard_delegate,
+        onboard_ask_subagent,
         memory_recall_kg,
     ]
 
