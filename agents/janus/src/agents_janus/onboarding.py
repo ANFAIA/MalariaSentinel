@@ -184,6 +184,10 @@ def run_onboarding(
         if langfuse_client is not None:
             try:
                 langfuse_client.flush()
+            except ValueError:
+                # OpenTelemetry context detach error — non-fatal, traces already
+                # shipped by ObservabilityMiddleware.after_agent.
+                pass
             except Exception:
                 pass
 
