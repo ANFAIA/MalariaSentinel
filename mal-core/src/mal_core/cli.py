@@ -186,7 +186,8 @@ def ingest(
         if not hosts_path.exists():
             hosts_path = P("data") / aoi / f"{aoi}_host_static.nc"
         if hosts_path.exists():
-            result = build_mobility_dataset(hosts_path=hosts_path, output_dir=output_dir, aoi_slug=aoi)
+            mobility_out = P("data") / aoi
+            result = build_mobility_dataset(hosts_path=hosts_path, output_dir=mobility_out, aoi_slug=aoi)
             results["mobility"] = result
         else:
             typer.echo(f"Warning: host_static.nc not found, skipping mobility build", err=True)

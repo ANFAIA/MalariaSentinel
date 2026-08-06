@@ -43,8 +43,12 @@ def build_mobility_dataset(
     beta_night: float = 0.5,
     beta_livestock: float = 0.1,
     max_distance_km: float = 50.0,
+    sparsity_threshold: float = 5e-4,
 ) -> dict:
     """Build gravity-model mobility OD matrices from host_static.nc.
+
+    Matrices are built and written one at a time so peak RAM stays at
+    ~one matrix (the livestock matrix dominates at 1km Ghana resolution).
 
     Args:
         hosts_path: path to host_static.nc.
@@ -55,6 +59,7 @@ def build_mobility_dataset(
         beta_night: friction for human nighttime mobility.
         beta_livestock: friction for livestock mobility.
         max_distance_km: maximum mobility distance.
+        sparsity_threshold: minimum normalised probability kept per entry.
 
     Returns:
         dict with 'files', 'manifest_path', and stats.
@@ -67,9 +72,10 @@ def build_mobility_dataset(
     H, W = shape
     n_cells = H * W
 
-    # Human attractiveness = human population
+    # Human attractiveness = human population (nodata -> 0)
     human = host_data.get("human", np.zeros(shape, dtype=np.float32))
-    human_total = float(human[human != -9999.0].sum()) if (human == -9999.0).any() else float(human.sum())
+    human = np.where(human == -9999.0, 0.0, human)
+    human_total = float(human.sum())
 
     # Livestock attractiveness = sum of livestock species
     livestock_vars = ["cattle", "goats", "sheep", "pigs", "chickens"]
@@ -80,38 +86,36 @@ def build_mobility_dataset(
             livestock += np.where(arr == -9999.0, 0.0, arr)
     livestock_total = float(livestock.sum())
 
-    # Build OD matrices
+    # Build + write each OD matrix, freeing memory between matrices
+    output_dir.mkdir(parents=True, exist_ok=True)
     t0 = time.time()
+    nnz_by_file: dict[str, int] = {}
 
-    rp_hday, ci_hday, v_hday, nr, nc = build_gravity_od(
-        human, cell_size_km, beta_day, max_distance_km,
-    )
+    def _build_write(name: str, grid: np.ndarray, beta: float) -> str:
+        rp, ci, vl, nr, nc = build_gravity_od(
+            grid, cell_size_km, beta, max_distance_km, sparsity_threshold,
+        )
+        p = write_csr(rp, ci, vl, nr, nc, output_dir / name)
+        nnz_by_file[name] = int(ci.shape[0])
+        del rp, ci, vl
+        return str(p)
 
-    rp_hnight, ci_hnight, v_hnight, _, _ = build_gravity_od(
-        human, cell_size_km, beta_night, max_distance_km,
-    )
-
+    written_paths = [
+        _build_write(f"{aoi_slug}_mobility_day.csr", human, beta_day),
+        _build_write(f"{aoi_slug}_mobility_night.csr", human, beta_night),
+    ]
     if livestock_total > 0:
-        rp_live, ci_live, v_live, _, _ = build_gravity_od(
-            livestock, cell_size_km, beta_livestock, max_distance_km,
+        written_paths.append(
+            _build_write(f"{aoi_slug}_livestock_mobility.csr", livestock, beta_livestock)
         )
     else:
-        rp_live, ci_live, v_live, nr, nc = build_identity_od(n_cells)
+        rp_live, ci_live, v_live, nr_live, nc_live = build_identity_od(n_cells)
+        p = write_csr(rp_live, ci_live, v_live, nr_live, nc_live,
+                      output_dir / f"{aoi_slug}_livestock_mobility.csr")
+        nnz_by_file[f"{aoi_slug}_livestock_mobility.csr"] = int(ci_live.shape[0])
+        written_paths.append(str(p))
 
     elapsed = time.time() - t0
-
-    # Write CSR files
-    output_dir.mkdir(parents=True, exist_ok=True)
-
-    csr_files = {
-        f"{aoi_slug}_mobility_day.csr": (rp_hday, ci_hday, v_hday),
-        f"{aoi_slug}_mobility_night.csr": (rp_hnight, ci_hnight, v_hnight),
-        f"{aoi_slug}_livestock_mobility.csr": (rp_live, ci_live, v_live),
-    }
-    written_paths: list[str] = []
-    for name, (rp, ci, vl) in csr_files.items():
-        p = write_csr(rp, ci, vl, nr, nc, output_dir / name)
-        written_paths.append(str(p))
 
     # Write manifest
     manifest = {
@@ -123,6 +127,8 @@ def build_mobility_dataset(
         "beta_night": beta_night,
         "beta_livestock": beta_livestock,
         "max_distance_km": max_distance_km,
+        "sparsity_threshold": sparsity_threshold,
+        "nnz_by_file": nnz_by_file,
         "human_total": human_total,
         "livestock_total": livestock_total,
         "build_time_s": round(elapsed, 2),

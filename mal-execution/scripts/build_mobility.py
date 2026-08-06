@@ -15,6 +15,7 @@ def main() -> None:
     p.add_argument("--beta-night", type=float, default=0.5)
     p.add_argument("--beta-livestock", type=float, default=0.1)
     p.add_argument("--max-distance-km", type=float, default=50.0)
+    p.add_argument("--sparsity-threshold", type=float, default=5e-4)
     args = p.parse_args()
 
     from mal_core.ingest.mobility import build_mobility_dataset
