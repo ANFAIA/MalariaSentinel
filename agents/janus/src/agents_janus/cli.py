@@ -234,10 +234,14 @@ def onboard(
     provider: str = typer.Option("openrouter", "--provider", "-p", help="LLM provider."),
     model: str = typer.Option("xiaomi/mimo-v2.5", "--model", help="Model identifier."),
     quiet: bool = typer.Option(False, "--quiet", "-q", help="Suppress technical output. Clean conversational experience."),
+    tracing: str = typer.Option("", "--tracing", help="Tracing backend: 'langfuse' (requires langfuse SDK + env vars)."),
 ):
     """Conversational onboarding agent. Ask questions, run tasks, get help."""
+    resolved_tracing = _resolve_tracing(tracing)
+    langfuse_client = _build_langfuse_client(resolved_tracing)
+
     from agents_janus.onboarding import run_onboarding
-    result = run_onboarding(provider=provider, model=model, quiet=quiet)
+    result = run_onboarding(provider=provider, model=model, quiet=quiet, langfuse_client=langfuse_client)
     typer.echo(result)
 
 

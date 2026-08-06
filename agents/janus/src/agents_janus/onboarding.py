@@ -116,6 +116,14 @@ def _build_agent(provider: str, model: str, langfuse_client=None):
         memory_recall_kg,
     ]
 
+    # Build observability middleware if langfuse is active
+    middleware = []
+    if langfuse_client is not None:
+        import agents_janus.agent as agent_mod
+        if agent_mod.SESSION_LOGGER is not None:
+            from agents_janus.observability import ObservabilityMiddleware
+            middleware.append(ObservabilityMiddleware(agent_mod.SESSION_LOGGER, langfuse_client=langfuse_client))
+
     skills = []
     if _PROJECT_SKILLS.is_dir():
         skills.append("agents/skills/")
@@ -127,6 +135,7 @@ def _build_agent(provider: str, model: str, langfuse_client=None):
         backend=backend,
         skills=skills or None,
         name="centinela-onboarding",
+        middleware=middleware or None,
         permissions=[
             FilesystemPermission(operations=["read"], paths=["/**"], mode="allow"),
             FilesystemPermission(operations=["write"], paths=["/**"], mode="deny"),
@@ -138,6 +147,7 @@ def run_onboarding(
     provider: str = "openrouter",
     model: str = "xiaomi/mimo-v2.5",
     quiet: bool = False,
+    langfuse_client=None,
 ) -> str:
     """Run the conversational onboarding agent.
 
@@ -148,11 +158,18 @@ def run_onboarding(
         provider: LLM provider.
         model: Model identifier.
         quiet: If True, suppress technical output (tool calls, etc.).
+        langfuse_client: Optional pre-configured langfuse.Langfuse instance.
 
     Returns:
         Final status message when the user exits.
     """
-    agent = _build_agent(provider=provider, model=model)
+    import agents_janus.agent as agent_mod
+    from agents_janus.logger import SessionLogger
+
+    logger = SessionLogger()
+    agent_mod.SESSION_LOGGER = logger
+
+    agent = _build_agent(provider=provider, model=model, langfuse_client=langfuse_client)
 
     print("\n" + "=" * 60, file=sys.stderr)
     print("  Centinela — MalariaSentinel SDSS Assistant", file=sys.stderr)
@@ -162,17 +179,27 @@ def run_onboarding(
     # Conversation history for multi-turn
     messages: list[dict] = []
 
+    def _cleanup():
+        agent_mod.SESSION_LOGGER = None
+        if langfuse_client is not None:
+            try:
+                langfuse_client.flush()
+            except Exception:
+                pass
+
     while True:
         try:
             user_input = input("you> ").strip()
         except (EOFError, KeyboardInterrupt):
             print("\n¡Hasta luego!", file=sys.stderr)
+            _cleanup()
             return json.dumps({"status": "quit"})
 
         if not user_input:
             continue
         if user_input.lower() in ("quit", "exit", "salir", "q"):
             print("¡Hasta luego!", file=sys.stderr)
+            _cleanup()
             return json.dumps({"status": "quit"})
 
         # Add user message to history
