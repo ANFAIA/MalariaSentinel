@@ -46,6 +46,7 @@
   "agent": {
     "supervisor": {
       "description": "Primary orchestrator. Uses gawt MCP (gitagent-mcp) for worktree isolation and multi-agent coordination. Delegates to loops and subagents. Reads the knowledge graph; does NOT write to it (delegates writes to memory-curator).",
+      "prompt": "{file:agents/loops/supervisor.md}",
       "permission": {
         "task": "allow",
         "question": "allow",
