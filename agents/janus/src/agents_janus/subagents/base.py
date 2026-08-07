@@ -13,16 +13,17 @@ class SubagentSpec:
     provider: str
     spec_path: Path | None
     skills: tuple[str, ...]
-    mailbox_inbox: str
+    mailbox_inbox: str  # kept for backwards compat, replaced by gawt inbox
     edits_allow: tuple[str, ...]
-    plugins: tuple[str, ...]  # unique-to-subagent plugins
+    plugins: tuple[str, ...]
     thread_id_prefix: str = "sub-"
+    gawt_role: str = ""  # gawt register_agent role (defaults to name if empty)
 
 
 @dataclass(frozen=True)
 class ResolvedSubagent:
     spec: SubagentSpec
     tools: tuple[Callable, ...]
-    permissions: tuple[Any, ...]  # FilesystemPermission instances
+    permissions: tuple[Any, ...]
     preamble: str
-    hooks: dict[str, Callable]  # keys: before_task, after_task, after_proposal, before_finalize
+    hooks: dict[str, Callable]

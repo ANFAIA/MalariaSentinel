@@ -8,18 +8,16 @@ class EditPlugin(Plugin):
     name = "edit"
 
     def permissions(self, spec: SubagentSpec) -> list:
-        return [
-            {"operations": ["read"], "paths": ["/.env", "/**/.env", "/**/*secret*", "/**/*credential*"], "mode": "deny"},
-            {"operations": ["write"], "paths": ["/data/**"], "mode": "deny"},
-            {"operations": ["write"], "paths": ["/.git/**"], "mode": "deny"},
-            {"operations": ["write"], "paths": ["/.gitagent/features/*/agents/*/worktree/**"], "mode": "allow"},
-            {"operations": ["write"], "paths": ["/**"], "mode": "deny"},
-            {"operations": ["read"], "paths": ["/**"], "mode": "allow"},
-        ]
+        # Permissions are set by the orchestrator in agent.py.
+        # The shared worktree path (/.gitagent/worktree/**) is configured there.
+        return []
 
     def preamble(self, spec: SubagentSpec) -> str:
         return (
-            "You work in an isolated gitagent worktree. All edits go through gitagent propose. "
-            "Never run git add or git commit directly. "
-            "When done, run: gitagent propose --agent <id> --title '...' --summary '...' --confidence 0.8 --feature <name>"
+            "You work in a shared gawt worktree. "
+            "ALWAYS use mcp__gitagent__edit_file / write_file for ALL file changes. "
+            "NEVER use the host's Edit/Write tools — they bypass attribution and conflict tracking. "
+            "Always pass agent_id to every gitagent call. "
+            "Set start_intent before your first edit. "
+            "Check inbox after each significant edit."
         )

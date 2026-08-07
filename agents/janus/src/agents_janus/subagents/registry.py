@@ -64,6 +64,7 @@ def load_registry(config_path: Path | None = None) -> Registry:
             edits_allow=tuple(entry.get("edits_allow", [])),
             plugins=tuple(entry.get("plugins", [])),
             thread_id_prefix=entry.get("thread_id_prefix", defaults.get("thread_id_prefix", "sub-")),
+            gawt_role=entry.get("gawt_role", ""),
         )
 
     return Registry(specs)

@@ -353,6 +353,85 @@ class LivePanel:
             self._prev_sigint_handler = None
 
 
+class MultiAgentPanel:
+    """Multi-agent status panel. Shows one row per active specialist.
+
+    Each row: agent_id, role, current_intent, last_edit, inbox_status.
+    Updated from gawt MCP list_agents + list_edits + list_intents.
+    """
+
+    def __init__(self, quiet: bool = False):
+        self.quiet = quiet
+        self._agents: dict[str, dict] = {}  # agent_id → state
+        self._console = Console()
+        self._live: Live | None = None
+
+    def __enter__(self) -> "MultiAgentPanel":
+        if not self.quiet:
+            self._live = Live(
+                self._render(),
+                console=self._console,
+                refresh_per_second=2,
+                transient=False,
+            )
+            self._live.__enter__()
+        return self
+
+    def __exit__(self, *args) -> None:
+        if self._live is not None:
+            try:
+                self._live.__exit__(*args)
+            except Exception:
+                pass
+            self._live = None
+
+    def update_agent(self, agent_id: str, role: str, intent: str = "", last_edit: str = "", inbox_count: int = 0):
+        """Update or add an agent's status."""
+        self._agents[agent_id] = {
+            "role": role,
+            "intent": intent,
+            "last_edit": last_edit,
+            "inbox_count": inbox_count,
+        }
+        self._refresh()
+
+    def remove_agent(self, agent_id: str):
+        """Remove an agent (when it unregisters)."""
+        self._agents.pop(agent_id, None)
+        self._refresh()
+
+    def _render(self) -> RenderableType:
+        header = Text()
+        header.append("🩺 janus · multi-agent", style="bold cyan")
+
+        lines: list[RenderableType] = [header, Text("")]
+
+        if not self._agents:
+            lines.append(Text("  No active specialists", style="dim"))
+        else:
+            for agent_id, state in self._agents.items():
+                row = Text()
+                row.append(f"  ● {agent_id}", style="bold green")
+                row.append(f" [{state['role']}]", style="bold")
+                if state["intent"]:
+                    intent_short = state["intent"][:60]
+                    row.append(f"  {intent_short}", style="dim")
+                if state["last_edit"]:
+                    row.append(f"  last: {state['last_edit']}", style="dim")
+                if state["inbox_count"] > 0:
+                    row.append(f"  ⚠ {state['inbox_count']} inbox", style="yellow")
+                lines.append(row)
+
+        return Panel(Group(*lines), title="agents", border_style="cyan", padding=(0, 1))
+
+    def _refresh(self) -> None:
+        if self._live is not None:
+            try:
+                self._live.update(self._render())
+            except Exception:
+                pass
+
+
 def now_iso() -> str:
     """UTC ISO timestamp — handy for tests that want to assert log entries."""
     return datetime.now(timezone.utc).isoformat()

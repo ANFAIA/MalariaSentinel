@@ -1,7 +1,5 @@
-"""Improvement orchestrator — edit-capable, goal-driven, registry-based."""
+"""Improvement orchestrator — dispatcher mode."""
 from __future__ import annotations
-import json
-from pathlib import Path
 
 
 def run_improvement(
@@ -14,7 +12,10 @@ def run_improvement(
     quiet: bool = False,
     langfuse_client=None,
 ) -> str:
-    """Run the improvement orchestrator for a given goal.
+    """Run the improvement dispatcher for a given goal.
+
+    Creates the orchestrator agent and streams until done. The orchestrator
+    prompt (loaded from disk by agent.py) contains the full methodology.
 
     Args:
         goal: The objective (required).
@@ -22,46 +23,16 @@ def run_improvement(
         provider: LLM provider.
         model: Model identifier.
         thread_id: Thread ID for checkpointing.
-        context: Additional context from onboarding (answers, menu_key, etc.).
-        quiet: If True, suppress the live terminal panel. JSONL + langfuse still emit.
-        langfuse_client: Optional pre-configured langfuse.Langfuse instance. If set,
-            the orchestrator's LLM/tool events are also streamed to langfuse.
+        context: Additional context from onboarding.
+        quiet: If True, suppress the live terminal panel.
+        langfuse_client: Optional langfuse.Langfuse instance.
 
     Returns:
         The orchestrator's final response.
     """
-    from agents_janus.subagents.registry import load_registry
+    from pathlib import Path
+    import json
 
-    reg = load_registry()
-
-    # Build the prompt
-    prompt_parts = [f"GOAL: {goal}\n"]
-
-    if plan_path:
-        plan_file = Path(plan_path)
-        if plan_file.exists():
-            plan_content = plan_file.read_text()
-            prompt_parts.append(f"## Plan ({plan_path})\n{plan_content}\n")
-        else:
-            prompt_parts.append(f"Plan file not found: {plan_path}\n")
-
-    if context:
-        prompt_parts.append(f"## Context from onboarding\n{json.dumps(context, indent=2)}\n")
-
-    # List available subagents
-    prompt_parts.append("## Available subagents\n")
-    for name, spec in reg.all().items():
-        prompt_parts.append(f"- **{name}**: {spec.description} (model={spec.model}, plugins={list(spec.plugins)})")
-
-    prompt_parts.append("\n## Methodology\n")
-    prompt_parts.append("Follow the standard improvement methodology: reconnaissance → diagnostics → hypotheses → diagnosis → delegate → validate.")
-    prompt_parts.append("\nBefore editing, call `mailbox_check_inbox` for the target subagent.")
-    prompt_parts.append("After proposals, the scope validator runs automatically.")
-    prompt_parts.append("After any ABM task, scoring runs automatically via ScorerPlugin.")
-
-    prompt = "\n".join(prompt_parts)
-
-    # Delegate to the existing orchestrator with the built prompt
     import agents_janus.agent as agent_mod
     from agents_janus.live_panel import LivePanel
     from agents_janus.logger import SessionLogger
@@ -69,6 +40,18 @@ def run_improvement(
     logger = SessionLogger()
     agent_mod.SESSION_LOGGER = logger
     logger.log_decision("improvement_start", f"goal={goal}, plan={plan_path}")
+
+    # Build the user message
+    parts = [f"GOAL: {goal}\n"]
+    if plan_path:
+        plan_file = Path(plan_path)
+        if plan_file.exists():
+            parts.append(f"## Plan ({plan_path})\n{plan_file.read_text()}\n")
+        else:
+            parts.append(f"Plan file not found: {plan_path}\n")
+    if context:
+        parts.append(f"## Context from onboarding\n{json.dumps(context, indent=2)}\n")
+    prompt = "\n".join(parts)
 
     def _on_abort() -> None:
         logger.log_decision("aborted_by_user", "Ctrl-C during improvement stream")
@@ -80,7 +63,9 @@ def run_improvement(
 
     try:
         agent = agent_mod.create_orchestrator(
-            provider=provider, model=model, thread_id=thread_id,
+            provider=provider,
+            model=model,
+            thread_id=thread_id,
             langfuse_client=langfuse_client,
         )
 

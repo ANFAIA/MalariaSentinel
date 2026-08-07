@@ -74,7 +74,7 @@ def build_subagent_prompt(
     """Compose the full system prompt from three layers + plugins.
 
     Layer A: behavioral spec (from docs/specs/<X>/spec.md)
-    Layer B: common role (identical for all subagents)
+    Layer B: specialist template (gawt MCP-native registration protocol)
     Layer C: per-subagent domain clarifications
     Plugins: preambles from plugin chain
     """
@@ -85,17 +85,17 @@ def build_subagent_prompt(
         if full_path.exists():
             spec_text = full_path.read_text()
 
-    # Layer B: common role
-    peer_table = _get_peer_registry_table(spec.name, all_specs or {})
-    common_text = _render_template(
-        "common_role.md.j2",
-        subagent_name=spec.name,
-        invoker_name="orchestrator",
-        model=spec.model,
-        mailbox_inbox=spec.mailbox_inbox,
+    # Layer B: specialist template
+    gawt_role = spec.gawt_role or spec.name
+    specialist_text = _render_template(
+        "specialist.md.tmpl",
+        role=gawt_role,
+        task=spec.description,
+        manifest_path=f"agents/janus/src/agents_janus/config/subagents.yaml",
         edits_allow=list(spec.edits_allow),
         skills=list(spec.skills),
-        peer_registry_table=peer_table,
+        depends_on=[],
+        spec_text=spec_text,
     )
 
     # Layer C: per-subagent domain clarifications
@@ -109,12 +109,10 @@ def build_subagent_prompt(
 
     # Assemble
     parts = []
-    if common_text:
-        parts.append(common_text)
+    if specialist_text:
+        parts.append(specialist_text)
     if per_subagent_text:
         parts.append(per_subagent_text)
-    if spec_text:
-        parts.append(f"## Domain behavioral spec\n{spec_text}")
     if plugin_text:
         parts.append(f"## Plugin instructions\n{plugin_text}")
 

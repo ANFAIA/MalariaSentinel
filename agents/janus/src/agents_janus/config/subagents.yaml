@@ -8,7 +8,8 @@ subagents:
     description: "ABM C++ engine + Mesa-Geo adapter + runner"
     spec: docs/specs/abm/spec.md
     skills: [abm-engine, calibration-framework]
-    mailbox_inbox: inbox-abm
+    gawt_role: abm
+    can_call_via: [scoring]
     edits_allow:
       - mal-core/src/mal_core/abm/**
       - mal-core/src/mal_core/abm/tests/calibration/**
@@ -17,7 +18,8 @@ subagents:
     description: "Calibration scorers + composite"
     spec: docs/specs/scoring/spec.md
     skills: [calibration-framework]
-    mailbox_inbox: inbox-scoring
+    gawt_role: scoring
+    can_call_via: []
     edits_allow:
       - mal-core/src/mal_core/abm/tests/calibration/**
       - mal-core/src/mal_core/scoring/**
@@ -25,13 +27,15 @@ subagents:
   ingest:
     description: "Env tensor + host density + mobility builder"
     spec: docs/specs/ingest/spec.md
-    mailbox_inbox: inbox-ingest
+    gawt_role: ingest
+    can_call_via: []
     edits_allow: [mal-core/src/mal_core/ingest/**]
     plugins: [ingest]
   download:
     description: "Plugin-based data fetcher (loaders, registry, runner)"
     spec: docs/specs/download/spec.md
-    mailbox_inbox: inbox-download
+    gawt_role: download
+    can_call_via: []
     edits_allow:
       - mal-core/src/mal_core/download/**
       - mal-commonlib/src/mal_commonlib/data/loaders/**
@@ -39,19 +43,22 @@ subagents:
   prediction:
     description: "Risk raster predictor"
     spec: docs/specs/prediction/spec.md
-    mailbox_inbox: inbox-prediction
+    gawt_role: prediction
+    can_call_via: []
     edits_allow: [mal-core/src/mal_core/prediction/**]
     plugins: [prediction]
   training:
     description: "U-Net model, dataset, trainer"
     spec: docs/specs/training/spec.md
-    mailbox_inbox: inbox-training
+    gawt_role: training
+    can_call_via: []
     edits_allow: [mal-core/src/mal_core/training/**]
     plugins: [training]
   data:
     description: "Manifest + naming + completeness validation"
     spec: docs/specs/data/spec.md
-    mailbox_inbox: inbox-data
+    gawt_role: data
+    can_call_via: []
     edits_allow:
       - mal-commonlib/src/mal_commonlib/data/**
       - docs/specs/data/**
@@ -59,13 +66,15 @@ subagents:
   commonlib:
     description: "Shared config + paths + AOI primitives"
     spec: docs/specs/commonlib/spec.md
-    mailbox_inbox: inbox-commonlib
+    gawt_role: commonlib
+    can_call_via: []
     edits_allow: [mal-commonlib/**]
     plugins: [commonlib]
   research:
     description: "Read-only literature synthesist"
     spec: null
     skills: [sdss-reference]
-    mailbox_inbox: inbox-research
+    gawt_role: research
+    can_call_via: []
     edits_allow: []
     plugins: [research]
