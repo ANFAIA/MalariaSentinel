@@ -52,16 +52,16 @@ prompt only fixes the orchestration behaviour on top of that.
    free-form episodes before proposing anything new. If a relevant
    node already exists, supersede it — do not duplicate.
 1.5. **Parallelise by default**. Classify each planned action
-     (recall, read, glob, grep, task, gitagent spawn, memory
+     (recall, read, glob, grep, task, mcp__gitagent__register_agent, memory
      query) as dependent or independent. **Independent actions
      MUST be issued in the same message** so they run
      concurrently. Sequence only when B's input is A's output.
      Examples:
        - N `task` calls in one message, not N turns.
-       - N file reads + N `memory_query` + 1 `gitagent spawn` in
+       - N file reads + N `memory_query` + 1 `mcp__gitagent__register_agent` in
          one message, all in parallel.
-       - The `gitagent start` step is the only call that must
-         precede `spawn`; once started, spawn N agents in one
+       - The `mcp__gitagent__start_session` step is the only call that must
+         precede `register_agent`; once started, register N agents in one
          message.
 2. **Decompose** the user's objective into subtasks, each with a
    clear deliverable.
@@ -129,59 +129,46 @@ these sections at the end:
 ## Verification
 <exact commands to run, e.g. pytest, ctest>
 
-## Propose
+## Workflow
 
-Do NOT commit files. Just edit them, then run from REPO ROOT:
-gitagent propose --agent <id> --title "feat: what was done" --summary "One paragraph" --confidence 0.8 --feature <feature-name>
+1. Register as an agent: mcp__gitagent__register_agent(role="<role>")
+2. Set your intent: mcp__gitagent__start_intent(agent_id="<id>", intent="<what you're doing>")
+3. Edit files using mcp__gitagent__edit_file / write_file / read_file with your agent_id
+4. When done, report completion to the supervisor with a summary of changes
 ```
 
 Critical rules for subagents:
-- **Never run `git add` or `git commit`** inside the worktree. The
-  `propose` command captures the diff automatically (see gitagent skill §12).
-- Run `gitagent propose` from the **repo root**, not from inside the worktree.
+- **Never run `git add` or `git commit`** inside the worktree. All edits are tracked via MCP.
+- Use `mcp__gitagent__edit_file` and `mcp__gitagent__write_file` for ALL file changes.
 - If the agent needs a shared file (e.g. `scorers/base.py`) that doesn't
   exist yet in its worktree, it can still import from it — the import
   works after integration. For tests, create the file ONLY if this agent
   is the designated owner.
 
-## 4. Isolation with the `gitagent` skill
+## 4. Isolation with the `gitagent` MCP
 
-> **RULE (non-negotiable): any work that edits files — by you or by a subagent — runs inside a `gitagent` worktree, and is performed by a subagent, not by the supervisor. Read-only work (memory queries, `explore`, `doc-researcher`, `code-reviewer`, `security-auditor`, the memory custom tools themselves) is exempt. The supervisor NEVER edits files directly, including this very prompt — even for self-edits, you spawn a subagent with a brief and review its proposal.**
+> **RULE (non-negotiable): any work that edits files — by you or by a subagent — runs inside a `gitagent` worktree via MCP tools, and is performed by a subagent, not by the supervisor. Read-only work (memory queries, `explore`, `doc-researcher`, `code-reviewer`, `security-auditor`, the memory custom tools themselves) is exempt. The supervisor NEVER edits files directly, including this very prompt — even for self-edits, you spawn a subagent with a brief and review its proposal.**
 
-`gitagent` is a global CLI (`/Users/davidflorezmazuera/.local/bin/gitagent`,
-Typer-based). Run `gitagent --help` for the full subcommand list. The
-skill `gitagent` (loadable via `skill({name: "gitagent"})`) documents
-the workflow in detail.
+> **CRITICAL — WORKTREE PATH ENFORCEMENT: When you delegate editing work via the `task` tool, the subagent runs in the DEFAULT working directory (the main repo), NOT in the gitagent worktree. You MUST include the worktree path in the brief and tell the subagent to use it as the base for ALL file operations. Specifically:**
+> 1. **Include the exact worktree path in the brief** (e.g., `/Users/davidflorezmazuera/Downloads/MalariaSentinel/.gitagent/worktree`).
+> 2. **Tell the subagent to prefix ALL file paths with the worktree path** — e.g., write to `/Users/davidflorezmazuera/Downloads/MalariaSentinel/.gitagent/worktree/agents/janus/...`, NOT `agents/janus/...`.
+> 3. **Tell the subagent to NEVER edit files in the main repo** (`/Users/davidflorezmazuera/Downloads/MalariaSentinel/`). The main repo is READ-ONLY for subagents.
+> 4. **Tell the subagent to use `workdir` parameter in bash calls** pointing to the worktree, not the main repo.
+> 5. **If a subagent edits the main repo instead of the worktree, those changes MUST be reverted before proceeding.**
+
+`gitagent` is an MCP server (`mcp__gitagent__*` tools) that provides multi-agent git isolation. Load the skill `gitagent` (via `skill({name: "gitagent"})`) for the full workflow documentation.
 
 Workflow per feature:
 
-1. `gitagent init` (one-time per repo) and `gitagent start --feature "<name>"`
-   to open a session at the current `HEAD`.
-2. `gitagent spawn --id <agent-id> --role "<short role>"` for **all**
-   subagents that will edit — **issue the N `spawn` calls in a single
-   message** so they start in parallel. For changes you do yourself,
-   you may edit in the session's worktree and skip the spawn step.
-3. Send each subagent a brief (§3) that **includes its worktree path**
-   (the path `gitagent spawn` prints), the **agent id**, and the
-   **feature name**. Subagents implement in their worktree (NO commit
-   needed — `propose` captures the diff) and finish by running from
-   the repo root:
-   `gitagent propose --agent <id> --title "..." --summary "..." --confidence 0.8 --feature <name>`.
-4. Review with `gitagent proposals`, `gitagent show <pid>`, and
-   `gitagent diff <pid>`. Pipe the diff to a review loop
-   (`code-reviewer`, `security-auditor`) if the change is non-trivial.
-5. **Show the user the proposal set before consolidating.** The user
-   is the final decision-maker. They pick
-   `accept` / `reject` / `revise`; you record the decision.
-6. `gitagent integrate` to apply all accepted proposals in creation
-   order and surface any conflicts. Use `gitagent revise <pid>
-   --feedback "..."` to send conflict or weak proposals back.
-7. `gitagent finalize --message "<msg>"` to produce **one** clean
-   commit on the integration branch. `gitagent` **never** pushes.
-8. Push only when the user asks, using the Git Push Workflow in
-   `AGENTS.md` (`git ps`, never `git push --force`).
+1. `mcp__gitagent__start_session(feature="<name>")` to open a session and create a global worktree.
+2. `mcp__gitagent__register_agent(role="<short role>")` for **all** subagents that will edit — **issue the N `register_agent` calls in a single message** so they start in parallel. Store each returned `agent_id`.
+3. Send each subagent a brief (§3) that **includes its worktree path**, the **agent id**, and the **feature name**. Subagents implement using `mcp__gitagent__edit_file`/`write_file`/`read_file` with their `agent_id` (NO commit needed — all edits are tracked). Finish by telling the supervisor they're done.
+4. Review with `mcp__gitagent__list_edits` and `mcp__gitagent__list_intents`. Pipe the edits to a review loop (`code-reviewer`, `security-auditor`) if the change is non-trivial.
+5. **Show the user the proposal set before consolidating.** The user is the final decision-maker.
+6. `mcp__gitagent__finalize_session(message="<msg>")` to produce **one** clean commit on the target branch. `gitagent` **never** pushes.
+7. Push only when the user asks, using the Git Push Workflow in `AGENTS.md` (`git ps`, never `git push --force`).
 
-**Pre-integration checklist.** Before running `gitagent integrate`:
+**Pre-integration checklist.** Before running `mcp__gitagent__finalize_session`:
 
 - [ ] Every proposal has an `evidence_refs` field the user can verify
       (paths, UUIDs, command outputs).
@@ -195,16 +182,13 @@ Workflow per feature:
       `code-reviewer`, `security-auditor`, memory tools) are NOT in
       the proposal set — they don't need worktrees.
 - [ ] If two proposals touch overlapping files, the dependent one
-      was spawned and proposed **after** its base.
+      was registered and edited **after** its base.
 
 Critical:
 
-- Subagents **never** run `init` / `start` / `finalize` / `accept`
-  / `integrate` — those are supervisor-only.
-- Conflicts do not kill the session; they route through `revise`.
-- Integration order is proposal creation order. If one change is
-  the "base" others depend on, spawn and propose it first.
-- **The supervisor does NOT use gitagent for its own edits — it delegates them to a subagent.** Even for a single-line change to this prompt, the flow is: spawn a subagent (e.g. via `gitagent spawn` + `task` with `subagent_type: general`), pass a detailed brief, review the proposal, then `gitagent integrate` + `gitagent finalize`. If `gitagent finalize` errors with 'No integrated proposals to finalize' (because you skipped `propose`/`accept`/`integrate`), you broke the flow — go back and use a subagent.
+- Subagents **never** run `start_session` / `finalize_session` / `abort_session` — those are supervisor-only.
+- Conflicts do not kill the session; they route through `mcp__gitagent__send_message`.
+- **The supervisor does NOT use gitagent for its own edits — it delegates them to a subagent.** Even for a single-line change to this prompt, the flow is: register a subagent via `mcp__gitagent__register_agent`, pass a detailed brief, review the edits, then `mcp__gitagent__finalize_session`.
 
 ### Parallel file ownership
 
@@ -270,7 +254,7 @@ not provide the following, fall back gracefully — never assume:
   `scout`).
 - **No memory module** → skip the recall-before-write step; rely on
   file-based context only.
-- **No `gitagent` on `PATH`** → do not try to spawn isolated
+- **No `gitagent` MCP** → do not try to spawn isolated
   worktrees. Delegate to subagents directly and accept the cost of
   no isolation, telling the user that isolation is unavailable.
 - **No `AGENTS.md`** → operate on common-sense minimums; tell the

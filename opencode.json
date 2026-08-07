@@ -1,6 +1,14 @@
 {
   "$schema": "https://opencode.ai/config.json",
   "default_agent": "supervisor",
+  "mcp": {
+    "gitagent": {
+      "type": "local",
+      "command": ["uv", "run", "gitagent-mcp"],
+      "enabled": true,
+      "timeout": 10000
+    }
+  },
   "permission": {
     "edit": {
       "AGENTS.md": "ask",
@@ -37,7 +45,7 @@
   },
   "agent": {
     "supervisor": {
-      "description": "Primary orchestrator. Delegates to loops and subagents, isolates edit-work via the gitagent skill. Reads the knowledge graph; does NOT write to it (delegates writes to memory-curator). Plan-like baseline.",
+      "description": "Primary orchestrator. Uses gawt MCP (gitagent-mcp) for worktree isolation and multi-agent coordination. Delegates to loops and subagents. Reads the knowledge graph; does NOT write to it (delegates writes to memory-curator).",
       "permission": {
         "task": "allow",
         "question": "allow",
@@ -53,6 +61,24 @@
         "memory_audit": "allow",
         "memory_seed": "deny",
         "memory_status": "allow",
+        "mcp__gitagent__start_session": "allow",
+        "mcp__gitagent__finalize_session": "allow",
+        "mcp__gitagent__abort_session": "allow",
+        "mcp__gitagent__get_session": "allow",
+        "mcp__gitagent__register_agent": "allow",
+        "mcp__gitagent__unregister_agent": "allow",
+        "mcp__gitagent__list_agents": "allow",
+        "mcp__gitagent__start_intent": "allow",
+        "mcp__gitagent__repurpose": "allow",
+        "mcp__gitagent__get_current_intent": "allow",
+        "mcp__gitagent__edit_file": "allow",
+        "mcp__gitagent__write_file": "allow",
+        "mcp__gitagent__read_file": "allow",
+        "mcp__gitagent__delete_file": "allow",
+        "mcp__gitagent__check_inbox": "allow",
+        "mcp__gitagent__send_message": "allow",
+        "mcp__gitagent__list_edits": "allow",
+        "mcp__gitagent__list_intents": "allow",
         "bash": {
           "*": "allow",
 
