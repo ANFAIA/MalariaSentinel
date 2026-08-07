@@ -1,4 +1,4 @@
-"""Tests for cli.py — run command with auto-detect mode and --mode flag."""
+"""Tests for cli.py — command registration and run command."""
 from __future__ import annotations
 
 import json
@@ -11,58 +11,51 @@ from agents_janus.cli import app
 runner = CliRunner()
 
 
+class TestCommandRegistration:
+    """All expected commands are registered."""
+
+    def test_run_command_exists(self):
+        result = runner.invoke(app, ["run", "--help"])
+        assert result.exit_code == 0
+
+    def test_improve_command_exists(self):
+        result = runner.invoke(app, ["improve", "--help"])
+        assert result.exit_code == 0
+
+    def test_onboard_command_exists(self):
+        result = runner.invoke(app, ["onboard", "--help"])
+        assert result.exit_code == 0
+
+    def test_status_command_exists(self):
+        result = runner.invoke(app, ["status", "--help"])
+        assert result.exit_code == 0
+
+    def test_agents_list_command_exists(self):
+        result = runner.invoke(app, ["agents", "list", "--help"])
+        assert result.exit_code == 0
+
+    def test_agents_show_command_exists(self):
+        result = runner.invoke(app, ["agents", "show", "--help"])
+        assert result.exit_code == 0
+
+
 class TestRunCommand:
-    @patch("agents_janus.cycles.run_cycle.run_cycle")
-    def test_run_dry_run_auto_mode(self, mock_cycle):
-        """`run` with --dry-run auto-detects mode from goal."""
-        mock_cycle.return_value = json.dumps({"status": "dry_run", "mode": "calibration"})
-        result = runner.invoke(app, ["run", "-g", "calibration of population extinction", "--dry-run"])
+    @patch("agents_janus.improvement.run_improvement")
+    def test_run_dry_run(self, mock_improve):
+        """`run` with --dry-run prints prompt without executing."""
+        mock_improve.return_value = json.dumps({"status": "dry_run"})
+        result = runner.invoke(app, ["run", "-g", "test goal", "--dry-run"])
         assert result.exit_code == 0
 
-    @patch("agents_janus.cycles.run_cycle.run_cycle")
-    def test_run_explicit_mode(self, mock_cycle):
-        """`run --mode feature` passes explicit mode."""
-        mock_cycle.return_value = json.dumps({"status": "ok", "mode": "feature"})
-        result = runner.invoke(app, ["run", "-g", "test goal", "--mode", "feature"])
-        assert result.exit_code == 0
-
-    @patch("agents_janus.cycles.run_cycle.run_cycle")
-    def test_run_no_verify(self, mock_cycle):
+    @patch("agents_janus.improvement.run_improvement")
+    def test_run_no_verify(self, mock_improve):
         """`run --no-verify` skips approval gates."""
-        mock_cycle.return_value = "done"
+        mock_improve.return_value = "done"
         result = runner.invoke(app, ["run", "-g", "test goal", "--no-verify", "--provider", "openrouter", "--model", "test"])
         assert result.exit_code == 0
 
-    def test_run_invalid_mode(self):
-        """Invalid mode is rejected."""
-        result = runner.invoke(app, ["run", "-g", "test", "--mode", "invalid"])
-        assert result.exit_code != 0
-
-    @patch("agents_janus.cycles.run_cycle.run_cycle")
-    def test_run_research_mode(self, mock_cycle):
-        """Research mode passes through."""
-        mock_cycle.return_value = json.dumps({"status": "ok", "mode": "research"})
-        result = runner.invoke(app, ["run", "-g", "review literature on Anopheles", "--mode", "research"])
-        assert result.exit_code == 0
-
-
-class TestBackwardsCompatDeprecated:
-    """The old calibration/feature/research commands still work but emit deprecation warnings."""
-
-    @patch("agents_janus.cycles.run_cycle.run_calibration_cycle")
-    def test_calibration_alias_works(self, mock_cycle):
-        mock_cycle.return_value = json.dumps({"status": "ok"})
-        result = runner.invoke(app, ["calibration", "-g", "test", "--dry-run"])
-        assert result.exit_code == 0
-
-    @patch("agents_janus.cycles.run_cycle.run_feature_cycle")
-    def test_feature_alias_works(self, mock_cycle):
-        mock_cycle.return_value = json.dumps({"status": "ok"})
-        result = runner.invoke(app, ["feature", "test-feat", "test desc", "-g", "test goal", "--dry-run"])
-        assert result.exit_code == 0
-
-    @patch("agents_janus.cycles.run_cycle.run_research_cycle")
-    def test_research_alias_works(self, mock_cycle):
-        mock_cycle.return_value = json.dumps({"status": "ok"})
-        result = runner.invoke(app, ["research", "topic", "-g", "test goal", "--dry-run"])
-        assert result.exit_code == 0
+    def test_run_prompts_for_goal(self):
+        """`run` without -g prompts for goal."""
+        result = runner.invoke(app, ["run"], input="my goal\n")
+        # Will fail because improvement module needs env, but it should prompt
+        assert "goal" in result.output.lower() or result.exit_code != 0

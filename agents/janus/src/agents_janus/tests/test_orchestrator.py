@@ -1,4 +1,4 @@
-"""Tests for agent.py — create_orchestrator, WORKER_DEFINITIONS."""
+"""Tests for agent.py — create_orchestrator, _load_orchestrator_prompt, TOOLS."""
 from __future__ import annotations
 
 import sys
@@ -8,57 +8,54 @@ import pytest
 
 from agents_janus.agent import (
     VERIFY_FINALIZE,
-    VERIFY_INTEGRATE,
     TOOLS,
-    ORCHESTRATOR_PROMPT,
-    WORKER_DEFINITIONS,
+    _load_orchestrator_prompt,
 )
 
 
 class TestModuleFlags:
-    def test_verify_flags_exist(self):
+    def test_verify_finalize_is_bool(self):
         assert isinstance(VERIFY_FINALIZE, bool)
-        assert isinstance(VERIFY_INTEGRATE, bool)
 
     def test_tools_list_not_empty(self):
         assert len(TOOLS) > 0
 
-    def test_orchestrator_prompt_mentions_workflow(self):
-        assert "set_worktree_context" in ORCHESTRATOR_PROMPT
-        assert "clear_worktree_context" in ORCHESTRATOR_PROMPT
-        assert "gitagent_spawn" in ORCHESTRATOR_PROMPT
-        assert "gitagent_integrate" in ORCHESTRATOR_PROMPT
-        assert "RECONNAISSANCE" in ORCHESTRATOR_PROMPT
-        assert "HYPOTHESES" in ORCHESTRATOR_PROMPT
-        assert "DIAGNOSTICS" in ORCHESTRATOR_PROMPT
-        assert "ASK WHEN UNCERTAIN" in ORCHESTRATOR_PROMPT
-        assert "PARALLEL WORKERS" in ORCHESTRATOR_PROMPT
-        assert "ask_user" in ORCHESTRATOR_PROMPT
+    def test_tools_no_gitagent_functions(self):
+        """TOOLS must not contain any gitagent_* functions (replaced by gawt MCP)."""
+        for tool in TOOLS:
+            name = getattr(tool, "__name__", str(tool))
+            assert "gitagent_" not in name, f"Old gitagent tool found in TOOLS: {name}"
 
 
-class TestWorkerDefinitions:
-    def test_workers_exist(self):
-        """Both abm-worker (code-modifying) and research-worker (read-only) are defined."""
-        defs = WORKER_DEFINITIONS()  # Now a callable returning registry-based defs
-        names = [w["name"] for w in defs]
-        assert "abm" in names
-        assert "research" in names
+class TestOrchestratorPrompt:
+    def test_prompt_is_string(self):
+        prompt = _load_orchestrator_prompt()
+        assert isinstance(prompt, str)
+        assert len(prompt) > 100
 
-    def test_worker_definitions_is_callable(self):
-        """WORKER_DEFINITIONS is a callable (lazy alias from registry)."""
-        assert callable(WORKER_DEFINITIONS)
+    def test_prompt_mentions_gawt_mcp_tools(self):
+        """Orchestrator prompt must reference gawt MCP tools, not old gitagent_*."""
+        prompt = _load_orchestrator_prompt()
+        assert "mcp__gitagent__start_session" in prompt
+        assert "mcp__gitagent__finalize_session" in prompt
+        assert "mcp__gitagent__list_agents" in prompt
 
-    def test_worker_descriptions_present(self):
-        """Each worker has a description."""
-        defs = WORKER_DEFINITIONS()
-        for w in defs:
-            assert "description" in w
-            assert w["description"]
+    def test_prompt_does_not_mention_old_tools(self):
+        """Old gitagent_spawn/propose/integrate must be gone."""
+        prompt = _load_orchestrator_prompt()
+        assert "gitagent_spawn" not in prompt
+        assert "gitagent_propose" not in prompt
+        assert "gitagent_integrate" not in prompt
+
+    def test_prompt_mentions_dispatcher_concepts(self):
+        prompt = _load_orchestrator_prompt()
+        assert "specialist" in prompt.lower() or "dispatch" in prompt.lower()
+        assert "gawt" in prompt.lower()
 
 
 class TestCreateOrchestrator:
     def test_orchestrator_read_only_backend(self):
-        """Test that the orchestrator uses virtual_mode=True backend with deny-write permissions."""
+        """Test that create_orchestrator uses virtual_mode=True backend."""
         mock_backend_mod = MagicMock()
         mock_backend_class = MagicMock()
         mock_backend_mod.FilesystemBackend = mock_backend_class
