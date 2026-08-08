@@ -12,6 +12,7 @@ dependencies = [
     "langgraph>=0.4",
     "langchain-core>=0.3",
     "langchain-openai>=0.3",
+    "mcp>=2.0",
     "typer>=0.9.0",
     "rich>=13.0.0",
     "jinja2>=3.1.0",
@@ -19,7 +20,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-observability = ["langfuse>=3.0"]
+observability = ["langfuse>=4.0"]
 
 [project.scripts]
 janus = "agents_janus.cli:app"
