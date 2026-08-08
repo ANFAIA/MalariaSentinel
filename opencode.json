@@ -6,7 +6,7 @@
       "type": "local",
       "command": ["uv", "run", "gitagent-mcp"],
       "enabled": true,
-      "timeout": 10000
+      "timeout": 30000
     }
   },
   "permission": {
@@ -134,6 +134,19 @@
         "memory_audit": "allow",
         "memory_seed": "deny",
         "memory_status": "allow",
+        "mcp__gitagent__register_agent": "allow",
+        "mcp__gitagent__unregister_agent": "allow",
+        "mcp__gitagent__start_intent": "allow",
+        "mcp__gitagent__repurpose": "allow",
+        "mcp__gitagent__get_current_intent": "allow",
+        "mcp__gitagent__edit_file": "allow",
+        "mcp__gitagent__write_file": "allow",
+        "mcp__gitagent__read_file": "allow",
+        "mcp__gitagent__delete_file": "allow",
+        "mcp__gitagent__check_inbox": "allow",
+        "mcp__gitagent__send_message": "allow",
+        "mcp__gitagent__list_edits": "allow",
+        "mcp__gitagent__list_intents": "allow",
         "bash": {
           "*": "ask",
           "uv run pytest *": "allow",
@@ -329,6 +342,56 @@
         "question": "allow"
       }
     },
+    "gawt-editor": {
+      "description": "Edits files via gawt MCP for isolated multi-agent work. Use this instead of `general` when file edits need attribution, conflict tracking, and worktree isolation.",
+      "mode": "subagent",
+      "prompt": "{file:agents/loops/gawt-editor.md}",
+      "permission": {
+        "edit": "deny",
+        "read": "allow",
+        "glob": "allow",
+        "grep": "allow",
+        "list": "allow",
+        "memory_node": "deny",
+        "memory_rel": "deny",
+        "memory_query": "allow",
+        "memory_recall": "allow",
+        "memory_audit": "allow",
+        "memory_seed": "deny",
+        "memory_status": "allow",
+        "mcp__gitagent__start_session": "deny",
+        "mcp__gitagent__finalize_session": "deny",
+        "mcp__gitagent__abort_session": "deny",
+        "mcp__gitagent__get_session": "allow",
+        "mcp__gitagent__register_agent": "allow",
+        "mcp__gitagent__unregister_agent": "allow",
+        "mcp__gitagent__list_agents": "allow",
+        "mcp__gitagent__start_intent": "allow",
+        "mcp__gitagent__repurpose": "allow",
+        "mcp__gitagent__get_current_intent": "allow",
+        "mcp__gitagent__edit_file": "allow",
+        "mcp__gitagent__write_file": "allow",
+        "mcp__gitagent__read_file": "allow",
+        "mcp__gitagent__delete_file": "allow",
+        "mcp__gitagent__check_inbox": "allow",
+        "mcp__gitagent__send_message": "allow",
+        "mcp__gitagent__list_edits": "allow",
+        "mcp__gitagent__list_intents": "allow",
+        "bash": {
+          "*": "deny",
+          "uv run pytest *": "allow",
+          "git diff *": "allow",
+          "git status *": "allow",
+          "git log *": "allow"
+        },
+        "webfetch": "deny",
+        "websearch": "deny",
+        "task": "deny",
+        "todowrite": "allow",
+        "question": "allow",
+        "skill": "allow"
+      }
+    },
     "janus-orchestrator": {
       "description": "LangChain deepagents-based orchestrator for multi-agent ABM calibration improvement. Uses gitagent for worktree isolation, OpenCode/Exa for web search, and the mal-core pipeline for scoring.",
       "mode": "primary",
@@ -347,7 +410,25 @@
         "read": "allow",
         "memory_query": "allow",
         "memory_recall": "allow",
-        "skill": "allow"
+        "skill": "allow",
+        "mcp__gitagent__start_session": "allow",
+        "mcp__gitagent__finalize_session": "allow",
+        "mcp__gitagent__abort_session": "allow",
+        "mcp__gitagent__get_session": "allow",
+        "mcp__gitagent__register_agent": "allow",
+        "mcp__gitagent__unregister_agent": "allow",
+        "mcp__gitagent__list_agents": "allow",
+        "mcp__gitagent__start_intent": "allow",
+        "mcp__gitagent__repurpose": "allow",
+        "mcp__gitagent__get_current_intent": "allow",
+        "mcp__gitagent__edit_file": "allow",
+        "mcp__gitagent__write_file": "allow",
+        "mcp__gitagent__read_file": "allow",
+        "mcp__gitagent__delete_file": "allow",
+        "mcp__gitagent__check_inbox": "allow",
+        "mcp__gitagent__send_message": "allow",
+        "mcp__gitagent__list_edits": "allow",
+        "mcp__gitagent__list_intents": "allow"
       }
     },
     "improvement-agent": {

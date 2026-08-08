@@ -145,11 +145,17 @@ class ObservabilityMiddleware(AgentMiddleware):
                 # re-resolving on every call. Import here to keep import
                 # cost off the hot path when langfuse is disabled.
                 if self._lf_trace_id:
-                    from langfuse.types import TraceContext
-                    self._trace_context = TraceContext(
-                        trace_id=self._lf_trace_id,
-                        parent_span_id=self._lf_root_span_id,
-                    )
+                    try:
+                        from langfuse.types import TraceContext
+                        self._trace_context = TraceContext(
+                            trace_id=self._lf_trace_id,
+                            parent_span_id=self._lf_root_span_id,
+                        )
+                    except ImportError:
+                        # langfuse < 4.0 or not installed — TraceContext unavailable.
+                        # Langfuse spans will still be created but without explicit
+                        # parent attachment (OTel context propagation fallback).
+                        self._trace_context = None
             except Exception as e:
                 self._log_langfuse_error("before_agent.root_span", _LangfuseErrorMarker(e))
                 self._lf_root_span = None

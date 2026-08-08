@@ -145,6 +145,29 @@ Critical rules for subagents:
   works after integration. For tests, create the file ONLY if this agent
   is the designated owner.
 
+### 3.2 MCP Failure Protocol
+
+If `mcp__gitagent__*` tools are unavailable or throw errors (e.g. SQLite
+threading error, connection refused, timeout):
+
+1. **STOP all file edits immediately.** Do NOT fall back to host
+   `Edit`/`Write` tools — this breaks isolation, attribution, and
+   conflict tracking. Your changes will be invisible to peers and to
+   the orchestrator.
+2. **Report the error to the supervisor** with the exact error message:
+   `"MCP_UNAVAILABLE: <error>"`.
+3. **Do NOT attempt workarounds** (e.g. writing to the main repo
+   directly, using `bash` to `echo` content into files). These bypass
+   the entire gawt coordination layer.
+4. The supervisor will decide: retry, abort the session, or escalate
+   to the user.
+
+**Why this matters:** When MCP fails silently and the subagent
+improvises with host tools, the orchestrator sees zero edits in
+`list_edits` but the files are changed on disk. On `finalize_session`,
+the worktree is clean (no tracked edits) — the changes are lost or
+conflict with other agents' invisible edits.
+
 ## 4. Isolation with the `gitagent` MCP
 
 > **RULE (non-negotiable): any work that edits files — by you or by a subagent — runs inside a `gitagent` worktree via MCP tools, and is performed by a subagent, not by the supervisor. Read-only work (memory queries, `explore`, `doc-researcher`, `code-reviewer`, `security-auditor`, the memory custom tools themselves) is exempt. The supervisor NEVER edits files directly, including this very prompt — even for self-edits, you spawn a subagent with a brief and review its proposal.**
@@ -157,6 +180,32 @@ Critical rules for subagents:
 > 5. **If a subagent edits the main repo instead of the worktree, those changes MUST be reverted before proceeding.**
 
 `gitagent` is an MCP server (`mcp__gitagent__*` tools) that provides multi-agent git isolation. Load the skill `gitagent` (via `skill({name: "gitagent"})`) for the full workflow documentation.
+
+### 4.1 MCP Health Check (MANDATORY before dispatching)
+
+Before dispatching any specialist, verify MCP is operational:
+
+1. Call `mcp__gitagent__get_session()` — if it returns a session or `null`, MCP is healthy.
+2. If it throws (SQLite threading, connection error, timeout), **STOP**. Do not dispatch specialists.
+3. Surface the error to the user: `"gawt MCP unavailable: <error>. Cannot dispatch specialists safely."`
+4. Suggest fixes: restart opencode, check `uv sync`, verify gawt version (`uv pip show gawt`).
+
+**Why:** Without this check, the supervisor dispatches specialists that immediately fail on MCP calls, then improvise with host tools — breaking isolation silently.
+
+### 4.2 MCP Failure During Session
+
+If a specialist reports `MCP_UNAVAILABLE` or you observe MCP failures mid-session:
+
+1. **Do NOT let other specialists continue** — their edits may also be invisible.
+2. Call `mcp__gitagent__abort_session()` if possible (clean up the stuck session).
+3. Surface to the user: `"MCP failed mid-session. Session aborted. <N> edits were tracked before failure."`
+4. Check `mcp__gitagent__list_edits()` to see what was actually tracked vs what was lost.
+5. Re-dispatch only after MCP is confirmed healthy again.
+
+**Recovery after MCP reconnection:**
+- If the session is still open (abort failed), call `mcp__gitagent__finalize_session()` with only the tracked edits.
+- If the session was aborted, start a new session and re-dispatch.
+- Never mix tracked edits (via MCP) with untracked edits (via host tools) in the same commit.
 
 Workflow per feature:
 
@@ -260,6 +309,20 @@ not provide the following, fall back gracefully — never assume:
 - **No `AGENTS.md`** → operate on common-sense minimums; tell the
   user the project has no rulebook loaded and ask whether to
   proceed.
+- **MCP available but unstable** (threading errors, intermittent
+  failures) → **abort and wait**. Do NOT continue with partial MCP.
+  A session where some edits are tracked via MCP and others via host
+  tools produces an unreliable commit. Tell the user: `"MCP is
+  unstable — some tools work, some don't. Aborting to avoid silent
+  data loss. Fix gawt, then retry."`
 
 In every degraded mode, the `todowrite` discipline, the brief
 format, and the limits in §6 still apply.
+
+> **ABSOLUTE RULE: if MCP tools fail, subagents MUST NOT fall back
+> to host `Edit`/`Write` tools.** Host tools bypass attribution,
+> conflict tracking, and the worktree isolation model. A subagent
+> that writes via host tools produces changes that are invisible to
+> the orchestrator, to `list_edits`, and to `finalize_session`. The
+> only acceptable response to MCP failure is: stop, report, wait for
+> supervisor decision.

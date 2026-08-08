@@ -1173,14 +1173,14 @@ wheels = [
 
 [[package]]
 name = "gawt"
-version = "0.5.0"
+version = "0.5.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "mcp" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/51/ce/b35f93879ceae5f49fd8b9872e03faff225c1e7af886bb60a1b23b7e08ba/gawt-0.5.0.tar.gz", hash = "sha256:79c336a26ebd3ab993f39c2e280d69705dc6013f939bbd839743fea792029c4e", size = 27386 }
+sdist = { url = "https://files.pythonhosted.org/packages/5c/b1/543bcaa82c313e26187f1af85fbd48cbd7cb31448c735188b25df736ea2e/gawt-0.5.1.tar.gz", hash = "sha256:253bb736cb5c597d1d575b92a40b90961b5fafbcadecc27d3571ba0d1ed6ce9a", size = 28292 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/31/1e/713dc6c7a03b496ea31985c5037e33e12b0215776d7a0158af5c72eb89c8/gawt-0.5.0-py3-none-any.whl", hash = "sha256:25b0ea95fcbeb0ac120ec9957f0889a7a57399de045cb3204721def186a5887a", size = 19965 },
+    { url = "https://files.pythonhosted.org/packages/25/c7/b942d7a479eeec27ebf79405e21c6b7fde7b0e023d1f4cba25ff09b3ff8a/gawt-0.5.1-py3-none-any.whl", hash = "sha256:30ff81473ef21b3d3cd1358674533f7b88bcc1e372a0b23cfa56914270e2f5e8", size = 20346 },
 ]
 
 [[package]]
@@ -2231,6 +2231,7 @@ dependencies = [
     { name = "gawt" },
     { name = "jinja2" },
     { name = "langchain-core" },
+    { name = "langchain-openai" },
     { name = "langgraph" },
     { name = "rich" },
     { name = "typer" },
@@ -2240,9 +2241,6 @@ dependencies = [
 observability = [
     { name = "langfuse" },
 ]
-openrouter = [
-    { name = "langchain-openai" },
-]
 
 [package.metadata]
 requires-dist = [
@@ -2250,13 +2248,13 @@ requires-dist = [
     { name = "gawt", specifier = ">=0.5.0" },
     { name = "jinja2", specifier = ">=3.1.0" },
     { name = "langchain-core", specifier = ">=0.3" },
-    { name = "langchain-openai", marker = "extra == 'openrouter'", specifier = ">=0.3" },
+    { name = "langchain-openai", specifier = ">=0.3" },
     { name = "langfuse", marker = "extra == 'observability'", specifier = ">=3.0" },
     { name = "langgraph", specifier = ">=0.4" },
     { name = "rich", specifier = ">=13.0.0" },
     { name = "typer", specifier = ">=0.9.0" },
 ]
-provides-extras = ["openrouter", "observability"]
+provides-extras = ["observability"]
 
 [[package]]
 name = "malaria-sentinel"
@@ -2268,6 +2266,7 @@ dependencies = [
     { name = "contextily" },
     { name = "earthaccess" },
     { name = "fastapi" },
+    { name = "gawt" },
     { name = "geopandas" },
     { name = "h5py" },
     { name = "matplotlib" },
@@ -2305,6 +2304,7 @@ requires-dist = [
     { name = "contextily", specifier = ">=1.6" },
     { name = "earthaccess", specifier = ">=0.12" },
     { name = "fastapi", specifier = ">=0.115" },
+    { name = "gawt", specifier = ">=0.5.1" },
     { name = "geopandas", specifier = ">=1.0" },
     { name = "h5py", specifier = ">=3.10" },
     { name = "matplotlib", specifier = ">=3.11.0" },

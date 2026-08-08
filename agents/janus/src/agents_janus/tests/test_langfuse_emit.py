@@ -92,7 +92,7 @@ def test_no_langfuse_when_disabled():
 # ----------------------------------------------------------------------
 
 @pytest.fixture
-def mock_langfuse():
+def mock_langfuse(monkeypatch):
     lf = MagicMock()
     # v4 API: start_observation returns a span-like object
     lf.start_observation.return_value = _FakeLangfuseSpan("child")
@@ -102,6 +102,15 @@ def mock_langfuse():
     cm.__enter__ = MagicMock(return_value=root_span)
     cm.__exit__ = MagicMock(return_value=False)
     lf.start_as_current_observation.return_value = cm
+
+    # Mock TraceContext so before_agent can import it without langfuse installed
+    mock_tc = MagicMock()
+    mock_tc.trace_id = "fake-trace-id"
+    mock_tc.parent_span_id = "span-root"
+    mock_langfuse_types = MagicMock()
+    mock_langfuse_types.TraceContext = MagicMock(return_value=mock_tc)
+    monkeypatch.setitem(__import__("sys").modules, "langfuse.types", mock_langfuse_types)
+
     return lf
 
 
