@@ -23,7 +23,7 @@ from agents_janus.tools import (
     ask_user,
 )
 from agents_janus.logger import SessionLogger
-from agents_janus.observability import ObservabilityMiddleware
+from agents_janus.observability import ObservabilityMiddleware, SubAgentObservabilityMiddleware
 
 try:
     from deepagents import FilesystemPermission
@@ -33,6 +33,7 @@ except ImportError:
 # Module-level flags set by CLI before creating the agent
 VERIFY_FINALIZE: bool = True
 SESSION_LOGGER: SessionLogger | None = None
+OBSERVABILITY_MIDDLEWARE: ObservabilityMiddleware | None = None
 
 AGENT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent.parent
@@ -174,6 +175,8 @@ def _resolve_provider(provider: str, model: str):
             model=model,
             base_url="https://openrouter.ai/api/v1",
             api_key=api_key,
+            timeout=180,
+            max_retries=2,
         )
     else:
         try:
@@ -190,6 +193,10 @@ def create_orchestrator(
     model: str = "xiaomi/mimo-v2.5",
     thread_id: str = "centinela-session",
     langfuse_client=None,
+    *,
+    goal: str = "",
+    env: str = "",
+    iteration: int = 0,
 ):
     """Create the dispatcher orchestrator agent using deepagents.
 
@@ -198,7 +205,14 @@ def create_orchestrator(
 
     gawt MCP tools (mcp__gitagent__*) are available natively via the MCP
     server configured in opencode.json — they don't need to be in the TOOLS list.
+
+    Args:
+        goal: The session goal (enriches Langfuse trace metadata + tags).
+        env: Environment name (dev/staging/production). Enriches Langfuse tags.
+        iteration: Improvement iteration number. Enriches Langfuse metadata.
     """
+    global OBSERVABILITY_MIDDLEWARE
+
     try:
         from deepagents import create_deep_agent, FilesystemPermission
         from deepagents.backends import FilesystemBackend
@@ -216,8 +230,18 @@ def create_orchestrator(
     )
 
     middleware = []
+    obs = None
     if SESSION_LOGGER is not None:
-        middleware.append(ObservabilityMiddleware(SESSION_LOGGER, langfuse_client=langfuse_client))
+        obs = ObservabilityMiddleware(
+            SESSION_LOGGER,
+            langfuse_client=langfuse_client,
+            goal=goal,
+            thread_id=thread_id,
+            env=env,
+            iteration=iteration,
+        )
+        middleware.append(obs)
+        OBSERVABILITY_MIDDLEWARE = obs
 
     skills = []
     if PROJECT_SKILLS.is_dir():
@@ -247,6 +271,7 @@ def create_orchestrator(
             "description": spec.description,
             "system_prompt": system_prompt,
             "tools": wrapped_tools,
+            "middleware": [SubAgentObservabilityMiddleware(obs, name)] if obs else [],
         }
 
         if FilesystemPermission is not None:

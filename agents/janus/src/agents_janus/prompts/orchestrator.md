@@ -50,7 +50,7 @@ Call `mcp__gitagent__start_session(feature="<feature_key>")`.
 
 ### 4. DISPATCH SPECIALISTS
 For each agent in the manifest:
-- Use the `task` tool with `subagent_type="<role>-specialist"`
+- Use the `task` tool with `subagent_type="<role>"` where role is one of: abm, scoring, ingest, download, prediction, training, data, commonlib, research
 - Context must include: manifest_path, agent_role, agent_requested_id, feature
 - Dispatch independent agents in parallel
 - Dispatch dependent agents sequentially (after their dependencies complete)

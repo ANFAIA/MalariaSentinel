@@ -168,8 +168,8 @@ class LivePanel:
                 console=self._console,
                 refresh_per_second=4,
                 transient=False,
-                redirect_stdout=False,
-                redirect_stderr=False,
+                redirect_stdout=True,
+                redirect_stderr=True,
             )
             self._live.__enter__()
         self._install_sigint_handler()

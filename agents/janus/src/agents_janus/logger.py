@@ -150,6 +150,24 @@ class SessionLogger:
             "detail": detail,
         })
 
+    def log_dispatch_start(self, agent_role: str, task: str = "") -> None:
+        """Log specialist dispatch start."""
+        self._append({
+            "event": "dispatch_start",
+            "ts": self._now_iso(),
+            "agent_role": agent_role,
+            "task": _truncate(task, max_chars=500),
+        })
+
+    def log_dispatch_end(self, agent_role: str, *, error: str = "") -> None:
+        """Log specialist dispatch end."""
+        self._append({
+            "event": "dispatch_end",
+            "ts": self._now_iso(),
+            "agent_role": agent_role,
+            "error": error[:500] if error else "",
+        })
+
     def log_token_summary(
         self,
         total_prompt: int,

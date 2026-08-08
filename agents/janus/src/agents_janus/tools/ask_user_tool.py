@@ -70,7 +70,8 @@ def ask_user(
     try:
         if timeout_s > 0:
             import select
-            print("   > ", end="", file=sys.stderr, flush=True)
+            sys.stderr.write("   > ")
+            sys.stderr.flush()
             ready, _, _ = select.select([sys.stdin], [], [], timeout_s)
             if ready:
                 answer = sys.stdin.readline().strip()
@@ -78,7 +79,9 @@ def ask_user(
                 print(f"(timeout → default: {default})", file=sys.stderr)
                 answer = default or ""
         else:
-            answer = input("   > ").strip()
+            sys.stderr.write("   > ")
+            sys.stderr.flush()
+            answer = sys.stdin.readline().strip()
     except (EOFError, KeyboardInterrupt):
         print("\n   (interrupted → using default)", file=sys.stderr)
         answer = default or ""
