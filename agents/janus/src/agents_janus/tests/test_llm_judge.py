@@ -38,11 +38,14 @@ def _llm_judge(prompt: str) -> dict:
     if not api_key:
         pytest.skip("OPENROUTER_API_KEY not set — LLM judge tests require API access")
 
+    # Load model from .env DEFAULT_MODEL, fallback to gpt-4o-mini for judge reliability
+    model = os.environ.get("DEFAULT_MODEL", "openai/gpt-4o-mini")
+
     import urllib.request
     import urllib.error
 
     payload = json.dumps({
-        "model": "openai/gpt-4o-mini",
+        "model": model,
         "messages": [
             {"role": "system", "content": (
                 "You are a test judge. Evaluate whether the described system behavior "
