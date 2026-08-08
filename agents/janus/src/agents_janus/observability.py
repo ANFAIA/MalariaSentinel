@@ -474,8 +474,9 @@ class ObservabilityMiddleware(AgentMiddleware):
                     as_type="generation",
                     name=f"llm:{self._current_agent_role}",
                     model=model_name,
-                    input=[{"role": "user", "content": str(m.content)[:300]}
-                           for m in request.messages[-3:] if hasattr(m, "content")],
+                    input=[{"role": "system", "content": str(request.system_message)[:500]}
+                           ] + [{"role": "user", "content": str(m.content)[:300]}
+                                for m in request.messages[-3:] if hasattr(m, "content")],
                     output=response_preview,
                     usage_details={
                         "input": prompt_tokens,
