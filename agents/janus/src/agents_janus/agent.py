@@ -132,6 +132,7 @@ When you dispatch a specialist, you give them:
 - A clear, specific task
 - The user's full goal (as context)
 - Any constraints (e.g., "do not break existing calibration")
+- A [MODE:...] tag: [MODE:research] for investigation, [MODE:implementation] for file edits
 
 You do NOT give them hypotheses. They form their own.
 
