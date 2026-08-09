@@ -203,8 +203,8 @@ def create_orchestrator(
     The orchestrator decomposes goals, dispatches specialists via gawt MCP,
     monitors progress, and finalizes. It never edits files directly.
 
-    gawt MCP tools (mcp__gitagent__*) are available natively via the MCP
-    server configured in opencode.json — they don't need to be in the TOOLS list.
+    gawt MCP tools are injected via mcp_bridge.py — the same interface
+    used by subagents. Both share the same MCP server and SQLite state.
 
     Args:
         goal: The session goal (enriches Langfuse trace metadata + tags).
