@@ -253,7 +253,7 @@ def create_orchestrator(
     from agents_janus.plugins.edit import EditPlugin
     from agents_janus.mcp_bridge import get_gawt_mcp_tools_sync, filter_gawt_tools
 
-    # Get gawt MCP tools (shared across all subagents)
+    # Get gawt MCP tools (shared across orchestrator + all subagents)
     all_mcp_tools = get_gawt_mcp_tools_sync()
     gawt_tools = filter_gawt_tools(all_mcp_tools)
     _log.info("Loaded %d gawt MCP tools for subagents: %s",
@@ -304,9 +304,12 @@ def create_orchestrator(
             FilesystemPermission(operations=["read"], paths=["/**"], mode="allow"),
         ]
 
+    # Add gawt MCP tools to orchestrator (session lifecycle, agent management)
+    orch_tools = TOOLS + [_wrap_with_logging(t) for t in gawt_tools]
+
     return create_deep_agent(
         model=llm,
-        tools=TOOLS,
+        tools=orch_tools,
         subagents=worker_defs,
         system_prompt=_load_orchestrator_prompt(),
         backend=backend,
