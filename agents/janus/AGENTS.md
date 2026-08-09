@@ -27,22 +27,62 @@
 Scorers follow the pattern `D<id>_<name>.py` where `<id>` is the next number (D1, D2, ... D10 currently).
 Each scorer must be registered in `thresholds.yaml` with `min_score`, `max_delta`, and `hard_floor`.
 
-## M-AGENT Architecture (gawt MCP-native dispatcher)
+## Dual-Mode Orchestrator (Centinela + Dispatcher)
 
-### Architecture overview
-Janus is a **dispatcher orchestrator** that coordinates specialist agents via gawt MCP.
-The orchestrator decomposes goals, dispatches specialists, monitors progress, and finalizes.
-It **never edits files directly** — only lifecycle tools.
+### Architecture
+
+Janus has **two orchestrator modes** sharing the same factory (`create_orchestrator()`):
 
 ```
-User goal → Orchestrator (dispatcher)
-  ├── 1. DECOMPOSE: LLM → subtasks
-  ├── 2. WRITE MANIFEST: .gitagent/sessions/<feature>/plan.json
-  ├── 3. START SESSION: mcp__gitagent__start_session
-  ├── 4. DISPATCH SPECIALISTS: deepagents task (parallel/sequential)
-  ├── 5. MONITOR: list_agents, list_edits, list_intents
-  └── 6. FINALIZE: mcp__gitagent__finalize_session
+create_orchestrator(mode="centinela")     create_orchestrator(mode="dispatcher")
+  │                                         │
+  ├─ prompt: orchestrator.md.j2             ├─ prompt: orchestrator.md.j2
+  │  (rendered mode=centinela)               │  (rendered mode=dispatcher)
+  │                                         │
+  ├─ tools: onboard + ask_user              ├─ tools: pipeline + gawt_mcp + ask_user
+  │  + memory_kg + delegate_to_disp         │  + memory_kg
+  │                                         │
+  ├─ subagents: 8 specialists ✅             ├─ subagents: 8 specialists ✅
+  │                                         │
+  └─ perms: r-all, w-deny                   └─ perms: r-all, w-deny
 ```
+
+### Delegation Model
+
+```
+Centinela (REPL, talks to user):
+  ├─ Research:  task("abm", "[MODE:research] ...")     ← direct dispatch
+  └─ Implement: delegate_to_dispatcher(goal="...")     ← opens gawt session
+
+Dispatcher (goal-driven, one-shot):
+  ├─ start_session → task("scoring", "[MODE:implementation] ...") → finalize
+  └─ returns summary to centinela
+```
+
+- **Research tasks**: centinela dispatches directly via `task()` (no gawt session needed)
+- **Implementation tasks**: centinela delegates to dispatcher via `delegate_to_dispatcher()` (dispatcher manages session lifecycle)
+- **Quick questions**: centinela uses `onboard_ask_subagent(name, question)` (lightweight, single LLM call)
+
+### Prompt Template
+
+`prompts/orchestrator.md.j2` — Jinja2 template with two protocol sections:
+- `{% if mode == "centinela" %}` — conversational REPL, explain-then-delegate, onboard tools
+- `{% if mode == "dispatcher" %}` — decompose → session → dispatch → monitor → finalize
+
+### Tool Matrix
+
+| Tool | Centinela | Dispatcher | Subagents |
+|---|---|---|---|
+| `ask_user` | ✅ | ✅ | ✅ |
+| `memory_recall_kg` | ✅ | ✅ | via plugin |
+| `onboard_run_*` | ✅ | ❌ | ❌ |
+| `onboard_status` | ✅ | ❌ | ❌ |
+| `onboard_diagnose` | ✅ | ❌ | ❌ |
+| `onboard_ask_subagent` | ✅ | ❌ | ❌ |
+| `delegate_to_dispatcher` | ✅ | ❌ | ❌ |
+| `pipeline_*` | ❌ | ✅ | via plugin |
+| `gawt_mcp_*` | ❌ | ✅ | ✅ |
+| `task()` (subagents) | ✅ | ✅ | ❌ |
 
 ### gawt MCP server (external dependency)
 - Package: `gawt>=0.5.0` (branch `feat/mcp-sqlite-core`)
@@ -63,58 +103,41 @@ Each specialist is a **planner + executor** in the shared worktree:
 7. `send_message(to=__orchestrator__, message="done: ...")` → report
 8. `unregister_agent()` → clean up
 
-### Inter-specialist coordination
-- **Always spawn a new agent** — never reuse existing ones (avoids intent drift)
-- `spawn_subagent()` is a local Python function (NOT an MCP server)
-- gawt inbox handles conflict detection (advisory, not blocking)
-- If conflict: re-read file, re-plan, retry
-
-### Session manifest
-- Path: `.gitagent/sessions/<feature>/plan.json`
-- Written by orchestrator BEFORE any agent is spawned
-- Read by each specialist on init
-- Updated by `spawn_subagent` when a specialist spawns a sub-agent
-- Schema: `feature`, `agents[]`, `conflict_window_seconds`, `specialist_spawns_allowed`
-
 ### Subagent registry
-- Config: `config/subagents.yaml` (9 subagents: abm, scoring, ingest, download, prediction, training, data, commonlib, research)
+- Config: `config/subagents.yaml` (8 subagents: abm, scoring, ingest, download, prediction, training, data, commonlib)
 - Each subagent has: `spec`, `skills`, `gawt_role`, `can_call_via`, `edits_allow` (glob patterns), `plugins`
 - `gawt_role` maps to the gawt `register_agent(role=...)` parameter
-
-### Plugin model
-- `Plugin` ABC at `plugins/base.py` — transformer over `SubagentSpec` → `ResolvedSubagent`.
-- `EditPlugin`: gawt MCP preamble (shared worktree instructions).
-- `ReadOnlyPlugin`: deny-all writes (onboarding).
-- Per-subagent plugins: scoring, download, ingest, training, prediction, data, commonlib, research.
-
-### Scope validator
-- Plain Python (not LLM). Validates edits against `edits_allow` globs.
-- `validate_edit_scope(edited_files, agent_role, registry)` → `{ok, in_scope, cross_scope, unowned}`
-- Cross-scope → warning (not block). Unowned → ask_user.
 
 ### Observability
 - **LivePanel**: single-agent terminal panel (orchestrator's own stream)
 - **MultiAgentPanel**: multi-agent rows (agent_id, role, intent, inbox)
 - **SessionLogger**: JSONL in `runs/<session>/session.jsonl`
 - **Langfuse SDK**: optional trace dashboard (`--tracing langfuse`)
+- Tags: `agent:<role>`, `env:<env>`, `mode:centinela|dispatcher`, `stage:<phase>`, `tool:<category>`
+- Dispatch spans: one per specialist, nested under root trace
+- Delegation spans: dispatcher trace nested under centinela trace
 
 ### CLI
 ```
-janus onboard                # interactive menu (read-only)
-janus run -g "..."           # dispatcher (goal-driven)
-janus improve -g "..."       # same as run (back-compat)
-janus improve -g "..." --plan docs/plans/in-process/m-agent.md
-janus improve -g "..." --quiet           # suppress live panel
-janus improve -g "..." --tracing langfuse  # + langfuse dashboard
-janus status                 # scorecards, plans, subagents
-janus agents list            # all subagents
-janus agents show abm        # one subagent's details
+janus                          # centinela REPL (conversational)
+janus --tracing langfuse       # with Langfuse tracing
+janus onboard                  # same as bare janus
+janus run -g "..."             # dispatcher (goal-driven)
+janus run -g "..." --plan docs/plans/calibration.md
+janus run -g "..." --tracing langfuse
+janus improve -g "..."         # same as run (back-compat)
+janus improve -g "..." --plan docs/plans/calibration.md
+janus status                   # scorecards, plans, subagents
+janus agents list              # all subagents
+janus agents show abm          # one subagent's details
 ```
 
-### Removed (M14 → M-AGENT)
+### Removed (M14 → M-AGENT → Dual-Mode)
 - `sibling/` directory (intent, peer_message, watcher, ASTIndex, merge_preflight, recovery, coordination, fork, frame_stack, scan, state)
 - `tools/gitagent_tool.py` (old gitagent CLI wrappers)
 - `cycles/run_cycle.py` (7-phase methodology, replaced by dispatcher prompt)
+- `cycles/improvement_cycle.py` (shim, replaced by direct run_improvement call)
+- `tools/subagent_invoke.py` (handoff_to_improver, replaced by delegate_to_dispatcher)
 - `plugins/sibling.py` (SiblingPlugin)
 - `mailbox.py` (file-based mailbox)
 - All `tools/mailbox_*.py`, `tools/claim_file.py`, `tools/peer_message_*.py`, `tools/fork_brief_tool.py`, `tools/merge_result_tool.py`, `tools/scope_validate.py`
@@ -123,20 +146,19 @@ janus agents show abm        # one subagent's details
 ### Files
 ```
 agents/janus/src/agents_janus/
-├── agent.py                    # create_orchestrator (dispatcher mode)
+├── agent.py                    # create_orchestrator (dual-mode: centinela + dispatcher)
 ├── cli.py                      # CLI entry (run, improve, onboard, status)
-├── improvement.py              # run_improvement (stream orchestrator)
-├── onboarding.py               # conversational onboarding
+├── improvement.py              # run_improvement (dispatcher stream)
+├── onboarding.py               # centinela REPL (conversational)
 ├── live_panel.py               # LivePanel + MultiAgentPanel
-├── observability.py            # ObservabilityMiddleware (3 sinks)
+├── observability.py            # ObservabilityMiddleware (mode tag, Langfuse)
 ├── logger.py                   # SessionLogger (JSONL)
 ├── scope_validator.py          # validate_edit_scope
-├── gawt_client.py              # thin MCP wrapper stubs
 ├── manifest.py                 # session manifest CRUD
-├── config/subagents.yaml       # 9 subagent definitions
-├── plugins/                    # Plugin chain (edit, readonly, per-domain)
+├── config/subagents.yaml       # 8 subagent definitions
+├── plugins/                    # Plugin chain (per-domain)
 ├── subagents/                  # Registry, builder, base types
-├── tools/                      # Pipeline, KG, ask_user, spawn_subagent, scope_tools
-├── prompts/                    # orchestrator.md, specialist.md.tmpl, per_subagent/
-└── tests/                      # 88+ tests (unit, integration, LLM-as-judge)
+├── tools/                      # Pipeline, KG, ask_user, delegate_to_dispatcher, onboard_tools
+├── prompts/                    # orchestrator.md.j2, specialist.md.tmpl, per_subagent/
+└── tests/                      # unit, integration, LLM-as-judge tests
 ```

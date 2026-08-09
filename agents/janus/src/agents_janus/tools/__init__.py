@@ -14,7 +14,8 @@ from .onboard_tools import (
     onboard_status,
     onboard_diagnose,
     onboard_list_components,
-    onboard_delegate,
+    delegate_to_dispatcher,
+    onboard_ask_subagent,
 )
 
 __all__ = [
@@ -30,5 +31,6 @@ __all__ = [
     "onboard_status",
     "onboard_diagnose",
     "onboard_list_components",
-    "onboard_delegate",
+    "delegate_to_dispatcher",
+    "onboard_ask_subagent",
 ]

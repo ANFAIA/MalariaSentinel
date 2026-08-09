@@ -65,6 +65,15 @@ _TOOL_CATEGORIES: dict[str, str] = {
     "memory_query": "memory",
     # User interaction
     "ask_user": "user",
+    # Dispatch delegation
+    "delegate_to_dispatcher": "dispatch",
+    "onboard_ask_subagent": "user",
+    "onboard_run_abm": "pipeline",
+    "onboard_run_stage": "pipeline",
+    "onboard_run_pipeline": "pipeline",
+    "onboard_status": "pipeline",
+    "onboard_diagnose": "pipeline",
+    "onboard_list_components": "pipeline",
     # Prompt tools
     "improve_prompt": "other",
     "opencode_search": "other",
@@ -123,6 +132,7 @@ class ObservabilityMiddleware(AgentMiddleware):
         thread_id: str = "",
         env: str = "",
         iteration: int = 0,
+        mode: str = "dispatcher",
     ):
         self.logger = session_logger
         self.langfuse = langfuse_client
@@ -138,6 +148,7 @@ class ObservabilityMiddleware(AgentMiddleware):
         self._thread_id = thread_id
         self._env = env or os.environ.get("JANUS_ENV", "dev")
         self._iteration = iteration
+        self._mode = mode  # centinela | dispatcher
 
         # Current agent role — set by orchestrator before each subagent dispatch
         self._current_agent_role: str = "orchestrator"
@@ -198,6 +209,7 @@ class ObservabilityMiddleware(AgentMiddleware):
         tags = [
             f"agent:{self._current_agent_role}",
             f"env:{self._env}",
+            f"mode:{self._mode}",
         ]
         if extra:
             tags.extend(extra)
@@ -288,6 +300,7 @@ class ObservabilityMiddleware(AgentMiddleware):
                 base_tags = [
                     "agent:orchestrator",
                     f"env:{self._env}",
+                    f"mode:{self._mode}",
                     "stage:start",
                 ]
                 if self._goal:

@@ -1,7 +1,11 @@
-"""MalariaSentinel Janus orchestrator — dispatcher mode.
+"""MalariaSentinel Janus orchestrator — dual-mode (centinela + dispatcher).
 
 The orchestrator decomposes goals, dispatches specialists, monitors progress,
 and finalizes via gawt MCP. It never edits files directly.
+
+Two modes:
+- centinela: conversational REPL, interacts with user, delegates implementation
+- dispatcher: goal-driven, manages gawt session, coordinates specialists
 """
 from __future__ import annotations
 
@@ -9,19 +13,12 @@ import json
 import os
 import sys
 from pathlib import Path
+from typing import Literal
 
 _project_root = Path(__file__).resolve().parent.parent.parent
 if str(_project_root) not in sys.path:
     sys.path.insert(0, str(_project_root))
 
-from agents_janus.tools import (
-    opencode_search,
-    pipeline_run_calibration,
-    pipeline_compare_scorecards,
-    memory_recall_kg,
-    improve_prompt,
-    ask_user,
-)
 from agents_janus.logger import SessionLogger
 from agents_janus.observability import ObservabilityMiddleware, SubAgentObservabilityMiddleware
 
@@ -40,11 +37,20 @@ REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent.parent
 PROJECT_SKILLS = REPO_ROOT / "agents" / "skills"
 GLOBAL_SKILLS = Path.home() / ".agents" / "skills"
 
-_ORCHESTRATOR_PROMPT_PATH = AGENT_DIR / "prompts" / "orchestrator.md"
+_ORCHESTRATOR_PROMPT_TEMPLATE = AGENT_DIR / "prompts" / "orchestrator.md.j2"
+_ORCHESTRATOR_PROMPT_LEGACY = AGENT_DIR / "prompts" / "orchestrator.md"
 
 
 def _wrap_with_logging(tool_func):
-    """Wrap a tool function to add structured logging + error capture."""
+    """Wrap a tool function to add structured logging + error capture.
+
+    If tool_func is already a BaseTool, return it as-is (middleware handles logging).
+    If it's a plain function, wrap it with logging.
+    """
+    from langchain_core.tools import BaseTool
+    if isinstance(tool_func, BaseTool):
+        return tool_func
+
     import functools
 
     @functools.wraps(tool_func)
@@ -106,55 +112,100 @@ def _import_abm_score():
     return abm_score
 
 
-def _load_orchestrator_prompt() -> str:
-    """Load the dispatcher prompt from disk, with fallback to inline."""
-    if _ORCHESTRATOR_PROMPT_PATH.exists():
-        return _ORCHESTRATOR_PROMPT_PATH.read_text()
-    return """\
-You are the Janus orchestrator. Your role is to coordinate specialist agents via gawt.
+def _render_prompt(mode: Literal["centinela", "dispatcher"]) -> str:
+    """Render the orchestrator prompt from the Jinja2 template."""
+    try:
+        from jinja2 import Environment, FileSystemLoader
+        env = Environment(
+            loader=FileSystemLoader(str(_ORCHESTRATOR_PROMPT_TEMPLATE.parent)),
+            keep_trailing_newline=True,
+        )
+        template = env.get_template(_ORCHESTRATOR_PROMPT_TEMPLATE.name)
+        return template.render(mode=mode)
+    except Exception:
+        # Fallback to legacy static prompt (dispatcher only)
+        if _ORCHESTRATOR_PROMPT_LEGACY.exists():
+            return _ORCHESTRATOR_PROMPT_LEGACY.read_text()
+        return _fallback_prompt(mode)
 
-You do NOT:
-- Edit files via mcp__gitagent__edit_file or write_file
-- Read code in detail
-- Run ABM simulations
-- Form hypotheses about bugs
 
-You DO:
-- Receive the user's goal
-- Decompose it into subtasks using the LLM
-- Identify which specialists can handle each subtask
-- Start a gawt session via mcp__gitagent__start_session
-- Dispatch specialists via deepagents task tool
-- Monitor progress via mcp__gitagent__list_agents, list_edits, list_intents
-- Finalize when all specialists are done via mcp__gitagent__finalize_session
+def _fallback_prompt(mode: str) -> str:
+    """Minimal fallback prompt if template + legacy both missing."""
+    base = """\
+You are the Janus orchestrator. Your role is to coordinate specialist agents.
 
-When you dispatch a specialist, you give them:
-- A clear, specific task
-- The user's full goal (as context)
-- Any constraints (e.g., "do not break existing calibration")
-- A [MODE:...] tag: [MODE:research] for investigation, [MODE:implementation] for file edits
+You do NOT edit files. You DO decompose goals and dispatch specialists.
 
-You do NOT give them hypotheses. They form their own.
-
-You may run multiple specialists in parallel if their tasks are independent.
-You may run specialists sequentially if one depends on another's output.
-
-When all specialists have reported done, run mcp__gitagent__finalize_session
-with a summary commit message.
+When you dispatch a specialist, prefix the task with:
+- [MODE:research] for investigation
+- [MODE:implementation] for file edits
 """
+    if mode == "centinela":
+        base += """
+You are the Centinela — a conversational assistant. You interact with the user,
+explain results, and delegate implementation work to the dispatcher via
+delegate_to_dispatcher(goal="...").
+"""
+    else:
+        base += """
+You are the Dispatcher — a goal-driven agent. You decompose goals, start gawt
+sessions, dispatch specialists, monitor progress, and finalize.
+"""
+    return base
 
 
-TOOLS = [
-    _wrap_with_logging(opencode_search),
-    _wrap_with_logging(_import_abm_run()),
-    _wrap_with_logging(_import_abm_test()),
-    _wrap_with_logging(_import_abm_score()),
-    _wrap_with_logging(pipeline_run_calibration),
-    _wrap_with_logging(pipeline_compare_scorecards),
-    _wrap_with_logging(memory_recall_kg),
-    _wrap_with_logging(improve_prompt),
-    _wrap_with_logging(ask_user),
-]
+# ── Tool sets ───────────────────────────────────────────────────────────
+
+def _get_dispatcher_tools():
+    """Tools for dispatcher mode: pipeline, ABM, search, memory."""
+    from agents_janus.tools import (
+        opencode_search,
+        pipeline_run_calibration,
+        pipeline_compare_scorecards,
+        memory_recall_kg,
+        improve_prompt,
+        ask_user,
+    )
+    return [
+        _wrap_with_logging(opencode_search),
+        _wrap_with_logging(_import_abm_run()),
+        _wrap_with_logging(_import_abm_test()),
+        _wrap_with_logging(_import_abm_score()),
+        _wrap_with_logging(pipeline_run_calibration),
+        _wrap_with_logging(pipeline_compare_scorecards),
+        _wrap_with_logging(memory_recall_kg),
+        _wrap_with_logging(improve_prompt),
+        _wrap_with_logging(ask_user),
+    ]
+
+
+def _get_centinela_tools():
+    """Tools for centinela mode: onboard tools + memory + ask_user."""
+    from agents_janus.tools.kg_tool import memory_recall_kg
+    from agents_janus.tools.ask_user_tool import ask_user
+    from agents_janus.tools.onboard_tools import (
+        onboard_run_abm,
+        onboard_run_stage,
+        onboard_run_pipeline,
+        onboard_status,
+        onboard_diagnose,
+        onboard_list_components,
+        delegate_to_dispatcher,
+        onboard_ask_subagent,
+    )
+    return [
+        _wrap_with_logging(onboard_run_abm),
+        _wrap_with_logging(onboard_run_stage),
+        _wrap_with_logging(onboard_run_pipeline),
+        _wrap_with_logging(onboard_status),
+        _wrap_with_logging(onboard_diagnose),
+        _wrap_with_logging(onboard_list_components),
+        _wrap_with_logging(delegate_to_dispatcher),
+        _wrap_with_logging(onboard_ask_subagent),
+        _wrap_with_logging(memory_recall_kg),
+        _wrap_with_logging(ask_user),
+    ]
+
 
 MEMORY_FILES = [str(AGENT_DIR / "AGENTS.md")]
 
@@ -195,19 +246,21 @@ def create_orchestrator(
     thread_id: str = "centinela-session",
     langfuse_client=None,
     *,
+    mode: Literal["centinela", "dispatcher"] = "dispatcher",
     goal: str = "",
     env: str = "",
     iteration: int = 0,
 ):
-    """Create the dispatcher orchestrator agent using deepagents.
+    """Create an orchestrator agent using deepagents.
 
-    The orchestrator decomposes goals, dispatches specialists via gawt MCP,
-    monitors progress, and finalizes. It never edits files directly.
+    Two modes:
+    - centinela: conversational REPL, interacts with user, delegates implementation
+    - dispatcher: goal-driven, manages gawt session, coordinates specialists
 
-    gawt MCP tools are injected via mcp_bridge.py — the same interface
-    used by subagents. Both share the same MCP server and SQLite state.
+    Both modes have access to 8 specialist subagents via the task() tool.
 
     Args:
+        mode: Orchestrator mode (centinela or dispatcher).
         goal: The session goal (enriches Langfuse trace metadata + tags).
         env: Environment name (dev/staging/production). Enriches Langfuse tags.
         iteration: Improvement iteration number. Enriches Langfuse metadata.
@@ -230,6 +283,7 @@ def create_orchestrator(
         virtual_mode=True,
     )
 
+    # Observability middleware
     middleware = []
     obs = None
     if SESSION_LOGGER is not None:
@@ -240,6 +294,7 @@ def create_orchestrator(
             thread_id=thread_id,
             env=env,
             iteration=iteration,
+            mode=mode,
         )
         middleware.append(obs)
         OBSERVABILITY_MIDDLEWARE = obs
@@ -248,16 +303,15 @@ def create_orchestrator(
     if PROJECT_SKILLS.is_dir():
         skills.append("agents/skills/")
 
+    # ── Subagent definitions (shared across both modes) ──────────────
     from agents_janus.subagents.registry import load_registry
     from agents_janus.subagents.builder import build_subagent_prompt
     from agents_janus.plugins import PLUGIN_REGISTRY
     from agents_janus.mcp_bridge import get_gawt_mcp_tools_sync, filter_gawt_tools
+    from agents_janus.tools.ask_user_tool import ask_user as ask_user_tool
 
-    # Get gawt MCP tools (shared across orchestrator + all subagents)
     all_mcp_tools = get_gawt_mcp_tools_sync()
     gawt_tools = filter_gawt_tools(all_mcp_tools)
-    _log.info("Loaded %d gawt MCP tools for subagents: %s",
-              len(gawt_tools), [t.name for t in gawt_tools])
 
     registry = load_registry()
     worker_defs = []
@@ -270,9 +324,10 @@ def create_orchestrator(
 
         # Add gawt MCP tools to each subagent
         all_tools.extend(gawt_tools)
+        # Add ask_user to each subagent (fix: prompt tells them to use it)
+        all_tools.append(ask_user_tool)
 
         wrapped_tools = [_wrap_with_logging(t) for t in all_tools]
-
         system_prompt = build_subagent_prompt(spec, plugin_chain, registry.all())
 
         wd = {
@@ -295,6 +350,7 @@ def create_orchestrator(
 
         worker_defs.append(wd)
 
+    # ── Orchestrator permissions (both modes: read-only) ─────────────
     orch_permissions = []
     if FilesystemPermission is not None:
         orch_permissions = [
@@ -303,17 +359,20 @@ def create_orchestrator(
             FilesystemPermission(operations=["read"], paths=["/**"], mode="allow"),
         ]
 
-    # Add gawt MCP tools to orchestrator (session lifecycle, agent management)
-    orch_tools = TOOLS + [_wrap_with_logging(t) for t in gawt_tools]
+    # ── Orchestrator tools (mode-specific) ───────────────────────────
+    if mode == "centinela":
+        orch_tools = _get_centinela_tools()
+    else:
+        orch_tools = _get_dispatcher_tools() + [_wrap_with_logging(t) for t in gawt_tools]
 
     return create_deep_agent(
         model=llm,
         tools=orch_tools,
         subagents=worker_defs,
-        system_prompt=_load_orchestrator_prompt(),
+        system_prompt=_render_prompt(mode),
         backend=backend,
         skills=skills or None,
-        name="janus-orchestrator",
+        name=f"janus-orchestrator-{mode}",
         middleware=middleware,
         permissions=orch_permissions,
     )

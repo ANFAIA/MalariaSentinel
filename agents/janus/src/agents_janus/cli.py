@@ -1,4 +1,9 @@
-"""CLI entry point for the MalariaSentinel DeepAgent system."""
+"""CLI entry point for the MalariaSentinel Janus system.
+
+Two modes:
+    janus              — Centinela REPL (conversational assistant)
+    janus improve      — Dispatcher (goal-driven, coordinates specialists)
+"""
 from __future__ import annotations
 
 import os
@@ -13,17 +18,53 @@ import typer
 
 app = typer.Typer(
     name="janus",
-    help="MalariaSentinel DeepAgent System — multi-agent ABM orchestrator. "
-         "Running `janus` with no arguments starts the conversational assistant.",
+    help=(
+        "MalariaSentinel Centinela — multi-agent decision support system.\n\n"
+        "Two modes:\n"
+        "  janus          Centinela REPL: conversational assistant that investigates,\n"
+        "                 asks clarifying questions, and delegates implementation.\n"
+        "  janus improve  Dispatcher: decomposes goals, coordinates specialists,\n"
+        "                 manages gawt sessions, and finalizes changes.\n\n"
+        "Run with no arguments to start the Centinela REPL."
+    ),
+    no_args_is_help=False,
 )
 
 
 @app.callback(invoke_without_command=True)
-def _main(ctx: typer.Context) -> None:
-    """Default: start the conversational onboarding assistant."""
+def _main(
+    ctx: typer.Context,
+    no_tracing: bool = typer.Option(
+        False, "--no-tracing",
+        help="Disable Langfuse tracing (enabled by default).",
+    ),
+    env: str = typer.Option(
+        "", "--env",
+        help="Environment tag: dev, staging, production.",
+    ),
+) -> None:
+    """Start the Centinela REPL — a conversational assistant for the SDSS.
+
+    The Centinela can:
+    - Run ABM simulations and pipeline stages
+    - Ask specialists about their domain
+    - Investigate issues by dispatching research specialists
+    - Delegate code changes to the dispatcher
+
+    Langfuse tracing is ON by default. Each session creates a trace with
+    nested spans for LLM calls, tool calls, and specialist dispatches.
+    Use --no-tracing to disable.
+
+    Language: responds in the same language you use (Spanish or English).
+    """
     if ctx.invoked_subcommand is None:
         from agents_janus.onboarding import run_onboarding
-        run_onboarding()
+
+        tracing = "" if no_tracing else "langfuse"
+        langfuse_client = _build_langfuse_client(tracing)
+        resolved_env = _resolve_env(env)
+
+        run_onboarding(langfuse_client=langfuse_client, env=resolved_env)
 
 
 def _load_dotenv() -> None:
@@ -62,14 +103,18 @@ def _resolve_tracing(tracing: str | None) -> str:
 
 
 def _build_langfuse_client(tracing: str):
-    """Build a langfuse.Langfuse client if tracing=langfuse and env is set."""
+    """Build a langfuse.Langfuse client.
+
+    By default tracing is enabled. Pass --no-tracing to disable.
+    If env vars are missing, tracing degrades gracefully (no crash).
+    """
     if tracing != "langfuse":
         return None
     try:
         from langfuse import Langfuse
     except ImportError:
         typer.echo(
-            "⚠ --tracing langfuse requested but langfuse is not installed. "
+            "Warning: langfuse not installed. Tracing disabled. "
             "Install with: uv pip install -e 'agents/janus[observability]'",
             err=True,
         )
@@ -80,9 +125,8 @@ def _build_langfuse_client(tracing: str):
     secret_key = os.environ.get("LANGFUSE_SECRET_KEY")
     if not (host and public_key and secret_key):
         typer.echo(
-            "⚠ --tracing langfuse requires LANGFUSE_HOST (or LANGFUSE_BASE_URL), "
-            "LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY env vars. "
-            "Continuing without langfuse.",
+            "Warning: Langfuse env vars not set (LANGFUSE_HOST, "
+            "LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY). Tracing disabled.",
             err=True,
         )
         return None
@@ -94,27 +138,72 @@ def _build_langfuse_client(tracing: str):
     )
 
 
-@app.command()
-def run(
-    goal: str = typer.Option(None, "--goal", "-g", help="Goal for this run. If not set, you'll be prompted."),
-    max_iterations: int = typer.Option(10, "--max-iterations", "-n", help="Maximum improvement iterations."),
-    provider: str = typer.Option("openrouter", "--provider", "-p", help="LLM provider."),
-    model: str = typer.Option("xiaomi/mimo-v2.5", "--model", help="Model identifier."),
-    thread_id: str = typer.Option("centinela-session", "--thread-id", "-t", help="Thread ID for checkpointing."),
-    dry_run: bool = typer.Option(False, "--dry-run", help="Print the prompt without executing."),
-    no_verify: bool = typer.Option(False, "--no-verify", help="Skip approval prompts before finalize."),
-    no_ask: bool = typer.Option(False, "--no-ask", help="Skip user prompts (auto-proceed with defaults)."),
-    quiet: bool = typer.Option(False, "--quiet", "-q", help="Disable the live terminal panel."),
-    tracing: str = typer.Option("", "--tracing", help="Tracing backend: 'langfuse'."),
-):
-    """Run the improvement dispatcher.
+def _resolve_env(env: str | None) -> str:
+    """Resolve environment from CLI flag or JANUS_ENV env var."""
+    return env or os.environ.get("JANUS_ENV", "dev")
 
-    The orchestrator decomposes the goal, dispatches specialists via gawt MCP,
-    monitors progress, and finalizes the session.
+
+@app.command()
+def improve(
+    goal: str = typer.Option(
+        None, "--goal", "-g",
+        help="Goal for the dispatcher to accomplish.",
+    ),
+    plan: str = typer.Option(
+        None, "--plan",
+        help="Path to a plan file. The dispatcher reads it for task decomposition.",
+    ),
+    provider: str = typer.Option(
+        "openrouter", "--provider", "-p",
+        help="LLM provider (openrouter, openai, anthropic).",
+    ),
+    model: str = typer.Option(
+        "xiaomi/mimo-v2.5", "--model",
+        help="Model identifier for the LLM.",
+    ),
+    no_verify: bool = typer.Option(
+        False, "--no-verify",
+        help="Skip approval prompts before finalizing the session.",
+    ),
+    no_ask: bool = typer.Option(
+        False, "--no-ask",
+        help="Auto-proceed without asking the user (for CI/automation).",
+    ),
+    quiet: bool = typer.Option(
+        False, "--quiet", "-q",
+        help="Suppress the live terminal panel.",
+    ),
+    no_tracing: bool = typer.Option(
+        False, "--no-tracing",
+        help="Disable Langfuse tracing (enabled by default).",
+    ),
+    env: str = typer.Option(
+        "", "--env",
+        help="Environment tag: dev, staging, production.",
+    ),
+):
+    """Run the dispatcher — goal-driven specialist coordination.
+
+    The dispatcher decomposes your goal into subtasks, starts a gawt session,
+    dispatches specialists in parallel or sequential, monitors progress, and
+    finalizes all changes into a single commit.
+
+    Langfuse tracing is ON by default. Each run creates a trace in the Langfuse
+    dashboard with nested spans for LLM calls, tool calls, and specialist
+    dispatches. Use --no-tracing to disable.
+
+    Requires env vars: LANGFUSE_HOST, LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY.
+    If not set, tracing degrades gracefully (no crash, just a warning).
 
     Examples:
-        janus run -g "Population goes extinct around day 90"
-        janus run -g "Add gonotrophic cycle tracking"
+
+        janus improve -g "Fix population extinction at day 90"
+
+        janus improve -g "Add gonotrophic cycle scorer D15" --plan docs/plans/calibration.md
+
+        janus improve -g "Refactor ingest pipeline" --no-tracing
+
+        janus improve -g "Fix scoring" --env production
     """
     if not goal:
         goal = typer.prompt("What is your goal?")
@@ -123,60 +212,9 @@ def run(
         os.environ["JANUS_NO_ASK_USER"] = "1"
 
     _setup_module_flags(no_verify)
-    resolved_tracing = _resolve_tracing(tracing)
-    langfuse_client = _build_langfuse_client(resolved_tracing)
-
-    from agents_janus.improvement import run_improvement
-
-    result = run_improvement(
-        goal=goal,
-        provider=provider,
-        model=model,
-        thread_id=thread_id,
-        quiet=quiet,
-        langfuse_client=langfuse_client,
-    )
-    typer.echo(result)
-
-
-@app.command()
-def onboard(
-    provider: str = typer.Option("openrouter", "--provider", "-p", help="LLM provider."),
-    model: str = typer.Option("xiaomi/mimo-v2.5", "--model", help="Model identifier."),
-    quiet: bool = typer.Option(False, "--quiet", "-q", help="Suppress technical output."),
-    tracing: str = typer.Option("", "--tracing", help="Tracing backend: 'langfuse'."),
-):
-    """Conversational onboarding agent. Ask questions, run tasks, get help."""
-    resolved_tracing = _resolve_tracing(tracing)
-    langfuse_client = _build_langfuse_client(resolved_tracing)
-
-    from agents_janus.onboarding import run_onboarding
-    result = run_onboarding(provider=provider, model=model, quiet=quiet, langfuse_client=langfuse_client)
-    typer.echo(result)
-
-
-@app.command()
-def improve(
-    goal: str = typer.Option(None, "--goal", "-g", help="Goal for improvement."),
-    plan: str = typer.Option(None, "--plan", help="Path to a plan file to use as context."),
-    provider: str = typer.Option("openrouter", "--provider", "-p", help="LLM provider."),
-    model: str = typer.Option("xiaomi/mimo-v2.5", "--model", help="Model identifier."),
-    thread_id: str = typer.Option("improvement-session", "--thread-id", "-t", help="Thread ID."),
-    no_verify: bool = typer.Option(False, "--no-verify", help="Skip approval prompts."),
-    no_ask: bool = typer.Option(False, "--no-ask", help="Skip user prompts."),
-    quiet: bool = typer.Option(False, "--quiet", "-q", help="Disable the live terminal panel."),
-    tracing: str = typer.Option("", "--tracing", help="Tracing backend: 'langfuse'."),
-):
-    """Run the improvement orchestrator for a goal."""
-    if not goal:
-        goal = typer.prompt("What is your goal?")
-
-    if no_ask:
-        os.environ["JANUS_NO_ASK_USER"] = "1"
-
-    _setup_module_flags(no_verify)
-    resolved_tracing = _resolve_tracing(tracing)
-    langfuse_client = _build_langfuse_client(resolved_tracing)
+    tracing = "" if no_tracing else "langfuse"
+    resolved_env = _resolve_env(env)
+    langfuse_client = _build_langfuse_client(tracing)
 
     from agents_janus.improvement import run_improvement
 
@@ -185,55 +223,11 @@ def improve(
         plan_path=plan,
         provider=provider,
         model=model,
-        thread_id=thread_id,
         quiet=quiet,
         langfuse_client=langfuse_client,
+        env=resolved_env,
     )
     typer.echo(result)
-
-
-@app.command()
-def status():
-    """Show current session status: scorecards, plans, subagents."""
-    from agents_janus.onboarding import _show_status
-    typer.echo(_show_status())
-
-
-# Subagent group
-agents_app = typer.Typer(help="Manage subagents.")
-app.add_typer(agents_app, name="agents")
-
-
-@agents_app.command("list")
-def agents_list():
-    """List all registered subagents."""
-    from agents_janus.onboarding import _list_components
-    typer.echo(_list_components())
-
-
-@agents_app.command("show")
-def agents_show(name: str = typer.Argument(..., help="Subagent name.")):
-    """Show details for a specific subagent."""
-    import json as _json
-    from agents_janus.subagents.registry import load_registry
-    try:
-        reg = load_registry()
-        spec = reg.get(name)
-        result = {
-            "name": spec.name,
-            "description": spec.description,
-            "model": f"{spec.provider}/{spec.model}",
-            "skills": list(spec.skills),
-            "plugins": list(spec.plugins),
-            "edits_allow": list(spec.edits_allow),
-            "mailbox_inbox": spec.mailbox_inbox,
-            "spec": str(spec.spec_path) if spec.spec_path else None,
-            "thread_id_prefix": spec.thread_id_prefix,
-        }
-        typer.echo(_json.dumps(result, indent=2))
-    except KeyError as e:
-        typer.echo(f"Error: {e}", err=True)
-        raise typer.Exit(1)
 
 
 if __name__ == "__main__":

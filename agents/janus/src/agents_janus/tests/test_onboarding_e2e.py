@@ -1,9 +1,9 @@
 """E2E tests for the onboarding agent tools.
 
 Tests cover:
-- onboard_ask_subagent: returns answer, handles unknown subagent, enforces ReadOnlyPlugin
-- onboard_delegate: still works with mocked improver
-- tool completeness: onboard_ask_subagent is in the tools list
+- onboard_ask_subagent: returns answer, handles unknown subagent
+- delegate_to_dispatcher: works with mocked improver
+- tool completeness: all expected tools are callable
 """
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ from agents_janus.tools.onboard_tools import (
     onboard_status,
     onboard_diagnose,
     onboard_list_components,
-    onboard_delegate,
+    delegate_to_dispatcher,
     onboard_ask_subagent,
 )
 
@@ -114,11 +114,11 @@ def test_onboard_ask_subagent_unknown_subagent():
 
 
 # ---------------------------------------------------------------------------
-# Test 3: onboard_ask_subagent uses ReadOnlyPlugin
+# Test 3: onboard_ask_subagent uses empty plugin chain
 # ---------------------------------------------------------------------------
 
-def test_onboard_ask_subagent_readonly_plugin():
-    """build_subagent_prompt should be called with only ReadOnlyPlugin."""
+def test_onboard_ask_subagent_empty_plugins():
+    """build_subagent_prompt should be called with empty plugin list."""
     with (
         patch("agents_janus.tools.onboard_tools._resolve_llm") as mock_llm,
         patch("agents_janus.subagents.builder.build_subagent_prompt") as mock_build,
@@ -130,39 +130,56 @@ def test_onboard_ask_subagent_readonly_plugin():
 
         onboard_ask_subagent("scoring", "test")
 
-        # Verify the plugin chain is [ReadOnlyPlugin]
-        args, kwargs = mock_build.call_args
-        plugin_chain = args[1]
-        assert len(plugin_chain) == 1
-        assert plugin_chain[0].__class__.__name__ == "ReadOnlyPlugin"
+        # Verify the plugin chain is empty (passed as keyword arg)
+        _, kwargs = mock_build.call_args
+        plugin_chain = kwargs.get("plugin_chain", None)
+        # If not a keyword arg, check positional
+        if plugin_chain is None:
+            args = mock_build.call_args[0]
+            plugin_chain = args[1] if len(args) > 1 else None
+        assert plugin_chain is not None, f"call_args: {mock_build.call_args}"
+        assert len(plugin_chain) == 0
 
 
 # ---------------------------------------------------------------------------
-# Test 4: onboard_delegate still works
+# Test 4: delegate_to_dispatcher works
 # ---------------------------------------------------------------------------
 
-def test_onboard_delegate_still_works():
-    """onboard_delegate should return valid JSON with the goal."""
-    with patch("agents_janus.tools.subagent_invoke.handoff_to_improver") as mock_handoff:
-        mock_handoff.return_value = json.dumps({
-            "status": "ok",
-            "goal": "test goal",
-            "result": "done",
-        })
+def test_delegate_to_dispatcher_works():
+    """delegate_to_dispatcher should return valid JSON with the goal."""
+    with patch("agents_janus.improvement.run_improvement") as mock_run:
+        mock_run.return_value = "All done. Fixed D14."
 
-        result = json.loads(onboard_delegate(goal="test goal"))
+        result = json.loads(delegate_to_dispatcher(goal="test goal"))
 
     assert result["status"] == "ok"
     assert result["goal"] == "test goal"
-    mock_handoff.assert_called_once_with(goal="test goal", context={})
+    assert result["result"] == "All done. Fixed D14."
+    mock_run.assert_called_once()
+
+
+def test_delegate_to_dispatcher_with_plan():
+    """delegate_to_dispatcher should pass plan_path to run_improvement."""
+    with patch("agents_janus.improvement.run_improvement") as mock_run:
+        mock_run.return_value = "Done."
+
+        result = json.loads(delegate_to_dispatcher(
+            goal="fix scoring",
+            plan_path="docs/plans/calibration.md",
+        ))
+
+    assert result["status"] == "ok"
+    mock_run.assert_called_once()
+    call_kwargs = mock_run.call_args[1]
+    assert call_kwargs["plan_path"] == "docs/plans/calibration.md"
 
 
 # ---------------------------------------------------------------------------
-# Test 5: tool completeness — onboard_ask_subagent is in the tools list
+# Test 5: tool completeness
 # ---------------------------------------------------------------------------
 
 def test_onboarding_tools_complete():
-    """onboard_ask_subagent should be in the onboarding agent's tool list."""
+    """All expected tools should be callable."""
     expected_tools = [
         onboard_run_abm,
         onboard_run_stage,
@@ -170,7 +187,7 @@ def test_onboarding_tools_complete():
         onboard_status,
         onboard_diagnose,
         onboard_list_components,
-        onboard_delegate,
+        delegate_to_dispatcher,
         onboard_ask_subagent,
     ]
     for tool in expected_tools:

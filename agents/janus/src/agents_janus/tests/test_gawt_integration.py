@@ -283,31 +283,32 @@ class TestArchitectureInvariants:
     """Test that the new architecture maintains key invariants."""
 
     def test_orchestrator_prompt_mentions_gawt_lifecycle(self):
-        """Orchestrator prompt must mention gawt lifecycle tools."""
-        from agents_janus.agent import _load_orchestrator_prompt
-        prompt = _load_orchestrator_prompt()
+        """Orchestrator prompt must mention gawt lifecycle tools (dispatcher mode)."""
+        from agents_janus.agent import _render_prompt
+        prompt = _render_prompt("dispatcher")
         assert "mcp__gitagent__start_session" in prompt
         assert "mcp__gitagent__finalize_session" in prompt
         assert "mcp__gitagent__list_agents" in prompt
 
     def test_orchestrator_prompt_forbids_editing(self):
         """Orchestrator prompt must state it does NOT edit files."""
-        from agents_janus.agent import _load_orchestrator_prompt
-        prompt = _load_orchestrator_prompt()
+        from agents_janus.agent import _render_prompt
+        prompt = _render_prompt("dispatcher")
         assert "You do NOT" in prompt
         assert "Edit files" in prompt
 
-    def test_tools_list_no_gitagent_cli(self):
-        """TOOLS list must not contain old gitagent CLI wrappers."""
-        from agents_janus.agent import TOOLS
-        tool_names = [t.__name__ if hasattr(t, '__name__') else str(t) for t in TOOLS]
+    def test_centinela_prompt_has_delegation(self):
+        """Centinela prompt must mention delegation to dispatcher."""
+        from agents_janus.agent import _render_prompt
+        prompt = _render_prompt("centinela")
+        assert "delegate_to_dispatcher" in prompt
+        assert "Centinela Protocol" in prompt
+
+    def test_no_gitagent_cli_imports(self):
+        """No module imports from deleted gitagent CLI wrappers."""
+        from agents_janus.tools import __all__ as tool_names
         for name in tool_names:
-            assert "gitagent_init" not in name
-            assert "gitagent_start" not in name
-            assert "gitagent_spawn" not in name
-            assert "gitagent_propose" not in name
-            assert "gitagent_integrate" not in name
-            assert "gitagent_finalize" not in name
+            assert "gitagent_" not in name, f"Old gitagent tool in tools: {name}"
 
     def test_no_sibling_imports(self):
         """No module imports from deleted sibling package."""

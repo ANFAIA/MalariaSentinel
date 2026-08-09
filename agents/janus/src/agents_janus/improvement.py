@@ -130,6 +130,7 @@ def run_improvement(
             model=model,
             thread_id=thread_id,
             langfuse_client=langfuse_client,
+            mode="dispatcher",
             goal=goal,
             env=env,
         )

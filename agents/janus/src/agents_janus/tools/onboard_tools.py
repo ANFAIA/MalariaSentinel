@@ -1,8 +1,8 @@
-"""Onboarding agent tools — direct-execution tools for the conversational onboarding agent.
+"""Onboarding agent tools — direct-execution tools for the conversational centinela.
 
-These tools let the onboarding agent run ABM simulations, pipeline stages,
-diagnostics, and status checks without delegating to the improvement orchestrator.
-For code-editing tasks, use onboard_delegate to hand off to the improver.
+These tools let the centinela run ABM simulations, pipeline stages,
+diagnostics, and status checks. For code-editing tasks, use
+delegate_to_dispatcher to hand off to the dispatcher orchestrator.
 """
 from __future__ import annotations
 
@@ -280,35 +280,63 @@ def onboard_list_components() -> str:
         return json.dumps({"error": str(e)})
 
 
-def onboard_delegate(goal: str, context: str = "{}") -> str:
-    """Delegate a complex task to the improvement orchestrator.
+def delegate_to_dispatcher(
+    goal: str,
+    context: str = "{}",
+    plan_path: str = "",
+    provider: str = "openrouter",
+    model: str = "xiaomi/mimo-v2.5",
+) -> str:
+    """Delegate implementation work to the dispatcher orchestrator.
 
-    Use this for tasks that require code editing, spawning workers,
-    or multi-step improvement cycles. The improver has full edit access.
+    Creates a dispatcher orchestrator, streams until done, returns summary.
+    Runs in a separate LangGraph invocation (not nested in REPL).
+    The centinela REPL is paused during execution — user sees LivePanel output.
 
     Args:
-        goal: The objective for the improvement orchestrator.
-        context: JSON string with additional context (answers, menu_key, etc.).
+        goal: The objective for the dispatcher.
+        context: JSON string with additional context (research findings, etc.).
+        plan_path: Optional path to a plan file. If provided, the dispatcher
+                   reads it as context for decomposition (equivalent to
+                   `janus improve -g "..." --plan <path>`).
+        provider: LLM provider (default: openrouter).
+        model: Model identifier (default: xiaomi/mimo-v2.5).
+
+    Returns:
+        JSON with the dispatcher's summary.
     """
     try:
         ctx = json.loads(context) if isinstance(context, str) else context
     except json.JSONDecodeError:
         ctx = {"raw_context": context}
 
-    from agents_janus.tools.subagent_invoke import handoff_to_improver
-    result = handoff_to_improver(goal=goal, context=ctx)
-    return result
+    try:
+        from agents_janus.improvement import run_improvement
+    except ImportError as e:
+        return json.dumps({"status": "error", "error": f"Import failed: {e}"})
+
+    try:
+        result = run_improvement(
+            goal=goal,
+            plan_path=plan_path or None,
+            provider=provider,
+            model=model,
+            context=ctx,
+        )
+        return json.dumps({"status": "ok", "goal": goal, "result": result})
+    except Exception as e:
+        return json.dumps({"status": "error", "goal": goal, "error": str(e)})
 
 
 def onboard_ask_subagent(name: str, question: str) -> str:
     """Ask a specialist subagent a read-only question about the system.
 
-    Spawns the specialist inline (no worktree, no gitagent) with read-only
-    permissions. The specialist answers from its domain knowledge.
+    Builds the specialist's system prompt and invokes the LLM directly
+    (no worktree, no gitagent, lightweight single call).
 
     Args:
         name: Subagent name (abm, scoring, ingest, download, prediction,
-              training, data, commonlib, research).
+              training, data, commonlib).
         question: The question to ask.
 
     Returns:
@@ -317,7 +345,6 @@ def onboard_ask_subagent(name: str, question: str) -> str:
     try:
         from agents_janus.subagents.registry import load_registry
         from agents_janus.subagents.builder import build_subagent_prompt
-        from agents_janus.plugins.readonly import ReadOnlyPlugin
     except ImportError as e:
         return json.dumps({"status": "error", "error": f"Import failed: {e}"})
 
@@ -332,9 +359,8 @@ def onboard_ask_subagent(name: str, question: str) -> str:
             "available": list(registry.all().keys()) if "registry" in dir() else [],
         })
 
-    # Build prompt with ReadOnlyPlugin only
-    plugins = [ReadOnlyPlugin()]
-    system_prompt = build_subagent_prompt(spec, plugins, all_specs=registry.all())
+    # Build prompt (no plugins — read-only question)
+    system_prompt = build_subagent_prompt(spec, plugin_chain=[], all_specs=registry.all())
 
     # Resolve LLM and invoke
     try:
@@ -349,7 +375,6 @@ def onboard_ask_subagent(name: str, question: str) -> str:
             HumanMessage(content=question),
         ]
     except ImportError:
-        # Fallback: use dict-based messages (works with ChatOpenAI)
         messages = [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": question},

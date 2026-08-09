@@ -143,7 +143,7 @@ def test_llm_call_emits_generation(mock_langfuse):
     gen_calls = [c for c in calls if c.kwargs.get("as_type") == "generation"]
     assert len(gen_calls) == 1
     kwargs = gen_calls[0].kwargs
-    assert kwargs["name"] == "llm_call"
+    assert kwargs["name"] == "llm:orchestrator"
     assert kwargs["model"] == "mimo"
     assert kwargs["usage_details"]["input"] == 100
     assert kwargs["usage_details"]["output"] == 20
