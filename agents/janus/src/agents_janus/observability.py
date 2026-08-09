@@ -26,6 +26,7 @@ Tags (color-coded in Langfuse UI):
 from __future__ import annotations
 
 import os
+import threading
 import time
 from typing import Any
 
@@ -150,8 +151,9 @@ class ObservabilityMiddleware(AgentMiddleware):
         self._iteration = iteration
         self._mode = mode  # centinela | dispatcher
 
-        # Current agent role — set by orchestrator before each subagent dispatch
-        self._current_agent_role: str = "orchestrator"
+        # Thread-local agent role — each subagent thread gets its own role
+        # without cross-contamination when dispatching in parallel.
+        self._thread_local = threading.local()
 
         # Langfuse handle holders
         self._lf_root_cm: Any = None
@@ -167,6 +169,15 @@ class ObservabilityMiddleware(AgentMiddleware):
     # ------------------------------------------------------------------
     # Public: set current agent role (called by orchestrator before dispatch)
     # ------------------------------------------------------------------
+
+    @property
+    def _current_agent_role(self) -> str:
+        """Thread-local agent role. Each subagent thread has its own."""
+        return getattr(self._thread_local, "agent_role", "orchestrator")
+
+    @_current_agent_role.setter
+    def _current_agent_role(self, role: str) -> None:
+        self._thread_local.agent_role = role
 
     def set_agent_role(self, role: str) -> None:
         """Set the current agent role for tag coloring.

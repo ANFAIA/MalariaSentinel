@@ -15,7 +15,6 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
-import sys
 from pathlib import Path
 from typing import Any
 
@@ -60,19 +59,11 @@ def get_gawt_mcp_tools_sync() -> list[BaseTool]:
 
     async def _connect_and_list():
         """Connect to MCP server, list tools, return converted tools."""
-        # Redirect stderr to suppress MCP server output
-        old_stderr = sys.stderr
-        sys.stderr = open(os.devnull, "w")
-
-        try:
-            async with stdio_client(server_params) as (read_stream, write_stream):
-                async with ClientSession(read_stream, write_stream) as session:
-                    await session.initialize()
-                    tools_result = await session.list_tools()
-                    return tools_result.tools
-        finally:
-            sys.stderr.close()
-            sys.stderr = old_stderr
+        async with stdio_client(server_params) as (read_stream, write_stream):
+            async with ClientSession(read_stream, write_stream) as session:
+                await session.initialize()
+                tools_result = await session.list_tools()
+                return tools_result.tools
 
     try:
         mcp_tools = asyncio.run(_connect_and_list())
@@ -114,26 +105,19 @@ def _mcp_tool_to_langchain(mcp_tool: Any) -> BaseTool:
 
     async def _call_async(**kwargs: Any) -> str:
         """Call the MCP tool via a temporary session."""
-        old_stderr = sys.stderr
-        sys.stderr = open(os.devnull, "w")
+        async with stdio_client(server_params) as (read_stream, write_stream):
+            async with ClientSession(read_stream, write_stream) as session:
+                await session.initialize()
+                result = await session.call_tool(tool_name, kwargs)
 
-        try:
-            async with stdio_client(server_params) as (read_stream, write_stream):
-                async with ClientSession(read_stream, write_stream) as session:
-                    await session.initialize()
-                    result = await session.call_tool(tool_name, kwargs)
-
-                    # Extract text content from result
-                    if hasattr(result, "content") and result.content:
-                        texts = []
-                        for block in result.content:
-                            if hasattr(block, "text"):
-                                texts.append(block.text)
-                        return "\n".join(texts) if texts else str(result)
-                    return str(result)
-        finally:
-            sys.stderr.close()
-            sys.stderr = old_stderr
+                # Extract text content from result
+                if hasattr(result, "content") and result.content:
+                    texts = []
+                    for block in result.content:
+                        if hasattr(block, "text"):
+                            texts.append(block.text)
+                    return "\n".join(texts) if texts else str(result)
+                return str(result)
 
     def _run(**kwargs: Any) -> str:
         """Synchronous wrapper for MCP tool call."""
