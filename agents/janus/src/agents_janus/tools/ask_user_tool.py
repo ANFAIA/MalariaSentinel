@@ -15,6 +15,37 @@ import os
 import sys
 
 
+def _safe_write(text: str, file=None) -> None:
+    """Write text to a file handle, falling back to stdout if closed.
+
+    DeepAgents/LangChain may close stderr via thread cleanup or broken
+    HTTP streams. This wrapper prevents ValueError('I/O operation on
+    closed file') from crashing the tool.
+    """
+    target = file or sys.stderr
+    try:
+        target.write(text)
+        target.flush()
+    except (ValueError, OSError):
+        try:
+            sys.stdout.write(text)
+            sys.stdout.flush()
+        except Exception:
+            pass
+
+
+def _safe_print(*args, **kwargs) -> None:
+    """Print with stderr fallback."""
+    try:
+        print(*args, file=sys.stderr, **kwargs)
+    except (ValueError, OSError):
+        kwargs.pop("file", None)
+        try:
+            print(*args, **kwargs)
+        except Exception:
+            pass
+
+
 def ask_user(
     question: str,
     options: list[str] | None = None,
@@ -46,7 +77,7 @@ def ask_user(
     # No-ask mode: auto-proceed with default when JANUS_NO_ASK_USER=1
     if os.environ.get("JANUS_NO_ASK_USER") == "1":
         auto_answer = default or "auto-proceed"
-        print(f"   [no-ask mode] {question} → {auto_answer}", file=sys.stderr)
+        _safe_print(f"   [no-ask mode] {question} → {auto_answer}")
         return json.dumps({
             "question": question,
             "answer": auto_answer,
@@ -54,36 +85,34 @@ def ask_user(
             "auto": True,
         })
 
-    print("\n" + "═" * 70, file=sys.stderr)
-    print("🤔 AGENT ASKS:", file=sys.stderr)
-    print(f"   {question}", file=sys.stderr)
-    print("═" * 70, file=sys.stderr)
+    _safe_print("\n" + "═" * 70)
+    _safe_print("🤔 AGENT ASKS:")
+    _safe_print(f"   {question}")
+    _safe_print("═" * 70)
 
     if options:
         for i, opt in enumerate(options, 1):
-            print(f"   {i}. {opt}", file=sys.stderr)
-        print("   (or type your own answer)", file=sys.stderr)
+            _safe_print(f"   {i}. {opt}")
+        _safe_print("   (or type your own answer)")
 
     if default:
-        print(f"   [default: {default}]", file=sys.stderr)
+        _safe_print(f"   [default: {default}]")
 
     try:
         if timeout_s > 0:
             import select
-            sys.stderr.write("   > ")
-            sys.stderr.flush()
+            _safe_write("   > ")
             ready, _, _ = select.select([sys.stdin], [], [], timeout_s)
             if ready:
                 answer = sys.stdin.readline().strip()
             else:
-                print(f"(timeout → default: {default})", file=sys.stderr)
+                _safe_print(f"(timeout → default: {default})")
                 answer = default or ""
         else:
-            sys.stderr.write("   > ")
-            sys.stderr.flush()
+            _safe_write("   > ")
             answer = sys.stdin.readline().strip()
     except (EOFError, KeyboardInterrupt):
-        print("\n   (interrupted → using default)", file=sys.stderr)
+        _safe_print("\n   (interrupted → using default)")
         answer = default or ""
 
     if not answer:
@@ -100,8 +129,8 @@ def ask_user(
             # User typed the option text directly — that's fine
             resolved = answer
 
-    print(f"   → {resolved}", file=sys.stderr)
-    print("═" * 70 + "\n", file=sys.stderr)
+    _safe_print(f"   → {resolved}")
+    _safe_print("═" * 70 + "\n")
 
     return json.dumps({
         "question": question,

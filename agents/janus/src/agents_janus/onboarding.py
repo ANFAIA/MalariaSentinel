@@ -21,6 +21,24 @@ ONBOARD_BANNER = """\
 """
 
 
+def _safe_print(*args, **kwargs) -> None:
+    """Print to stderr, falling back to stdout if stderr is closed.
+
+    DeepAgents/LangChain may close stderr via thread cleanup or broken
+    HTTP streams. This wrapper prevents ValueError('I/O operation on
+    closed file') from crashing the REPL.
+    """
+    try:
+        print(*args, file=sys.stderr, **kwargs)
+    except (ValueError, OSError):
+        # stderr closed — fall back to stdout
+        kwargs.pop("file", None)
+        try:
+            print(*args, **kwargs)
+        except Exception:
+            pass
+
+
 def run_onboarding(
     provider: str = "openrouter",
     model: str = "xiaomi/mimo-v2.5",
@@ -59,7 +77,7 @@ def run_onboarding(
         env=env,
     )
 
-    print(ONBOARD_BANNER, file=sys.stderr)
+    _safe_print(ONBOARD_BANNER)
 
     # Conversation history for multi-turn
     messages: list[dict] = []
@@ -74,16 +92,23 @@ def run_onboarding(
 
     while True:
         try:
-            user_input = input("you> ").strip()
+            # Write prompt to stderr (or stdout if stderr is closed)
+            try:
+                sys.stderr.write("you> ")
+                sys.stderr.flush()
+            except (ValueError, OSError):
+                sys.stdout.write("you> ")
+                sys.stdout.flush()
+            user_input = sys.stdin.readline().strip()
         except (EOFError, KeyboardInterrupt):
-            print("\nHasta luego!", file=sys.stderr)
+            _safe_print("\nHasta luego!")
             _cleanup()
             return json.dumps({"status": "quit"})
 
         if not user_input:
             continue
         if user_input.lower() in ("quit", "exit", "salir", "q"):
-            print("Hasta luego!", file=sys.stderr)
+            _safe_print("Hasta luego!")
             _cleanup()
             return json.dumps({"status": "quit"})
 
@@ -109,14 +134,14 @@ def run_onboarding(
             if full_response:
                 # Add assistant response to history
                 messages.append({"role": "assistant", "content": full_response})
-                print(f"\n{full_response}\n", file=sys.stderr)
+                _safe_print(f"\n{full_response}\n")
             else:
-                print("\n(no response)\n", file=sys.stderr)
+                _safe_print("\n(no response)\n")
 
         except KeyboardInterrupt:
-            print("\n(interrupted — continuing conversation)\n", file=sys.stderr)
+            _safe_print("\n(interrupted — continuing conversation)\n")
         except Exception as e:
-            print(f"\nError: {e}\n", file=sys.stderr)
+            _safe_print(f"\nError: {e}\n")
 
 
 # Keep helpers for backwards compat (used by cli.py status command)

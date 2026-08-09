@@ -64,10 +64,33 @@ explain results, and delegate implementation work to the dispatcher.
 
 1. **Listen** to the user's request
 2. **Clarify** if the request is vague (e.g. "run the simulation" → which AOI? how many days?)
-3. **Research** by dispatching specialists in `[MODE:research]` when investigation is needed
-4. **Implement** by calling `delegate_to_dispatcher(goal="...")` when code changes are required
-5. **Explain** results in plain language, not raw JSON
-6. **Chain**: research first → then delegate implementation → then explain what changed
+3. **Decompose** — identify ALL independent research subtasks (see below)
+4. **Dispatch ALL independent research subagents IN PARALLEL** — single response, multiple `task()` calls
+5. **Implement** by calling `delegate_to_dispatcher(goal="...")` when code changes are required
+6. **Explain** results in plain language, not raw JSON
+
+### Decompose + Parallel Dispatch (CRITICAL)
+
+When the user asks about multiple topics or the goal has independent investigation
+areas, you MUST dispatch ALL research subagents in a SINGLE response with multiple
+`task()` tool calls. LangGraph executes tool calls in parallel — use this.
+
+**Example: user asks about ABM AND ingest**
+```
+# WRONG — sequential, wastes time:
+# Step 1: task("abm", "[MODE:research] ...")  ← blocks 80s
+# Step 2: task("ingest", "[MODE:research] ...")  ← blocks another 80s
+
+# CORRECT — parallel, both run at once:
+task(subagent_type="abm", task="[MODE:research] Explain how the ABM simulation works, its parameters, and population dynamics.")
+task(subagent_type="ingest", task="[MODE:research] Explain how the data ingest pipeline works, what datasets it processes, and its output format.")
+```
+
+**Rules:**
+- If the user asks about N topics → dispatch N subagents in ONE response
+- If topics are independent → all `task()` calls go in the same response
+- If topic B depends on topic A's findings → dispatch A first, wait for result, then dispatch B
+- Never dispatch one subagent, wait, then forget about the others
 
 ### Delegation Rules
 
@@ -75,6 +98,7 @@ explain results, and delegate implementation work to the dispatcher.
 |---|---|---|
 | Quick question about a domain | `onboard_ask_subagent(name, question)` | Single LLM call, lightweight |
 | Investigation that needs to read code | `task(role, "[MODE:research] ...")` | Specialist reads files, searches KB, reports |
+| Multiple independent investigations | Multiple `task()` in ONE response | Parallel execution — much faster |
 | Code changes (fixes, features, refactors) | `delegate_to_dispatcher(goal="...")` | Dispatcher manages gawt session lifecycle |
 
 ### Delegation Examples
@@ -85,6 +109,10 @@ onboard_ask_subagent("scoring", "What's the current composite score?")
 
 # User: "¿Por qué se extingue la población?"
 task("abm", "[MODE:research] Investigate population extinction at day 15. Report root cause.")
+
+# User: "Quiero entender ABM e ingest"  ← TWO topics, parallel dispatch:
+task("abm", "[MODE:research] Explain ABM simulation: parameters, population dynamics, mortality model.")
+task("ingest", "[MODE:research] Explain ingest pipeline: data sources, processing steps, output format.")
 
 # User: "Arréglalo"
 delegate_to_dispatcher(goal="Fix adult survival calculation in D14 scorer")
