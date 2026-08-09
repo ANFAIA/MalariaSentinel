@@ -250,7 +250,6 @@ def create_orchestrator(
     from agents_janus.subagents.registry import load_registry
     from agents_janus.subagents.builder import build_subagent_prompt
     from agents_janus.plugins import PLUGIN_REGISTRY
-    from agents_janus.plugins.edit import EditPlugin
     from agents_janus.mcp_bridge import get_gawt_mcp_tools_sync, filter_gawt_tools
 
     # Get gawt MCP tools (shared across orchestrator + all subagents)
@@ -263,7 +262,6 @@ def create_orchestrator(
     worker_defs = []
     for name, spec in registry.all().items():
         plugin_chain = [PLUGIN_REGISTRY[p]() for p in spec.plugins]
-        plugin_chain.insert(0, EditPlugin())
 
         all_tools = []
         for plugin in plugin_chain:
