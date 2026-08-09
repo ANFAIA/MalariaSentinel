@@ -164,7 +164,10 @@ def run_improvement(
         trace_url = _get_trace_url(agent_mod)
         if trace_url:
             import sys
-            print(f"\n🔗 Langfuse trace: {trace_url}", file=sys.stderr)
+            try:
+                print(f"\n🔗 Langfuse trace: {trace_url}", file=sys.stderr)
+            except (ValueError, OSError):
+                print(f"\n🔗 Langfuse trace: {trace_url}")
 
         return final_content
     finally:
