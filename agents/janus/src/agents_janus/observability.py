@@ -156,7 +156,6 @@ class ObservabilityMiddleware(AgentMiddleware):
         self._thread_local = threading.local()
 
         # Langfuse handle holders
-        self._lf_root_cm: Any = None
         self._lf_root_span: Any = None
         self._lf_trace_id: str | None = None
         self._lf_root_span_id: str | None = None
@@ -164,7 +163,6 @@ class ObservabilityMiddleware(AgentMiddleware):
 
         # Dispatch spans — one per specialist, keyed by agent_role
         self._lf_dispatch_spans: dict[str, Any] = {}
-        self._lf_dispatch_cms: dict[str, Any] = {}
 
     # ------------------------------------------------------------------
     # Public: set current agent role (called by orchestrator before dispatch)
@@ -236,11 +234,14 @@ class ObservabilityMiddleware(AgentMiddleware):
         Call this in the orchestrator when dispatching a specialist. All
         LLM calls and tool calls from that specialist will be nested under
         this span (via trace_context parent re-pointing).
+
+        Uses start_observation() (not start_as_current_observation) to avoid
+        OpenTelemetry context token issues when subagents run in parallel threads.
         """
         if not self.langfuse or self._trace_context is None:
             return
         try:
-            cm = self.langfuse.start_as_current_observation(
+            span = self.langfuse.start_observation(
                 as_type="span",
                 name=f"dispatch:{agent_role}",
                 input={"task": task[:500]} if task else None,
@@ -251,17 +252,14 @@ class ObservabilityMiddleware(AgentMiddleware):
                 },
                 trace_context=self._trace_context,
             )
-            span = cm.__enter__()
-            self._lf_dispatch_cms[agent_role] = cm
             self._lf_dispatch_spans[agent_role] = span
         except Exception as e:
             self._log_langfuse_error(f"start_dispatch({agent_role})", _LangfuseErrorMarker(e))
 
     def end_dispatch_span(self, agent_role: str, *, error: str = "") -> None:
         """Close the dispatch span for a specialist."""
-        cm = self._lf_dispatch_cms.pop(agent_role, None)
         span = self._lf_dispatch_spans.pop(agent_role, None)
-        if cm is None or span is None:
+        if span is None:
             return
         try:
             if error:
@@ -270,7 +268,7 @@ class ObservabilityMiddleware(AgentMiddleware):
                     level="ERROR",
                     status_message=error[:200],
                 )
-            cm.__exit__(None, None, None)
+            span.end()
         except Exception as e:
             self._log_langfuse_error(f"end_dispatch({agent_role})", _LangfuseErrorMarker(e))
 
@@ -329,14 +327,15 @@ class ObservabilityMiddleware(AgentMiddleware):
                 if self._iteration:
                     root_metadata["iteration"] = self._iteration
 
-                # Open the top-level span as a context manager.
+                # Open the top-level span (no OTel context management —
+                # avoids "Failed to detach context" when subagents run
+                # in parallel threads with different ContextVars).
                 root_metadata["tags"] = base_tags
-                self._lf_root_cm = self.langfuse.start_as_current_observation(
+                self._lf_root_span = self.langfuse.start_observation(
                     as_type="span",
                     name="janus_session",
                     metadata=root_metadata,
                 )
-                self._lf_root_span = self._lf_root_cm.__enter__()
                 self._lf_trace_id = getattr(self._lf_root_span, "trace_id", None)
                 self._lf_root_span_id = getattr(self._lf_root_span, "id", None)
 
@@ -352,7 +351,6 @@ class ObservabilityMiddleware(AgentMiddleware):
             except Exception as e:
                 self._log_langfuse_error("before_agent.root_span", _LangfuseErrorMarker(e))
                 self._lf_root_span = None
-                self._lf_root_cm = None
                 self._lf_trace_id = None
                 self._lf_root_span_id = None
                 self._trace_context = None
@@ -426,11 +424,14 @@ class ObservabilityMiddleware(AgentMiddleware):
                         except Exception:
                             pass
 
-                # Exit the root span context
-                if self._lf_root_cm is not None:
-                    self._lf_root_cm.__exit__(None, None, None)
-                # CRITICAL: ship buffered spans before the run ends.
-                self.langfuse.flush()
+                    # Close the root span
+                    if self._lf_root_span is not None:
+                        try:
+                            self._lf_root_span.end()
+                        except Exception:
+                            pass
+                    # CRITICAL: ship buffered spans before the run ends.
+                    self.langfuse.flush()
             except Exception as e:
                 self._log_langfuse_error("after_agent.flush", _LangfuseErrorMarker(e))
 

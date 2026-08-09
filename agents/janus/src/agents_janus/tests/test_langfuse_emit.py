@@ -94,14 +94,8 @@ def test_no_langfuse_when_disabled():
 @pytest.fixture
 def mock_langfuse(monkeypatch):
     lf = MagicMock()
-    # v4 API: start_observation returns a span-like object
-    lf.start_observation.return_value = _FakeLangfuseSpan("child")
-    # v4 API: start_as_current_observation returns a context manager
-    root_span = _FakeLangfuseSpan("root")
-    cm = MagicMock()
-    cm.__enter__ = MagicMock(return_value=root_span)
-    cm.__exit__ = MagicMock(return_value=False)
-    lf.start_as_current_observation.return_value = cm
+    # v4 API: start_observation returns a span-like object (used for root + child spans)
+    lf.start_observation.return_value = _FakeLangfuseSpan("span")
 
     # Mock TraceContext so before_agent can import it without langfuse installed
     mock_tc = MagicMock()
@@ -210,7 +204,7 @@ def test_langfuse_error_does_not_crash(mock_langfuse):
     """A failing langfuse SDK must not abort the orchestrator run."""
     sl = MagicMock()
     sl.session_dir.name = "janus-test"
-    mock_langfuse.start_as_current_observation.side_effect = RuntimeError("network down")
+    mock_langfuse.start_observation.side_effect = RuntimeError("network down")
 
     mw = ObservabilityMiddleware(sl, langfuse_client=mock_langfuse)
     state = {"messages": []}
@@ -256,9 +250,9 @@ def test_before_agent_writes_session_id_metadata(mock_langfuse):
     runtime = MagicMock()
     runtime.model_name = "m"
     mw.before_agent(state, runtime)
-    # v4: start_as_current_observation called with session_id metadata
-    mock_langfuse.start_as_current_observation.assert_called_once()
-    kwargs = mock_langfuse.start_as_current_observation.call_args.kwargs
+    # v4: start_observation called with session_id metadata
+    mock_langfuse.start_observation.assert_called_once()
+    kwargs = mock_langfuse.start_observation.call_args.kwargs
     assert kwargs["metadata"]["session_id"] == "janus-20260803-123456"
 
 
