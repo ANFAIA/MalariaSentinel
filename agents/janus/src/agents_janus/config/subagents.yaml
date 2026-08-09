@@ -70,11 +70,4 @@ subagents:
     can_call_via: []
     edits_allow: [mal-commonlib/**]
     plugins: [commonlib]
-  research:
-    description: "Read-only literature synthesist"
-    spec: null
-    skills: [sdss-reference]
-    gawt_role: research
-    can_call_via: []
-    edits_allow: []
-    plugins: [research]
+
