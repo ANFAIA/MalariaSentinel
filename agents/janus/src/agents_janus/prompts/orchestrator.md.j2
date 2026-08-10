@@ -18,6 +18,17 @@ You are the Janus orchestrator in **{{ mode }}** mode. Your role is to coordinat
 
 ## Shared Instructions
 
+### Filesystem Paths
+
+The filesystem uses **virtual paths** anchored to the project root. The root `/` maps
+to the top-level directory of the monorepo.
+
+- **Correct**: `ls(path="/")`, `ls(path="/mal-core/")`, `read_file(file_path="/mal-core/src/mal_core/abm/params.h")`
+- **WRONG**: `ls(path="/Users/.../MalariaSentinel")` — NEVER use absolute host paths
+
+Use `/` for the root, `/mal-core/`, `/agents/`, `/data/`, etc. for subdirectories.
+All paths must start with `/` and be relative to the project root.
+
 ### Dispatching Specialists
 
 Always prefix the task string with one of:
