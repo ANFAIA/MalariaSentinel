@@ -99,14 +99,32 @@ D16_suitability_auc:
   hard_floor: 0.40
   source: "Mordecai 2013 thermal response + MCE weighted overlay; AUC lower CI > 0.65 vs larval sites"
 
-D17_pool_persistence:
+D19_pool_persistence:
   min_score: 0.70
   max_delta: -0.20
   hard_floor: 0.30
   source: "Depinay 2004 §3.1: pool persistence in West Africa; Ward 2015: pan evaporation 5-8 mm/day"
 
-D18_washout_response:
+D20_washout_response:
   min_score: 0.70
   max_delta: -0.20
   hard_floor: 0.30
   source: "wire.hpp:148-150: daily rain >40mm correlates negatively with larval density (washout)"
+
+D21_spread_rate:
+  min_score: 0.70
+  max_delta: -0.25
+  hard_floor: 0.30
+  source: "Thomas 2013: p90 = 1.28 km at day 1; 5-20 km at day 180"
+
+D22_host_clustering:
+  min_score: 0.60
+  max_delta: -0.25
+  hard_floor: 0.30
+  source: "Depinay 2004; North & Godfray 2018: settlement-to-settlement dispersal"
+
+D23_oviposition_fidelity:
+  min_score: 0.60
+  max_delta: -0.25
+  hard_floor: 0.30
+  source: "Lindh 2015: gravid site preference; Mwingira 2020: chemical attractants"

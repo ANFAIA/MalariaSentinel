@@ -1,4 +1,4 @@
-"""Composite score: weighted geometric mean of D1..D18."""
+"""Composite score: weighted geometric mean of D1..D23."""
 from __future__ import annotations
 import math
 from scorers.base import ScorerResult
@@ -12,12 +12,11 @@ DEFAULT_WEIGHTS: dict[str, float] = {
     "D14_mobility_conservation": 2.0,
     "D15_long_horizon_persistence": 3.0,
     "D16_suitability_auc": 2.0,
-    "D17_pool_persistence": 0.5,
-    "D18_washout_response": 0.5,
-    # Plan D spatial scorers (kernel expansion + oviposition).
-    "D16_spread_rate": 0.15,
-    "D17_host_clustering": 0.10,
-    "D18_oviposition_fidelity": 0.10,
+    "D19_pool_persistence": 0.5,
+    "D20_washout_response": 0.5,
+    "D21_spread_rate": 0.15,
+    "D22_host_clustering": 0.10,
+    "D23_oviposition_fidelity": 0.10,
 }
 
 def geometric_mean(scores: dict[str, ScorerResult], weights: dict[str, float] | None = None) -> float:
