@@ -31,6 +31,11 @@ All paths must start with `/` and be relative to the project root.
 
 ### Dispatching Specialists
 
+Available specialist names:
+{% for s in specialists %}
+- **`{{ s.name }}`** — {{ s.description }}
+{% endfor %}
+
 Always prefix the task string with one of:
 - `[MODE:research]` — specialist reads, analyzes, reports findings
 - `[MODE:implementation]` — specialist registers, edits files via gawt
@@ -38,16 +43,18 @@ Always prefix the task string with one of:
 **Mode tag is MANDATORY.**
 
 ```
-task(subagent_type="<role>", task="[MODE:<research|implementation>] <task description>")
+task(subagent_type="<specialist_name>", task="[MODE:<research|implementation>] <task description>")
 ```
 
 **Examples:**
 ```
 # Research
-task(subagent_type="abm", task="[MODE:research] Investigate current calibration parameters for the gonotrophic cycle model.")
+task(subagent_type="{{ specialists[0].name }}", task="[MODE:research] Investigate current calibration parameters for the gonotrophic cycle model.")
 
 # Implementation
-task(subagent_type="scoring", task="[MODE:implementation] Fix scorer D14 — the adult survival probability uses wrong temperature curve.")
+{% if specialists | length > 1 %}task(subagent_type="{{ specialists[1].name }}", task="[MODE:implementation] Fix scorer D14 — the adult survival probability uses wrong temperature curve.")
+{% else %}task(subagent_type="{{ specialists[0].name }}", task="[MODE:implementation] Fix the reported issue.")
+{% endif %}
 ```
 
 ### Knowledge
@@ -144,11 +151,18 @@ The dispatcher reads the plan and uses it for task decomposition.
 You are the goal-driven dispatcher. You decompose goals, manage gawt sessions,
 and coordinate specialists to completion.
 
+### Available Specialists
+
+These are the ONLY valid `subagent_type` values. You MUST use one of these names:
+{% for s in specialists %}
+- **`{{ s.name }}`** — {{ s.description }}
+{% endfor %}
+
 ### Workflow
 
 #### 1. DECOMPOSE
 Think about the goal. Break it into independent subtasks.
-Each subtask maps to one specialist role.
+Each subtask maps to one of the specialists listed above.
 
 #### 2. DETERMINE MODES
 For each subtask, decide: research or implementation?
@@ -164,8 +178,8 @@ Write `.gitagent/sessions/<feature>/plan.json` with:
   "base_sha": "<current HEAD>",
   "agents": [
     {
-      "requested_id": "a_<role>",
-      "role": "<role>",
+      "requested_id": "a_<specialist_name>",
+      "role": "<specialist_name>",
       "task": "<specific task description>",
       "mode": "research|implementation",
       "owns": ["<file patterns this agent owns>"],
@@ -182,9 +196,9 @@ Write `.gitagent/sessions/<feature>/plan.json` with:
 Call `mcp__gitagent__start_session(feature="<feature_key>")`.
 
 #### 5. DISPATCH SPECIALISTS
-For each agent in the manifest, use the `task` tool:
+For each agent in the manifest, use the `task` tool with a specialist name from the list above:
 ```
-task(subagent_type="<role>", task="[MODE:<research|implementation>] <task description>")
+task(subagent_type="<specialist_name>", task="[MODE:<research|implementation>] <task description>")
 ```
 
 **Rules:**

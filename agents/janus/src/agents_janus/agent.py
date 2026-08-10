@@ -114,6 +114,14 @@ def _import_abm_score():
 
 def _render_prompt(mode: Literal["centinela", "dispatcher"]) -> str:
     """Render the orchestrator prompt from the Jinja2 template."""
+    # Load specialist list from registry for programmatic injection
+    from agents_janus.subagents.registry import load_registry
+    registry = load_registry()
+    specialists = [
+        {"name": name, "description": spec.description}
+        for name, spec in registry.all().items()
+    ]
+
     try:
         from jinja2 import Environment, FileSystemLoader
         env = Environment(
@@ -121,7 +129,7 @@ def _render_prompt(mode: Literal["centinela", "dispatcher"]) -> str:
             keep_trailing_newline=True,
         )
         template = env.get_template(_ORCHESTRATOR_PROMPT_TEMPLATE.name)
-        return template.render(mode=mode)
+        return template.render(mode=mode, specialists=specialists)
     except Exception:
         # Fallback to legacy static prompt (dispatcher only)
         if _ORCHESTRATOR_PROMPT_LEGACY.exists():
@@ -268,13 +276,31 @@ def create_orchestrator(
     global OBSERVABILITY_MIDDLEWARE
 
     try:
-        from deepagents import create_deep_agent, FilesystemPermission
+        from deepagents import (
+            create_deep_agent,
+            FilesystemPermission,
+            GeneralPurposeSubagentProfile,
+            HarnessProfile,
+            register_harness_profile,
+        )
         from deepagents.backends import FilesystemBackend
     except ImportError:
         raise ImportError(
             "The 'deepagents' package is required but not installed. "
             "Install it with: pip install 'mal-janus' or pip install deepagents"
         )
+
+    # Disable the auto-added general-purpose subagent so the LLM only sees
+    # our specialist subagents (abm, scoring, ingest, etc.). Without this,
+    # deepagents inserts "general-purpose" at position 0 and the LLM defaults
+    # to it because the built-in TASK_TOOL_DESCRIPTION has 5 examples all
+    # using "general-purpose".
+    register_harness_profile(
+        "openrouter",
+        HarnessProfile(
+            general_purpose_subagent=GeneralPurposeSubagentProfile(enabled=False),
+        ),
+    )
 
     llm = _resolve_provider(provider, model)
 
