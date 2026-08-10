@@ -44,6 +44,10 @@ class PatchState:
         Daily water temperature (C) at the patch's centroid.
     water_frac : float
         Fraction of the patch's cell covered by open water, ∈ [0, 1].
+    pool_water_mm : float
+        Current pool water depth (mm) from the water-balance model (M14).
+    pool_days_dry : int
+        Consecutive days with water below the dry threshold (M14).
     """
 
     patch_id: int
@@ -53,6 +57,8 @@ class PatchState:
     rain_d: float
     temp_d: float
     water_frac: float
+    pool_water_mm: float = 0.0
+    pool_days_dry: int = 0
 
 
 #: Polars schema for the per-day patch-state DataFrame exchanged between
@@ -66,6 +72,8 @@ PATCH_STATE_SCHEMA: dict[str, pl.DataType] = {
     "rain_d": pl.Float32,
     "temp_d": pl.Float32,
     "water_frac": pl.Float32,
+    "pool_water_mm": pl.Float32,
+    "pool_days_dry": pl.Int32,
 }
 
 
@@ -86,6 +94,8 @@ def patch_states_to_dataframe(states: list[PatchState]) -> pl.DataFrame:
             "rain_d": [s.rain_d for s in states],
             "temp_d": [s.temp_d for s in states],
             "water_frac": [s.water_frac for s in states],
+            "pool_water_mm": [s.pool_water_mm for s in states],
+            "pool_days_dry": [s.pool_days_dry for s in states],
         },
         schema=PATCH_STATE_SCHEMA,
     )

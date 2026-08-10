@@ -74,6 +74,12 @@ from rasterio.transform import from_bounds
 from .climate import ClimateEngine
 from .habitat_engine import HabitatEngine
 from .patch_state import PATCH_STATE_SCHEMA
+from .pool_hydrology import (
+    POOL_WATER_BREED_MM,
+    PoolState,
+    DailyForcing,
+    advance_pool,
+)
 from .scheduler import RandomActivationByTypeShim
 
 if TYPE_CHECKING:
@@ -153,6 +159,9 @@ class CoordinatorModel(mesa.Model):
         # reuses the same ``patch_id``).
         self._dynamic_patch_registry: dict[tuple[int, int], int] = {}
         self._next_dynamic_patch_id: int = len(self.habitat_engine.patches)
+        # Pool hydrology (M14): per-cell water state for dynamic patches.
+        # Pre-existing patches store pool_state on the HabitatPatch agent.
+        self._dynamic_pool_states: dict[tuple[int, int], PoolState] = {}
 
     # -- cell-index helpers --------------------------------------------------
 
@@ -286,15 +295,49 @@ class CoordinatorModel(mesa.Model):
         rain_d = rain_grid[rows, cols].astype(np.float32, copy=False)
         water_frac = water_frac_grid[rows, cols].astype(np.float32, copy=False)
         temp_d = temp_grid[rows, cols].astype(np.float32, copy=False)
+
+        # Pool hydrology (M14): advance pool state for each active cell.
+        # Pre-existing patches already have pool_state from activate().
+        # Dynamic patches need pool state tracked here.
+        activated_arr = np.zeros(pids.size, dtype=bool)
+        pool_water_arr = np.zeros(pids.size, dtype=np.float32)
+        pool_days_dry_arr = np.zeros(pids.size, dtype=np.int32)
+
+        # Build pre-existing patch_id → pool_state lookup.
+        # patch_id is the index in habitat_engine.patches.
+        pre_pool: dict[int, PoolState] = {}
+        for idx, patch in enumerate(self.habitat_engine.patches):
+            pre_pool[idx] = patch.pool_state
+
+        for i in range(pids.size):
+            pid = int(pids[i])
+            cell = (int(rows[i]), int(cols[i]))
+            r = float(rain_d[i])
+            t = float(temp_d[i])
+            if pid in pre_pool:
+                # Pre-existing patch: pool_state already updated by activate().
+                pool = pre_pool[pid]
+            else:
+                # Dynamic patch: advance pool state.
+                prev = self._dynamic_pool_states.get(cell, PoolState())
+                forcing = DailyForcing(rain_mm=r, temp_c=t)
+                pool = advance_pool(prev, forcing)
+                self._dynamic_pool_states[cell] = pool
+            activated_arr[i] = pool.water_mm >= POOL_WATER_BREED_MM
+            pool_water_arr[i] = np.float32(pool.water_mm)
+            pool_days_dry_arr[i] = np.int32(pool.days_dry)
+
         return pl.DataFrame(
             {
                 "patch_id": pids,
                 "row": rows,
                 "col": cols,
-                "activated": np.ones(pids.size, dtype=bool),
+                "activated": activated_arr,
                 "rain_d": rain_d,
                 "temp_d": temp_d,
                 "water_frac": water_frac,
+                "pool_water_mm": pool_water_arr,
+                "pool_days_dry": pool_days_dry_arr,
             },
             schema=PATCH_STATE_SCHEMA,
         )

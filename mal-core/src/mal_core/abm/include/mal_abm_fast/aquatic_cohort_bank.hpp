@@ -24,6 +24,7 @@
 
 #include "wire.hpp"
 #include "aquatic_stages.hpp"
+#include "pool_hydrology.hpp"
 
 namespace mal_abm_fast {
 
@@ -130,8 +131,14 @@ private:
     // Helper: apply stage-specific mortality (eggs, pupae).
     void stage_mortality(const std::vector<PatchState>& patch_states);
 
-    // Helper: desiccation for eggs and early instars at inactive patches.
+    // Helper: desiccation for eggs and early instars at dry patches.
+    // Uses pool water level and days_dry from PoolState (M14).
     void desiccation(const std::vector<PatchState>& patch_states);
+
+    // Helper: washout from heavy rain — flushes a fraction of all
+    // aquatic cohorts (eggs, larvae, pupae) at patches experiencing
+    // rain >= POOL_RAIN_WASH_MM (M14).
+    void washout(const std::vector<PatchState>& patch_states);
 
     // Helper: compute cell (row, col) for a patch_id from patch_states.
     bool patch_to_cell(int64_t patch_id, const std::vector<PatchState>& ps,

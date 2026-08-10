@@ -26,6 +26,14 @@ from mesa_geo.geoagent import GeoAgent
 if TYPE_CHECKING:
     from .patch_state import PatchState
 
+from .pool_hydrology import (
+    POOL_WATER_BREED_MM,
+    POOL_WATER_DRY_MM,
+    PoolState,
+    DailyForcing,
+    advance_pool,
+)
+
 
 class HabitatType(str, Enum):
     """Habitat subtype enum. M1 only uses ``PLUVIAL_POOL``; the rest are inert."""
@@ -65,6 +73,8 @@ class HabitatPatch(GeoAgent):
         self.water_temp_c: float = 25.0
         self.twi_value: float = float(twi_value)
         self.predator_pressure: float = 0.0
+        # Pool hydrology (M14): per-patch water-balance state.
+        self.pool_state: PoolState = PoolState()
 
     def step(self) -> None:
         """Mesa-Geo agent step. The M1 scheduler calls this once per day.
@@ -78,11 +88,16 @@ class HabitatPatch(GeoAgent):
     def activate(self, rain_24h: float, water_temp_c: float) -> None:
         """Activate/deactivate the patch based on daily rain and water temperature.
 
-        ``PLUVIAL_POOL`` activation rule (M1 v1): ``rain_24h > RAIN_THRESHOLD_MM``.
+        ``PLUVIAL_POOL`` activation rule (M14): uses pool water-balance
+        model. The patch is active when ``pool_state.water_mm >= POOL_WATER_BREED_MM``.
         """
         self.rain_24h = float(rain_24h)
         self.water_temp_c = float(water_temp_c)
-        self.activated = bool(rain_24h > self.RAIN_THRESHOLD_MM)
+        # Advance pool hydrology.
+        forcing = DailyForcing(rain_mm=rain_24h, temp_c=water_temp_c)
+        self.pool_state = advance_pool(self.pool_state, forcing)
+        # Activation depends on water level, not binary rain threshold.
+        self.activated = bool(self.pool_state.water_mm >= POOL_WATER_BREED_MM)
 
     def to_patch_state(
         self,
@@ -112,6 +127,8 @@ class HabitatPatch(GeoAgent):
             rain_d=float(self.rain_24h if rain_d is None else rain_d),
             temp_d=float(self.water_temp_c if temp_d is None else temp_d),
             water_frac=float(0.5 if water_frac is None else water_frac),
+            pool_water_mm=float(self.pool_state.water_mm),
+            pool_days_dry=int(self.pool_state.days_dry),
         )
 
     def mortality(self, N: int, *, density_dep: bool = True) -> int:

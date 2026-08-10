@@ -26,6 +26,7 @@
 #include "habitat_engine.hpp"
 #include "mosquito_submodel.hpp"
 #include "output_contract.hpp"
+#include "pool_hydrology.hpp"
 #include "seeding.hpp"
 #include "wire.hpp"
 
@@ -82,20 +83,15 @@ std::vector<PatchState> CoordinatorModel::to_dataframe() {
     std::unordered_set<std::pair<int32_t, int32_t>, PairHash> union_cells;
     union_cells.reserve(pre_rowcol_to_pid.size() + hw);
 
+    // Pre-existing habitat patches (rivers, lakes, wetlands from gpkg).
+    // They share the same water-balance rule; permanent water bodies
+    // maintain water_mm >= W_BREED because their water_frac is high.
     for (const auto& patch : habitat_.patches()) {
-        // Pre-existing habitat patches are always activated. They
-        // represent permanent water features (rivers, lakes, wetlands)
-        // identified at habitat-engine build time, NOT ephemeral
-        // pluvial pools that come and go with daily rain. The
-        // PLUVIAL_POOL_RAIN_THRESHOLD_MM rule below still gates the
-        // dynamic ephemeral-pool rule (cells satisfying
-        // twi > THRESHOLD AND water_frac > MIN AND rain > 50 mm/day).
-        // The viability filter in build_seed_instructions
-        // (water_frac > 0.05 AND twi > 8) is independent of daily rain.
-        (void)climate_->rain_at(patch.row, patch.col);
         union_cells.insert({patch.row, patch.col});
     }
 
+    // Dynamic ephemeral pool rule: TWI > 8 AND water_frac > 0 AND
+    // rain > 15mm. Cells satisfying this get a PoolState tracked.
     const std::vector<float> twi = climate_->twi_grid();
     const bool has_twi = (twi.size() == hw);
     for (int32_t r = 0; r < H; ++r) {
@@ -129,14 +125,37 @@ std::vector<PatchState> CoordinatorModel::to_dataframe() {
                 dynamic_patch_registry_[cell] = pid;
             }
         }
+
+        // Advance pool hydrology for this patch.
+        const float rain_val = climate_->rain_at(cell.first, cell.second);
+        const float temp_val = climate_->temp_at(cell.first, cell.second);
+        DailyForcing forcing{rain_val, temp_val};
+
+        auto pool_it = pool_states_.find(pid);
+        if (pool_it == pool_states_.end()) {
+            // First day this patch is tracked — initialise from rain.
+            PoolState init;
+            init.water_mm = rain_val;
+            init.days_dry = (rain_val < POOL_WATER_DRY_MM) ? 1 : 0;
+            init.days_since_fill = (rain_val > PLUVIAL_POOL_RAIN_THRESHOLD_MM)
+                ? 0 : 1;
+            pool_states_[pid] = init;
+        } else {
+            pool_states_[pid] = advance_pool(pool_it->second, forcing);
+        }
+
+        const PoolState& pool = pool_states_[pid];
+
         PatchState ps;
         ps.patch_id = pid;
         ps.row = cell.first;
         ps.col = cell.second;
-        ps.activated = true;
-        ps.rain_d = climate_->rain_at(cell.first, cell.second);
-        ps.temp_d = climate_->temp_at(cell.first, cell.second);
+        ps.activated = (pool.water_mm >= POOL_WATER_BREED_MM);
+        ps.rain_d = rain_val;
+        ps.temp_d = temp_val;
         ps.water_frac = climate_->water_frac_at(cell.first, cell.second);
+        ps.pool_water_mm = pool.water_mm;
+        ps.pool_days_dry = pool.days_dry;
         states.push_back(ps);
     }
 

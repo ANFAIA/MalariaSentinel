@@ -151,9 +151,19 @@ mal_abm_fast run --n-rollouts 3 \
 | `ADULT_DISPERSE_SIGMA_M`        | 1000.0 | dispersal kernel sigma (m)               |
 | `ADULT_DISPERSE_MAX_M`          | 2000.0 | dispersal cap (m)                        |
 | `BIRTH_RATE`                    | 0.005  | binomial per active patch                |
-| `PLUVIAL_POOL_RAIN_THRESHOLD_MM`| 15.0   | dynamic patch rule (rain)                |
+| `PLUVIAL_POOL_RAIN_THRESHOLD_MM`| 15.0   | dynamic patch rule (rain); also refill threshold |
 | `PLUVIAL_POOL_TWI_THRESHOLD`    | 8.0    | dynamic patch rule (TWI)                 |
 | `PLUVIAL_POOL_WATER_FRAC_MIN`   | 0.0    | dynamic patch rule (water; strictly > 0) |
+| `POOL_WATER_BREED_MM`           | 5.0    | min water depth for oviposition (M14)    |
+| `POOL_WATER_DRY_MM`             | 1.0    | below this: larvae desiccate (M14)       |
+| `POOL_WATER_MAX_MM`             | 500.0  | cap to prevent runaway accumulation (M14)|
+| `POOL_RAIN_WASH_MM`             | 40.0   | heavy rain: washout event (M14)          |
+| `POOL_DESICCATION_GRACE_DAYS`   | 5      | grace before desiccation starts (M14)    |
+| `POOL_EVAP_REF_MM`              | 5.0    | reference evap at 30°C mm/day (M14)      |
+| `POOL_EVAP_REF_T`               | 30.0   | reference temperature °C (M14)           |
+| `POOL_EVAP_T_COEFF`             | 0.07   | fractional evap change per °C (M14)      |
+| `POOL_WASH_FRACTION_MAX`        | 0.6    | max washout fraction at 2*WASH (M14)     |
+| `POOL_DESICC_BASE_DAILY`        | 0.10   | baseline desiccation after grace (M14)   |
 | `NODATA_SENTINEL`               | -9999.0| state COG nodata                         |
 | `CONTRACT_VERSION`              | "2.0"  | sidecar (breaking change from v1.x COG)         |
 | `GENERATOR_VERSION`             | "m1.5-mesa-frames+polars" | sidecar                  |

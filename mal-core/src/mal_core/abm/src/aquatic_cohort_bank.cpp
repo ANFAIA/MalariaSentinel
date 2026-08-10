@@ -22,6 +22,7 @@
 #include <unordered_map>
 #include <utility>
 
+#include "mal_abm_fast/pool_hydrology.hpp"
 #include "mal_abm_fast/thermal_responses.hpp"
 
 namespace mal_abm_fast {
@@ -140,14 +141,21 @@ bool AquaticCohortBank::patch_to_cell(
 }
 
 // ---------------------------------------------------------------------------
-// desiccation — kill eggs and early instars at inactive patches
+// desiccation — kill eggs and early instars at dry patches (M14)
+//
+// Uses the per-patch PoolState carried in PatchState.pool_water_mm and
+// PatchState.pool_days_dry. The desiccation_rate() function from
+// pool_hydrology.hpp handles the grace period and temperature ramp.
 // ---------------------------------------------------------------------------
 void AquaticCohortBank::desiccation(
     const std::vector<PatchState>& patch_states) {
-    // Build active set
-    std::unordered_map<int64_t, bool> active;
+    // Build lookup: patch_id → PoolState fields
+    std::unordered_map<int64_t, PoolState> pool_by_patch;
     for (const auto& ps : patch_states) {
-        active[ps.patch_id] = ps.activated;
+        PoolState pool;
+        pool.water_mm = ps.pool_water_mm;
+        pool.days_dry = ps.pool_days_dry;
+        pool_by_patch[ps.patch_id] = pool;
     }
 
     for (auto& c : cohorts_) {
@@ -161,13 +169,44 @@ void AquaticCohortBank::desiccation(
         }
         if (!vulnerable) continue;
 
-        auto it = active.find(c.patch_id);
-        if (it == active.end() || !it->second) {
-            // Inactive patch — apply desiccation
-            const int64_t deaths = static_cast<int64_t>(
-                std::llround(static_cast<double>(c.count) * AQUATIC_DESICCATION_DAILY_RATE));
-            c.count -= std::min(deaths, c.count);
-        }
+        auto it = pool_by_patch.find(c.patch_id);
+        if (it == pool_by_patch.end()) continue;  // patch not tracked
+        const float rate = desiccation_rate(it->second);
+        if (rate <= 0.0f) continue;
+
+        const int64_t deaths = static_cast<int64_t>(
+            std::llround(static_cast<double>(c.count) * rate));
+        c.count -= std::min(deaths, c.count);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// washout — flush aquatic cohorts during heavy rain (M14)
+//
+// Heavy rain (>= POOL_RAIN_WASH_MM) washes larvae out of pools.
+// Applies to eggs, larvae, and pupae. Adult washout is NOT modelled
+// (mosquitoes are not aquatic; they can shelter).
+// ---------------------------------------------------------------------------
+void AquaticCohortBank::washout(
+    const std::vector<PatchState>& patch_states) {
+    // Build lookup: patch_id → rain_d
+    std::unordered_map<int64_t, float> rain_by_patch;
+    for (const auto& ps : patch_states) {
+        rain_by_patch[ps.patch_id] = ps.rain_d;
+    }
+
+    std::mt19937_64 rng(789);  // deterministic for reproducibility
+    for (auto& c : cohorts_) {
+        if (c.count <= 0) continue;
+        auto it = rain_by_patch.find(c.patch_id);
+        if (it == rain_by_patch.end()) continue;
+        const float frac = washout_fraction(it->second);
+        if (frac <= 0.0f) continue;
+
+        const double p = static_cast<double>(frac);
+        std::binomial_distribution<int64_t> dist(c.count, p);
+        const int64_t flushed = dist(rng);
+        c.count -= std::min(flushed, c.count);
     }
 }
 
@@ -304,10 +343,13 @@ void AquaticCohortBank::advance_day(
     const RuntimeOverrides& overrides) {
     if (cohorts_.empty()) return;
 
-    // 1. Desiccation (eggs + early instars at inactive patches)
+    // 1. Desiccation (eggs + early instars at dry patches)
     desiccation(patch_states);
 
-    // 2. Stage mortality (egg/pupa background, larva density-dependent)
+    // 2. Washout (heavy rain flushes aquatic cohorts)
+    washout(patch_states);
+
+    // 3. Stage mortality (egg/pupa background, larva density-dependent)
     stage_mortality(patch_states);
     larva_mortality_density(overrides);
 

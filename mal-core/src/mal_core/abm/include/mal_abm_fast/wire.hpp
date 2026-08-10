@@ -66,6 +66,21 @@ inline constexpr float  WIND_FLIGHT_HOURS      = 4.0f;   // hours of wind advect
 inline constexpr float  WIND_SURVIVAL          = 0.85f;  // flight survival
 inline constexpr float  WIND_FLIGHT_SPEED_MS   = 1.0f;   // self-propelled speed
 
+// Host-seeking plume parameters (Plan D).
+// CO₂ + body-odour plume: kScale=100m (Giraldo 2023, Spitzen 2013,
+// Okumu 2013). search_radius=300m (Yang 2009: 94% malaria reduction
+// when habitats within 300m of houses are eliminated).
+inline constexpr float  HOST_SEEKING_SCALE_M         = 100.0f;
+inline constexpr float  HOST_SEEKING_RADIUS_M        = 300.0f;
+inline constexpr int    HOST_SEEKING_STARVATION_DAYS  = 7;
+
+// Oviposition-seeking plume parameters (Plan D).
+// Water-vapour + VOC plume: kScale=50m (Okal 2013), radius=500m
+// (Okal 2013, Lindh 2015: 9+m semi-field scaled up).
+inline constexpr float  OVIPOSITION_SCALE_M          = 50.0f;
+inline constexpr float  OVIPOSITION_RADIUS_M         = 500.0f;
+inline constexpr int    OVIPOSITION_SEEKING_TIMEOUT_DAYS = 7;
+
 // Per-adult per-day fecundity: binomial(n_adults/2, BIRTH_FECUNDITY) new larvae.
 // Tuned so the population stays near the initial seeded count on the
 // 30k-patch, 30-day M1.5 perf budget. The M1.5 perf baseline; raising
@@ -152,6 +167,25 @@ inline constexpr float  PLUVIAL_POOL_RAIN_THRESHOLD_MM = 15.0f;
 inline constexpr float  PLUVIAL_POOL_TWI_THRESHOLD  = 8.0f;
 inline constexpr float  PLUVIAL_POOL_WATER_FRAC_MIN = 0.0f;  // strictly > 0
 
+// Pool hydrology (M14) — per-patch water-balance model.
+// All water amounts in mm (same units as CHIRPS daily rainfall).
+// Activation: patch is active when water_mm >= POOL_WATER_BREED_MM.
+// Desiccation: eggs + L1-L2 die when water_mm < POOL_WATER_DRY_MM
+//   after a grace period of POOL_DESICCATION_GRACE_DAYS dry days.
+// Washout: heavy rain (>= POOL_RAIN_WASH_MM) flushes a fraction of
+//   aquatic cohorts. Linear from 0 at WASH to WASH_FRACTION_MAX at 2*WASH.
+// Evaporation: simplified Penman-Monteith (FAO 1998, Ward 2015).
+inline constexpr float  POOL_WATER_BREED_MM         = 5.0f;    // min depth for oviposition
+inline constexpr float  POOL_WATER_DRY_MM           = 1.0f;    // below this: larvae desiccate
+inline constexpr float  POOL_WATER_MAX_MM           = 500.0f;  // cap to prevent runaway accumulation
+inline constexpr float  POOL_RAIN_WASH_MM           = 40.0f;   // heavy rain: washout event
+inline constexpr float  POOL_DESICCATION_GRACE_DAYS = 5.0f;    // grace before desiccation starts
+inline constexpr float  POOL_EVAP_REF_MM            = 5.0f;    // reference evap at 30°C (mm/day)
+inline constexpr float  POOL_EVAP_REF_T             = 30.0f;   // reference temperature (°C)
+inline constexpr float  POOL_EVAP_T_COEFF           = 0.07f;   // fractional change per °C from ref
+inline constexpr float  POOL_WASH_FRACTION_MAX      = 0.6f;    // at rain=80mm, 60% larvae flushed
+inline constexpr float  POOL_DESICC_BASE_DAILY      = 0.10f;   // baseline desiccation after grace
+
 // Habitat-engine build-time filter: a gpkg patch is loaded only if
 // its TWI exceeds this threshold. TWI is a static terrain signal
 // (Topographic Wetness Index, derived from the SRTM DEM) and should
@@ -216,13 +250,16 @@ struct AOI {
 // coordinator hands to the MosquitoSubmodel. Mirrors the Polars
 // patch_state.PATCH_STATE_SCHEMA in the Python engine.
 struct PatchState {
-    int64_t patch_id  = 0;
-    int32_t row       = 0;
-    int32_t col       = 0;
-    bool    activated = false;
-    float   rain_d    = 0.0f;     // mm, today's daily rainfall at the cell
-    float   temp_d    = 25.0f;    // deg C, post Mordecai inverse (EIP uses T)
-    float   water_frac = 0.0f;    // [0, 1], open-water fraction in the cell
+    int64_t patch_id      = 0;
+    int32_t row           = 0;
+    int32_t col           = 0;
+    bool    activated     = false;
+    float   rain_d        = 0.0f;     // mm, today's daily rainfall at the cell
+    float   temp_d        = 25.0f;    // deg C, post Mordecai inverse (EIP uses T)
+    float   water_frac    = 0.0f;     // [0, 1], open-water fraction in the cell
+    // Pool hydrology (M14).
+    float   pool_water_mm = 0.0f;     // current pool water depth (mm)
+    int     pool_days_dry = 0;        // consecutive dry days
 };
 
 // A single habitat patch loaded from the gpkg. Carries the cell (row, col),

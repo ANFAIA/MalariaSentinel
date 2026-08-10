@@ -31,6 +31,8 @@ class InterventionConfig(BaseModel):
 class ClimateConfig(BaseModel):
     rainfall_anomaly: float = Field(default=0.0, ge=-1.0, le=1.0)
     temperature_anomaly: float = Field(default=0.0, ge=-5.0, le=5.0)
+    evaporation_multiplier: float = Field(default=1.0, ge=0.0, le=2.0)
+    washout_multiplier: float = Field(default=1.0, ge=0.0, le=2.0)
 
 
 class ScenarioConfig(BaseModel):
@@ -67,4 +69,6 @@ def interventions_to_params(scenario: ScenarioConfig) -> dict[str, Any]:
             params[key] = params.get(key, 1.0) * (1.0 - iv.coverage * (1.0 - value))
     params["rainfall_multiplier"] = 1.0 + scenario.climate.rainfall_anomaly
     params["temperature_offset"] = scenario.climate.temperature_anomaly
+    params["evaporation_multiplier"] = scenario.climate.evaporation_multiplier
+    params["washout_multiplier"] = scenario.climate.washout_multiplier
     return params

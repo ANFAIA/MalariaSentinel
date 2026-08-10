@@ -79,7 +79,7 @@ D13_host_seeking_distance:
   min_score: 0.60
   max_delta: -0.25
   hard_floor: 0.30
-  source: "Takken et al. 1998: CO2 plume 20-70m; Costantini 1996: 35m baseline"
+  source: "Yang 2009: 300m = 94% malaria reduction; Giraldo 2023: 60m CO2 plume; Okumu 2013: 70m significant attraction; Spitzen 2013: 60-70m nocturnal"
 
 D14_mobility_conservation:
   min_score: 0.90
@@ -98,3 +98,15 @@ D16_suitability_auc:
   max_delta: -0.25
   hard_floor: 0.40
   source: "Mordecai 2013 thermal response + MCE weighted overlay; AUC lower CI > 0.65 vs larval sites"
+
+D17_pool_persistence:
+  min_score: 0.70
+  max_delta: -0.20
+  hard_floor: 0.30
+  source: "Depinay 2004 §3.1: pool persistence in West Africa; Ward 2015: pan evaporation 5-8 mm/day"
+
+D18_washout_response:
+  min_score: 0.70
+  max_delta: -0.20
+  hard_floor: 0.30
+  source: "wire.hpp:148-150: daily rain >40mm correlates negatively with larval density (washout)"

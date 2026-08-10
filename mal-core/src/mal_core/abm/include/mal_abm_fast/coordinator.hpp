@@ -62,6 +62,7 @@
 #include "aoi.hpp"
 #include "climate.hpp"
 #include "habitat_engine.hpp"
+#include "pool_hydrology.hpp"
 #include "prng.hpp"
 #include "seeding.hpp"
 #include "wire.hpp"
@@ -183,6 +184,8 @@ private:
     std::unordered_map<std::pair<int32_t, int32_t>, int64_t, PairHash> dynamic_patch_registry_;
     int64_t                              next_dynamic_patch_id_ = 0;
     std::vector<PatchState>                   cached_states_;  // per-day snapshot
+    // Pool hydrology (M14): per-patch water state, keyed by patch_id.
+    std::unordered_map<int64_t, PoolState>     pool_states_;
 };
 
 }  // namespace mal_abm_fast
