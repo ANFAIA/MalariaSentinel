@@ -79,7 +79,10 @@ EIP_THRESHOLD_GD: float = 110.0
 #: Per-day adult dispersal probability.
 ADULT_DISPERSE_PROB: float = 0.2
 #: Dispersal kernel sigma (m), for ``An. gambiae`` s.s. rural.
-ADULT_DISPERSE_SIGMA_M: float = 1000.0
+#: Sigma=450m: midpoint of Costantini et al. 1996 (350-650 m/day,
+#: Burkina Faso MRR) and Thomas et al. 2013 (median 386m, The Gambia).
+#: Matches authoritative C++ value in wire.hpp.
+ADULT_DISPERSE_SIGMA_M: float = 450.0
 #: Dispersal cap (m).
 ADULT_DISPERSE_MAX_M: float = 2000.0
 

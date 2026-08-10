@@ -14,16 +14,18 @@
 //   indoor_modifier = 1 + indoor_fraction × (endophilic_ratio - 1)
 //   urban_modifier  = 1 + 0.2 × urbanicity  (urban hosts are more
 //                      detectable due to concentrated CO₂)
-//   scale           = 35m (baseline detection distance for CO₂ plume)
+//   scale           = 100m (CO₂ + body-odour plume, Plan D)
 //
 // Biological basis:
-//   - CO₂ plume: km-scale detection, modelled by exponential decay
-//   - Thermal plume: m-scale, not modelled explicitly (subsumed into
-//     indoor_modifier for close-range detection)
+//   - CO₂ plume: ~60m detection (Giraldo 2023), significant at 70m
+//     (Okumu 2013), activates at 100m (Okumu 2013)
+//   - Body odour: >CO₂ for long-range (Giraldo 2023)
+//   - 300m: 94% malaria reduction when habitats removed (Yang 2009)
 //   - Host preference: de facto anthropophily (Takken et al. 1998)
 #pragma once
 
 #include <cstdint>
+#include <optional>
 #include <utility>
 #include <vector>
 
@@ -70,7 +72,7 @@ public:
         int32_t mosquito_row, int32_t mosquito_col,
         const HostLandscape& landscape,
         const AOI& aoi,
-        float search_radius_m = 70.0f) const;
+        float search_radius_m = 300.0f) const;
 
     /// Stochastically select a host type from the attraction field.
     /// Returns the dominant host type if the field is empty.
@@ -89,6 +91,16 @@ public:
     /// Mutable access to host preference weights.
     HostPreference& preference() { return pref_; }
     const HostPreference& preference() const { return pref_; }
+
+    /// Detect the best host cell within `range_m` of the mosquito.
+    /// Returns the (row, col) of the cell with highest attraction
+    /// where attraction > 0.5, or nullopt if no host found.
+    /// O(N) per call; caches results per (row, col, day).
+    std::optional<std::pair<int32_t, int32_t>> detect_host_cell(
+        int32_t mosquito_row, int32_t mosquito_col,
+        const HostLandscape& landscape,
+        const AOI& aoi,
+        double range_m = 2000.0) const;
 
 private:
     HostPreference pref_;

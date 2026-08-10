@@ -3,7 +3,8 @@
 | Field | Value |
 |---|---|
 | **Plan ID** | B |
-| **Status** | proposed |
+| **Status** | superseded-by: plan-D |
+| **Superseded** | Plan D absorbs Phases 1–2 (kernel expansion + directed flight) + Phase 4 (patch tracking). F1.e prerequisite completed in Plan D. |
 | **Hypothesis** | A *Anopheles* female in the `HOST_SEEKING` state performs **active, directed upwind flight** toward a detected host plume; replacing the current isotropic random walk with a one-cell-per-day step along the existing (but currently unused) `HostSeekingModel::approach_vector` is the dominant spatial-spread mechanism the current ABM is missing. |
 | **Risk class** | Medium — touches the state machine, two existing dead-code paths, and adds a starvation timer. |
 | **Effort** | ~3 sessions |

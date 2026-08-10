@@ -806,9 +806,9 @@ PRNG xoshiro256** canonico. Dos runs con mismo `(seed, i, days, AOI, env, habita
 ctest --test-dir mal-core/src/mal_core/abm/build --output-on-failure
 # 60 tests
 
-# Python parity test (F1.e)
-cd mal-core && uv run pytest src/mal_core/abm/tests/test_abm_fast_parity.py -v
-# 5 tests, tolerance: max(2e-2 abs, 12% rel)
+# Calibration scorers (F1.e — replaces parity test)
+cd mal-core/src/mal_core/abm/tests/calibration && uv run pytest -m fast -v
+# 10 scorers + composite
 ```
 
 ### Build (macOS)

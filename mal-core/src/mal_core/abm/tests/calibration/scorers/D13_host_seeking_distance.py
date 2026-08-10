@@ -1,4 +1,4 @@
-"""D13: Host-seeking distance — kernel parameters match 20-70m detection range."""
+"""D13: Host-seeking distance — kernel parameters match 70-300m detection range."""
 from __future__ import annotations
 
 import math
@@ -7,11 +7,13 @@ from typing import Any
 
 from scorers.base import Scorer, ScorerResult
 
-# Expected detection range for An. gambiae CO₂ plume
-# Takken et al. 1998, Costantini et al. 1996
-EXPECTED_SCALE_M = 35.0  # baseline detection distance
-MIN_SCALE_M = 20.0
-MAX_SCALE_M = 70.0
+# Expected detection range for An. gambiae CO₂ + body-odour plume.
+# Giraldo 2023: CO₂ ~60m; Spitzen 2013: 60-70m nocturnal;
+# Okumu 2013: significant at 70m, activates at 100m;
+# Yang 2009: 94% malaria reduction <300m.
+EXPECTED_SCALE_M = 100.0
+MIN_SCALE_M = 70.0
+MAX_SCALE_M = 300.0
 
 
 class HostSeekingDistanceScorer(Scorer):

@@ -37,6 +37,7 @@
 #include "mal_abm_fast/gonotrophic_cycle.hpp"
 #include "mal_abm_fast/bite_ledger.hpp"
 #include "mal_abm_fast/multirate_scheduler.hpp"
+#include "mal_abm_fast/oviposition_seeking.hpp"
 #include "mal_abm_fast/wind_field.hpp"
 
 namespace mal_abm_fast {
@@ -445,28 +446,125 @@ void MosquitoSubmodel::advance_day(const AOI& aoi,
             g_state, g_timer, gonotrophic_params_);
         soa_.gonotrophic_state[si] = static_cast<uint8_t>(g_state);
 
-        // Handle OVIPOSITION_SEEKING: check for viable oviposition site.
-        if (g_state == GonotrophicState::OVIPOSITION_SEEKING) {
-            bool found_site = false;
-            for (const auto& ps : patch_states) {
-                if (ps.row == soa_.row[si] &&
-                    ps.col == soa_.col[si] &&
-                    ps.activated) {
-                    found_site = true;
-                    break;
+        // Handle HOST_APPROACH: directed flight toward detected host (Plan D).
+        if (g_state == GonotrophicState::HOST_APPROACH && host_seeking_ && host_landscape_) {
+            auto target = host_seeking_->detect_host_cell(
+                soa_.row[si], soa_.col[si], *host_landscape_, aoi, 2000.0);
+            if (!target) {
+                g_state = GonotrophicState::HOST_SEEKING;
+                g_timer = 0;
+                soa_.gonotrophic_state[si] = static_cast<uint8_t>(g_state);
+                soa_.gonotrophic_timer[si] = g_timer;
+            } else {
+                auto [step_r, step_c] = host_seeking_->approach_vector(
+                    soa_.row[si], soa_.col[si],
+                    target->first, target->second, aoi, 50.0f);
+                // Apply step (round to nearest cell)
+                int32_t new_row = soa_.row[si] + static_cast<int32_t>(std::round(step_r));
+                int32_t new_col = soa_.col[si] + static_cast<int32_t>(std::round(step_c));
+                soa_.row[si] = new_row;
+                soa_.col[si] = new_col;
+                // Snap lon/lat to new cell centre
+                const int32_t w = aoi.cells_per_side();
+                const int32_t h = cells_per_side_h(aoi);
+                const double cellW = (aoi.east - aoi.west) / static_cast<double>(w);
+                const double cellH = (aoi.north - aoi.south) / static_cast<double>(h);
+                soa_.lon[si] = static_cast<float>(aoi.west + (static_cast<double>(new_col) + 0.5) * cellW);
+                soa_.lat[si] = static_cast<float>(aoi.north - (static_cast<double>(new_row) + 0.5) * cellH);
+                // Check if arrived at host cell
+                if (new_row == target->first && new_col == target->second) {
+                    g_state = GonotrophicState::HOST_SEEKING;
+                    g_timer = 0;
+                    soa_.gonotrophic_state[si] = static_cast<uint8_t>(g_state);
+                    soa_.gonotrophic_timer[si] = g_timer;
+                    // Will feed in the HOST_SEEKING block below
                 }
             }
-            if (found_site) {
-                g_state = GonotrophicState::OVIPOSITING;
-                g_timer = 0;
-                soa_.gonotrophic_state[si] =
-                    static_cast<uint8_t>(g_state);
-                soa_.gonotrophic_timer[si] = g_timer;
+        }
+
+        // Starvation timer for HOST_SEEKING (Plan D).
+        if (g_state == GonotrophicState::HOST_SEEKING) {
+            soa_.gonotrophic_timer[si] += 1;
+            if (soa_.gonotrophic_timer[si] >= HOST_SEEKING_STARVATION_DAYS) {
+                swap_with_last(soa_, i, soa_.n_alive);
+                --soa_.n_alive;
+                continue;
+            }
+        }
+
+        // Handle OVIPOSITION_SEEKING: directed walk toward breeding site (Plan D).
+        if (g_state == GonotrophicState::OVIPOSITION_SEEKING) {
+            if (oviposition_seeking_) {
+                auto target = oviposition_seeking_->detect_breeding_cell(
+                    soa_.row[si], soa_.col[si],
+                    *habitat_engine_for_ovip_, patch_states, aoi, 2000.0);
+                if (!target) {
+                    // No breeding site within 2km; increment timer.
+                    g_timer += 1;
+                    soa_.gonotrophic_timer[si] = g_timer;
+                } else {
+                    // Walk toward target.
+                    auto [new_row, new_col] = oviposition_seeking_->step_toward(
+                        soa_.row[si], soa_.col[si],
+                        target->first, target->second, aoi, 50.0f);
+                    soa_.row[si] = new_row;
+                    soa_.col[si] = new_col;
+                    // Snap lon/lat to new cell centre.
+                    const int32_t w = aoi.cells_per_side();
+                    const int32_t h = cells_per_side_h(aoi);
+                    const double cellW = (aoi.east - aoi.west) / static_cast<double>(w);
+                    const double cellH = (aoi.north - aoi.south) / static_cast<double>(h);
+                    soa_.lon[si] = static_cast<float>(aoi.west + (static_cast<double>(new_col) + 0.5) * cellW);
+                    soa_.lat[si] = static_cast<float>(aoi.north - (static_cast<double>(new_row) + 0.5) * cellH);
+                    g_timer += 1;
+                    soa_.gonotrophic_timer[si] = g_timer;
+                    // Check if arrived at a viable site.
+                    bool arrived = false;
+                    for (const auto& ps : patch_states) {
+                        if (ps.row == new_row && ps.col == new_col && ps.activated) {
+                            arrived = true;
+                            break;
+                        }
+                    }
+                    if (arrived) {
+                        g_state = GonotrophicState::OVIPOSITING;
+                        g_timer = 0;
+                        soa_.gonotrophic_state[si] = static_cast<uint8_t>(g_state);
+                        soa_.gonotrophic_timer[si] = g_timer;
+                    }
+                }
+                // OVIPOSITION_SEEKING timeout: skip-oviposit, return to HOST_SEEKING.
+                if (g_timer >= OVIPOSITION_SEEKING_TIMEOUT_DAYS &&
+                    g_state == GonotrophicState::OVIPOSITION_SEEKING) {
+                    g_state = GonotrophicState::HOST_SEEKING;
+                    g_timer = 0;
+                    soa_.gonotrophic_state[si] = static_cast<uint8_t>(g_state);
+                    soa_.gonotrophic_timer[si] = g_timer;
+                }
+            } else {
+                // Fallback: original binary check at current cell.
+                bool found_site = false;
+                for (const auto& ps : patch_states) {
+                    if (ps.row == soa_.row[si] &&
+                        ps.col == soa_.col[si] &&
+                        ps.activated) {
+                        found_site = true;
+                        break;
+                    }
+                }
+                if (found_site) {
+                    g_state = GonotrophicState::OVIPOSITING;
+                    g_timer = 0;
+                    soa_.gonotrophic_state[si] = static_cast<uint8_t>(g_state);
+                    soa_.gonotrophic_timer[si] = g_timer;
+                }
             }
         }
 
         // Handle OVIPOSITING: deposit eggs into aquatic cohort bank.
         if (g_state == GonotrophicState::OVIPOSITING) {
+            // Update patch_id before depositing eggs (Plan D Phase 4).
+            update_patch_id(i, soa_.row[si], soa_.col[si], patch_states, aoi);
             int32_t eggs = gonotrophic_params_.egg_batch_mean;
             if (eggs < gonotrophic_params_.egg_batch_min)
                 eggs = gonotrophic_params_.egg_batch_min;
@@ -545,6 +643,16 @@ void MosquitoSubmodel::advance_day(const AOI& aoi,
 
     // 4. Adult dispersal
     adult_dispersal(aoi);
+
+    // 4b. Update patch_id after dispersal (Plan D Phase 4).
+    // Every adult that moved may have changed patch; snap to nearest
+    // activated patch within 500m.
+    for (int64_t i = 0; i < soa_.n_alive; ++i) {
+        const size_t si = static_cast<size_t>(i);
+        if (soa_.stage[si] != 1) continue;
+        update_patch_id(i, soa_.row[si], soa_.col[si], patch_states, aoi);
+    }
+
     const int64_t pre_mort_n_alive = soa_.n_alive;
     // 5. Adult mortality (Lardeux)
     adult_mortality(patch_states);
@@ -597,6 +705,38 @@ void MosquitoSubmodel::advance_day(const AOI& aoi,
             static_cast<double>(p_d),
             static_cast<long long>(n_deaths));
     }
+}
+
+// ---------------------------------------------------------------------------
+// Patch tracking (Plan D Phase 4)
+// ---------------------------------------------------------------------------
+
+void MosquitoSubmodel::update_patch_id(
+    int64_t idx, int32_t new_row, int32_t new_col,
+    const std::vector<PatchState>& patch_states,
+    const AOI& aoi)
+{
+    const size_t si = static_cast<size_t>(idx);
+    const float cell_size_m = static_cast<float>(aoi.resolution_m);
+
+    // Snap to nearest activated patch within 500m of new position.
+    int64_t best_patch = -1;
+    float best_dist_m = std::numeric_limits<float>::infinity();
+    for (const auto& ps : patch_states) {
+        if (!ps.activated) continue;
+        const float dy = static_cast<float>(ps.row - new_row) * cell_size_m;
+        const float dx = static_cast<float>(ps.col - new_col) * cell_size_m;
+        const float d = std::sqrt(dy * dy + dx * dx);
+        if (d > 500.0f) continue;
+        if (d < best_dist_m) {
+            best_dist_m = d;
+            best_patch = ps.patch_id;
+        }
+    }
+    if (best_patch >= 0) {
+        soa_.patch_id[si] = best_patch;
+    }
+    // else: leave patch_id unchanged — female continues searching.
 }
 
 // ---------------------------------------------------------------------------

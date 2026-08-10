@@ -40,6 +40,7 @@
 #include "mal_abm_fast/host_landscape.hpp"
 #include "mal_abm_fast/mobility_schedule.hpp"
 #include "mal_abm_fast/host_seeking.hpp"
+#include "mal_abm_fast/oviposition_seeking.hpp"
 #include "mal_abm_fast/wind_field.hpp"
 
 namespace mal_abm_fast {
@@ -115,6 +116,8 @@ public:
     void set_host_landscape(const HostLandscape* h) { host_landscape_ = h; }
     void set_mobility_schedule(const MobilitySchedule* m) { mobility_schedule_ = m; }
     void set_host_seeking_model(const HostSeekingModel* h) { host_seeking_ = h; }
+    void set_oviposition_seeking_model(const OvipositionSeekingModel* o) { oviposition_seeking_ = o; }
+    void set_habitat_engine(const HabitatEngine* h) { habitat_engine_for_ovip_ = h; }
 
     // Wind field setter (M7.6 — windborne migration).
     void set_wind_field(const WindField* w) { wind_field_ = w; }
@@ -167,6 +170,11 @@ public:
     // 2. Adult mortality — Lardeux thermo-dependent daily survival.
     void adult_mortality(const std::vector<PatchState>& patch_states);
 
+    // 3. Patch tracking: update patch_id after position change (Plan D).
+    void update_patch_id(int64_t idx, int32_t new_row, int32_t new_col,
+                         const std::vector<PatchState>& patch_states,
+                         const AOI& aoi);
+
     // -- queries used by the coordinator -----------------------------------
 
     // density_by_patch: vector of (patch_id, count), one row per
@@ -198,9 +206,11 @@ private:
     MultirateDayState night_state_;
 
     // Host-seeking (non-owning pointers; Engine owns the components).
-    const HostLandscape*    host_landscape_    = nullptr;
-    const MobilitySchedule* mobility_schedule_ = nullptr;
-    const HostSeekingModel* host_seeking_      = nullptr;
+    const HostLandscape*         host_landscape_         = nullptr;
+    const MobilitySchedule*      mobility_schedule_      = nullptr;
+    const HostSeekingModel*      host_seeking_           = nullptr;
+    const OvipositionSeekingModel* oviposition_seeking_  = nullptr;
+    const HabitatEngine*         habitat_engine_for_ovip_ = nullptr;
 
     // Wind field (M7.6 — non-owning pointer; Engine owns it).
     const WindField*        wind_field_        = nullptr;

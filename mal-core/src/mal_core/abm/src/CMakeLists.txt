@@ -16,6 +16,7 @@ add_library(mal_abm_fast_core STATIC
     seeding.cpp
     host_landscape.cpp
     host_seeking.cpp
+    oviposition_seeking.cpp
     mobility_schedule.cpp
     wind_field.cpp
 )

@@ -13,6 +13,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <optional>
 #include <utility>
 #include <vector>
 
@@ -31,8 +32,10 @@ namespace mal_abm_fast {
 float HostSeekingModel::cell_attraction(
     const HostCell& cell, float dist_m) const
 {
-    // Exponential distance decay: scale = 35m (CO₂ plume detection).
-    constexpr float kScale = 35.0f;
+    // Exponential distance decay: scale = 100m (CO₂ + body-odour plume).
+    // Giraldo 2023: CO₂ detection ~60m; Spitzen 2013: 60-70m nocturnal;
+    // Okumu 2013: significant attraction at 70m, activates at 100m.
+    const float kScale = HOST_SEEKING_SCALE_M;
     const float decay = std::exp(-dist_m / kScale);
 
     // Indoor modifier: endophilic species get a boost indoors.
@@ -194,6 +197,53 @@ std::pair<float, float> HostSeekingModel::approach_vector(
         step_m * dy_cells / dist_m,
         step_m * dx_cells / dist_m
     };
+}
+
+std::optional<std::pair<int32_t, int32_t>> HostSeekingModel::detect_host_cell(
+    int32_t mosquito_row, int32_t mosquito_col,
+    const HostLandscape& landscape,
+    const AOI& aoi,
+    double range_m) const
+{
+    const int32_t grid_h = landscape.h();
+    const int32_t grid_w = landscape.w();
+    if (grid_h <= 0 || grid_w <= 0) return std::nullopt;
+
+    const float cell_size_m = static_cast<float>(aoi.resolution_m);
+    const int32_t search_cells = static_cast<int32_t>(
+        std::ceil(static_cast<float>(range_m) / cell_size_m));
+
+    const int32_t r_min = std::max(0, mosquito_row - search_cells);
+    const int32_t r_max = std::min(grid_h - 1, mosquito_row + search_cells);
+    const int32_t c_min = std::max(0, mosquito_col - search_cells);
+    const int32_t c_max = std::min(grid_w - 1, mosquito_col + search_cells);
+
+    float best_attr = 0.5f;  // minimum threshold
+    int32_t best_row = -1;
+    int32_t best_col = -1;
+
+    for (int32_t r = r_min; r <= r_max; ++r) {
+        for (int32_t c = c_min; c <= c_max; ++c) {
+            const HostCell cell = landscape.at(r, c);
+            const float dy = (static_cast<float>(r) - static_cast<float>(mosquito_row)) * cell_size_m;
+            const float dx = (static_cast<float>(c) - static_cast<float>(mosquito_col)) * cell_size_m;
+            const float dist_m = std::sqrt(dx * dx + dy * dy);
+
+            if (dist_m > static_cast<float>(range_m)) continue;
+
+            const float att = cell_attraction(cell, dist_m);
+            if (att > best_attr) {
+                best_attr = att;
+                best_row = r;
+                best_col = c;
+            }
+        }
+    }
+
+    if (best_row >= 0) {
+        return std::make_pair(best_row, best_col);
+    }
+    return std::nullopt;
 }
 
 }  // namespace mal_abm_fast

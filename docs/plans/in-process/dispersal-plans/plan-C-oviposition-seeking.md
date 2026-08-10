@@ -3,7 +3,8 @@
 | Field | Value |
 |---|---|
 | **Plan ID** | C |
-| **Status** | proposed |
+| **Status** | superseded-by: plan-D |
+| **Superseded** | Plan D Phase 3 (oviposition kernel) replaces site fidelity with directed plume-following. Diallo 2026 (12,937 MRR) rejects site fidelity hypothesis. Plan D Phase 4 (patch tracking) achieves egg-correctness without natal return. |
 | **Hypothesis** | Gravid *Anopheles* females exhibit strong **site fidelity** to their natal oviposition patch and will return to it (or a nearby viable patch) for oviposition, rather than ovipositing at whatever cell they happen to occupy. Encoding this as a per-mosquito `natal_patch_id` field plus a probabilistic return walk is the dominant realistic mechanism for the *clustered, patch-bound* spatial signature observed in the field. |
 | **Risk class** | Medium — adds a new SoA field, changes where eggs are deposited, requires a new walk kernel. |
 | **Effort** | ~2 sessions |

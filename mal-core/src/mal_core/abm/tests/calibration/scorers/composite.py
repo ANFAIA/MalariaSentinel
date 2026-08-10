@@ -14,6 +14,10 @@ DEFAULT_WEIGHTS: dict[str, float] = {
     "D16_suitability_auc": 2.0,
     "D17_pool_persistence": 0.5,
     "D18_washout_response": 0.5,
+    # Plan D spatial scorers (kernel expansion + oviposition).
+    "D16_spread_rate": 0.15,
+    "D17_host_clustering": 0.10,
+    "D18_oviposition_fidelity": 0.10,
 }
 
 def geometric_mean(scores: dict[str, ScorerResult], weights: dict[str, float] | None = None) -> float:

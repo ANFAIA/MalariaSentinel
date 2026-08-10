@@ -2,6 +2,8 @@
 
 **Status**: COMPLETED. F1 + F2 implemented; F3 SIMD dropped; F4/F5 gated-cancelled. See Change log for details.
 
+**F1.e parity test**: removed in Plan D (M7.8). The Python↔C++ parity test (`test_abm_fast_parity.py`) has been replaced by calibration scorers (10 scorers + LLM verdict in `tests/calibration/`). References to "parity test" below are historical.
+
 **Milestone**: M-perf (between M2 "ABM validation" and M3 "U-Net surrogate")
 **Module**: `mal-abm-fast/` (uv workspace member + CMake + vcpkg)
 **Stack**: C++20, CMake ≥ 3.20 (manifest mode), vcpkg, Eigen, GDAL, CLI11, nlohmann-json, GoogleTest, OpenMP
