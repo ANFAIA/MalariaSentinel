@@ -167,14 +167,14 @@ sessions, dispatch specialists, monitor progress, and finalize.
 def _get_dispatcher_tools():
     """Tools for dispatcher mode: pipeline, ABM, search, memory."""
     from agents_janus.tools import (
-        opencode_search,
+        web_search,
         pipeline_run_calibration,
         pipeline_compare_scorecards,
         memory_recall_kg,
         ask_user,
     )
     return [
-        _wrap_with_logging(opencode_search),
+        _wrap_with_logging(web_search),
         _wrap_with_logging(_import_abm_run()),
         _wrap_with_logging(_import_abm_test()),
         _wrap_with_logging(_import_abm_score()),

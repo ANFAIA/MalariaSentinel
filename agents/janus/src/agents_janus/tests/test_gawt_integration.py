@@ -107,7 +107,7 @@ class TestDispatcherWorkflow:
         )
         manifest_path = get_manifest_path("test", tmp_path)
 
-        # Simulate spawn_subagent appending a new entry
+        # Simulate task() delegation appending a new entry
         append_agent(manifest_path, {
             "requested_id": "a_scoring",
             "role": "scoring",

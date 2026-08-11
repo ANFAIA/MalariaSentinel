@@ -182,7 +182,7 @@ def _build_conflict_scenario_tracker() -> MCPTracker:
     return tracker
 
 
-def _build_spawn_subagent_scenario_tracker() -> MCPTracker:
+def _build_delegation_scenario_tracker() -> MCPTracker:
     """Simulate specialist A spawning specialist B."""
     tracker = MCPTracker()
 
@@ -191,7 +191,7 @@ def _build_spawn_subagent_scenario_tracker() -> MCPTracker:
     tracker.record("start_intent", intent="fix engine")
 
     # Agent A discovers it needs a scorer
-    tracker.record("register_agent", role="scoring")  # spawn_subagent registers B
+    tracker.record("register_agent", role="scoring")  # task() registers B
     # Agent B starts
     tracker.record("start_intent", intent="add D15")
     tracker.record("check_inbox")
@@ -362,7 +362,7 @@ class TestSubagentSpawn:
 
     def test_spawn_creates_new_agent(self):
         """When specialist A needs specialist B, a new agent is registered."""
-        tracker = _build_spawn_subagent_scenario_tracker()
+        tracker = _build_delegation_scenario_tracker()
 
         prompt = f"""Evaluate this sub-agent spawn scenario:
 
@@ -484,7 +484,7 @@ Expected behavior:
 7. ABM unregisters
 
 Key rule: If a specialist needs to touch files outside its scope, it MUST call
-the owning specialist via spawn_subagent. It MUST NOT edit the files directly.
+the owning specialist via task(). It MUST NOT edit the files directly.
 
 Does the sequence correctly handle out-of-scope delegation?"""
 

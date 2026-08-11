@@ -9,13 +9,18 @@ in the shared worktree. This module provides advisory validation:
 The validation runs automatically via ScopeValidationMiddleware, which
 intercepts gawt edit/write/delete tool calls on every subagent and
 validates the file path against the agent's edits_allow patterns.
+
+For post-hoc batch validation, use validate_agent_edits() which can
+source edits from gawt's SQLite state database.
 """
 from __future__ import annotations
 
 import fnmatch
 import json
 import logging
+import sqlite3
 import threading
+from pathlib import Path
 from typing import Any
 
 from agents_janus.subagents.registry import Registry
@@ -92,6 +97,100 @@ def validate_single_file(file_path: str, agent_role: str, registry: Registry) ->
     Returns the same schema as validate_edit_scope, but for a single file.
     """
     return validate_edit_scope([file_path], agent_role, registry)
+
+
+def query_gawt_edits(
+    agent_id: str,
+    worktree_root: Path | str | None = None,
+    since_ts: str | None = None,
+) -> list[str]:
+    """Query gawt's SQLite state database for an agent's recent edits.
+
+    Reads .gitagent/state.db directly (gawt MCP is not importable from Python).
+    Returns a list of file paths the agent edited.
+
+    Args:
+        agent_id: The gawt agent ID (e.g., "a_abm").
+        worktree_root: Path to the worktree root containing .gitagent/.
+            Defaults to REPO_ROOT.
+        since_ts: ISO timestamp — only return edits after this time.
+            None means all edits for this agent.
+
+    Returns:
+        List of file paths (may be empty if no edits found or db missing).
+    """
+    REPO = Path(__file__).resolve().parent.parent.parent.parent.parent
+    root = Path(worktree_root) if worktree_root else REPO
+    db_path = root / ".gitagent" / "state.db"
+
+    if not db_path.exists():
+        return []
+
+    try:
+        conn = sqlite3.connect(str(db_path), timeout=5)
+        try:
+            # gawt stores edits in an 'edits' table with columns:
+            # agent_id, file, action, timestamp, content (schema from gawt 0.5.x)
+            query = "SELECT file FROM edits WHERE agent_id = ?"
+            params: list[Any] = [agent_id]
+            if since_ts:
+                query += " AND timestamp > ?"
+                params.append(since_ts)
+            query += " ORDER BY timestamp ASC"
+
+            cursor = conn.execute(query, params)
+            return [row[0] for row in cursor.fetchall()]
+        finally:
+            conn.close()
+    except Exception as e:
+        _log.warning("Could not query gawt edits from %s: %s", db_path, e)
+        return []
+
+
+def validate_agent_edits(
+    agent_id: str,
+    registry: Registry,
+    edited_files: list[str] | None = None,
+    since_ts: str | None = None,
+    worktree_root: Path | str | None = None,
+) -> dict:
+    """Validate an agent's edits against its declared scope.
+
+    Post-hoc batch validation — useful for session-end audit or conflict
+    investigation. Complements the real-time per-call validation done by
+    ScopeValidationMiddleware.
+
+    If edited_files is provided, validates those directly (no gawt query).
+    If edited_files is None, queries gawt's state.db via query_gawt_edits().
+
+    Args:
+        agent_id: The gawt agent ID (used for gawt query and scope lookup).
+        registry: The subagent registry.
+        edited_files: Explicit list of file paths. If None, queries gawt.
+        since_ts: ISO timestamp — only validate edits after this time.
+            Only used when edited_files is None (gawt query mode).
+        worktree_root: Path to worktree root containing .gitagent/.
+
+    Returns:
+        Same schema as validate_edit_scope:
+        {
+            "ok": bool,
+            "in_scope": [paths in agent's edits_allow],
+            "cross_scope": [{"path": str, "owner": str}],
+            "unowned": [paths not in any agent's scope],
+        }
+    """
+    # Determine the agent's role from the agent_id (strip leading "a_" prefix)
+    role = agent_id.removeprefix("a_") if agent_id.startswith("a_") else agent_id
+
+    # Resolve edited_files
+    if edited_files is None:
+        edited_files = query_gawt_edits(agent_id, worktree_root, since_ts)
+
+    if not edited_files:
+        return {"ok": True, "in_scope": [], "cross_scope": [], "unowned": []}
+
+    return validate_edit_scope(edited_files, role, registry)
 
 
 def _extract_file_path(tool_args: Any) -> str | None:

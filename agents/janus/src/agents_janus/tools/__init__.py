@@ -1,5 +1,5 @@
 """Custom tools for the MalariaSentinel Janus orchestrator."""
-from .opencode_tool import opencode_search
+from .web_search import web_search
 from .pipeline_tool import (
     pipeline_run_calibration,
     pipeline_compare_scorecards,
@@ -18,7 +18,7 @@ from .onboard_tools import (
 )
 
 __all__ = [
-    "opencode_search",
+    "web_search",
     "pipeline_run_calibration",
     "pipeline_compare_scorecards",
     "memory_recall_kg",

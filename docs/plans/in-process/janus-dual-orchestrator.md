@@ -109,8 +109,6 @@ User says "Fix population extinction"
 | `pipeline_*` | ❌ | ✅ | via plugin |
 | `gawt_mcp_*` | ❌ | ✅ | ✅ |
 | `task()` (subagents) | ✅ | ✅ | ❌ |
-| `opencode_search` | ❌ | ✅ | ❌ |
-| `improve_prompt` | ❌ | ✅ | ❌ |
 
 ### Delegation Rules
 

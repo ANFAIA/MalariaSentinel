@@ -1,7 +1,7 @@
 """Trial harness — runs janus with a trial prompt, captures trace, invokes judge.
 
 This is the "test harness" described in M16 plan §9. It:
-1. Runs janus with a TRIAL goal (sibling coordination scenario).
+1. Runs janus with a TRIAL goal.
 2. Captures the Langfuse trace (if tracing is enabled).
 3. Feeds the trace to the LLM-as-Judge.
 4. Produces a verdict JSON.
@@ -12,7 +12,7 @@ Usage:
 
     # From code
     from agents_janus.trace_analyzer.harness import run_trial
-    verdict = run_trial(goal="TRIAL: spawn abm + scoring as siblings", tracing="langfuse")
+    verdict = run_trial(goal="TRIAL: run abm + scoring", tracing="langfuse")
 """
 from __future__ import annotations
 
@@ -25,17 +25,8 @@ from pathlib import Path
 from typing import Any
 
 
-TRIAL_GOAL_DEFAULT = (
-    "TRIAL: run a full e2e test of the sibling coordination system. "
-    "Use abm-worker as primary, spawn scoring-worker and ingest-worker as siblings. "
-    "Have them edit overlapping files in the shared worktree. Verify the watcher "
-    "fires, peer_message is sent, fork_brief is invoked, merge_result is returned. "
-    "End when scoring-worker has consumed ingest-worker's output."
-)
-
-
 def run_trial(
-    goal: str = TRIAL_GOAL_DEFAULT,
+    goal: str,
     *,
     provider: str = "openrouter",
     model: str = "xiaomi/mimo-v2.5",
@@ -46,10 +37,10 @@ def run_trial(
     judge_provider: str | None = None,
     judge_model: str | None = None,
 ) -> dict:
-    """Run a sibling coordination trial and evaluate with LLM-as-Judge.
+    """Run a trial and evaluate with LLM-as-Judge.
     
     Args:
-        goal: The trial goal (default: full sibling e2e test).
+        goal: The trial goal (required).
         provider: LLM provider for janus.
         model: Model for janus.
         thread_id: Thread ID for checkpointing.
@@ -243,8 +234,8 @@ def _save_fixture(verdict: dict, trace_id: str | None) -> Path:
 def main():
     """CLI entry point for the trial harness."""
     import argparse
-    parser = argparse.ArgumentParser(description="M16 sibling coordination trial harness")
-    parser.add_argument("--goal", "-g", default=TRIAL_GOAL_DEFAULT, help="Trial goal")
+    parser = argparse.ArgumentParser(description="Janus trial harness")
+    parser.add_argument("--goal", "-g", required=True, help="Trial goal")
     parser.add_argument("--provider", "-p", default="openrouter", help="LLM provider")
     parser.add_argument("--model", "-m", default="xiaomi/mimo-v2.5", help="Model")
     parser.add_argument("--tracing", "-t", default="langfuse", help="Tracing backend")

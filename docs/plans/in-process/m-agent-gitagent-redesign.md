@@ -9,6 +9,8 @@
 > **Predecessor**: M14 (Two-Tier Orchestrator + Plugin System) — current Janus as we know it.
 >
 > **External dependency**: **`gawt`** (the new gitagent, branch `feat/mcp-sqlite-core`). Must be installed from the branch, not PyPI — currently `uv pip install -e git+https://github.com/david-fm/gawt.git@feat/mcp-sqlite-core`. When stable, this dependency will be promoted to PyPI by the user.
+>
+> **Superseded sections**: §4.3 (`spawn_subagent` module) and §6.4 (`spawn_subagent` canonical implementation) are superseded. Use `task()` (deepagents native delegation) instead of a custom `spawn_subagent` Python function. The `tools/spawn_subagent.py` file has been deleted.
 
 ---
 

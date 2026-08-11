@@ -124,10 +124,10 @@ agents_janus/
 │   ├── __init__.py          # Exports all 17 tools
 │   ├── gitagent_tool.py     # 12 gitagent CLI wrappers (init→finalize)
 │   ├── abm_tools.py         # abm_run, abm_test, abm_score (worker tools)
-│   ├── opencode_tool.py     # Web search via OpenRouter/Perplexity
+│   ├── web_search.py         # Web search via OpenRouter/Perplexity
 │   ├── kg_tool.py           # Knowledge graph recall (Neo4j)
 │   ├── pipeline_tool.py     # Run calibration suite, compare scorecards
-│   └── improve_tool.py      # Self-improvement: patch prompts from failures
+│   └── improve_tool.py      # DELETED: replaced by self_improve specialist
 │
 ├── cycles/                  # High-level workflows
 │   ├── calibration_cycle.py # Calibration improvement cycle (9 steps)
@@ -168,8 +168,7 @@ agents_janus/
 | `pipeline_run_calibration` | Run pytest calibration suite | pipeline |
 | `pipeline_compare_scorecards` | Compare scorecards against baseline | pipeline |
 | `memory_recall_kg` | Recall from Neo4j knowledge graph | kg |
-| `opencode_search` | Web search via Perplexity | search |
-| `improve_prompt` | Patch prompts from failure analysis | self-improve |
+| `web_search` | Web search via Perplexity | search |
 
 ### Worker tools (3)
 

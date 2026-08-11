@@ -5,7 +5,7 @@ import urllib.request
 import urllib.parse
 
 
-def opencode_search(query: str, num_results: int = 5) -> str:
+def web_search(query: str, num_results: int = 5) -> str:
     """Search the web for information.
 
     Uses OpenRouter API directly to get search-augmented responses.
