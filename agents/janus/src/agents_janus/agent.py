@@ -339,15 +339,21 @@ def create_orchestrator(
     from agents_janus.mcp_bridge import get_gawt_mcp_tools_sync, filter_gawt_tools
     from agents_janus.tools.ask_user_tool import ask_user as ask_user_tool
     from agents_janus.scope_validator import ScopeValidationMiddleware
+    from agents_janus.middleware.inbox_check import InboxCheckMiddleware
+    from agents_janus.tools.resolve_conflict import make_resolve_conflict_tool, set_agent_ref
 
     all_mcp_tools = get_gawt_mcp_tools_sync()
     gawt_tools = filter_gawt_tools(all_mcp_tools)
+
+    # Create resolve_conflict tool (lazy agent ref — populated after agent creation)
+    resolve_conflict_tool = make_resolve_conflict_tool()
 
     registry = load_registry()
     worker_defs = []
     for name, spec in registry.all().items():
         all_tools = list(gawt_tools)
         all_tools.append(ask_user_tool)
+        all_tools.append(resolve_conflict_tool)
 
         wrapped_tools = [_wrap_with_logging(t) for t in all_tools]
         system_prompt = build_subagent_prompt(spec, registry.all())
@@ -359,8 +365,12 @@ def create_orchestrator(
             "tools": wrapped_tools,
             "middleware": [
                 ScopeValidationMiddleware(registry, name),
+                InboxCheckMiddleware(),
                 SubAgentObservabilityMiddleware(obs, name),
-            ] if obs else [ScopeValidationMiddleware(registry, name)],
+            ] if obs else [
+                ScopeValidationMiddleware(registry, name),
+                InboxCheckMiddleware(),
+            ],
         }
 
         if FilesystemPermission is not None:
@@ -390,7 +400,7 @@ def create_orchestrator(
     else:
         orch_tools = _get_dispatcher_tools() + [_wrap_with_logging(t) for t in gawt_tools]
 
-    return create_deep_agent(
+    agent = create_deep_agent(
         model=llm,
         tools=orch_tools,
         subagents=worker_defs,
@@ -401,3 +411,8 @@ def create_orchestrator(
         middleware=middleware,
         permissions=orch_permissions,
     )
+
+    # Wire resolve_conflict lazy reference — tool can now access the agent graph
+    set_agent_ref(agent, {"configurable": {"thread_id": thread_id}})
+
+    return agent

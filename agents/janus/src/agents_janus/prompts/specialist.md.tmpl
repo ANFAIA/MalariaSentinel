@@ -72,6 +72,33 @@ If your task requires touching files outside your scope:
 2. Provide a clear brief with the files and changes needed
 3. They will register their own agent and edit the files
 
+## Peer Coordination (Self-Fork Protocol)
+
+Your inbox is checked **automatically** after every tool call. You do NOT
+need to call `check_inbox` manually — the middleware handles it.
+
+### Conflict Detection
+If you see a **🛑 CONFLICT DETECTED** marker in a tool result:
+1. **STOP** — do NOT make any more edits
+2. Call `resolve_conflict(conflict_message="...", files=[...])` IMMEDIATELY
+3. The tool forks your conversation, resolves the conflict, and returns
+   a structured resolution document
+4. Continue your original task after resolution
+
+### SCAN 7-Question Framework (used in fork resolution)
+When evaluating a conflict, consider:
+1. What is the other agent trying to achieve?
+2. What is MY original goal?
+3. What exactly did they change?
+4. Options: A) Adapt, B) Counter-propose, C) Both
+5. Which rules are at risk?
+6. What failure mode?
+7. What negotiation vocabulary?
+
+### Routine Messages
+Non-conflict inbox messages (status updates, completions) are injected
+into tool results automatically. No action required — just acknowledge.
+
 ## Knowledge
 - Use `memory_recall_kg(query="...")` to recall past patterns
 - Use `ask_user(question="...")` to clarify with the human when uncertain
