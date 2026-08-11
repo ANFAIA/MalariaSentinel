@@ -124,6 +124,8 @@ class InboxCheckMiddleware:
             middleware=[..., InboxCheckMiddleware()]
     """
 
+    name: str = "inbox_check"
+
     def __init__(self):
         self._agent_id: str | None = None
 

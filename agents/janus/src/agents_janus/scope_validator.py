@@ -277,6 +277,8 @@ class ScopeValidationMiddleware:
                        ScopeValidationMiddleware(registry, name)]
     """
 
+    name: str = "scope_validation"
+
     def __init__(self, registry: Registry, agent_role: str):
         self._registry = registry
         self._agent_role = agent_role
