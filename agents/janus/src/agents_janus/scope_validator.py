@@ -23,6 +23,7 @@ import threading
 from pathlib import Path
 from typing import Any
 
+from langchain.agents.middleware.types import AgentMiddleware
 from agents_janus.subagents.registry import Registry
 
 _log = logging.getLogger("agents_janus.scope_validator")
@@ -264,7 +265,7 @@ def _append_warning(tool_result: Any, warning: str) -> str:
     return f"{tool_result}\n\n{warning}"
 
 
-class ScopeValidationMiddleware:
+class ScopeValidationMiddleware(AgentMiddleware):
     """Middleware that validates subagent file edits against declared scopes.
 
     Intercepts gawt edit/write/delete tool calls and checks the file path
@@ -277,9 +278,8 @@ class ScopeValidationMiddleware:
                        ScopeValidationMiddleware(registry, name)]
     """
 
-    name: str = "scope_validation"
-
     def __init__(self, registry: Registry, agent_role: str):
+        super().__init__()
         self._registry = registry
         self._agent_role = agent_role
 

@@ -24,6 +24,8 @@ import json
 import logging
 from typing import Any
 
+from langchain.agents.middleware.types import AgentMiddleware
+
 _log = logging.getLogger("agents_janus.middleware.inbox_check")
 
 # gawt tools that perform file mutations (where conflicts matter most)
@@ -109,7 +111,7 @@ def _check_inbox_via_mcp(agent_id: str) -> list[dict]:
         return []
 
 
-class InboxCheckMiddleware:
+class InboxCheckMiddleware(AgentMiddleware):
     """Middleware that auto-checks gawt inbox after each tool call.
 
     After every tool call, if the agent has an agent_id (extracted from
@@ -124,9 +126,8 @@ class InboxCheckMiddleware:
             middleware=[..., InboxCheckMiddleware()]
     """
 
-    name: str = "inbox_check"
-
     def __init__(self):
+        super().__init__()
         self._agent_id: str | None = None
 
     def before_agent(self, state, runtime):
