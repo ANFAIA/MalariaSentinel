@@ -2,7 +2,7 @@
 
 The manifest is the orchestrator's single source of truth for the work split.
 Written before any agent is spawned. Read by each specialist on init.
-Updated by spawn_subagent when a specialist spawns a sub-agent.
+Updated by the orchestrator when a specialist spawns a sub-agent.
 
 Schema:
 {
@@ -98,7 +98,7 @@ def read_manifest(manifest_path: str | Path) -> dict:
 
 
 def append_agent(manifest_path: str | Path, agent_entry: dict) -> None:
-    """Append a new agent entry to the manifest (used by spawn_subagent)."""
+    """Append a new agent entry to the manifest."""
     path = Path(manifest_path)
     manifest = read_manifest(path)
 
