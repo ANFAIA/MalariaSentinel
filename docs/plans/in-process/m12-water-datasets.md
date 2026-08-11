@@ -65,6 +65,7 @@ Stored as `<aoi>_water_stack.nc` in `data/<aoi>/`. Registered in manifest with `
 - **Metric**: precision / recall of `permanent_water_mask ∪ dynamic_water_mask` (mask union) over each site buffer (e.g. 250 m).
 - **Acceptance**: recall ≥ 0.80 on ≥ 18 / 24 sites; precision ≥ 0.60.
 - **Registered in**: `mal-core/src/mal_core/abm/tests/calibration/thresholds.yaml` as D12 with `min_score`, `max_delta`, `hard_floor`.
+- **Note**: D12 in `thresholds.yaml` currently holds `D12_host_density` (WorldPop census validation). The water-dataset scorer should be registered as a **separate dimension** (e.g. `D12_water_mask_recall`) or renamed when M12 ships. The water stack output (`water_frac`) feeds into M14's pool hydrology model via the `PLUVIAL_POOL_WATER_FRAC_MIN` threshold in `coordinator.cpp`.
 
 ## 6. Pitfalls to record (KG `Pitfall` nodes)
 
@@ -82,6 +83,14 @@ Stored as `<aoi>_water_stack.nc` in `data/<aoi>/`. Registered in manifest with `
 | §2.5 manifest v3 (`variables` field) | `load_water_stack` registers multi-band output; relies on `variables` list to declare its 5-6 bands. |
 | §2.6 runner split-by-(year, month) | Not used for water stack (it's static), but used by DSWX-S1 climatology's underlying per-week-of-year tile production. |
 | §3 Phase 4 ABM compatibility | Water stack is consumed by env tensor assembly in `ingest/env.py` — must verify `.nc` is read correctly. |
+
+## 7b. Cross-link to M14
+
+| M14 input | M12 output | Relationship |
+|---|---|---|
+| `water_frac` in `PatchState` | `water_frac` band from `load_water_stack()` | M14's pool hydrology uses `water_frac > POOL_WATER_FRAC_MIN (=0)` as a precondition for tracking pool state. M12 improves the accuracy of this signal by adding DSWX-S1 seasonal dynamics and permanent water masks. |
+| `PLUVIAL_POOL_WATER_FRAC_MIN` in `wire.hpp` | N/A | Static threshold in the ABM; unchanged by M12. M12's `load_water_stack()` replaces JRC GSW as the water source once registered. |
+| `activate_patches()` in `coordinator.cpp` | `water_frac_at(r, c)` | M14's water-balance update runs AFTER the TWI+water_frac prefilter. If M12's `water_frac` is more accurate, fewer false-positive pool activations occur. |
 
 ## 8. Acceptance criteria (milestone-level, preview)
 
@@ -107,3 +116,4 @@ M12 is **done** when:
 | Date | Author | Change |
 |---|---|---|
 | 2026-07-30 | supervisor | Stub created, linking to M11. Full plan deferred until M11 ships. |
+| 2026-08-10 | supervisor | Added cross-link to M14 (pool hydrology); noted D12 scorer naming conflict with D12_host_density. |
