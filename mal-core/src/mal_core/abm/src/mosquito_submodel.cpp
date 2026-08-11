@@ -66,6 +66,8 @@ inline void swap_with_last(MosquitoSoA& soa, int64_t i, int64_t n) {
     std::swap(soa.gonotrophic_state[i], soa.gonotrophic_state[n - 1]);
     std::swap(soa.gonotrophic_timer[i], soa.gonotrophic_timer[n - 1]);
     std::swap(soa.feeding_success[i],   soa.feeding_success[n - 1]);
+    std::swap(soa.last_patch_update_row[i], soa.last_patch_update_row[n - 1]);
+    std::swap(soa.last_patch_update_col[i], soa.last_patch_update_col[n - 1]);
 }
 
 // Trim every SoA vector to `new_size` (the new live range after a
@@ -89,6 +91,8 @@ inline void trim_soa(MosquitoSoA& soa, size_t new_size) {
     soa.gonotrophic_state.resize(new_size);
     soa.gonotrophic_timer.resize(new_size);
     soa.feeding_success.resize(new_size);
+    soa.last_patch_update_row.resize(new_size);
+    soa.last_patch_update_col.resize(new_size);
 }
 
 }  // namespace
@@ -178,6 +182,8 @@ MosquitoSubmodel::MosquitoSubmodel(int32_t n_patches, int32_t k_per_patch,
                 static_cast<uint8_t>(GonotrophicState::TENERAL));
             soa_.gonotrophic_timer.push_back(0);
             soa_.feeding_success.push_back(0.0f);
+            soa_.last_patch_update_row.push_back(0);
+            soa_.last_patch_update_col.push_back(0);
         }
         // Eggs in cohort bank
         if (n_eggs > 0) {
@@ -248,6 +254,8 @@ MosquitoSubmodel::MosquitoSubmodel(int32_t n_patches, int32_t k_per_patch,
     soa_.gonotrophic_state.reserve(cap);
     soa_.gonotrophic_timer.reserve(cap);
     soa_.feeding_success.reserve(cap);
+    soa_.last_patch_update_row.reserve(cap);
+    soa_.last_patch_update_col.reserve(cap);
 
     for (const auto& inst : instructions) {
         // Adults: cap at K_MAX per patch to prevent seeding above
@@ -275,6 +283,8 @@ MosquitoSubmodel::MosquitoSubmodel(int32_t n_patches, int32_t k_per_patch,
                 static_cast<uint8_t>(GonotrophicState::TENERAL));
             soa_.gonotrophic_timer.push_back(0);
             soa_.feeding_success.push_back(0.0f);
+            soa_.last_patch_update_row.push_back(inst.row);
+            soa_.last_patch_update_col.push_back(inst.col);
         }
         // Larvae: distribute across aquatic stages with pre-set
         // development progress (age-structured seeding). This creates
@@ -421,6 +431,8 @@ void MosquitoSubmodel::advance_day(const AOI& aoi,
                 static_cast<uint8_t>(GonotrophicState::TENERAL));
             soa_.gonotrophic_timer.push_back(0);
             soa_.feeding_success.push_back(0.0f);
+            soa_.last_patch_update_row.push_back(ev.row);
+            soa_.last_patch_update_col.push_back(ev.col);
         }
         n_emerged += ev.n_adults;
     }
@@ -717,9 +729,21 @@ void MosquitoSubmodel::update_patch_id(
     const AOI& aoi)
 {
     const size_t si = static_cast<size_t>(idx);
-    const float cell_size_m = static_cast<float>(aoi.resolution_m);
 
-    // Snap to nearest activated patch within 500m of new position.
+    // Fast path: if position hasn't changed since last update, skip
+    // the O(N_patches) scan. This is the common case — 95% of adults
+    // don't move each day (only 5% disperse via Gaussian kernel).
+    if (soa_.last_patch_update_row[si] == new_row &&
+        soa_.last_patch_update_col[si] == new_col) {
+        return;
+    }
+
+    // Update cache before the scan so future calls benefit.
+    soa_.last_patch_update_row[si] = new_row;
+    soa_.last_patch_update_col[si] = new_col;
+
+    // Full scan: snap to nearest activated patch within 500m.
+    const float cell_size_m = static_cast<float>(aoi.resolution_m);
     int64_t best_patch = -1;
     float best_dist_m = std::numeric_limits<float>::infinity();
     for (const auto& ps : patch_states) {

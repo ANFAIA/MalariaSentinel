@@ -43,6 +43,12 @@ struct MosquitoSoA {
     std::vector<int32_t>  gonotrophic_timer;      // days in current state
     std::vector<float>    feeding_success;         // 1.0 if fed today, 0.0 otherwise
 
+    // Patch tracking cache (Plan D Phase 4): last (row, col) passed to
+    // update_patch_id(). If the agent hasn't moved since the last call,
+    // update_patch_id() is O(1) instead of O(N_patches).
+    std::vector<int32_t>  last_patch_update_row;
+    std::vector<int32_t>  last_patch_update_col;
+
     int64_t n_alive  = 0;   // valid prefix length of all SoA vectors
     int64_t next_uid = 0;   // next unique_id to allocate
 };
