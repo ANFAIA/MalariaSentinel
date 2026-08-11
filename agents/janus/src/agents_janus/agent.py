@@ -171,7 +171,6 @@ def _get_dispatcher_tools():
         pipeline_run_calibration,
         pipeline_compare_scorecards,
         memory_recall_kg,
-        improve_prompt,
         ask_user,
     )
     return [
@@ -182,7 +181,6 @@ def _get_dispatcher_tools():
         _wrap_with_logging(pipeline_run_calibration),
         _wrap_with_logging(pipeline_compare_scorecards),
         _wrap_with_logging(memory_recall_kg),
-        _wrap_with_logging(improve_prompt),
         _wrap_with_logging(ask_user),
     ]
 

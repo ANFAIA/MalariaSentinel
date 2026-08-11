@@ -75,8 +75,7 @@ _TOOL_CATEGORIES: dict[str, str] = {
     "onboard_status": "pipeline",
     "onboard_diagnose": "pipeline",
     "onboard_list_components": "pipeline",
-    # Prompt tools
-    "improve_prompt": "other",
+    # Misc tools
     "opencode_search": "other",
 }
 

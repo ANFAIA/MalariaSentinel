@@ -5,7 +5,6 @@ from .pipeline_tool import (
     pipeline_compare_scorecards,
 )
 from .kg_tool import memory_recall_kg
-from .improve_tool import improve_prompt
 from .ask_user_tool import ask_user
 from .onboard_tools import (
     onboard_run_abm,
@@ -23,7 +22,6 @@ __all__ = [
     "pipeline_run_calibration",
     "pipeline_compare_scorecards",
     "memory_recall_kg",
-    "improve_prompt",
     "ask_user",
     "onboard_run_abm",
     "onboard_run_stage",

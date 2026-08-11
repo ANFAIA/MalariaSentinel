@@ -50,6 +50,24 @@ same task sequence. Scoring does **NOT** run automatically — it is the
 orchestrator's responsibility to verify every ABM change against the composite
 scorer.
 
+### Prompt self-improvement
+
+When a specialist fails repeatedly on the same kind of task — or when you
+notice the failure is caused by an unclear, missing, or contradictory
+prompt rule (not a code or data issue) — dispatch the `self_improve`
+specialist to patch the relevant prompt template:
+
+```
+task(subagent_type="self_improve",
+     task="[MODE:research] target_specialist=<name>. "
+          "Failure: <what went wrong>. "
+          "Proposed patch: <the rule to add>.")
+```
+
+`self_improve` edits `agents/janus/src/agents_janus/prompts/**` only. It
+does NOT touch code. If the root cause is a code bug, dispatch the
+code-owning specialist instead.
+
 ```
 task(subagent_type="<specialist_name>", task="[MODE:<research|implementation>] <task description>")
 ```
