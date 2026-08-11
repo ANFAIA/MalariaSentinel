@@ -63,10 +63,10 @@ subagents:
     can_call_via: []
     edits_allow: [mal-commonlib/**]
   self_improve:
-    description: "Prompt self-improvement — patches specialist templates based on observed failure modes"
+    description: "Janus self-improvement — patches prompts, config, tools, wiring, and janus-internal code based on observed failure modes"
     spec: docs/specs/self_improve/spec.md
     gawt_role: self_improve
     can_call_via: []
     edits_allow:
-      - agents/janus/src/agents_janus/prompts/**
+      - agents/janus/**
 
