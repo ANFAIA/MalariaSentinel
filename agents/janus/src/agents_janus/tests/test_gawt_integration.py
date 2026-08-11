@@ -43,19 +43,16 @@ def _make_registry():
             name="abm", description="ABM C++ engine", model="", provider="",
             spec_path=None, skills=(), mailbox_inbox="",
             edits_allow=("mal-core/src/mal_core/abm/**",),
-            plugins=(),
         ),
         "scoring": SubagentSpec(
             name="scoring", description="Calibration scorers", model="", provider="",
             spec_path=None, skills=(), mailbox_inbox="",
             edits_allow=("mal-core/src/mal_core/abm/tests/calibration/**",),
-            plugins=(),
         ),
         "ingest": SubagentSpec(
             name="ingest", description="Env tensor builder", model="", provider="",
             spec_path=None, skills=(), mailbox_inbox="",
             edits_allow=("mal-core/src/mal_core/ingest/**",),
-            plugins=(),
         ),
     }
     return Registry(specs)

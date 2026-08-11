@@ -42,6 +42,14 @@ Always prefix the task string with one of:
 
 **Mode tag is MANDATORY.**
 
+### Scoring after ABM changes
+
+After dispatching the `abm` specialist to modify C++ ABM code, you **must**
+dispatch the `scoring` specialist (or invoke the scoring pipeline tool) in the
+same task sequence. Scoring does **NOT** run automatically — it is the
+orchestrator's responsibility to verify every ABM change against the composite
+scorer.
+
 ```
 task(subagent_type="<specialist_name>", task="[MODE:<research|implementation>] <task description>")
 ```

@@ -49,7 +49,6 @@ def _make_fake_registry():
     mock_spec.skills = ()
     mock_spec.mailbox_inbox = "inbox-scoring"
     mock_spec.edits_allow = ("runs/**",)
-    mock_spec.plugins = ()
 
     mock_spec_abm = MagicMock()
     mock_spec_abm.name = "abm"
@@ -60,7 +59,6 @@ def _make_fake_registry():
     mock_spec_abm.skills = ()
     mock_spec_abm.mailbox_inbox = "inbox-abm"
     mock_spec_abm.edits_allow = ("mal-core/**",)
-    mock_spec_abm.plugins = ()
 
     mock_registry = MagicMock()
     mock_registry.get.return_value = mock_spec
@@ -114,11 +112,11 @@ def test_onboard_ask_subagent_unknown_subagent():
 
 
 # ---------------------------------------------------------------------------
-# Test 3: onboard_ask_subagent uses empty plugin chain
+# Test 3: onboard_ask_subagent builds prompt without plugins
 # ---------------------------------------------------------------------------
 
-def test_onboard_ask_subagent_empty_plugins():
-    """build_subagent_prompt should be called with empty plugin list."""
+def test_onboard_ask_subagent_builds_prompt():
+    """build_subagent_prompt should be called with spec and all_specs."""
     with (
         patch("agents_janus.tools.onboard_tools._resolve_llm") as mock_llm,
         patch("agents_janus.subagents.builder.build_subagent_prompt") as mock_build,
@@ -130,15 +128,13 @@ def test_onboard_ask_subagent_empty_plugins():
 
         onboard_ask_subagent("scoring", "test")
 
-        # Verify the plugin chain is empty (passed as keyword arg)
-        _, kwargs = mock_build.call_args
-        plugin_chain = kwargs.get("plugin_chain", None)
-        # If not a keyword arg, check positional
-        if plugin_chain is None:
-            args = mock_build.call_args[0]
-            plugin_chain = args[1] if len(args) > 1 else None
-        assert plugin_chain is not None, f"call_args: {mock_build.call_args}"
-        assert len(plugin_chain) == 0
+        # Verify build_subagent_prompt was called (no plugin_chain param)
+        mock_build.assert_called_once()
+        call_args = mock_build.call_args
+        # First positional arg is spec
+        assert call_args[0][0].name == "scoring"
+        # all_specs is a keyword arg
+        assert "all_specs" in call_args.kwargs
 
 
 # ---------------------------------------------------------------------------

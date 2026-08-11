@@ -270,7 +270,6 @@ def onboard_list_components() -> str:
                 "name": name,
                 "description": spec.description,
                 "model": f"{spec.provider}/{spec.model}",
-                "plugins": list(spec.plugins),
                 "edits_allow": list(spec.edits_allow),
                 "mailbox_inbox": spec.mailbox_inbox,
                 "spec": str(spec.spec_path) if spec.spec_path else None,
@@ -359,8 +358,8 @@ def onboard_ask_subagent(name: str, question: str) -> str:
             "available": list(registry.all().keys()) if "registry" in dir() else [],
         })
 
-    # Build prompt (no plugins — read-only question)
-    system_prompt = build_subagent_prompt(spec, plugin_chain=[], all_specs=registry.all())
+    # Build prompt (read-only question, no plugins needed)
+    system_prompt = build_subagent_prompt(spec, all_specs=registry.all())
 
     # Resolve LLM and invoke
     try:

@@ -338,9 +338,9 @@ def create_orchestrator(
     # ── Subagent definitions (shared across both modes) ──────────────
     from agents_janus.subagents.registry import load_registry
     from agents_janus.subagents.builder import build_subagent_prompt
-    from agents_janus.plugins import PLUGIN_REGISTRY
     from agents_janus.mcp_bridge import get_gawt_mcp_tools_sync, filter_gawt_tools
     from agents_janus.tools.ask_user_tool import ask_user as ask_user_tool
+    from agents_janus.scope_validator import ScopeValidationMiddleware
 
     all_mcp_tools = get_gawt_mcp_tools_sync()
     gawt_tools = filter_gawt_tools(all_mcp_tools)
@@ -348,26 +348,21 @@ def create_orchestrator(
     registry = load_registry()
     worker_defs = []
     for name, spec in registry.all().items():
-        plugin_chain = [PLUGIN_REGISTRY[p]() for p in spec.plugins]
-
-        all_tools = []
-        for plugin in plugin_chain:
-            all_tools.extend(plugin.tools(spec))
-
-        # Add gawt MCP tools to each subagent
-        all_tools.extend(gawt_tools)
-        # Add ask_user to each subagent (fix: prompt tells them to use it)
+        all_tools = list(gawt_tools)
         all_tools.append(ask_user_tool)
 
         wrapped_tools = [_wrap_with_logging(t) for t in all_tools]
-        system_prompt = build_subagent_prompt(spec, plugin_chain, registry.all())
+        system_prompt = build_subagent_prompt(spec, registry.all())
 
         wd = {
             "name": name,
             "description": spec.description,
             "system_prompt": system_prompt,
             "tools": wrapped_tools,
-            "middleware": [SubAgentObservabilityMiddleware(obs, name)] if obs else [],
+            "middleware": [
+                ScopeValidationMiddleware(registry, name),
+                SubAgentObservabilityMiddleware(obs, name),
+            ] if obs else [ScopeValidationMiddleware(registry, name)],
         }
 
         if FilesystemPermission is not None:

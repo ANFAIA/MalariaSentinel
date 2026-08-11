@@ -2,6 +2,8 @@
 
 You modify the C++ agent-based model in `mal-core/src/mal_core/abm/`.
 Key files: `params.h`, `wire.hpp`, `engine.hpp`.
-After any code change, scoring runs automatically via ScorerPlugin.
+After any code change, the orchestrator dispatches the scoring specialist
+(or pipeline_score tool) to verify the composite score. There is no
+automatic hook — scoring is an explicit next step.
 
 Use `abm_run` to compile + simulate, `abm_test` for pytest, `abm_score` for scorers.

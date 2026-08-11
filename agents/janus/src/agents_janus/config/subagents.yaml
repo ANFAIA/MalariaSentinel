@@ -13,7 +13,6 @@ subagents:
     edits_allow:
       - mal-core/src/mal_core/abm/**
       - mal-core/src/mal_core/abm/tests/calibration/**
-    plugins: [scoring]
   scoring:
     description: "Calibration scorers + composite"
     spec: docs/specs/scoring/spec.md
@@ -23,14 +22,12 @@ subagents:
     edits_allow:
       - mal-core/src/mal_core/abm/tests/calibration/**
       - mal-core/src/mal_core/scoring/**
-    plugins: []
   ingest:
     description: "Env tensor + host density + mobility builder"
     spec: docs/specs/ingest/spec.md
     gawt_role: ingest
     can_call_via: []
     edits_allow: [mal-core/src/mal_core/ingest/**]
-    plugins: [ingest]
   download:
     description: "Plugin-based data fetcher (loaders, registry, runner)"
     spec: docs/specs/download/spec.md
@@ -39,21 +36,18 @@ subagents:
     edits_allow:
       - mal-core/src/mal_core/download/**
       - mal-commonlib/src/mal_commonlib/data/loaders/**
-    plugins: [download]
   prediction:
     description: "Risk raster predictor"
     spec: docs/specs/prediction/spec.md
     gawt_role: prediction
     can_call_via: []
     edits_allow: [mal-core/src/mal_core/prediction/**]
-    plugins: [prediction]
   training:
     description: "U-Net model, dataset, trainer"
     spec: docs/specs/training/spec.md
     gawt_role: training
     can_call_via: []
     edits_allow: [mal-core/src/mal_core/training/**]
-    plugins: [training]
   data:
     description: "Manifest + naming + completeness validation"
     spec: docs/specs/data/spec.md
@@ -62,12 +56,10 @@ subagents:
     edits_allow:
       - mal-commonlib/src/mal_commonlib/data/**
       - docs/specs/data/**
-    plugins: [data]
   commonlib:
     description: "Shared config + paths + AOI primitives"
     spec: docs/specs/commonlib/spec.md
     gawt_role: commonlib
     can_call_via: []
     edits_allow: [mal-commonlib/**]
-    plugins: [commonlib]
 

@@ -1,4 +1,4 @@
-"""Tests for the M14 subagent system."""
+"""Tests for the subagent system."""
 import json
 import tempfile
 from pathlib import Path
@@ -10,7 +10,7 @@ def test_subagent_spec_frozen():
     spec = SubagentSpec(
         name="test", description="test desc", model="m", provider="p",
         spec_path=None, skills=(), mailbox_inbox="inbox-test",
-        edits_allow=(), plugins=()
+        edits_allow=()
     )
     assert spec.name == "test"
     with pytest.raises(AttributeError):
@@ -22,73 +22,26 @@ def test_subagent_spec_gawt_role():
     spec = SubagentSpec(
         name="test", description="test desc", model="m", provider="p",
         spec_path=None, skills=(), mailbox_inbox="inbox-test",
-        edits_allow=(), plugins=(), gawt_role="custom-role"
+        edits_allow=(), gawt_role="custom-role"
     )
     assert spec.gawt_role == "custom-role"
 
     spec_default = SubagentSpec(
         name="test", description="test desc", model="m", provider="p",
         spec_path=None, skills=(), mailbox_inbox="inbox-test",
-        edits_allow=(), plugins=()
+        edits_allow=()
     )
     assert spec_default.gawt_role == ""
 
 
-def test_resolved_subagent():
-    from agents_janus.subagents.base import ResolvedSubagent, SubagentSpec
-    spec = SubagentSpec(
-        name="test", description="", model="", provider="",
-        spec_path=None, skills=(), mailbox_inbox="",
-        edits_allow=(), plugins=()
-    )
-    resolved = ResolvedSubagent(
-        spec=spec, tools=(), permissions=(), preamble="hello", hooks={}
-    )
-    assert resolved.preamble == "hello"
-
-
-def test_readonly_plugin():
-    from agents_janus.plugins.readonly import ReadOnlyPlugin
+def test_subagent_spec_no_plugins_field():
     from agents_janus.subagents.base import SubagentSpec
     spec = SubagentSpec(
         name="test", description="", model="", provider="",
         spec_path=None, skills=(), mailbox_inbox="",
-        edits_allow=(), plugins=()
+        edits_allow=()
     )
-    ro = ReadOnlyPlugin()
-    resolved = ro.apply(spec)
-    assert "READ-ONLY" in resolved.preamble
-    assert len(resolved.permissions) > 0
-
-
-def test_edit_plugin():
-    from agents_janus.plugins.edit import EditPlugin
-    from agents_janus.subagents.base import SubagentSpec
-    spec = SubagentSpec(
-        name="test", description="", model="", provider="",
-        spec_path=None, skills=(), mailbox_inbox="",
-        edits_allow=(), plugins=()
-    )
-    edit = EditPlugin()
-    resolved = edit.apply(spec)
-    assert "gawt" in resolved.preamble.lower()
-    assert "mcp__gitagent__edit_file" in resolved.preamble
-    assert len(resolved.permissions) == 0
-
-
-def test_builder_chain():
-    from agents_janus.subagents.builder import build_resolved
-    from agents_janus.plugins.edit import EditPlugin
-    from agents_janus.plugins.readonly import ReadOnlyPlugin
-    from agents_janus.subagents.base import SubagentSpec
-    spec = SubagentSpec(
-        name="test", description="", model="", provider="",
-        spec_path=None, skills=(), mailbox_inbox="",
-        edits_allow=(), plugins=()
-    )
-    result = build_resolved(spec, [EditPlugin(), ReadOnlyPlugin()])
-    assert "gawt" in result.preamble.lower()
-    assert "READ-ONLY" in result.preamble
+    assert not hasattr(spec, "plugins")
 
 
 def test_scope_validator():
@@ -97,9 +50,9 @@ def test_scope_validator():
     from agents_janus.subagents.base import SubagentSpec
     specs = {
         "abm": SubagentSpec(name="abm", description="", model="", provider="", spec_path=None,
-                            skills=(), mailbox_inbox="", edits_allow=("mal-core/src/mal_core/abm/**",), plugins=()),
+                            skills=(), mailbox_inbox="", edits_allow=("mal-core/src/mal_core/abm/**",)),
         "download": SubagentSpec(name="download", description="", model="", provider="", spec_path=None,
-                                 skills=(), mailbox_inbox="", edits_allow=("mal-core/src/mal_core/download/**",), plugins=()),
+                                 skills=(), mailbox_inbox="", edits_allow=("mal-core/src/mal_core/download/**",)),
     }
     reg = Registry(specs)
     # In scope
@@ -120,7 +73,7 @@ def test_registry_find_owner():
     from agents_janus.subagents.base import SubagentSpec
     specs = {
         "abm": SubagentSpec(name="abm", description="", model="", provider="", spec_path=None,
-                            skills=(), mailbox_inbox="", edits_allow=("mal-core/src/mal_core/abm/**",), plugins=()),
+                            skills=(), mailbox_inbox="", edits_allow=("mal-core/src/mal_core/abm/**",)),
     }
     reg = Registry(specs)
     assert reg.find_owner("mal-core/src/mal_core/abm/engine.hpp") == "abm"
@@ -132,7 +85,7 @@ def test_registry_loads_gawt_role():
     from agents_janus.subagents.base import SubagentSpec
     specs = {
         "abm": SubagentSpec(name="abm", description="", model="", provider="", spec_path=None,
-                            skills=(), mailbox_inbox="", edits_allow=(), plugins=(),
+                            skills=(), mailbox_inbox="", edits_allow=(),
                             gawt_role="abm-worker"),
     }
     reg = Registry(specs)

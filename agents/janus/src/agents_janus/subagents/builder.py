@@ -1,49 +1,13 @@
-"""Build a deepagents subagent from a SubagentSpec + plugin chain."""
+"""Build a deepagents subagent prompt from a SubagentSpec."""
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
 from pathlib import Path
 from jinja2 import Template
 
-from agents_janus.subagents.base import ResolvedSubagent, SubagentSpec
-
-if TYPE_CHECKING:
-    from agents_janus.plugins.base import Plugin
+from agents_janus.subagents.base import SubagentSpec
 
 _PROMPTS_DIR = Path(__file__).resolve().parent.parent / "prompts"
-
-
-def build_resolved(spec: SubagentSpec, plugins: list[Plugin]) -> ResolvedSubagent:
-    """Apply a plugin chain to a SubagentSpec, returning a ResolvedSubagent.
-
-    Plugins are applied in order. Each plugin's apply() is called on the spec,
-    producing a ResolvedSubagent. Then the next plugin's outputs are merged:
-    - tools: concatenated
-    - permissions: concatenated
-    - preamble: concatenated (newline-joined)
-    - hooks: merged (later plugin wins on key conflict)
-    """
-    all_tools: list = []
-    all_permissions: list = []
-    preambles: list[str] = []
-    all_hooks: dict = {}
-
-    for plugin in plugins:
-        resolved = plugin.apply(spec)
-        all_tools.extend(resolved.tools)
-        all_permissions.extend(resolved.permissions)
-        if resolved.preamble:
-            preambles.append(resolved.preamble)
-        all_hooks.update(resolved.hooks)
-
-    return ResolvedSubagent(
-        spec=spec,
-        tools=tuple(all_tools),
-        permissions=tuple(all_permissions),
-        preamble="\n\n".join(preambles),
-        hooks=all_hooks,
-    )
 
 
 def _render_template(name: str, **kwargs) -> str:
@@ -68,15 +32,13 @@ def _get_peer_registry_table(self_name: str, all_specs: dict[str, SubagentSpec])
 
 def build_subagent_prompt(
     spec: SubagentSpec,
-    plugin_chain: list[Plugin],
     all_specs: dict[str, SubagentSpec] | None = None,
 ) -> str:
-    """Compose the full system prompt from three layers + plugins.
+    """Compose the full system prompt from three layers.
 
     Layer A: behavioral spec (from docs/specs/<X>/spec.md)
     Layer B: specialist template (gawt MCP-native registration protocol)
     Layer C: per-subagent domain clarifications
-    Plugins: preambles from plugin chain
     """
     # Layer A: behavioral spec
     spec_text = ""
@@ -104,16 +66,11 @@ def build_subagent_prompt(
         spec=spec,
     )
 
-    # Plugin preambles
-    plugin_text = "\n\n".join(p.preamble(spec) for p in plugin_chain if p.preamble(spec))
-
     # Assemble
     parts = []
     if specialist_text:
         parts.append(specialist_text)
     if per_subagent_text:
         parts.append(per_subagent_text)
-    if plugin_text:
-        parts.append(f"## Plugin instructions\n{plugin_text}")
 
     return "\n\n".join(parts)
