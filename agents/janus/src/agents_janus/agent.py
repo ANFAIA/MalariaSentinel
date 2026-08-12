@@ -20,12 +20,9 @@ if str(_project_root) not in sys.path:
     sys.path.insert(0, str(_project_root))
 
 from agents_janus.logger import SessionLogger
+from agents_janus.malariasim_backend import MalariasimShellBackend
+from agents_janus.middleware.tool_filter import ToolFilterMiddleware
 from agents_janus.observability import ObservabilityMiddleware, SubAgentObservabilityMiddleware
-
-try:
-    from deepagents import FilesystemPermission
-except ImportError:
-    FilesystemPermission = None  # type: ignore[assignment,misc]
 
 # Module-level flags set by CLI before creating the agent
 VERIFY_FINALIZE: bool = True
@@ -97,21 +94,6 @@ def _wrap_with_logging(tool_func):
     return wrapper
 
 
-def _import_abm_run():
-    from agents_janus.tools.abm_tools import abm_run
-    return abm_run
-
-
-def _import_abm_test():
-    from agents_janus.tools.abm_tools import abm_test
-    return abm_test
-
-
-def _import_abm_score():
-    from agents_janus.tools.abm_tools import abm_score
-    return abm_score
-
-
 def _render_prompt(mode: Literal["centinela", "dispatcher"]) -> str:
     """Render the orchestrator prompt from the Jinja2 template."""
     # Load specialist list from registry for programmatic injection
@@ -165,46 +147,39 @@ sessions, dispatch specialists, monitor progress, and finalize.
 # ── Tool sets ───────────────────────────────────────────────────────────
 
 def _get_dispatcher_tools():
-    """Tools for dispatcher mode: pipeline, ABM, search, memory."""
+    """Tools for dispatcher mode: search, memory, ask_user.
+
+    Shell access comes from the built-in `execute` tool (MalariasimShellBackend
+    restricts it to `malariasim` only) — no custom ABM execution tools.
+    """
     from agents_janus.tools import (
         web_search,
-        pipeline_run_calibration,
-        pipeline_compare_scorecards,
         memory_recall_kg,
         ask_user,
     )
     return [
         _wrap_with_logging(web_search),
-        _wrap_with_logging(_import_abm_run()),
-        _wrap_with_logging(_import_abm_test()),
-        _wrap_with_logging(_import_abm_score()),
-        _wrap_with_logging(pipeline_run_calibration),
-        _wrap_with_logging(pipeline_compare_scorecards),
         _wrap_with_logging(memory_recall_kg),
         _wrap_with_logging(ask_user),
     ]
 
 
 def _get_centinela_tools():
-    """Tools for centinela mode: onboard tools + memory + ask_user."""
+    """Tools for centinela mode: onboard tools + memory + ask_user.
+
+    Shell access comes from the built-in `execute` tool (restricted to
+    `malariasim` via the backend) — no custom ABM execution tools.
+    """
     from agents_janus.tools.kg_tool import memory_recall_kg
     from agents_janus.tools.ask_user_tool import ask_user
     from agents_janus.tools.onboard_tools import (
-        onboard_run_abm,
-        onboard_run_stage,
-        onboard_run_pipeline,
         onboard_status,
-        onboard_diagnose,
         onboard_list_components,
         delegate_to_dispatcher,
         onboard_ask_subagent,
     )
     return [
-        _wrap_with_logging(onboard_run_abm),
-        _wrap_with_logging(onboard_run_stage),
-        _wrap_with_logging(onboard_run_pipeline),
         _wrap_with_logging(onboard_status),
-        _wrap_with_logging(onboard_diagnose),
         _wrap_with_logging(onboard_list_components),
         _wrap_with_logging(delegate_to_dispatcher),
         _wrap_with_logging(onboard_ask_subagent),
@@ -276,12 +251,10 @@ def create_orchestrator(
     try:
         from deepagents import (
             create_deep_agent,
-            FilesystemPermission,
             GeneralPurposeSubagentProfile,
             HarnessProfile,
             register_harness_profile,
         )
-        from deepagents.backends import FilesystemBackend
     except ImportError:
         raise ImportError(
             "The 'deepagents' package is required but not installed. "
@@ -308,9 +281,15 @@ def create_orchestrator(
 
     llm = _resolve_provider(provider, model)
 
-    backend = FilesystemBackend(
+    # MalariasimShellBackend exposes the built-in `execute` tool (bash) but
+    # restricts it to `malariasim` commands via a policy hook. Filesystem
+    # deny rules (secrets, data/, .git/) are enforced in the backend too, so
+    # no FilesystemPermission is passed to deepagents (it is incompatible
+    # with execution-capable backends).
+    backend = MalariasimShellBackend(
         root_dir=str(REPO_ROOT),
         virtual_mode=True,
+        inherit_env=True,
     )
 
     # Observability middleware
@@ -373,26 +352,15 @@ def create_orchestrator(
             ],
         }
 
-        if FilesystemPermission is not None:
-            wd["permissions"] = [
-                FilesystemPermission(operations=["read"], paths=["/.env", "/**/.env", "/**/*secret*", "/**/*credential*"], mode="deny"),
-                FilesystemPermission(operations=["write"], paths=["/data/**"], mode="deny"),
-                FilesystemPermission(operations=["write"], paths=["/.git/**"], mode="deny"),
-                FilesystemPermission(operations=["write"], paths=["/.gitagent/worktree/**"], mode="allow"),
-                FilesystemPermission(operations=["write"], paths=["/**"], mode="deny"),
-                FilesystemPermission(operations=["read"], paths=["/**"], mode="allow"),
-            ]
+        # Only the abm specialist gets shell access (the built-in `execute`
+        # tool). Every other subagent has `execute` filtered out. The
+        # orchestrator keeps `execute` (it runs malariasim directly).
+        if name != "abm":
+            wd["middleware"].append(
+                ToolFilterMiddleware(excluded=frozenset({"execute"}))
+            )
 
         worker_defs.append(wd)
-
-    # ── Orchestrator permissions (both modes: read-only) ─────────────
-    orch_permissions = []
-    if FilesystemPermission is not None:
-        orch_permissions = [
-            FilesystemPermission(operations=["read"], paths=["/.env", "/**/.env", "/**/*secret*", "/**/*credential*"], mode="deny"),
-            FilesystemPermission(operations=["write"], paths=["/**"], mode="deny"),
-            FilesystemPermission(operations=["read"], paths=["/**"], mode="allow"),
-        ]
 
     # ── Orchestrator tools (mode-specific) ───────────────────────────
     if mode == "centinela":
@@ -409,7 +377,6 @@ def create_orchestrator(
         skills=skills or None,
         name=f"janus-orchestrator-{mode}",
         middleware=middleware,
-        permissions=orch_permissions,
     )
 
     # Wire resolve_conflict lazy reference — tool can now access the agent graph

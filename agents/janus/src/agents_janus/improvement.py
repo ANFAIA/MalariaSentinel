@@ -101,6 +101,8 @@ def run_improvement(
     from agents_janus.logger import SessionLogger
 
     logger = SessionLogger()
+    prev_logger = agent_mod.SESSION_LOGGER
+    prev_obs = agent_mod.OBSERVABILITY_MIDDLEWARE
     agent_mod.SESSION_LOGGER = logger
     logger.log_decision("improvement_start", f"goal={goal}, plan={plan_path}")
 
@@ -177,8 +179,8 @@ def run_improvement(
             except Exception:
                 pass
         logger.close()
-        agent_mod.SESSION_LOGGER = None
-        agent_mod.OBSERVABILITY_MIDDLEWARE = None
+        agent_mod.SESSION_LOGGER = prev_logger
+        agent_mod.OBSERVABILITY_MIDDLEWARE = prev_obs
 
 
 def _get_trace_url(agent_mod) -> str | None:

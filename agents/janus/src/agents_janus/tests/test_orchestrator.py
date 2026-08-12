@@ -48,8 +48,12 @@ class TestRenderPrompt:
 
     def test_centinela_has_onboard_tools(self):
         prompt = _render_prompt("centinela")
-        assert "onboard_run_abm" in prompt
+        assert "onboard_status" in prompt
         assert "delegate_to_dispatcher" in prompt
+
+    def test_centinela_has_execute(self):
+        prompt = _render_prompt("centinela")
+        assert "execute(command=\"malariasim" in prompt
 
 
 class TestGetTools:

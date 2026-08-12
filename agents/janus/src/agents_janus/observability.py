@@ -52,13 +52,8 @@ _TOOL_CATEGORIES: dict[str, str] = {
     "mcp__gitagent__start_intent": "gawt",
     "mcp__gitagent__repurpose": "gawt",
     "mcp__gitagent__unregister_agent": "gawt",
-    # ABM tools
-    "abm_run": "abm",
-    "abm_test": "abm",
-    "abm_score": "abm",
-    # Pipeline tools
-    "pipeline_run_calibration": "pipeline",
-    "pipeline_compare_scorecards": "pipeline",
+    # Execute tool (bash restricted to malariasim)
+    "execute": "abm",
     # Memory tools
     "memory_recall_kg": "memory",
     "memory_node": "memory",
@@ -69,11 +64,7 @@ _TOOL_CATEGORIES: dict[str, str] = {
     # Dispatch delegation
     "delegate_to_dispatcher": "dispatch",
     "onboard_ask_subagent": "user",
-    "onboard_run_abm": "pipeline",
-    "onboard_run_stage": "pipeline",
-    "onboard_run_pipeline": "pipeline",
     "onboard_status": "pipeline",
-    "onboard_diagnose": "pipeline",
     "onboard_list_components": "pipeline",
     # Misc tools
     "web_search": "other",

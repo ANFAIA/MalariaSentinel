@@ -3,7 +3,21 @@
 You modify the C++ agent-based model in `mal-core/src/mal_core/abm/`.
 Key files: `params.h`, `wire.hpp`, `engine.hpp`.
 After any code change, the orchestrator dispatches the scoring specialist
-(or pipeline_score tool) to verify the composite score. There is no
+(or `malariasim score`) to verify the composite score. There is no
 automatic hook — scoring is an explicit next step.
 
-Use `abm_run` to compile + simulate, `abm_test` for pytest, `abm_score` for scorers.
+## Running the ABM pipeline
+
+Use the `execute` tool to run the pipeline via the `malariasim` CLI
+(the only shell command available to you):
+
+```
+execute(command="malariasim abm --aoi ghana --days 30 --seed 1")
+execute(command="malariasim abm --aoi ghana --year 2024 --month 6 --days 365")
+execute(command="malariasim score --run-dir runs/abm --tier fast")
+execute(command="malariasim ingest --aoi ghana --year 2024 --month 6")
+```
+
+Always run from the repo root. Inspect the returned stdout/stderr before
+changing code. Use `malariasim` subcommands — do not invoke the C++ binary
+directly.

@@ -14,11 +14,7 @@ import pytest
 
 # Pre-import so module-level patches work (avoids import-inside-with issues)
 from agents_janus.tools.onboard_tools import (
-    onboard_run_abm,
-    onboard_run_stage,
-    onboard_run_pipeline,
     onboard_status,
-    onboard_diagnose,
     onboard_list_components,
     delegate_to_dispatcher,
     onboard_ask_subagent,
@@ -177,11 +173,7 @@ def test_delegate_to_dispatcher_with_plan():
 def test_onboarding_tools_complete():
     """All expected tools should be callable."""
     expected_tools = [
-        onboard_run_abm,
-        onboard_run_stage,
-        onboard_run_pipeline,
         onboard_status,
-        onboard_diagnose,
         onboard_list_components,
         delegate_to_dispatcher,
         onboard_ask_subagent,

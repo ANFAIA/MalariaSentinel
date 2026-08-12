@@ -26,19 +26,25 @@ uv run python -m agents_janus calibration -g "Improve spatial scorers" --dry-run
 ```
 ┌──────────────────────────────────────────────────────────┐
 │ ORCHESTRATOR (LLM)                                       │
-│ Backend: FilesystemBackend(virtual_mode=True)             │
-│ Tools: 17 (gitagent, pipeline, kg, search, improve)      │
-│ Read-only via deny-write permissions.                     │
+│ Backend: MalariasimShellBackend(virtual_mode=True)       │
+│ execute tool (bash) → malariasim only                   │
+│ + gawt MCP, search, kg, ask_user                        │
 └───────────┬──────────────────────────────────────────────┘
             │ gitagent spawn → worktree
             ▼
 ┌──────────────────────────────────────────────────────────┐
-│ WORKER (LLM, sandboxed)                                  │
-│ Backend: FilesystemBackend(virtual_mode=True)             │
-│ Tools: abm_run, abm_test, abm_score (3 custom)           │
-│ Can only see its own worktree. No secrets/data/git writes.│
+│ WORKER (LLM)                                             │
+│ Backend: MalariasimShellBackend(virtual_mode=True)       │
+│ abm specialist: execute → malariasim only               │
+│ others: execute filtered out (ToolFilterMiddleware)     │
+│ No secrets/data/git writes (backend policy hooks).       │
 └──────────────────────────────────────────────────────────┘
 ```
+
+Shell access is the deepagents built-in `execute` tool — restricted to
+`malariasim` commands via the `MalariasimShellBackend` policy hook. The old
+custom ABM tools (`abm_run`, `abm_test`, `abm_score`) and pipeline tools were
+removed.
 
 ### The gitagent workflow
 
@@ -121,13 +127,17 @@ agents_janus/
 ├── AGENTS.md                # Agent conventions and pitfalls
 │
 ├── tools/                   # Custom tools for the orchestrator
-│   ├── __init__.py          # Exports all 17 tools
-│   ├── gitagent_tool.py     # 12 gitagent CLI wrappers (init→finalize)
-│   ├── abm_tools.py         # abm_run, abm_test, abm_score (worker tools)
-│   ├── web_search.py         # Web search via OpenRouter/Perplexity
+│   ├── __init__.py          # Exports all tools
+│   ├── web_search.py        # Web search via OpenRouter/Perplexity
 │   ├── kg_tool.py           # Knowledge graph recall (Neo4j)
-│   ├── pipeline_tool.py     # Run calibration suite, compare scorecards
-│   └── improve_tool.py      # DELETED: replaced by self_improve specialist
+│   ├── onboard_tools.py     # Status, list components, delegate, ask_subagent
+│   └── ask_user_tool.py     # Ask the user
+│
+├── malariasim_backend.py    # MalariasimShellBackend — execute → malariasim only
+│
+├── middleware/              # Agent middleware (scope, inbox, tool filter)
+│   ├── inbox_check.py
+│   └── tool_filter.py       # Excludes execute from non-abm subagents
 │
 ├── cycles/                  # High-level workflows
 │   ├── calibration_cycle.py # Calibration improvement cycle (9 steps)
@@ -138,72 +148,60 @@ agents_janus/
 │   ├── templates/           # Per-worker prompt templates
 │   └── patches/             # Self-improvement patches
 │
-└── tests/                   # E2E tests (34 tests, all mocked)
+└── tests/                   # E2E tests (all mocked)
     ├── conftest.py          # sys.path setup for imports
-    ├── test_gitagent_tools.py
-    ├── test_abm_tools.py
     ├── test_orchestrator.py
     ├── test_cli.py
-    └── test_permissions.py
+    └── test_permissions.py  # Backend policy hooks (execute + fs denies)
 ```
 
 ## Tools reference
 
-### Orchestrator tools (17)
+### Orchestrator tools
 
 | Tool | Purpose | Category |
 |---|---|---|
-| `gitagent_init` | Initialize gitagent in repo (idempotent) | gitagent |
-| `gitagent_start` | Open a session for a feature | gitagent |
-| `gitagent_spawn` | Spawn worker in isolated worktree | gitagent |
-| `gitagent_list_agents` | List active workers | gitagent |
-| `gitagent_kill` | Kill a zombie worker | gitagent |
-| `gitagent_proposals` | List proposals (JSON) | gitagent |
-| `gitagent_diff` | Raw diff for a proposal | gitagent |
-| `gitagent_accept` | Mark proposal accepted (no apply) | gitagent |
-| `gitagent_reject` | Reject a proposal | gitagent |
-| `gitagent_revise` | Send proposal back for iteration | gitagent |
-| `gitagent_integrate` | Apply all accepted proposals | gitagent |
-| `gitagent_finalize` | Create 1 commit on main + cleanup | gitagent |
-| `pipeline_run_calibration` | Run pytest calibration suite | pipeline |
-| `pipeline_compare_scorecards` | Compare scorecards against baseline | pipeline |
-| `memory_recall_kg` | Recall from Neo4j knowledge graph | kg |
+| `execute` | Shell — **only `malariasim`** (built-in, restricted by backend) | abm |
 | `web_search` | Web search via Perplexity | search |
+| `memory_recall_kg` | Recall from Neo4j knowledge graph | kg |
+| `ask_user` | Ask the user for clarification | user |
+| `onboard_status` | Show system status (centinela) | pipeline |
+| `onboard_list_components` | List registered subagents (centinela) | pipeline |
+| `delegate_to_dispatcher` | Hand off implementation to dispatcher (centinela) | dispatch |
+| `onboard_ask_subagent` | Quick specialist question (centinela) | user |
+| `mcp__gitagent__*` | gawt session lifecycle (dispatcher) | gawt |
 
-### Worker tools (3)
+### Worker tools (subagents)
 
 | Tool | Purpose |
 |---|---|
-| `abm_run` | Compile (if needed) + run ABM simulation |
-| `abm_test` | Run `pytest -m fast -v` on calibration suite |
-| `abm_score` | Run 14 scorers + composite + optional LLM verdict |
+| `mcp__gitagent__*` | gawt edit/read/list (shared worktree) |
+| `execute` | **abm specialist only** — shell restricted to `malariasim` |
+| `ask_user`, `resolve_conflict` | Interaction helpers |
 
 ## Sandboxing
 
-### Orchestrator permissions
+Shell access is the deepagents built-in `execute` tool, restricted to
+`malariasim` via the `MalariasimShellBackend` policy hook
+(`malariasim_backend.py`). Only the orchestrator and the `abm` specialist see
+`execute`; every other subagent has it filtered out by `ToolFilterMiddleware`.
+Filesystem deny rules are enforced as backend policy hooks (not
+`FilesystemPermission`, which is incompatible with execution backends):
+
+### Backend policy hooks (all agents)
 
 | Path | Operation | Mode |
 |---|---|---|
-| `/**` | read | allow |
 | `/.env`, `/**/.env`, `/**/*secret*`, `/**/*credential*` | read | deny |
-| `/**` | write, edit | deny |
+| `/.gitagent/worktree/**` | write, edit | allow |
+| `/data/**`, `/.git/**`, anything else | write, edit | deny |
+| shell commands not starting with `malariasim` | execute | deny |
 
-The orchestrator has **read-only access to the entire repo** via `deny-write` permissions. It writes only via `gitagent_*` tools (which operate through the gitagent CLI, not the filesystem).
-
-### Worker permissions
-
-| Path | Operation | Mode |
-|---|---|---|
-| `/**` | read, write, edit | allow |
-| `/.env`, `/**/.env`, `/**/*secret*`, `/**/*credential*` | read | deny |
-| `/data/**` | write, edit | deny |
-| `/.gitagent/**`, `/.git/**` | write, edit | deny |
-
-Workers are sandboxed to their gitagent worktree via `FilesystemBackend(virtual_mode=True)`. They cannot:
+Agents cannot:
 - Read `.env` files or secrets
 - Modify input datasets in `/data/`
 - Touch gitagent metadata or git internals
-- Escape their worktree (no `../` access)
+- Run any shell command other than `malariasim`
 
 ## Session logging
 

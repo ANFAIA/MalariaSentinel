@@ -1,92 +1,91 @@
-"""Tests for permission configuration — secrets, data, gitagent protection."""
+"""Tests for backend policy hooks — secrets, data, gitagent protection.
+
+FilesystemPermission is no longer passed to deepagents (it is incompatible
+with execution-capable backends). The deny rules now live in
+MalariasimShellBackend as backend policy hooks:
+- execute(): only `malariasim` commands
+- read(): denies secrets/.env
+- write()/edit(): only under the gawt worktree
+"""
 from __future__ import annotations
 
-import sys
-from pathlib import Path
-from unittest.mock import MagicMock, patch
 import pytest
 
 
-class TestWorkerPermissions:
-    """Test that worker permissions are correctly configured via create_orchestrator."""
+def _output(result) -> str:
+    return getattr(result, "output", "")
 
-    def _create_orchestrator_with_mock(self):
-        """Helper to create orchestrator with mocked deepagents."""
-        mock_backend_mod = MagicMock()
-        mock_backend_class = MagicMock()
-        mock_backend_mod.FilesystemBackend = mock_backend_class
 
-        mock_deepagents = MagicMock()
-        mock_deepagents.create_deep_agent = MagicMock()
-        mock_deepagents.backends = mock_backend_mod
-        mock_deepagents.FilesystemPermission = MagicMock
+def _rejected(result) -> bool:
+    return "Only `malariasim` commands" in _output(result)
 
-        originals = {
-            "deepagents": sys.modules.get("deepagents"),
-            "deepagents.backends": sys.modules.get("deepagents.backends"),
-        }
-        sys.modules["deepagents"] = mock_deepagents
-        sys.modules["deepagents.backends"] = mock_backend_mod
 
-        try:
-            import importlib
-            import agents_janus.agent as agent_mod
-            importlib.reload(agent_mod)
+class TestMalariasimShellBackendExecute:
+    @pytest.fixture()
+    def backend(self):
+        from agents_janus.malariasim_backend import MalariasimShellBackend
+        return MalariasimShellBackend(root_dir="/tmp", virtual_mode=True, inherit_env=True)
 
-            with patch.object(agent_mod, "_resolve_provider") as mock_resolve:
-                mock_resolve.return_value = MagicMock()
-                agent_mod.create_orchestrator(provider="openrouter", model="test", thread_id="test")
+    def test_allows_malariasim(self, backend):
+        # malariasim may not be on PATH; what matters is the command is NOT
+        # rejected by the policy hook (it reaches the shell).
+        result = backend.execute("malariasim --help")
+        assert not _rejected(result)
 
-            # Get the worker definitions that were passed to create_deep_agent
-            call_kwargs = mock_deepagents.create_deep_agent.call_args
-            worker_defs = call_kwargs.kwargs.get("subagents", call_kwargs.args[2] if len(call_kwargs.args) > 2 else [])
-            return worker_defs[0] if worker_defs else None
-        finally:
-            for key, val in originals.items():
-                if val is not None:
-                    sys.modules[key] = val
-                else:
-                    sys.modules.pop(key, None)
-            importlib.reload(agent_mod)
+    def test_allows_uv_run_malariasim(self, backend):
+        result = backend.execute("uv run malariasim --help")
+        assert not _rejected(result)
 
-    def test_deny_secrets(self):
-        result = self._create_orchestrator_with_mock()
-        assert result is not None, "No worker definitions found"
-        perms = result.get("permissions", [])
-        deny_perms = [p for p in perms if hasattr(p, 'mode') and p.mode == "deny"]
-        all_deny_paths = [path for p in deny_perms for path in p.paths]
-        assert any("secret" in p for p in all_deny_paths)
-        assert any(".env" in p for p in all_deny_paths)
+    def test_rejects_non_malariasim(self, backend):
+        result = backend.execute("ls -la")
+        assert _rejected(result)
+        assert result.exit_code == 1
 
-    def test_deny_data_write(self):
-        result = self._create_orchestrator_with_mock()
-        assert result is not None
-        perms = result.get("permissions", [])
-        deny_write = [
-            p for p in perms
-            if hasattr(p, 'mode') and p.mode == "deny" and "write" in p.operations
-        ]
-        all_deny_paths = [path for p in deny_write for path in p.paths]
-        assert any("/data/**" in p for p in all_deny_paths)
+    def test_rejects_shell_escape(self, backend):
+        result = backend.execute("malariasim --help; rm -rf /")
+        assert _rejected(result)
 
-    def test_deny_gitagent_write(self):
-        result = self._create_orchestrator_with_mock()
-        assert result is not None
-        perms = result.get("permissions", [])
+    def test_rejects_pipe_escape(self, backend):
+        result = backend.execute("malariasim --help | sh")
+        assert _rejected(result)
 
-        # .git/ must be denied (git internals protection)
-        deny_write = [
-            p for p in perms
-            if hasattr(p, 'mode') and p.mode == "deny" and "write" in p.operations
-        ]
-        all_deny_paths = [path for p in deny_write for path in p.paths]
-        assert any(".git/" in p for p in all_deny_paths), ".git/ should be in deny paths"
+    def test_rejects_command_substitution(self, backend):
+        result = backend.execute("malariasim --aoi $(whoami)")
+        assert _rejected(result)
 
-        # .gitagent worktree paths must be explicitly ALLOWED (overrides catch-all deny)
-        allow_write = [
-            p for p in perms
-            if hasattr(p, 'mode') and p.mode == "allow" and "write" in p.operations
-        ]
-        all_allow_paths = [path for p in allow_write for path in p.paths]
-        assert any(".gitagent" in p and "worktree" in p for p in all_allow_paths), \
-            ".gitagent worktree paths should be in allow paths"
+
+class TestMalariasimShellBackendFilesystem:
+    @pytest.fixture()
+    def backend(self, tmp_path):
+        from agents_janus.malariasim_backend import MalariasimShellBackend
+        return MalariasimShellBackend(root_dir=str(tmp_path), virtual_mode=True)
+
+    def test_read_denies_secrets(self, backend):
+        result = backend.read("/.env")
+        assert result.error is not None
+        assert "denied" in result.error
+
+    def test_read_allows_normal_files(self, backend):
+        result = backend.write("/.gitagent/worktree/notes.txt", "hello")
+        assert result.error is None
+        result = backend.read("/.gitagent/worktree/notes.txt")
+        assert result.error is None
+
+    def test_write_denied_outside_worktree(self, backend):
+        result = backend.write("/data/ghana/foo.tif", "x")
+        assert result.error is not None
+        assert "denied" in result.error
+
+    def test_write_denied_git_internals(self, backend):
+        result = backend.write("/.git/config", "x")
+        assert result.error is not None
+        assert "denied" in result.error
+
+    def test_write_allowed_in_worktree(self, backend):
+        result = backend.write("/.gitagent/worktree/test.txt", "hi")
+        assert result.error is None
+
+    def test_edit_denied_outside_worktree(self, backend):
+        result = backend.edit("/data/ghana/foo.tif", "a", "b")
+        assert result.error is not None
+        assert "denied" in result.error

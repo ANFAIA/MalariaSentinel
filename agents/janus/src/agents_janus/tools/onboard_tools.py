@@ -1,16 +1,13 @@
-"""Onboarding agent tools — direct-execution tools for the conversational centinela.
+"""Onboarding agent tools — status, diagnostics, and delegation for the centinela.
 
-These tools let the centinela run ABM simulations, pipeline stages,
-diagnostics, and status checks. For code-editing tasks, use
+For shell access, the centinela uses the built-in `execute` tool (restricted
+to `malariasim` by MalariasimShellBackend). For code-editing tasks, use
 delegate_to_dispatcher to hand off to the dispatcher orchestrator.
 """
 from __future__ import annotations
 
 import json
 import os
-import subprocess
-import sys
-import time
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent
@@ -55,145 +52,6 @@ def _resolve_llm():
 STAGES = ("download", "ingest", "abm", "score", "train", "predict")
 
 
-def onboard_run_abm(
-    aoi: str = "ghana",
-    year: int = 2024,
-    month: int = 1,
-    days: int = 365,
-    seed: int = 1,
-    n_rollouts: int = 1,
-) -> str:
-    """Run an ABM simulation for the given AOI.
-
-    Builds the C++ binary if needed, then runs the simulation.
-    Returns JSON with status, duration, and output path.
-
-    Args:
-        aoi: Area of interest slug (ghana, niger, tanzania, custom).
-        year: Simulation year.
-        month: Simulation month.
-        days: Simulation duration in days.
-        seed: PRNG seed for reproducibility.
-        n_rollouts: Number of parallel rollouts.
-    """
-    start = time.monotonic()
-    try:
-        from mal_core.abm.runner import run_abm
-
-        result = run_abm(
-            aoi=aoi, year=year, month=month, days=days,
-            n_rollouts=n_rollouts, seed=seed,
-        )
-        elapsed = time.monotonic() - start
-        return json.dumps({
-            "status": "ok" if result.get("returncode", -1) == 0 else "run_failed",
-            "aoi": aoi,
-            "year": year,
-            "days": days,
-            "seed": seed,
-            "returncode": result.get("returncode"),
-            "stdout_tail": result.get("stdout", "")[-500:],
-            "stderr_tail": result.get("stderr", "")[-500:],
-            "duration_s": round(elapsed, 1),
-        })
-    except Exception as e:
-        return json.dumps({"status": "error", "error": str(e), "aoi": aoi})
-
-
-def onboard_run_stage(
-    stage: str,
-    aoi: str = "ghana",
-) -> str:
-    """Run a single pipeline stage via the malariasim CLI.
-
-    Args:
-        stage: One of: download, ingest, abm, score, train, predict.
-        aoi: Area of interest slug.
-    """
-    if stage not in STAGES:
-        return json.dumps({
-            "status": "error",
-            "error": f"Unknown stage: {stage}. Must be one of: {', '.join(STAGES)}",
-        })
-
-    start = time.monotonic()
-    cmd = [sys.executable, "-m", "mal_core.cli", stage, "--aoi", aoi]
-
-    # Stage-specific defaults
-    if stage == "download":
-        cmd.extend(["--datasets", "era5,chirps"])
-    elif stage == "abm":
-        cmd.extend(["--days", "30", "--seed", "1"])
-    elif stage == "score":
-        # score needs --run-dir, not --aoi
-        run_dir = REPO_ROOT / "runs" / "abm"
-        if run_dir.exists():
-            cmd = [sys.executable, "-m", "mal_core.cli", "score", "--run-dir", str(run_dir)]
-        else:
-            return json.dumps({
-                "status": "error",
-                "error": f"No ABM run directory found at {run_dir}. Run the ABM stage first.",
-            })
-    elif stage == "train":
-        run_dir = REPO_ROOT / "runs" / "abm"
-        if run_dir.exists():
-            cmd = [sys.executable, "-m", "mal_core.cli", "train", "--run-dir", str(run_dir)]
-        else:
-            return json.dumps({
-                "status": "error",
-                "error": f"No ABM run directory found at {run_dir}. Run the ABM stage first.",
-            })
-    elif stage == "predict":
-        cmd.extend(["--scale", "regional", "--year", "2024"])
-
-    try:
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=600,
-            cwd=str(REPO_ROOT),
-        )
-        elapsed = time.monotonic() - start
-        return json.dumps({
-            "status": "ok" if result.returncode == 0 else "stage_failed",
-            "stage": stage,
-            "aoi": aoi,
-            "returncode": result.returncode,
-            "stdout_tail": result.stdout[-1000:],
-            "stderr_tail": result.stderr[-500:],
-            "duration_s": round(elapsed, 1),
-        })
-    except subprocess.TimeoutExpired:
-        return json.dumps({"status": "timeout", "stage": stage, "aoi": aoi})
-    except Exception as e:
-        return json.dumps({"status": "error", "stage": stage, "error": str(e)})
-
-
-def onboard_run_pipeline(aoi: str = "ghana") -> str:
-    """Run all 6 pipeline stages sequentially for an AOI.
-
-    Stops on first failure and reports per-stage results.
-    Order: download → ingest → abm → score → train → predict.
-    """
-    results = {}
-    for stage in STAGES:
-        stage_result = json.loads(onboard_run_stage(stage=stage, aoi=aoi))
-        results[stage] = stage_result
-        if stage_result.get("status") != "ok":
-            return json.dumps({
-                "status": "pipeline_failed",
-                "failed_stage": stage,
-                "aoi": aoi,
-                "stages": results,
-            })
-    return json.dumps({
-        "status": "ok",
-        "aoi": aoi,
-        "stages": results,
-    })
-
-
 def onboard_status() -> str:
     """Show current system status: scorecards, plans, subagents, recent runs.
 
@@ -233,32 +91,6 @@ def onboard_status() -> str:
     return json.dumps(info, indent=2)
 
 
-def onboard_diagnose(symptom: str = "") -> str:
-    """Run diagnostics: calibration test + trajectory data for agent analysis.
-
-    Executes a 365-day simulation with trajectory to help diagnose issues.
-    The agent should analyze the returned data and explain findings to the user.
-
-    Args:
-        symptom: Optional description of the symptom to focus on.
-    """
-    from agents_janus.tools.pipeline_tool import pipeline_run_calibration
-
-    # Run calibration with trajectory
-    result = pipeline_run_calibration(seed=1, days=365, include_trajectory=True)
-    data = json.loads(result)
-
-    # Add symptom context
-    data["symptom_hint"] = symptom if symptom else "general diagnostic"
-    data["instructions"] = (
-        "Analyze the trajectory data to identify when population changes occur. "
-        "Look for: extinction events, sudden drops, oscillations, or plateaus. "
-        "Compare against expected biological behavior."
-    )
-
-    return json.dumps(data, indent=2)
-
-
 def onboard_list_components() -> str:
     """List all registered subagents with their specs."""
     try:
@@ -277,6 +109,24 @@ def onboard_list_components() -> str:
         return json.dumps(result, indent=2)
     except Exception as e:
         return json.dumps({"error": str(e)})
+
+
+def _active_langfuse_client():
+    """Return the langfuse client owned by the running orchestrator, if any.
+
+    When delegate_to_dispatcher runs, the centinela's ObservabilityMiddleware
+    holds the active Langfuse client. Propagating it to the delegated
+    dispatcher keeps its trace visible in the same Langfuse project instead
+    of running as an unobservable ghost.
+    """
+    try:
+        import agents_janus.agent as agent_mod
+        mw = getattr(agent_mod, "OBSERVABILITY_MIDDLEWARE", None)
+        if mw is not None:
+            return getattr(mw, "langfuse", None)
+    except Exception:
+        pass
+    return None
 
 
 def delegate_to_dispatcher(
@@ -321,6 +171,7 @@ def delegate_to_dispatcher(
             provider=provider,
             model=model,
             context=ctx,
+            langfuse_client=_active_langfuse_client(),
         )
         return json.dumps({"status": "ok", "goal": goal, "result": result})
     except Exception as e:

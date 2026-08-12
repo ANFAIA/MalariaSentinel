@@ -39,13 +39,19 @@ create_orchestrator(mode="centinela")     create_orchestrator(mode="dispatcher")
   ├─ prompt: orchestrator.md.j2             ├─ prompt: orchestrator.md.j2
   │  (rendered mode=centinela)               │  (rendered mode=dispatcher)
   │                                         │
-  ├─ tools: onboard + ask_user              ├─ tools: pipeline + gawt_mcp + ask_user
+  ├─ tools: onboard + ask_user              ├─ tools: search + gawt_mcp + ask_user
   │  + memory_kg + delegate_to_disp         │  + memory_kg
   │                                         │
   ├─ subagents: 8 specialists ✅             ├─ subagents: 8 specialists ✅
   │                                         │
-  └─ perms: r-all, w-deny                   └─ perms: r-all, w-deny
+  └─ backend: MalariasimShellBackend        └─ backend: MalariasimShellBackend
+     (execute → malariasim only)              (execute → malariasim only)
 ```
+
+Both modes run on `MalariasimShellBackend` — the built-in deepagents `execute`
+tool (bash) is restricted to `malariasim` commands. Filesystem deny rules
+(secrets, `/data/**`, `/.git/**`) are enforced as backend policy hooks instead
+of `FilesystemPermission` (which is incompatible with execution backends).
 
 ### Delegation Model
 
@@ -75,14 +81,19 @@ Dispatcher (goal-driven, one-shot):
 |---|---|---|---|
 | `ask_user` | ✅ | ✅ | ✅ |
 | `memory_recall_kg` | ✅ | ✅ | via plugin |
-| `onboard_run_*` | ✅ | ❌ | ❌ |
+| `execute` (bash → `malariasim` only) | ✅ | ✅ | abm only |
 | `onboard_status` | ✅ | ❌ | ❌ |
-| `onboard_diagnose` | ✅ | ❌ | ❌ |
 | `onboard_ask_subagent` | ✅ | ❌ | ❌ |
 | `delegate_to_dispatcher` | ✅ | ❌ | ❌ |
-| `pipeline_*` | ❌ | ✅ | via plugin |
 | `gawt_mcp_*` | ❌ | ✅ | ✅ |
 | `task()` (subagents) | ✅ | ✅ | ❌ |
+
+**Shell access**: only the orchestrator and the `abm` specialist see the
+`execute` tool, and it only runs `malariasim` commands (enforced by
+`MalariasimShellBackend` policy hook in `malariasim_backend.py`). No custom
+ABM execution tools (`abm_run`/`abm_test`/`abm_score`/`pipeline_*` were
+removed). All other subagents have `execute` filtered out via
+`ToolFilterMiddleware`.
 
 ### gawt MCP server (external dependency)
 - Package: `gawt>=0.5.0` (branch `feat/mcp-sqlite-core`)
@@ -142,6 +153,8 @@ janus agents show abm          # one subagent's details
 - `mailbox.py` (file-based mailbox)
 - All `tools/mailbox_*.py`, `tools/claim_file.py`, `tools/peer_message_*.py`, `tools/fork_brief_tool.py`, `tools/merge_result_tool.py`, `tools/scope_validate.py`
 - Deprecated CLI commands: `calibration`, `feature`, `research`
+- `tools/abm_tools.py` (abm_run/abm_test/abm_score) + `tools/pipeline_tool.py` — replaced by the built-in `execute` tool restricted to `malariasim`
+- `FilesystemPermission` on orchestrator/subagents — replaced by backend policy hooks in `malariasim_backend.py` (incompatible with execution-capable backends)
 
 ### Files
 ```
@@ -155,10 +168,12 @@ agents/janus/src/agents_janus/
 ├── logger.py                   # SessionLogger (JSONL)
 ├── scope_validator.py          # validate_edit_scope
 ├── manifest.py                 # session manifest CRUD
+├── malariasim_backend.py       # MalariasimShellBackend (execute → malariasim only)
+├── middleware/                 # ToolFilterMiddleware (excludes execute from non-abm)
 ├── config/subagents.yaml       # 8 subagent definitions
 ├── plugins/                    # Plugin chain (per-domain)
 ├── subagents/                  # Registry, builder, base types
-├── tools/                      # Pipeline, KG, ask_user, delegate_to_dispatcher, onboard_tools
+├── tools/                      # KG, ask_user, delegate_to_dispatcher, onboard_tools
 ├── prompts/                    # orchestrator.md.j2, specialist.md.tmpl, per_subagent/
 └── tests/                      # unit, integration, LLM-as-judge tests
 ```
