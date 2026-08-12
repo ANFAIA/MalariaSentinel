@@ -7,6 +7,26 @@
       "command": ["uv", "run", "gitagent-mcp"],
       "enabled": true,
       "timeout": 30000
+    },
+    "langfuse": {
+      "type": "remote",
+      "url": "https://cloud.langfuse.com/api/public/mcp",
+      "headers": {
+        "Authorization": "Basic cGstbGYtY2JlMzgyNTItZDY0YS00NGE5LTk0MjMtNjBlNDk4MTY2NGQ2OnNrLWxmLTk0OWYwNzA2LWIyMTgtNDNhZS1iM2ZlLTRhNjJkZTljMDliNg=="
+      },
+      "oauth": false,
+      "enabled": true,
+      "timeout": 10000
+    }
+  },
+  "lsp": {
+    "python": {
+      "command": ["pyright-langserver", "--stdio"],
+      "extensions": [".py", ".pyi"]
+    },
+    "cpp": {
+      "command": ["clangd", "--background-index", "--clang-tidy"],
+      "extensions": [".cpp", ".cc", ".cxx", ".c", ".h", ".hpp"]
     }
   },
   "permission": {

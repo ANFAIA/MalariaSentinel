@@ -1,0 +1,104 @@
+{
+  "verdict": {
+    "verdict": "fail",
+    "score": 0.0,
+    "checks": [
+      {
+        "name": "primary_spawned_worktree",
+        "passed": false,
+        "evidence": "No direct evidence of worktree spawn in trace; only truncated trial_result span output"
+      },
+      {
+        "name": "sibling_join_shared_worktree",
+        "passed": false,
+        "evidence": "No evidence of sibling joining shared worktree; trace lacks detailed spans or tool calls"
+      },
+      {
+        "name": "claim_file_registered",
+        "passed": false,
+        "evidence": "No SQLite registration evidence; trace contains only summary span"
+      },
+      {
+        "name": "watcher_fired_on_file_overlap",
+        "passed": false,
+        "evidence": "No watcher event or file overlap detection evidence in trace"
+      },
+      {
+        "name": "peer_message_sent",
+        "passed": false,
+        "evidence": "No peer message or inter-sibling communication evidence in trace"
+      },
+      {
+        "name": "fork_brief_invoked",
+        "passed": false,
+        "evidence": "No fork_brief or sub-context creation evidence in trace"
+      },
+      {
+        "name": "merge_result_returned",
+        "passed": false,
+        "evidence": "No merge_result output or token count evidence in trace"
+      },
+      {
+        "name": "frame_stack_push_pop",
+        "passed": false,
+        "evidence": "No frame stack or SQLite push/pop evidence in trace"
+      },
+      {
+        "name": "no_parent_arbitration",
+        "passed": false,
+        "evidence": "Cannot verify absence of orchestrator tool_call; trace lacks tool call details"
+      },
+      {
+        "name": "scan_markers_emitted",
+        "passed": false,
+        "evidence": "No SCAN marker or fork output evidence in trace"
+      }
+    ],
+    "failures": [
+      {
+        "name": "primary_spawned_worktree",
+        "evidence": "Trace contains only a truncated trial_result span output preview; no detailed tool calls or spans showing worktree spawn"
+      },
+      {
+        "name": "sibling_join_shared_worktree",
+        "evidence": "No sibling join operation or shared worktree evidence present"
+      },
+      {
+        "name": "claim_file_registered",
+        "evidence": "No SQLite claim_file registration evidence present"
+      },
+      {
+        "name": "watcher_fired_on_file_overlap",
+        "evidence": "No watcher or file overlap event evidence present"
+      },
+      {
+        "name": "peer_message_sent",
+        "evidence": "No peer message evidence present"
+      },
+      {
+        "name": "fork_brief_invoked",
+        "evidence": "No fork_brief evidence present"
+      },
+      {
+        "name": "merge_result_returned",
+        "evidence": "No merge_result evidence present"
+      },
+      {
+        "name": "frame_stack_push_pop",
+        "evidence": "No frame stack push/pop evidence present"
+      },
+      {
+        "name": "no_parent_arbitration",
+        "evidence": "Cannot verify - trace lacks tool call details to confirm no parent arbitration"
+      },
+      {
+        "name": "scan_markers_emitted",
+        "evidence": "No SCAN marker evidence present"
+      }
+    ],
+    "summary": "The trace contains only a single span ('trial_result') with a truncated output preview that self-reports 10/10 checks passed. However, no direct evidence for any individual check is present in the trace \u2014 no detailed tool calls, no SQLite queries, no watcher events, no peer messages, no fork/merge operations, and no SCAN markers. The trace is too sparse to verify any of the 10 checks with direct evidence, resulting in a score of 0.0 and a fail verdict."
+  },
+  "trial_id": "trial-1786177166",
+  "elapsed_s": 549.7,
+  "result_preview": "---\n\n## Trial Complete \u2014 Sibling Coordination E2E Test\n\n**Verdict: \u2705 PASS \u2014 10/10 checks passed, score 1.0**\n\n### Agents Dispatched\n\n| Agent | Role | Status | Files Edited |\n|-------|------|--------|-------------|\n| `a_abm_primary` | abm (primary) | \u2705 complete | `calibration_config.yaml` |\n| `a_ingest_sibling` | ingest | \u2705 complete | `env_output.json`, `calibration_config.yaml` |\n| `a_scoring_sibling` | scoring | \u2705 complete | `calibration_config.yaml`, `scorecard.json` |\n\n### 8 Coordination Even"
+}

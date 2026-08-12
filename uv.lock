@@ -2233,6 +2233,7 @@ dependencies = [
     { name = "langchain-core" },
     { name = "langchain-openai" },
     { name = "langgraph" },
+    { name = "mcp" },
     { name = "rich" },
     { name = "typer" },
 ]
@@ -2249,8 +2250,9 @@ requires-dist = [
     { name = "jinja2", specifier = ">=3.1.0" },
     { name = "langchain-core", specifier = ">=0.3" },
     { name = "langchain-openai", specifier = ">=0.3" },
-    { name = "langfuse", marker = "extra == 'observability'", specifier = ">=3.0" },
+    { name = "langfuse", marker = "extra == 'observability'", specifier = ">=4.0" },
     { name = "langgraph", specifier = ">=0.4" },
+    { name = "mcp", specifier = ">=2.0" },
     { name = "rich", specifier = ">=13.0.0" },
     { name = "typer", specifier = ">=0.9.0" },
 ]
