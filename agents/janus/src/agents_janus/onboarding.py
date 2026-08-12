@@ -65,6 +65,14 @@ def run_onboarding(
     import agents_janus.agent as agent_mod
     from agents_janus.logger import SessionLogger
 
+    # Reconfigure stdin so REPL input never crashes on undecodable bytes
+    # (mixed encodings, terminal paste artifacts). errors="replace" turns
+    # bad bytes into U+FFFD instead of raising UnicodeDecodeError.
+    try:
+        sys.stdin.reconfigure(errors="replace")
+    except Exception:
+        pass
+
     logger = SessionLogger()
     agent_mod.SESSION_LOGGER = logger
 
@@ -99,7 +107,17 @@ def run_onboarding(
             except (ValueError, OSError):
                 sys.stdout.write("you> ")
                 sys.stdout.flush()
-            user_input = sys.stdin.readline().strip()
+            try:
+                user_input = sys.stdin.readline().strip()
+            except UnicodeDecodeError:
+                # Terminal sent bytes stdin can't decode as UTF-8 (mixed
+                # encoding, paste artifacts). Reconfigure to never crash and
+                # retry once.
+                try:
+                    sys.stdin.reconfigure(errors="replace")
+                except Exception:
+                    pass
+                user_input = sys.stdin.readline().strip()
         except (EOFError, KeyboardInterrupt):
             _safe_print("\nHasta luego!")
             _cleanup()
