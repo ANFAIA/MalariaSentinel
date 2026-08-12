@@ -5,7 +5,7 @@ edit. If they forget, they miss conflict messages. This middleware wraps
 every tool call and automatically checks the inbox, injecting pending
 messages into the tool result.
 
-If a conflict is detected (file_overlap message from a peer), the middleware
+If a conflict is detected (gawt kind="conflict" message from a peer), the middleware
 appends a loud conflict marker so the LLM knows to call resolve_conflict
 immediately.
 
@@ -118,7 +118,7 @@ class InboxCheckMiddleware(AgentMiddleware):
     register_agent calls), poll check_inbox() and inject any pending
     messages into the tool result.
 
-    If a conflict is detected (file_overlap), mark it loudly so the LLM
+    If a conflict is detected (gawt kind="conflict"), mark it loudly so the LLM
     knows to call resolve_conflict immediately.
 
     Usage:
@@ -184,15 +184,25 @@ class InboxCheckMiddleware(AgentMiddleware):
         if not messages:
             return result
 
-        # Detect conflicts (file_overlap messages)
+        # Detect conflicts (gawt sends kind="conflict", payload is a JSON
+        # string with {"file": ..., "conflicting_agent" | "other_edit_ts": ...})
         conflict = None
         routine = []
         for msg in messages:
-            if msg.get("type") == "file_overlap":
+            if msg.get("kind") == "conflict":
+                payload = msg.get("payload", {})
+                if isinstance(payload, str):
+                    try:
+                        payload = json.loads(payload)
+                    except (json.JSONDecodeError, TypeError):
+                        payload = {}
+                files = [payload.get("file")] if payload.get("file") else []
                 conflict = {
                     "from_agent": msg.get("from_agent", "unknown"),
-                    "message": msg.get("message", ""),
-                    "files": msg.get("files", []),
+                    "message": (
+                        f"peer {msg.get('from_agent', 'unknown')} edited the same file"
+                    ),
+                    "files": files,
                 }
             else:
                 routine.append(msg)

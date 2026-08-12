@@ -106,8 +106,9 @@ class TestInboxCheckMiddleware:
 
     @patch("agents_janus.middleware.inbox_check._check_inbox_via_mcp")
     def test_detects_conflict(self, mock_check):
+        # gawt sends kind="conflict" with payload as a JSON string
         mock_check.return_value = [
-            {"type": "file_overlap", "from_agent": "a_scoring", "message": "editing D14", "files": ["D14.py"]},
+            {"kind": "conflict", "from_agent": "a_scoring", "payload": '{"file": "D14.py", "conflicting_agent": "a_scoring"}'},
         ]
         mw = InboxCheckMiddleware()
         mw._agent_id = "a_abm"
@@ -119,6 +120,24 @@ class TestInboxCheckMiddleware:
 
         assert "CONFLICT DETECTED" in result
         assert "a_scoring" in result
+        assert "D14.py" in result
+
+    @patch("agents_janus.middleware.inbox_check._check_inbox_via_mcp")
+    def test_conflict_with_dict_payload(self, mock_check):
+        # Some gawt versions may already parse payload to a dict
+        mock_check.return_value = [
+            {"kind": "conflict", "from_agent": "a_scoring", "payload": {"file": "D14.py", "other_edit_ts": "..."}},
+        ]
+        mw = InboxCheckMiddleware()
+        mw._agent_id = "a_abm"
+        handler = MagicMock(return_value="tool output")
+
+        req = MagicMock()
+        req.tool_call = {"name": "mcp__gitagent__edit_file", "args": {"agent_id": "a_abm", "file": "D14.py"}}
+        result = mw.wrap_tool_call(req, handler)
+
+        assert "CONFLICT DETECTED" in result
+        assert "D14.py" in result
 
     @patch("agents_janus.middleware.inbox_check._check_inbox_via_mcp")
     def test_mcp_failure_passthrough(self, mock_check):
