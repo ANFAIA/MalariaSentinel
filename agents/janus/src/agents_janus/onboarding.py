@@ -139,6 +139,7 @@ def run_onboarding(
             for event in agent.stream(
                 {"messages": messages},
                 stream_mode="updates",
+                config={"configurable": {"thread_id": "centinela-session"}},
             ):
                 if not quiet and isinstance(event, dict):
                     for node_name, delta in event.items():

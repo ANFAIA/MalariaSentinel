@@ -146,6 +146,7 @@ def run_improvement(
             for event in agent.stream(
                 {"messages": [{"role": "user", "content": prompt}]},
                 stream_mode="updates",
+                config={"configurable": {"thread_id": thread_id}},
             ):
                 # Bridge LangGraph node-keyed updates into PanelState events
                 _emit_panel_events(panel, event)
