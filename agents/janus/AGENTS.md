@@ -22,6 +22,7 @@
 - gawt MCP uses SQLite internally — threading errors if called from wrong thread
 - Only one gawt session can be open at a time (session singleton)
 - `finalize_session` warns if agents still active — unregister first
+- `resolve_conflict` forks the graph via get_state/update_state/invoke — the orchestrator must be created with a checkpointer (`agent.py::_checkpointer()`), or it fails with "No checkpointer set"
 
 ## Scorer naming convention
 Scorers follow the pattern `D<id>_<name>.py` where `<id>` is the next number (D1, D2, ... D10 currently).

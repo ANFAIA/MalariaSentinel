@@ -94,6 +94,20 @@ def _wrap_with_logging(tool_func):
     return wrapper
 
 
+def _checkpointer():
+    """Create the in-memory checkpointer for the orchestrator graph.
+
+    resolve_conflict forks the conversation via get_state/update_state/invoke,
+    which require a checkpointer. deepagents' create_deep_agent accepts a
+    checkpointer but doesn't default to one.
+    """
+    try:
+        from langgraph.checkpoint.memory import MemorySaver
+        return MemorySaver()
+    except ImportError:
+        return None
+
+
 def _render_prompt(mode: Literal["centinela", "dispatcher"]) -> str:
     """Render the orchestrator prompt from the Jinja2 template."""
     # Load specialist list from registry for programmatic injection
@@ -377,6 +391,7 @@ def create_orchestrator(
         skills=skills or None,
         name=f"janus-orchestrator-{mode}",
         middleware=middleware,
+        checkpointer=_checkpointer(),
     )
 
     # Wire resolve_conflict lazy reference — tool can now access the agent graph
