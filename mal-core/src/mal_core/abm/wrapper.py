@@ -39,7 +39,7 @@ class CppAbmWrapper:
             flags[name] = {"type": tmap.get(ftype, str), "default": None, "help": desc}
         return flags
 
-    def run(self, **flags) -> dict[str, Any]:
+    def run(self, _timeout: int = 600, **flags) -> dict[str, Any]:
         if self._flags_schema is None:
             self._flags_schema = self._introspect_flags()
         cmd = [str(self.binary), "run"]
@@ -52,7 +52,7 @@ class CppAbmWrapper:
                     cmd.append(cli)
             else:
                 cmd.extend([cli, str(value)])
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=600, check=False)
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=_timeout, check=False)
         return {"stdout": result.stdout, "stderr": result.stderr, "returncode": result.returncode}
 
     def get_flags_schema(self) -> dict[str, dict[str, Any]]:
@@ -139,6 +139,7 @@ def run_abm_from_manifest(
         "days": days,
         "seed": seed,
         "n_rollouts": n_rollouts,
+        "snapshot_every": kwargs.pop("snapshot_every", 1),  # default daily
         "output": str(output_path),
     }
     if hosts_path:

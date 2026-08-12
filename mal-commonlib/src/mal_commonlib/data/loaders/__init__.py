@@ -6,6 +6,14 @@ from .glw import load_glw_livestock
 from .ghsl import load_ghsl_urban_class
 from .wildlife import load_wildlife_host_proxy
 from .buildings import load_buildings_fraction
+from .hydrolakes import load_hydrolakes_permanent_lakes
+from .hydrorivers import load_hydrorivers_permanent_rivers, load_hydrorivers_river_proximity
+from .worldcover import (
+    load_worldcover_landcover,
+    load_worldcover_permanent_water,
+    load_worldcover_wetland,
+    load_worldcover_mangrove,
+)
 
 # Deprecated class-style shims (kept for backward compatibility)
 from .worldpop import WorldPopLoader
@@ -21,6 +29,13 @@ __all__ = [
     "load_ghsl_urban_class",
     "load_wildlife_host_proxy",
     "load_buildings_fraction",
+    "load_hydrolakes_permanent_lakes",
+    "load_hydrorivers_permanent_rivers",
+    "load_hydrorivers_river_proximity",
+    "load_worldcover_landcover",
+    "load_worldcover_permanent_water",
+    "load_worldcover_wetland",
+    "load_worldcover_mangrove",
     "WorldPopLoader",
     "GLWLoader",
     "GHSLLoader",

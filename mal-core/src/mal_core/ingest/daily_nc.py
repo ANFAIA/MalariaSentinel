@@ -6,6 +6,12 @@ Combines:
   - ERA5 water temperature (deg C) -> water_temp_c
   - MODIS NDVI (vegetation index, clipped to [0, 1]) -> ndvi
 
+Optional M12 enrichment (when TIF files are present in data_dir):
+  - HydroLAKES permanent water mask ({aoi}_permanent_lakes.tif) -> merged
+    into water_frac via np.maximum(JRC_GSW, permanent_water)
+  - ESA WorldCover wetland mask ({aoi}_wc_wetland.tif) -> diagnostic
+    variable (wetland contribution to water_frac is commented-out by default)
+
 Static layers are broadcast to every day (the ABM's daily slice has the same
 spatial climate each day; only rainfall changes per day in this version).
 
@@ -120,6 +126,36 @@ def build_daily_env_nc(
     if np.nanmax(water_frac_static) > 1.0:
         water_frac_static = water_frac_static / 100.0
     water_frac_static = np.nan_to_num(water_frac_static, nan=0.0)
+
+    # --- M12 enrichment: compose M12 water datasets into water_frac ---
+    # Optional layers from hydrolakes / worldcover loaders.  When present
+    # they improve the water_frac estimate; when absent the function falls
+    # back to JRC GSW only (backward-compatible).
+    permanent_water_mask = None
+    wetland_mask = None
+
+    lakes_file = data_dir / f"{aoi}_permanent_lakes.tif"
+    if lakes_file.exists():
+        print(f"Loading M12 permanent water mask: {lakes_file}")
+        permanent_water_mask = read_static_tif(lakes_file, target_shape)
+        permanent_water_mask = np.nan_to_num(permanent_water_mask, nan=0.0)
+        permanent_water_mask = np.clip(permanent_water_mask, 0.0, 1.0)
+
+    wetland_file = data_dir / f"{aoi}_wc_wetland.tif"
+    if wetland_file.exists():
+        print(f"Loading M12 wetland mask: {wetland_file}")
+        wetland_mask = read_static_tif(wetland_file, target_shape)
+        wetland_mask = np.nan_to_num(wetland_mask, nan=0.0)
+        wetland_mask = np.clip(wetland_mask, 0.0, 1.0)
+
+    # Merge: permanent water always has water_frac = 1.0
+    if permanent_water_mask is not None:
+        water_frac_static = np.maximum(water_frac_static, permanent_water_mask)
+
+    # Optionally add wetland contribution (uncomment to enable)
+    # if wetland_mask is not None:
+    #     water_frac_static = np.clip(water_frac_static + 0.3 * wetland_mask, 0.0, 1.0)
+
     water_frac = np.broadcast_to(water_frac_static, (n_days, h, w)).copy()
     n_viable = int((water_frac_static > WATER_FRAC_VIABILITY_THRESHOLD).sum())
     if n_viable == 0:
@@ -145,7 +181,7 @@ def build_daily_env_nc(
     ds = xr.Dataset(
         {
             "water_frac": (["time", "y", "x"], water_frac,
-                           {"long_name": "JRC GSW open water fraction",
+                           {"long_name": "Enriched water fraction (JRC GSW + M12 permanent water)",
                             "units": "1"}),
             "rainfall": (["time", "y", "x"], rainfall,
                          {"long_name": "CHIRPS v2.0 daily precipitation",
@@ -163,12 +199,35 @@ def build_daily_env_nc(
             "aoi_slug": aoi,
             "scale": "regional",
             "contract_version": "2.0",
-            "generator_version": "m2-daily-0.4.0",
+            "generator_version": "m2-daily-0.5.0",
+            "m12_enriched": permanent_water_mask is not None or wetland_mask is not None,
         },
     )
 
+    # Optional diagnostic variables (C++ reader ignores them via GDAL)
+    if permanent_water_mask is not None:
+        pw_broadcast = np.broadcast_to(permanent_water_mask, (n_days, h, w)).copy()
+        ds["permanent_water_mask"] = (
+            ["time", "y", "x"], pw_broadcast,
+            {"long_name": "Permanent water mask (JRC GSW ≥95%)", "units": "1"},
+        )
+
+    if wetland_mask is not None:
+        wl_broadcast = np.broadcast_to(wetland_mask, (n_days, h, w)).copy()
+        ds["wetland_mask"] = (
+            ["time", "y", "x"], wl_broadcast,
+            {"long_name": "Wetland mask (ESA WorldCover class 90)", "units": "1"},
+        )
+
+    # Core variables are always written with zlib; diagnostic vars too
+    encoding_vars = ["water_frac", "rainfall", "water_temp_c", "ndvi"]
+    if permanent_water_mask is not None:
+        encoding_vars.append("permanent_water_mask")
+    if wetland_mask is not None:
+        encoding_vars.append("wetland_mask")
+
     encoding = {v: {"dtype": "float32", "zlib": True, "complevel": 4}
-                for v in ["water_frac", "rainfall", "water_temp_c", "ndvi"]}
+                for v in encoding_vars}
 
     output_path = output_dir / f"{aoi}_regional_2024_2025_env.nc"
     print(f"Writing: {output_path}")
@@ -178,11 +237,21 @@ def build_daily_env_nc(
         f"\n=== SUMMARY ===\n"
         f"  water_frac: [{water_frac.min():.4f}, {water_frac.max():.4f}], "
         f"viable cells (>0.05): {n_viable}\n"
+        f"  M12 enrichment: permanent_water={'yes' if permanent_water_mask is not None else 'no'}, "
+        f"wetland={'yes' if wetland_mask is not None else 'no'}\n"
         f"  rainfall: [{rainfall.min():.1f}, {rainfall.max():.1f}], "
         f"nodata replaced: {nodata_count}\n"
         f"  water_temp: [{water_temp_c.min():.1f}, {water_temp_c.max():.1f}]\n"
         f"  ndvi: [{ndvi.min():.2f}, {ndvi.max():.2f}]"
     )
+
+    # Manifest variable list: core ABM variables always present; M12 diagnostics
+    # are optional (C++ reader ignores them, but they're useful for analysis).
+    variables = ["water_frac", "rainfall", "water_temp_c", "ndvi"]
+    if permanent_water_mask is not None:
+        variables.append("permanent_water_mask")
+    if wetland_mask is not None:
+        variables.append("wetland_mask")
 
     return {
         "env_path": str(output_path),
@@ -191,7 +260,8 @@ def build_daily_env_nc(
         "n_days": n_days,
         "n_viable_cells": n_viable,
         "grid": f"{h}x{w}",
-        "variables": ["water_frac", "rainfall", "water_temp_c", "ndvi"],
+        "variables": variables,
+        "m12_enriched": permanent_water_mask is not None or wetland_mask is not None,
     }
 
 

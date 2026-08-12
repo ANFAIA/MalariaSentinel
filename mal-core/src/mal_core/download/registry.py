@@ -9,6 +9,7 @@ log = logging.getLogger(__name__)
 LOADER_MODULES = [
     "era5", "chirps", "dem", "jrc_gsw", "modis",
     "worldpop", "glw", "ghsl", "wildlife", "buildings",
+    "hydrolakes", "hydrorivers", "worldcover",
 ]
 
 @dataclass
