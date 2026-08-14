@@ -213,18 +213,17 @@ def _resolve_provider(provider: str, model: str):
     """Resolve the LLM based on provider and model."""
     if provider == "openrouter":
         try:
-            from langchain_openai import ChatOpenAI
+            from langchain_openrouter import ChatOpenRouter
         except ImportError:
             raise ImportError(
-                "langchain-openai is required for OpenRouter. "
-                "Install with: pip install 'mal-janus[openrouter]'"
+                "langchain-openrouter is required for OpenRouter. "
+                "Install with: pip install langchain-openrouter"
             )
         api_key = os.environ.get("OPENROUTER_API_KEY") or os.environ.get("OPENROUTER_KEY")
         if not api_key:
             raise ValueError("OPENROUTER_API_KEY or OPENROUTER_KEY env var required for OpenRouter provider")
-        return ChatOpenAI(
+        return ChatOpenRouter(
             model=model,
-            base_url="https://openrouter.ai/api/v1",
             api_key=api_key,
             timeout=180,
             max_retries=2,

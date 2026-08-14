@@ -1654,6 +1654,15 @@ wheels = [
 ]
 
 [[package]]
+name = "jsonpath-python"
+version = "1.1.6"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/98/18/4ca8742534a5993ff383f7602e325ce2d5d7cc93d72ac5e1cdedbea8a458/jsonpath_python-1.1.6.tar.gz", hash = "sha256:dded9932b4ec41fb8726e09c83afa4e6be618f938c2db287cc2a81723c639671", size = 88178 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/55/8a/1270a6803bd821cbfcdda387eaa13cb41a7b1f7b9bd145979b3bfb9d6cb7/jsonpath_python-1.1.6-py3-none-any.whl", hash = "sha256:a1c50afd8d3fbbaf47a4873bc890dcb3c15da96f5c020327977d844d8731a2d4", size = 14453 },
+]
+
+[[package]]
 name = "jsonpointer"
 version = "3.1.1"
 source = { registry = "https://pypi.org/simple" }
@@ -1898,6 +1907,19 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/89/fc/d146705e0cf6cf8865d4e873e0551452f94d6520f43fe703594ccdf95763/langchain_openai-1.4.0.tar.gz", hash = "sha256:a3acf6be0937f3970fc9e7f0aae22929c6f117e49128bd62f4d45a64b2587d8b", size = 3261776 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/f1/6c/f786dfcb6711cb06449041e72b67f7e28fc77a53e2aa16866c4f0002625a/langchain_openai-1.4.0-py3-none-any.whl", hash = "sha256:7a777731fe32a913085ec85bacd5650c3f8422048b65346b63a13b36b1b4a12f", size = 121901 },
+]
+
+[[package]]
+name = "langchain-openrouter"
+version = "0.2.7"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "langchain-core" },
+    { name = "openrouter" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/48/89/cf39b374bdf0172af99cbd85807feaa07bc7b1f5d05dd6524436222ebff7/langchain_openrouter-0.2.7.tar.gz", hash = "sha256:07f6fc26db08b97eb60bab330d45af7668777f596d48b5ce5098b21e063e964b", size = 182317 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/65/70/6c003f4d250feecd57bd102fd36eb199ab2e9ccc7dc70f3d5f3e10e15000/langchain_openrouter-0.2.7-py3-none-any.whl", hash = "sha256:d4a06f93fd9ffdd2d8840013e1c70ae071aef0faf8b9b30f2c6642ece2828d8a", size = 29214 },
 ]
 
 [[package]]
@@ -2232,6 +2254,7 @@ dependencies = [
     { name = "jinja2" },
     { name = "langchain-core" },
     { name = "langchain-openai" },
+    { name = "langchain-openrouter" },
     { name = "langgraph" },
     { name = "mcp" },
     { name = "pydantic" },
@@ -2251,6 +2274,7 @@ requires-dist = [
     { name = "jinja2", specifier = ">=3.1.0" },
     { name = "langchain-core", specifier = ">=0.3" },
     { name = "langchain-openai", specifier = ">=0.3" },
+    { name = "langchain-openrouter", specifier = ">=0.1" },
     { name = "langfuse", marker = "extra == 'observability'", specifier = ">=4.0" },
     { name = "langgraph", specifier = ">=0.4" },
     { name = "mcp", specifier = ">=2.0" },
@@ -3013,6 +3037,21 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/af/ac/f725c4efbda8657d02be684607e5a2e5ce362e4790fdbcbdfb7c15018647/openai-2.46.0.tar.gz", hash = "sha256:0421e0735ac41451cad894af4cddf0435bfbf8cbc538ac0e15b3c062f2ddc06a", size = 1114628 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/ea/7b/206238ebcb50b235942b1c66dba4974776f2057402a8d91c399be587d66a/openai-2.46.0-py3-none-any.whl", hash = "sha256:672381db55efb3a1e2610f29304c130cccdd0b319bace4d492b2443cb64c1e7c", size = 1637556 },
+]
+
+[[package]]
+name = "openrouter"
+version = "0.10.8"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "httpcore" },
+    { name = "httpx" },
+    { name = "jsonpath-python" },
+    { name = "pydantic" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/38/4c/1fed3f4cbcf0962d8117b54f1740696c98d0dc2e3d5c34459d46effe8a3b/openrouter-0.10.8.tar.gz", hash = "sha256:ac7f4cea1ec1c2a063b0ad9792a8f64dde68ed053279b6c42bee849a50afc47c", size = 340259 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/15/ae/76fc8ad57f6717e9231fbd7313e5623733d86f1a2149baa458772164f456/openrouter-0.10.8-py3-none-any.whl", hash = "sha256:ff9b3cd2f55a3f905d21f56517344da9f9556ffbd2cb9d31ddc388c4b930aab6", size = 748497 },
 ]
 
 [[package]]

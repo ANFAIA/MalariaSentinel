@@ -19,26 +19,24 @@ REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 def _resolve_llm():
     """Resolve an LLM client from environment variables.
 
-    Uses the same pattern as onboarding.py: reads OPENROUTER_API_KEY (or
-    OPENROUTER_KEY), falls back to OPENAI_API_KEY for local models.
-    Returns a langchain ChatOpenAI instance.
+    Uses ChatOpenRouter for OpenRouter, falls back to OpenAI for local models.
+    Returns a langchain ChatOpenRouter or ChatOpenAI instance.
     """
-    try:
-        from langchain_openai import ChatOpenAI
-    except ImportError:
-        raise ImportError("langchain-openai is required for LLM calls.")
-
     api_key = os.environ.get("OPENROUTER_API_KEY") or os.environ.get("OPENROUTER_KEY")
     if api_key:
+        try:
+            from langchain_openrouter import ChatOpenRouter
+        except ImportError:
+            raise ImportError("langchain-openrouter is required for OpenRouter LLM calls.")
         model = os.environ.get("ONBOARDING_MODEL", "xiaomi/mimo-v2.5")
-        return ChatOpenAI(
-            model=model,
-            base_url="https://openrouter.ai/api/v1",
-            api_key=api_key,
-        )
+        return ChatOpenRouter(model=model, api_key=api_key)
 
     openai_key = os.environ.get("OPENAI_API_KEY")
     if openai_key:
+        try:
+            from langchain_openai import ChatOpenAI
+        except ImportError:
+            raise ImportError("langchain-openai is required for local LLM calls.")
         model = os.environ.get("ONBOARDING_MODEL", "gpt-4o-mini")
         return ChatOpenAI(model=model, api_key=openai_key)
 

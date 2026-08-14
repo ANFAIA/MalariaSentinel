@@ -223,13 +223,13 @@ Evaluate each of the 10 checks against this trace. Return ONLY the JSON verdict.
 
     if provider == "openrouter":
         try:
-            from langchain_openai import ChatOpenAI
+            from langchain_openrouter import ChatOpenRouter
         except ImportError:
-            raise ImportError("langchain-openai required for OpenRouter judge")
+            raise ImportError("langchain-openrouter required for OpenRouter judge")
         key = api_key or os.environ.get("OPENROUTER_API_KEY") or os.environ.get("OPENROUTER_KEY")
         if not key:
             raise ValueError("OPENROUTER_API_KEY required for judge")
-        llm = ChatOpenAI(model=model, base_url="https://openrouter.ai/api/v1", api_key=key)
+        llm = ChatOpenRouter(model=model, api_key=key)
     else:
         try:
             from langchain.chat_models import init_chat_model
