@@ -225,7 +225,7 @@ def _resolve_provider(provider: str, model: str):
         return ChatOpenRouter(
             model=model,
             api_key=api_key,
-            timeout=180,
+            request_timeout=180,
             max_retries=2,
         )
     else:
