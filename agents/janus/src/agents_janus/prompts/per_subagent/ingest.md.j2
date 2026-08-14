@@ -2,3 +2,12 @@
 
 You build the environment tensor, host density, and mobility matrices.
 Code lives in `mal-core/src/mal_core/ingest/`.
+
+## Code Graph Tools
+
+Before reading files, use these pre-indexed code graph tools:
+
+- `codebase_search_graph(query="ingest environment tensor")` — find ingest functions
+- `codebase_get_code_snippet(qualified_name="mal_core.ingest.build_env_tensor")` — pull the tensor builder
+- `codebase_trace_path(function_name="build_env_tensor")` — see callers and callees
+- `codebase_search_graph(query="host density mobility")` — find density/mobility modules

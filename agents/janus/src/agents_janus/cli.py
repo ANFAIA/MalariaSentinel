@@ -38,6 +38,10 @@ def _main(
         False, "--no-tracing",
         help="Disable Langfuse tracing (enabled by default).",
     ),
+    no_codebase_index: bool = typer.Option(
+        False, "--no-codebase-index",
+        help="Skip codebase-memory-mcp index_repository on startup.",
+    ),
     env: str = typer.Option(
         "", "--env",
         help="Environment tag: dev, staging, production.",
@@ -57,6 +61,9 @@ def _main(
 
     Language: responds in the same language you use (Spanish or English).
     """
+    import agents_janus.agent as agent_mod
+    agent_mod.CODEBASE_INDEX_ON_STARTUP = not no_codebase_index
+
     if ctx.invoked_subcommand is None:
         from agents_janus.onboarding import run_onboarding
 

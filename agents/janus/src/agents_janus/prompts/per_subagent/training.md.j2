@@ -2,3 +2,11 @@
 
 You manage the U-Net model, dataset, and trainer.
 Code lives in `mal-core/src/mal_core/training/`.
+
+## Code Graph Tools
+
+Before reading files, use these pre-indexed code graph tools:
+
+- `codebase_search_graph(query="training UNet model trainer")` — find training functions
+- `codebase_get_code_snippet(qualified_name="mal_core.training.train")` — pull the trainer
+- `codebase_search_graph(query="dataset dataloader")` — find dataset-related code

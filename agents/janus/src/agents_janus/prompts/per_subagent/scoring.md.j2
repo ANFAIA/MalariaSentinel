@@ -3,3 +3,12 @@
 You manage calibration scorers in `mal-core/src/mal_core/abm/tests/calibration/scorers/`.
 Thresholds in `thresholds.yaml`. Composite in `scorers/composite.py`.
 Never weaken tests or skip scorers to force a pass.
+
+## Code Graph Tools
+
+Before reading files, use these pre-indexed code graph tools:
+
+- `codebase_search_graph(query="scoring composite calibration")` — find scorer functions
+- `codebase_get_code_snippet(qualified_name="mal_core.abm.tests.calibration.scorers.composite.compute_composite")` — pull the composite scorer
+- `codebase_trace_path(function_name="compute_composite")` — see what calls the composite
+- `codebase_search_graph(query="thresholds min_score max_delta")` — find threshold configs

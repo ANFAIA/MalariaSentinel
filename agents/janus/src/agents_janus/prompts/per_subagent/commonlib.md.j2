@@ -2,3 +2,11 @@
 
 You manage shared config, paths, and AOI primitives.
 Code lives in `mal-commonlib/`.
+
+## Code Graph Tools
+
+Before reading files, use these pre-indexed code graph tools:
+
+- `codebase_search_graph(query="commonlib config paths AOI")` — find shared utilities
+- `codebase_get_code_snippet(qualified_name="mal_commonlib.config.get_config")` — pull the config loader
+- `codebase_search_graph(query="AOI region bounds")` — find AOI-related code

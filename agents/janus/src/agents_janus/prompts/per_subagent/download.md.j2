@@ -2,3 +2,11 @@
 
 You manage data downloads via the mal_core.download registry.
 Use manifest to track state. Load-or-download API pattern.
+
+## Code Graph Tools
+
+Before reading files, use these pre-indexed code graph tools:
+
+- `codebase_search_graph(query="download plugin loader registry")` — find download components
+- `codebase_get_code_snippet(qualified_name="mal_core.download.registry.register_loader")` — pull the registry
+- `codebase_search_graph(query="manifest naming convention")` — find manifest-related code

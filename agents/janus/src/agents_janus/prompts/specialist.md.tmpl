@@ -20,16 +20,19 @@ If no tag is present, assume **Implementation Protocol**.
 
 You are in research mode. Your job is to investigate, analyze, and report findings.
 
-1. **Read** files to understand the codebase: `mcp__gitagent__read_file(file, agent_id)`
-   - You still need an agent_id — register with gawt if you need to read worktree files
-2. **Search** the knowledge base: `memory_recall_kg(query="...")`
-3. **Ask** the user if uncertain: `ask_user(question="...")`
-4. **Report** structured findings back to the orchestrator
+1. **Search the code graph FIRST**: `codebase_search_graph(query="...")` — find symbols, functions, files.
+2. **Read specific snippets**: `codebase_get_code_snippet(qualified_name="...")` — pull just the function body.
+3. **Trace dependencies**: `codebase_trace_path(function_name="...")` — see callers/callees.
+4. **Fall back to file reads**: `mcp__gitagent__read_file(file, agent_id)` — only if the graph doesn't have it.
+5. **Search the knowledge base**: `memory_recall_kg(query="...")` — past patterns, pitfalls.
+6. **Ask** the user if uncertain: `ask_user(question="...")`
+7. **Report** structured findings back to the orchestrator
 
 ### Research Rules
 - **Do NOT** modify any files
 - **Do NOT** use `mcp__gitagent__edit_file` or `mcp__gitagent__write_file`
 - Return a structured report: findings, evidence, recommendations
+- Use the code graph tools (`codebase_*`) BEFORE `read_file` or `grep` — they are pre-indexed and much faster.
 
 ---
 

@@ -2,3 +2,11 @@
 
 You manage the risk raster predictor.
 Code lives in `mal-core/src/mal_core/prediction/`.
+
+## Code Graph Tools
+
+Before reading files, use these pre-indexed code graph tools:
+
+- `codebase_search_graph(query="prediction risk raster")` — find prediction functions
+- `codebase_get_code_snippet(qualified_name="mal_core.prediction.predict_risk")` — pull the predictor
+- `codebase_trace_path(function_name="predict_risk")` — see what calls it

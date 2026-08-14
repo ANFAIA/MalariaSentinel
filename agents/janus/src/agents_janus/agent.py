@@ -10,10 +10,13 @@ Two modes:
 from __future__ import annotations
 
 import json
+import logging
 import os
 import sys
 from pathlib import Path
 from typing import Literal
+
+_log = logging.getLogger("agents_janus.agent")
 
 _project_root = Path(__file__).resolve().parent.parent.parent
 if str(_project_root) not in sys.path:
@@ -26,6 +29,7 @@ from agents_janus.observability import ObservabilityMiddleware, SubAgentObservab
 
 # Module-level flags set by CLI before creating the agent
 VERIFY_FINALIZE: bool = True
+CODEBASE_INDEX_ON_STARTUP: bool = True
 SESSION_LOGGER: SessionLogger | None = None
 OBSERVABILITY_MIDDLEWARE: ObservabilityMiddleware | None = None
 
@@ -329,14 +333,30 @@ def create_orchestrator(
     # ── Subagent definitions (shared across both modes) ──────────────
     from agents_janus.subagents.registry import load_registry
     from agents_janus.subagents.builder import build_subagent_prompt
-    from agents_janus.mcp_bridge import get_gawt_mcp_tools_sync, filter_gawt_tools
+    from agents_janus.mcp_bridge import (
+        get_mcp_tools_sync,
+        load_janus_config,
+        filter_gawt_tools,
+        filter_codebase_tools,
+    )
     from agents_janus.tools.ask_user_tool import ask_user as ask_user_tool
     from agents_janus.scope_validator import ScopeValidationMiddleware
     from agents_janus.middleware.inbox_check import InboxCheckMiddleware
     from agents_janus.tools.resolve_conflict import make_resolve_conflict_tool, set_agent_ref
 
-    all_mcp_tools = get_gawt_mcp_tools_sync()
+    janus_config = load_janus_config()
+    all_mcp_tools = get_mcp_tools_sync(janus_config, REPO_ROOT)
     gawt_tools = filter_gawt_tools(all_mcp_tools)
+    codebase_tools = filter_codebase_tools(all_mcp_tools)
+
+    # Index codebase on startup if enabled (idempotent — no-op if already fresh)
+    if CODEBASE_INDEX_ON_STARTUP:
+        from agents_janus.mcp_bridge import ensure_index_on_startup
+        import asyncio
+        try:
+            asyncio.run(ensure_index_on_startup(janus_config, REPO_ROOT))
+        except Exception as e:
+            _log.warning("ensure_index_on_startup failed (non-fatal): %s", e)
 
     # Create resolve_conflict tool (lazy agent ref — populated after agent creation)
     resolve_conflict_tool = make_resolve_conflict_tool()
@@ -344,7 +364,7 @@ def create_orchestrator(
     registry = load_registry()
     worker_defs = []
     for name, spec in registry.all().items():
-        all_tools = list(gawt_tools)
+        all_tools = list(gawt_tools) + list(codebase_tools)
         all_tools.append(ask_user_tool)
         all_tools.append(resolve_conflict_tool)
 
@@ -378,9 +398,9 @@ def create_orchestrator(
 
     # ── Orchestrator tools (mode-specific) ───────────────────────────
     if mode == "centinela":
-        orch_tools = _get_centinela_tools()
+        orch_tools = _get_centinela_tools() + [_wrap_with_logging(t) for t in codebase_tools]
     else:
-        orch_tools = _get_dispatcher_tools() + [_wrap_with_logging(t) for t in gawt_tools]
+        orch_tools = _get_dispatcher_tools() + [_wrap_with_logging(t) for t in gawt_tools] + [_wrap_with_logging(t) for t in codebase_tools]
 
     agent = create_deep_agent(
         model=llm,

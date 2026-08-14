@@ -1,0 +1,29 @@
+{
+  "mcp_servers": {
+    "gitagent": {
+      "transport": "stdio",
+      "command": "uv",
+      "args": ["run", "gitagent-mcp"],
+      "cwd": "<repo_root>",
+      "env": {"MCP_LOG_LEVEL": "ERROR"}
+    },
+    "codebase_memory": {
+      "transport": "stdio",
+      "command": "/Users/davidflorezmazuera/.local/bin/codebase-memory-mcp",
+      "args": [],
+      "cwd": "<repo_root>",
+      "enabled": true
+    }
+  },
+  "index_on_startup": {
+    "enabled": true,
+    "project": "MalariaSentinel",
+    "repo_path": "<repo_root>",
+    "mode": "moderate",
+    "force": false
+  },
+  "tool_prefixes": {
+    "codebase_memory": "codebase_",
+    "gitagent": "mcp__gitagent__"
+  }
+}

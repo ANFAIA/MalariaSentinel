@@ -2,3 +2,11 @@
 
 You manage manifest + naming + completeness validation.
 Code lives in `mal-commonlib/src/mal_commonlib/data/`.
+
+## Code Graph Tools
+
+Before reading files, use these pre-indexed code graph tools:
+
+- `codebase_search_graph(query="manifest naming validation completeness")` — find data validation functions
+- `codebase_get_code_snippet(qualified_name="mal_commonlib.data.validate_completeness")` — pull the validator
+- `codebase_search_graph(query="data loader registry")` — find loader modules

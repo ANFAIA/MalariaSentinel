@@ -6,6 +6,16 @@ After any code change, the orchestrator dispatches the scoring specialist
 (or `malariasim score`) to verify the composite score. There is no
 automatic hook — scoring is an explicit next step.
 
+## Code Graph Tools
+
+Before reading files, use these pre-indexed code graph tools — they answer in <100ms:
+
+- `codebase_search_graph(query="ABM population dynamics")` — find functions/classes by description
+- `codebase_get_code_snippet(qualified_name="mal_core.abm.engine.run_simulation")` — pull just the function
+- `codebase_trace_path(function_name="run_simulation")` — see who calls it and what it calls
+- `codebase_query_graph(query="MATCH (f:Function) WHERE f.name CONTAINS 'mortality' RETURN f.qualified_name")` — Cypher for complex queries
+- `codebase_get_architecture()` — high-level project overview
+
 ## Running the ABM pipeline
 
 Use the `execute` tool to run the pipeline via the `malariasim` CLI

@@ -98,6 +98,32 @@ task(subagent_type="{{ specialists[0].name }}", task="[MODE:research] Investigat
 - Use `memory_recall_kg(query="...")` to recall past patterns
 - Use `ask_user(question="...")` to clarify with the human when uncertain
 
+### Code Knowledge Graph (codebase-memory-mcp)
+
+You have access to the **code knowledge graph** — a pre-indexed BM25 + LSP
+call-graph of the entire MalariaSentinel codebase. Use these tools to answer
+questions about code structure, find functions, trace dependencies, and
+understand the blast radius of changes. **Always prefer these over `grep`/`read_file`**
+for code exploration — they hit a pre-built index in <100ms.
+
+| Tool | Purpose |
+|---|---|
+| `codebase_search_graph(query="...")` | Find functions, classes, routes by pattern (BM25 ranked) |
+| `codebase_get_code_snippet(qualified_name="...")` | Read just the function body (not the whole file) |
+| `codebase_trace_path(function_name="...")` | See callers and callees of a function |
+| `codebase_query_graph(query="Cypher...")` | Complex multi-hop Cypher queries |
+| `codebase_get_architecture()` | High-level project summary |
+| `codebase_detect_changes(project="...")` | Blast radius of a git diff |
+| `codebase_index_status()` | Check if the project is indexed |
+| `codebase_check_index_coverage(paths=[...])` | Verify which files the indexer covered |
+
+**When to use:**
+- Research tasks: start with `search_graph` to find relevant symbols
+- Before reading large files: `get_code_snippet` returns just the function
+- Understanding call chains: `trace_path` replaces reading 5+ files
+- After making edits: `detect_changes` shows impact
+- Diagnosing failures: `check_index_coverage` verifies the indexer's coverage
+
 ---
 
 {% if mode == "centinela" %}

@@ -45,7 +45,8 @@ You will typically be dispatched under one of these categories:
 ## How to apply a change
 
 1. **Read** the current file via `mcp__gitagent__read_file` (INV-2:
-   never blind-overwrite).
+   never blind-overwrite). Or use `codebase_get_code_snippet` to pull
+   just the function body from the code graph.
 2. **Locate the right insertion point** — usually at the end of an
    existing section, or by adding a new `## Rules` / `## Pitfalls`
    section.
