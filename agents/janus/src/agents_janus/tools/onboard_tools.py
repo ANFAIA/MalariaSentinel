@@ -1,8 +1,7 @@
-"""Onboarding agent tools — status, diagnostics, and delegation for the centinela.
+"""Research coordinator tools — status, diagnostics, and specialist questions.
 
-For shell access, the centinela uses the built-in `execute` tool (restricted
-to `malariasim` by MalariasimShellBackend). For code-editing tasks, use
-delegate_to_dispatcher to hand off to the dispatcher orchestrator.
+For shell access, the research coordinator uses the built-in `execute` tool
+restricted to `malariasim` by MalariasimShellBackend.
 """
 from __future__ import annotations
 
@@ -107,73 +106,6 @@ def onboard_list_components() -> str:
         return json.dumps(result, indent=2)
     except Exception as e:
         return json.dumps({"error": str(e)})
-
-
-def _active_langfuse_client():
-    """Return the langfuse client owned by the running orchestrator, if any.
-
-    When delegate_to_dispatcher runs, the centinela's ObservabilityMiddleware
-    holds the active Langfuse client. Propagating it to the delegated
-    dispatcher keeps its trace visible in the same Langfuse project instead
-    of running as an unobservable ghost.
-    """
-    try:
-        import agents_janus.agent as agent_mod
-        mw = getattr(agent_mod, "OBSERVABILITY_MIDDLEWARE", None)
-        if mw is not None:
-            return getattr(mw, "langfuse", None)
-    except Exception:
-        pass
-    return None
-
-
-def delegate_to_dispatcher(
-    goal: str,
-    context: str = "{}",
-    plan_path: str = "",
-    provider: str = "openrouter",
-    model: str = "xiaomi/mimo-v2.5",
-) -> str:
-    """Delegate implementation work to the dispatcher orchestrator.
-
-    Creates a dispatcher orchestrator, streams until done, returns summary.
-    Runs in a separate LangGraph invocation (not nested in REPL).
-    The centinela REPL is paused during execution — user sees LivePanel output.
-
-    Args:
-        goal: The objective for the dispatcher.
-        context: JSON string with additional context (research findings, etc.).
-        plan_path: Optional path to a plan file. If provided, the dispatcher
-                   reads it as context for decomposition (equivalent to
-                   `janus improve -g "..." --plan <path>`).
-        provider: LLM provider (default: openrouter).
-        model: Model identifier (default: xiaomi/mimo-v2.5).
-
-    Returns:
-        JSON with the dispatcher's summary.
-    """
-    try:
-        ctx = json.loads(context) if isinstance(context, str) else context
-    except json.JSONDecodeError:
-        ctx = {"raw_context": context}
-
-    try:
-        from agents_janus.improvement import run_improvement
-    except ImportError as e:
-        return json.dumps({"status": "error", "error": f"Import failed: {e}"})
-
-    try:
-        result = run_improvement(
-            goal=goal,
-            plan_path=plan_path or None,
-            provider=provider,
-            model=model,
-            context=ctx,
-            langfuse_client=_active_langfuse_client(),
-        )
-        return json.dumps({"status": "ok", "goal": goal, "result": result})
-    except Exception as e:
-        return json.dumps({"status": "error", "goal": goal, "error": str(e)})
 
 
 def onboard_ask_subagent(name: str, question: str) -> str:

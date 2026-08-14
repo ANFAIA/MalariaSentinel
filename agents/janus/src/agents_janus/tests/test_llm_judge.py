@@ -1,6 +1,6 @@
 """LLM-as-judge E2E tests for the gawt MCP-native architecture.
 
-These tests simulate the full dispatcher workflow and use an LLM judge
+These tests simulate the full implementation coordinator workflow and use an LLM judge
 to evaluate whether the system's behavior matches the plan's expectations.
 
 Each test:

@@ -1,11 +1,12 @@
-"""MalariaSentinel Janus orchestrator — dual-mode (centinela + dispatcher).
+"""MalariaSentinel Janus orchestrator hierarchy.
 
 The orchestrator decomposes goals, dispatches specialists, monitors progress,
 and finalizes via gawt MCP. It never edits files directly.
 
-Two modes:
-- centinela: conversational REPL, interacts with user, delegates implementation
-- dispatcher: goal-driven, manages gawt session, coordinates specialists
+Roles:
+- request_router: minimal parent that routes user requests
+- research_coordinator: read-only research parent
+- implementation_coordinator: editing and GAWT parent
 """
 from __future__ import annotations
 
@@ -14,7 +15,7 @@ import logging
 import os
 import sys
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 _log = logging.getLogger("agents_janus.agent")
 
@@ -112,7 +113,13 @@ def _checkpointer():
         return None
 
 
-def _render_prompt(mode: Literal["centinela", "dispatcher"]) -> str:
+def _render_prompt(
+    mode: Literal[
+        "request_router",
+        "research_coordinator",
+        "implementation_coordinator",
+    ],
+) -> str:
     """Render the orchestrator prompt from the Jinja2 template."""
     # Load specialist list from registry for programmatic injection
     from agents_janus.subagents.registry import load_registry
@@ -131,7 +138,7 @@ def _render_prompt(mode: Literal["centinela", "dispatcher"]) -> str:
         template = env.get_template(_ORCHESTRATOR_PROMPT_TEMPLATE.name)
         return template.render(mode=mode, specialists=specialists)
     except Exception:
-        # Fallback to legacy static prompt (dispatcher only)
+        # Fallback to legacy static prompt when the template is unavailable.
         if _ORCHESTRATOR_PROMPT_LEGACY.exists():
             return _ORCHESTRATOR_PROMPT_LEGACY.read_text()
         return _fallback_prompt(mode)
@@ -148,24 +155,28 @@ When you dispatch a specialist, prefix the task with:
 - [MODE:research] for investigation
 - [MODE:implementation] for file edits
 """
-    if mode == "centinela":
+    if mode == "request_router":
         base += """
-You are the Centinela — a conversational assistant. You interact with the user,
-explain results, and delegate implementation work to the dispatcher via
-delegate_to_dispatcher(goal="...").
+You are the request router. Delegate each request to exactly one coordinator:
+research_coordinator or implementation_coordinator.
+"""
+    elif mode == "research_coordinator":
+        base += """
+You are the research coordinator. Dispatch specialists with [MODE:research].
+Never edit files.
 """
     else:
         base += """
-You are the Dispatcher — a goal-driven agent. You decompose goals, start gawt
-sessions, dispatch specialists, monitor progress, and finalize.
+You are the implementation coordinator. Start GAWT sessions, dispatch specialists,
+monitor progress, and finalize changes.
 """
     return base
 
 
 # ── Tool sets ───────────────────────────────────────────────────────────
 
-def _get_dispatcher_tools():
-    """Tools for dispatcher mode: search, memory, ask_user.
+def _get_implementation_tools():
+    """Tools for implementation coordinator: search, memory, ask_user.
 
     Shell access comes from the built-in `execute` tool (MalariasimShellBackend
     restricts it to `malariasim` only) — no custom ABM execution tools.
@@ -182,28 +193,23 @@ def _get_dispatcher_tools():
     ]
 
 
-def _get_centinela_tools():
-    """Tools for centinela mode: onboard tools + memory + ask_user.
+def _get_research_tools():
+    """Tools for research coordinator mode: clarification only.
 
-    Shell access comes from the built-in `execute` tool (restricted to
-    `malariasim` via the backend) — no custom ABM execution tools.
+    Repository and knowledge tools belong to research specialists. Keeping
+    them off the coordinator forces repository questions through task().
     """
-    from agents_janus.tools.kg_tool import memory_recall_kg
     from agents_janus.tools.ask_user_tool import ask_user
-    from agents_janus.tools.onboard_tools import (
-        onboard_status,
-        onboard_list_components,
-        delegate_to_dispatcher,
-        onboard_ask_subagent,
-    )
-    return [
-        _wrap_with_logging(onboard_status),
-        _wrap_with_logging(onboard_list_components),
-        _wrap_with_logging(delegate_to_dispatcher),
-        _wrap_with_logging(onboard_ask_subagent),
-        _wrap_with_logging(memory_recall_kg),
-        _wrap_with_logging(ask_user),
-    ]
+    return [_wrap_with_logging(ask_user)]
+
+
+def _get_router_tools():
+    """Minimal tools for the request router.
+
+    The router only receives user input and delegates to one coordinator via
+    deepagents' built-in task tool. It must not inspect or edit the repository.
+    """
+    return []
 
 
 MEMORY_FILES = [str(AGENT_DIR / "AGENTS.md")]
@@ -239,24 +245,29 @@ def _resolve_provider(provider: str, model: str):
 def create_orchestrator(
     provider: str = "openrouter",
     model: str = "xiaomi/mimo-v2.5",
-    thread_id: str = "centinela-session",
+    thread_id: str = "request-router-session",
     langfuse_client=None,
     *,
-    mode: Literal["centinela", "dispatcher"] = "dispatcher",
+    mode: Literal[
+        "request_router",
+        "research_coordinator",
+        "implementation_coordinator",
+    ] = "implementation_coordinator",
     goal: str = "",
     env: str = "",
     iteration: int = 0,
 ):
     """Create an orchestrator agent using deepagents.
 
-    Two modes:
-    - centinela: conversational REPL, interacts with user, delegates implementation
-    - dispatcher: goal-driven, manages gawt session, coordinates specialists
+    Three roles:
+    - request_router: minimal parent that routes each request to a coordinator
+    - research_coordinator: user-facing research coordinator
+    - implementation_coordinator: goal-driven editor and GAWT coordinator
 
-    Both modes have access to 8 specialist subagents via the task() tool.
+    Coordinator roles have access to domain specialists via task().
 
     Args:
-        mode: Orchestrator mode (centinela or dispatcher).
+        mode: Orchestrator role.
         goal: The session goal (enriches Langfuse trace metadata + tags).
         env: Environment name (dev/staging/production). Enriches Langfuse tags.
         iteration: Improvement iteration number. Enriches Langfuse metadata.
@@ -296,6 +307,68 @@ def create_orchestrator(
 
     llm = _resolve_provider(provider, model)
 
+    # Request router is intentionally minimal: its children own all capabilities.
+    if mode == "request_router":
+        from deepagents import CompiledSubAgent
+
+        research_agent = create_orchestrator(
+            provider=provider,
+            model=model,
+            thread_id=f"{thread_id}-research",
+            langfuse_client=langfuse_client,
+            mode="research_coordinator",
+            goal=goal,
+            env=env,
+            iteration=iteration,
+        )
+        implementation_agent = create_orchestrator(
+            provider=provider,
+            model=model,
+            thread_id=f"{thread_id}-implementation",
+            langfuse_client=langfuse_client,
+            mode="implementation_coordinator",
+            goal=goal,
+            env=env,
+            iteration=iteration,
+        )
+
+        router_middleware = []
+        if SESSION_LOGGER is not None:
+            router_obs = ObservabilityMiddleware(
+                SESSION_LOGGER,
+                langfuse_client=langfuse_client,
+                goal=goal,
+                thread_id=thread_id,
+                env=env,
+                iteration=iteration,
+                mode=mode,
+            )
+            router_middleware.append(router_obs)
+            OBSERVABILITY_MIDDLEWARE = router_obs
+
+        router = create_deep_agent(
+            model=llm,
+            tools=_get_router_tools(),
+            subagents=[
+                CompiledSubAgent(
+                    name="research_coordinator",
+                    description="Researches and explains the system. Never edits files.",
+                    runnable=research_agent,
+                ),
+                CompiledSubAgent(
+                    name="implementation_coordinator",
+                    description="Plans and implements repository changes through GAWT.",
+                    runnable=implementation_agent,
+                ),
+            ],
+            system_prompt=_render_prompt(mode),
+            skills=None,
+            name="janus-request-router",
+            middleware=router_middleware,
+            checkpointer=_checkpointer(),
+        )
+        return router
+
     # MalariasimShellBackend exposes the built-in `execute` tool (bash) but
     # restricts it to `malariasim` commands via a policy hook. Filesystem
     # deny rules (secrets, data/, .git/) are enforced in the backend too, so
@@ -322,6 +395,12 @@ def create_orchestrator(
         )
         middleware.append(obs)
         OBSERVABILITY_MIDDLEWARE = obs
+    if mode == "research_coordinator":
+        middleware.append(
+            ToolFilterMiddleware(
+                excluded=frozenset({"write_file", "edit_file", "delete_file"})
+            )
+        )
 
     skills = []
     if PROJECT_SKILLS.is_dir():
@@ -359,45 +438,62 @@ def create_orchestrator(
     resolve_conflict_tool = make_resolve_conflict_tool()
 
     registry = load_registry()
-    worker_defs = []
+    worker_defs: list[Any] = []
     for name, spec in registry.all().items():
-        all_tools = list(gawt_tools) + list(codebase_tools)
-        all_tools.append(ask_user_tool)
-        all_tools.append(resolve_conflict_tool)
+        if mode == "research_coordinator":
+            all_tools: list[Any] = list(codebase_tools) + [ask_user_tool]
+        else:
+            all_tools = list(gawt_tools) + list(codebase_tools)
+            all_tools.append(ask_user_tool)
+            all_tools.append(resolve_conflict_tool)
 
         wrapped_tools = [_wrap_with_logging(t) for t in all_tools]
-        system_prompt = build_subagent_prompt(spec, registry.all())
+        system_prompt = build_subagent_prompt(
+            spec,
+            registry.all(),
+            coordinator_mode="research" if mode == "research_coordinator" else "implementation",
+        )
 
         wd = {
             "name": name,
             "description": spec.description,
             "system_prompt": system_prompt,
             "tools": wrapped_tools,
-            "middleware": [
-                ScopeValidationMiddleware(registry, name),
-                InboxCheckMiddleware(),
-                SubAgentObservabilityMiddleware(obs, name),
-            ] if obs else [
-                ScopeValidationMiddleware(registry, name),
-                InboxCheckMiddleware(),
-            ],
+            "middleware": (
+                [SubAgentObservabilityMiddleware(obs, name)] if obs else []
+            ) if mode == "research_coordinator" else (
+                [
+                    ScopeValidationMiddleware(registry, name),
+                    InboxCheckMiddleware(),
+                    SubAgentObservabilityMiddleware(obs, name),
+                ] if obs else [
+                    ScopeValidationMiddleware(registry, name),
+                    InboxCheckMiddleware(),
+                ]
+            ),
         }
 
         # Only the abm specialist gets shell access (the built-in `execute`
         # tool). Every other subagent has `execute` filtered out. The
         # orchestrator keeps `execute` (it runs malariasim directly).
-        if name != "abm":
+        excluded_tools = {"execute"} if name != "abm" else set()
+        if mode == "research_coordinator":
+            excluded_tools.update({"write_file", "edit_file", "delete_file"})
+        if excluded_tools:
             wd["middleware"].append(
-                ToolFilterMiddleware(excluded=frozenset({"execute"}))
+                ToolFilterMiddleware(excluded=frozenset(excluded_tools))
             )
 
         worker_defs.append(wd)
 
     # ── Orchestrator tools (mode-specific) ───────────────────────────
-    if mode == "centinela":
-        orch_tools = _get_centinela_tools() + [_wrap_with_logging(t) for t in codebase_tools]
+    if mode == "research_coordinator":
+        # Research coordinators must delegate repository investigation to
+        # specialists. They retain clarification and memory tools, but no
+        # direct codebase tools that let them bypass task().
+        orch_tools = _get_research_tools()
     else:
-        orch_tools = _get_dispatcher_tools() + [_wrap_with_logging(t) for t in gawt_tools] + [_wrap_with_logging(t) for t in codebase_tools]
+        orch_tools = _get_implementation_tools() + [_wrap_with_logging(t) for t in gawt_tools] + [_wrap_with_logging(t) for t in codebase_tools]
 
     agent = create_deep_agent(
         model=llm,

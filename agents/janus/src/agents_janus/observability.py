@@ -62,7 +62,6 @@ _TOOL_CATEGORIES: dict[str, str] = {
     # User interaction
     "ask_user": "user",
     # Dispatch delegation
-    "delegate_to_dispatcher": "dispatch",
     "onboard_ask_subagent": "user",
     "onboard_status": "pipeline",
     "onboard_list_components": "pipeline",
@@ -123,7 +122,7 @@ class ObservabilityMiddleware(AgentMiddleware):
         thread_id: str = "",
         env: str = "",
         iteration: int = 0,
-        mode: str = "dispatcher",
+        mode: str = "implementation_coordinator",
     ):
         self.logger = session_logger
         self.langfuse = langfuse_client
@@ -139,11 +138,12 @@ class ObservabilityMiddleware(AgentMiddleware):
         self._thread_id = thread_id
         self._env = env or os.environ.get("JANUS_ENV", "dev")
         self._iteration = iteration
-        self._mode = mode  # centinela | dispatcher
+        self._mode = mode  # request_router | research_coordinator | implementation_coordinator
 
         # Thread-local agent role — each subagent thread gets its own role
         # without cross-contamination when dispatching in parallel.
         self._thread_local = threading.local()
+        self._thread_local.agent_role = mode
 
         # Langfuse handle holders
         self._lf_root_span: Any = None
@@ -161,7 +161,7 @@ class ObservabilityMiddleware(AgentMiddleware):
     @property
     def _current_agent_role(self) -> str:
         """Thread-local agent role. Each subagent thread has its own."""
-        return getattr(self._thread_local, "agent_role", "orchestrator")
+        return getattr(self._thread_local, "agent_role", self._mode)
 
     @_current_agent_role.setter
     def _current_agent_role(self, role: str) -> None:
@@ -297,7 +297,7 @@ class ObservabilityMiddleware(AgentMiddleware):
                     initial_content = content if isinstance(content, str) else str(content)
 
                 base_tags = [
-                    "agent:orchestrator",
+                    f"agent:{self._mode}",
                     f"env:{self._env}",
                     f"mode:{self._mode}",
                     "stage:start",
@@ -684,7 +684,7 @@ class SubAgentObservabilityMiddleware(AgentMiddleware):
         )
         self._obs.end_dispatch_span(self._agent_role)
         # Restore orchestrator's root trace context (subagent overwrote it)
-        self._obs.set_agent_role("orchestrator")
+        self._obs.set_agent_role(self._obs._mode)
 
     def before_model(self, state, runtime):
         self._obs.before_model(state, runtime)

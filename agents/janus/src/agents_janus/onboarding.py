@@ -1,8 +1,7 @@
 """Onboarding agent — conversational REPL for the MalariaSentinel SDSS.
 
-Uses the dual-mode orchestrator (centinela mode) to interact with users.
-The centinela has access to 8 specialist subagents, onboard tools, and
-can delegate implementation work to the dispatcher.
+Uses the request router to interact with users. The router delegates each
+request to either the research or implementation coordinator.
 """
 from __future__ import annotations
 
@@ -15,7 +14,7 @@ _AGENT_DIR = Path(__file__).resolve().parent
 ONBOARD_BANNER = """\
 
 ======================================================================
-  Centinela — MalariaSentinel SDSS Assistant
+  Janus — MalariaSentinel SDSS Assistant
   Escribe tu pregunta o tarea. 'salir' para terminar.
 ======================================================================
 """
@@ -49,7 +48,7 @@ def run_onboarding(
 ) -> str:
     """Run the conversational onboarding agent.
 
-    Creates the centinela orchestrator and enters a REPL loop.
+    Creates the request router and enters a REPL loop.
     The agent responds in the user's language and executes tools directly.
 
     Args:
@@ -79,7 +78,7 @@ def run_onboarding(
     agent = agent_mod.create_orchestrator(
         provider=provider,
         model=model,
-        mode="centinela",
+        mode="request_router",
         langfuse_client=langfuse_client,
         goal="onboarding",
         env=env,
@@ -139,7 +138,7 @@ def run_onboarding(
             for event in agent.stream(
                 {"messages": messages},
                 stream_mode="updates",
-                config={"configurable": {"thread_id": "centinela-session"}},
+                    config={"configurable": {"thread_id": "request-router-session"}},
             ):
                 if not quiet and isinstance(event, dict):
                     for node_name, delta in event.items():

@@ -1,4 +1,4 @@
-"""Improvement orchestrator — dispatcher mode."""
+"""Implementation coordinator — direct improvement entry point."""
 from __future__ import annotations
 
 
@@ -74,9 +74,9 @@ def run_improvement(
     *,
     env: str = "",
 ) -> str:
-    """Run the improvement dispatcher for a given goal.
+    """Run the implementation coordinator for a given goal.
 
-    Creates the orchestrator agent and streams until done. The orchestrator
+    Creates the implementation coordinator and streams until done. The coordinator
     prompt (loaded from disk by agent.py) contains the full methodology.
 
     Args:
@@ -132,7 +132,7 @@ def run_improvement(
             model=model,
             thread_id=thread_id,
             langfuse_client=langfuse_client,
-            mode="dispatcher",
+            mode="implementation_coordinator",
             goal=goal,
             env=env,
         )

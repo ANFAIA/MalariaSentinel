@@ -1,8 +1,8 @@
 """CLI entry point for the MalariaSentinel Janus system.
 
-Two modes:
-    janus              — Centinela REPL (conversational assistant)
-    janus improve      — Dispatcher (goal-driven, coordinates specialists)
+Two entry points:
+    janus              — Request router REPL
+    janus improve      — Implementation coordinator
 """
 from __future__ import annotations
 
@@ -19,13 +19,12 @@ import typer
 app = typer.Typer(
     name="janus",
     help=(
-        "MalariaSentinel Centinela — multi-agent decision support system.\n\n"
-        "Two modes:\n"
-        "  janus          Centinela REPL: conversational assistant that investigates,\n"
-        "                 asks clarifying questions, and delegates implementation.\n"
-        "  janus improve  Dispatcher: decomposes goals, coordinates specialists,\n"
+        "MalariaSentinel Janus — multi-agent decision support system.\n\n"
+        "Two entry points:\n"
+        "  janus          Request router: routes each request to a coordinator.\n"
+        "  janus improve  Implementation coordinator: edits through GAWT,\n"
         "                 manages gawt sessions, and finalizes changes.\n\n"
-        "Run with no arguments to start the Centinela REPL."
+        "Run with no arguments to start the request router REPL."
     ),
     no_args_is_help=False,
 )
@@ -47,13 +46,13 @@ def _main(
         help="Environment tag: dev, staging, production.",
     ),
 ) -> None:
-    """Start the Centinela REPL — a conversational assistant for the SDSS.
+    """Start the request router REPL for the SDSS.
 
-    The Centinela can:
+    The research coordinator can:
     - Run ABM simulations and pipeline stages
     - Ask specialists about their domain
     - Investigate issues by dispatching research specialists
-    - Delegate code changes to the dispatcher
+    The implementation coordinator handles repository changes.
 
     Langfuse tracing is ON by default. Each session creates a trace with
     nested spans for LLM calls, tool calls, and specialist dispatches.
@@ -154,11 +153,11 @@ def _resolve_env(env: str | None) -> str:
 def improve(
     goal: str = typer.Option(
         None, "--goal", "-g",
-        help="Goal for the dispatcher to accomplish.",
+        help="Goal for the implementation coordinator to accomplish.",
     ),
     plan: str = typer.Option(
         None, "--plan",
-        help="Path to a plan file. The dispatcher reads it for task decomposition.",
+        help="Path to a plan file. The implementation coordinator reads it for task decomposition.",
     ),
     provider: str = typer.Option(
         "openrouter", "--provider", "-p",
@@ -189,9 +188,9 @@ def improve(
         help="Environment tag: dev, staging, production.",
     ),
 ):
-    """Run the dispatcher — goal-driven specialist coordination.
+    """Run the implementation coordinator — goal-driven specialist coordination.
 
-    The dispatcher decomposes your goal into subtasks, starts a gawt session,
+    The implementation coordinator decomposes your goal into subtasks, starts a gawt session,
     dispatches specialists in parallel or sequential, monitors progress, and
     finalizes all changes into a single commit.
 

@@ -44,6 +44,24 @@ def test_subagent_spec_no_plugins_field():
     assert not hasattr(spec, "plugins")
 
 
+def test_research_subagent_prompt_disables_implementation_protocol():
+    from agents_janus.subagents.base import SubagentSpec
+    from agents_janus.subagents.builder import build_subagent_prompt
+
+    spec = SubagentSpec(
+        name="test", description="research test", model="m", provider="p",
+        spec_path=None, skills=(), mailbox_inbox="inbox-test", edits_allow=()
+    )
+    prompt = build_subagent_prompt(
+        spec,
+        {"test": spec},
+        coordinator_mode="research",
+    )
+    assert "research coordinator" in prompt
+    assert "Do not edit files" in prompt
+    assert "Registration (MANDATORY)" not in prompt
+
+
 def test_scope_validator():
     from agents_janus.scope_validator import validate_edit_scope
     from agents_janus.subagents.registry import Registry

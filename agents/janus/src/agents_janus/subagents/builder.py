@@ -33,6 +33,7 @@ def _get_peer_registry_table(self_name: str, all_specs: dict[str, SubagentSpec])
 def build_subagent_prompt(
     spec: SubagentSpec,
     all_specs: dict[str, SubagentSpec] | None = None,
+    coordinator_mode: str = "implementation",
 ) -> str:
     """Compose the full system prompt from three layers.
 
@@ -58,6 +59,7 @@ def build_subagent_prompt(
         skills=list(spec.skills),
         depends_on=[],
         spec_text=spec_text,
+        coordinator_mode=coordinator_mode,
     )
 
     # Layer C: per-subagent domain clarifications

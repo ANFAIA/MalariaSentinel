@@ -3,7 +3,7 @@
 Runs the onboarding agent with controlled inputs, captures tool calls,
 verifies:
   1. onboard_ask_subagent was invoked (read-only specialist query works)
-  2. delegate_to_dispatcher works (improver handoff not broken)
+  2. request router can hand off to a coordinator
   3. No write tools were called (onboarding stays read-only)
 
 Two modes:
@@ -47,7 +47,7 @@ def _run_onboarding_with_inputs(
     agent = agent_mod.create_orchestrator(
         provider=provider,
         model=model,
-        mode="centinela",
+        mode="request_router",
         langfuse_client=langfuse_client,
     )
 
@@ -65,6 +65,7 @@ def _run_onboarding_with_inputs(
         for event in agent.stream(
             {"messages": messages},
             stream_mode="updates",
+            config={"configurable": {"thread_id": "router-test-session"}},
         ):
             if not isinstance(event, dict):
                 continue
@@ -119,19 +120,19 @@ MOCK_ONBOARDING_RESULT = {
         "El sistema tiene 14 scorers (D1-D14) con composite 0.87.",
         "Tenemos 8 subagentes especializados: abm, scoring, ingest, download, prediction, training, data, commonlib.",
         "El especialista de scoring indica que tiene D1-D14 más el composite.",
-        "Delegado al dispatcher para añadir el scorer D15.",
+        "Delegado al implementation coordinator para añadir el scorer D15.",
     ],
     "tool_calls": [
         "onboard_status",
         "onboard_list_components",
         "onboard_ask_subagent",
-        "delegate_to_dispatcher",
+        "task",
     ],
     "tool_outputs": {
         "onboard_status": '{"scorecards": {"best_composite": 0.87}, "plans": ["m16.md"], "subagents": ["abm","scoring","ingest","download","prediction","training","data","commonlib"]}',
         "onboard_list_components": '[{"name": "abm", "description": "ABM C++ engine"}, {"name": "scoring", "description": "Calibration scorers"}]',
         "onboard_ask_subagent": '{"status": "ok", "subagent": "scoring", "response": "We have D1-D14 scorers plus composite."}',
-        "delegate_to_dispatcher": '{"status": "ok", "goal": "Add gonotrophic cycle scorer D15"}',
+        "task": '{"status": "ok", "coordinator": "implementation_coordinator"}',
     },
     "elapsed_s": 12.3,
 }
@@ -144,9 +145,9 @@ class TestOnboardingPromoted:
         """onboard_ask_subagent appears in tool_calls."""
         assert "onboard_ask_subagent" in MOCK_ONBOARDING_RESULT["tool_calls"]
 
-    def test_delegate_called(self):
-        """delegate_to_dispatcher appears in tool_calls."""
-        assert "delegate_to_dispatcher" in MOCK_ONBOARDING_RESULT["tool_calls"]
+    def test_coordinator_called(self):
+        """Router task dispatch appears in tool_calls."""
+        assert "task" in MOCK_ONBOARDING_RESULT["tool_calls"]
 
     def test_status_called(self):
         """onboard_status appears in tool_calls."""
@@ -157,10 +158,10 @@ class TestOnboardingPromoted:
         tc = MOCK_ONBOARDING_RESULT["tool_calls"]
         assert tc.index("onboard_status") < tc.index("onboard_ask_subagent")
 
-    def test_delegate顺序_after_ask(self):
-        """delegate is called after ask_subagent (escalation flow)."""
+    def test_task顺序_after_ask(self):
+        """Coordinator dispatch follows specialist research."""
         tc = MOCK_ONBOARDING_RESULT["tool_calls"]
-        assert tc.index("onboard_ask_subagent") < tc.index("delegate_to_dispatcher")
+        assert tc.index("onboard_ask_subagent") < tc.index("task")
 
     def test_no_write_tools(self):
         """No write tools called — onboarding stays read-only."""
@@ -177,11 +178,11 @@ class TestOnboardingPromoted:
         assert "response" in data
 
     def test_delegate_output_valid_json(self):
-        """delegate_to_dispatcher output is valid JSON with status=ok."""
-        out = MOCK_ONBOARDING_RESULT["tool_outputs"]["delegate_to_dispatcher"]
+        """Coordinator dispatch output is valid JSON with status=ok."""
+        out = MOCK_ONBOARDING_RESULT["tool_outputs"]["task"]
         data = json.loads(out)
         assert data["status"] == "ok"
-        assert data["goal"] == "Add gonotrophic cycle scorer D15"
+        assert data["coordinator"] == "implementation_coordinator"
 
     def test_responses_non_empty(self):
         """All agent responses are non-empty strings."""
@@ -189,12 +190,12 @@ class TestOnboardingPromoted:
             assert r, f"Response {i} is empty"
 
     def test_full_flow_completes(self):
-        """Full onboarding flow: status → ask → delegate."""
+        """Full onboarding flow: status → ask → coordinator."""
         tc = MOCK_ONBOARDING_RESULT["tool_calls"]
         assert len(tc) >= 3
         assert tc[0] == "onboard_status"
         assert "onboard_ask_subagent" in tc
-        assert "delegate_to_dispatcher" in tc
+        assert "task" in tc
 
 
 # ── LIVE: real LLM, real tool calls ──────────────────────────────────────
@@ -204,8 +205,8 @@ class TestOnboardingPromoted:
 class TestOnboardingLive:
     """LIVE onboarding trial — real LLM, real tool calls, real assertions.
 
-    NOTE: delegate_to_dispatcher is MOCKED because run_improvement() tries to
-    install signal.signal(SIGINT) which only works in the main thread.
+    The router is tested only for read-only behavior here. Implementation
+    coordinator coverage belongs to the direct `janus improve` tests.
     """
 
     def test_ask_subagent_live(self):
@@ -221,66 +222,6 @@ class TestOnboardingLive:
         if out:
             data = json.loads(out)
             assert data["status"] == "ok"
-
-    def test_delegate_still_works_live(self):
-        """Run onboarding with delegate input, verify handoff works.
-
-        Mocks run_improvement to avoid signal.signal() crash in threads.
-        """
-        mock_result = json.dumps({
-            "status": "ok",
-            "goal": "Add gonotrophic cycle scorer D15",
-            "result": "Improvement cycle started. D15 scorer added to scoring/.",
-        })
-        import agents_janus.tools.onboard_tools as ot_mod
-        orig = ot_mod.run_improvement
-        ot_mod.run_improvement = lambda **kw: mock_result
-        try:
-            result = _run_onboarding_with_inputs([
-                "Delega al orchestrator de mejora la tarea de añadir scorer D15",
-            ])
-        finally:
-            ot_mod.run_improvement = orig
-
-        assert "delegate_to_dispatcher" in result["tool_calls"], (
-            f"delegate not called. Tool calls: {result['tool_calls']}"
-        )
-        out = result["tool_outputs"].get("delegate_to_dispatcher", "")
-        if out:
-            data = json.loads(out)
-            assert data["status"] == "ok"
-
-    def test_full_flow_live(self):
-        """Full onboarding flow: status → ask specialist → delegate.
-
-        Mocks delegate to avoid signal.signal() crash.
-        """
-        mock_result = json.dumps({
-            "status": "ok",
-            "goal": "Add D15",
-            "result": "done",
-        })
-        import agents_janus.tools.onboard_tools as ot_mod
-        orig = ot_mod.run_improvement
-        ot_mod.run_improvement = lambda **kw: mock_result
-        try:
-            result = _run_onboarding_with_inputs([
-                "¿Cuál es el estado del sistema?",
-                "Pregúntale al especialista de scoring qué scorers tiene",
-                "Delega al orchestrator de mejora la tarea de añadir scorer D15",
-            ])
-        finally:
-            ot_mod.run_improvement = orig
-
-        tc = result["tool_calls"]
-        assert len(result["responses"]) == 3, f"Expected 3 responses, got {len(result['responses'])}"
-        assert "onboard_status" in tc, f"status not called: {tc}"
-        assert "onboard_ask_subagent" in tc, f"ask_subagent not called: {tc}"
-        write_tools = {"gitagent_start", "gitagent_spawn", "gitagent_propose",
-                       "gitagent_integrate", "gitagent_finalize"}
-        assert not write_tools.intersection(tc), f"Write tools called: {write_tools.intersection(tc)}"
-        for i, r in enumerate(result["responses"]):
-            assert len(r) > 10, f"Response {i} too short: {r[:50]}"
 
     def test_no_write_tools_live(self):
         """Onboarding never calls write tools, even with live LLM."""

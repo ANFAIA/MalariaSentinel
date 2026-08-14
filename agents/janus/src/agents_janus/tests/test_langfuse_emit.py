@@ -137,11 +137,42 @@ def test_llm_call_emits_generation(mock_langfuse):
     gen_calls = [c for c in calls if c.kwargs.get("as_type") == "generation"]
     assert len(gen_calls) == 1
     kwargs = gen_calls[0].kwargs
-    assert kwargs["name"] == "llm:orchestrator"
+    assert kwargs["name"] == "llm:implementation_coordinator"
     assert kwargs["model"] == "mimo"
     assert kwargs["usage_details"]["input"] == 100
     assert kwargs["usage_details"]["output"] == 20
     mock_langfuse.flush.assert_called_once()
+
+
+@pytest.mark.parametrize(
+    ("mode", "expected_name"),
+    [
+        ("request_router", "llm:request_router"),
+        ("research_coordinator", "llm:research_coordinator"),
+        ("implementation_coordinator", "llm:implementation_coordinator"),
+    ],
+)
+def test_llm_call_uses_coordinator_role(mock_langfuse, mode, expected_name):
+    sl = MagicMock()
+    sl.session_dir.name = "janus-test"
+    mw = ObservabilityMiddleware(sl, langfuse_client=mock_langfuse, mode=mode)
+    state = {"messages": []}
+    runtime = MagicMock()
+    runtime.model_name = "mimo"
+    mw.before_agent(state, runtime)
+
+    request = MagicMock()
+    request.model.model_name = "mimo"
+    request.messages = []
+    response = MagicMock()
+    response.result = [MagicMock(usage_metadata={}, content="ok")]
+    mw.wrap_model_call(request, lambda req: response)
+
+    generations = [
+        c for c in mock_langfuse.start_observation.call_args_list
+        if c.kwargs.get("as_type") == "generation"
+    ]
+    assert generations[-1].kwargs["name"] == expected_name
 
 
 def test_tool_call_emits_span(mock_langfuse):

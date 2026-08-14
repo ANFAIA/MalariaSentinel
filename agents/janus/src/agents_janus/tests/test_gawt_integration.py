@@ -1,6 +1,6 @@
 """Integration tests for gawt MCP architecture.
 
-Tests the full dispatcher workflow using mocks:
+Tests the full implementation coordinator workflow using mocks:
 1. Orchestrator decomposes goal -> subtasks
 2. Writes manifest
 3. Starts gawt session
@@ -58,9 +58,9 @@ def _make_registry():
     return Registry(specs)
 
 
-# -- Dispatcher workflow tests --
+# -- Implementation coordinator workflow tests --
 
-class TestDispatcherWorkflow:
+class TestImplementationCoordinatorWorkflow:
     """Test the full orchestrator -> specialist dispatch workflow."""
 
     def test_manifest_written_before_session(self, tmp_path):
@@ -280,26 +280,26 @@ class TestArchitectureInvariants:
     """Test that the new architecture maintains key invariants."""
 
     def test_orchestrator_prompt_mentions_gawt_lifecycle(self):
-        """Orchestrator prompt must mention gawt lifecycle tools (dispatcher mode)."""
+        """Implementation coordinator prompt must mention GAWT lifecycle tools."""
         from agents_janus.agent import _render_prompt
-        prompt = _render_prompt("dispatcher")
+        prompt = _render_prompt("implementation_coordinator")
         assert "mcp__gitagent__start_session" in prompt
         assert "mcp__gitagent__finalize_session" in prompt
         assert "mcp__gitagent__list_agents" in prompt
 
     def test_orchestrator_prompt_forbids_editing(self):
-        """Orchestrator prompt must state it does NOT edit files."""
+        """Implementation coordinator must not edit files directly."""
         from agents_janus.agent import _render_prompt
-        prompt = _render_prompt("dispatcher")
+        prompt = _render_prompt("implementation_coordinator")
         assert "You do NOT" in prompt
-        assert "Edit files" in prompt
+        assert "edit repository files directly" in prompt
 
-    def test_centinela_prompt_has_delegation(self):
-        """Centinela prompt must mention delegation to dispatcher."""
+    def test_router_prompt_has_coordinators(self):
+        """Router prompt must mention both coordinator targets."""
         from agents_janus.agent import _render_prompt
-        prompt = _render_prompt("centinela")
-        assert "delegate_to_dispatcher" in prompt
-        assert "Centinela Protocol" in prompt
+        prompt = _render_prompt("request_router")
+        assert "research_coordinator" in prompt
+        assert "implementation_coordinator" in prompt
 
     def test_no_gitagent_cli_imports(self):
         """No module imports from deleted gitagent CLI wrappers."""

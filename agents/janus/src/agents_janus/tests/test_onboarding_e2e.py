@@ -2,8 +2,7 @@
 
 Tests cover:
 - onboard_ask_subagent: returns answer, handles unknown subagent
-- delegate_to_dispatcher: works with mocked improver
-- tool completeness: all expected tools are callable
+- tool completeness: all expected research tools are callable
 """
 from __future__ import annotations
 
@@ -16,7 +15,6 @@ import pytest
 from agents_janus.tools.onboard_tools import (
     onboard_status,
     onboard_list_components,
-    delegate_to_dispatcher,
     onboard_ask_subagent,
 )
 
@@ -134,40 +132,7 @@ def test_onboard_ask_subagent_builds_prompt():
 
 
 # ---------------------------------------------------------------------------
-# Test 4: delegate_to_dispatcher works
-# ---------------------------------------------------------------------------
-
-def test_delegate_to_dispatcher_works():
-    """delegate_to_dispatcher should return valid JSON with the goal."""
-    with patch("agents_janus.improvement.run_improvement") as mock_run:
-        mock_run.return_value = "All done. Fixed D14."
-
-        result = json.loads(delegate_to_dispatcher(goal="test goal"))
-
-    assert result["status"] == "ok"
-    assert result["goal"] == "test goal"
-    assert result["result"] == "All done. Fixed D14."
-    mock_run.assert_called_once()
-
-
-def test_delegate_to_dispatcher_with_plan():
-    """delegate_to_dispatcher should pass plan_path to run_improvement."""
-    with patch("agents_janus.improvement.run_improvement") as mock_run:
-        mock_run.return_value = "Done."
-
-        result = json.loads(delegate_to_dispatcher(
-            goal="fix scoring",
-            plan_path="docs/plans/calibration.md",
-        ))
-
-    assert result["status"] == "ok"
-    mock_run.assert_called_once()
-    call_kwargs = mock_run.call_args[1]
-    assert call_kwargs["plan_path"] == "docs/plans/calibration.md"
-
-
-# ---------------------------------------------------------------------------
-# Test 5: tool completeness
+# Test 4: tool completeness
 # ---------------------------------------------------------------------------
 
 def test_onboarding_tools_complete():
@@ -175,7 +140,6 @@ def test_onboarding_tools_complete():
     expected_tools = [
         onboard_status,
         onboard_list_components,
-        delegate_to_dispatcher,
         onboard_ask_subagent,
     ]
     for tool in expected_tools:
