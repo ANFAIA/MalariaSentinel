@@ -284,13 +284,13 @@ def create_orchestrator(
     # to it because the built-in TASK_TOOL_DESCRIPTION has 5 examples all
     # using "general-purpose".
     #
-    # Key must be "openai" (the resolved provider), NOT "openrouter".
-    # deepagents resolves ChatOpenAI as provider='openai' regardless of the
-    # base_url pointing to OpenRouter. The lookup order is:
-    #   1. "openai:xiaomi/mimo-v2.5" (provider:model)
-    #   2. "openai" (provider fallback)
+    # Key must match the resolved provider. ChatOpenRouter resolves as
+    # provider='openrouter'; ChatOpenAI resolves as 'openai'.
+    # Lookup order:
+    #   1. "openrouter:xiaomi/mimo-v2.5" (provider:model)
+    #   2. "openrouter" (provider fallback)
     register_harness_profile(
-        "openai",
+        "openrouter",
         HarnessProfile(
             general_purpose_subagent=GeneralPurposeSubagentProfile(enabled=False),
         ),
