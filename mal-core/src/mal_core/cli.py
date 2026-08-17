@@ -207,6 +207,7 @@ def abm(
     n_rollouts: int = typer.Option(1, "--n-rollouts"),
     snapshot_every: int = typer.Option(1, "--snapshot-every", help="Snapshot interval in days (0=final only)."),
     cohort_log: Path | None = typer.Option(None, "--cohort-log", help="Daily cohort JSON path."),
+    timeout: int = typer.Option(3600, "--timeout", help="Subprocess timeout in seconds."),
     output_dir: Path = typer.Option(Path("runs/abm"), "--output-dir"),
     data_root: Path | None = typer.Option(None, "--data-root", help="Root containing AOI manifest"),
 ) -> None:
@@ -227,7 +228,7 @@ def abm(
     """
     from .abm import run_abm_from_manifest
 
-    result = run_abm_from_manifest(aoi=aoi, year=year, month=month, seed=seed, days=days, n_rollouts=n_rollouts, snapshot_every=snapshot_every, cohort_log=cohort_log, output_dir=output_dir, data_root=data_root)
+    result = run_abm_from_manifest(aoi=aoi, year=year, month=month, seed=seed, days=days, n_rollouts=n_rollouts, snapshot_every=snapshot_every, cohort_log=cohort_log, timeout=timeout, output_dir=output_dir, data_root=data_root)
     typer.echo(f"ABM result: {result}")
 
 

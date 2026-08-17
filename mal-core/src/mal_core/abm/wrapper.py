@@ -70,6 +70,7 @@ def run_abm_from_manifest(
     n_rollouts: int = 1,
     output_dir: str | Path | None = None,
     data_root: str | Path | None = None,
+    timeout: int = 3600,
     **kwargs,
 ) -> dict[str, Any]:
     """Run ABM using manifest to resolve data paths.
@@ -101,7 +102,7 @@ def run_abm_from_manifest(
     for ds_name, ds in manifest.get("datasets", {}).items():
         files = ds.get("files", {})
         if ds_name == "env":
-            fname = files.get(str(year)) or next(iter(files.values()), None)
+            fname = files.get("env") or files.get(str(year)) or next(iter(files.values()), None)
             if fname:
                 env_path = str(data_dir / fname)
         elif ds_name == "habitat":
@@ -113,13 +114,21 @@ def run_abm_from_manifest(
             if fname:
                 hosts_path = str(data_dir / fname)
         elif ds_name == "wind":
-            fname = files.get(str(year)) or next(iter(files.values()), None)
+            fname = files.get("wind") or files.get(str(year)) or next(iter(files.values()), None)
             if fname:
                 wind_path = str(data_dir / fname)
-        elif ds_name == "mobility_manifest":
-            mobility_day_path = str(data_dir / files.get("mobility_day", ""))
-            mobility_night_path = str(data_dir / files.get("mobility_night", ""))
-            livestock_mobility_path = str(data_dir / files.get("livestock_mobility", ""))
+        elif ds_name == "mobility_day":
+            fname = files.get("mobility_day")
+            if fname:
+                mobility_day_path = str(data_dir / fname)
+        elif ds_name == "mobility_night":
+            fname = files.get("mobility_night")
+            if fname:
+                mobility_night_path = str(data_dir / fname)
+        elif ds_name == "livestock_mobility":
+            fname = files.get("livestock_mobility")
+            if fname:
+                livestock_mobility_path = str(data_dir / fname)
 
     if not env_path:
         raise FileNotFoundError(f"No env data found for AOI '{aoi}', year {year}")
@@ -162,6 +171,6 @@ def run_abm_from_manifest(
 
     log.info("Running ABM for %s (year=%d, seed=%d)", aoi, year, seed)
     wrapper = CppAbmWrapper()
-    result = wrapper.run(**flags)
+    result = wrapper.run(**flags, _timeout=timeout)
 
     return {"output_path": str(output_path), **result}
