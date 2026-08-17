@@ -182,18 +182,26 @@ def build_daily_env_nc(
             f"Check {water_frac_file} contains real JRC GSW data."
         )
 
-    # ERA5 water temperature -> water_temp_c
-    print(f"Reading water_temp: {water_temp_file}")
-    water_temp_static = read_static_tif(water_temp_file, target_shape)
-    water_temp_static = np.nan_to_num(water_temp_static, nan=25.0)
-    water_temp_c = np.broadcast_to(water_temp_static, (n_days, h, w)).copy()
+    def _annual_raster_stack(prefix: str, fallback: pathlib.Path, fill: float) -> np.ndarray:
+        """Use matching annual rasters for each day, with explicit fallback."""
+        years = np.unique(times.astype("datetime64[Y]")).astype(int) + 1970
+        annual: dict[int, np.ndarray] = {}
+        for data_year in years:
+            candidate = data_dir / f"{aoi}_{prefix}_{data_year}.tif"
+            path = candidate if candidate.exists() else fallback
+            print(f"Reading {prefix}: {path}")
+            annual[int(data_year)] = np.nan_to_num(
+                read_static_tif(path, target_shape), nan=fill,
+            )
+        stacked = np.empty((n_days, h, w), dtype=np.float32)
+        for index, timestamp in enumerate(times):
+            data_year = int(timestamp.astype("datetime64[Y]").astype(int) + 1970)
+            stacked[index] = annual[data_year]
+        return stacked
 
-    # MODIS NDVI -> ndvi
-    print(f"Reading ndvi: {ndvi_file}")
-    ndvi_static = read_static_tif(ndvi_file, target_shape)
-    ndvi_static = np.nan_to_num(ndvi_static, nan=0.5)
-    ndvi_static = np.clip(ndvi_static, 0.0, 1.0)
-    ndvi = np.broadcast_to(ndvi_static, (n_days, h, w)).copy()
+    # ERA5 water temperature and MODIS NDVI are annual static rasters.
+    water_temp_c = _annual_raster_stack("water_temp", water_temp_file, 25.0)
+    ndvi = np.clip(_annual_raster_stack("ndvi", ndvi_file, 0.5), 0.0, 1.0)
 
     ds = xr.Dataset(
         {
