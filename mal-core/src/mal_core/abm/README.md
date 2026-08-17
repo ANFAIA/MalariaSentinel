@@ -116,9 +116,15 @@ With `--snapshot-every 1`, a snapshot is taken every day (30 files per rollout).
 | `--year` | 2024 | Start year |
 | `--month` | 6 | Start month (1–12) |
 | `--seed` | 1 | PRNG seed |
-| `--days` | 30 | Simulation days (1–366) |
+| `--days` | 30 | One continuous simulation (1–731 days; 2024+2025 = 731) |
 | `--n-rollouts` | 1 | Number of rollouts (≥1) |
 | `--snapshot-every` | 0 | Intermediate snapshot frequency in days (0 = only final). Files named `<stem>_dayNNN.tif` |
+| `--emit-cohort-log` | — | Daily cohort statistics JSON for eggs, larvae, pupae, adults, births, deaths and maturation. |
+
+For multi-year runs, pass all days in one invocation. Do not split by month:
+a new process re-seeds mosquitoes and loses aquatic cohort and engine state.
+For complete 2024-2025 use `--year 2024 --month 1 --days 731` with an
+environment NetCDF containing all 731 days.
 
 ## Tests
 

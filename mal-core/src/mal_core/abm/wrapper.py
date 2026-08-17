@@ -144,6 +144,10 @@ def run_abm_from_manifest(
         "snapshot_every": kwargs.pop("snapshot_every", 1),  # default daily
         "output": str(output_path),
     }
+    cohort_log = kwargs.pop("cohort_log", None)
+    if cohort_log is None:
+        cohort_log = output_dir / f"{aoi}_abm_seed{seed:04d}_cohort.json"
+    flags["emit_cohort_log"] = str(cohort_log)
     if hosts_path:
         flags["hosts"] = hosts_path
     if mobility_day_path:
@@ -152,9 +156,8 @@ def run_abm_from_manifest(
         flags["human_mobility_night"] = mobility_night_path
     if livestock_mobility_path:
         flags["livestock_mobility"] = livestock_mobility_path
-    # NOTE: --wind-field not yet supported by compiled binary; skip for now
-    # if wind_path:
-    #     flags["wind_field"] = wind_path
+    if wind_path:
+        flags["wind_field"] = wind_path
     flags.update(kwargs)
 
     log.info("Running ABM for %s (year=%d, seed=%d)", aoi, year, seed)

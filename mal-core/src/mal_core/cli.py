@@ -205,6 +205,8 @@ def abm(
     seed: int = typer.Option(1, "--seed"),
     days: int = typer.Option(30, "--days"),
     n_rollouts: int = typer.Option(1, "--n-rollouts"),
+    snapshot_every: int = typer.Option(1, "--snapshot-every", help="Snapshot interval in days (0=final only)."),
+    cohort_log: Path | None = typer.Option(None, "--cohort-log", help="Daily cohort JSON path."),
     output_dir: Path = typer.Option(Path("runs/abm"), "--output-dir"),
     data_root: Path | None = typer.Option(None, "--data-root", help="Root containing AOI manifest"),
 ) -> None:
@@ -214,14 +216,18 @@ def abm(
     and transmission potential using the mal_abm_fast C++ engine.
 
     Key parameters:
-      --days: Simulation duration (default 30, max 730)
+      --days: One continuous simulation (default 30, max 731; 2024+2025 = 731)
       --n-rollouts: Parallel rollouts for ensemble runs
       --seed: PRNG seed for reproducibility
       --snapshot-every: Intermediate output interval
+      --cohort-log: Daily eggs/larvae/pupae/adult statistics JSON
+
+    Use one invocation for multi-year runs. Splitting by month loses
+    population, aquatic cohort, and engine state.
     """
     from .abm import run_abm_from_manifest
 
-    result = run_abm_from_manifest(aoi=aoi, year=year, month=month, seed=seed, days=days, n_rollouts=n_rollouts, output_dir=output_dir, data_root=data_root)
+    result = run_abm_from_manifest(aoi=aoi, year=year, month=month, seed=seed, days=days, n_rollouts=n_rollouts, snapshot_every=snapshot_every, cohort_log=cohort_log, output_dir=output_dir, data_root=data_root)
     typer.echo(f"ABM result: {result}")
 
 

@@ -14,109 +14,6 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 
-# ── Chunking helpers ──────────────────────────────────────────────
-
-class TestChunkingLogic:
-    """Verify that run_abm_full_period splits months correctly."""
-
-    def test_single_month_no_split(self):
-        """A single month (Jan 2024, 31 days) should produce one chunk."""
-        from mal_core.abm.runner import _month_days, _next_month
-
-        assert _month_days(2024, 1) == 31
-        assert _next_month(2024, 1) == (2024, 2)
-        assert _next_month(2024, 12) == (2025, 1)
-
-    def test_leap_year_feb(self):
-        """2024 is a leap year; Feb has 29 days."""
-        from mal_core.abm.runner import _month_days
-
-        assert _month_days(2024, 2) == 29
-        assert _month_days(2025, 2) == 28
-
-    def test_full_year_chunk_count(self):
-        """2024 alone (leap year) = 366 days → 1 chunk at max_chunk_days=730."""
-        from mal_core.abm.runner import run_abm_full_period
-
-        with tempfile.TemporaryDirectory() as tmp:
-            out = Path(tmp)
-            with patch("mal_core.abm.runner.CppAbmWrapper") as MockWrapper:
-                mock_instance = MockWrapper.return_value
-                mock_instance.run.return_value = {
-                    "stdout": "", "stderr": "", "returncode": 0,
-                }
-                result = run_abm_full_period(
-                    aoi="ghana", year=2024, month=1,
-                    end_year=2024, end_month=12,
-                    output_dir=out, max_chunk_days=730,
-                )
-                # 2024 has 366 days < 730, so exactly 1 chunk
-                assert result["n_chunks"] == 1
-                assert result["total_days"] == 366
-                assert result["success"] is True
-
-    def test_two_year_split(self):
-        """2024-2025 = 731 days → 2 chunks at max_chunk_days=730."""
-        from mal_core.abm.runner import run_abm_full_period
-
-        with tempfile.TemporaryDirectory() as tmp:
-            out = Path(tmp)
-            with patch("mal_core.abm.runner.CppAbmWrapper") as MockWrapper:
-                mock_instance = MockWrapper.return_value
-                mock_instance.run.return_value = {
-                    "stdout": "", "stderr": "", "returncode": 0,
-                }
-                result = run_abm_full_period(
-                    aoi="ghana", year=2024, month=1,
-                    end_year=2025, end_month=12,
-                    output_dir=out, max_chunk_days=730,
-                )
-                # 731 days total → 730 + 1
-                assert result["n_chunks"] == 2
-                assert result["total_days"] == 731
-                assert result["success"] is True
-
-    def test_small_chunk_splits_month(self):
-        """A month of 31 days with max_chunk_days=10 → 4 chunks (10+10+10+1)."""
-        from mal_core.abm.runner import run_abm_full_period
-
-        with tempfile.TemporaryDirectory() as tmp:
-            out = Path(tmp)
-            with patch("mal_core.abm.runner.CppAbmWrapper") as MockWrapper:
-                mock_instance = MockWrapper.return_value
-                mock_instance.run.return_value = {
-                    "stdout": "", "stderr": "", "returncode": 0,
-                }
-                result = run_abm_full_period(
-                    aoi="ghana", year=2024, month=1,
-                    end_year=2024, end_month=1,
-                    output_dir=out, max_chunk_days=10,
-                )
-                assert result["n_chunks"] == 4
-                assert result["total_days"] == 31
-
-    def test_chunk_failure_marks_overall_failure(self):
-        """If one chunk fails (non-zero returncode), overall success=False."""
-        from mal_core.abm.runner import run_abm_full_period
-
-        with tempfile.TemporaryDirectory() as tmp:
-            out = Path(tmp)
-            with patch("mal_core.abm.runner.CppAbmWrapper") as MockWrapper:
-                mock_instance = MockWrapper.return_value
-                # First chunk succeeds, second fails
-                mock_instance.run.side_effect = [
-                    {"stdout": "", "stderr": "", "returncode": 0},
-                    {"stdout": "", "stderr": "FATAL", "returncode": 1},
-                ]
-                result = run_abm_full_period(
-                    aoi="ghana", year=2024, month=1,
-                    end_year=2025, end_month=12,
-                    output_dir=out, max_chunk_days=730,
-                )
-                assert result["success"] is False
-                assert result["n_chunks"] == 2
-
-
 # ── Flag plumbing ─────────────────────────────────────────────────
 
 class TestFlagPlumbing:
@@ -180,7 +77,7 @@ class TestFlagPlumbing:
         with pytest.raises(ValueError, match="days must be"):
             run_abm(aoi="ghana", days=0)
         with pytest.raises(ValueError, match="days must be"):
-            run_abm(aoi="ghana", days=731)
+            run_abm(aoi="ghana", days=732)
 
 
 # ── Wrapper flag formatting ───────────────────────────────────────

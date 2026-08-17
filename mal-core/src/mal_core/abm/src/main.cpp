@@ -320,9 +320,9 @@ OUTPUT
                     "Each rollout gets seed+i.")
         ->default_val(1)
         ->group("Spatial & Temporal");
-    run->add_option("--days", days, "Simulation duration (1..730 days).")
+    run->add_option("--days", days, "One continuous simulation (1..731 days; 2024+2025 = 731).")
         ->default_val(30)
-        ->check(CLI::Range(1, 730))
+        ->check(CLI::Range(1, 731))
         ->group("Spatial & Temporal");
     run->add_option("--n-rollouts", n_rollouts,
                     "Parallel rollouts (1+). Each gets fresh PRNG seeded "

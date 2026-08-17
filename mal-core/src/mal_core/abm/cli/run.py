@@ -6,7 +6,7 @@ from pathlib import Path
 
 import typer
 
-from mal_core.abm.runner import run_abm, run_abm_full_period
+from mal_core.abm.runner import run_abm
 
 app = typer.Typer(help="Run an ABM simulation.")
 
@@ -29,35 +29,6 @@ def run(
         year=year,
         month=month,
         days=days,
-        n_rollouts=n_rollouts,
-        seed=seed,
-        snapshot_every=snapshot_every,
-        output_dir=output_dir,
-        timeout=timeout,
-    )
-    typer.echo(json.dumps(result, indent=2, default=str))
-
-
-@app.command("full-period")
-def full_period(
-    aoi: str = typer.Option("ghana", help="Area of interest."),
-    year: int = typer.Option(2024, help="Start year."),
-    month: int = typer.Option(1, help="Start month (1-12)."),
-    end_year: int = typer.Option(2025, help="End year (inclusive)."),
-    end_month: int = typer.Option(12, help="End month (inclusive)."),
-    n_rollouts: int = typer.Option(1, help="Number of rollouts."),
-    seed: int = typer.Option(1, help="Random seed."),
-    snapshot_every: int = typer.Option(1, help="Snapshot interval in days (1=daily)."),
-    output_dir: Path | None = typer.Option(None, help="Output directory."),
-    timeout: int = typer.Option(600, help="Per-chunk timeout in seconds."),
-) -> None:
-    """Run ABM across multiple months/years, auto-splitting into chunks."""
-    result = run_abm_full_period(
-        aoi=aoi,
-        year=year,
-        month=month,
-        end_year=end_year,
-        end_month=end_month,
         n_rollouts=n_rollouts,
         seed=seed,
         snapshot_every=snapshot_every,
