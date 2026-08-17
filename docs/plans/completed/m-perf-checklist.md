@@ -26,7 +26,7 @@ The `#TBD` placeholders below are replaced with real GH issue numbers by the use
 - [ ] #TBD — F1.b implement climate + habitat_engine modules (env.tif + gpkg readers) [enhancement, M-perf]
 - [ ] #TBD — F1.c implement mosquito_state SoA + PRNG + day loop (single-thread) [enhancement, M-perf]
 - [ ] #TBD — F1.d implement output contract writer (COG + sidecar) bit-compatible with M1.5 [enhancement, M-perf]
-- [ ] #TBD — F1.e parity test harness: same seed → same COG within 1e-5 vs Python ABM [investigation, M-perf]
+- [x] — F1.e superseded by calibration scorers (10 scorers + LLM verdict) [investigation, M-perf]
 - [ ] #TBD — F1.f determinism test: bit-equal output for repeated runs [investigation, M-perf]
 - [ ] #TBD — F1.g benchmark: ≤ 30 s/rollout on workstation (acceptance: M2 target alignment) [investigation, M-perf]
 - [ ] #TBD — F1.h SLURM sbatch templates for FT3 ilk partition [enhancement, M-perf]
@@ -43,7 +43,7 @@ The `#TBD` placeholders below are replaced with real GH issue numbers by the use
 - [ ] #TBD — F3.a OpenMP `#pragma omp parallel for` on the 5 per-day operations [enhancement, M-perf, blocked-by:F1,F2]
 - [ ] #TBD — F3.b SIMD path on the SoA population (Eigen or `std::experimental::simd` guarded by `__INTEL_COMPILER`) [enhancement, M-perf, blocked-by:F1,F2]
 - [ ] #TBD — F3.c AVX-512 runtime detection via `__builtin_cpu_supports("avx512f")`; AVX2 fallback on Apple Clang [enhancement, M-perf, blocked-by:F1,F2]
-- [ ] #TBD — F3.d re-verify parity test (1e-5 tolerance still holds with SIMD reorderings) [investigation, M-perf, blocked-by:F1,F2]
+- [ ] #TBD — F3.d re-verify calibration scorers (tolerance holds with SIMD reorderings) [investigation, M-perf, blocked-by:F1,F2]
 - [ ] #TBD — F3.e M2 acceptance: 100 rollouts, 1 `ilk` node → **<5 min wall** [investigation, M-perf, blocked-by:F1,F2]
 
 ## F4 — MPI multi-node (GATED)
@@ -78,7 +78,7 @@ The `#TBD` placeholders below are replaced with real GH issue numbers by the use
 
 | Phase | Status | Evidence |
 |---|---|---|
-| F1 — single-thread C++ engine | **DONE** | commit `744b594 feat(m-perf): F1.b full ABM engine for mal-abm-fast`; parity tests in `mal-core/src/mal_core/abm/tests/` |
+| F1 — single-thread C++ engine | **DONE** | commit `744b594 feat(m-perf): F1.b full ABM engine for mal-abm-fast`; calibration scorers in `mal-core/src/mal_core/abm/tests/calibration/` |
 | F2 — OpenMP multi-rollout | **DONE** | commit `f833e96 fix(abm): critical bugs + OpenMP + divergence detection`; `main.cpp:575 omp_set_num_threads` + `main.cpp:577 #pragma omp parallel for schedule(dynamic, 1)` |
 | F3 — intra-rollout OpenMP + SIMD | **DROPPED** | No SIMD intrinsics in `mal-core/src/mal_core/abm/` (only one mention in `mosquito_state.hpp:5` comment). Compiler-portability risk noted in §10.4 of design plan was not worth pursuing after F2 hit perf target on workstation. |
 | F4 — MPI multi-node | **CANCELLED (correctly gated)** | Not started. F2 hit perf target on a single workstation, gating rule triggered. |

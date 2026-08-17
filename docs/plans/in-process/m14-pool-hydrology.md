@@ -162,11 +162,11 @@ float washout_fraction(const PoolState& pool, const DailyForcing& f) {
 
 `washout_fraction` is applied to egg, larva, and pupa cohorts with a binomial draw — same RNG pattern as `stage_mortality`. Adult washout is **not** modelled in this milestone (mosquitoes are not aquatic; they can shelter).
 
-### 3.5 Python parity
+### 3.5 Python implementation
 
 The Mesa-Geo sim in `mal-ghana-sim` mirrors the C++ logic. New module `mal-ghana-sim/src/mal_ghana_sim/abm/pool_hydrology.py` with the same constants and the same `advance_pool` function. The Python `HabitatPatch` gains a `pool_state` field, initialized to all zeros. `coordinator.py` is updated to call `advance_pool` once per day per patch and to replace the per-day `active_mask` with a `water_level >= W_BREED` check.
 
-The wire-spec guarantees (§"M1.5 thin slice" in `AGENTS.md` → "Patterns") require C++ / Python bit-for-bit agreement on the same inputs. The water-level evolution is therefore a deterministic function of `(rain_history, temp_history)` — no per-day RNG involved.
+The water-level evolution is a deterministic function of `(rain_history, temp_history)` — no per-day RNG involved.
 
 ### 3.6 Wire-spec update
 

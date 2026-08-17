@@ -149,16 +149,9 @@ D1 reused.
 
 D17 (host-clustering, Plan B's signature) is **not** added here — Plan C's spatial signature is patch-bound, not village-bound. If the orchestrator integration later combines B and C, both D17 and D18 should be added.
 
-## 5. F1.e parity removal — required file touches
+## 5. Required file touches
 
-(Same as Plan A. The implementing agent must do F1.e first.)
-
-| File | Lines | Action |
-|---|---|---|
-| `mal-core/src/mal_core/abm/README.md` | 19–22, 137–139 | Update F1.e language |
-| `../../in-process/perf-cpp-abm-plan.md` | 14, 68, 89, 152, 201, 266, 289, 431, 446–448, 499, 501 | Update F1.e language |
-| `mal-core/src/mal_core/abm/tests/test_abm_fast_parity.py` | whole | Delete |
-| `mal-ghana-sim/tests/test_abm_fast_parity.py` | whole | Delete |
+No parity-specific file touches needed — parity tests have been removed.
 
 ## 6. Risks
 
@@ -179,22 +172,18 @@ D17 (host-clustering, Plan B's signature) is **not** added here — Plan C's spa
 - `mal-core/src/mal_core/abm/tests/calibration/scorers/D18_site_fidelity.py` (new)
 - `mal-core/src/mal_core/abm/tests/calibration/thresholds.yaml` (D16, D18)
 - `mal-core/src/mal_core/abm/tests/calibration/scorers/composite.py` (weights)
-- `mal-core/src/mal_core/abm/README.md` (F1.e)
-- `../../in-process/perf-cpp-abm-plan.md` (F1.e)
-- `mal-core/src/mal_core/abm/tests/test_abm_fast_parity.py` (delete)
-- `mal-ghana-sim/tests/test_abm_fast_parity.py` (delete)
+- `mal-core/src/mal_core/abm/README.md` (calibration scorer language)
 
 ## 8. Effort estimate
 
 | Phase | Sessions |
 |---|---|
-| F1.e removal (safe-first) | 0.3 |
 | D16 + D18 scorers + thresholds | 0.4 |
 | `natal_patch_id` + emergence set | 0.3 |
 | OVIPOSITION_SEEKING return-decision + walk | 0.6 |
 | `deposit_eggs` + new HabitatEngine methods | 0.3 |
 | Run fast suite, tune, 30/180-day sims | 0.1 |
-| **Total** | **~2.0** |
+| **Total** | **~1.7** |
 
 ## 9. Acceptance criteria
 

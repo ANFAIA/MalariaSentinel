@@ -101,17 +101,14 @@ D16:
 
 And add to `scorers/composite.py::DEFAULT_WEIGHTS` as `"D16": 0.15` (rebalance existing weights to sum 1.0 — see composite.py for current distribution).
 
-## 5. F1.e parity removal — required file touches
+## 5. Required file touches
 
 | File | Lines | Action |
 |---|---|---|
-| `mal-core/src/mal_core/abm/README.md` | 19–22 | Remove "F1.e parity" bullet; replace with "F1.e is the calibration metric (10 scorers + D16)". |
-| `mal-core/src/mal_core/abm/README.md` | 137–139 | Drop the sentence "Behavioural parity is enforced by `test_abm_fast_parity.py`". |
-| `../../in-process/perf-cpp-abm-plan.md` | 14, 68, 89, 152, 201, 266, 289, 431, 446–448, 499, 501 | Grep `parity` and `F1.e`; update each to refer to the calibration suite instead. |
-| `mal-core/src/mal_core/abm/tests/test_abm_fast_parity.py` | whole file | Delete. |
-| `mal-ghana-sim/tests/test_abm_fast_parity.py` | whole file | Delete. |
+| `mal-core/src/mal_core/abm/README.md` | 19–22 | Update calibration scorer language |
+| `mal-core/src/mal_core/abm/README.md` | 137–139 | Drop parity test references |
 
-The implementing agent must complete the F1.e removal **first**, then run the fast suite to confirm nothing else breaks, before starting Plan A's parameter changes.
+The implementing agent must run the fast suite to confirm nothing breaks before starting Plan A's parameter changes.
 
 ## 6. Risks
 
@@ -129,27 +126,22 @@ The implementing agent must complete the F1.e removal **first**, then run the fa
 - `mal-core/src/mal_core/abm/tests/calibration/scorers/D16_spread_rate.py` (new file)
 - `mal-core/src/mal_core/abm/tests/calibration/thresholds.yaml` (1 entry)
 - `mal-core/src/mal_core/abm/tests/calibration/scorers/composite.py` (1 weight)
-- `mal-core/src/mal_core/abm/README.md` (F1.e language)
-- `../../in-process/perf-cpp-abm-plan.md` (F1.e language)
-- `mal-core/src/mal_core/abm/tests/test_abm_fast_parity.py` (delete)
-- `mal-ghana-sim/tests/test_abm_fast_parity.py` (delete)
+- `mal-core/src/mal_core/abm/README.md` (calibration scorer language)
 
 ## 8. Effort estimate
 
 | Phase | Sessions |
 |---|---|
-| F1.e removal (safe-first) | 0.3 |
 | D16 scorer + threshold | 0.4 |
 | Parameter tune + viability gate | 0.3 |
 | Run fast suite, tune to pass | 0.3 |
 | 30-day + 180-day Ghana run, capture metrics | 0.2 |
-| **Total** | **~1.5** |
+| **Total** | **~1.2** |
 
 ## 9. Acceptance criteria
 
 - [ ] `pytest -m fast -v` passes; D1 ≥ 0.70, D16 ≥ 0.70, no other scorer regresses by > 0.05.
 - [ ] Day-180 Ghana simulation reports `spread_p90_km` ∈ **[5, 20]** and `spread_median_km` ∈ **[0.3, 0.8]**.
-- [ ] `test_abm_fast_parity.py` deleted in both packages; no remaining references to `F1.e parity` in README or `perf-cpp-abm-plan.md`.
 - [ ] CMake C++ tests pass; no new compiler warnings.
 - [ ] Composite score ≥ 0.70.
 - [ ] `gitagent propose --agent plan-a` succeeds with confidence ≥ 0.85.

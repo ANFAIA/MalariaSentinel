@@ -450,22 +450,15 @@ The drift fixes are doc-sync only — no behaviour change to existing dispersal 
 
 - **Plan A (`plan-A-windborne.md`)**: no change. Windborne parameters (prob=0.05, survival=0.85, flight_hours=4) are unchanged. Plan D's patch-tracking fix removes the egg-misallocation artefact that Plan A's parameter tuning was partially compensating for.
 
-- **Plan B (`plan-B-host-seeking.md`)**: superseded by Plan D's Phases 1–2 + 4. F1.e parity removal (Section 5) is still a prerequisite.
+- **Plan B (`plan-B-host-seeking.md`)**: superseded by Plan D's Phases 1–2 + 4.
 
 ---
 
 ## 5. Pre-requisites
 
-### 5.1 F1.e parity removal (must run first; ~0.3 sessions)
+### 5.1 Pre-requisites
 
-Same as Plan B §5. Plan D cannot ship with `test_abm_fast_parity.py` still in the tree — the `HOST_APPROACH` wiring will trigger parity failures that are unrelated to the kernel change.
-
-| File | Lines | Action |
-|---|---|---|
-| `mal-core/src/mal_core/abm/README.md` | 19-22, 137-139 | Update F1.e language |
-| `../../in-process/perf-cpp-abm-plan.md` | 14, 68, 89, 152, 201, 266, 289, 431, 446-448, 499, 501 | Update F1.e language |
-| `mal-core/src/mal_core/abm/tests/test_abm_fast_parity.py` | whole | Delete |
-| `mal-ghana-sim/tests/test_abm_fast_parity.py` | whole | Delete |
+No parity-specific pre-requisites needed — parity tests have been removed.
 
 ### 5.2 Recall-before-write
 
@@ -524,18 +517,12 @@ If a relevant node already exists, MERGE into it (don't duplicate). Use `memory_
 - `docs/plans/in-process/dispersal-plans/plan-B-host-seeking.md` (mark superseded)
 - `docs/plans/in-process/dispersal-plans/plan-C-oviposition-seeking.md` (mark superseded)
 
-### Deleted files (F1.e prerequisite)
-
-- `mal-core/src/mal_core/abm/tests/test_abm_fast_parity.py`
-- `mal-ghana-sim/tests/test_abm_fast_parity.py`
-
 ---
 
 ## 8. Effort estimate
 
 | Phase | Sessions |
 |---|---|
-| 5.1 F1.e removal (prerequisite) | 0.3 |
 | 1. Kernel expansion (constants + D13 update) | 0.5 |
 | 2. Wire directed host-seeking flight (HOST_APPROACH) | 1.0 |
 | 3. Oviposition-seeking kernel (new class + integration) | 1.5 |
@@ -543,7 +530,7 @@ If a relevant node already exists, MERGE into it (don't duplicate). Use `memory_
 | 5. New scorers (D16, D17, D18) + composite weights | 0.6 |
 | 6. Drift fixes (Python + spec sync) | 0.3 |
 | Tuning & regression (fast suite, 30/180-day sims) | 0.5 |
-| **Total** | **~5.2** |
+| **Total** | **~4.9** |
 
 ---
 

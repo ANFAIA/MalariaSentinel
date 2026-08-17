@@ -117,22 +117,15 @@ D13 (`D13_host_seeking_distance.py`) is **reused** — it already measures the m
 
 D1 reused.
 
-## 5. F1.e parity removal — required file touches
+## 5. Required file touches
 
-(Same as Plan A. The implementing agent must do F1.e first.)
-
-| File | Lines | Action |
-|---|---|---|
-| `mal-core/src/mal_core/abm/README.md` | 19–22, 137–139 | Update F1.e language |
-| `../../in-process/perf-cpp-abm-plan.md` | 14, 68, 89, 152, 201, 266, 289, 431, 446–448, 499, 501 | Update F1.e language |
-| `mal-core/src/mal_core/abm/tests/test_abm_fast_parity.py` | whole | Delete |
-| `mal-ghana-sim/tests/test_abm_fast_parity.py` | whole | Delete |
+No parity-specific file touches needed — parity tests have been removed.
 
 ## 6. Risks
 
 1. **Starvation cascades**: a too-aggressive 5-day starvation timer will collapse the adult population, breaking D1 (expansion) and D13. Mitigation: start with 7 days, decrement only if D1 is still high.
 2. **`detect_host_cell` is O(N) over all HostCells**: per-female per-day. Performance regression in large AOIs. Mitigation: cache by (row, col, day) in a `std::unordered_map`; expire every 5 days.
-3. **State machine interaction with F1.e parity suite**: `HOST_APPROACH` was untested. Adding a transition without deleting the parity test will cause 5+ parity failures that the implementer may misdiagnose. **Do the F1.e removal first.**
+3. **State machine interaction with calibration suite**: `HOST_APPROACH` was untested. Adding a transition may cause test failures. **Run the calibration suite first.**
 4. **Determinism**: the new directed walk changes the spatial pattern; if any test relied on a specific seed producing a specific cell, it will break. Mitigation: re-record 2–3 regression snapshots and rebase.
 5. **Double-counting with Plan A's windborne**: in the orchestrator integration, Plan B's directed walk may *also* trigger a windborne move (if `ADULT_DISPERSE_PROB` fires the same day). Plan B keeps `ADULT_DISPERSE_PROB = 0.15` unchanged — the *windborne* boost from Plan A is a separate channel.
 
@@ -149,22 +142,18 @@ D1 reused.
 - `mal-core/src/mal_core/abm/tests/calibration/scorers/D17_host_clustering.py` (new)
 - `mal-core/src/mal_core/abm/tests/calibration/thresholds.yaml` (D16, D17)
 - `mal-core/src/mal_core/abm/tests/calibration/scorers/composite.py` (weights)
-- `mal-core/src/mal_core/abm/README.md` (F1.e)
-- `../../in-process/perf-cpp-abm-plan.md` (F1.e)
-- `mal-core/src/mal_core/abm/tests/test_abm_fast_parity.py` (delete)
-- `mal-ghana-sim/tests/test_abm_fast_parity.py` (delete)
+- `mal-core/src/mal_core/abm/README.md` (calibration scorer language)
 
 ## 8. Effort estimate
 
 | Phase | Sessions |
 |---|---|
-| F1.e removal (safe-first) | 0.3 |
 | D16 + D17 scorers + thresholds | 0.6 |
 | Wire HOST_APPROACH + starvation timer | 1.0 |
 | OVIPOSITION_SEEKING directed walk | 0.4 |
 | `detect_host_cell` + cache + unit test | 0.4 |
 | Run fast suite, tune starvation, run 30/180-day sims | 0.3 |
-| **Total** | **~3.0** |
+| **Total** | **~2.7** |
 
 ## 9. Acceptance criteria
 

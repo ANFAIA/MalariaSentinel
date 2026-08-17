@@ -16,7 +16,7 @@ Format: vertical 4:5 (1080×1350), ~45s total. A linked PDF export reuses the sa
   - Subtitle: `for malaria elimination`
   - Funder: ANFAIA — Asociación Nacional Faro, para la Aceleración de la Inteligencia Artificial. Tagline: "Driving Progress with Artificial Intelligence". Summer scholarships program.
   - Stack: `ABM Python v0.5.0` · `ABM C++ mal-abm-fast F1`
-  - Tests: `71/71 Python + 60/60 C++ + 5/5 parity`
+  - Tests: `71/71 Python + 60/60 C++ + 14 calibration scorers`
   - Pipeline: `INGESTA → SUITABILIDAD → ABM → DATASET → U-NET → PREDICCIÓN`
 
 ## Palette — "Slate & sage" (cool, calm, evidence-led)

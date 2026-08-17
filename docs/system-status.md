@@ -463,7 +463,7 @@ graph LR
 ## 6. ABM C++ Engine (inside mal-core)
 
 **Ubicacion**: `mal-core/src/mal_core/abm/`
-**Estado**: M7.2 — F1 complete (60/60 ctest + 5/5 parity), M7 biology v2 actively developing
+**Estado**: M7.2 — F1 complete (60/60 ctest + 14 calibration scorers), M7 biology v2 actively developing
 **Objetivo**: 100 rollouts en <5 min wall en un nodo FT3 ilk
 
 ### Que es?
@@ -806,7 +806,7 @@ PRNG xoshiro256** canonico. Dos runs con mismo `(seed, i, days, AOI, env, habita
 ctest --test-dir mal-core/src/mal_core/abm/build --output-on-failure
 # 60 tests
 
-# Calibration scorers (F1.e — replaces parity test)
+# Calibration scorers
 cd mal-core/src/mal_core/abm/tests/calibration && uv run pytest -m fast -v
 # 10 scorers + composite
 ```
@@ -1182,7 +1182,7 @@ graph LR
 | Infeccion Plasmodium | No (parasite_eip_progress en SoA, preparado) | M8+ |
 | ITN/IRS | No (BiteLedger mosquito_deaths preparado) | M8+ |
 | Poblacion | SoA + AquaticCohortBank | + mesa-frames |
-| Validacion | 14 calibration scorers (D1-D14) + parity | 100+ rollouts |
+| Validacion | 14 calibration scorers (D1-D14) | 100+ rollouts |
 | Contract | v2.0 (adult_occupancy + host_seeking_pressure) | — |
 
 ---
@@ -1193,7 +1193,7 @@ graph LR
 
 **ABM Python (v0.5.0)**: 71/71 tests, ~9M agentes Polars, JRC GSW 30m, dynamic patches, adult density by cell post-dispersal, ciclo biologico completo.
 
-**ABM C++ (mal-core/src/mal_core/abm/ M7.2)**: 60+ ctest + 5/5 parity + 14 calibration scorers (D1-D14), C++20 black-box equivalente, ciclo completo egg→larva→pupa→adult (cohort-based), ciclo gonotrofico 11 estados, host-seeking kernel (CO2 plume 35m), host data 9 variables, mobility OD matrices (CSR, 4 fases), Mortalidad Lardeux recalibrada (basal=0.93, sigma=15), nacimiento Mordecai EFD termico, PRNG xoshiro256** determinista, contract v2.0. Consolidado en mal-core (M9).
+**ABM C++ (mal-core/src/mal_core/abm/ M7.2)**: 60+ ctest + 14 calibration scorers (D1-D14), C++20 black-box equivalente, ciclo completo egg→larva→pupa→adult (cohort-based), ciclo gonotrofico 11 estados, host-seeking kernel (CO2 plume 35m), host data 9 variables, mobility OD matrices (CSR, 4 fases), Mortalidad Lardeux recalibrada (basal=0.93, sigma=15), nacimiento Mordecai EFD termico, PRNG xoshiro256** determinista, contract v2.0. Consolidado en mal-core (M9).
 
 **Host data pipeline (M7)**: WorldPop (poblacion), GLW4 (ganado), GHSL (urbano/rural), Overture Maps (building_fraction), wildlife proxy. Todo agrega a host_static.nc (9 variables). Mobility matrices via gravity model (build_mobility.py).
 

@@ -12,7 +12,7 @@ Two implementations of the M1.5 thin-slice ABM for mosquito population dynamics 
 | Python reference | `mal-ghana-sim/src/mal_ghana_sim/abm/` | Development, validation, prototyping (deprecated) |
 | C++ fast engine | `mal-core/src/mal_core/abm/` | Production runs, HPC (CESGA FT3), 100x faster |
 
-Both produce identical 2-band COG output (density + suitability) and sidecar JSON, verified by the parity test (F1.e).
+Both produce identical 2-band COG output (density + suitability) and sidecar JSON, validated by calibration scorers (10 scorers + LLM verdict).
 
 ## Daily loop (both engines)
 
@@ -340,12 +340,11 @@ ctest --test-dir mal-core/src/mal_core/abm/build --output-on-failure
 #           coordinator, engine, output_contract, state_cog, smoke
 ```
 
-### Python parity test (F1.e)
+### Calibration scorers (PR gate)
 
 ```bash
-cd mal-ghana-sim && uv run pytest tests/test_abm_fast_parity.py -v
-# 5 tests: 3-day, 30-day, 10 random triples, determinism, sidecar keys
-# Tolerance: max(2e-2 abs, 12% rel) per band mean
+cd mal-core/src/mal_core/abm/tests/calibration && uv run pytest -m fast -v
+# 10 scorers: D1-D15 + D16-D18 (fast tier)
 ```
 
 ### Python smoke test

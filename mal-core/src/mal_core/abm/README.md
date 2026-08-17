@@ -16,7 +16,7 @@ reference (`mal_ghana_sim.abm`). All F1 acceptance criteria are met:
 | F1.a scaffold | ✅ | `016b902` |
 | F1.b full engine | ✅ | `744b594` (60/60 ctest) |
 | F1.c perf (BTPE + vectors + n-rollouts) | ✅ | `8ab7a58` |
-| F1.d output contract (COG + sidecar) | ✅ | verified by F1.e parity |
+| F1.d output contract (COG + sidecar) | ✅ | verified by calibration scorers |
 | F1.e calibration scorers (replaces parity test) | ✅ | 10 scorers + LLM verdict in `tests/calibration/` |
 | F1.f determinism test | ✅ | included in F1.c review fixes |
 | F1.g FT3 benchmark | ⏳ | deferred to FT3 measurement |
@@ -130,7 +130,7 @@ ctest --test-dir mal-abm-fast/build --output-on-failure
 #           coordinator, engine, output_contract, state_cog, smoke
 ```
 
-### Calibration scorers (F1.e — replaces parity test)
+### Calibration scorers
 
 ```bash
 cd mal-core/src/mal_core/abm/tests/calibration

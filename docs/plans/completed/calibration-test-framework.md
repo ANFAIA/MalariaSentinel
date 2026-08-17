@@ -922,17 +922,16 @@ production engine. The Python ABM in `mal-ghana-sim/` is a research
 reference. Two options:
 
 1. **Skip the Python ABM.** The calibration framework only scores
-   the C++ engine. The parity test (`test_abm_fast_parity.py`) is the
-   contract between them.
+   the C++ engine. The calibration scorers are the contract between
+   C++ and biological realism.
 2. **Score the Python ABM too.** Useful for catching "Python ABM
-   regression" bugs that the parity test misses (e.g. a Python ABM
+   regression" bugs that the calibration framework might miss (e.g. a Python ABM
    bug that produces the same wrong answer as the C++ engine).
 
 **Recommended**: start with option 1. The Python ABM is not under
-active calibration — it's a reference. If the user later wants to
-calibrate against the Python ABM's outputs, that's a new experiment
-class (`experiment_type="python_reference"`) and a new scorer
-(`scorers/parity.py` that compares Python and C++ outputs).
+   active calibration — it's a reference. If the user later wants to
+   calibrate against the Python ABM's outputs, that's a new experiment
+   class (`experiment_type="python_reference"`) and a new scorer.
 
 ### 7.6 What if the env COG is too big for the PR gate?
 

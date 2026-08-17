@@ -62,17 +62,14 @@ Your worktree: .gitagent/features/abm-dispersal-plans/agents/<<ID>>/worktree
 Read your plan in full: docs/plans/completed/dispersal-plans/<<PLAN>>.md
 
 Mandatory order of operations:
-  1. F1.e parity removal (delete test_abm_fast_parity.py in both
-     mal-core and mal-ghana-sim; update README.md and perf-cpp-abm-plan.md
-     F1.e language). Run `pytest -m fast` to confirm no other test broke.
-  2. Implement your plan's code changes exactly as specified.
-  3. Add the new scorers (D16 always; D17 for B; D18 for C).
-  4. Update thresholds.yaml and composite.py weights.
-  5. Run the 3 verification commands (see Step 4).
-  6. Append a JSON block to the bottom of your plan file
+  1. Implement your plan's code changes exactly as specified.
+  2. Add the new scorers (D16 always; D17 for B; D18 for C).
+  3. Update thresholds.yaml and composite.py weights.
+  4. Run the 3 verification commands (see Step 4).
+  5. Append a JSON block to the bottom of your plan file
      (under a "## Results" heading you create) with the metrics
      described in Step 5.
-  7. `gitagent propose --agent <<ID>> --title "..." --summary "..." \
+  6. `gitagent propose --agent <<ID>> --title "..." --summary "..." \
       --confidence 0.8` from the repo root.
 
 Do NOT touch any file outside the lists in your plan's "Files modified" section.
@@ -89,7 +86,7 @@ cd mal-core/src/mal_core/abm && cmake --build build -j && ctest --test-dir build
 # (2) Calibration fast suite (PR gate)
 cd mal-core/src/mal_core/abm/tests/calibration && uv run pytest -m fast -v
 
-# (3a) 30-day Ghana sim — captures D1, D13, parity regression
+# (3a) 30-day Ghana sim — captures D1, D13, regression check
 cd mal-ghana-sim && uv run python scripts/03_simulate.py --days 30 --seed 1
 
 # (3b) 180-day Ghana sim — captures D16 spread metrics, D17 host clustering, D18 site fidelity
@@ -122,7 +119,7 @@ The proposal's `--summary` field must end with this JSON block (so the superviso
   "spread_n_cells_day180": 184,
   "composite_score": 0.73,
   "files_modified": ["mal-core/src/mal_core/abm/src/wire.hpp", "..."],
-  "parity_test_status": "deleted"
+  "parity_test_status": "removed"
 }
 ```
 
@@ -233,15 +230,7 @@ memory_rel \
     --type PART_OF
 ```
 
-**Pitfall logging (conditional)**: if any plan caused the F1.e parity-test removal to break a different test, log:
-
-```bash
-memory_node \
-    --uuid pitfall-m7-parity-removal-cascade \
-    --name "F1.e parity removal cascade in M7" \
-    --type Pitfall \
-    --summary "Removing test_abm_fast_parity.py in M7 caused N other tests to fail because they imported the parity helper. Fix: <description>."
-```
+**Pitfall logging (conditional)**: if any plan causes a test failure, log:
 
 ### Step 12 — Session end
 
