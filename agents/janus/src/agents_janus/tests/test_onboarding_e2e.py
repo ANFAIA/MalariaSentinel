@@ -41,7 +41,6 @@ def _make_fake_registry():
     mock_spec.model = "xiaomi/mimo-v2.5"
     mock_spec.provider = "openrouter"
     mock_spec.skills = ()
-    mock_spec.mailbox_inbox = "inbox-scoring"
     mock_spec.edits_allow = ("runs/**",)
 
     mock_spec_abm = MagicMock()
@@ -51,7 +50,6 @@ def _make_fake_registry():
     mock_spec_abm.model = "xiaomi/mimo-v2.5"
     mock_spec_abm.provider = "openrouter"
     mock_spec_abm.skills = ()
-    mock_spec_abm.mailbox_inbox = "inbox-abm"
     mock_spec_abm.edits_allow = ("mal-core/**",)
 
     mock_registry = MagicMock()

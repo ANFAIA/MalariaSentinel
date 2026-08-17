@@ -100,7 +100,8 @@ def onboard_list_components() -> str:
                 "description": spec.description,
                 "model": f"{spec.provider}/{spec.model}",
                 "edits_allow": list(spec.edits_allow),
-                "mailbox_inbox": spec.mailbox_inbox,
+                "gawt_role": spec.effective_gawt_role,
+                "tools": list(spec.tools),
                 "spec": str(spec.spec_path) if spec.spec_path else None,
             })
         return json.dumps(result, indent=2)

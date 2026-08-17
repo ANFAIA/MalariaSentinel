@@ -1,0 +1,241 @@
+version: 1
+
+defaults:
+  provider: openrouter
+  model: xiaomi/mimo-v2.5
+  thread_id_prefix: "sub-"
+  tool_name_prefix: true
+  default_deny: true
+  fail_on_missing_tools: true
+  global_deny_tools: []
+
+servers:
+  gitagent:
+    transport: stdio
+    command: uv
+    args: [run, gitagent-mcp]
+    cwd: <repo_root>
+    env:
+      MCP_LOG_LEVEL: ERROR
+
+  codebase_memory:
+    transport: stdio
+    command: /Users/davidflorezmazuera/.local/bin/codebase-memory-mcp
+    args: []
+    cwd: <repo_root>
+    enabled: true
+
+index_on_startup:
+  enabled: true
+  project: MalariaSentinel
+  repo_path: <repo_root>
+  mode: moderate
+  force: false
+
+agents:
+  request_router:
+    kind: coordinator
+    description: Routes each request to one coordinator.
+    tools: []
+
+  research_coordinator:
+    kind: coordinator
+    description: Routes read-only research to domain specialists.
+    tools: [ask_user]
+
+  implementation_coordinator:
+    kind: coordinator
+    description: Manages GAWT lifecycle and delegates repository work.
+    servers: [gitagent]
+    tools:
+      - ask_user
+      - mcp__gitagent__start_session
+      - mcp__gitagent__get_session
+      - mcp__gitagent__list_agents
+      - mcp__gitagent__list_edits
+      - mcp__gitagent__list_intents
+      - mcp__gitagent__check_inbox
+      - mcp__gitagent__finalize_session
+      - mcp__gitagent__abort_session
+
+  abm:
+    kind: specialist
+    description: ABM C++ engine + Mesa-Geo adapter + runner
+    spec: docs/specs/abm/spec.md
+    skills: [abm-engine, calibration-framework]
+    gawt_role: abm
+    servers: [gitagent, codebase_memory]
+    tools:
+      - mcp__gitagent__read_file
+      - mcp__gitagent__edit_file
+      - mcp__gitagent__write_file
+      - mcp__gitagent__check_inbox
+      - mcp__gitagent__start_intent
+      - mcp__gitagent__send_message
+      - codebase_search_graph
+      - codebase_get_code_snippet
+      - ask_user
+      - resolve_conflict
+      - execute
+    edits_allow:
+      - mal-core/src/mal_core/abm/**
+      - mal-core/src/mal_core/abm/tests/calibration/**
+
+  scoring:
+    kind: specialist
+    description: Calibration scorers + composite
+    spec: docs/specs/scoring/spec.md
+    skills: [calibration-framework]
+    gawt_role: scoring
+    servers: [gitagent, codebase_memory]
+    tools:
+      - mcp__gitagent__read_file
+      - mcp__gitagent__edit_file
+      - mcp__gitagent__write_file
+      - mcp__gitagent__check_inbox
+      - mcp__gitagent__start_intent
+      - mcp__gitagent__send_message
+      - codebase_search_graph
+      - codebase_get_code_snippet
+      - ask_user
+      - resolve_conflict
+    edits_allow:
+      - mal-core/src/mal_core/abm/tests/calibration/**
+      - mal-core/src/mal_core/scoring/**
+
+  ingest:
+    kind: specialist
+    description: Env tensor + host density + mobility builder
+    spec: docs/specs/ingest/spec.md
+    gawt_role: ingest
+    servers: [gitagent, codebase_memory]
+    tools:
+      - mcp__gitagent__read_file
+      - mcp__gitagent__edit_file
+      - mcp__gitagent__write_file
+      - mcp__gitagent__check_inbox
+      - mcp__gitagent__start_intent
+      - mcp__gitagent__send_message
+      - codebase_search_graph
+      - codebase_get_code_snippet
+      - ask_user
+      - resolve_conflict
+    edits_allow: [mal-core/src/mal_core/ingest/**]
+
+  download:
+    kind: specialist
+    description: Plugin-based data fetcher
+    spec: docs/specs/download/spec.md
+    gawt_role: download
+    servers: [gitagent, codebase_memory]
+    tools:
+      - mcp__gitagent__read_file
+      - mcp__gitagent__edit_file
+      - mcp__gitagent__write_file
+      - mcp__gitagent__check_inbox
+      - mcp__gitagent__start_intent
+      - mcp__gitagent__send_message
+      - codebase_search_graph
+      - codebase_get_code_snippet
+      - ask_user
+      - resolve_conflict
+    edits_allow:
+      - mal-core/src/mal_core/download/**
+      - mal-commonlib/src/mal_commonlib/data/loaders/**
+
+  prediction:
+    kind: specialist
+    description: Risk raster predictor
+    spec: docs/specs/prediction/spec.md
+    gawt_role: prediction
+    servers: [gitagent, codebase_memory]
+    tools:
+      - mcp__gitagent__read_file
+      - mcp__gitagent__edit_file
+      - mcp__gitagent__write_file
+      - mcp__gitagent__check_inbox
+      - mcp__gitagent__start_intent
+      - mcp__gitagent__send_message
+      - codebase_search_graph
+      - codebase_get_code_snippet
+      - ask_user
+      - resolve_conflict
+    edits_allow: [mal-core/src/mal_core/prediction/**]
+
+  training:
+    kind: specialist
+    description: U-Net model, dataset, trainer
+    spec: docs/specs/training/spec.md
+    gawt_role: training
+    servers: [gitagent, codebase_memory]
+    tools:
+      - mcp__gitagent__read_file
+      - mcp__gitagent__edit_file
+      - mcp__gitagent__write_file
+      - mcp__gitagent__check_inbox
+      - mcp__gitagent__start_intent
+      - mcp__gitagent__send_message
+      - codebase_search_graph
+      - codebase_get_code_snippet
+      - ask_user
+      - resolve_conflict
+    edits_allow: [mal-core/src/mal_core/training/**]
+
+  data:
+    kind: specialist
+    description: Manifest, naming and completeness validation
+    spec: docs/specs/data/spec.md
+    gawt_role: data
+    servers: [gitagent, codebase_memory]
+    tools:
+      - mcp__gitagent__read_file
+      - mcp__gitagent__edit_file
+      - mcp__gitagent__write_file
+      - mcp__gitagent__check_inbox
+      - mcp__gitagent__start_intent
+      - mcp__gitagent__send_message
+      - codebase_search_graph
+      - codebase_get_code_snippet
+      - ask_user
+      - resolve_conflict
+    edits_allow:
+      - mal-commonlib/src/mal_commonlib/data/**
+      - docs/specs/data/**
+
+  commonlib:
+    kind: specialist
+    description: Shared config, paths and AOI primitives
+    spec: docs/specs/commonlib/spec.md
+    gawt_role: commonlib
+    servers: [gitagent, codebase_memory]
+    tools:
+      - mcp__gitagent__read_file
+      - mcp__gitagent__edit_file
+      - mcp__gitagent__write_file
+      - mcp__gitagent__check_inbox
+      - mcp__gitagent__start_intent
+      - mcp__gitagent__send_message
+      - codebase_search_graph
+      - codebase_get_code_snippet
+      - ask_user
+      - resolve_conflict
+    edits_allow: [mal-commonlib/**]
+
+  self_improve:
+    kind: specialist
+    description: Janus self-improvement and internal wiring
+    spec: docs/specs/self_improve/spec.md
+    gawt_role: self_improve
+    servers: [gitagent, codebase_memory]
+    tools:
+      - mcp__gitagent__read_file
+      - mcp__gitagent__edit_file
+      - mcp__gitagent__write_file
+      - mcp__gitagent__check_inbox
+      - mcp__gitagent__start_intent
+      - mcp__gitagent__send_message
+      - codebase_search_graph
+      - codebase_get_code_snippet
+      - ask_user
+      - resolve_conflict
+    edits_allow: [agents/janus/**]

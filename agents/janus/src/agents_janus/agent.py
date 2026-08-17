@@ -25,7 +25,8 @@ if str(_project_root) not in sys.path:
 
 from agents_janus.logger import SessionLogger
 from agents_janus.malariasim_backend import MalariasimShellBackend
-from agents_janus.middleware.tool_filter import ToolFilterMiddleware
+from agents_janus.middleware.gawt_context import GawtContextMiddleware
+from agents_janus.middleware.runtime_policy import BACKEND_TOOLS, ToolExposureMiddleware
 from agents_janus.observability import ObservabilityMiddleware, SubAgentObservabilityMiddleware
 
 # Module-level flags set by CLI before creating the agent
@@ -395,10 +396,16 @@ def create_orchestrator(
         )
         middleware.append(obs)
         OBSERVABILITY_MIDDLEWARE = obs
-    if mode == "research_coordinator":
+    # Backend tools are injected by DeepAgents. Declarative policy filters them
+    # at model exposure time; coordinator policy allows none.
+    if mode != "request_router":
+        from agents_janus.agent_config import load_agent_configuration
+        coordinator_policy = load_agent_configuration().agents[mode]
         middleware.append(
-            ToolFilterMiddleware(
-                excluded=frozenset({"write_file", "edit_file", "delete_file"})
+            ToolExposureMiddleware(
+                allowed_backend_tools=frozenset(
+                    set(coordinator_policy.tools) & set(BACKEND_TOOLS)
+                )
             )
         )
 
@@ -407,23 +414,20 @@ def create_orchestrator(
         skills.append("agents/skills/")
 
     # ── Subagent definitions (shared across both modes) ──────────────
+    from agents_janus.agent_config import load_agent_configuration
     from agents_janus.subagents.registry import load_registry
     from agents_janus.subagents.builder import build_subagent_prompt
     from agents_janus.mcp_bridge import (
         get_mcp_tools_sync,
         load_janus_config,
-        filter_gawt_tools,
-        filter_codebase_tools,
     )
+    from agents_janus.tool_catalog import resolve_tools
     from agents_janus.tools.ask_user_tool import ask_user as ask_user_tool
-    from agents_janus.scope_validator import ScopeValidationMiddleware
-    from agents_janus.middleware.inbox_check import InboxCheckMiddleware
     from agents_janus.tools.resolve_conflict import make_resolve_conflict_tool, set_agent_ref
 
+    agent_configuration = load_agent_configuration()
     janus_config = load_janus_config()
     all_mcp_tools = get_mcp_tools_sync(janus_config, REPO_ROOT)
-    gawt_tools = filter_gawt_tools(all_mcp_tools)
-    codebase_tools = filter_codebase_tools(all_mcp_tools)
 
     # Index codebase on startup if enabled (idempotent — no-op if already fresh)
     if CODEBASE_INDEX_ON_STARTUP:
@@ -438,51 +442,57 @@ def create_orchestrator(
     resolve_conflict_tool = make_resolve_conflict_tool()
 
     registry = load_registry()
+    available_tools = list(all_mcp_tools) + [ask_user_tool, resolve_conflict_tool]
+    register_tool = next(
+        (t for t in all_mcp_tools if t.name == "mcp__gitagent__register_agent"), None
+    )
+    unregister_tool = next(
+        (t for t in all_mcp_tools if t.name == "mcp__gitagent__unregister_agent"), None
+    )
     worker_defs: list[Any] = []
     for name, spec in registry.all().items():
+        policy = agent_configuration.agents[name]
+        all_tools = available_tools
+        selected_tools = resolve_tools(all_tools, policy, agent_configuration)
         if mode == "research_coordinator":
-            all_tools: list[Any] = list(codebase_tools) + [ask_user_tool]
-        else:
-            all_tools = list(gawt_tools) + list(codebase_tools)
-            all_tools.append(ask_user_tool)
-            all_tools.append(resolve_conflict_tool)
-
-        wrapped_tools = [_wrap_with_logging(t) for t in all_tools]
+            selected_tools = [
+                t for t in selected_tools
+                if getattr(t, "name", "").startswith("codebase_")
+                or getattr(t, "name", "") == "ask_user"
+            ]
+        wrapped_tools = [_wrap_with_logging(t) for t in selected_tools]
         system_prompt = build_subagent_prompt(
             spec,
             registry.all(),
             coordinator_mode="research" if mode == "research_coordinator" else "implementation",
         )
 
+        worker_middleware: list[Any] = [
+            ToolExposureMiddleware(
+                allowed_backend_tools=frozenset(
+                    set(policy.tools) & set(BACKEND_TOOLS)
+                )
+            )
+        ]
+        if mode != "research_coordinator" and register_tool is not None:
+            worker_middleware.insert(
+                0,
+                GawtContextMiddleware(
+                    role=policy.effective_gawt_role,
+                    register_tool=register_tool,
+                    unregister_tool=unregister_tool,
+                ),
+            )
+
         wd = {
             "name": name,
             "description": spec.description,
             "system_prompt": system_prompt,
             "tools": wrapped_tools,
-            "middleware": (
+            "middleware": worker_middleware + (
                 [SubAgentObservabilityMiddleware(obs, name)] if obs else []
-            ) if mode == "research_coordinator" else (
-                [
-                    ScopeValidationMiddleware(registry, name),
-                    InboxCheckMiddleware(),
-                    SubAgentObservabilityMiddleware(obs, name),
-                ] if obs else [
-                    ScopeValidationMiddleware(registry, name),
-                    InboxCheckMiddleware(),
-                ]
             ),
         }
-
-        # Only the abm specialist gets shell access (the built-in `execute`
-        # tool). Every other subagent has `execute` filtered out. The
-        # orchestrator keeps `execute` (it runs malariasim directly).
-        excluded_tools = {"execute"} if name != "abm" else set()
-        if mode == "research_coordinator":
-            excluded_tools.update({"write_file", "edit_file", "delete_file"})
-        if excluded_tools:
-            wd["middleware"].append(
-                ToolFilterMiddleware(excluded=frozenset(excluded_tools))
-            )
 
         worker_defs.append(wd)
 
@@ -493,7 +503,12 @@ def create_orchestrator(
         # direct codebase tools that let them bypass task().
         orch_tools = _get_research_tools()
     else:
-        orch_tools = _get_implementation_tools() + [_wrap_with_logging(t) for t in gawt_tools] + [_wrap_with_logging(t) for t in codebase_tools]
+        # Implementation coordinators only manage consensus and lifecycle.
+        # Specialists own repository inspection, memory lookup, and edits.
+        orch_tools = resolve_tools(
+            available_tools, agent_configuration.agents[mode], agent_configuration
+        )
+        orch_tools = [_wrap_with_logging(t) for t in orch_tools]
 
     agent = create_deep_agent(
         model=llm,

@@ -1,14 +1,13 @@
-"""Subagent registry — loads SubagentSpec instances from config/subagents.yaml."""
+"""Registry facade over the single declarative agents.yaml."""
 
 from __future__ import annotations
 
 from pathlib import Path
 
-import yaml
-
+from agents_janus.agent_config import load_agent_configuration
 from agents_janus.subagents.base import SubagentSpec
 
-_CONFIG_PATH = Path(__file__).resolve().parent.parent / "config" / "subagents.yaml"
+_CONFIG_PATH = Path(__file__).resolve().parent.parent / "config" / "agents.yaml"
 
 
 class Registry:
@@ -38,32 +37,28 @@ class Registry:
 
 
 def load_registry(config_path: Path | None = None) -> Registry:
-    """Load the registry from YAML config."""
+    """Load specialist specs from the single agents.yaml config."""
     path = config_path or _CONFIG_PATH
-    if not path.exists():
-        raise FileNotFoundError(f"Subagent config not found: {path}")
-
-    with open(path) as f:
-        data = yaml.safe_load(f)
-
-    defaults = data.get("defaults", {})
+    configuration = load_agent_configuration(path)
     specs: dict[str, SubagentSpec] = {}
-
-    for name, entry in data.get("subagents", {}).items():
-        spec_path_str = entry.get("spec")
-        spec_path = Path(spec_path_str) if spec_path_str else None
-
+    defaults = configuration.defaults
+    for name, entry in configuration.agents.items():
+        if entry.kind != "specialist":
+            continue
         specs[name] = SubagentSpec(
             name=name,
-            description=entry.get("description", ""),
-            model=entry.get("model", defaults.get("model", "xiaomi/mimo-v2.5")),
-            provider=entry.get("provider", defaults.get("provider", "openrouter")),
-            spec_path=spec_path,
-            skills=tuple(entry.get("skills", [])),
-            mailbox_inbox=entry.get("mailbox_inbox", f"inbox-{name}"),
-            edits_allow=tuple(entry.get("edits_allow", [])),
-            thread_id_prefix=entry.get("thread_id_prefix", defaults.get("thread_id_prefix", "sub-")),
-            gawt_role=entry.get("gawt_role", ""),
+            description=entry.description,
+            model=entry.model or defaults.model,
+            provider=entry.provider or defaults.provider,
+            spec_path=entry.spec,
+            skills=tuple(entry.skills),
+            edits_allow=tuple(entry.edits_allow),
+            thread_id_prefix=entry.thread_id_prefix or defaults.thread_id_prefix,
+            gawt_role=entry.gawt_role,
+            kind=entry.kind,
+            servers=tuple(entry.servers),
+            tools=tuple(entry.tools),
+            middleware=tuple(entry.middleware),
         )
 
     return Registry(specs)

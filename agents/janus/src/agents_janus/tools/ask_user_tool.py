@@ -109,8 +109,7 @@ def ask_user(
                 _safe_print(f"(timeout → default: {default})")
                 answer = default or ""
         else:
-            _safe_write("   > ")
-            answer = sys.stdin.readline().strip()
+            answer = input("   > ").strip()
     except (EOFError, KeyboardInterrupt):
         _safe_print("\n   (interrupted → using default)")
         answer = default or ""

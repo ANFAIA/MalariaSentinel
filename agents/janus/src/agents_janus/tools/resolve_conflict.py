@@ -1,7 +1,7 @@
 """resolve_conflict — self-fork tool for peer coordination.
 
-When an agent receives a conflict (via InboxCheckMiddleware's CONFLICT
-DETECTED marker), it calls this tool to:
+When an agent receives a structured conflict marker from GAWT, it calls this
+tool to:
 
 1. Fork its current conversation into an isolated thread
 2. Run conflict resolution (SCAN evaluation, peer communication)

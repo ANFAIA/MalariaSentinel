@@ -50,23 +50,33 @@ This specialist runs under the research coordinator.
 
 You are in implementation mode. Your job is to make concrete changes.
 
-### Registration (MANDATORY)
-1. **Register**: `mcp__gitagent__register_agent(role="{{ role }}")` — get `agent_id`
-2. **Read the manifest**: `mcp__gitagent__read_file(agent_id, "agents/janus/src/agents_janus/config/subagents.yaml")` — find your entry
-3. **Set your intent**: `mcp__gitagent__start_intent(agent_id, "{{ task }}")`
-4. **Check inbox**: `mcp__gitagent__check_inbox(agent_id)` — see what peers are doing
+### Automatic Identity (MANDATORY)
+Janus installs `GawtContextMiddleware` before calling you. It automatically:
+
+1. Registers your role in GAWT when `task(...)` starts you.
+2. Stores `agent_id` in checkpoint-private state for resume/recovery.
+3. Injects `agent_id` and `from_agent_id` into GAWT tool calls.
+4. Unregisters you after completion, including normal cleanup.
+
+Do **NOT** call `register_agent` or `unregister_agent`.
+Do **NOT** invent an agent ID. Use GAWT tools normally; middleware supplies IDs.
+If resumed from checkpoint, middleware reuses existing active identity.
+
+After registration, define intent from your actual task:
+`mcp__gitagent__start_intent(intent="<specific current task>")`.
+Use `mcp__gitagent__repurpose(intent="<new task>")` when task scope changes.
+Middleware injects your `agent_id` into both calls.
 
 ### File Editing (CRITICAL)
 - **ALWAYS** use `mcp__gitagent__edit_file` or `mcp__gitagent__write_file`
 - **NEVER** use the host's Edit/Write tools — they bypass attribution
-- Always pass `agent_id` to every gitagent call
-- After each significant edit: `mcp__gitagent__check_inbox(agent_id)`
+- Middleware injects `agent_id` into identity-bound GAWT calls.
+- After each significant edit: call `mcp__gitagent__check_inbox()`.
 - On conflict: re-read the file, re-plan, retry
 
 ### Completion
 1. Report: `mcp__gitagent__send_message(from_agent_id, to_agent_id="__orchestrator__", message="done: <summary>")`
-2. Unregister: `mcp__gitagent__unregister_agent(agent_id)`
-3. Return a structured summary
+2. Return a structured summary. Middleware handles unregister.
 
 ---
 
@@ -87,8 +97,8 @@ If your task requires touching files outside your scope:
 
 ## Peer Coordination (Self-Fork Protocol)
 
-Your inbox is checked **automatically** after every tool call. You do NOT
-need to call `check_inbox` manually — the middleware handles it.
+Check inbox before and after significant edits. GAWT identity is injected by
+middleware; do not write `agent_id` manually.
 
 ### Conflict Detection
 If you see a **🛑 CONFLICT DETECTED** marker in a tool result:

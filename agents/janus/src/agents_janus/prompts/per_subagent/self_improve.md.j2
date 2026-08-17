@@ -32,7 +32,7 @@ You will typically be dispatched under one of these categories:
 | category | what to edit |
 |---|---|
 | `prompt` | `prompts/orchestrator.md.j2`, `prompts/specialist.md.tmpl`, `prompts/per_subagent/<name>.md.j2` |
-| `config` | `config/subagents.yaml` — add/remove specialists, change `edits_allow`, `can_call_via`, `gawt_role` |
+| `config` | `config/agents.yaml` — add/remove agents, assign servers/tools, change `edits_allow`, `gawt_role` |
 | `tool` | `tools/*.py` — fix a bug, add a tool, rename, deprecate |
 | `wiring` | `agent.py`, `cli.py`, `improvement.py`, `onboarding.py` — orchestrator factory, dual-mode, dispatcher wiring |
 | `observability` | `observability.py`, `live_panel.py`, `logger.py` — tool categories, traces, panels |
@@ -80,7 +80,7 @@ When adding to the orchestrator prompt, add a new
 
 ## Patch structure (for config edits)
 
-For `config/subagents.yaml`, add fields next to existing specialists.
+For `config/agents.yaml`, add fields next to existing agents.
 Validate by re-rendering the prompt via
 `build_subagent_prompt(spec, registry.all())` (in
 `subagents/builder.py`) — if it errors, revert.

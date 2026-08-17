@@ -1,6 +1,6 @@
 """mcp_bridge — Multi-server MCP bridge for Janus.
 
-Loads janus.json, connects to all configured MCP servers via mcp==2.0.0
+Loads agents.yaml, connects to configured MCP servers via MCP client
 native client, converts tools to LangChain BaseTool objects.
 
 Architecture:
@@ -37,7 +37,7 @@ from agents_janus.mcp_config_schema import (
 
 _log = logging.getLogger("agents_janus.mcp_bridge")
 
-_CONFIG_PATH = Path(__file__).parent / "config" / "janus.json"
+_CONFIG_PATH = Path(__file__).parent / "config" / "agents.yaml"
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent.parent
 
 # Per-config cache: tools_list for each unique config
@@ -161,16 +161,12 @@ atexit.register(shutdown_all_sessions)
 
 
 def load_janus_config(path: Path | None = None) -> JanusConfig:
-    """Load janus.json. Returns empty config if file not found."""
+    """Load the MCP section of agents.yaml and fail on invalid configuration."""
     p = path or _CONFIG_PATH
-    try:
-        return load_config(p)
-    except FileNotFoundError:
-        _log.warning("janus.json not found at %s — running with no MCP servers", p)
-        return JanusConfig()
-    except Exception as e:
-        _log.error("Failed to parse janus.json: %s", e)
-        return JanusConfig()
+    config = load_config(p)
+    if not config.mcp_servers:
+        raise ValueError(f"No MCP servers configured in {p}")
+    return config
 
 
 def _skip_disabled(config: JanusConfig) -> dict[str, StdioServerConfig | HttpServerConfig]:
@@ -285,9 +281,9 @@ async def _connect_server(name: str, spec: dict[str, Any], prefix: str = "") -> 
 
         return [_mcp_tool_to_langchain(name, t, server_params, prefix=prefix) for t in mcp_tools]
 
-    else:
-        _log.warning("Server '%s': transport '%s' not implemented yet", name, spec["transport"])
-        return []
+    raise ValueError(
+        f"Server '{name}' transport '{spec['transport']}' is not implemented"
+    )
 
 
 def _mcp_tool_to_langchain(
@@ -310,6 +306,9 @@ def _mcp_tool_to_langchain(
 
         async def _attempt(p: _PooledSession) -> str:
             result = await p.session.call_tool(raw_name, kwargs)
+            structured = getattr(result, "structuredContent", None)
+            if structured is not None:
+                return json.dumps(structured)
             if hasattr(result, "content") and result.content:
                 texts = []
                 for block in result.content:
@@ -359,11 +358,16 @@ def _mcp_tool_to_langchain(
         name=display_name,
         description=tool_description,
         func=_run,
-        args_schema=_build_args_schema(input_schema),
+        args_schema=_build_args_schema(
+            input_schema,
+            hide_identity=server_name == "gitagent" and raw_name not in {
+                "register_agent", "unregister_agent"
+            },
+        ),
     )
 
 
-def _build_args_schema(schema: dict) -> Any:
+def _build_args_schema(schema: dict, *, hide_identity: bool = False) -> Any:
     """Convert JSON Schema to Pydantic model for LangChain tool args."""
     from pydantic import create_model, Field
 
@@ -375,7 +379,11 @@ def _build_args_schema(schema: dict) -> Any:
         prop_type = prop_schema.get("type", "string")
         python_type = _json_type_to_python(prop_type)
         description = prop_schema.get("description", "")
-        default = ... if prop_name in required else None
+        if hide_identity and prop_name in {"agent_id", "from_agent_id"}:
+            python_type = python_type | None
+            default = None
+        else:
+            default = ... if prop_name in required else None
         fields[prop_name] = (python_type, Field(description=description, default=default))
 
     if not fields:

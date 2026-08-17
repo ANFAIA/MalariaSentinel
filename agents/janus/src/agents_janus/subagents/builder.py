@@ -38,7 +38,7 @@ def build_subagent_prompt(
     """Compose the full system prompt from three layers.
 
     Layer A: behavioral spec (from docs/specs/<X>/spec.md)
-    Layer B: specialist template (gawt MCP-native registration protocol)
+    Layer B: specialist template (runtime identity is injected by Janus)
     Layer C: per-subagent domain clarifications
     """
     # Layer A: behavioral spec
@@ -49,12 +49,12 @@ def build_subagent_prompt(
             spec_text = full_path.read_text()
 
     # Layer B: specialist template
-    gawt_role = spec.gawt_role or spec.name
+    gawt_role = spec.effective_gawt_role
     specialist_text = _render_template(
         "specialist.md.tmpl",
         role=gawt_role,
         task=spec.description,
-        manifest_path=f"agents/janus/src/agents_janus/config/subagents.yaml",
+        manifest_path="agents/janus/src/agents_janus/config/agents.yaml",
         edits_allow=list(spec.edits_allow),
         skills=list(spec.skills),
         depends_on=[],

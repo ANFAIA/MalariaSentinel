@@ -1,7 +1,4 @@
 """Tests for the subagent system."""
-import json
-import tempfile
-from pathlib import Path
 import pytest
 
 
@@ -9,7 +6,7 @@ def test_subagent_spec_frozen():
     from agents_janus.subagents.base import SubagentSpec
     spec = SubagentSpec(
         name="test", description="test desc", model="m", provider="p",
-        spec_path=None, skills=(), mailbox_inbox="inbox-test",
+        spec_path=None, skills=(),
         edits_allow=()
     )
     assert spec.name == "test"
@@ -21,14 +18,14 @@ def test_subagent_spec_gawt_role():
     from agents_janus.subagents.base import SubagentSpec
     spec = SubagentSpec(
         name="test", description="test desc", model="m", provider="p",
-        spec_path=None, skills=(), mailbox_inbox="inbox-test",
+        spec_path=None, skills=(),
         edits_allow=(), gawt_role="custom-role"
     )
     assert spec.gawt_role == "custom-role"
 
     spec_default = SubagentSpec(
         name="test", description="test desc", model="m", provider="p",
-        spec_path=None, skills=(), mailbox_inbox="inbox-test",
+        spec_path=None, skills=(),
         edits_allow=()
     )
     assert spec_default.gawt_role == ""
@@ -38,7 +35,7 @@ def test_subagent_spec_no_plugins_field():
     from agents_janus.subagents.base import SubagentSpec
     spec = SubagentSpec(
         name="test", description="", model="", provider="",
-        spec_path=None, skills=(), mailbox_inbox="",
+        spec_path=None, skills=(),
         edits_allow=()
     )
     assert not hasattr(spec, "plugins")
@@ -50,7 +47,7 @@ def test_research_subagent_prompt_disables_implementation_protocol():
 
     spec = SubagentSpec(
         name="test", description="research test", model="m", provider="p",
-        spec_path=None, skills=(), mailbox_inbox="inbox-test", edits_allow=()
+        spec_path=None, skills=(), edits_allow=()
     )
     prompt = build_subagent_prompt(
         spec,
@@ -62,36 +59,12 @@ def test_research_subagent_prompt_disables_implementation_protocol():
     assert "Registration (MANDATORY)" not in prompt
 
 
-def test_scope_validator():
-    from agents_janus.scope_validator import validate_edit_scope
-    from agents_janus.subagents.registry import Registry
-    from agents_janus.subagents.base import SubagentSpec
-    specs = {
-        "abm": SubagentSpec(name="abm", description="", model="", provider="", spec_path=None,
-                            skills=(), mailbox_inbox="", edits_allow=("mal-core/src/mal_core/abm/**",)),
-        "download": SubagentSpec(name="download", description="", model="", provider="", spec_path=None,
-                                 skills=(), mailbox_inbox="", edits_allow=("mal-core/src/mal_core/download/**",)),
-    }
-    reg = Registry(specs)
-    # In scope
-    r = validate_edit_scope(["mal-core/src/mal_core/abm/engine.hpp"], "abm", reg)
-    assert r["ok"] is True
-    # Cross scope
-    r2 = validate_edit_scope(["mal-core/src/mal_core/download/runner.py"], "abm", reg)
-    assert r2["ok"] is False
-    assert len(r2["cross_scope"]) == 1
-    # Unowned
-    r3 = validate_edit_scope(["some/random/file.py"], "abm", reg)
-    assert r3["ok"] is False
-    assert len(r3["unowned"]) == 1
-
-
 def test_registry_find_owner():
     from agents_janus.subagents.registry import Registry
     from agents_janus.subagents.base import SubagentSpec
     specs = {
         "abm": SubagentSpec(name="abm", description="", model="", provider="", spec_path=None,
-                            skills=(), mailbox_inbox="", edits_allow=("mal-core/src/mal_core/abm/**",)),
+                            skills=(), edits_allow=("mal-core/src/mal_core/abm/**",)),
     }
     reg = Registry(specs)
     assert reg.find_owner("mal-core/src/mal_core/abm/engine.hpp") == "abm"
@@ -103,7 +76,7 @@ def test_registry_loads_gawt_role():
     from agents_janus.subagents.base import SubagentSpec
     specs = {
         "abm": SubagentSpec(name="abm", description="", model="", provider="", spec_path=None,
-                            skills=(), mailbox_inbox="", edits_allow=(),
+                            skills=(), edits_allow=(),
                             gawt_role="abm-worker"),
     }
     reg = Registry(specs)

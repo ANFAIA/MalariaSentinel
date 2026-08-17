@@ -29,3 +29,8 @@ janus = "agents_janus.cli:app"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/agents_janus"]
+
+[tool.pytest.ini_options]
+markers = [
+    "live: tests requiring live model or external services",
+]

@@ -36,6 +36,13 @@ class TestRenderPrompt:
         assert "mcp__gitagent__start_session" in prompt
         assert "mcp__gitagent__finalize_session" in prompt
         assert "[MODE:implementation]" in prompt
+        assert "no direct repository tools" in prompt
+        assert "codebase_*" not in prompt
+        assert "GAWT Consensus Protocol" in prompt
+        assert "SESSION_OPEN" in prompt
+        assert "Inbox Semantics" in prompt
+        assert "CONFLICT DETECTED" in prompt
+        assert "Failure Recovery" in prompt
 
 
 class TestGetTools:

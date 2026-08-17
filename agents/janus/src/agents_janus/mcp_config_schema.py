@@ -1,4 +1,4 @@
-"""Pydantic models for janus.json MCP server configuration."""
+"""Pydantic models for declarative Janus MCP server configuration."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -51,14 +51,24 @@ class JanusConfig(BaseModel):
 
 
 def load_config(path: str | Path) -> JanusConfig:
-    """Load and validate janus.json."""
-    import json
-    from pathlib import Path
+    """Load MCP server configuration from agents.yaml."""
+    import yaml
 
     p = Path(path)
     if not p.exists():
         raise FileNotFoundError(f"Config not found: {p}")
-    return JanusConfig.model_validate_json(p.read_text())
+    raw = yaml.safe_load(p.read_text()) or {}
+    servers = raw.get("servers", raw.get("mcp_servers", {}))
+    index = raw.get("index_on_startup", {})
+    prefixes = raw.get("tool_prefixes", {
+        "codebase_memory": "codebase_",
+        "gitagent": "mcp__gitagent__",
+    })
+    return JanusConfig.model_validate({
+        "mcp_servers": servers,
+        "index_on_startup": index,
+        "tool_prefixes": prefixes,
+    })
 
 
 def build_multiserver_dict(config: JanusConfig, *, project_root: str | Path | None = None) -> dict[str, dict[str, Any]]:
