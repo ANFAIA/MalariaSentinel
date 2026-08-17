@@ -42,6 +42,8 @@ _REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent.parent
 
 # Per-config cache: tools_list for each unique config
 _tools_cache: dict[frozenset, list[BaseTool]] = {}
+_failed_servers: set[str] = set()
+_MCP_CONNECT_TIMEOUT = float(os.environ.get("JANUS_MCP_CONNECT_TIMEOUT", "8"))
 
 
 # ---------------------------------------------------------------------------
@@ -173,6 +175,9 @@ def _skip_disabled(config: JanusConfig) -> dict[str, StdioServerConfig | HttpSer
     """Filter to enabled servers, auto-skip if binary not found for stdio servers."""
     active = {}
     for name, server in config.mcp_servers.items():
+        if name in _failed_servers:
+            _log.info("MCP server '%s' unavailable earlier — skipping for this process", name)
+            continue
         if not getattr(server, "enabled", True):
             _log.info("MCP server '%s' disabled — skipping", name)
             continue
@@ -231,6 +236,7 @@ def get_mcp_tools_sync(
                 tools = await _connect_server(server_name, server_spec, prefix=prefix)
                 all_tools.extend(tools)
             except Exception as e:
+                _failed_servers.add(server_name)
                 _log.error("Failed to connect to MCP server '%s': %s", server_name, e)
         return all_tools
 
@@ -276,7 +282,16 @@ async def _connect_server(name: str, spec: dict[str, Any], prefix: str = "") -> 
                     result = await session.list_tools()
                     return result.tools
 
-        mcp_tools = await _list_tools()
+        try:
+            mcp_tools = await asyncio.wait_for(_list_tools(), timeout=_MCP_CONNECT_TIMEOUT)
+        except asyncio.TimeoutError:
+            _failed_servers.add(name)
+            _log.warning(
+                "MCP server '%s' did not initialize within %.1fs — treating as unavailable",
+                name,
+                _MCP_CONNECT_TIMEOUT,
+            )
+            return []
         _log.info("Server '%s': %d tools", name, len(mcp_tools))
 
         return [_mcp_tool_to_langchain(name, t, server_params, prefix=prefix) for t in mcp_tools]

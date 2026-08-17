@@ -26,6 +26,8 @@ if str(_project_root) not in sys.path:
 from agents_janus.logger import SessionLogger
 from agents_janus.malariasim_backend import MalariasimShellBackend
 from agents_janus.middleware.gawt_context import GawtContextMiddleware
+from agents_janus.middleware.dispatch_policy import DispatchPathMiddleware
+from agents_janus.middleware.gawt_session import GawtSessionMiddleware
 from agents_janus.middleware.runtime_policy import BACKEND_TOOLS, ToolExposureMiddleware
 from agents_janus.observability import ObservabilityMiddleware, SubAgentObservabilityMiddleware
 
@@ -347,6 +349,11 @@ def create_orchestrator(
             router_middleware.append(router_obs)
             OBSERVABILITY_MIDDLEWARE = router_obs
 
+        router_middleware.append(
+            ToolExposureMiddleware(allowed_backend_tools=frozenset())
+        )
+        router_middleware.append(DispatchPathMiddleware())
+
         router = create_deep_agent(
             model=llm,
             tools=_get_router_tools(),
@@ -408,6 +415,8 @@ def create_orchestrator(
                 )
             )
         )
+        if mode == "implementation_coordinator":
+            middleware.append(DispatchPathMiddleware())
 
     skills = []
     if PROJECT_SKILLS.is_dir():
@@ -449,6 +458,21 @@ def create_orchestrator(
     unregister_tool = next(
         (t for t in all_mcp_tools if t.name == "mcp__gitagent__unregister_agent"), None
     )
+    start_session_tool = next(
+        (t for t in all_mcp_tools if t.name == "mcp__gitagent__start_session"), None
+    )
+    get_session_tool = next(
+        (t for t in all_mcp_tools if t.name == "mcp__gitagent__get_session"), None
+    )
+    if mode == "implementation_coordinator" and start_session_tool is not None:
+        middleware.insert(
+            0,
+            GawtSessionMiddleware(
+                feature=goal or "janus implementation",
+                start_tool=start_session_tool,
+                get_tool=get_session_tool,
+            ),
+        )
     worker_defs: list[Any] = []
     for name, spec in registry.all().items():
         policy = agent_configuration.agents[name]

@@ -23,10 +23,11 @@ servers:
     command: /Users/davidflorezmazuera/.local/bin/codebase-memory-mcp
     args: []
     cwd: <repo_root>
-    enabled: true
+    # Optional dependency. Enable after CBM/Neo4j health check passes.
+    enabled: false
 
 index_on_startup:
-  enabled: true
+  enabled: false
   project: MalariaSentinel
   repo_path: <repo_root>
   mode: moderate

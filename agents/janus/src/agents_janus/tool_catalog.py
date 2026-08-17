@@ -2,10 +2,14 @@
 from __future__ import annotations
 
 import fnmatch
+import logging
 from collections.abc import Iterable
 from typing import Any
 
 from agents_janus.agent_config import AgentConfiguration, AgentSpec
+
+
+_log = logging.getLogger(__name__)
 
 
 RUNTIME_TOOLS = frozenset({
@@ -18,10 +22,13 @@ RUNTIME_TOOLS = frozenset({
     "edit_file",
     "delete_file",
 })
+OPTIONAL_TOOL_PATTERNS = ("codebase_*",)
 
 
 def _name(tool: Any) -> str:
-    return tool.get("name", "") if isinstance(tool, dict) else getattr(tool, "name", "")
+    if isinstance(tool, dict):
+        return tool.get("name", "")
+    return getattr(tool, "name", "") or getattr(tool, "__name__", "")
 
 
 def _matches(patterns: Iterable[str], name: str) -> bool:
@@ -57,6 +64,17 @@ def resolve_tools(
             if not _matches(denied, name) and name not in {_name(t) for t in selected}:
                 selected.append(available[name])
 
-    if missing and configuration.defaults.fail_on_missing_tools:
-        raise LookupError(f"{spec.name}: configured tools not discovered: {missing}")
+    optional_missing = [
+        name for name in missing
+        if any(fnmatch.fnmatchcase(name, pattern) for pattern in OPTIONAL_TOOL_PATTERNS)
+    ]
+    if optional_missing:
+        _log.debug(
+            "%s: optional tools unavailable; continuing without %s",
+            spec.name,
+            optional_missing,
+        )
+    required_missing = [name for name in missing if name not in optional_missing]
+    if required_missing and configuration.defaults.fail_on_missing_tools:
+        raise LookupError(f"{spec.name}: configured tools not discovered: {required_missing}")
     return selected

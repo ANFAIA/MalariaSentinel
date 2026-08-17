@@ -34,3 +34,24 @@ def test_resolver_fails_on_missing_declared_tool():
     )
     with pytest.raises(LookupError, match="missing_tool"):
         resolve_tools([], spec, config)
+
+
+def test_resolver_recognizes_plain_function_tools():
+    config = load_agent_configuration()
+    spec = AgentSpec(name="x", kind="specialist", tools=("ask_user",))
+
+    def ask_user(question: str) -> str:
+        return question
+
+    assert resolve_tools([ask_user], spec, config) == [ask_user]
+
+
+def test_resolver_allows_missing_codebase_tools():
+    config = load_agent_configuration()
+    spec = AgentSpec(
+        name="x",
+        kind="specialist",
+        tools=("codebase_search_graph",),
+    )
+
+    assert resolve_tools([], spec, config) == []

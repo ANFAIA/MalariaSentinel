@@ -107,7 +107,12 @@ def run_onboarding(
                 sys.stdout.write("you> ")
                 sys.stdout.flush()
             try:
-                user_input = sys.stdin.readline().strip()
+                raw_input = sys.stdin.readline()
+                if raw_input == "":
+                    _safe_print("\nHasta luego!")
+                    _cleanup()
+                    return json.dumps({"status": "quit"})
+                user_input = raw_input.strip()
             except UnicodeDecodeError:
                 # Terminal sent bytes stdin can't decode as UTF-8 (mixed
                 # encoding, paste artifacts). Reconfigure to never crash and
