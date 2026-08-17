@@ -85,7 +85,7 @@ def test_chirps_no_auth_required() -> None:
     # that nothing tried to read ~/.cdsapirc.
     aoi = AOI.from_bbox(GHANA_W, GHANA_S, GHANA_E, GHANA_N, "EPSG:4326", "ghana", 1000)
     fetch = _synthetic_chirps_daily(aoi)
-    out = load_chirps_rainfall(aoi, year=2024, month=6, _fetch_daily=fetch)
+    out = load_chirps_rainfall(aoi, years=[2024], months=[6], _fetch_daily=fetch)
     assert out is not None
     # The function never imports cdsapi; a quick import-check that the loader
     # module does not import cdsapi at all.
@@ -104,7 +104,7 @@ def test_chirps_ghana_smoke(
     """
     try:
         out = load_chirps_rainfall(
-            ghana_aoi, year=2024, month=6, cache_dir=tmp_path / "chirps-cache"
+            ghana_aoi, years=[2024], months=[6], cache_dir=tmp_path / "chirps-cache"
         )
     except Exception as e:  # network down, 404, etc.
         pytest.skip(f"network not available: {type(e).__name__}: {e}")
@@ -141,7 +141,7 @@ def test_chirps_dry_run_no_network(ghana_aoi: AOI) -> None:
     synthetic fetch is 25 mm/day, so a 30-day month sums to ~25 mm at
     the bump centre and ~0 mm at the edges; the band is NOT [0, 1]."""
     fetch = _synthetic_chirps_daily(ghana_aoi)
-    out = load_chirps_rainfall(ghana_aoi, year=2024, month=6, _fetch_daily=fetch)
+    out = load_chirps_rainfall(ghana_aoi, years=[2024], months=[6], _fetch_daily=fetch)
 
     h, w = ghana_aoi.cells_per_side()
     assert out.shape == (h, w)
@@ -167,12 +167,12 @@ def test_chirps_dry_run_no_network(ghana_aoi: AOI) -> None:
 def test_chirps_invalid_month_rejected(ghana_aoi: AOI) -> None:
     fetch = _synthetic_chirps_daily(ghana_aoi)
     with pytest.raises(ValueError, match="month"):
-        load_chirps_rainfall(ghana_aoi, year=2024, month=0, _fetch_daily=fetch)
+        load_chirps_rainfall(ghana_aoi, years=[2024], months=[0], _fetch_daily=fetch)
     with pytest.raises(ValueError, match="month"):
-        load_chirps_rainfall(ghana_aoi, year=2024, month=13, _fetch_daily=fetch)
+        load_chirps_rainfall(ghana_aoi, years=[2024], months=[13], _fetch_daily=fetch)
 
 
 def test_chirps_pre_1981_rejected(ghana_aoi: AOI) -> None:
     fetch = _synthetic_chirps_daily(ghana_aoi)
     with pytest.raises(ValueError, match="1981"):
-        load_chirps_rainfall(ghana_aoi, year=1980, month=6, _fetch_daily=fetch)
+        load_chirps_rainfall(ghana_aoi, years=[1980], months=[6], _fetch_daily=fetch)

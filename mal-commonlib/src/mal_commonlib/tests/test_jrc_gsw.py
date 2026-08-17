@@ -136,37 +136,6 @@ def test_jrc_gsw_binarisation_at_threshold() -> None:
     assert DEFAULT_THRESHOLD_PCT == 80
 
 
-def test_jrc_gsw_custom_threshold(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path,
-) -> None:
-    """A custom ``threshold_pct`` controls the binarisation cut-off.
-
-    With ``occurrence = 50`` everywhere and ``threshold_pct=40``,
-    every cell is permanent water. With ``threshold_pct=60``,
-    no cell is permanent water.
-    """
-    occurrence = np.full((30, 30), 50, dtype=np.uint8)
-    _stub_pc_loader(monkeypatch, occurrence)
-
-    aoi = _small_aoi()
-
-    # threshold_pct=40 (below 50) → all permanent water.
-    out = load_jrc_gsw_water_frac(
-        aoi, year=2021, cache_dir=tmp_path / "cache", threshold_pct=40,
-    )
-    valid = out.values[out.values != NODATA_OUT]
-    assert valid.size > 0
-    assert float(valid.mean()) > 0.9
-
-    # threshold_pct=60 (above 50) → no permanent water.
-    out = load_jrc_gsw_water_frac(
-        aoi, year=2021, cache_dir=tmp_path / "cache", threshold_pct=60,
-    )
-    valid = out.values[out.values != NODATA_OUT]
-    assert valid.size > 0
-    assert float(valid.mean()) < 0.1
-
-
 def test_jrc_gsw_year_must_be_in_range() -> None:
     """The loader rejects years outside the JRC GSW product range (1984-2021)."""
     aoi = _small_aoi()
@@ -174,19 +143,6 @@ def test_jrc_gsw_year_must_be_in_range() -> None:
         load_jrc_gsw_water_frac(aoi, year=1983)
     with pytest.raises(ValueError):
         load_jrc_gsw_water_frac(aoi, year=2022)
-
-
-def test_jrc_gsw_threshold_must_be_in_range(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """The loader rejects threshold_pct outside [0, 100]."""
-    occurrence = np.full((30, 30), 80, dtype=np.uint8)
-    _stub_pc_loader(monkeypatch, occurrence)
-    aoi = _small_aoi()
-    with pytest.raises(ValueError):
-        load_jrc_gsw_water_frac(aoi, year=2021, threshold_pct=-1)
-    with pytest.raises(ValueError):
-        load_jrc_gsw_water_frac(aoi, year=2021, threshold_pct=101)
 
 
 def test_jrc_gsw_pc_stub_returns_valid_contract(

@@ -113,7 +113,7 @@ def test_era5_requires_cds_auth(
 
     monkeypatch.setattr(cdsapi, "Client", _raise_on_init)
     with pytest.raises(RuntimeError, match="CDS auth"):
-        load_era5_temp_suitability(ghana_aoi, year=2024, month=6)
+        load_era5_temp_suitability(ghana_aoi, years=[2024], months=[6])
 
 
 def test_sharpe_demichele_growth_known_values() -> None:
@@ -175,7 +175,7 @@ def test_era5_dry_run_no_network(
     monkeypatch.setattr(cdsapi, "Client", _make_mock_client)
 
     out = load_era5_temp_suitability(
-        ghana_aoi, year=2024, month=6, cache_dir=tmp_path / "era5-cache"
+        ghana_aoi, years=[2024], months=[6], cache_dir=tmp_path / "era5-cache"
     )
 
     h, w = ghana_aoi.cells_per_side()
@@ -205,7 +205,7 @@ def test_era5_invalid_month_rejected(ghana_aoi: AOI) -> None:
     # months surface as ValueError. In-range months without CDS auth
     # surface as RuntimeError (see ``test_era5_requires_cds_auth``).
     with pytest.raises(ValueError, match="month"):
-        load_era5_temp_suitability(ghana_aoi, year=2024, month=13)
+        load_era5_temp_suitability(ghana_aoi, years=[2024], months=[13])
 
 
 def test_monthly_mean_reduces_valid_time() -> None:
@@ -266,7 +266,7 @@ def _make_wind_dataset(year: int, month: int, n_days: int) -> xr.Dataset:
 
 
 def test_load_era5_wind_6hourly_mock(
-    tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch,
+    ghana_aoi: AOI, tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Mock CDS client: verifies load_era5_wind_6hourly calls CDS
     for each migration month and merges into a single NetCDF."""
@@ -292,9 +292,8 @@ def test_load_era5_wind_6hourly_mock(
 
     out_path = str(tmp_path / "wind_6h_2024.nc")
     result = load_era5_wind_6hourly(
-        "ghana", 2024,
-        months=MIGRATION_SEASON_MONTHS[2024],
-        output_path=out_path,
+        ghana_aoi, years=[2024],
+        months=[int(m) for m in MIGRATION_SEASON_MONTHS[2024]],
         cache_dir=tmp_path / "cache",
     )
 
@@ -311,7 +310,7 @@ def test_load_era5_wind_6hourly_mock(
 
 
 def test_load_era5_wind_6hourly_full_year_mock(
-    tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch,
+    ghana_aoi: AOI, tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Full year download: all 12 months requested."""
     import cdsapi
@@ -337,8 +336,7 @@ def test_load_era5_wind_6hourly_full_year_mock(
     out_path = str(tmp_path / "wind_6h_2024_full.nc")
     # months=None → all 12 months
     result = load_era5_wind_6hourly(
-        "ghana", 2024,
-        output_path=out_path,
+        ghana_aoi, years=[2024],
         cache_dir=tmp_path / "cache",
     )
 
@@ -349,7 +347,7 @@ def test_load_era5_wind_6hourly_full_year_mock(
 
 
 def test_load_era5_wind_6hourly_auth_error(
-    tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch,
+    ghana_aoi: AOI, tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Missing CDS auth raises RuntimeError."""
     import cdsapi
@@ -362,12 +360,13 @@ def test_load_era5_wind_6hourly_auth_error(
     from mal_commonlib.data.loaders.era5 import load_era5_wind_6hourly
 
     with pytest.raises(RuntimeError, match="CDS auth"):
-        load_era5_wind_6hourly("ghana", 2024, output_path=str(tmp_path / "out.nc"))
+        load_era5_wind_6hourly(ghana_aoi, years=[2024], cache_dir=tmp_path)
 
 
 def test_load_era5_wind_6hourly_empty_years() -> None:
     """Empty years list raises ValueError."""
     from mal_commonlib.data.loaders.era5 import load_era5_wind_6hourly
 
+    aoi = AOI.from_bbox(GHANA_W, GHANA_S, GHANA_E, GHANA_N, "EPSG:4326", "ghana", 1000)
     with pytest.raises(ValueError, match="must not be empty"):
-        load_era5_wind_6hourly("ghana", [], output_path="/tmp/out.nc")
+        load_era5_wind_6hourly(aoi, years=[], cache_dir=pathlib.Path("/tmp"))

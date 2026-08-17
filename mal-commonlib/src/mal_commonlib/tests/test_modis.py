@@ -49,7 +49,7 @@ def test_modis_requires_earthdata_token(monkeypatch: pytest.MonkeyPatch) -> None
     monkeypatch.delenv("EARTHDATA_TOKEN", raising=False)
     aoi = _small_aoi()
     with pytest.raises(RuntimeError) as excinfo:
-        load_modis_ndvi(aoi, year=2024, month=7)
+        load_modis_ndvi(aoi, years=[2024], months=[7])
     assert "EARTHDATA_TOKEN" in str(excinfo.value)
 
 
@@ -74,7 +74,7 @@ def test_modis_with_fake_token_calls_earthaccess_login(
     aoi = _small_aoi()
     # search_data returns [] → FileNotFoundError. That's the expected branch.
     with pytest.raises(FileNotFoundError):
-        load_modis_ndvi(aoi, year=2024, month=7)
+        load_modis_ndvi(aoi, years=[2024], months=[7])
     assert called["login"] is True
 
 
@@ -161,7 +161,7 @@ def test_modis_dry_run_no_network(
     monkeypatch.setattr("earthaccess.download", _fake_download, raising=False)
 
     aoi = _small_aoi()
-    out = load_modis_ndvi(aoi, year=2024, month=7, cache_dir=tmp_path / "cache")
+    out = load_modis_ndvi(aoi, years=[2024], months=[7], cache_dir=tmp_path / "cache")
     assert out.dtype == np.float32
     assert out.dims == ("y", "x")
     h, w = aoi.cells_per_side()
@@ -204,7 +204,7 @@ def test_modis_dry_run_rescales_raw_to_unit_interval(
     monkeypatch.setattr("earthaccess.download", _fake_download, raising=False)
 
     aoi = AOI.from_bbox(-1.0, 6.0, 0.0, 7.0, "EPSG:4326", "test-modis", 1000)
-    out = load_modis_ndvi(aoi, year=2024, month=7, cache_dir=tmp_path / "cache")
+    out = load_modis_ndvi(aoi, years=[2024], months=[7], cache_dir=tmp_path / "cache")
     # The single tile is reprojected to the AOI grid via reproject_match with
     # bilinear. The leftmost source column (-0.2) rescaled to 0.4 is the
     # global minimum; the rightmost source column (1.0) rescaled to 1.0 is
@@ -263,7 +263,7 @@ def test_modis_ghana_smoke() -> None:
     """
     aoi = AOI.from_bbox(GHANA_W, GHANA_S, GHANA_E, GHANA_N, "EPSG:4326", "ghana", 1000)
     try:
-        out = load_modis_ndvi(aoi, year=2022, month=7)
+        out = load_modis_ndvi(aoi, years=[2022], months=[7])
     except Exception as e:
         pytest.skip(f"MOD13A3 download failed: {e}")
     assert out.dtype == np.float32

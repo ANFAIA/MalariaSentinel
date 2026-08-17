@@ -291,6 +291,7 @@ def load_chirps_rainfall(
     years: Sequence[int],
     months: Sequence[int] | None = None,
     cache_dir: pathlib.Path | None = None,
+    _fetch_daily: Callable[[int, int, int], xr.DataArray] | None = None,
 ) -> xr.DataArray:
     """Load CHIRPS v2.0 monthly precipitation for the given AOI.
 
@@ -317,10 +318,15 @@ def load_chirps_rainfall(
 
     cdir = cache_dir if cache_dir is not None else _default_cache_dir()
 
-    def _default_fetch(y: int, m: int, d: int) -> xr.DataArray:
-        url = _daily_url_for(y, m, d)
-        dest = _cache_path_aoi(cdir, aoi.slug, y, m, d)
-        return _download_and_clip_to_aoi(url, aoi, dest)
+    if _fetch_daily is None:
+        def _default_fetch(y: int, m: int, d: int) -> xr.DataArray:
+            url = _daily_url_for(y, m, d)
+            dest = _cache_path_aoi(cdir, aoi.slug, y, m, d)
+            return _download_and_clip_to_aoi(url, aoi, dest)
+
+        fetch = _default_fetch
+    else:
+        fetch = _fetch_daily
 
     results: list[xr.DataArray] = []
     time_coords: list[np.datetime64] = []
@@ -332,7 +338,7 @@ def load_chirps_rainfall(
             if year < 1981:
                 raise ValueError(f"CHIRPS starts in 1981; got year={year}")
 
-            daily_rasters = [_default_fetch(year, month, d) for d in _days_in_month(year, month)]
+            daily_rasters = [fetch(year, month, d) for d in _days_in_month(year, month)]
             monthly = _monthly_total_from_rasters(daily_rasters, aoi)
             rain_mm = _reproject_to_aoi_grid(monthly, aoi)
             _normalized, cap_mm = _normalize_rainfall(rain_mm)

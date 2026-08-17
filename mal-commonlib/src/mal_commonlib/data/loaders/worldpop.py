@@ -182,6 +182,9 @@ def load_worldpop_population(
             f"WorldPop constrained years are 2000–2020; got {year}"
         )
 
+    if year != 2019:
+        raise ValueError(f"WorldPop Ghana product only supports year 2019; got {year}")
+
     cache = cache_dir if cache_dir is not None else _default_cache_dir()
     cache = pathlib.Path(cache)
     cache.mkdir(parents=True, exist_ok=True)

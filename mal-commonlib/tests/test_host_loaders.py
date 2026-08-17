@@ -321,12 +321,13 @@ class TestGHSLLoader:
         )
 
         def _fake_download(url, dest, **kwargs):
-            import shutil
+            import zipfile
             dest.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(str(fake_tif), str(dest))
+            with zipfile.ZipFile(dest, "w") as archive:
+                archive.write(fake_tif, arcname=ghsl_mod._GHSL_TIF_NAME)
             return dest
 
-        monkeypatch.setattr(ghsl_mod, "_download_to", _fake_download)
+        monkeypatch.setattr(ghsl_mod, "_download_zip", _fake_download)
 
         loader = ghsl_mod.GHSLLoader()
         da = loader.load(aoi, cache_dir=tmp_path / "cache")

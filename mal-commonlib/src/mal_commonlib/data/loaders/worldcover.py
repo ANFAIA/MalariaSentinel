@@ -81,6 +81,7 @@ WC_CLASSES = {
 
 # M12-relevant water/wetland classes.
 WC_WATER_CLASSES = {WC_WATER, WC_WETLAND, WC_MANGROVE}
+DEFAULT_WATER_CLASSES = tuple(sorted(WC_WATER_CLASSES))
 
 # Year range. The ESA WorldCover 2021 v200 is a single static product
 # (published 2021); PC may also have the 2020 version.
@@ -114,6 +115,7 @@ def _aoi_bbox_wgs84(aoi: "AOI") -> tuple[float, float, float, float]:
 def _load_worldcover_pc(
     aoi: "AOI",
     year: int,
+    water_classes: tuple[int, ...] | None = None,
 ) -> tuple[np.ndarray, dict]:
     """Read ESA WorldCover 2021 v200 ``map`` band via Planetary Computer.
 
@@ -217,6 +219,12 @@ def _load_worldcover_pc(
         "height": H,
         "width": W,
     }
+    if water_classes is not None:
+        result = np.where(
+            result == _NODATA_OUT_INT,
+            _NODATA_OUT_SCALAR,
+            np.isin(result, water_classes).astype(np.float32),
+        ).astype(np.float32)
     return result, profile
 
 
@@ -404,6 +412,34 @@ def load_worldcover_mangrove(
     return da
 
 
+def load_worldcover_water_frac(
+    aoi: "AOI",
+    *,
+    year: int = 2021,
+    cache_dir: pathlib.Path | None = None,
+    water_classes: tuple[int, ...] = DEFAULT_WATER_CLASSES,
+) -> xr.DataArray:
+    """Load binary water fraction using configurable WorldCover classes."""
+    if year not in (_MIN_YEAR, _MAX_YEAR):
+        raise ValueError(
+            f"WorldCover year must be in [{_MIN_YEAR}, {_MAX_YEAR}]; got {year}"
+        )
+    arr, profile = _load_worldcover_pc(aoi, int(year), tuple(water_classes))
+    da = xr.DataArray(
+        arr.astype(np.float32), dims=("y", "x"), name="water_frac",
+        attrs={
+            "long_name": "ESA WorldCover water fraction",
+            "source": f"ESA WorldCover {year} v200 (Planetary Computer STAC)",
+            "water_classes": list(water_classes),
+            "nodata": _NODATA_OUT_SCALAR,
+        },
+    )
+    da.rio.write_crs(profile["crs"], inplace=True)
+    da.rio.write_transform(profile["transform"], inplace=True)
+    da.rio.write_nodata(_NODATA_OUT_SCALAR, inplace=True)
+    return da
+
+
 DOWNLOADER = {
     "name": "worldcover",
     "description": "ESA WorldCover 2021 v200 land cover classification (10 m)",
@@ -442,5 +478,10 @@ __all__ = [
     "WC_MOSS_LICHEN",
     "WC_CLASSES",
     "WC_WATER_CLASSES",
+    "DEFAULT_WATER_CLASSES",
+    "NODATA_OUT",
+    "load_worldcover_water_frac",
     "DOWNLOADER",
 ]
+
+NODATA_OUT = _NODATA_OUT_SCALAR
