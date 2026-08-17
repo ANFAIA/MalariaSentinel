@@ -157,6 +157,7 @@ def ingest(
     year: int = typer.Option(2024, "--year", help="Year"),
     month: int = typer.Option(6, "--month", help="Month"),
     output_dir: Path = typer.Option(Path("runs/ingest"), "--output-dir"),
+    data_dir: Path | None = typer.Option(None, "--data-dir", help="Downloaded AOI directory"),
     scale: str = typer.Option("regional", "--scale"),
     what: str = typer.Option("all", "--what", help="What to build: env, hosts, mobility, all"),
 ) -> None:
@@ -175,7 +176,8 @@ def ingest(
     from mal_commonlib.aoi import AOI as _AOI
     aoi_obj = _AOI.from_slug(aoi) if isinstance(aoi, str) else aoi
     if what in ("env", "all"):
-        result = build_env_tensor(aoi=aoi, year=year, month=month, output_dir=output_dir, scale=scale)
+        chosen_data_dir = data_dir or output_dir
+        result = build_env_tensor(aoi=aoi, year=year, month=month, output_dir=chosen_data_dir, scale=scale, data_root=chosen_data_dir.parent)
         results["env"] = result
     if what in ("hosts", "all"):
         result = build_host_dataset(aoi=aoi_obj, output_dir=output_dir)
@@ -204,6 +206,7 @@ def abm(
     days: int = typer.Option(30, "--days"),
     n_rollouts: int = typer.Option(1, "--n-rollouts"),
     output_dir: Path = typer.Option(Path("runs/abm"), "--output-dir"),
+    data_root: Path | None = typer.Option(None, "--data-root", help="Root containing AOI manifest"),
 ) -> None:
     """Run the agent-based malaria simulation.
 
@@ -216,9 +219,9 @@ def abm(
       --seed: PRNG seed for reproducibility
       --snapshot-every: Intermediate output interval
     """
-    from .abm import run_abm
+    from .abm import run_abm_from_manifest
 
-    result = run_abm(aoi=aoi, year=year, month=month, seed=seed, days=days, n_rollouts=n_rollouts, output_dir=output_dir)
+    result = run_abm_from_manifest(aoi=aoi, year=year, month=month, seed=seed, days=days, n_rollouts=n_rollouts, output_dir=output_dir, data_root=data_root)
     typer.echo(f"ABM result: {result}")
 
 

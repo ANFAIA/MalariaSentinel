@@ -69,6 +69,7 @@ def run_abm_from_manifest(
     seed: int = 1,
     n_rollouts: int = 1,
     output_dir: str | Path | None = None,
+    data_root: str | Path | None = None,
     **kwargs,
 ) -> dict[str, Any]:
     """Run ABM using manifest to resolve data paths.
@@ -78,15 +79,16 @@ def run_abm_from_manifest(
     """
     from mal_core.download.manifest import read_manifest, validate_completeness
 
-    complete = validate_completeness(aoi)
+    data_root = Path(data_root) if data_root else None
+    complete = validate_completeness(aoi, data_root=data_root)
     if complete:  # non-empty list = missing files
         raise FileNotFoundError(
             f"Missing required ABM data for AOI '{aoi}': {complete}. "
             f"Run: malariasim download --aoi {aoi} --all"
         )
 
-    manifest = read_manifest(aoi)
-    data_dir = Path("data") / aoi
+    manifest = read_manifest(aoi, data_root)
+    data_dir = (data_root or Path("data")) / aoi
 
     env_path = None
     habitat_path = None

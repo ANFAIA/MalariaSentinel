@@ -22,6 +22,9 @@ class DownloaderSpec:
     module_name: str
     is_time_series: bool = False
     formats: dict[str, str] | None = None
+    abm_default_outputs: list[str] | None = None
+    required_for_abm: dict[str, bool] | None = None
+    reductions: dict[str, str] | None = None
 
 def discover_downloaders() -> dict[str, DownloaderSpec]:
     registry: dict[str, DownloaderSpec] = {}
@@ -31,6 +34,17 @@ def discover_downloaders() -> dict[str, DownloaderSpec]:
             raw = getattr(mod, "DOWNLOADER", None)
             if raw is None:
                 continue
+            profile_defaults = {
+                "chirps": ["rainfall_daily"],
+                "era5": ["water_temp"],
+                "hydrolakes": ["permanent_lakes"],
+                "hydrorivers": [],
+                "worldcover": [],
+            }
+            profile_formats = {
+                "era5": {"wind_6hourly": "daily", "water_temp": "monthly"},
+                "chirps": {"rainfall": "monthly", "rainfall_daily": "daily"},
+            }
             spec = DownloaderSpec(
                 name=raw["name"],
                 description=raw.get("description", ""),
@@ -39,7 +53,10 @@ def discover_downloaders() -> dict[str, DownloaderSpec]:
                 manifest_keys=raw.get("manifest_keys", {}),
                 module_name=mod_name,
                 is_time_series=raw.get("is_time_series", False),
-                formats=raw.get("formats", None),
+                formats=raw.get("formats", profile_formats.get(raw["name"])),
+                abm_default_outputs=raw.get("abm_default_outputs", profile_defaults.get(raw["name"])),
+                required_for_abm=raw.get("required_for_abm", None),
+                reductions=raw.get("reductions", None),
             )
             registry[spec.name] = spec
             log.debug("Registered downloader: %s (%d outputs)", spec.name, len(spec.outputs))

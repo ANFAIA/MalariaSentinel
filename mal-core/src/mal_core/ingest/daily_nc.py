@@ -21,6 +21,7 @@ mal-core/src/mal_core/abm/include/mal_abm_fast/climate.hpp:80-86.
 from __future__ import annotations
 
 import pathlib
+import re
 from typing import Tuple
 
 import numpy as np
@@ -87,8 +88,10 @@ def build_daily_env_nc(
         else _find_chirps_daily(data_dir)
     )
     water_frac_file = water_frac_file or (data_dir / f"{aoi}_water_occurrence.tif")
-    water_temp_file = water_temp_file or (data_dir / f"{aoi}_water_temp_2024.tif")
-    ndvi_file = ndvi_file or (data_dir / f"{aoi}_ndvi_2024.tif")
+    year_match = re.search(r"_(20\d{2})(?:_|\.)", rain_file.name)
+    data_year = year_match.group(1) if year_match else "2024"
+    water_temp_file = water_temp_file or (data_dir / f"{aoi}_water_temp_{data_year}.tif")
+    ndvi_file = ndvi_file or (data_dir / f"{aoi}_ndvi_{data_year}.tif")
 
     for label, p in [
         ("rainfall", rain_file),
@@ -133,6 +136,7 @@ def build_daily_env_nc(
     # back to JRC GSW only (backward-compatible).
     permanent_water_mask = None
     wetland_mask = None
+    component_masks: dict[str, np.ndarray] = {}
 
     lakes_file = data_dir / f"{aoi}_permanent_lakes.tif"
     if lakes_file.exists():
@@ -140,6 +144,19 @@ def build_daily_env_nc(
         permanent_water_mask = read_static_tif(lakes_file, target_shape)
         permanent_water_mask = np.nan_to_num(permanent_water_mask, nan=0.0)
         permanent_water_mask = np.clip(permanent_water_mask, 0.0, 1.0)
+        component_masks["permanent_lakes"] = permanent_water_mask.copy()
+
+    rivers_file = data_dir / f"{aoi}_permanent_rivers.tif"
+    if rivers_file.exists():
+        rivers = np.clip(np.nan_to_num(read_static_tif(rivers_file, target_shape), nan=0.0), 0.0, 1.0)
+        component_masks["permanent_rivers"] = rivers.copy()
+        permanent_water_mask = rivers if permanent_water_mask is None else np.maximum(permanent_water_mask, rivers)
+
+    worldcover_water_file = data_dir / f"{aoi}_wc_permanent_water.tif"
+    if worldcover_water_file.exists():
+        wc_water = np.clip(np.nan_to_num(read_static_tif(worldcover_water_file, target_shape), nan=0.0), 0.0, 1.0)
+        component_masks["worldcover_permanent_water"] = wc_water.copy()
+        permanent_water_mask = wc_water if permanent_water_mask is None else np.maximum(permanent_water_mask, wc_water)
 
     wetland_file = data_dir / f"{aoi}_wc_wetland.tif"
     if wetland_file.exists():
@@ -200,9 +217,14 @@ def build_daily_env_nc(
             "scale": "regional",
             "contract_version": "2.0",
             "generator_version": "m2-daily-0.5.0",
-            "m12_enriched": permanent_water_mask is not None or wetland_mask is not None,
+            "m12_enriched": int(permanent_water_mask is not None or wetland_mask is not None),
         },
     )
+    for name, component in component_masks.items():
+        ds[f"m12_{name}"] = (
+            ["time", "y", "x"], np.broadcast_to(component, (n_days, h, w)).copy(),
+            {"long_name": f"M12 {name} mask", "units": "1"},
+        )
 
     # Optional diagnostic variables (C++ reader ignores them via GDAL)
     if permanent_water_mask is not None:
@@ -211,6 +233,7 @@ def build_daily_env_nc(
             ["time", "y", "x"], pw_broadcast,
             {"long_name": "Permanent water mask (JRC GSW ≥95%)", "units": "1"},
         )
+
 
     if wetland_mask is not None:
         wl_broadcast = np.broadcast_to(wetland_mask, (n_days, h, w)).copy()
@@ -229,7 +252,8 @@ def build_daily_env_nc(
     encoding = {v: {"dtype": "float32", "zlib": True, "complevel": 4}
                 for v in encoding_vars}
 
-    output_path = output_dir / f"{aoi}_regional_2024_2025_env.nc"
+    years_in_data = np.unique(times.astype("datetime64[Y]")).astype(int) + 1970
+    output_path = output_dir / f"{aoi}_regional_{years_in_data.min()}_{years_in_data.max()}_env.nc"
     print(f"Writing: {output_path}")
     ds.to_netcdf(output_path, encoding=encoding)
 

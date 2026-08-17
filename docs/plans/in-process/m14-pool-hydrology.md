@@ -205,7 +205,10 @@ These let the calibration scorer sweep the evaporation rate and washout strength
 
 ## 4. Why this is M14, not M12
 
-M12 (`docs/plans/in-process/m12-water-datasets.md`) adds water **datasets** — new remote-sensing inputs (HydroLAKES, HydroRIVERS, WorldCover, DSWX-S1). The pool hydrology work uses the existing `water_frac` channel from JRC GSW and the existing `rain` channel from CHIRPS. M12 unlocks richer static water masks, but the dynamic water-balance model is independent of the dataset source. They compose: M14 reads `water_frac` from M12's `load_water_stack()` if present, else from JRC GSW.
+M12 (`docs/plans/in-process/m12-water-datasets.md`) adds static water
+context (HydroLAKES and HydroRIVERS). M14 uses the existing `water_frac`
+channel from JRC GSW and the existing `rain` channel from CHIRPS. The dynamic
+water-balance model remains independent of remote-sensing acquisition data.
 
 ## 5. Acceptance criteria
 
@@ -263,7 +266,7 @@ M12 (`docs/plans/in-process/m12-water-datasets.md`) adds water **datasets** — 
 
 | Adjacent plan | Link |
 |---|---|
-| M12 (water datasets) | composes: M14 reads `water_frac` from M12's `load_water_stack()` if present |
+| M12 (water datasets) | supplies static water context; M14 keeps its own pool state |
 | M13 (daily env NC) | input: the daily (rain, temp) layers feed `advance_pool` |
 | M7.2 (gonotrophic cycle) | output: `active` flag now depends on water level, not just rain — gonotrophic oviposition sees hydrology |
 | M7.3 (multi-species) | extends: per-species water preferences (e.g. *An. funestus* needs permanent water) can layer on top of `PoolState` |

@@ -23,9 +23,9 @@ _REPO_ROOT = _find_repo_root()
 DATA_ROOT = _REPO_ROOT / "data"
 
 
-def read_manifest(aoi: str) -> dict:
+def read_manifest(aoi: str, data_root: Path | None = None) -> dict:
     """Read manifest. Handles both v1 (flat files) and v2 (datasets block)."""
-    path = DATA_ROOT / aoi / "manifest.json"
+    path = (data_root or DATA_ROOT) / aoi / "manifest.json"
     if not path.exists():
         return {"aoi": aoi, "datasets": {}, "expected_files": []}
     with open(path) as f:
@@ -70,6 +70,7 @@ def update_dataset(
     variables: list[str] | None = None,
     format: str | None = None,
     period: dict[str, str] | None = None,
+    data_root: Path | None = None,
 ) -> Path:
     """Update a specific dataset entry in the manifest.
 
@@ -84,8 +85,9 @@ def update_dataset(
         format: file format ("tif" | "nc" | "gpkg" | "csr").
         period: for multi-year NC, {"start": "YYYY-MM-DD", "end": "YYYY-MM-DD"}.
     """
-    path = DATA_ROOT / aoi / "manifest.json"
-    manifest = read_manifest(aoi)
+    root = data_root or DATA_ROOT
+    path = root / aoi / "manifest.json"
+    manifest = read_manifest(aoi, root)
     if dataset_name not in manifest.get("datasets", {}):
         manifest.setdefault("datasets", {})[dataset_name] = {
             "type": type,
@@ -130,14 +132,15 @@ def list_files(aoi: str) -> dict[str, str]:
     return flat
 
 
-def validate_completeness(aoi: str, *, years: list[int] | None = None) -> list[str]:
+def validate_completeness(aoi: str, *, years: list[int] | None = None, data_root: Path | None = None) -> list[str]:
     """Return list of missing expected files. Empty = complete.
 
     For daily NC entries with a ``period`` field, checks that the
     period covers the requested years rather than individual file existence.
     """
-    manifest = read_manifest(aoi)
-    data_dir = DATA_ROOT / aoi
+    root = data_root or DATA_ROOT
+    manifest = read_manifest(aoi, root)
+    data_dir = root / aoi
     missing = []
 
     for ds_name, ds in manifest.get("datasets", {}).items():

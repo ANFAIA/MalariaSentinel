@@ -125,13 +125,14 @@ def register_dataset(
     required_for_abm: bool = False,
     variables: list[str] | None = None,
     format: str | None = None,
+    data_root: Path | None = None,
 ) -> None:
     """Register a build output in the central manifest."""
     import json
 
     from mal_core.download.manifest import read_manifest, update_dataset
 
-    update_dataset(aoi_slug, dataset_name, year, filename, type=type, required_for_abm=required_for_abm, variables=variables, format=format)
+    update_dataset(aoi_slug, dataset_name, year, filename, type=type, required_for_abm=required_for_abm, variables=variables, format=format, data_root=data_root)
 
     manifest = read_manifest(aoi_slug)
     ds = manifest.get("datasets", {}).get(dataset_name, {})

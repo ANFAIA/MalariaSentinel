@@ -197,6 +197,7 @@ def build_env_tensor(
     output_format: str = "nc",
     name: str | None = None,
     twi_threshold: float = 8.0,
+    data_root: pathlib.Path | None = None,
 ) -> dict:
     """Build the env tensor + habitat patches for an AOI.
 
@@ -235,7 +236,28 @@ def build_env_tensor(
             type="time-series",
             variables=nc_result["variables"],
             format="nc",
+            data_root=data_root,
         )
+        dem_path = output_dir / f"{aoi.slug}_elevation.tif"
+        water_path = output_dir / f"{aoi.slug}_water_occurrence.tif"
+        if dem_path.exists() and water_path.exists():
+            from .daily_nc import read_static_tif
+
+            h, w = aoi.cells_per_side()
+            dem_da = xr.DataArray(read_static_tif(dem_path, (h, w)), dims=("y", "x"))
+            water_da = xr.DataArray(read_static_tif(water_path, (h, w)), dims=("y", "x"))
+            dem_da.rio.write_crs(aoi.crs_obj, inplace=True)
+            water_da.rio.write_crs(aoi.crs_obj, inplace=True)
+            transform = from_bounds(*aoi.bbox, w, h)
+            dem_da.rio.write_transform(transform, inplace=True)
+            water_da.rio.write_transform(transform, inplace=True)
+            habitat_path = output_dir / f"{aoi.slug}_habitat_patches.gpkg"
+            _write_habitat_patches_gpkg(habitat_path, dem_da, water_da, aoi, twi_threshold=twi_threshold)
+            register_dataset(
+                aoi.slug, "habitat", year, habitat_path.name,
+                type="time-series", format="gpkg", data_root=data_root,
+            )
+            nc_result["habitat_path"] = str(habitat_path)
         return nc_result
 
     if isinstance(scale, str):

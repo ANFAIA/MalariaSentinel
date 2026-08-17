@@ -40,7 +40,7 @@ kg_refs:
 | Field | Value |
 |---|---|
 | Component | `mal-core/src/mal_core/download/` + `mal-commonlib/src/mal_commonlib/data/loaders/` |
-| Version | `v1.1` (DOWNLOADER convention — added `formats`); `v1.1` (runner API — added `cache_dir`, daily NC path) |
+| Version | `v1.2` (OPERA DSWX-S1 removed; baseline water sources are JRC GSW + hydrography) |
 | Status | `stable` |
 | Owner | David Flórez-Mazuera |
 | Last drift check | `2026-08-05` |
@@ -138,6 +138,14 @@ registry/auth/manifest plumbing, and the manifest would diverge.
 
 - **DEPRECATED**: `worldcover` — archived to `_legacy/worldcover.py`. Use `jrc_gsw` for `water_frac`.
 
+- **REMOVED**: `opera_dswx_s1` — removed from registry and loader surface.
+  OPERA DSWX-S1 had irregular Ghana acquisition coverage and could return
+  partial monthly windows instead of complete month coverage. Making it part
+  of the download contract created an unreliable dependency for water-stack
+  and validation runs. M14 keeps using CHIRPS daily rainfall and ERA5
+  temperature as forcing, with JRC GSW plus permanent hydrography as water
+  context.
+
 ## 6. Data contracts
 
 - Output on disk: `data/<aoi>/<aoi>_<product>_<year>.<ext>` or `data/<aoi>/<aoi>_<product>.<ext>` or `data/<aoi>/<aoi>_<product>_<start>_<end>_daily.nc` — see `data/spec.md` §5.1.
@@ -150,6 +158,8 @@ registry/auth/manifest plumbing, and the manifest would diverge.
 - Renaming a manifest key: BREAKING (MAJOR). Requires updating the ABM wrapper, ingest builders, and any consumer that calls `get_dataset_files(aoi, "<old_key>")`.
 - Deprecating a loader: move to `_legacy/`, keep the module importable but drop from `LOADER_MODULES`. Document the replacement in §5.4.
 - Deprecation policy: 1 MINOR spec version carries the warning; removed in the next MAJOR.
+- OPERA removal is intentional and breaking: new downloads must not request
+  `opera_dswx_s1`; old manifests containing its key are historical only.
 
 ## 8. Drift check
 

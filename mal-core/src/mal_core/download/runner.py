@@ -31,16 +31,16 @@ def _check_auth(spec: DownloaderSpec) -> bool:
     return True
 
 
-def _standard_path(aoi: str, product: str, year: int | None, ext: str) -> Path:
-    data_dir = _REPO_ROOT / "data" / aoi
+def _standard_path(aoi: str, product: str, year: int | None, ext: str, data_dir: Path | None = None) -> Path:
+    data_dir = data_dir or (_REPO_ROOT / "data" / aoi)
     if year:
         return data_dir / f"{aoi}_{product}_{year}.{ext}"
     return data_dir / f"{aoi}_{product}.{ext}"
 
 
-def _standard_path_daily(aoi: str, product: str, year_start: int, year_end: int) -> Path:
+def _standard_path_daily(aoi: str, product: str, year_start: int, year_end: int, data_dir: Path | None = None) -> Path:
     """Path for multi-year daily NC output: data/<aoi>/<aoi>_<product>_<start>_<end>_daily.nc"""
-    data_dir = _REPO_ROOT / "data" / aoi
+    data_dir = data_dir or (_REPO_ROOT / "data" / aoi)
     return data_dir / f"{aoi}_{product}_{year_start}_{year_end}_daily.nc"
 
 
@@ -50,7 +50,7 @@ def run_download(
     datasets: list[str] | None = None,
     outputs: list[str] | None = None,
     years: list[int] | None = None,
-    months: list[str] | None = None,
+    months: list[int] | None = None,
     output_dir: str | Path | None = None,
     cache_dir: str | Path | None = None,
     **kwargs,
@@ -74,6 +74,7 @@ def run_download(
     cache = Path(cache_dir) if cache_dir else None
 
     results: dict[str, Any] = {}
+    use_abm_profile = datasets is None and outputs is None
     for name, spec in selected.items():
         log.info("Downloading: %s", name)
         if not _check_auth(spec):
@@ -84,10 +85,12 @@ def run_download(
             for output_name, func in spec.outputs.items():
                 if outputs and output_name not in outputs:
                     continue
+                if use_abm_profile and spec.abm_default_outputs is not None and output_name not in spec.abm_default_outputs:
+                    continue
 
                 log.info("  %s.%s", name, output_name)
                 is_ts = spec.is_time_series
-                required_for_abm = True  # TODO: propagate from DownloaderSpec in future
+                required_for_abm = bool(spec.required_for_abm and spec.required_for_abm.get(output_name, False))
 
                 if is_ts:
                     if not years:
@@ -108,7 +111,7 @@ def run_download(
                         # Variable name: strip "_daily" suffix for ABM compatibility
                         # (e.g. "rainfall_daily" → "rainfall")
                         nc_var_name = output_name.removesuffix("_daily")
-                        path = _standard_path_daily(aoi, output_name, min(years), max(years))
+                        path = _standard_path_daily(aoi, output_name, min(years), max(years), data_dir=out_dir)
                         path.parent.mkdir(parents=True, exist_ok=True)
                         save_product(result, path, format="nc", var_name=nc_var_name)
                         # Register with period metadata
@@ -124,6 +127,7 @@ def run_download(
                             required_for_abm=required_for_abm,
                             format="nc",
                             period={"start": t0, "end": t1},
+                            data_root=out_dir.parent,
                         )
                         log.info("    daily NC → %s (period %s to %s)", path.name, t0, t1)
                     else:
@@ -137,25 +141,30 @@ def run_download(
                             time_dim = "valid_time" if "valid_time" in result.dims else "time"
                             for yr in years:
                                 sel = result.sel({time_dim: result[time_dim].dt.year == yr})
-                                for mo in (months or range(1, 13)):
-                                    month_int = int(mo)
-                                    slc = sel.sel({time_dim: sel[time_dim].dt.month == month_int})
-                                    path = _standard_path(aoi, output_name, yr, "tif")
-                                    save_product(slc, path, format="tif")
-                                    update_dataset(
-                                        aoi,
-                                        spec.manifest_keys[output_name],
-                                        yr,
-                                        path.name,
-                                        type="time-series",
-                                        required_for_abm=required_for_abm,
-                                        format="tif",
-                                    )
-                                    log.info("    %s/%02d → %s", yr, month_int, path.name)
+                                reduction = (spec.reductions or {}).get(output_name, "mean")
+                                if reduction == "sum":
+                                    slc = sel.sum(time_dim, keep_attrs=True)
+                                elif reduction == "first":
+                                    slc = sel.isel({time_dim: 0}, drop=True)
+                                else:
+                                    slc = sel.mean(time_dim, keep_attrs=True)
+                                path = _standard_path(aoi, output_name, yr, "tif", data_dir=out_dir)
+                                save_product(slc, path, format="tif")
+                                update_dataset(
+                                    aoi,
+                                    spec.manifest_keys[output_name],
+                                    yr,
+                                    path.name,
+                                    type="time-series",
+                                    required_for_abm=required_for_abm,
+                                    format="tif",
+                                    data_root=out_dir.parent,
+                                )
+                                log.info("    %s aggregate (%s) → %s", yr, reduction, path.name)
                         else:
                             # Single (year, month) — 2D result, no time dim
                             yr = years[0]
-                            path = _standard_path(aoi, output_name, yr, "tif")
+                            path = _standard_path(aoi, output_name, yr, "tif", data_dir=out_dir)
                             save_product(result, path, format="tif")
                             update_dataset(
                                 aoi,
@@ -165,6 +174,7 @@ def run_download(
                                 type="time-series",
                                 required_for_abm=required_for_abm,
                                 format="tif",
+                                data_root=out_dir.parent,
                             )
                             log.info("    %s → %s", yr, path.name)
                 else:
@@ -174,7 +184,7 @@ def run_download(
                         continue
 
                     ext = ".nc" if isinstance(result, xr.Dataset) else ".tif"
-                    path = _standard_path(aoi, output_name, None, ext.lstrip("."))
+                    path = _standard_path(aoi, output_name, None, ext.lstrip("."), data_dir=out_dir)
                     save_product(result, path)
                     update_dataset(
                         aoi,
@@ -183,6 +193,7 @@ def run_download(
                         path.name,
                         type="static",
                         required_for_abm=required_for_abm,
+                        data_root=out_dir.parent,
                     )
                     log.info("    → %s", path.name)
 
