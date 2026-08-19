@@ -118,22 +118,35 @@ SpeciesParams species_params_for(MosquitoSpeciesId id) {
 
 // Salinity habitat-suitability multiplier in [0,1].
 //
-//   s(psu) = exp(-slope * max(0, psu - opt))
+//   above = psu - opt
+//   if above <= 0:            s = 1.0
+//   else:                     s = (1 - frac) * exp(-slope * above)
+//                             frac = above / (hi_tol - opt)
+//   if psu >= hi_tol:         s = 0.0          (hard cap: cannot breed)
 //
 // Properties:
 //   - s = 1.0 for psu <= opt (freshwater peak).
 //   - Monotonic decreasing for psu > opt; maximum at opt.
-//   - Never exactly 0 for finite psu (soft survivor tail): a coastal
-//     cell at ~35 psu leaves a low-but-positive survivor fraction for
-//     coluzzii, yet essentially 0 for the fresh-water gambiae s.s.
-//     (steeper slope).
-// Deterministic and smooth; slope alone discriminates species above
-// the optimum. hi_tol is kept as a declared registry parameter (used
-// for species discrimination in tests and future saturation forms).
+//   - Smooth exponential decay in (opt, hi_tol): the (1 - frac) factor
+//     tapers the tail so s reaches exactly 0 at psu == hi_tol. At mid
+//     psu the slope still discriminates species (coluzzii with its
+//     gentler slope out-tolerates gambiae s.s. with the steeper slope).
+//   - Hard cap: psu >= hi_tol => s = 0.0. The species cannot breed in
+//     brackish water above its high tolerance; coastal cells deactivate
+//     for fresh-water-limited species.
+// Deterministic and continuous on (opt, hi_tol); the hard cap makes
+// hi_tol the breeding cut-off (previously an unused registry value).
 float salinity_suitability(const SpeciesParams& sp, float salinity_ppt) {
+    if (salinity_ppt >= sp.salinity_hi_tol_ppt) return 0.0f;
     const float above = salinity_ppt - sp.salinity_opt_ppt;
     if (above <= 0.0f) return 1.0f;
-    return std::exp(-sp.salinity_slope * above);
+    const float range = sp.salinity_hi_tol_ppt - sp.salinity_opt_ppt;
+    if (range <= 0.0f) return 0.0f;
+    const float frac = above / range;
+    const float s = (1.0f - frac) * std::exp(-sp.salinity_slope * above);
+    if (s < 0.0f) return 0.0f;
+    if (s > 1.0f) return 1.0f;
+    return s;
 }
 
 }  // namespace mal_abm_fast

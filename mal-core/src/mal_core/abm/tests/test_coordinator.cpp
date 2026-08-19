@@ -269,8 +269,9 @@ std::filesystem::path MakeTmpEnvNC() {
 }
 
 void WriteSyntheticEnvNC(const std::filesystem::path& path, int n_days,
-                         int h = 4, int w = 4) {
-    int ncid, dimids[3], vid[4];
+                         int h = 4, int w = 4,
+                         const std::vector<float>& sal_vals = {}) {
+    int ncid, dimids[3], vid[4], vidsal;
     int dimid_time, dimid_y, dimid_x;
 
     ASSERT_EQ(nc_create(path.string().c_str(),
@@ -284,6 +285,10 @@ void WriteSyntheticEnvNC(const std::filesystem::path& path, int n_days,
     ASSERT_EQ(nc_def_var(ncid, "water_temp_c", NC_FLOAT, 3, dimids, &vid[1]), NC_NOERR);
     ASSERT_EQ(nc_def_var(ncid, "water_frac", NC_FLOAT, 3, dimids, &vid[2]), NC_NOERR);
     ASSERT_EQ(nc_def_var(ncid, "ndvi", NC_FLOAT, 3, dimids, &vid[3]), NC_NOERR);
+    const bool with_salinity = !sal_vals.empty();
+    if (with_salinity) {
+        ASSERT_EQ(nc_def_var(ncid, "salinity_ppt", NC_FLOAT, 3, dimids, &vidsal), NC_NOERR);
+    }
     ASSERT_EQ(nc_put_att_text(ncid, NC_GLOBAL, "Conventions", 6, "CF-1.8"), NC_NOERR);
     ASSERT_EQ(nc_enddef(ncid), NC_NOERR);
 
@@ -304,6 +309,10 @@ void WriteSyntheticEnvNC(const std::filesystem::path& path, int n_days,
         ASSERT_EQ(nc_put_vara_float(ncid, vid[2], start, count, buf.data()), NC_NOERR);
         std::fill(buf.begin(), buf.end(), 0.4f);
         ASSERT_EQ(nc_put_vara_float(ncid, vid[3], start, count, buf.data()), NC_NOERR);
+        if (with_salinity) {
+            std::fill(buf.begin(), buf.end(), sal_vals[d % sal_vals.size()]);
+            ASSERT_EQ(nc_put_vara_float(ncid, vidsal, start, count, buf.data()), NC_NOERR);
+        }
     }
     ASSERT_EQ(nc_close(ncid), NC_NOERR);
 }
@@ -383,4 +392,100 @@ TEST(CoordinatorModel, PatchActivationTogglesDaily) {
 
     std::filesystem::remove(nc_path);
     std::filesystem::remove_all(temp_dir("coordinator_daily_hab"));
+}
+
+TEST(CoordinatorModel, SalinityAboveHiTolDeactivatesPatch) {
+    using namespace mal_abm_fast;
+    GDALAllRegister();
+
+    // Salinity per day: 35 psu (brackish, > coluzzii 30.0 default hi_tol)
+    // then 5 psu (<= hi_tol, breeding allowed).
+    const auto nc_path = MakeTmpEnvNC();
+    if (std::filesystem::exists(nc_path)) std::filesystem::remove(nc_path);
+    WriteSyntheticEnvNC(nc_path, 2, /*h=*/4, /*w=*/4, {35.0f, 5.0f});
+
+    AOI aoi = make_aoi_4x4();
+    auto climate = std::make_shared<ClimateEngine>();
+    climate->load_from_env_nc(nc_path.string(), aoi);
+    ASSERT_EQ(climate->n_days(), 2);
+
+    // Single pre-existing habitat patch at (row=2, col=2).
+    const std::string hab_path = temp_dir("coordinator_salinity_hab") + "/hab.gpkg";
+    {
+        std::filesystem::create_directories(
+            std::filesystem::path(hab_path).parent_path());
+        GDALDriver* drv = GetGDALDriverManager()->GetDriverByName("GPKG");
+        ASSERT_NE(drv, nullptr);
+        GDALDataset* ds = drv->Create(hab_path.c_str(), 0, 0, 0, GDT_Unknown, nullptr);
+        ASSERT_NE(ds, nullptr);
+        OGRLayer* lyr = ds->CreateLayer("habitat", ds->GetSpatialRef(), wkbPoint, nullptr);
+        ASSERT_NE(lyr, nullptr);
+        OGRFieldDefn hab_type("hab_type", OFTString);
+        lyr->CreateField(&hab_type);
+        OGRFieldDefn k("K", OFTInteger);
+        lyr->CreateField(&k);
+        OGRFieldDefn twi("twi_value", OFTReal);
+        lyr->CreateField(&twi);
+        OGRFieldDefn row("row", OFTInteger);
+        lyr->CreateField(&row);
+        OGRFieldDefn col("col", OFTInteger);
+        lyr->CreateField(&col);
+        OGRFeature* f = OGRFeature::CreateFeature(lyr->GetLayerDefn());
+        f->SetField("hab_type", "pluvial_pool");
+        f->SetField("K", 1000);
+        f->SetField("twi_value", 9.0);
+        f->SetField("row", 2);
+        f->SetField("col", 2);
+        OGRPoint pt(0.02, 0.02);
+        f->SetGeometry(&pt);
+        lyr->CreateFeature(f);
+        OGRFeature::DestroyFeature(f);
+        GDALClose(ds);
+    }
+    HabitatEngine habitat;
+    habitat.load_from_gpkg(hab_path, aoi);
+    ASSERT_EQ(habitat.patches().size(), 1u);
+
+    // Day 0: salinity 35 psu > default hi_tol 30 -> patch cannot breed.
+    climate->set_day(0);
+    CoordinatorModel coord0(
+        std::move(aoi), climate, std::move(habitat),
+        /*seed=*/int32_t{1}, make_date(2024, 1, 1));
+    coord0.activate_patches();
+    auto states0 = coord0.to_dataframe();
+    ASSERT_EQ(states0.size(), 1u);
+    EXPECT_FLOAT_EQ(states0[0].salinity_ppt, 35.0f);
+    EXPECT_FALSE(states0[0].activated)
+        << "patch above salinity_hi_tol_ppt must be deactivated";
+
+    // Day 1: salinity 5 psu <= hi_tol -> activated by the water rule
+    // (pool water_mm = rain 40 >= POOL_WATER_BREED_MM).
+    climate->set_day(1);
+    coord0.activate_patches();
+    auto states1 = coord0.to_dataframe();
+    ASSERT_EQ(states1.size(), 1u);
+    EXPECT_FLOAT_EQ(states1[0].salinity_ppt, 5.0f);
+    EXPECT_TRUE(states1[0].activated)
+        << "patch at or below salinity_hi_tol_ppt must follow the water rule";
+
+    // Raising the species' hi_tol re-enables the brackish patch.
+    climate->set_day(0);
+    HabitatEngine habitat_high;
+    habitat_high.load_from_gpkg(hab_path, make_aoi_4x4());
+    CoordinatorModel coord_high(
+        make_aoi_4x4(), climate, std::move(habitat_high),
+        /*seed=*/int32_t{1}, make_date(2024, 1, 1));
+    coord_high.set_salinity_hi_tol_ppt(40.0f);
+    coord_high.activate_patches();
+    auto states_high = coord_high.to_dataframe();
+    bool saw_patch = false;
+    for (const auto& s : states_high) {
+        if (s.patch_id == 0) saw_patch = true;
+        EXPECT_FLOAT_EQ(s.salinity_ppt, 35.0f);
+        EXPECT_TRUE(s.activated);
+    }
+    EXPECT_TRUE(saw_patch);
+
+    std::filesystem::remove(nc_path);
+    std::filesystem::remove_all(temp_dir("coordinator_salinity_hab"));
 }

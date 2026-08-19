@@ -107,6 +107,9 @@ Engine::Engine(AOI aoi,
     const int32_t coord_seed32 = static_cast<int32_t>(coord_seed);
     coord_ = std::make_unique<CoordinatorModel>(
         aoi_, climate_, *habitat_, coord_seed32, current_date_);
+    // M7.8 salinity: the coordinator gates patch activation on the
+    // species' salinity high-tolerance. Deterministic (no RNG draw).
+    coord_->set_salinity_hi_tol_ppt(species_params_.salinity_hi_tol_ppt);
 
     // The submodel is seeded with the derived sub_seed and the
     // count of pre-existing patches. An empty gpkg is allowed (M2
@@ -236,6 +239,9 @@ Engine::Engine(AOI aoi,
     const int32_t coord_seed32 = static_cast<int32_t>(coord_seed);
     coord_ = std::make_unique<CoordinatorModel>(
         aoi_, climate_, *habitat_, coord_seed32, current_date_);
+    // M7.8 salinity: gate patch activation on the species' salinity
+    // high-tolerance. Deterministic (no RNG draw).
+    coord_->set_salinity_hi_tol_ppt(species_params_.salinity_hi_tol_ppt);
 
     const int32_t n_patches = static_cast<int32_t>(habitat_->patches().size());
 

@@ -415,7 +415,7 @@ Referencia del producto:
 - Migrar constantes de *An. gambiae* hard-coded a `SpeciesParams`.
 - Configurar *An. coluzzii* como única población activa.
 - Añadir curva salinidad sintética y tests de monotonicidad/óptimo.
-- Implementar loader `smap` + registro en `LOADER_MODULES` + `malariasim download --datasets smap --outputs salinity --years ...`.
+- Implementar loader `smap` + registro en `LOADER_MODULES` + `malariasim download --datasets smap --outputs salinity --years 2024,2025`.
 - Añadir formato `monthly_nc` al runner (o rechazarlo en revisión) para persistir salinidad mensual multi-año.
 - Añadir variable `salinity_ppt` al env NC vía `build_daily_env_nc` (broadcast mensual por día).
 - Ejecutar checklist de revisión de datos (§5.6) antes de activar salinidad espacial.

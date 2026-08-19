@@ -46,6 +46,7 @@ struct EnvBands {
     std::vector<float>  temp_suitability;  // Mordecai-inverted deg C
     std::vector<float>  ndvi;
     std::vector<float>  twi;               // optional
+    std::vector<float>  salinity_ppt;      // optional; empty = freshwater everywhere
     int32_t             h = 0;
     int32_t             w = 0;
     std::array<double, 6> transform;       // GDAL affine
@@ -69,6 +70,8 @@ struct DailyEnvBands {
     std::vector<float>  water_temp_c;   // deg C, NO Mordecai inverse
     std::vector<float>  water_frac;     // [0, 1]
     std::vector<float>  ndvi;           // [0, 1]
+    std::vector<float>  salinity_ppt;   // psu; empty if the NC has no
+                                        // salinity_ppt variable (= freshwater)
     int32_t             n_days = 0;
     int32_t             h      = 0;
     int32_t             w      = 0;
@@ -82,8 +85,10 @@ struct DailyEnvBands {
 // time steps are loaded (useful for large multi-year files). The time
 // dimension is UNLIMITED. Each variable is written as a multi-band raster
 // by GDAL where bands map to time steps. No Mordecai inverse is applied —
-// `water_temp_c` is already in deg C. Throws std::runtime_error on any
-// IO error or if a required variable is missing.
+// `water_temp_c` is already in deg C. Optionally reads a `salinity_ppt`
+// variable (psu); if absent, `salinity_ppt` stays empty (= freshwater,
+// the legacy behaviour). Throws std::runtime_error on any IO error or if
+// a required variable is missing.
 DailyEnvBands read_env_nc(const std::string& path, int32_t max_days = 0);
 
 }  // namespace env_reader

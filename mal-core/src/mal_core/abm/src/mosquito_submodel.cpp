@@ -658,12 +658,15 @@ void MosquitoSubmodel::advance_day(const AOI& aoi,
             const TimePhase phase = static_cast<TimePhase>(p);
             if (!phase_active(species_params_, phase)) continue;
 
-            const EffectiveGrid eff_grid =
+            const EffectiveGrid eff_grid_human =
                 effective_hosts_->sample_effective_hosts(
                     day_idx, phase, /*is_livestock=*/false, rng_);
+            const EffectiveGrid eff_grid_livestock =
+                effective_hosts_->sample_effective_hosts(
+                    day_idx, phase, /*is_livestock=*/true, rng_);
             const HostLandscape eff =
                 HostLandscape::make_effective(
-                    *host_landscape_, eff_grid, h, w);
+                    *host_landscape_, eff_grid_human, eff_grid_livestock, h, w);
 
             for (int64_t i = 0; i < soa_.n_alive; ++i) {
                 const size_t si = static_cast<size_t>(i);

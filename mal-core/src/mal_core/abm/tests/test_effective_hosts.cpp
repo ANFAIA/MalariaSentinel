@@ -263,4 +263,77 @@ TEST(EffectiveHosts, WeightedDailyExpectationSinglePhase) {
     EXPECT_NEAR(grid_sum(daily2), 100.0f, 1e-2f);
 }
 
+TEST(EffectiveHosts, LivestockNightIdentity) {
+    MobilitySchedule ms;
+    // Day matrix redistributes livestock; night must fall back to identity.
+    const std::vector<std::vector<std::pair<int32_t, float>>> rows = {
+        {{0, 0.5f}, {1, 0.5f}},
+        {{1, 1.0f}},
+    };
+    ms.set_livestock_od(make_od(rows));  // night = identity automatically
+    EffectiveHostLandscape el;
+    el.configure({0.0f, 0.0f}, {40.0f, 10.0f}, 2);
+    el.set_schedule(&ms);
+
+    Prng rng(3);
+    const EffectiveGrid night =
+        el.sample_effective_hosts(2, TimePhase::NIGHT, /*is_livestock=*/true, rng);
+    // Identity: each origin stays in place regardless of the day matrix.
+    EXPECT_NEAR(night[0], 40.0f, 1e-3f);
+    EXPECT_NEAR(night[1], 10.0f, 1e-3f);
+    EXPECT_EQ(grid_sum(night), 50.0f);
+}
+
+TEST(EffectiveHosts, LivestockDayRedistribution) {
+    MobilitySchedule ms;
+    const std::vector<std::vector<std::pair<int32_t, float>>> rows = {
+        {{0, 0.6f}, {1, 0.4f}},
+        {{1, 1.0f}},
+    };
+    ms.set_livestock_od(make_od(rows));
+    EffectiveHostLandscape el;
+    el.configure({0.0f, 0.0f}, {100.0f, 0.0f}, 2);
+    el.set_schedule(&ms);
+
+    // Expected H_eff(1, DAY) = 0.4 * 100 = 40; H_eff(0) = 0.6 * 100 = 60.
+    const EffectiveGrid expected = el.expected_effective_hosts(TimePhase::DAY, true);
+    EXPECT_NEAR(expected[0], 60.0f, 1e-3f);
+    EXPECT_NEAR(expected[1], 40.0f, 1e-3f);
+
+    // Sampled realization stays mass-conserving and close to expectation.
+    Prng rng(8);
+    const EffectiveGrid day =
+        el.sample_effective_hosts(1, TimePhase::DAY, /*is_livestock=*/true, rng);
+    EXPECT_NEAR(grid_sum(day), 100.0f, 1e-3f);
+    EXPECT_GT(day[1], 20.0f);  // substantial mass moved to cell 1
+}
+
+TEST(EffectiveHosts, HumanLivestockIndependence) {
+    MobilitySchedule ms;
+    // Livestock-only redistribution: neither human matrix is set.
+    const std::vector<std::vector<std::pair<int32_t, float>>> live_rows = {
+        {{0, 0.3f}, {1, 0.7f}},
+        {{1, 1.0f}},
+    };
+    ms.set_livestock_od(make_od(live_rows));
+    EffectiveHostLandscape el;
+    el.configure({50.0f, 50.0f}, {20.0f, 5.0f}, 2);
+    el.set_schedule(&ms);
+
+    Prng rng(5);
+    const EffectiveGrid human =
+        el.sample_effective_hosts(4, TimePhase::DAY, /*is_livestock=*/false, rng);
+    // No human OD loaded -> human falls back to residential (identity).
+    EXPECT_NEAR(human[0], 50.0f, 1e-3f);
+    EXPECT_NEAR(human[1], 50.0f, 1e-3f);
+
+    Prng rng2(5);
+    const EffectiveGrid livestock =
+        el.sample_effective_hosts(4, TimePhase::DAY, /*is_livestock=*/true, rng2);
+    // Livestock does redistribute.
+    EXPECT_NEAR(grid_sum(livestock), 25.0f, 1e-3f);
+    EXPECT_GT(livestock[1], 15.0f);
+    EXPECT_NE(livestock[0], 20.0f);
+}
+
 }  // namespace mal_abm_fast

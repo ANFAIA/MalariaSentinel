@@ -61,12 +61,17 @@ public:
     const std::vector<float>& temp_d()      const { return temp_; }
     const std::vector<float>& water_frac()  const { return water_; }
     const std::vector<float>& ndvi()        const { return ndvi_; }
+    const std::vector<float>& salinity()    const { return salinity_; }
 
     // Point lookups at (row, col). Out-of-bounds returns 0 (the env
     // is land; no patch, no rain).
     float rain_at(int32_t row, int32_t col) const;
     float temp_at(int32_t row, int32_t col) const;
     float water_frac_at(int32_t row, int32_t col) const;
+    // Salinity (psu). Out-of-bounds returns 0.0 (freshwater). When no
+    // salinity data was loaded (TIF path, or a pre-salinity NC), every
+    // cell reads 0.0 — the salinity factor is inert, as before.
+    float salinity_at(int32_t row, int32_t col) const;
 
     // TWI grid (per-cell, static). Setter is for the habitat engine
     // (it loads TWI from the gpkg) or the loader (it reads a
@@ -105,12 +110,14 @@ private:
     std::vector<float>   temp_;     // Mordecai-inverted deg C
     std::vector<float>   water_;
     std::vector<float>   ndvi_;
+    std::vector<float>   salinity_; // psu; empty = freshwater everywhere
     std::vector<float>   twi_;      // optional 5th band; empty = zeros
     // Daily NC state - shared across threads via shared_ptr
     std::shared_ptr<std::vector<float>>   rain_nc_;      // n_days * h * w
     std::shared_ptr<std::vector<float>>   water_temp_nc_;// n_days * h * w (deg C, no inverse)
     std::shared_ptr<std::vector<float>>   water_frac_nc_;// n_days * h * w
     std::shared_ptr<std::vector<float>>   ndvi_nc_;      // n_days * h * w
+    std::shared_ptr<std::vector<float>>   salinity_nc_;  // n_days * h * w (psu)
     int32_t              n_days_ = 1;
     int32_t              cur_day_ = 0;
 };

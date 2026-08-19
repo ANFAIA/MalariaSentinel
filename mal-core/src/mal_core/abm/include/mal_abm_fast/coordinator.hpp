@@ -119,6 +119,13 @@ public:
 
     void set_climate_day(int32_t day_index);
 
+    // Species salinity high-tolerance (psu). Patches whose water
+    // salinity exceeds this cannot breed (activated=false). The Engine
+    // passes the active species' `salinity_hi_tol_ppt` during wiring;
+    // default = coluzzii 30.0 psu (freshwater runs are unchanged).
+    void set_salinity_hi_tol_ppt(float ppt) { salinity_hi_tol_ppt_ = ppt; }
+    float salinity_hi_tol_ppt() const { return salinity_hi_tol_ppt_; }
+
     // Update patch.activated from climate. For M1 with monthly env,
     // day is constant per month and may be ignored. The
     // implementation subagent decides whether to consume
@@ -184,6 +191,8 @@ private:
     std::unordered_map<std::pair<int32_t, int32_t>, int64_t, PairHash> dynamic_patch_registry_;
     int64_t                              next_dynamic_patch_id_ = 0;
     std::vector<PatchState>                   cached_states_;  // per-day snapshot
+    // Species salinity high-tolerance (psu); default = coluzzii 30.0.
+    float                                     salinity_hi_tol_ppt_ = 30.0f;
     // Pool hydrology (M14): per-patch water state, keyed by patch_id.
     std::unordered_map<int64_t, PoolState>     pool_states_;
 };

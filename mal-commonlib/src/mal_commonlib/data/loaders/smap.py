@@ -100,8 +100,13 @@ def _earthaccess_login() -> None:
 
 def _search_window(year: int, month: int) -> tuple[str, str]:
     start = f"{year:04d}-{month:02d}-01"
+    # Add one month in [M] units first, then cast to [D]: mixing a
+    # datetime64[D] with a timedelta64[M] directly raises a cast error.
+    # The cast to [M] -> [D] handles variable-length months.
     start_dt = np.datetime64(start, "D")
-    end_dt = (start_dt + np.timedelta64(1, "M")) - np.timedelta64(1, "D")
+    end_dt = (start_dt.astype("datetime64[M]") + np.timedelta64(1, "M")).astype(
+        "datetime64[D]"
+    ) - np.timedelta64(1, "D")
     return start, str(end_dt)
 
 
@@ -189,7 +194,15 @@ def _postprocess_smap_ds(raw: xr.Dataset, aoi: AOI) -> xr.DataArray:
 
     vals = da.values.astype(np.float32)
     fill = (vals == np.float32(_FILL)) | ~np.isfinite(vals)
-    arr = np.where(fill, np.nan, vals * np.float32(_SCALE)).astype(np.float32)
+    # Scale detection: the RSS product documents raw values stored x1000
+    # (units 1e-3), but the PO.DAAC granules delivered by earthaccess come
+    # already in PSU (~0-45). Branch by magnitude so both encodings work:
+    # coded (>100) gets /1000; already-scaled PSU stays untouched.
+    finite_vals = vals[~fill]
+    if finite_vals.size > 0 and float(np.nanmax(finite_vals)) > 100.0:
+        arr = np.where(fill, np.nan, vals * np.float32(_SCALE)).astype(np.float32)
+    else:
+        arr = np.where(fill, np.nan, vals).astype(np.float32)
     arr = np.where((arr < 0.0) | (arr > 45.0), np.nan, arr)
 
     if land is not None:

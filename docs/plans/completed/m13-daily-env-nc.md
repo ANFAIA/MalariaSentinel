@@ -152,7 +152,7 @@ Current `mal-core/src/mal_core/ingest/env.py` has `output_format: 'tif' | 'nc'` 
 1. Mark `output_format='nc'` as deprecated. Raise `DeprecationWarning` if invoked.
 2. Remove the `nc` branch in `build_env_tensor` (lines 352-382). Keep only `tif` branch.
 3. Remove `_write_env_nc()` function (lines 149-246).
-4. Add migration note in `agents/skills/mal-execution-api/SKILL.md`: legacy daily NC is now produced by the runner via `malariasim download --outputs rainfall_daily --years 2024 2025`.
+4. Add migration note in `agents/skills/mal-execution-api/SKILL.md`: legacy daily NC is now produced by the runner via `malariasim download --outputs rainfall_daily --years 2024,2025`.
 
 Future removal: M14+ (out of scope for M13).
 
@@ -189,7 +189,7 @@ M13 does NOT modify `env_reader.hpp` or `climate.hpp`. The existing `read_env_nc
 - Add `DeprecationWarning` for `output_format='nc'`.
 - Remove `_write_env_nc` function.
 - Update `agents/skills/mal-execution-api/SKILL.md` with migration note.
-- E2E test: `malariasim download --datasets chirps --outputs rainfall_daily --years 2024 2025 --aoi ghana` → produces `ghana_chirps_rainfall_daily_2024_2025.nc` (~ X MB for 731 days × 429K cells × 4 bytes = ~1.2 GB uncompressed). Then `malariasim run --stages abm --env data/ghana/ghana_chirps_rainfall_daily_2024_2025.nc --aoi ghana` → C++ ABM reads via `read_env_nc`, runs end-to-end.
+- E2E test: `malariasim download --datasets chirps --outputs rainfall_daily --years 2024,2025 --aoi ghana` → produces `ghana_chirps_rainfall_daily_2024_2025.nc` (~ X MB for 731 days × 429K cells × 4 bytes = ~1.2 GB uncompressed). Then `malariasim run --stages abm --env data/ghana/ghana_chirps_rainfall_daily_2024_2025.nc --aoi ghana` → C++ ABM reads via `read_env_nc`, runs end-to-end.
 
 ## 5. Pitfalls to record (KG `Pitfall` nodes)
 
@@ -218,7 +218,7 @@ M13 is **done** when:
 - [ ] Runner writes daily outputs as single multi-year NC files via `xarray.to_netcdf()`.
 - [ ] Manifest v3.1 supports `period` field. `validate_completeness("ghana")` checks daily NC entries by period coverage.
 - [ ] `env.py` `output_format='nc'` raises `DeprecationWarning`. `_write_env_nc` removed.
-- [ ] `malariasim download --datasets chirps --outputs rainfall_daily --years 2024 2025 --aoi ghana` produces a valid NC consumable by `read_env_nc()` in C++ ABM.
+- [ ] `malariasim download --datasets chirps --outputs rainfall_daily --years 2024,2025 --aoi ghana` produces a valid NC consumable by `read_env_nc()` in C++ ABM.
 - [ ] C++ ABM reads the runner-produced NC and runs end-to-end without silent errors (population > 0, no NaN/Inf, stderr clean).
 - [ ] 4 pitfalls recorded in KG.
 - [ ] KG node `op-m13-daily-env-nc` summary reflects "DONE" with commit SHAs.

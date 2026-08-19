@@ -154,6 +154,15 @@ std::vector<PatchState> CoordinatorModel::to_dataframe() {
         ps.rain_d = rain_val;
         ps.temp_d = temp_val;
         ps.water_frac = climate_->water_frac_at(cell.first, cell.second);
+        ps.salinity_ppt = climate_->salinity_at(cell.first, cell.second);
+        // Salinity hard gate (M7.8): a patch whose water salinity
+        // exceeds the species' high tolerance cannot breed. This
+        // deactivates coastal brackish cells for freshwater-limited
+        // species and also disables oviposition site search (which
+        // reads ps.activated) at those cells.
+        if (ps.salinity_ppt > salinity_hi_tol_ppt_) {
+            ps.activated = false;
+        }
         ps.pool_water_mm = pool.water_mm;
         ps.pool_days_dry = pool.days_dry;
         states.push_back(ps);

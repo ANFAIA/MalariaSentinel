@@ -162,7 +162,7 @@ uv run python mal-execution/scripts/build_environment.py \
 
 **New way**: Use the download runner to produce daily NC files:
 ```bash
-malariasim download --datasets chirps --outputs rainfall_daily --years 2024 2025 --aoi ghana
+malariasim download --datasets chirps --outputs rainfall_daily --years 2024,2025 --aoi ghana
 ```
 This produces `data/ghana/ghana_chirps_rainfall_daily_2024_2025_daily.nc` consumable by the C++ ABM's `read_env_nc()`.
 

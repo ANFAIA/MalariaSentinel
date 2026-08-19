@@ -326,6 +326,26 @@ DailyEnvBands read_env_nc(const std::string& path, int32_t max_days) {
     out.water_frac   = read_variable("water_frac");
     out.ndvi         = read_variable("ndvi");
 
+    // Optional salinity (psu). The env NC predates salinity; a file
+    // without `salinity_ppt` must load identically (salinity_ empty,
+    // accessor returns 0.0 = freshwater, the legacy behaviour).
+    if (subdatasets.count("salinity_ppt") != 0) {
+        std::vector<float> v = read_variable("salinity_ppt");
+        const size_t expected = static_cast<size_t>(out.n_days)
+                             * static_cast<size_t>(out.h) * static_cast<size_t>(out.w);
+        if (v.size() != expected) {
+            throw std::runtime_error(
+                std::string("env_reader::read_env_nc: salinity_ppt size ")
+                + std::to_string(v.size()) + " != " + std::to_string(expected));
+        }
+        // Fill no-data / NaN / negative values with 0.0 (freshwater).
+        for (float& x : v) {
+            if (!std::isfinite(x)) x = 0.0f;
+            else if (x < 0.0f) x = 0.0f;
+        }
+        out.salinity_ppt = std::move(v);
+    }
+
     if (out.h <= 0 || out.w <= 0) {
         throw std::runtime_error(
             "env_reader::read_env_nc: dataset has no rasters");

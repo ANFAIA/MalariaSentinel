@@ -20,7 +20,7 @@
 uv sync --all-packages
 
 # Run the Ghana simulation (via mal-core CLI)
-malariasim download --aoi ghana --datasets era5 --outputs wind_6hourly --years 2024 2025
+malariasim download --aoi ghana --datasets era5 --outputs wind_6hourly --years 2024,2025
 malariasim ingest --aoi ghana --year 2024 --month 6
 malariasim abm --aoi ghana --days 30
 malariasim score --run-dir runs/abm --tier fast
@@ -40,7 +40,7 @@ make -f agents/memory/scripts/Makefile session-start
 make -f agents/memory/scripts/Makefile session-end
 
 # Download data for an AOI
-malariasim download --aoi ghana --datasets era5 --outputs wind_6hourly --years 2024 2025
+malariasim download --aoi ghana --datasets era5 --outputs wind_6hourly --years 2024,2025
 
 # Validate data completeness
 uv run python -c "from mal_core.download.manifest import validate_completeness; print(validate_completeness('ghana'))"

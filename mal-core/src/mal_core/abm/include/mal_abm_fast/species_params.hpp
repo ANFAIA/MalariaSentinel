@@ -57,9 +57,11 @@ struct SpeciesParams {
 SpeciesParams species_params_for(MosquitoSpeciesId id);
 
 /// Salinity habitat-suitability multiplier in [0,1].
-///   = 1.0 at and below opt; decays as exp(-slope * (psu - opt)) past
-///   opt, monotone decreasing with a soft, never-zero survivor tail.
-///   coluzzii (gentler slope) tolerates > gambiae s.s. at equal psu.
+///   = 1.0 at and below opt; decays as (1 - frac) * exp(-slope * above)
+///   past opt (frac = (psu - opt) / (hi_tol - opt)), reaching exactly 0
+///   at hi_tol; psu >= hi_tol => 0.0 (hard cap — the species cannot
+///   breed above its high tolerance). coluzzii (gentler slope + higher
+///   hi_tol) tolerates > gambiae s.s. at equal psu.
 float salinity_suitability(const SpeciesParams& sp, float salinity_ppt);
 
 }  // namespace mal_abm_fast

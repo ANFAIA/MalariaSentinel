@@ -85,8 +85,8 @@ void WriteSyntheticEnv(const fs::path& path) {
 }
 
 // Write a synthetic multi-day NetCDF using the netCDF-C API.
-void WriteSyntheticEnvNC(const fs::path& path, int n_days) {
-    int ncid, dimids[3], vid[4];
+void WriteSyntheticEnvNC(const fs::path& path, int n_days, bool with_salinity = false) {
+    int ncid, dimids[3], vid[4], vidsal;
     int dimid_time, dimid_y, dimid_x;
 
     ASSERT_EQ(nc_create(path.string().c_str(),
@@ -100,11 +100,15 @@ void WriteSyntheticEnvNC(const fs::path& path, int n_days) {
     ASSERT_EQ(nc_def_var(ncid, "water_temp_c", NC_FLOAT, 3, dimids, &vid[1]), NC_NOERR);
     ASSERT_EQ(nc_def_var(ncid, "water_frac", NC_FLOAT, 3, dimids, &vid[2]), NC_NOERR);
     ASSERT_EQ(nc_def_var(ncid, "ndvi", NC_FLOAT, 3, dimids, &vid[3]), NC_NOERR);
+    if (with_salinity) {
+        ASSERT_EQ(nc_def_var(ncid, "salinity_ppt", NC_FLOAT, 3, dimids, &vidsal), NC_NOERR);
+    }
     ASSERT_EQ(nc_put_att_text(ncid, NC_GLOBAL, "Conventions", 6, "CF-1.8"), NC_NOERR);
     ASSERT_EQ(nc_enddef(ncid), NC_NOERR);
 
     const float rain_vals[] = {60.0f, 40.0f, 55.0f};
     const float temp_vals[] = {25.0f, 20.0f, 30.0f};
+    const float sal_vals[]  = {0.0f, 25.0f, 3.0f};
     float buf[kH * kW];
     size_t start[3] = {0, 0, 0};
     size_t count[3] = {1, static_cast<size_t>(kH), static_cast<size_t>(kW)};
@@ -119,6 +123,10 @@ void WriteSyntheticEnvNC(const fs::path& path, int n_days) {
         ASSERT_EQ(nc_put_vara_float(ncid, vid[2], start, count, buf), NC_NOERR);
         std::fill(buf, buf + kH * kW, 0.4f);
         ASSERT_EQ(nc_put_vara_float(ncid, vid[3], start, count, buf), NC_NOERR);
+        if (with_salinity) {
+            std::fill(buf, buf + kH * kW, sal_vals[d % 3]);
+            ASSERT_EQ(nc_put_vara_float(ncid, vidsal, start, count, buf), NC_NOERR);
+        }
     }
     ASSERT_EQ(nc_close(ncid), NC_NOERR);
 }
@@ -271,6 +279,75 @@ TEST(ClimateEngine, SetDayClampsToValidRange) {
     // set_day(1) should work normally
     eng.set_day(1);
     EXPECT_FLOAT_EQ(eng.rain_at(0, 0), 40.0f);  // day 1 value
+
+    fs::remove(path);
+}
+
+// -- Salinity (M7.8) --------------------------------------------------------
+
+TEST(ClimateEngine, LoadFromEnvNcWithoutSalinityDefaultsToFreshwater) {
+    const fs::path path = MakeTmpEnvNC();
+    if (fs::exists(path)) fs::remove(path);
+    WriteSyntheticEnvNC(path, 2, /*with_salinity=*/false);
+    ASSERT_TRUE(fs::exists(path));
+
+    mal_abm_fast::ClimateEngine eng;
+    eng.load_from_env_nc(path.string(), MakeAoi());
+
+    // Pre-salinity NC: salinity accessor stays fresh-water (0.0) everywhere,
+    // including out-of-bounds. The salinity factor is inert, as before.
+    for (int d = 0; d < 2; ++d) {
+        eng.set_day(d);
+        EXPECT_FLOAT_EQ(eng.salinity_at(0, 0), 0.0f);
+        EXPECT_FLOAT_EQ(eng.salinity_at(kH - 1, kW - 1), 0.0f);
+    }
+    EXPECT_TRUE(eng.salinity().empty());
+
+    fs::remove(path);
+}
+
+TEST(ClimateEngine, LoadFromEnvNcWithSalinityPopulatesAccessor) {
+    const fs::path path = MakeTmpEnvNC();
+    if (fs::exists(path)) fs::remove(path);
+    WriteSyntheticEnvNC(path, 3, /*with_salinity=*/true);
+    ASSERT_TRUE(fs::exists(path));
+
+    mal_abm_fast::ClimateEngine eng;
+    eng.load_from_env_nc(path.string(), MakeAoi());
+
+    // Day 0: salinity=0.0, Day 1: salinity=25.0, Day 2: salinity=3.0 at (0,0).
+    eng.set_day(0);
+    EXPECT_FLOAT_EQ(eng.salinity_at(0, 0), 0.0f);
+
+    eng.set_day(1);
+    EXPECT_FLOAT_EQ(eng.salinity_at(0, 0), 25.0f);
+    EXPECT_FLOAT_EQ(eng.salinity_at(kH - 1, kW - 1), 25.0f);
+
+    eng.set_day(2);
+    EXPECT_FLOAT_EQ(eng.salinity_at(0, 0), 3.0f);
+
+    // Out-of-bounds returns 0.0 (freshwater).
+    EXPECT_FLOAT_EQ(eng.salinity_at(-1, 0), 0.0f);
+    EXPECT_FLOAT_EQ(eng.salinity_at(kH, 0), 0.0f);
+    EXPECT_FLOAT_EQ(eng.salinity_at(0, kW), 0.0f);
+
+    fs::remove(path);
+}
+
+TEST(ClimateEngine, CloneForThreadPropagatesSalinity) {
+    const fs::path path = MakeTmpEnvNC();
+    if (fs::exists(path)) fs::remove(path);
+    WriteSyntheticEnvNC(path, 3, /*with_salinity=*/true);
+    ASSERT_TRUE(fs::exists(path));
+
+    mal_abm_fast::ClimateEngine eng;
+    eng.load_from_env_nc(path.string(), MakeAoi());
+
+    auto clone = eng.clone_for_thread();
+    ASSERT_NE(clone, nullptr);
+
+    clone->set_day(1);
+    EXPECT_FLOAT_EQ(clone->salinity_at(0, 0), 25.0f);
 
     fs::remove(path);
 }

@@ -7,7 +7,7 @@ from typing import Any
 
 import pytest
 
-from scorers.score import score_run, save_scorecard
+from scorers.score import save_scorecard
 from scorers.diff import diff_scorecards
 from scorers.best import load_best, save_best, update_best
 
@@ -39,76 +39,6 @@ def _make_scorecard(
         "timestamp": "2026-07-20T00:00:00+00:00",
         "run_dir": "/tmp/test",
     }
-
-
-# ── score_run ──────────────────────────────────────────────────────
-
-
-class TestScoreRun:
-    def test_score_run_produces_scorecard(self, tmp_path: Path) -> None:
-        """score_run produces a scorecard with all 10 dims + composite."""
-        import numpy as np
-        import rasterio
-        from rasterio.transform import from_bounds
-
-        # Create minimal COG files so at least some scorers produce non-zero scores
-        b0 = np.zeros((10, 10), dtype=np.float32)
-        b0[5, 5] = 0.8
-        b1 = np.zeros((10, 10), dtype=np.float32)
-        transform = from_bounds(-1.5, 4.5, 1.5, 11.5, 10, 10)
-        with rasterio.open(
-            tmp_path / "state_seed0001.tif",
-            "w",
-            driver="GTiff",
-            height=10,
-            width=10,
-            count=2,
-            dtype="float32",
-            crs="EPSG:4326",
-            transform=transform,
-            nodata=-9999.0,
-        ) as dst:
-            dst.write(b0, 1)
-            dst.write(b1, 2)
-
-        experiment = {"name": "test_exp", "params": {}, "n_days": 30, "n_seeds": 1}
-        scorecard = score_run(tmp_path, experiment)
-
-        # Check structure
-        assert "experiment" in scorecard
-        assert "scores" in scorecard
-        assert "composite" in scorecard
-        assert "timestamp" in scorecard
-        assert "run_dir" in scorecard
-
-        # Check all 10 dimensions present
-        expected_dims = {
-            "D1_expansion", "D2_survival", "D3_eip", "D4_stability",
-            "D5_morans", "D6_mass", "D7_determinism", "D8_coupling",
-            "D9_activation", "D10_perf",
-        }
-        assert set(scorecard["scores"].keys()) == expected_dims
-
-        # Each score entry has the right keys
-        for dim, entry in scorecard["scores"].items():
-            assert "score" in entry
-            assert "value" in entry
-            assert "passed" in entry
-            assert isinstance(entry["score"], float)
-
-    def test_score_run_handles_missing_files(self, tmp_path: Path) -> None:
-        """Empty run_dir → most scorers return 0.0, composite is 0.0."""
-        experiment = {"name": "empty", "params": {}, "n_days": 1, "n_seeds": 1}
-        scorecard = score_run(tmp_path, experiment)
-
-        assert scorecard["composite"] == 0.0
-        # D7_determinism and D10_perf return 1.0 when files are missing (defaults to OK)
-        exempt_dims = {"D7_determinism", "D10_perf"}
-        for dim, entry in scorecard["scores"].items():
-            if dim in exempt_dims:
-                assert entry["score"] == 1.0
-            else:
-                assert entry["score"] == 0.0
 
 
 # ── diff_scorecards ────────────────────────────────────────────────

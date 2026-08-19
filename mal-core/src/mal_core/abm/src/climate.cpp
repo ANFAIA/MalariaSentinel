@@ -99,6 +99,15 @@ float ClimateEngine::water_frac_at(int32_t row, int32_t col) const {
     return water_[Idx(row, col, w_)];
 }
 
+float ClimateEngine::salinity_at(int32_t row, int32_t col) const {
+    // Empty salinity_ => no salinity data (TIF path or pre-salinity
+    // NC): every cell is freshwater (0.0 psu), the legacy behaviour.
+    if (salinity_.empty()) return 0.0f;
+    if (h_ <= 0 || w_ <= 0) return 0.0f;
+    if (row < 0 || row >= h_ || col < 0 || col >= w_) return 0.0f;
+    return salinity_[Idx(row, col, w_)];
+}
+
 // -- Daily NetCDF support ----------------------------------------------------
 
 void ClimateEngine::load_from_env_nc(const std::string& path,
@@ -117,12 +126,23 @@ void ClimateEngine::load_from_env_nc(const std::string& path,
     water_temp_nc_ = std::make_shared<std::vector<float>>(std::move(bands.water_temp_c));
     water_frac_nc_ = std::make_shared<std::vector<float>>(std::move(bands.water_frac));
     ndvi_nc_       = std::make_shared<std::vector<float>>(std::move(bands.ndvi));
+    if (!bands.salinity_ppt.empty()) {
+        salinity_nc_ = std::make_shared<std::vector<float>>(
+            std::move(bands.salinity_ppt));
+    } else {
+        salinity_nc_.reset();
+    }
 
     // Populate single-day accessors for day 0 (backwards compat).
     rain_.assign(h_ * w_, 0.0f);
     temp_.assign(h_ * w_, 25.0f);
     water_.assign(h_ * w_, 0.0f);
     ndvi_.assign(h_ * w_, 0.0f);
+    if (salinity_nc_) {
+        salinity_.assign(h_ * w_, 0.0f);
+    } else {
+        salinity_.clear();  // accessor returns 0.0 for every cell
+    }
 
     const size_t slice = static_cast<size_t>(h_) * static_cast<size_t>(w_);
     for (size_t i = 0; i < slice; ++i) {
@@ -130,6 +150,7 @@ void ClimateEngine::load_from_env_nc(const std::string& path,
         temp_[i]  = (*water_temp_nc_)[i];
         water_[i] = (*water_frac_nc_)[i];
         ndvi_[i]  = (*ndvi_nc_)[i];
+        if (salinity_nc_) salinity_[i] = (*salinity_nc_)[i];
     }
 }
 
@@ -146,6 +167,7 @@ void ClimateEngine::set_day(int32_t day) {
         temp_[i]  = (*water_temp_nc_)[offset + i];
         water_[i] = (*water_frac_nc_)[offset + i];
         ndvi_[i]  = (*ndvi_nc_)[offset + i];
+        if (salinity_nc_) salinity_[i] = (*salinity_nc_)[offset + i];
     }
 }
 
@@ -161,12 +183,18 @@ std::shared_ptr<ClimateEngine> ClimateEngine::clone_for_thread() const {
     clone->water_temp_nc_ = water_temp_nc_;
     clone->water_frac_nc_ = water_frac_nc_;
     clone->ndvi_nc_ = ndvi_nc_;
+    clone->salinity_nc_ = salinity_nc_;
     
     // Independent single-day arrays (thread-local)
     clone->rain_.assign(h_ * w_, 0.0f);
     clone->temp_.assign(h_ * w_, 25.0f);
     clone->water_.assign(h_ * w_, 0.0f);
     clone->ndvi_.assign(h_ * w_, 0.0f);
+    if (salinity_nc_) {
+        clone->salinity_.assign(h_ * w_, 0.0f);
+    } else {
+        clone->salinity_.clear();
+    }
     
     // Initialize day 0
     if (n_days_ > 0 && rain_nc_) {
@@ -176,6 +204,7 @@ std::shared_ptr<ClimateEngine> ClimateEngine::clone_for_thread() const {
             clone->temp_[i]  = (*water_temp_nc_)[i];
             clone->water_[i] = (*water_frac_nc_)[i];
             clone->ndvi_[i]  = (*ndvi_nc_)[i];
+            if (salinity_nc_) clone->salinity_[i] = (*salinity_nc_)[i];
         }
     } else {
         // COG-loaded engine: no multi-day NetCDF data, so rain_nc_ is
@@ -188,6 +217,7 @@ std::shared_ptr<ClimateEngine> ClimateEngine::clone_for_thread() const {
         clone->temp_  = temp_;
         clone->water_ = water_;
         clone->ndvi_  = ndvi_;
+        clone->salinity_ = salinity_;
         clone->twi_   = twi_;
     }
 
