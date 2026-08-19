@@ -108,16 +108,16 @@ registry/auth/manifest plumbing, and the manifest would diverge.
 
 ### §5.2 `DOWNLOADER` dict
 
-- **INV-5.** Every loader module exports a `DOWNLOADER` dict with keys `name` (string), `description` (string), `requires_auth` (list[str] from {`"cds"`,`"earthdata"`,`"planetary_computer"`,`"none"`}), `outputs` (dict[str, callable]), `manifest_keys` (dict[str, str]), `is_time_series` (bool, default false), `formats` (optional dict[str, str], maps output name to `"monthly"` or `"daily"`).
+- **INV-5.** Every loader module exports a `DOWNLOADER` dict with keys `name` (string), `description` (string), `requires_auth` (list[str] from {`"cds"`,`"earthdata"`,`"planetary_computer"`,`"none"`}), `outputs` (dict[str, callable]), `manifest_keys` (dict[str, str]), `is_time_series` (bool, default false), `formats` (optional dict[str, str], maps output name to `"monthly"`, `"daily"`, or `"monthly_nc"`).
 - **INV-6.** Every key in `outputs` is a real callable (the loader function). Every value in `manifest_keys` is a unique key under `manifest.json`'s `datasets` block.
 
 ### §5.3 Runner behaviour
 
 - **INV-7.** Runner discovers `DOWNLOADER`s via `importlib` from `LOADER_MODULES` (no hardcoded registry; one source of truth in `registry.py`).
 - **INV-8.** Runner filters by `--datasets` (match `name`) and `--outputs` (match output key inside the dict).
-- **INV-9.** Runner uses `spec.is_time_series` (from the DOWNLOADER dict) to branch: time-series loaders get `years` + `months`; static loaders get only `aoi` + `cache_dir`. For time-series loaders, the runner also reads `spec.formats[output_name]` to decide between **monthly** (default) and **daily** write paths. Signature inspection is not used.
+- **INV-9.** Runner uses `spec.is_time_series` (from the DOWNLOADER dict) to branch: time-series loaders get `years` + `months`; static loaders get only `aoi` + `cache_dir`. For time-series loaders, the runner also reads `spec.formats[output_name]` to decide between **monthly** (default), **daily**, and **monthly_nc** write paths. Signature inspection is not used.
 - **INV-10.** Runner passes only kwargs the loader accepts (`accepted = set(sig.parameters)`); unknown kwargs are silently dropped (logged).
-- **INV-11.** Runner saves `xr.DataArray` → GeoTIFF, `xr.Dataset` → NetCDF. The runner is the **only** save point. For daily NC outputs, the runner writes a single multi-year NetCDF with `_standard_path_daily` naming (`<aoi>_<product>_<start>_<end>_daily.nc`). 3D DataArrays cannot be saved as TIF (the writer raises `ValueError`). When writing DataArray → NC, `var_name` is set to the output name with `_daily` suffix stripped (e.g. `"rainfall_daily"` → `"rainfall"`).
+- **INV-11.** Runner saves `xr.DataArray` → GeoTIFF, `xr.Dataset` → NetCDF. The runner is the **only** save point. For `daily` NC outputs, the runner writes a single multi-year NetCDF with `_standard_path_daily` naming (`<aoi>_<product>_<start>_<end>_daily.nc`). For `monthly_nc` outputs it writes a single multi-year NetCDF with `_standard_path_monthly_nc` naming (`<aoi>_<product>_<start>_<end>_monthly.nc`) that preserves per-month time steps. 3D DataArrays cannot be saved as TIF (the writer raises `ValueError`). When writing DataArray → NC, `var_name` is set to the output name with the `_daily` / `_salinity` suffix stripped (e.g. `"rainfall_daily"` → `"rainfall"`, `"salinity"` → `"salinity"`).
 - **INV-12.** After each successful save, runner calls `update_dataset(aoi, manifest_key, year, path.name, type=..., required_for_abm=True, format=..., period=...)` — see `data/spec.md` §4. For daily NC, `year=None` and `period={"start": t0, "end": t1}`.
 - **INV-13.** Auth gate: if `requires_auth` is non-empty and credentials are missing, the runner reports `{"status": "skipped"}` and does **not** raise.
 
@@ -130,6 +130,7 @@ registry/auth/manifest plumbing, and the manifest would diverge.
 | `dem` | `none` | `elevation` | `dem` | Falls back to NASADEM via Planetary Computer on MERIT auth failure |
 | `jrc_gsw` | `none` | `water_occurrence` | `jrc_water` | |
 | `modis` | `earthdata` | `ndvi` | `modis_ndvi` | |
+| `smap` | `earthdata` | `salinity` | `smap_salinity` | RSS SMAP L3 SSS SMI Monthly V6.0 (PO.DAAC), `formats`: `salinity`=monthly_nc |
 | `worldpop` | `none` | `population` | `worldpop` | Accepts `AOI \| str`; optional `year` param (default 2019) |
 | `glw` | `none` | `cattle`, `goats`, `sheep`, `pigs`, `chickens` | `glw_cattle`, `glw_goats`, `glw_sheep`, `glw_pigs`, `glw_chickens` | Lambdas wrap `load_glw_livestock(aoi, species=...)`; accepts `AOI \| str` |
 | `ghsl` | `none` | `urban_class` | `ghsl_urban` | |
@@ -148,7 +149,7 @@ registry/auth/manifest plumbing, and the manifest would diverge.
 
 ## 6. Data contracts
 
-- Output on disk: `data/<aoi>/<aoi>_<product>_<year>.<ext>` or `data/<aoi>/<aoi>_<product>.<ext>` or `data/<aoi>/<aoi>_<product>_<start>_<end>_daily.nc` — see `data/spec.md` §5.1.
+- Output on disk: `data/<aoi>/<aoi>_<product>_<year>.<ext>` or `data/<aoi>/<aoi>_<product>.<ext>` or `data/<aoi>/<aoi>_<product>_<start>_<end>_daily.nc` or `data/<aoi>/<aoi>_<product>_<start>_<end>_monthly.nc` — see `data/spec.md` §5.1.
 - In-memory return: `xr.DataArray` (raster) or `xr.Dataset` (multi-var, typically wind or env daily).
 - Manifest update via `data/spec.md` §4.
 

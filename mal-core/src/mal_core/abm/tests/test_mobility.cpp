@@ -199,19 +199,46 @@ TEST(MobilitySchedule, LoadFromDirectorySkipsMissing) {
     // Non-existent directory — should be a no-op
     ms.load_from_directory("/tmp/nonexistent_dir_12345", aoi);
     EXPECT_FALSE(ms.has_data());
+
+    // Directory exists but has no matching slug-named files — silent skip.
+    const std::string empty_dir = "/tmp/mal_test_mobility_empty";
+    std::filesystem::create_directories(empty_dir);
+    mal_abm_fast::AOI aoi2;
+    aoi2.slug = "ghana";
+    ms.load_from_directory(empty_dir, aoi2);
+    EXPECT_FALSE(ms.has_data());
+    std::filesystem::remove_all(empty_dir);
 }
 
 TEST(MobilitySchedule, LoadFromDirectoryLoadsCSR) {
     const std::string dir = "/tmp/mal_test_mobility_dir";
     std::filesystem::create_directories(dir);
-    write_identity_csr(dir + "/human_mobility_day.csr", 3);
-    write_identity_csr(dir + "/human_mobility_night.csr", 3);
+    const std::string slug = "ghana";
+    write_identity_csr(dir + "/" + slug + "_mobility_day.csr", 3);
+    write_identity_csr(dir + "/" + slug + "_mobility_night.csr", 3);
 
     mal_abm_fast::MobilitySchedule ms;
     mal_abm_fast::AOI aoi;
+    aoi.slug = slug;
     ms.load_from_directory(dir, aoi);
     EXPECT_TRUE(ms.has_human());
     EXPECT_EQ(ms.n_cells(), 3);
+
+    std::filesystem::remove_all(dir);
+}
+
+TEST(MobilitySchedule, LoadFromDirectoryLoadsLivestockBySlug) {
+    const std::string dir = "/tmp/mal_test_mobility_dir_live";
+    std::filesystem::create_directories(dir);
+    const std::string slug = "ghana";
+    write_identity_csr(dir + "/" + slug + "_livestock_mobility.csr", 4);
+
+    mal_abm_fast::MobilitySchedule ms;
+    mal_abm_fast::AOI aoi;
+    aoi.slug = slug;
+    ms.load_from_directory(dir, aoi);
+    EXPECT_TRUE(ms.has_livestock());
+    EXPECT_EQ(ms.n_cells(), 4);
 
     std::filesystem::remove_all(dir);
 }

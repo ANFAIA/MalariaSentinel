@@ -44,6 +44,12 @@ def _standard_path_daily(aoi: str, product: str, year_start: int, year_end: int,
     return data_dir / f"{aoi}_{product}_{year_start}_{year_end}_daily.nc"
 
 
+def _standard_path_monthly_nc(aoi: str, product: str, year_start: int, year_end: int, data_dir: Path | None = None) -> Path:
+    """Path for multi-year monthly NC output: data/<aoi>/<aoi>_<product>_<start>_<end>_monthly.nc"""
+    data_dir = data_dir or (_REPO_ROOT / "data" / aoi)
+    return data_dir / f"{aoi}_{product}_{year_start}_{year_end}_monthly.nc"
+
+
 
 def run_download(
     aoi: str,
@@ -130,6 +136,35 @@ def run_download(
                             data_root=out_dir.parent,
                         )
                         log.info("    daily NC → %s (period %s to %s)", path.name, t0, t1)
+                    elif output_format == "monthly_nc":
+                        # Monthly NC path: write entire 3D monthly time-series
+                        # as ONE multi-year NetCDF with MONTHLY time steps,
+                        # preserving per-month resolution (e.g. SMAP salinity).
+                        result = func(aoi=aoi_obj, years=years, months=months, cache_dir=cache)
+                        if result is None:
+                            continue
+                        # Variable name: strip "_salinity" suffix for ABM/ingest
+                        # compatibility (e.g. "salinity" stays "salinity").
+                        nc_var_name = output_name.removesuffix("_salinity")
+                        path = _standard_path_monthly_nc(aoi, output_name, min(years), max(years), data_dir=out_dir)
+                        path.parent.mkdir(parents=True, exist_ok=True)
+                        save_product(result, path, format="nc", var_name=nc_var_name)
+                        # Register with period metadata (same shape as daily)
+                        time_dim = "time" if "time" in result.dims else "valid_time"
+                        t0 = str(result[time_dim].values[0])[:10]
+                        t1 = str(result[time_dim].values[-1])[:10]
+                        update_dataset(
+                            aoi,
+                            spec.manifest_keys[output_name],
+                            None,  # year=None for multi-year NC
+                            path.name,
+                            type="time-series",
+                            required_for_abm=required_for_abm,
+                            format="nc",
+                            period={"start": t0, "end": t1},
+                            data_root=out_dir.parent,
+                        )
+                        log.info("    monthly NC → %s (period %s to %s)", path.name, t0, t1)
                     else:
                         # Monthly path: existing M11 logic (per-month TIF slicing)
                         result = func(aoi=aoi_obj, years=years, months=months, cache_dir=cache)

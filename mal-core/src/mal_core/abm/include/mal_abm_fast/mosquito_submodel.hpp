@@ -42,6 +42,8 @@
 #include "mal_abm_fast/host_seeking.hpp"
 #include "mal_abm_fast/oviposition_seeking.hpp"
 #include "mal_abm_fast/wind_field.hpp"
+#include "mal_abm_fast/species_params.hpp"
+#include "mal_abm_fast/effective_host_landscape.hpp"
 
 namespace mal_abm_fast {
 
@@ -118,6 +120,12 @@ public:
     void set_host_seeking_model(const HostSeekingModel* h) { host_seeking_ = h; }
     void set_oviposition_seeking_model(const OvipositionSeekingModel* o) { oviposition_seeking_ = o; }
     void set_habitat_engine(const HabitatEngine* h) { habitat_engine_for_ovip_ = h; }
+
+    // Species (M7.8): active species + params. Sets the default species_id
+    // for newly created mosquitoes and the salinity context for breeding.
+    void set_species(const SpeciesParams& sp) { species_params_ = sp; }
+    const SpeciesParams& species_params() const { return species_params_; }
+    void set_effective_host_landscape(EffectiveHostLandscape* e) { effective_hosts_ = e; }
 
     // Wind field setter (M7.6 — windborne migration).
     void set_wind_field(const WindField* w) { wind_field_ = w; }
@@ -211,6 +219,10 @@ private:
     const HostSeekingModel*      host_seeking_           = nullptr;
     const OvipositionSeekingModel* oviposition_seeking_  = nullptr;
     const HabitatEngine*         habitat_engine_for_ovip_ = nullptr;
+    EffectiveHostLandscape*      effective_hosts_        = nullptr;
+
+    // M7.8: active species params. Default = An. coluzzii.
+    SpeciesParams species_params_ = species_params_for(MosquitoSpeciesId::ANOPHELES_COLUZZII);
 
     // Wind field (M7.6 — non-owning pointer; Engine owns it).
     const WindField*        wind_field_        = nullptr;

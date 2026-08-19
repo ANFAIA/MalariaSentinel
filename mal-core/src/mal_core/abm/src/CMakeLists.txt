@@ -19,6 +19,8 @@ add_library(mal_abm_fast_core STATIC
     oviposition_seeking.cpp
     mobility_schedule.cpp
     wind_field.cpp
+    species_params.cpp
+    effective_host_landscape.cpp
 )
 target_include_directories(mal_abm_fast_core
     PUBLIC

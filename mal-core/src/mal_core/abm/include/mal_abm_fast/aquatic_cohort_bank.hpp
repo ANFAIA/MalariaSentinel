@@ -25,6 +25,7 @@
 #include "wire.hpp"
 #include "aquatic_stages.hpp"
 #include "pool_hydrology.hpp"
+#include "species_params.hpp"
 
 namespace mal_abm_fast {
 
@@ -77,6 +78,13 @@ public:
     void advance_day(const std::vector<PatchState>& patch_states,
                      const RuntimeOverrides& overrides);
 
+    // Set the active species. Salinity suitability of this species is
+    // applied as an independent larval-survival multiplier against the
+    // patch's salinity_ppt. Defaults to An. coluzzii (freshwater-peak),
+    // so with default freshwater patches behaviour is backward-compatible.
+    void set_species(const SpeciesParams& sp) { species_ = sp; }
+    const SpeciesParams& species() const { return species_; }
+
     // Collect emerged adults. Returns a list of EmergenceEvents
     // (one per patch with emergences). Removes emerged pupae
     // from the bank. Call AFTER advance_day().
@@ -99,6 +107,10 @@ public:
 
 private:
     std::vector<AquaticCohort> cohorts_;
+
+    // Active species for salinity response (defaults to coluzzii: the
+    // struct's in-class defaults give id + canonical_name = coluzzii).
+    SpeciesParams species_{};
 
     // Index: (patch_id, stage, instar) -> index into cohorts_
     using CohortKey = std::pair<int64_t, std::pair<uint8_t, uint8_t>>;
@@ -125,8 +137,9 @@ private:
     // Helper: promote eggs to L1, L1→L2, L2→L3, L3→L4, L4→Pupa.
     void promote_stages(const std::vector<PatchState>& patch_states);
 
-    // Helper: apply density-dependent mortality to larvae.
-    void larva_mortality_density(const RuntimeOverrides& overrides);
+    // Helper: apply density-dependent + salinity survival to larvae.
+    void larva_mortality_density(const std::vector<PatchState>& patch_states,
+                                 const RuntimeOverrides& overrides);
 
     // Helper: apply stage-specific mortality (eggs, pupae).
     void stage_mortality(const std::vector<PatchState>& patch_states);

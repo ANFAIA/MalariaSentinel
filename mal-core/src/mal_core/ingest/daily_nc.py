@@ -5,6 +5,7 @@ Combines:
   - JRC GSW water occurrence (static, normalized to [0, 1]) -> water_frac
   - ERA5 water temperature (deg C) -> water_temp_c
   - MODIS NDVI (vegetation index, clipped to [0, 1]) -> ndvi
+  - SMAP salinity (optional, M7.8) -> salinity_ppt (degree of marine influence)
 
 Optional M12 enrichment (when TIF files are present in data_dir):
   - HydroLAKES permanent water mask ({aoi}_permanent_lakes.tif) -> merged
@@ -64,6 +65,7 @@ def build_daily_env_nc(
     water_frac_file: pathlib.Path | None = None,
     water_temp_file: pathlib.Path | None = None,
     ndvi_file: pathlib.Path | None = None,
+    salinity_file: pathlib.Path | None = None,
 ) -> dict:
     """Build the daily env NC for an AOI. Returns manifest-ready dict.
 
@@ -73,6 +75,10 @@ def build_daily_env_nc(
         output_dir: where to write the NC (default: data_dir).
         rainfall_file, water_frac_file, water_temp_file, ndvi_file:
             override input paths (default: conventional filenames in data_dir).
+        salinity_file: optional SMAP monthly salinity NC. Defaults to a
+            conventional ``{aoi}_salinity_<start>_<end>_monthly.nc`` discovered
+            in data_dir. When absent, no ``salinity_ppt`` variable is emitted
+            (backward compatible).
 
     Returns:
         dict with 'env_path' (str), 'format' ('nc'), 'aoi_slug', 'n_days',
@@ -203,6 +209,25 @@ def build_daily_env_nc(
     water_temp_c = _annual_raster_stack("water_temp", water_temp_file, 25.0)
     ndvi = np.clip(_annual_raster_stack("ndvi", ndvi_file, 0.5), 0.0, 1.0)
 
+    # SMAP monthly sea surface salinity -> salinity_ppt (M7.8), optional.
+    # Reproject each month to the AOI grid, mask land/no-data cells to 0.0
+    # (freshwater), and broadcast the monthly value to every day of that month.
+    # Absent file -> no salinity_ppt variable at all (backward compatible).
+    salinity_monthly = None
+    salinity_ppt = None
+    salinity_path = salinity_file or _find_salinity_monthly(data_dir)
+    if salinity_path is not None and salinity_path.exists():
+        print(f"Reading salinity (monthly): {salinity_path}")
+        salinity_monthly = _read_salinity_monthly(salinity_path, y, x, _env_crs(rain_ds))
+    if salinity_monthly is not None:
+        salinity_ppt = np.zeros((n_days, h, w), dtype=np.float32)
+        for index, timestamp in enumerate(times):
+            month_key = timestamp.astype("datetime64[M]").astype("datetime64[D]")
+            arr = salinity_monthly.get(month_key)
+            if arr is not None:
+                # Cells without SMAP data (land, fill, mission gap) -> freshwater 0.0.
+                salinity_ppt[index] = np.nan_to_num(arr, nan=0.0)
+
     ds = xr.Dataset(
         {
             "water_frac": (["time", "y", "x"], water_frac,
@@ -228,6 +253,12 @@ def build_daily_env_nc(
             "m12_enriched": int(permanent_water_mask is not None or wetland_mask is not None),
         },
     )
+    if salinity_ppt is not None:
+        ds["salinity_ppt"] = (
+            ["time", "y", "x"], salinity_ppt,
+            {"long_name": "SMAP RSS L3 monthly sea surface salinity (broadcast)",
+             "units": "psu"},
+        )
     for name, component in component_masks.items():
         ds[f"m12_{name}"] = (
             ["time", "y", "x"], np.broadcast_to(component, (n_days, h, w)).copy(),
@@ -252,6 +283,8 @@ def build_daily_env_nc(
 
     # Core variables are always written with zlib; diagnostic vars too
     encoding_vars = ["water_frac", "rainfall", "water_temp_c", "ndvi"]
+    if salinity_ppt is not None:
+        encoding_vars.append("salinity_ppt")
     if permanent_water_mask is not None:
         encoding_vars.append("permanent_water_mask")
     if wetland_mask is not None:
@@ -280,6 +313,8 @@ def build_daily_env_nc(
     # Manifest variable list: core ABM variables always present; M12 diagnostics
     # are optional (C++ reader ignores them, but they're useful for analysis).
     variables = ["water_frac", "rainfall", "water_temp_c", "ndvi"]
+    if salinity_ppt is not None:
+        variables.append("salinity_ppt")
     if permanent_water_mask is not None:
         variables.append("permanent_water_mask")
     if wetland_mask is not None:
@@ -295,6 +330,70 @@ def build_daily_env_nc(
         "variables": variables,
         "m12_enriched": permanent_water_mask is not None or wetland_mask is not None,
     }
+
+
+def _find_salinity_monthly(data_dir: pathlib.Path) -> pathlib.Path | None:
+    """Locate the SMAP monthly salinity NC by conventional glob fallback."""
+    candidates = sorted(data_dir.glob(f"*salinity*monthly*.nc"))
+    if candidates:
+        return candidates[0]
+    candidates = sorted(data_dir.glob("*salinity*.nc"))
+    return candidates[0] if candidates else None
+
+
+def _env_crs(rain_ds: xr.Dataset) -> str:
+    """CRS of the env grid, read from the rainfall NC (fallback EPSG:4326)."""
+    try:
+        crs = rain_ds.rio.crs
+        if crs is not None:
+            return str(crs)
+    except Exception:  # noqa: BLE001 — no rioxarray CRS attached
+        pass
+    return "EPSG:4326"
+
+
+def _reference_grid(y: np.ndarray, x: np.ndarray, crs: str) -> xr.DataArray:
+    """1-pixel reference DataArray covering the env (y, x) grid in ``crs``."""
+    h, w = len(y), len(x)
+    transform = rasterio.transform.from_bounds(x.min(), y.min(), x.max(), y.max(), w, h)
+    arr = np.zeros((h, w), dtype=np.float32)
+    ref = xr.DataArray(arr, dims=("y", "x"), coords={"y": y, "x": x})
+    ref.rio.write_crs(crs, inplace=True)
+    ref.rio.write_transform(transform, inplace=True)
+    return ref
+
+
+def _read_salinity_monthly(
+    path: pathlib.Path, y: np.ndarray, x: np.ndarray, crs: str
+) -> dict[np.datetime64, np.ndarray]:
+    """Read a SMAP monthly salinity NC, reproject each month to the env grid.
+
+    Returns ``{month_start_day_precision: (H, W) float32}`` mapping, one entry
+    per month in the file. Land / no-data cells are left as NaN so the caller
+    can decide the freshwater (0.0) replacement.
+    """
+    resampling = rasterio.enums.Resampling.bilinear
+    ref = _reference_grid(y, x, crs)
+    out: dict[np.datetime64, np.ndarray] = {}
+    with xr.open_dataset(path) as ds:
+        if "salinity" not in ds:
+            raise ValueError(
+                f"salinity NC {path} has no 'salinity' variable; "
+                f"vars={sorted(ds.data_vars)}"
+            )
+        sss = ds["salinity"]
+        # SMAP is always WGS-84; the runner embeds CRS via rioxarray, but
+        # guard against a file written without a spatial_ref coordinate.
+        if sss.rio.crs is None:
+            sss.rio.write_crs("EPSG:4326", inplace=True)
+        times = ds.time.values
+        for i in range(int(sss.sizes["time"])):
+            month_da = sss.isel(time=i, drop=True)
+            rep = month_da.rio.reproject_match(ref, resampling=resampling)
+            arr = np.asarray(rep.values, dtype=np.float32)
+            key = np.datetime64(str(times[i])[:10], "D")
+            out[key] = arr
+    return out
 
 
 def _find_chirps_daily(data_dir: pathlib.Path) -> pathlib.Path:

@@ -260,6 +260,7 @@ struct PatchState {
     // Pool hydrology (M14).
     float   pool_water_mm = 0.0f;     // current pool water depth (mm)
     int     pool_days_dry = 0;        // consecutive dry days
+    float   salinity_ppt  = 0.0f;     // env water salinity (psu); 0 = freshwater
 };
 
 // A single habitat patch loaded from the gpkg. Carries the cell (row, col),

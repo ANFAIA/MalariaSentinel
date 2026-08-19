@@ -120,3 +120,17 @@ target_link_libraries(test_mobility
     PRIVATE mal_abm_fast_core GTest::gtest GTest::gtest_main mal_abm_fast::warnings
 )
 gtest_discover_tests(test_mobility)
+
+# M7.8: Species identity + SpeciesParams registry.
+add_executable(test_species test_species.cpp)
+target_link_libraries(test_species
+    PRIVATE mal_abm_fast_core GTest::gtest GTest::gtest_main mal_abm_fast::warnings
+)
+gtest_discover_tests(test_species)
+
+# M7.8: EffectiveHostLandscape multinomial phase operator.
+add_executable(test_effective_hosts test_effective_hosts.cpp)
+target_link_libraries(test_effective_hosts
+    PRIVATE mal_abm_fast_core GTest::gtest GTest::gtest_main mal_abm_fast::warnings
+)
+gtest_discover_tests(test_effective_hosts)

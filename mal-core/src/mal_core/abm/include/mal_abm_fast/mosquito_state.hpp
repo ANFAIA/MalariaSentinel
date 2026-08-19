@@ -42,6 +42,7 @@ struct MosquitoSoA {
     std::vector<uint8_t>  gonotrophic_state;      // GonotrophicState enum
     std::vector<int32_t>  gonotrophic_timer;      // days in current state
     std::vector<float>    feeding_success;         // 1.0 if fed today, 0.0 otherwise
+    std::vector<uint8_t>  species_id;              // MosquitoSpeciesId (0 = ANOPHELES_COLUZZII)
 
     // Patch tracking cache (Plan D Phase 4): last (row, col) passed to
     // update_patch_id(). If the agent hasn't moved since the last call,

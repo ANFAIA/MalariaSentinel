@@ -165,6 +165,24 @@ Engine::Engine(AOI aoi,
         sub_->set_host_seeking_model(host_seeking_model_.get());
     }
 
+    // -- M7.8 species + effective host landscape -----------------------------
+    sub_->set_species(species_params_);
+    sub_->cohort_bank_mutable().set_species(species_params_);
+    if (host_seeking_model_) {
+        host_seeking_model_->set_species_params(species_params_);
+    }
+    if (mobility_schedule_ && mobility_schedule_->has_data() &&
+        host_landscape_) {
+        effective_hosts_ = std::make_unique<EffectiveHostLandscape>();
+        effective_hosts_->set_schedule(mobility_schedule_.get());
+        const auto res_h = residential_human_grid();
+        const auto res_l = residential_livestock_grid();
+        effective_hosts_->configure(
+            res_h, res_l, static_cast<int32_t>(res_h.size()));
+        sub_->set_effective_host_landscape(effective_hosts_.get());
+        std::cout << "Engine: wired EffectiveHostLandscape (phase-aware)\n";
+    }
+
     // -- Optional wind field (M7.6) -----------------------------------------
     if (!wind_field_path.empty()) {
         wind_field_ = std::make_unique<WindField>();
@@ -262,6 +280,24 @@ Engine::Engine(AOI aoi,
     if (host_landscape_) {
         host_seeking_model_ = std::make_unique<HostSeekingModel>();
         sub_->set_host_seeking_model(host_seeking_model_.get());
+    }
+
+    // -- M7.8 species + effective host landscape -----------------------------
+    sub_->set_species(species_params_);
+    sub_->cohort_bank_mutable().set_species(species_params_);
+    if (host_seeking_model_) {
+        host_seeking_model_->set_species_params(species_params_);
+    }
+    if (mobility_schedule_ && mobility_schedule_->has_data() &&
+        host_landscape_) {
+        effective_hosts_ = std::make_unique<EffectiveHostLandscape>();
+        effective_hosts_->set_schedule(mobility_schedule_.get());
+        const auto res_h = residential_human_grid();
+        const auto res_l = residential_livestock_grid();
+        effective_hosts_->configure(
+            res_h, res_l, static_cast<int32_t>(res_h.size()));
+        sub_->set_effective_host_landscape(effective_hosts_.get());
+        std::cout << "Engine: wired EffectiveHostLandscape (phase-aware)\n";
     }
 
     // -- Optional wind field (M7.6) -----------------------------------------
@@ -386,6 +422,38 @@ void Engine::snapshot(const std::string& path,
 
 int64_t Engine::total_agents() const {
     return sub_ ? sub_->total_agents() : 0;
+}
+
+std::vector<float> Engine::residential_human_grid() const {
+    std::vector<float> out;
+    if (!host_landscape_) return out;
+    const int32_t h = host_landscape_->h();
+    const int32_t w = host_landscape_->w();
+    out.reserve(static_cast<size_t>(h) * static_cast<size_t>(w));
+    for (int32_t r = 0; r < h; ++r) {
+        for (int32_t c = 0; c < w; ++c) {
+            out.push_back(host_landscape_->at(r, c).humans_present);
+        }
+    }
+    return out;
+}
+
+std::vector<float> Engine::residential_livestock_grid() const {
+    std::vector<float> out;
+    if (!host_landscape_) return out;
+    const int32_t h = host_landscape_->h();
+    const int32_t w = host_landscape_->w();
+    out.reserve(static_cast<size_t>(h) * static_cast<size_t>(w));
+    for (int32_t r = 0; r < h; ++r) {
+        for (int32_t c = 0; c < w; ++c) {
+            const auto cell = host_landscape_->at(r, c);
+            // Livestock = cattle + goats + sheep + pigs + chickens.
+            out.push_back(cell.cattle_present + cell.goats_present +
+                          cell.sheep_present + cell.pigs_present +
+                          cell.chickens_present);
+        }
+    }
+    return out;
 }
 
 }  // namespace mal_abm_fast

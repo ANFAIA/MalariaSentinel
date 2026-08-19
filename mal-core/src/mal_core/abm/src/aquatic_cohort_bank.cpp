@@ -238,8 +238,17 @@ void AquaticCohortBank::stage_mortality(
 
 // ---------------------------------------------------------------------------
 // larva_mortality_density — Beverton-Holt density-dependent mortality
+// plus the species salinity factor (Fase 6).
+//
+// Density-dependent survival is multiplied by the species' salinity
+// suitability s_hat = salinity_suitability(species_, patch.salinity_ppt)
+// as an INDEPENDENT factor. water_frac / pool hydrology are untouched:
+// salinity only gates species compatibility of the water, not its presence.
+// With the default coluzzii params and freshwater patches (salinity 0 psu)
+// s_hat == 1.0, so the legacy behaviour is preserved exactly.
 // ---------------------------------------------------------------------------
 void AquaticCohortBank::larva_mortality_density(
+    const std::vector<PatchState>& patch_states,
     const RuntimeOverrides& overrides) {
     // Aggregate larva count per patch across all instars
     std::unordered_map<int64_t, int64_t> larva_per_patch;
@@ -249,13 +258,24 @@ void AquaticCohortBank::larva_mortality_density(
         }
     }
 
+    // Patch salinity lookup (missing patch => 0.0 freshwater => s_hat = 1.0)
+    std::unordered_map<int64_t, float> salinity_by_patch;
+    for (const auto& ps : patch_states) {
+        salinity_by_patch[ps.patch_id] = ps.salinity_ppt;
+    }
+
     const double K = static_cast<double>(K_MAX);
     std::mt19937_64 rng(123);  // deterministic
     for (auto& c : cohorts_) {
         if (c.count <= 0 || c.stage != AquaticStage::LARVA) continue;
         const int64_t N = larva_per_patch[c.patch_id];
-        const double p = static_cast<double>(LARVA_BH_S0) * K /
+        double p = static_cast<double>(LARVA_BH_S0) * K /
             (K + static_cast<double>(overrides.larva_bh_alpha) * static_cast<double>(N));
+        // Independent salinity suitability multiplier (Fase 6).
+        auto it = salinity_by_patch.find(c.patch_id);
+        const float psu = (it == salinity_by_patch.end()) ? 0.0f : it->second;
+        const float s_hat = salinity_suitability(species_, psu);
+        if (s_hat < 1.0f) p *= static_cast<double>(s_hat);
         // Binomial survival
         std::binomial_distribution<int64_t> dist(c.count, p);
         c.count = dist(rng);
@@ -349,9 +369,9 @@ void AquaticCohortBank::advance_day(
     // 2. Washout (heavy rain flushes aquatic cohorts)
     washout(patch_states);
 
-    // 3. Stage mortality (egg/pupa background, larva density-dependent)
+    // 3. Stage mortality (egg/pupa background, larva density + salinity)
     stage_mortality(patch_states);
-    larva_mortality_density(overrides);
+    larva_mortality_density(patch_states, overrides);
 
     // 3. Development + promotion
     promote_stages(patch_states);

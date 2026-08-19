@@ -27,6 +27,8 @@
 #include "seeding.hpp"
 #include "wire.hpp"
 #include "wind_field.hpp"
+#include "species_params.hpp"
+#include "effective_host_landscape.hpp"
 
 namespace mal_abm_fast {
 
@@ -171,6 +173,17 @@ private:
 
     // Optional wind field (M7.6 — loaded when --wind-field is provided).
     std::unique_ptr<WindField>              wind_field_;
+
+    // M7.8: active species + phase-aware effective host landscape.
+    SpeciesParams species_params_ =
+        species_params_for(MosquitoSpeciesId::ANOPHELES_COLUZZII);
+    std::unique_ptr<EffectiveHostLandscape> effective_hosts_;
+
+    // Extract per-cell residential human / livestock grids from the
+    // loaded HostLandscape (row-major, length h*w). Used to configure
+    // the EffectiveHostLandscape. Empty when no landscape is loaded.
+    std::vector<float> residential_human_grid() const;
+    std::vector<float> residential_livestock_grid() const;
 };
 
 }  // namespace mal_abm_fast

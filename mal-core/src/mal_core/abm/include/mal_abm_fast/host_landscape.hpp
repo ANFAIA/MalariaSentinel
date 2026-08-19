@@ -38,6 +38,15 @@ struct HostCell {
 
 /// Grid-wide host density landscape.  Loads from `host_static.nc` or
 /// returns sensible defaults when the file is missing.
+///
+/// The class serves two roles:
+///   * the static **residential** grid (loaded from NC), and
+///   * an **effective** view built by `make_effective` for a specific
+///     phase (H_eff(d, p)).  Effective views are deep copies of the
+///     residential cells with per-cell humans (and optionally cattle)
+///     replaced by runtime-supplied values; they never mutate the
+///     residential grid they were derived from.  `is_effective()`
+///     distinguishes the two so callers know which grid they hold.
 class HostLandscape {
 public:
     HostLandscape() = default;
@@ -56,11 +65,40 @@ public:
     /// True if data was loaded from a real NC file (vs defaults).
     bool has_data() const { return has_data_; }
 
+    /// True if this grid is an effective (phase-specific) view built by
+    /// `make_effective`, as opposed to the static residential grid.
+    bool is_effective() const { return is_effective_; }
+
+    /// Build an effective (phase-specific) host landscape view for one
+    /// phase: a deep copy of `residential` in which every cell's
+    /// `humans_present` is replaced by the H_eff value supplied in
+    /// `h_eff_human` (row-major, length h*w).  Non-human fields
+    /// (livestock, urbanicity, building fractions) are inherited from
+    /// the residential grid unchanged.  The residential grid itself is
+    /// NOT modified.
+    ///
+    /// Throws std::runtime_error if dimensions are non-positive or
+    /// `h_eff_human` does not match h*w.
+    static HostLandscape make_effective(
+        const HostLandscape& residential,
+        const std::vector<float>& h_eff_human,
+        int32_t h, int32_t w);
+
+    /// Overload that also replaces `cattle_present` per cell from
+    /// `h_eff_cattle` (e.g. the livestock H_eff grid).  Pass an empty
+    /// vector to leave cattle as the residential value.
+    static HostLandscape make_effective(
+        const HostLandscape& residential,
+        const std::vector<float>& h_eff_human,
+        const std::vector<float>& h_eff_cattle,
+        int32_t h, int32_t w);
+
 private:
     std::vector<HostCell> cells_;
     int32_t h_ = 0;
     int32_t w_ = 0;
     bool has_data_ = false;
+    bool is_effective_ = false;
 };
 
 }  // namespace mal_abm_fast

@@ -264,4 +264,64 @@ HostCell HostLandscape::at(int32_t row, int32_t col) const {
                   static_cast<size_t>(col)];
 }
 
+// ---------------------------------------------------------------------------
+// Effective (phase-specific) views
+// ---------------------------------------------------------------------------
+
+HostLandscape HostLandscape::make_effective(
+    const HostLandscape& residential,
+    const std::vector<float>& h_eff_human,
+    int32_t h, int32_t w) {
+    // Humans-only override (cattle inherited from residential).
+    return make_effective(residential, h_eff_human, {}, h, w);
+}
+
+HostLandscape HostLandscape::make_effective(
+    const HostLandscape& residential,
+    const std::vector<float>& h_eff_human,
+    const std::vector<float>& h_eff_cattle,
+    int32_t h, int32_t w) {
+    if (h <= 0 || w <= 0) {
+        throw std::runtime_error(
+            "host_landscape: make_effective with non-positive grid");
+    }
+    const size_t n = static_cast<size_t>(h) * static_cast<size_t>(w);
+    if (h_eff_human.size() != n) {
+        throw std::runtime_error(
+            "host_landscape: make_effective h_eff_human size mismatch: got "
+            + std::to_string(h_eff_human.size()) + ", expected "
+            + std::to_string(n));
+    }
+    if (!h_eff_cattle.empty() && h_eff_cattle.size() != n) {
+        throw std::runtime_error(
+            "host_landscape: make_effective h_eff_cattle size mismatch: got "
+            + std::to_string(h_eff_cattle.size()) + ", expected "
+            + std::to_string(n));
+    }
+
+    // Deep copy of the residential cells; the residential grid itself is
+    // never mutated.  at() returns defaults for out-of-range cells, so a
+    // residential grid smaller than h x w still yields a valid effective
+    // view (defaults + H_eff humans).
+    HostLandscape eff;
+    eff.h_ = h;
+    eff.w_ = w;
+    eff.has_data_ = residential.has_data_;
+    eff.is_effective_ = true;
+    eff.cells_.resize(n);
+    for (int32_t r = 0; r < h; ++r) {
+        for (int32_t c = 0; c < w; ++c) {
+            const size_t idx = static_cast<size_t>(r) * static_cast<size_t>(w)
+                             + static_cast<size_t>(c);
+            HostCell cell = residential.at(r, c);
+            cell.humans_present = h_eff_human[idx];
+            if (!h_eff_cattle.empty()) {
+                cell.cattle_present = h_eff_cattle[idx];
+            }
+            eff.cells_[idx] = cell;
+        }
+    }
+    return eff;
+}
+
 }  // namespace mal_abm_fast

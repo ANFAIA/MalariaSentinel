@@ -283,14 +283,20 @@ public:
     }
 
     /// Load from a directory containing expected CSR files.
-    void load_from_directory(const std::string& dir, const AOI& /*aoi*/) {
+    ///
+    /// Filenames are derived from the AOI slug so they match what ingest
+    /// produces (e.g. slug "ghana" -> ghana_mobility_day.csr,
+    /// ghana_mobility_night.csr, ghana_livestock_mobility.csr). Files are
+    /// loaded only when present; missing files are skipped silently.
+    void load_from_directory(const std::string& dir, const AOI& aoi) {
         namespace fs = std::filesystem;
         const fs::path base(dir);
         if (!fs::exists(base)) return;
 
-        const auto day_p   = base / "human_mobility_day.csr";
-        const auto night_p = base / "human_mobility_night.csr";
-        const auto live_p  = base / "livestock_mobility_season.csr";
+        const std::string slug = aoi.slug.empty() ? "custom" : aoi.slug;
+        const auto day_p   = base / (slug + "_mobility_day.csr");
+        const auto night_p = base / (slug + "_mobility_night.csr");
+        const auto live_p  = base / (slug + "_livestock_mobility.csr");
 
         if (fs::exists(day_p) && fs::exists(night_p)) {
             load_human_od(day_p.string(), night_p.string());

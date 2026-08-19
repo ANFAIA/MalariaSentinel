@@ -66,6 +66,7 @@ inline void swap_with_last(MosquitoSoA& soa, int64_t i, int64_t n) {
     std::swap(soa.gonotrophic_state[i], soa.gonotrophic_state[n - 1]);
     std::swap(soa.gonotrophic_timer[i], soa.gonotrophic_timer[n - 1]);
     std::swap(soa.feeding_success[i],   soa.feeding_success[n - 1]);
+    std::swap(soa.species_id[i],        soa.species_id[n - 1]);
     std::swap(soa.last_patch_update_row[i], soa.last_patch_update_row[n - 1]);
     std::swap(soa.last_patch_update_col[i], soa.last_patch_update_col[n - 1]);
 }
@@ -91,6 +92,7 @@ inline void trim_soa(MosquitoSoA& soa, size_t new_size) {
     soa.gonotrophic_state.resize(new_size);
     soa.gonotrophic_timer.resize(new_size);
     soa.feeding_success.resize(new_size);
+    soa.species_id.resize(new_size);
     soa.last_patch_update_row.resize(new_size);
     soa.last_patch_update_col.resize(new_size);
 }
@@ -182,6 +184,8 @@ MosquitoSubmodel::MosquitoSubmodel(int32_t n_patches, int32_t k_per_patch,
                 static_cast<uint8_t>(GonotrophicState::TENERAL));
             soa_.gonotrophic_timer.push_back(0);
             soa_.feeding_success.push_back(0.0f);
+            soa_.species_id.push_back(
+                static_cast<uint8_t>(species_params_.id));
             soa_.last_patch_update_row.push_back(0);
             soa_.last_patch_update_col.push_back(0);
         }
@@ -283,6 +287,8 @@ MosquitoSubmodel::MosquitoSubmodel(int32_t n_patches, int32_t k_per_patch,
                 static_cast<uint8_t>(GonotrophicState::TENERAL));
             soa_.gonotrophic_timer.push_back(0);
             soa_.feeding_success.push_back(0.0f);
+            soa_.species_id.push_back(
+                static_cast<uint8_t>(species_params_.id));
             soa_.last_patch_update_row.push_back(inst.row);
             soa_.last_patch_update_col.push_back(inst.col);
         }
@@ -431,6 +437,8 @@ void MosquitoSubmodel::advance_day(const AOI& aoi,
                 static_cast<uint8_t>(GonotrophicState::TENERAL));
             soa_.gonotrophic_timer.push_back(0);
             soa_.feeding_success.push_back(0.0f);
+            soa_.species_id.push_back(
+                static_cast<uint8_t>(species_params_.id));
             soa_.last_patch_update_row.push_back(ev.row);
             soa_.last_patch_update_col.push_back(ev.col);
         }
@@ -591,18 +599,39 @@ void MosquitoSubmodel::advance_day(const AOI& aoi,
             n_ovipositions += eggs;
         }
 
-        // Nightly host-seeking: attempt feeding if HOST_SEEKING
+        // Nightly host-seeking: attempt feeding if HOST_SEEKING.
+        // M7.8 F4: when an effective-host landscape is wired, the actual
+        // phase-aware feeding is handled AFTER this loop in a dedicated pass
+        // that builds each H_eff(d,p) once and shares it across all
+        // HOST_SEEKING females. Here we only run the single-phase residential
+        // fallback (used when mobility is absent).
         if (g_state == GonotrophicState::HOST_SEEKING) {
-            n_feeding_attempts++;
-            if (host_landscape_ && host_seeking_) {
-                // Use spatial host-seeking model with real host landscape.
-                auto attractions = host_seeking_->compute_attraction(
-                    soa_.row[si], soa_.col[si], *host_landscape_, aoi);
-                const HostType host = host_seeking_->select_host(attractions, rng_);
-                bite_ledger_.record_attempt(
-                    soa_.row[si], soa_.col[si], host);
-                // Check if any hosts are present (attraction field non-empty).
-                if (!attractions.empty()) {
+            const bool phase_aware =
+                (effective_hosts_ && host_landscape_ && host_seeking_);
+            if (!phase_aware) {
+                n_feeding_attempts++;
+                if (host_landscape_ && host_seeking_) {
+                    // Use spatial host-seeking model with real host landscape.
+                    auto attractions = host_seeking_->compute_attraction(
+                        soa_.row[si], soa_.col[si], *host_landscape_, aoi);
+                    const HostType host = host_seeking_->select_host(attractions, rng_);
+                    bite_ledger_.record_attempt(
+                        soa_.row[si], soa_.col[si], host);
+                    // Check if any hosts are present (attraction field non-empty).
+                    if (!attractions.empty()) {
+                        g_state = GonotrophicState::BLOOD_FED;
+                        g_timer = 0;
+                        soa_.gonotrophic_state[si] = static_cast<uint8_t>(g_state);
+                        soa_.gonotrophic_timer[si] = g_timer;
+                        soa_.feeding_success[si] = 1.0f;
+                        n_successful_feeds++;
+                        bite_ledger_.record_success(
+                            soa_.row[si], soa_.col[si], host);
+                    }
+                } else {
+                    // Fallback: deterministic feeding with default host (HUMAN).
+                    bite_ledger_.record_attempt(
+                        soa_.row[si], soa_.col[si], HostType::HUMAN);
                     g_state = GonotrophicState::BLOOD_FED;
                     g_timer = 0;
                     soa_.gonotrophic_state[si] = static_cast<uint8_t>(g_state);
@@ -610,46 +639,68 @@ void MosquitoSubmodel::advance_day(const AOI& aoi,
                     soa_.feeding_success[si] = 1.0f;
                     n_successful_feeds++;
                     bite_ledger_.record_success(
-                        soa_.row[si], soa_.col[si], host);
+                        soa_.row[si], soa_.col[si], HostType::HUMAN);
                 }
-            } else {
-                // Fallback: deterministic feeding with default host (HUMAN).
-                bite_ledger_.record_attempt(
-                    soa_.row[si], soa_.col[si], HostType::HUMAN);
-                g_state = GonotrophicState::BLOOD_FED;
-                g_timer = 0;
-                soa_.gonotrophic_state[si] = static_cast<uint8_t>(g_state);
-                soa_.gonotrophic_timer[si] = g_timer;
-                soa_.feeding_success[si] = 1.0f;
-                n_successful_feeds++;
-                bite_ledger_.record_success(
-                    soa_.row[si], soa_.col[si], HostType::HUMAN);
             }
+            // When phase_aware, feeding happens in the post-loop pass below;
+            // leave g_state == HOST_SEEKING here.
         }
     }
 
-    // -- G14: host-seeking using HostSeekingModel --
-    if (host_seeking_ && host_landscape_) {
-        for (int64_t i = 0; i < soa_.n_alive; ++i) {
-            const size_t si = static_cast<size_t>(i);
-            if (soa_.stage[si] != 1) continue;
-            if (soa_.sex[si] != 1) continue;
-            auto gs = static_cast<GonotrophicState>(soa_.gonotrophic_state[si]);
-            if (gs != GonotrophicState::HOST_SEEKING) continue;
+    // -- M7.8 F4: phase-aware host-seeking pass ------------------------------
+    // Build H_eff(d,p) ONCE per (day, phase) and share it across all
+    // HOST_SEEKING females (plan §3.3: one realization per day+phase).
+    // A female feeds in the first active phase where hosts are detected.
+    if (effective_hosts_ && host_landscape_ && host_seeking_) {
+        const int32_t h = cells_per_side_h(aoi);
+        const int32_t w = aoi.cells_per_side();
+        for (int p = 0; p < PHASE_WEIGHT_COUNT; ++p) {
+            const TimePhase phase = static_cast<TimePhase>(p);
+            if (!phase_active(species_params_, phase)) continue;
 
-            const auto attractions = host_seeking_->compute_attraction(
-                soa_.row[si], soa_.col[si], *host_landscape_, aoi);
-            const HostType host = host_seeking_->select_host(attractions, rng_);
+            const EffectiveGrid eff_grid =
+                effective_hosts_->sample_effective_hosts(
+                    day_idx, phase, /*is_livestock=*/false, rng_);
+            const HostLandscape eff =
+                HostLandscape::make_effective(
+                    *host_landscape_, eff_grid, h, w);
 
-            n_feeding_attempts++;
-            bite_ledger_.record_attempt(soa_.row[si], soa_.col[si], host);
+            for (int64_t i = 0; i < soa_.n_alive; ++i) {
+                const size_t si = static_cast<size_t>(i);
+                if (soa_.stage[si] != 1) continue;
+                if (soa_.sex[si] != 1) continue;
+                const auto gs =
+                    static_cast<GonotrophicState>(soa_.gonotrophic_state[si]);
+                if (gs != GonotrophicState::HOST_SEEKING) continue;
 
-            gs = GonotrophicState::BLOOD_FED;
-            soa_.gonotrophic_state[si] = static_cast<uint8_t>(gs);
-            soa_.gonotrophic_timer[si] = 0;
-            soa_.feeding_success[si] = 1.0f;
-            n_successful_feeds++;
-            bite_ledger_.record_success(soa_.row[si], soa_.col[si], host);
+                // Directed movement toward the best host cell (plan F3).
+                const auto target = host_seeking_->step_toward_host(
+                    soa_.row[si], soa_.col[si], eff, aoi, 500.0f);
+                if (target) {
+                    soa_.row[si] = target->first;
+                    soa_.col[si] = target->second;
+                    update_patch_id(i, soa_.row[si], soa_.col[si],
+                                    patch_states, aoi);
+                }
+
+                const auto attractions = host_seeking_->compute_attraction(
+                    soa_.row[si], soa_.col[si], eff, aoi);
+                const HostType host =
+                    host_seeking_->select_host(attractions, rng_);
+                n_feeding_attempts++;
+                bite_ledger_.record_attempt(
+                    soa_.row[si], soa_.col[si], host);
+                if (!attractions.empty()) {
+                    soa_.gonotrophic_state[si] =
+                        static_cast<uint8_t>(GonotrophicState::BLOOD_FED);
+                    soa_.gonotrophic_timer[si] = 0;
+                    soa_.feeding_success[si] = 1.0f;
+                    n_successful_feeds++;
+                    bite_ledger_.record_success(
+                        soa_.row[si], soa_.col[si], host);
+                    // BLOOD_FED: skip later phases for this female.
+                }
+            }
         }
     }
 

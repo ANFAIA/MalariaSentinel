@@ -32,9 +32,22 @@
 #include "aoi.hpp"
 #include "gonotrophic_cycle.hpp"
 #include "host_landscape.hpp"
+#include "mobility_schedule.hpp"
 #include "prng.hpp"
+#include "species_params.hpp"
 
 namespace mal_abm_fast {
+
+/// Activity-epsilon for the phase gate (Fase 4).
+inline constexpr float kPhaseActivityEpsilon = 0.001f;
+
+/// Phase-activity gate (Fase 4): true iff the species is active in the
+/// given phase, i.e. `sp.activity_weights[phase] > epsilon`.  Callers
+/// (engine step per phase) use this to decide whether host-seeking and
+/// directed movement run during a phase for a species.
+inline bool phase_active(const SpeciesParams& sp, TimePhase phase) {
+    return sp.activity_weights[static_cast<size_t>(phase)] > kPhaseActivityEpsilon;
+}
 
 /// Attraction score for one cell.  Returned by compute_attraction().
 struct HostAttraction {
@@ -68,11 +81,28 @@ public:
     /// the mosquito at (mosquito_row, mosquito_col).  Returns one
     /// HostAttraction per nearby cell with attraction > 0, sorted by
     /// descending attraction.
+    ///
+    /// `search_radius_m` defaults to a -1.0f sentinel: when species
+    /// params are set (set_species_params) the species
+    /// `host_seeking_radius_m` is used; otherwise 300m
+    /// (HOST_SEEKING_RADIUS_M).  Any positive value overrides both.
     std::vector<HostAttraction> compute_attraction(
         int32_t mosquito_row, int32_t mosquito_col,
         const HostLandscape& landscape,
         const AOI& aoi,
-        float search_radius_m = 300.0f) const;
+        float search_radius_m = -1.0f) const;
+
+    /// Configure the model with per-species host preferences and
+    /// host-seeking kernel (Fase 3/4).  Rebuilds the internal
+    /// HostPreference from `sp.pref_human / pref_cattle / pref_goat /
+    /// pref_sheep / pref_wildlife`, uses `sp.host_seeking_scale_m` for
+    /// the distance decay, and `sp.host_seeking_radius_m` as the
+    /// default compute_attraction radius.  The default HostPreference
+    /// path remains the fallback until this is called (backward compat).
+    void set_species_params(const SpeciesParams& sp);
+
+    /// True after set_species_params() has been called.
+    bool has_species_params() const { return has_species_params_; }
 
     /// Stochastically select a host type from the attraction field.
     /// Returns the dominant host type if the field is empty.
@@ -102,8 +132,25 @@ public:
         const AOI& aoi,
         double range_m = 2000.0) const;
 
+    /// One directed movement step toward the strongest detected host
+    /// cell (Fase 3: "movimiento dirigido del mosquito", no external
+    /// Plan D dependency).  Reuses detect_host_cell (range 2000m) and
+    /// approach_vector (step_size_m, default 50m): if a host cell is
+    /// detected, returns the new (row, col) after one step (rounded to
+    /// the nearest cell, clamped to the grid); else nullopt.  Pure
+    /// function — the integration calls it once per phase for
+    /// HOST_SEEKING mosquitoes within detection range.
+    std::optional<std::pair<int32_t, int32_t>> step_toward_host(
+        int32_t row, int32_t col,
+        const HostLandscape& eff_landscape,
+        const AOI& aoi,
+        float step_size_m = 50.0f) const;
+
 private:
     HostPreference pref_;
+    SpeciesParams species_;
+    bool has_species_params_ = false;
+    float scale_m_ = HOST_SEEKING_SCALE_M;
 
     /// Compute per-host-type attraction for one cell.
     float cell_attraction(

@@ -32,10 +32,12 @@ namespace mal_abm_fast {
 float HostSeekingModel::cell_attraction(
     const HostCell& cell, float dist_m) const
 {
-    // Exponential distance decay: scale = 100m (CO₂ + body-odour plume).
-    // Giraldo 2023: CO₂ detection ~60m; Spitzen 2013: 60-70m nocturnal;
-    // Okumu 2013: significant attraction at 70m, activates at 100m.
-    const float kScale = HOST_SEEKING_SCALE_M;
+    // Exponential distance decay: scale = species host_seeking_scale_m
+    // (default 100m, CO₂ + body-odour plume; overridable via
+    // set_species_params). Giraldo 2023: CO₂ detection ~60m; Spitzen
+    // 2013: 60-70m nocturnal; Okumu 2013: significant attraction at
+    // 70m, activates at 100m.
+    const float kScale = scale_m_;
     const float decay = std::exp(-dist_m / kScale);
 
     // Indoor modifier: endophilic species get a boost indoors.
@@ -97,13 +99,21 @@ std::vector<HostAttraction> HostSeekingModel::compute_attraction(
     const int32_t grid_w = landscape.w();
     if (grid_h <= 0 || grid_w <= 0) return result;
 
+    // Resolve the effective search radius: positive caller value wins;
+    // otherwise the species radius (when species params are set) or the
+    // 300m default (HOST_SEEKING_RADIUS_M).
+    const float radius = (search_radius_m <= 0.0f)
+        ? (has_species_params_ ? species_.host_seeking_radius_m
+                               : HOST_SEEKING_RADIUS_M)
+        : search_radius_m;
+
     // Cell size in metres.
     const float cell_size_m = static_cast<float>(
         aoi.resolution_m);
 
     // Convert search radius to grid cells (integer window).
     const int32_t search_cells = static_cast<int32_t>(
-        std::ceil(search_radius_m / cell_size_m));
+        std::ceil(radius / cell_size_m));
 
     const int32_t r_min = std::max(0, mosquito_row - search_cells);
     const int32_t r_max = std::min(grid_h - 1, mosquito_row + search_cells);
@@ -119,7 +129,7 @@ std::vector<HostAttraction> HostSeekingModel::compute_attraction(
             const float dx = (static_cast<float>(c) - static_cast<float>(mosquito_col)) * cell_size_m;
             const float dist_m = std::sqrt(dx * dx + dy * dy);
 
-            if (dist_m > search_radius_m) continue;
+            if (dist_m > radius) continue;
 
             const float att = cell_attraction(cell, dist_m);
             if (att <= 0.0f) continue;
@@ -139,6 +149,19 @@ std::vector<HostAttraction> HostSeekingModel::compute_attraction(
         });
 
     return result;
+}
+
+void HostSeekingModel::set_species_params(const SpeciesParams& sp) {
+    species_ = sp;
+    has_species_params_ = true;
+    scale_m_ = sp.host_seeking_scale_m;
+    // Rebuild the internal preference from the species' model attraction
+    // weights (plan §5.3: pref_k is the model weight, not observed HBI).
+    pref_.human    = sp.pref_human;
+    pref_.cattle   = sp.pref_cattle;
+    pref_.goat     = sp.pref_goat;
+    pref_.sheep    = sp.pref_sheep;
+    pref_.wildlife = sp.pref_wildlife;
 }
 
 HostType HostSeekingModel::select_host(
@@ -244,6 +267,31 @@ std::optional<std::pair<int32_t, int32_t>> HostSeekingModel::detect_host_cell(
         return std::make_pair(best_row, best_col);
     }
     return std::nullopt;
+}
+
+std::optional<std::pair<int32_t, int32_t>> HostSeekingModel::step_toward_host(
+    int32_t row, int32_t col,
+    const HostLandscape& eff_landscape,
+    const AOI& aoi,
+    float step_size_m) const
+{
+    // Detect the strongest host cell within the 2000m plume range.
+    const auto target = detect_host_cell(row, col, eff_landscape, aoi, 2000.0);
+    if (!target) return std::nullopt;
+
+    // One step toward it, clamped to step_size_m, rounded to the nearest
+    // cell and clamped to the grid bounds.
+    const auto [dr, dc] = approach_vector(
+        row, col, target->first, target->second, aoi, step_size_m);
+
+    const int32_t nr = std::clamp(
+        static_cast<int32_t>(std::lround(static_cast<float>(row) + dr)),
+        0, eff_landscape.h() - 1);
+    const int32_t nc = std::clamp(
+        static_cast<int32_t>(std::lround(static_cast<float>(col) + dc)),
+        0, eff_landscape.w() - 1);
+
+    return std::make_pair(nr, nc);
 }
 
 }  // namespace mal_abm_fast
