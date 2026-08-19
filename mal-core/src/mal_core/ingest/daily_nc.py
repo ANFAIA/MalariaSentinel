@@ -403,6 +403,6 @@ def _find_chirps_daily(data_dir: pathlib.Path) -> pathlib.Path:
         raise FileNotFoundError(
             f"No CHIRPS daily rainfall NC found in {data_dir}. "
             f"Run: malariasim download --aoi <slug> --datasets chirps "
-            f"--outputs rainfall_daily --years 2024 2025"
+            f"--outputs rainfall_daily --years 2024,2025"
         )
     return candidates[0]
