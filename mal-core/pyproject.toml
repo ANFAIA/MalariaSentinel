@@ -16,7 +16,7 @@ dependencies = [
 # Optional dependency groups. These are NOT installed by a bare `uv sync`;
 # pull them explicitly when a feature needs them:
 #
-#   uv sync --package mal-core --group abm          # ABM + commonlib base (VM default)
+#   uv sync --package mal-core --group abm          # ABM + commonlib base + viz (VM default)
 #   uv sync --package mal-core --group download     # download path
 #   uv sync --package mal-core --group ingest       # ingest path
 #   uv sync --package mal-core --group train        # U-Net training (torch)
@@ -24,7 +24,7 @@ dependencies = [
 #
 # Dev default stays `uv sync --all-packages` (installs every group below).
 [dependency-groups]
-abm = []
+abm = ["matplotlib>=3.8", "pillow>=10.0"]
 download = []
 ingest = []
 train = ["torch>=2.0"]

@@ -2130,6 +2130,10 @@ dependencies = [
 ]
 
 [package.dev-dependencies]
+abm = [
+    { name = "matplotlib" },
+    { name = "pillow" },
+]
 serve = [
     { name = "fastapi" },
     { name = "uvicorn" },
@@ -2150,7 +2154,10 @@ requires-dist = [
 ]
 
 [package.metadata.requires-dev]
-abm = []
+abm = [
+    { name = "matplotlib", specifier = ">=3.8" },
+    { name = "pillow", specifier = ">=10.0" },
+]
 download = []
 ingest = []
 serve = [
