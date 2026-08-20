@@ -265,10 +265,10 @@ Source this file; do not execute directly. Key variables:
 
 ### `run_abm.sh` details
 
-Runs 24 months (configurable) sequentially. Each month:
-1. Checks for env COG + habitat gpkg in `$DATA_DIR`
-2. Runs `uv run python -m mal_ghana_sim.abm.run` with the month's data
-3. Writes output TIF to `$RUNS_DIR`
+Runs 24 months (configurable) sequentially via the manifest-driven CLI. Each month:
+1. Checks for env + habitat artefacts in `$DATA_DIR`
+2. Runs `malariasim abm --aoi ghana --seed $ABM_SEED --days 30 --output-dir $RUNS_DIR/...`
+3. Writes output snapshots to `$RUNS_DIR`
 
 Override defaults via `--export` on `sbatch`:
 ```bash
@@ -345,10 +345,7 @@ uv run python mal-execution/scripts/build_hosts.py --output-dir hosts/
 uv run python mal-execution/scripts/build_mobility.py --hosts hosts/host_static.nc
 
 # 3. Run ABM rollouts (generates training data)
-uv run python -m mal_ghana_sim.abm.run \
-  --env data/runs/ghana/ghana_regional_2024_01_env.tif \
-  --habitat data/runs/ghana/ghana_regional_2024_01_habitat_patches.gpkg \
-  --seed 1 --days 30 --output runs/rollouts/
+uv run malariasim abm --aoi ghana --seed 1 --days 30 --output-dir runs/rollouts/
 
 # 4. Train U-Net surrogate
 uv run python mal-execution/scripts/train_unet.py runs/rollouts/ runs/models/ --epochs 50

@@ -113,53 +113,36 @@ The pipeline has 6 stages, each with a dedicated script:
 
 ## 3. Running the Pipeline
 
-All commands run from the `mal-ghana-sim/` directory:
+All commands run from the repo root:
 
 ```bash
-cd mal-ghana-sim
+# Stage 1: Download + ingest env rasters
+uv run malariasim download --aoi ghana --datasets era5,chirps
+uv run malariasim ingest --aoi ghana --year 2024 --month 6
 
-# Stage 1: Ingest & reproject env rasters (one-time, add --download to fetch missing layers)
-uv run python scripts/01_ingest.py --download
+# Stage 2: Run the ABM (continuous, manifest-driven)
+uv run malariasim abm --aoi ghana --days 30
 
-# Stage 2: Suitability field + AUC validation
-uv run python scripts/02_suitability.py
+# Stage 3: Score against observed data
+uv run malariasim score --run-dir runs/abm --tier fast
 
-# Stage 3: Reaction-diffusion simulator
-uv run python scripts/03_simulate.py
+# Stage 4: Train U-Net surrogate
+uv run malariasim train --run-dir runs/abm --epochs 50
 
-# Stage 4: Build dataset (optional — training does this internally)
-uv run python scripts/04_build_dataset.py
-
-# Stage 5: Train U-Net (args: n_rollouts epochs, defaults: 20 rollouts, 8 epochs)
-uv run python scripts/05_train.py [n_rollouts] [epochs]
-
-# Stage 6: Predict & render risk-expansion map
-uv run python scripts/06_predict_and_map.py
+# Stage 5: Predict risk for a target year
+uv run malariasim predict --aoi ghana --year 2026
 ```
 
-**Quick smoke test** (Stages 1–3 only, no GPU needed):
+**Quick smoke test** (ABM only, no GPU needed):
 
 ```bash
-cd mal-ghana-sim
-uv run python scripts/01_ingest.py --download
-uv run python scripts/02_suitability.py
-uv run python scripts/03_simulate.py
-```
-
-**Full pipeline** (requires GPU for Stage 5):
-
-```bash
-cd mal-ghana-sim
-uv run python scripts/01_ingest.py --download
-uv run python scripts/02_suitability.py
-uv run python scripts/03_simulate.py
-uv run python scripts/05_train.py 20 8
-uv run python scripts/06_predict_and_map.py
+uv run malariasim ingest --aoi ghana --year 2024 --month 6
+uv run malariasim abm --aoi ghana --days 30
 ```
 
 ## 4. Configuration
 
-All parameters live in `mal-ghana-sim/src/mal_ghana_sim/config.py`. Key sections:
+All parameters live in `mal-commonlib/src/mal_commonlib/config.py` (AOI bounds, data paths) and `mal-core/src/mal_core/abm/include/mal_abm_fast/` (ABM constants, C++). Key sections:
 
 - **AOI & grid**: `AOI_W/E/S/N`, `DST_CRS = "EPSG:32630"`, `DST_RES = 1000`
 - **Layer files**: `LAYER_FILES` dict mapping layer name to filename under `runs/layers/`
@@ -227,7 +210,7 @@ All outputs go to the `runs/` directory (gitignored):
 | OOM during training | GPU RAM exhaustion | Reduce `TRAIN_BATCH` in config.py, or use fewer rollouts |
 | CPU training very slow | No GPU available | Use MPS (Apple Silicon) if available; CPU training is infeasible for production |
 | `Dice ≈ 0` on unrolled inference | U-Net divergence in multi-step rollout | Known v1 limitation; U-Net is reliable for single-step t→t+T only |
-| `ModuleNotFoundError: mal_ghana_sim` | Package not synced | Run `uv sync --all-packages` from repo root |
+| `ModuleNotFoundError: mal_core` | Package not synced | Run `uv sync --all-packages` from repo root |
 | Deprecation warnings from rasterio/rioxarray | Library version mismatch | Run `uv lock --upgrade` then `uv sync --all-packages` |
 
 ### Debugging tips
@@ -260,7 +243,7 @@ The v1 simulator uses static climatological normals. For temporal variation:
 
 ### Using the ABM engine
 
-The project includes an agent-based model engine at `mal-ghana-sim/src/mal_ghana_sim/abm/`. The ABM tracks individual mosquito agents rather than grid-level densities. Use it for:
+The project includes an agent-based model engine (C++20) at `mal-core/src/mal_core/abm/`, exposed via the `malariasim abm` CLI. The ABM tracks individual mosquito agents rather than grid-level densities. Use it for:
 - Fine-grained movement behavior studies
 - Comparing individual-level vs population-level dynamics
 

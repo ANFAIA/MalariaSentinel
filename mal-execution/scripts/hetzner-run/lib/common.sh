@@ -196,7 +196,7 @@ calc_cost() {
     log_warn "no price entry for type '$t'"
     return 1
   fi
-  awk -v rate="$rate" -v h="$hours" 'BEGIN { printf "%.4f", rate*h }'
+  LC_NUMERIC=C awk -v rate="$rate" -v h="$hours" 'BEGIN { printf "%.4f", rate*h }'
 }
 
 # Compute cost-so-far for a running VM based on started_at.
@@ -272,7 +272,7 @@ wait_until() {
 # --- formatting ------------------------------------------------------------
 
 format_eur() {
-  awk -v x="$1" 'BEGIN { printf "€%.3f", x }'
+  LC_NUMERIC=C awk -v x="$1" 'BEGIN { printf "€%.3f", x }'
 }
 
 # Seconds -> "Hh Mm"

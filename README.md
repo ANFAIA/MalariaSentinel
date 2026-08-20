@@ -23,9 +23,8 @@ MalariaSentinel/
 
   # ─── Python packages (UV workspace members) ────────────────────
   mal-commonlib/              Shared config, paths, raster helpers
-  mal-core/                   Stable pipeline logic (empty — ready for promotion)
-  mal-execution/              CLI entrypoints, batch jobs (empty)
-  mal-ghana-sim/              Ghana spread simulation + U-Net surrogate
+  mal-core/                   Stable pipeline logic (ABM engine, training, prediction)
+  mal-execution/              CLI entrypoints, batch jobs, HPC/cloud automation
   mal-data-explorer/          Dataset visualization, mapping, bias analysis scripts
 
   # ─── Research content ─────────────────────────────────────────
@@ -48,23 +47,22 @@ MalariaSentinel/
 | `mal-commonlib` | (none) | Shared config, paths, data utilities |
 | `mal-core` | `mal-commonlib` | Stable, production-ready pipeline code |
 | `mal-execution` | `mal-core`, `mal-commonlib` | CLI scripts, batch jobs, schedulers |
-| `mal-ghana-sim` | `mal-commonlib` | Ghana spread simulation experiment (research) |
 | `mal-data-explorer` | (none, scripts only) | Dataset visualization and bias analysis |
 
 **Nothing depends on the research packages.** When research code stabilizes, promote it to `mal-core` or `mal-commonlib`.
 
-## Running the Ghana Simulation Experiment
+## Running the Ghana Simulation (ABM pipeline)
 
 ```bash
-cd mal-ghana-sim
-uv run python scripts/01_ingest.py --download
-uv run python scripts/02_suitability.py
-uv run python scripts/03_simulate.py
-uv run python scripts/05_train.py [n_rollouts] [epochs]
-uv run python scripts/06_predict_and_map.py
+uv run malariasim download --aoi ghana --datasets era5 --outputs wind_6hourly --years 2024,2025
+uv run malariasim ingest --aoi ghana --year 2024 --month 6
+uv run malariasim abm --aoi ghana --days 30
+uv run malariasim score --run-dir runs/abm --tier fast
+uv run malariasim train --run-dir runs/abm --epochs 50
+uv run malariasim predict --aoi ghana --year 2026
 ```
 
-Full design: `mal-ghana-sim/DESIGN.md`.
+Full design: `docs/plans/completed/perf-cpp-abm-plan.md`.
 
 ## Running the Dataset Explorer Scripts
 
@@ -102,21 +100,17 @@ uv run python 12_bias_plot.py            # Bias analysis visualizations
 
 ## v1 Ghana Demo Status & Known Limitations (2026-07)
 
-The Ghana simulation pipeline runs end-to-end: **env-raster ingestion → habitat suitability → reaction-diffusion simulator (teacher) → U-Net transition surrogate → risk-expansion map.** This is a proof-of-pipeline, not a validated predictor. Honest limitations:
+The Ghana pipeline runs end-to-end: **env ingestion → C++ ABM simulation → calibration scoring → U-Net surrogate → risk prediction.** This is a proof-of-pipeline, not a validated predictor. Honest limitations:
 
-**Data layers.** 4 of 5 env layers downloaded and reprojected to a common EPSG:32630 @1 km grid: SRTM elevation, WorldClim 2.1 BIO1 (temperature) + BIO12 (rainfall), JRC Global Surface Water (occurrence). **MODIS NDVI was not fetched** — needs a (free) NASA Earthdata login; without NDVI, its 0.15 suitability weight is auto-redistributed.
+**Data layers.** Env tensors are built from ERA5 (wind/temperature) and CHIRPS rainfall, reprojected to a common EPSG:32630 @1 km grid. MODIS NDVI was not fetched — needs a (free) NASA Earthdata login.
 
-**Habitat suitability — AUC 0.334, 95% CI [0.19, 0.50]** (criterion was lower-95% > 0.65). The 24 larval survey sites are mostly in a drier seasonal-savanna transect where breeding happens in sub-1 km water bodies the 1 km water layer cannot resolve. This is the documented v1 resolution limit.
+**ABM engine (C++20).** The `mal-abm-fast` engine in `mal-core/src/mal_core/abm/` is bit-compatible with the former M1.5 Python ABM (~1000× faster per rollout, scaling to 100 rollouts under 5 minutes). The former Python ABM experiment (`mal-ghana-sim`) has been removed.
 
-**Simulator — works.** Fisher-KPP reaction-diffusion with temperature-gated reproduction `r(T)=r_max·max(0,1−((T−25)/8)²)` (Mordecai 2013), temperature-dependent mortality, soft water factor, 4-neighbour diffusion (μ=0.2, stable). **Dynamics are NOT validated against reality** — v1 env is static climatological normals and dynamics vary only by parameter randomization.
+**Calibration scorers.** 10 geometric-mean scorers (D1–D10) plus an optional LLM judge verdict assess simulated epidemic curves, seasonality, and spatial patterns against observed data.
 
 **U-Net surrogate — learns, but weak: best val Dice 0.24** (criterion was > 0.6). Data- and compute-limited on this workstation. Scaling to ≥100 rollouts + a real GPU + the larger (32,64,128,256) U-Net is the path to the 0.6 bar.
 
-**Unrolled inference — diverges.** Rolling the trained U-Net forward step-by-step over the full image over-spreads. v1.5 fix: train with recurrent/teacher-forcing on unrolled sequences, or add a stability constraint to the rollout.
-
-**Artifacts (gitignored, regenerated):** `runs/suitability_static.png`, `runs/sim_rollout.png`, `runs/risk_expansion.png`, `runs/unet_best.pt`.
-
-**Full design:** `mal-ghana-sim/DESIGN.md`.
+**Artifacts (gitignored, regenerated):** `runs/abm/` (state COGs, cohort logs), `runs/training/` (U-Net checkpoints), `runs/prediction/` (risk maps).
 
 ---
 
@@ -140,10 +134,9 @@ re-downloads the SRTM terrain and WorldClim/JRC env layers. After data is
 restored, regenerate model weights and result PNGs with the pipeline:
 
 ```bash
-uv run python mal-ghana-sim/scripts/02_suitability.py
-uv run python mal-ghana-sim/scripts/03_simulate.py
-uv run python mal-ghana-sim/scripts/05_train.py
-uv run python mal-ghana-sim/scripts/06_predict_and_map.py
+uv run malariasim download --aoi ghana --datasets era5
+uv run malariasim ingest --aoi ghana --year 2024 --month 6
+uv run malariasim abm --aoi ghana --days 30
 ```
 
 See `data/README.md` for the dataset catalogue (sources, licenses, row counts)

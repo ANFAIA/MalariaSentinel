@@ -303,7 +303,7 @@ YEAR=2024
 #SBATCH --error=%x-%j.e
 
 cd $STORE/MalariaSentinel
-uv run python -m mal_ghana_sim.scripts.build_env --help
+uv run malariasim ingest --aoi ghana --year 2024 --month 6 --what env --help
 echo "Test completed successfully"
 ```
 
@@ -330,16 +330,12 @@ YEAR=${2:-2024}
 SEED=${3:-42}
 
 # Build env
-uv run python -m mal_ghana_sim.scripts.build_env \
-    --aoi ghana --year $YEAR --month $MONTH --scale regional \
+uv run malariasim ingest --aoi ghana --year $YEAR --month $MONTH --what env \
     --output-dir $STORE/runs/ghana-sim/env/$YEAR-$(printf '%02d' $MONTH)/
 
 # Run ABM
-uv run python -m mal_ghana_sim.abm.run \
-    --env-cog $STORE/runs/ghana-sim/env/$YEAR-$(printf '%02d' $MONTH)/env.tif \
-    --habitat-gpkg $STORE/runs/ghana-sim/env/$YEAR-$(printf '%02d' $MONTH)/habitat.gpkg \
-    --seed $SEED --days 30 \
-    --output $STORE/runs/ghana-sim/snapshots/$YEAR-$(printf '%02d' $MONTH)/seed${SEED}/
+uv run malariasim abm --aoi ghana --seed $SEED --days 30 \
+    --output-dir $STORE/runs/ghana-sim/snapshots/$YEAR-$(printf '%02d' $MONTH)/seed${SEED}/
 ```
 
 ### Job array — multiple rollouts (24 seeds for one month)
@@ -365,11 +361,8 @@ MONTH=${MONTH:-1}
 YEAR=${YEAR:-2024}
 SEED=$SLURM_ARRAY_TASK_ID
 
-uv run python -m mal_ghana_sim.abm.run \
-    --env-cog $STORE/runs/ghana-sim/env/$YEAR-$(printf '%02d' $MONTH)/env.tif \
-    --habitat-gpkg $STORE/runs/ghana-sim/env/$YEAR-$(printf '%02d' $MONTH)/habitat.gpkg \
-    --seed $SEED --days 30 \
-    --output $STORE/runs/ghana-sim/snapshots/$YEAR-$(printf '%02d' $MONTH)/seed${SEED}/
+uv run malariasim abm --aoi ghana --seed $SEED --days 30 \
+    --output-dir $STORE/runs/ghana-sim/snapshots/$YEAR-$(printf '%02d' $MONTH)/seed${SEED}/
 ```
 
 Submit with:
@@ -407,17 +400,13 @@ for i in $(seq 0 $((NUM_MONTHS - 1))); do
     echo "=== Running month $MONTH/$YEAR ==="
 
     # Build env
-    uv run python -m mal_ghana_sim.scripts.build_env \
-        --aoi ghana --year $YEAR --month $MONTH --scale regional \
+    uv run malariasim ingest --aoi ghana --year $YEAR --month $MONTH --what env \
         --output-dir $STORE/runs/ghana-sim/env/$YEAR-$(printf '%02d' $MONTH)/
 
     # Run rollouts for this month
     for SEED in $(seq 1 $N_ROLLOUTS); do
-        uv run python -m mal_ghana_sim.abm.run \
-            --env-cog $STORE/runs/ghana-sim/env/$YEAR-$(printf '%02d' $MONTH)/env.tif \
-            --habitat-gpkg $STORE/runs/ghana-sim/env/$YEAR-$(printf '%02d' $MONTH)/habitat.gpkg \
-            --seed $SEED --days 30 \
-            --output $STORE/runs/ghana-sim/snapshots/$YEAR-$(printf '%02d' $MONTH)/seed${SEED}/
+        uv run malariasim abm --aoi ghana --seed $SEED --days 30 \
+            --output-dir $STORE/runs/ghana-sim/snapshots/$YEAR-$(printf '%02d' $MONTH)/seed${SEED}/
     done
 done
 

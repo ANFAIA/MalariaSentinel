@@ -48,7 +48,7 @@ uv run --with requests --with rasterio --with matplotlib --with numpy \
 Verify the environment:
 
 ```bash
-python -c "import mal_commonlib; import mal_core; import mal_ghana_sim; print('OK')"
+python -c "import mal_commonlib; import mal_core; import mal_cli; print('OK')"
 ```
 
 Or use the full verification script:
@@ -100,23 +100,21 @@ Then load these skills for deeper context:
 | Skill | What it covers |
 |---|---|
 | `sdss-reference` | Kelly 2012 SDSS framework — the domain theory behind the Centinela |
-| `monorepo-dev` | 6-package layout, dependency rules, experiment vs core tiers, promotion flow |
+| `monorepo-dev` | 5-package layout, dependency rules, experiment vs core tiers, promotion flow |
 | `mal-commonlib-api` | Shared config, paths, data utilities |
 | `mal-core-api` | Stable mal-core API |
 
-**Key insight**: MalariaSentinel has two tiers — **core** (the Centinela: `mal-commonlib`, `mal-core`, `mal-execution`) and **experiments** (`mal-ghana-sim`, `mal-data-explorer`). Experiments either die or promote stable code into core. Nothing depends on experiments.
+**Key insight**: MalariaSentinel has two tiers — **core** (the Centinela: `mal-commonlib`, `mal-core`, `mal-execution`) and **experiments** (`mal-data-explorer`). Experiments either die or promote stable code into core. Nothing depends on experiments.
 
 ## Step 5: Run Something (~5 min)
 
 Get a working pipeline run under your belt.
 
-**Ghana simulation** (stages 1–3, no GPU needed):
+**Ghana simulation** (ABM pipeline, no GPU needed):
 
 ```bash
-cd mal-ghana-sim
-uv run python scripts/01_ingest.py --download
-uv run python scripts/02_suitability.py
-uv run python scripts/03_simulate.py
+uv run malariasim ingest --aoi ghana --year 2024 --month 6
+uv run malariasim abm --aoi ghana --days 30
 ```
 
 **Or dataset exploration**:
@@ -154,7 +152,6 @@ Branch naming conventions:
 | `common/` | `mal-commonlib` changes |
 | `core/` | `mal-core` changes |
 | `exec/` | `mal-execution` changes |
-| `sim/` | `mal-ghana-sim` changes |
 | `data/` | `mal-data-explorer` changes |
 | `docs/` | Documentation only |
 
