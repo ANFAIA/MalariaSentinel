@@ -110,7 +110,8 @@ TEST(GonotrophicParams, DefaultValues) {
     EXPECT_FLOAT_EQ(p.cycle_duration_days, 2.65f);
     EXPECT_FLOAT_EQ(p.first_cycle_days, 4.0f);
     EXPECT_FLOAT_EQ(p.feeding_success_rate, 0.825f);
-    EXPECT_EQ(p.egg_batch_mean, 52);
+    EXPECT_EQ(p.egg_batch_mean, 120);
+    EXPECT_EQ(p.egg_batch_n, 240);
     EXPECT_EQ(p.egg_batch_min, 30);
     EXPECT_EQ(p.egg_batch_max, 170);
     EXPECT_FLOAT_EQ(p.resting_duration_days, 1.0f);
@@ -123,9 +124,10 @@ TEST(GonotrophicParams, DefaultValues) {
 TEST(GonotrophicCycle, TeneralTransitionsToMateSeeking) {
     auto state = mal_abm_fast::GonotrophicState::TENERAL;
     int32_t timer = 0;
+    int32_t cycles = 0;
     mal_abm_fast::GonotrophicParams params;
     const bool wants = mal_abm_fast::advance_gonotrophic_one_day(
-        state, timer, params);
+        state, timer, cycles, params);
     EXPECT_EQ(state, mal_abm_fast::GonotrophicState::MATE_SEEKING);
     EXPECT_FALSE(wants);
 }
@@ -133,10 +135,11 @@ TEST(GonotrophicCycle, TeneralTransitionsToMateSeeking) {
 TEST(GonotrophicCycle, HostSeekingStaysWhenNotFed) {
     auto state = mal_abm_fast::GonotrophicState::HOST_SEEKING;
     int32_t timer = 0;
+    int32_t cycles = 0;
     mal_abm_fast::GonotrophicParams params;
     // Caller does NOT set BLOOD_FED, so state stays HOST_SEEKING.
     const bool wants = mal_abm_fast::advance_gonotrophic_one_day(
-        state, timer, params);
+        state, timer, cycles, params);
     EXPECT_EQ(state, mal_abm_fast::GonotrophicState::HOST_SEEKING);
     EXPECT_FALSE(wants);
 }
@@ -144,10 +147,11 @@ TEST(GonotrophicCycle, HostSeekingStaysWhenNotFed) {
 TEST(GonotrophicCycle, BloodFedToResting) {
     auto state = mal_abm_fast::GonotrophicState::BLOOD_FED;
     int32_t timer = 0;
+    int32_t cycles = 0;
     mal_abm_fast::GonotrophicParams params;
     // After 1 day rest, should transition to RESTING.
     const bool wants = mal_abm_fast::advance_gonotrophic_one_day(
-        state, timer, params);
+        state, timer, cycles, params);
     EXPECT_EQ(state, mal_abm_fast::GonotrophicState::RESTING);
     EXPECT_FALSE(wants);
 }
@@ -155,35 +159,54 @@ TEST(GonotrophicCycle, BloodFedToResting) {
 TEST(GonotrophicCycle, RestingToEggMaturing) {
     auto state = mal_abm_fast::GonotrophicState::RESTING;
     int32_t timer = 0;
+    int32_t cycles = 0;
     mal_abm_fast::GonotrophicParams params;
     const bool wants = mal_abm_fast::advance_gonotrophic_one_day(
-        state, timer, params);
+        state, timer, cycles, params);
     EXPECT_EQ(state, mal_abm_fast::GonotrophicState::EGG_MATURING);
     EXPECT_FALSE(wants);
 }
 
-TEST(GonotrophicCycle, EggMaturingToGravid) {
+TEST(GonotrophicCycle, FirstCycleEggMaturationTakesFourDays) {
     auto state = mal_abm_fast::GonotrophicState::EGG_MATURING;
     int32_t timer = 0;
+    int32_t cycles = 0;  // first cycle
     mal_abm_fast::GonotrophicParams params;
-    // Timer starts at 0, gets incremented each call. After the first
-    // increment, timer != 0 so cycle_duration_days (2.65) is used.
-    // After 3 increments (timer=3 >= 2.65), transition to GRAVID.
+    // First cycle uses first_cycle_days (4.0) rounded up to 4 days.
+    for (int d = 0; d < 3; ++d) {
+        mal_abm_fast::advance_gonotrophic_one_day(state, timer, cycles, params);
+        EXPECT_EQ(state, mal_abm_fast::GonotrophicState::EGG_MATURING);
+        EXPECT_EQ(cycles, 0);
+    }
+    // Day 4: timer reaches 4, should transition to GRAVID.
+    mal_abm_fast::advance_gonotrophic_one_day(state, timer, cycles, params);
+    EXPECT_EQ(state, mal_abm_fast::GonotrophicState::GRAVID);
+    EXPECT_EQ(cycles, 1);
+}
+
+TEST(GonotrophicCycle, SubsequentCycleEggMaturationTakesThreeDays) {
+    auto state = mal_abm_fast::GonotrophicState::EGG_MATURING;
+    int32_t timer = 0;
+    int32_t cycles = 1;  // a later cycle
+    mal_abm_fast::GonotrophicParams params;
+    // Subsequent cycles use cycle_duration_days (2.65) rounded up to 3 days.
     for (int d = 0; d < 2; ++d) {
-        mal_abm_fast::advance_gonotrophic_one_day(state, timer, params);
+        mal_abm_fast::advance_gonotrophic_one_day(state, timer, cycles, params);
         EXPECT_EQ(state, mal_abm_fast::GonotrophicState::EGG_MATURING);
     }
-    // Day 3: timer reaches 3, should transition.
-    mal_abm_fast::advance_gonotrophic_one_day(state, timer, params);
+    // Day 3: timer reaches 3, should transition to GRAVID.
+    mal_abm_fast::advance_gonotrophic_one_day(state, timer, cycles, params);
     EXPECT_EQ(state, mal_abm_fast::GonotrophicState::GRAVID);
+    EXPECT_EQ(cycles, 2);
 }
 
 TEST(GonotrophicCycle, GravidToOvipositionSeeking) {
     auto state = mal_abm_fast::GonotrophicState::GRAVID;
     int32_t timer = 0;
+    int32_t cycles = 0;
     mal_abm_fast::GonotrophicParams params;
     const bool wants = mal_abm_fast::advance_gonotrophic_one_day(
-        state, timer, params);
+        state, timer, cycles, params);
     EXPECT_EQ(state, mal_abm_fast::GonotrophicState::OVIPOSITION_SEEKING);
     EXPECT_FALSE(wants);
 }
@@ -191,10 +214,11 @@ TEST(GonotrophicCycle, GravidToOvipositionSeeking) {
 TEST(GonotrophicCycle, OvipositionSeekingStaysWithoutHabitat) {
     auto state = mal_abm_fast::GonotrophicState::OVIPOSITION_SEEKING;
     int32_t timer = 0;
+    int32_t cycles = 0;
     mal_abm_fast::GonotrophicParams params;
     // Caller does NOT transition to OVIPOSITING.
     const bool wants = mal_abm_fast::advance_gonotrophic_one_day(
-        state, timer, params);
+        state, timer, cycles, params);
     EXPECT_EQ(state, mal_abm_fast::GonotrophicState::OVIPOSITION_SEEKING);
     EXPECT_FALSE(wants);
 }
@@ -202,9 +226,10 @@ TEST(GonotrophicCycle, OvipositionSeekingStaysWithoutHabitat) {
 TEST(GonotrophicCycle, OviposingReportsWantsOviposit) {
     auto state = mal_abm_fast::GonotrophicState::OVIPOSITING;
     int32_t timer = 0;
+    int32_t cycles = 0;
     mal_abm_fast::GonotrophicParams params;
     const bool wants = mal_abm_fast::advance_gonotrophic_one_day(
-        state, timer, params);
+        state, timer, cycles, params);
     EXPECT_TRUE(wants);
 }
 
@@ -323,12 +348,14 @@ TEST(MosquitoSoA, GonotrophicFieldsAfterConstruction) {
     const auto& soa = sub.soa();
     EXPECT_EQ(static_cast<int64_t>(soa.gonotrophic_state.size()), soa.n_alive);
     EXPECT_EQ(static_cast<int64_t>(soa.gonotrophic_timer.size()), soa.n_alive);
+    EXPECT_EQ(static_cast<int64_t>(soa.gonotrophic_cycles.size()), soa.n_alive);
     EXPECT_EQ(static_cast<int64_t>(soa.feeding_success.size()), soa.n_alive);
     // All new adults start as TENERAL.
     for (int64_t i = 0; i < soa.n_alive; ++i) {
         EXPECT_EQ(soa.gonotrophic_state[static_cast<size_t>(i)],
                   static_cast<uint8_t>(mal_abm_fast::GonotrophicState::TENERAL));
         EXPECT_EQ(soa.gonotrophic_timer[static_cast<size_t>(i)], 0);
+        EXPECT_EQ(soa.gonotrophic_cycles[static_cast<size_t>(i)], 0);
         EXPECT_FLOAT_EQ(soa.feeding_success[static_cast<size_t>(i)], 0.0f);
     }
 }

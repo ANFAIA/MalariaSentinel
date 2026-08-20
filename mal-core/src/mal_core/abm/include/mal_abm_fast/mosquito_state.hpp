@@ -41,6 +41,7 @@ struct MosquitoSoA {
     // G4: Gonotrophic cycle fields (females only; males keep defaults).
     std::vector<uint8_t>  gonotrophic_state;      // GonotrophicState enum
     std::vector<int32_t>  gonotrophic_timer;      // days in current state
+    std::vector<int32_t>  gonotrophic_cycles;     // completed gonotrophic cycles (first = 0)
     std::vector<float>    feeding_success;         // 1.0 if fed today, 0.0 otherwise
     std::vector<uint8_t>  species_id;              // MosquitoSpeciesId (0 = ANOPHELES_COLUZZII)
 

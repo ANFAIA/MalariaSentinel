@@ -10,6 +10,7 @@
 // events (which feed the BiteLedger).
 #pragma once
 
+#include <cmath>
 #include <cstdint>
 #include <vector>
 
@@ -48,10 +49,11 @@ enum class HostType : uint8_t {
 /// Gonotrophic cycle parameters. Defaults are calibrated for
 /// An. gambiae s.s. in West Africa (Ghana).
 struct GonotrophicParams {
-    float cycle_duration_days   = 2.65f;   // post-first-cycle duration
-    float first_cycle_days      = 4.0f;    // pre-gravid (teneral → first oviposition)
+    float cycle_duration_days   = 2.65f;   // post-first-cycle egg maturation
+    float first_cycle_days      = 4.0f;    // first-cycle egg maturation
     float feeding_success_rate  = 0.825f;  // [0.75, 0.90]
-    int32_t egg_batch_mean      = 52;      // binomial(105, 0.5)
+    int32_t egg_batch_mean      = 120;     // binomial(240, 0.5)
+    int32_t egg_batch_n         = 240;     // trials for the egg-batch draw
     int32_t egg_batch_min       = 30;
     int32_t egg_batch_max       = 170;
     float resting_duration_days = 1.0f;    // post-feed rest
@@ -67,11 +69,18 @@ struct GonotrophicParams {
 ///     transitioning OVIPOSITING → HOST_SEEKING
 ///   - Recording feeding events in the BiteLedger
 ///
+/// `cycles_completed` counts gonotrophic cycles this female has already
+/// completed (0 before the first oviposition). It distinguishes the
+/// first, slower egg-maturation phase (first_cycle_days) from
+/// subsequent cycles (cycle_duration_days). Durations are rounded to
+/// whole days because the model advances in one-day steps.
+///
 /// Returns true if the female is in OVIPOSITING state after the
 /// transition (caller should deposit eggs).
 inline bool advance_gonotrophic_one_day(
     GonotrophicState& state,
     int32_t& timer,
+    int32_t& cycles_completed,
     const GonotrophicParams& params)
 {
     switch (state) {
@@ -119,14 +128,19 @@ inline bool advance_gonotrophic_one_day(
         break;
 
     case GonotrophicState::EGG_MATURING: {
-        // First cycle uses first_cycle_days; subsequent cycles use
-        // cycle_duration_days.
-        const float required = (timer == 0) ? params.first_cycle_days
-                                             : params.cycle_duration_days;
+        // First cycle matures eggs more slowly than subsequent cycles.
+        const float required = (cycles_completed == 0) ? params.first_cycle_days
+                                                       : params.cycle_duration_days;
+        // Durations are configured as fractional days but the model
+        // advances in one-day steps; round up so the phase lasts at
+        // least the configured duration.
+        const int32_t required_days = static_cast<int32_t>(
+            std::ceil(required));
         timer++;
-        if (static_cast<float>(timer) >= required) {
+        if (timer >= required_days) {
             state = GonotrophicState::GRAVID;
             timer = 0;
+            ++cycles_completed;
         }
         break;
     }
