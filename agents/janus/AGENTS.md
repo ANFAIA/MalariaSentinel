@@ -13,15 +13,20 @@
 - Don't weaken tests or skip scorers to force a pass
 - Always compare against the best historical composite score
 - Maximum 3 parallel workers at a time
-- Workers share a single gawt worktree (no per-agent isolation)
+- Workers share a single gawt worktree (multi-session, one shared worktree)
 - Never edit files directly from the orchestrator — dispatch specialists
 - Always use `mcp__gitagent__edit_file` / `write_file` — never host Edit/Write
 - Always call `register_agent` before editing (agent_id required on every call)
 - Always call `start_intent` before first edit (semantic attribution)
-- Always call `check_inbox` after each significant edit (conflict detection)
+- gawt v0.6.0 has **no inbox**: coordination comes from the **pheromone**
+  (`edits` log), **per-file write locks**, and **partial snapshots**
+- Handle informed write rejection (`{status: "rejected", ...}` / `STALE_WRITE`):
+  re-read, re-plan, retry — never blind-retry
 - gawt MCP uses SQLite internally — threading errors if called from wrong thread
-- Only one gawt session can be open at a time (session singleton)
-- `finalize_session` warns if agents still active — unregister first
+- Multiple gawt sessions share ONE worktree; `target_branch` is fixed per worktree
+- `snapshot_session` publishes part of the worktree (partial commit); it does
+  NOT close the session. `abort_session(session_id)` removes the worktree only
+  when the last open session aborts — unregister agents first
 - `resolve_conflict` forks the graph via get_state/update_state/invoke — the orchestrator must be created with a checkpointer (`agent.py::_checkpointer()`), or it fails with "No checkpointer set"
 
 ## Scorer naming convention
@@ -97,23 +102,35 @@ removed). All other subagents have `execute` filtered out via
 `ToolFilterMiddleware`.
 
 ### gawt MCP server (external dependency)
-- Package: `gawt>=0.5.0` (branch `feat/mcp-sqlite-core`)
+- Package: `gawt>=0.6.0` (PyPI, package `gawt`, command `gitagent-mcp`)
 - Transport: stdio (MCP server at `gitagent-mcp`)
-- Single shared worktree per session (`.gitagent/worktree/`)
-- SQLite-backed state (`.gitagent/state.db`)
-- Tools: `start_session`, `finalize_session`, `register_agent`, `edit_file`, `write_file`, `read_file`, `check_inbox`, `send_message`, `list_agents`, `list_edits`, `list_intents`
+- One shared worktree per repo (`.gitagent/worktree/`), reused across sessions
+- SQLite-backed state (`.gitagent/state.db`): sessions, agents, intents,
+  edits (pheromone), snapshot_progress, locks, snapshots
+- **No inbox.** Coordination emerges from the pheromone (`list_edits`),
+  per-file locks with informed reads, and partial snapshots
+- Tools: `start_session`, `abort_session`, `get_session`, `list_sessions`,
+  `snapshot_session`, `snapshot_status`, `list_snapshots`, `register_agent`,
+  `unregister_agent`, `list_agents`, `start_intent`, `repurpose`,
+  `get_current_intent`, `edit_file`, `write_file`, `read_file`,
+  `delete_file`, `list_edits`, `list_intents`
+- `read_file` is **informed**: returns `content`, `sha256`, `base_sha`,
+  `diff`, `edits[]`, intent `warning`
+- `write_file`/`edit_file`/`delete_file` acquire per-file locks; a foreign
+  lock → `{status: "rejected", read: {...}}` (never applied, no waiting)
 
 ### Specialist workflow
 Each specialist is a **planner + executor** in the shared worktree:
 
-1. `register_agent(role=...)` → get agent_id
-2. `read_file(plan.json)` → read manifest, find own entry
+1. `register_agent(role=...)` → get agent_id (middleware does this automatically)
+2. `read_file(plan.json)` → read manifest, find own entry (informed read)
 3. `start_intent(intent=...)` → declare work
-4. `check_inbox()` → check for peer conflicts
-5. `edit_file` / `write_file` → make edits (ALWAYS via gawt MCP)
-6. `check_inbox()` → verify no conflicts after edit
-7. `send_message(to=__orchestrator__, message="done: ...")` → report
-8. `unregister_agent()` → clean up
+4. `read_file(...)` → see peer pheromone/diff before editing
+5. `edit_file` / `write_file` → make edits (ALWAYS via gawt MCP, lock-protected)
+6. On `{status: "rejected", ...}` → re-read the `read` payload, re-plan, retry
+7. Return a structured summary (no message channel) — coordinator confirms
+   via `list_agents` + `list_edits`
+8. `unregister_agent()` → clean up (middleware handles unregister)
 
 ### Subagent registry
 - Config: `config/subagents.yaml` (8 subagents: abm, scoring, ingest, download, prediction, training, data, commonlib)

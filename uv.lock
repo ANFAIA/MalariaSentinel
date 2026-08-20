@@ -1172,14 +1172,14 @@ wheels = [
 
 [[package]]
 name = "gawt"
-version = "0.5.1"
+version = "0.6.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "mcp" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/5c/b1/543bcaa82c313e26187f1af85fbd48cbd7cb31448c735188b25df736ea2e/gawt-0.5.1.tar.gz", hash = "sha256:253bb736cb5c597d1d575b92a40b90961b5fafbcadecc27d3571ba0d1ed6ce9a", size = 28292 }
+sdist = { url = "https://files.pythonhosted.org/packages/5c/b4/56137c1cc240f48b81c6cca0a0c39c4ca5eab6517029b14a6ebe5b5c9e26/gawt-0.6.0.tar.gz", hash = "sha256:4d4e1eedcf90794bdc06f1a9309a8c502e6d57bf9e693a5c13218e898ee1dd34", size = 42332 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/25/c7/b942d7a479eeec27ebf79405e21c6b7fde7b0e023d1f4cba25ff09b3ff8a/gawt-0.5.1-py3-none-any.whl", hash = "sha256:30ff81473ef21b3d3cd1358674533f7b88bcc1e372a0b23cfa56914270e2f5e8", size = 20346 },
+    { url = "https://files.pythonhosted.org/packages/fd/c0/6bbe606b763667e49d9783534f1aac602c107b01043bd4ef7aa3dbb7e949/gawt-0.6.0-py3-none-any.whl", hash = "sha256:757657065e4662afec80244ee7a2b223a4e7b4852fc77c65d82aa21a77f258fe", size = 29472 },
 ]
 
 [[package]]
@@ -2216,7 +2216,7 @@ observability = [
 [package.metadata]
 requires-dist = [
     { name = "deepagents", specifier = ">=0.6" },
-    { name = "gawt", specifier = ">=0.5.0" },
+    { name = "gawt", specifier = ">=0.6.0" },
     { name = "jinja2", specifier = ">=3.1.0" },
     { name = "langchain-core", specifier = ">=0.3" },
     { name = "langchain-openai", specifier = ">=0.3" },
@@ -2278,7 +2278,7 @@ requires-dist = [
     { name = "contextily", specifier = ">=1.6" },
     { name = "earthaccess", specifier = ">=0.12" },
     { name = "fastapi", specifier = ">=0.115" },
-    { name = "gawt", specifier = ">=0.5.1" },
+    { name = "gawt", specifier = ">=0.6.0" },
     { name = "geopandas", specifier = ">=1.0" },
     { name = "h5py", specifier = ">=3.10" },
     { name = "matplotlib", specifier = ">=3.11.0" },
@@ -2305,7 +2305,7 @@ requires-dist = [
 ]
 
 [package.metadata.requires-dev]
-dev = [{ name = "gawt", specifier = ">=0.4.1" }]
+dev = [{ name = "gawt", specifier = ">=0.6.0" }]
 
 [[package]]
 name = "markdown"

@@ -17,6 +17,7 @@ class GawtContextState(AgentState, total=False):
     """Persistent GAWT identity carried through LangGraph node boundaries."""
 
     gawt_agent_id: str
+    gawt_session_id: str
 
 
 def _parse_result(value: Any) -> Any:
@@ -48,7 +49,6 @@ class GawtContextMiddleware(AgentMiddleware):
         "edit_file",
         "write_file",
         "delete_file",
-        "check_inbox",
         "start_intent",
         "repurpose",
         "get_current_intent",
@@ -63,6 +63,9 @@ class GawtContextMiddleware(AgentMiddleware):
         self._agent_id: contextvars.ContextVar[str | None] = contextvars.ContextVar(
             f"gawt_agent_id_{id(self)}", default=None
         )
+        self._session_id: contextvars.ContextVar[str | None] = contextvars.ContextVar(
+            f"gawt_session_id_{id(self)}", default=None
+        )
         self._agent_token: contextvars.ContextVar[contextvars.Token[str | None] | None] = contextvars.ContextVar(
             f"gawt_agent_token_{id(self)}", default=None
         )
@@ -72,6 +75,9 @@ class GawtContextMiddleware(AgentMiddleware):
         if state_id:
             agent_id = str(state_id)
             self._agent_id.set(agent_id)
+            session_id = state.get("gawt_session_id") if isinstance(state, dict) else None
+            if session_id:
+                self._session_id.set(str(session_id))
             return agent_id
         current_id = self._agent_id.get()
         if current_id is not None:
@@ -81,6 +87,9 @@ class GawtContextMiddleware(AgentMiddleware):
             raise RuntimeError(f"GAWT register_agent failed for role {self.role}: {result}")
         agent_id = str(result["agent_id"])
         self._agent_token.set(self._agent_id.set(agent_id))
+        session_id = result.get("session_id")
+        if session_id:
+            self._session_id.set(str(session_id))
         _log.info("GAWT registered role=%s agent_id=%s", self.role, agent_id)
         return agent_id
 
@@ -112,8 +121,6 @@ class GawtContextMiddleware(AgentMiddleware):
             args = dict(call.get("args") or {})
             if name.endswith(self._AGENT_TOOLS) or "agent_id" in args:
                 args["agent_id"] = agent_id
-            if name.endswith("send_message"):
-                args["from_agent_id"] = agent_id
             call["args"] = args
             request = request.override(tool_call=call)
         return handler(request)
@@ -129,8 +136,6 @@ class GawtContextMiddleware(AgentMiddleware):
             args = dict(call.get("args") or {})
             if name.endswith(self._AGENT_TOOLS) or "agent_id" in args:
                 args["agent_id"] = agent_id
-            if name.endswith("send_message"):
-                args["from_agent_id"] = agent_id
             call["args"] = args
             request = request.override(tool_call=call)
         return await handler(request)

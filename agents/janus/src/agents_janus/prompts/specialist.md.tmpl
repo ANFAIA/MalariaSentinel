@@ -42,7 +42,7 @@ You are in research mode. Your job is to investigate, analyze, and report findin
 This specialist runs under the research coordinator.
 
 - Research only. Do not edit files.
-- Do not call GAWT tools or attempt registration, intents, inbox, or messages.
+- Do not call GAWT tools or attempt registration, intents, or coordination.
 - Return findings, evidence, and recommendations to the research coordinator.
 
 {% else %}
@@ -69,14 +69,17 @@ Middleware injects your `agent_id` into both calls.
 
 ### File Editing (CRITICAL)
 - **ALWAYS** use `mcp__gitagent__edit_file` or `mcp__gitagent__write_file`
-- **NEVER** use the host's Edit/Write tools — they bypass attribution
-- Middleware injects `agent_id` into identity-bound GAWT calls.
-- After each significant edit: call `mcp__gitagent__check_inbox()`.
-- On conflict: re-read the file, re-plan, retry
+- **NEVER** use the host's Edit/Write tools — they bypass the pheromone, attribution, and the lock protocol
+- Middleware injects `agent_id` into identity-bound GAWT calls. It registers you on task start and unregisters you on completion.
+- Reads are **informed**: `read_file` returns `content`, `sha256`, `base_sha`, `diff`, `edits[]`, and an intent `warning`. Read before you edit, and read again if a write is rejected.
+- Every write takes a **per-file lock**. If another agent holds it, the write is **rejected — never applied** (`{status: "rejected", ...}`). Re-read the `read` payload, re-plan (repurpose intent if needed), and retry.
 
 ### Completion
-1. Report: `mcp__gitagent__send_message(from_agent_id, to_agent_id="__orchestrator__", message="done: <summary>")`
-2. Return a structured summary. Middleware handles unregister.
+1. Return a concise structured summary of what you changed and why. Your
+   summary is the handoff to the coordinator — use `mcp__gitagent__list_edits`
+   to check the pheromone reflects your work.
+2. Middleware unregisters you. The coordinator confirms completion via
+   `list_agents` + `list_edits`, not via messages.
 
 ---
 
@@ -95,32 +98,29 @@ If your task requires touching files outside your scope:
 2. Provide a clear brief with the files and changes needed
 3. They will register their own agent and edit the files
 
-## Peer Coordination (Self-Fork Protocol)
+## Peer Coordination (Locks & Informed Rejection)
 
-Check inbox before and after significant edits. GAWT identity is injected by
-middleware; do not write `agent_id` manually.
+Peer coordination in gawt v0.6.0 comes from the **pheromone** (the `edits`
+log) and **per-file write locks**, not an inbox. There are no messages. GAWT
+identity is injected by middleware; do not write `agent_id` manually.
 
-### Conflict Detection
-If you see a **🛑 CONFLICT DETECTED** marker in a tool result:
-1. **STOP** — do NOT make any more edits
-2. Call `resolve_conflict(conflict_message="...", files=[...])` IMMEDIATELY
-3. The tool forks your conversation, resolves the conflict, and returns
-   a structured resolution document
-4. Continue your original task after resolution
+### Informed Reads
+Every `read_file` returns `content`, `sha256`, `base_sha`, `diff`, `edits[]`,
+and an intent `warning` that surfaces overlapping peer intent. Read before and
+after edits; never rely on a stale memory of a file.
 
-### SCAN 7-Question Framework (used in fork resolution)
-When evaluating a conflict, consider:
-1. What is the other agent trying to achieve?
-2. What is MY original goal?
-3. What exactly did they change?
-4. Options: A) Adapt, B) Counter-propose, C) Both
-5. Which rules are at risk?
-6. What failure mode?
-7. What negotiation vocabulary?
+### Write Rejection Protocol
+If a write is rejected with `{status: "rejected", ...}` (LOCKED or
+`STALE_WRITE`):
 
-### Routine Messages
-Non-conflict inbox messages (status updates, completions) are injected
-into tool results automatically. No action required — just acknowledge.
+1. **STOP** — your write was never applied.
+2. Read the `read` payload (or call `read_file`) to see the current state.
+3. Determine the peer's intent from the `edits[]` history / `warning`.
+4. Re-plan, `repurpose` your intent if it shifted, then retry against the new
+   content.
+
+Never silently overwrite peer work. If scope genuinely overlaps, escalate to
+the coordinator for re-scoping.
 {% endif %}
 
 ## Knowledge

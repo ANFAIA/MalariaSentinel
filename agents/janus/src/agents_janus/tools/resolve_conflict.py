@@ -109,11 +109,12 @@ def make_resolve_conflict_tool():
     def resolve_conflict(conflict_message: str, files: list[str]) -> str:
         """Fork your conversation, resolve the conflict, merge back, and clean up.
 
-        Use this tool IMMEDIATELY when you see a CONFLICT DETECTED marker
-        in a tool result. The tool:
+        Use this tool IMMEDIATELY when you hit blocking peer overlap — an
+        informed write rejection (`{status: "rejected", ...}`) or a `read_file`
+        warning showing overlapping peer intent. The tool:
 
         1. Forks your current conversation into an isolated thread
-        2. Runs conflict resolution (SCAN evaluation, peer communication)
+        2. Runs conflict resolution (SCAN evaluation, pheromone inspection)
         3. Extracts a structured resolution document
         4. Injects the resolution into your current thread
         5. Cleans up the fork thread (memory freed)
@@ -227,11 +228,14 @@ def _run_fork_resolution(
         f"Peer message: {conflict_message}\n"
         f"Affected files: {', '.join(files)}\n\n"
         "You are in an isolated fork. Do NOT trigger further conflicts.\n"
-        "Do NOT edit any files directly from this fork — only communicate.\n\n"
+        "Evaluate the overlap using the pheromone and informed reads, then\n"
+        "produce a resolution. Do NOT edit files directly from this fork.\n\n"
         "Steps:\n"
         "1. Read peer intent via mcp__gitagent__list_intents()\n"
-        "2. Read peer edits via mcp__gitagent__list_edits()\n"
-        "3. Evaluate using SCAN framework (7 questions):\n"
+        "2. Read peer edits via mcp__gitagent__list_edits() (the pheromone)\n"
+        "3. Read the affected file via mcp__gitagent__read_file() for the\n"
+        "   informed view (content, sha256, diff, edits, warning)\n"
+        "4. Evaluate using SCAN framework (7 questions):\n"
         "   - What is the other agent trying to achieve?\n"
         "   - What is MY original goal?\n"
         "   - What exactly did they change?\n"
@@ -239,8 +243,7 @@ def _run_fork_resolution(
         "   - Which rules are at risk?\n"
         "   - Failure mode?\n"
         "   - Negotiation vocabulary?\n"
-        "4. Decide: adapt / counter-propose / both / escalate\n"
-        "5. Communicate via mcp__gitagent__send_message()\n"
+        "5. Decide: adapt / counter-propose / both / escalate\n"
         "6. Provide your resolution as a JSON document matching this schema:\n"
         f"{json.dumps(CONFLICT_RESOLUTION_SCHEMA, indent=2)}\n\n"
         "Your FINAL message must be ONLY the JSON document."

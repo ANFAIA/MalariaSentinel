@@ -46,15 +46,23 @@ Shell access is the deepagents built-in `execute` tool — restricted to
 custom ABM tools (`abm_run`, `abm_test`, `abm_score`) and pipeline tools were
 removed.
 
-### The gitagent workflow
+### The gitagent workflow (gawt v0.6.0)
 
 ```
-gitagent_init → gitagent_start → gitagent_spawn → worker proposes →
-gitagent_proposals → gitagent_diff → accept/reject/revise →
-gitagent_integrate → gitagent_finalize (1 commit on main)
+orchestrator start_session(session_id) → register_agent + dispatch specialists →
+specialists declare intent, edit via mcp__gitagent__* (per-file lock + informed read) →
+orchestrator monitor via pheromone (list_edits) + list_agents →
+orchestrator snapshot_session(session_id, message, files) → partial commit on main →
+orchestrator abort_session(session_id)
 ```
 
-Each feature gets its own isolated worktree. The orchestrator reviews diffs and decides. Workers iterate unlimited times until the change is correct.
+In gawt v0.6.0 multiple sessions share **one** global worktree
+(`.gitagent/worktree/`). There is **no inbox** — coordination emerges from the
+pheromone (the SQLite `edits` log), per-file write locks with informed reads
+(`read_file` returns `content`, `sha256`, `base_sha`, `diff`, `edits[]`,
+`warning`), and partial snapshots (`snapshot_session`). `finalize_session`,
+`check_inbox`, and `send_message` no longer exist. The orchestrator reviews
+informed reads and rejection payloads and decides.
 
 ## CLI commands
 
@@ -258,4 +266,5 @@ langchain-core >= 0.3
 typer >= 0.9
 rich >= 13
 langchain-openai >= 0.3  (optional, for OpenRouter)
+gawt >= 0.6.0            (MCP server `gitagent-mcp`)
 ```

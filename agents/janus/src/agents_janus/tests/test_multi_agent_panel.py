@@ -13,11 +13,11 @@ class TestMultiAgentPanel:
 
     def test_update_agent(self):
         panel = MultiAgentPanel()
-        panel.update_agent("a_1", "abm", intent="fix engine", last_edit="engine.cpp", inbox_count=2)
+        panel.update_agent("a_1", "abm", intent="fix engine", last_edit="engine.cpp", edit_count=2)
         assert "a_1" in panel._agents
         assert panel._agents["a_1"]["role"] == "abm"
         assert panel._agents["a_1"]["intent"] == "fix engine"
-        assert panel._agents["a_1"]["inbox_count"] == 2
+        assert panel._agents["a_1"]["edit_count"] == 2
 
     def test_remove_agent(self):
         panel = MultiAgentPanel()

@@ -432,12 +432,18 @@ def _apply_prefixes(tools: list[BaseTool], prefixes: dict[str, str]) -> list[Bas
 
 
 def filter_gawt_tools(tools: list[BaseTool]) -> list[BaseTool]:
-    """Filter to gawt session-lifecycle tools (no filesystem writes)."""
+    """Filter to gawt v0.6.0 session-lifecycle, snapshot, and agent tools.
+
+    The inbox (check_inbox/send_message) and finalize_session are gone in
+    gawt 0.6.0; coordination now flows through the pheromone (edits log),
+    per-file locks with informed reads, and partial snapshots.
+    """
     gawt_names = {
-        "start_session", "finalize_session", "abort_session", "get_session",
+        "start_session", "abort_session", "get_session", "list_sessions",
+        "snapshot_session", "snapshot_status", "list_snapshots",
         "register_agent", "unregister_agent", "list_agents",
         "start_intent", "repurpose", "get_current_intent",
-        "check_inbox", "send_message", "list_edits", "list_intents",
+        "list_edits", "list_intents",
     }
     # Match both raw names and prefixed names (mcp__gitagent__<tool>)
     prefixed = {f"mcp__gitagent__{n}" for n in gawt_names}

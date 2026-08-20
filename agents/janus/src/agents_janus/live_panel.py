@@ -356,7 +356,7 @@ class LivePanel:
 class MultiAgentPanel:
     """Multi-agent status panel. Shows one row per active specialist.
 
-    Each row: agent_id, role, current_intent, last_edit, inbox_status.
+    Each row: agent_id, role, current_intent, last_edit, edit (pheromone) count.
     Updated from gawt MCP list_agents + list_edits + list_intents.
     """
 
@@ -385,13 +385,13 @@ class MultiAgentPanel:
                 pass
             self._live = None
 
-    def update_agent(self, agent_id: str, role: str, intent: str = "", last_edit: str = "", inbox_count: int = 0):
+    def update_agent(self, agent_id: str, role: str, intent: str = "", last_edit: str = "", edit_count: int = 0):
         """Update or add an agent's status."""
         self._agents[agent_id] = {
             "role": role,
             "intent": intent,
             "last_edit": last_edit,
-            "inbox_count": inbox_count,
+            "edit_count": edit_count,
         }
         self._refresh()
 
@@ -418,8 +418,8 @@ class MultiAgentPanel:
                     row.append(f"  {intent_short}", style="dim")
                 if state["last_edit"]:
                     row.append(f"  last: {state['last_edit']}", style="dim")
-                if state["inbox_count"] > 0:
-                    row.append(f"  ⚠ {state['inbox_count']} inbox", style="yellow")
+                if state["edit_count"] > 0:
+                    row.append(f"  {state['edit_count']} edits", style="cyan")
                 lines.append(row)
 
         return Panel(Group(*lines), title="agents", border_style="cyan", padding=(0, 1))

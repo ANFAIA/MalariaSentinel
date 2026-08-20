@@ -60,10 +60,10 @@ You will typically be dispatched under one of these categories:
 5. **Record** the improvement in the knowledge graph via `memory.sh
    node` (or `memory_recall_kg` for read). Best-effort — KG failure
    does NOT block the change.
-6. **Report** back to the orchestrator via
-   `mcp__gitagent__send_message(to_agent_id="__orchestrator__",
-   message=<JSON summary>)`. Include `files_changed`,
-   `tests_run`, `tests_pass`, `kg_recorded`.
+6. **Report** back to the orchestrator with a concise JSON summary
+   (returned as your final message). Include `files_changed`,
+   `tests_run`, `tests_pass`, `kg_recorded`. There is no message
+   channel — the coordinator confirms via `list_edits` (pheromone).
 
 ## Patch structure (for prompt edits)
 

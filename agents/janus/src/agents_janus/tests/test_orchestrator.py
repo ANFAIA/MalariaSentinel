@@ -34,14 +34,16 @@ class TestRenderPrompt:
         prompt = _render_prompt("implementation_coordinator")
         assert "Janus Implementation Coordinator" in prompt
         assert "mcp__gitagent__start_session" in prompt
-        assert "mcp__gitagent__finalize_session" in prompt
+        assert "mcp__gitagent__snapshot_session" in prompt
+        assert "mcp__gitagent__snapshot_status" in prompt
         assert "[MODE:implementation]" in prompt
         assert "no direct repository tools" in prompt
         assert "codebase_*" not in prompt
         assert "GAWT Consensus Protocol" in prompt
         assert "SESSION_OPEN" in prompt
-        assert "Inbox Semantics" in prompt
-        assert "CONFLICT DETECTED" in prompt
+        assert "Pheromone & Locks Semantics" in prompt
+        assert "pheromone" in prompt
+        assert "informed" in prompt
         assert "Failure Recovery" in prompt
 
 

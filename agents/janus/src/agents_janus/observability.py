@@ -36,16 +36,19 @@ from langchain.agents.middleware.types import AgentMiddleware
 # ── Tool category mapping ──────────────────────────────────────────────
 # Maps tool names to visual categories for Langfuse tags.
 _TOOL_CATEGORIES: dict[str, str] = {
-    # gawt MCP tools
+    # gawt MCP tools (v0.6.0: pheromone + locks + partial snapshots)
     "mcp__gitagent__start_session": "gawt",
-    "mcp__gitagent__finalize_session": "gawt",
+    "mcp__gitagent__abort_session": "gawt",
+    "mcp__gitagent__get_session": "gawt",
+    "mcp__gitagent__list_sessions": "gawt",
+    "mcp__gitagent__snapshot_session": "gawt",
+    "mcp__gitagent__snapshot_status": "gawt",
+    "mcp__gitagent__list_snapshots": "gawt",
     "mcp__gitagent__register_agent": "gawt",
     "mcp__gitagent__edit_file": "gawt",
     "mcp__gitagent__write_file": "gawt",
     "mcp__gitagent__read_file": "gawt",
     "mcp__gitagent__delete_file": "gawt",
-    "mcp__gitagent__check_inbox": "gawt",
-    "mcp__gitagent__send_message": "gawt",
     "mcp__gitagent__list_agents": "gawt",
     "mcp__gitagent__list_edits": "gawt",
     "mcp__gitagent__list_intents": "gawt",

@@ -12,14 +12,15 @@ class Check:
 
 
 CHECKS: list[Check] = [
-    Check(name="session_started", description="Primary called mcp__gitagent__start_session to open a shared worktree"),
+    Check(name="session_started", description="Primary called mcp__gitagent__start_session to open the shared worktree"),
     Check(name="agents_registered", description="Subagents called mcp__gitagent__register_agent in the shared session"),
     Check(name="intent_declared", description="Agent called mcp__gitagent__start_intent before first edit (semantic attribution)"),
-    Check(name="inbox_checked_post_edit", description="Agent called mcp__gitagent__check_inbox after edit to detect conflicts"),
-    Check(name="peer_message_sent", description="mcp__gitagent__send_message exchanged between agents"),
-    Check(name="resolve_conflict_invoked", description="resolve_conflict tool invoked for self-fork on inbox conflict"),
-    Check(name="session_finalized", description="mcp__gitagent__finalize_session produced a commit"),
-    Check(name="agents_unregistered", description="Agents called mcp__gitagent__unregister_agent before finalization"),
+    Check(name="read_informed_before_write", description="Agent used informed read_file (pheromone/diff) before editing"),
+    Check(name="write_lock_protocol", description="Writes go through gawt edit/write with per-file lock handling"),
+    Check(name="rejection_handled", description="Informed write rejection (status: rejected / STALE_WRITE) led to re-read + retry"),
+    Check(name="pheromone_traceable", description="Edits recorded in the pheromone (mcp__gitagent__list_edits) with intent attribution"),
+    Check(name="session_snapshotted", description="mcp__gitagent__snapshot_session published a partial commit to the target branch"),
+    Check(name="agents_unregistered", description="Agents called mcp__gitagent__unregister_agent before snapshot"),
     Check(name="no_orchestrator_arbitration", description="No orchestrator tool_call between specialist edits"),
     Check(name="scan_markers_emitted", description="SCAN markers present in resolve_conflict output"),
 ]

@@ -52,11 +52,13 @@ agents:
       - ask_user
       - mcp__gitagent__start_session
       - mcp__gitagent__get_session
+      - mcp__gitagent__list_sessions
       - mcp__gitagent__list_agents
       - mcp__gitagent__list_edits
       - mcp__gitagent__list_intents
-      - mcp__gitagent__check_inbox
-      - mcp__gitagent__finalize_session
+      - mcp__gitagent__snapshot_session
+      - mcp__gitagent__snapshot_status
+      - mcp__gitagent__list_snapshots
       - mcp__gitagent__abort_session
 
   abm:
@@ -70,9 +72,7 @@ agents:
       - mcp__gitagent__read_file
       - mcp__gitagent__edit_file
       - mcp__gitagent__write_file
-      - mcp__gitagent__check_inbox
       - mcp__gitagent__start_intent
-      - mcp__gitagent__send_message
       - codebase_search_graph
       - codebase_get_code_snippet
       - ask_user
@@ -93,9 +93,7 @@ agents:
       - mcp__gitagent__read_file
       - mcp__gitagent__edit_file
       - mcp__gitagent__write_file
-      - mcp__gitagent__check_inbox
       - mcp__gitagent__start_intent
-      - mcp__gitagent__send_message
       - codebase_search_graph
       - codebase_get_code_snippet
       - ask_user
@@ -114,9 +112,7 @@ agents:
       - mcp__gitagent__read_file
       - mcp__gitagent__edit_file
       - mcp__gitagent__write_file
-      - mcp__gitagent__check_inbox
       - mcp__gitagent__start_intent
-      - mcp__gitagent__send_message
       - codebase_search_graph
       - codebase_get_code_snippet
       - ask_user
@@ -133,9 +129,7 @@ agents:
       - mcp__gitagent__read_file
       - mcp__gitagent__edit_file
       - mcp__gitagent__write_file
-      - mcp__gitagent__check_inbox
       - mcp__gitagent__start_intent
-      - mcp__gitagent__send_message
       - codebase_search_graph
       - codebase_get_code_snippet
       - ask_user
@@ -154,9 +148,7 @@ agents:
       - mcp__gitagent__read_file
       - mcp__gitagent__edit_file
       - mcp__gitagent__write_file
-      - mcp__gitagent__check_inbox
       - mcp__gitagent__start_intent
-      - mcp__gitagent__send_message
       - codebase_search_graph
       - codebase_get_code_snippet
       - ask_user
@@ -173,9 +165,7 @@ agents:
       - mcp__gitagent__read_file
       - mcp__gitagent__edit_file
       - mcp__gitagent__write_file
-      - mcp__gitagent__check_inbox
       - mcp__gitagent__start_intent
-      - mcp__gitagent__send_message
       - codebase_search_graph
       - codebase_get_code_snippet
       - ask_user
@@ -192,9 +182,7 @@ agents:
       - mcp__gitagent__read_file
       - mcp__gitagent__edit_file
       - mcp__gitagent__write_file
-      - mcp__gitagent__check_inbox
       - mcp__gitagent__start_intent
-      - mcp__gitagent__send_message
       - codebase_search_graph
       - codebase_get_code_snippet
       - ask_user
@@ -213,9 +201,7 @@ agents:
       - mcp__gitagent__read_file
       - mcp__gitagent__edit_file
       - mcp__gitagent__write_file
-      - mcp__gitagent__check_inbox
       - mcp__gitagent__start_intent
-      - mcp__gitagent__send_message
       - codebase_search_graph
       - codebase_get_code_snippet
       - ask_user
@@ -232,9 +218,7 @@ agents:
       - mcp__gitagent__read_file
       - mcp__gitagent__edit_file
       - mcp__gitagent__write_file
-      - mcp__gitagent__check_inbox
       - mcp__gitagent__start_intent
-      - mcp__gitagent__send_message
       - codebase_search_graph
       - codebase_get_code_snippet
       - ask_user
