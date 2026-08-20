@@ -58,11 +58,12 @@ _build_sim_cmd() {
   printf '%s' "$cmd"
 }
 
-# sim_run <name> <repo> <repo_url> <branch> <aoi> <year> <month> <days> <seed> <n_rollouts> <snapshot_every> <run_name> <gif> <data_ready> <cmd> <pull_to> <keep-vm>
+# sim_run <name> <repo> <repo_url> <branch> <aoi> <year> <month> <days> <seed> <n_rollouts> <snapshot_every> <run_name> <gif> <data_ready> <cmd> <pull_to> <keep-vm> <vm_type>
 sim_run() {
   local name="$1" repo="$2" repo_url="$3" branch="$4" aoi="$5" year="$6" month="$7"
   local days="$8" seed="$9" n_rollouts="${10}" snapshot_every="${11}" run_name="${12}"
-  local gif="${13}" data_ready="${14}" cmd="${15}" pull_to="${16}" keep_vm="${17}"
+  local gif="${13}" data_ready="${14}" cmd="${15}" pull_to="${16}" keep_vm="${17}" vm_type="${18}"
+  vm_type="${vm_type:-cx32}"
 
   _ensure_local_path "repo" "$repo"
   if [[ -n "$data_ready" ]]; then
@@ -96,9 +97,9 @@ sim_run() {
   # Cost estimate: assume HETZNER_RUN_ESTIMATE_HOURS worst case. The user
   # can pass --yes to skip the prompt.
   local estimate_rate estimate_hours estimate_cost
-  estimate_rate="$(price_for_type ccx33 || echo 0.030)"
+  estimate_rate="$(price_for_type "$vm_type" || echo 0.030)"
   estimate_hours="${HETZNER_RUN_ESTIMATE_HOURS:-1}"
-  estimate_cost="$(awk -v r="$estimate_rate" -v h="$estimate_hours" 'BEGIN { printf "%.4f", r*h }')"
+  estimate_cost="$(LC_NUMERIC=C awk -v r="$estimate_rate" -v h="$estimate_hours" 'BEGIN { printf "%.4f", r*h }')"
 
   if [[ "${HETZNER_RUN_DRY_RUN:-0}" == "1" ]]; then
     log_info "[dry-run] sim-run plan:"
@@ -118,11 +119,11 @@ sim_run() {
     else
       log_info "  end:  destroy"
     fi
-    log_info "  estimated cost (ccx33 × $estimate_hours h): $(format_eur "$estimate_cost")"
+    log_info "  estimated cost ($vm_type × $estimate_hours h): $(format_eur "$estimate_cost")"
     return 0
   fi
 
-  log_info "estimated cost: $(format_eur "$estimate_cost") (ccx33 × ${estimate_hours}h)"
+  log_info "estimated cost: $(format_eur "$estimate_cost") ($vm_type × ${estimate_hours}h)"
   if [[ "${HETZNER_RUN_ASSUME_YES:-0}" != "1" ]]; then
     if [[ -t 0 ]]; then
       printf 'Proceed? [y/N] ' >&2
@@ -135,7 +136,7 @@ sim_run() {
     fi
   fi
 
-  start_vm "$name" "ccx33" "ubuntu-24.04" "fsn1" \
+  start_vm "$name" "$vm_type" "ubuntu-24.04" "fsn1" \
     "$(resolve_ssh_key_name "")"
 
   exec_remote "$name" "bash -lc $(printf %q "$setup_cmd")"

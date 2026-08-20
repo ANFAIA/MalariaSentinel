@@ -95,6 +95,23 @@ hdr "cloud-init yaml"
 if command -v python3 >/dev/null 2>&1; then
   if python3 -c "import yaml; yaml.safe_load(open('$PKG_DIR/cloud-init.yaml'))" 2>/dev/null; then
     ok "cloud-init.yaml parses as YAML"
+    # Guard against the cloud-init schema trap: any runcmd entry containing
+    # ': ' (colon-space) parses as a YAML mapping instead of a string, which
+    # fails cloud-init schema validation and silently skips ALL of runcmd
+    # (observed: /work and uv never set up). Every runcmd entry must be a str.
+    if python3 -c "
+import yaml, sys
+d = yaml.safe_load(open('$PKG_DIR/cloud-init.yaml'))
+bad = [i for i, e in enumerate(d.get('runcmd', [])) if not isinstance(e, str)]
+if bad:
+    print('runcmd entries are NOT strings (schema will fail):', bad)
+    sys.exit(1)
+print('all runcmd entries are strings')
+" 2>/dev/null; then
+      ok "cloud-init runcmd entries are all strings (schema-safe)"
+    else
+      bad "cloud-init runcmd has non-string entries (': ' parses as YAML mapping)"
+    fi
   elif python3 -c "import yaml" 2>/dev/null; then
     bad "cloud-init.yaml did not parse"
   else

@@ -150,12 +150,12 @@ EOF
 
 print_sim_run_help() {
   cat <<'EOF'
-hetzner-run sim-run — boot a ccx33, git-clone the repo, optionally push ready
+hetzner-run sim-run — boot a VM, git-clone the repo, optionally push ready
 AOI data, run an ABM simulation, pull results, destroy
 
 USAGE
   hetzner-run sim-run [--name N] [--repo R] [--repo-url URL] [--branch B]
-                      [--data-ready DIR] [--cmd C]
+                      [--vm-type T] [--data-ready DIR] [--cmd C]
                       [--aoi A] [--year Y] [--month M] [--days D]
                       [--seed S] [--n-rollouts N] [--snapshot-every E]
                       [--run-name NAME] [--gif] [--pull-to P]
@@ -165,6 +165,14 @@ REPO
   The VM git-clones the repo (shallow) from --repo-url on --branch.
   Defaults are read from the local checkout given by --repo (origin + the
   current branch). The ready data folder (if any) is then rsynced in.
+
+VM TYPE (hardware)
+  A single-rollout ABM uses ~1 core and ~2 GB RAM, so ccx33 (8 cores/32 GB)
+  is overkill. Default cx32 (4 shared cores/8 GB, €0.018/h) fits comfortably.
+  Scale up only for --n-rollouts ensembles or very long runs:
+    cx22  €0.011/h   2 shared cores / 4 GB   (tight but enough for 1 rollout)
+    cx32  €0.018/h   4 shared cores / 8 GB   (default; recommended)
+    ccx33 €0.030/h   8 dedicated cores / 32 GB (ensembles, --n-rollouts>1)
 
 DATA FLAG
   --data-ready DIR  Local folder with the AOI's already-downloaded +
@@ -178,6 +186,7 @@ DEFAULTS
   --repo            <monorepo root> (auto-detected)
   --repo-url        <git origin of --repo>
   --branch          <current branch of --repo>
+  --vm-type         cx32
   --aoi             ghana
   --year            2024
   --month           1
@@ -312,13 +321,14 @@ cmd_sim_run() {
   local name="" repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
   local repo_url="" branch="" data_ready="" cmd="" pull_to="" keep_vm=0
   local aoi="ghana" year="2024" month="1" days="731" seed="1"
-  local n_rollouts="1" snapshot_every="7" run_name="" gif=0
+  local n_rollouts="1" snapshot_every="7" run_name="" gif=0 vm_type="cx32"
   while (( $# )); do
     case "$1" in
       --name)          name="$2"; shift 2 ;;
       --repo)          repo="$2"; shift 2 ;;
       --repo-url)      repo_url="$2"; shift 2 ;;
       --branch)        branch="$2"; shift 2 ;;
+      --vm-type)       vm_type="$2"; shift 2 ;;
       --data-ready)    data_ready="$2"; shift 2 ;;
       --cmd)           cmd="$2"; shift 2 ;;
       --aoi)           aoi="$2"; shift 2 ;;
@@ -348,7 +358,7 @@ cmd_sim_run() {
   fi
   sim_run "$name" "$repo" "$repo_url" "$branch" "$aoi" "$year" "$month" \
     "$days" "$seed" "$n_rollouts" "$snapshot_every" "$run_name" "$gif" \
-    "$data_ready" "$cmd" "$pull_to" "$keep_vm"
+    "$data_ready" "$cmd" "$pull_to" "$keep_vm" "$vm_type"
 }
 
 cmd_train() {

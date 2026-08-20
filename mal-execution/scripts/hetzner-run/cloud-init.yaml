@@ -60,5 +60,8 @@ runcmd:
   - chmod 755 /work /work/code /work/data /work/runs
   - chown -R root:root /work
   # Drop a tiny motd so anyone SSHing in can see what this box is for.
-  - printf 'MalariaSentinel ephemeral runner (hetzner-run)\n  /work/code   source repos\n  /work/data   input datasets\n  /work/runs   output artifacts\nDestroy this VM with: hetzner-run destroy <name>\n' > /etc/motd
-  - echo "hetzner-run cloud-init: complete at $(date -u +%Y-%m-%dT%H:%M:%SZ)" > /var/log/hetzner-run-cloud-init.log
+  # NOTE: runcmd entries are parsed as YAML scalars, so any ': ' (colon-space)
+  # inside a plain string becomes a mapping and fails cloud-init schema
+  # validation. Keep this free of ': ' and quote it explicitly.
+  - "printf 'MalariaSentinel ephemeral runner (hetzner-run)\\n  /work/code   source repos\\n  /work/data   input datasets\\n  /work/runs   output artifacts\\nDestroy this VM with hetzner-run destroy <name>\\n' > /etc/motd"
+  - "echo hetzner-run cloud-init complete at $(date -u +%Y-%m-%dT%H:%M:%SZ) > /var/log/hetzner-run-cloud-init.log"
