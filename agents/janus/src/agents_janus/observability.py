@@ -444,6 +444,7 @@ class ObservabilityMiddleware(AgentMiddleware):
         })
 
     def wrap_model_call(self, request, handler):
+        self._dump_prompt(request)
         # Langfuse: open generation BEFORE the handler so startTime is correct.
         lf_gen = None
         if self.langfuse and self._trace_context is not None:
@@ -530,6 +531,33 @@ class ObservabilityMiddleware(AgentMiddleware):
                 self._log_langfuse_error("end_observation(generation)", _LangfuseErrorMarker(e))
 
         return response
+
+    def _dump_prompt(self, request: Any) -> None:
+        """Persist exact model-visible prompt/tool surface when enabled."""
+        if os.environ.get("JANUS_DUMP_PROMPTS", "").lower() not in {"1", "true", "yes"}:
+            return
+        try:
+            tools: list[dict[str, Any]] = []
+            for tool in getattr(request, "tools", []) or []:
+                if isinstance(tool, dict):
+                    tools.append({
+                        key: value for key, value in tool.items()
+                        if key in {"name", "description", "parameters", "args_schema", "type"}
+                    })
+                else:
+                    tools.append({
+                        "name": getattr(tool, "name", ""),
+                        "description": getattr(tool, "description", ""),
+                        "args_schema": str(getattr(tool, "args_schema", "")),
+                    })
+            self.logger.log_prompt_snapshot(
+                agent_role=self._current_agent_role,
+                system_prompt=getattr(request, "system_message", ""),
+                messages=list(getattr(request, "messages", []) or []),
+                tools=tools,
+            )
+        except Exception as exc:
+            self._log_langfuse_error("dump_prompt", _LangfuseErrorMarker(exc))
 
     def after_model(self, state, runtime):
         messages = state.get("messages", [])
@@ -703,16 +731,28 @@ class SubAgentObservabilityMiddleware(AgentMiddleware):
         self._obs.set_agent_role(self._obs._mode)
 
     def before_model(self, state, runtime):
+        self._obs.set_agent_role(self._agent_role)
         self._obs.before_model(state, runtime)
 
     def after_model(self, state, runtime):
+        self._obs.set_agent_role(self._agent_role)
         self._obs.after_model(state, runtime)
 
     def wrap_model_call(self, request, handler):
+        self._obs.set_agent_role(self._agent_role)
         return self._obs.wrap_model_call(request, handler)
 
     def wrap_tool_call(self, request, handler):
+        self._obs.set_agent_role(self._agent_role)
         return self._obs.wrap_tool_call(request, handler)
+
+    async def awrap_model_call(self, request, handler):
+        self._obs.set_agent_role(self._agent_role)
+        return await self._obs.awrap_model_call(request, handler)
+
+    async def awrap_tool_call(self, request, handler):
+        self._obs.set_agent_role(self._agent_role)
+        return await self._obs.awrap_tool_call(request, handler)
 
 
 # ── Utility functions ───────────────────────────────────────────────────

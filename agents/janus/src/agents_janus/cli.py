@@ -7,6 +7,7 @@ Two entry points:
 from __future__ import annotations
 
 import os
+import json
 import sys
 from pathlib import Path
 
@@ -45,6 +46,10 @@ def _main(
         "", "--env",
         help="Environment tag: dev, staging, production.",
     ),
+    dump_prompts: bool = typer.Option(
+        False, "--dump-prompts",
+        help="Write complete model prompts and visible tool schemas to prompt_snapshots.jsonl.",
+    ),
 ) -> None:
     """Start the request router REPL for the SDSS.
 
@@ -62,6 +67,8 @@ def _main(
     """
     import agents_janus.agent as agent_mod
     agent_mod.CODEBASE_INDEX_ON_STARTUP = not no_codebase_index
+    if dump_prompts:
+        os.environ["JANUS_DUMP_PROMPTS"] = "1"
 
     if ctx.invoked_subcommand is None:
         from agents_janus.onboarding import run_onboarding
@@ -187,6 +194,10 @@ def improve(
         "", "--env",
         help="Environment tag: dev, staging, production.",
     ),
+    dump_prompts: bool = typer.Option(
+        False, "--dump-prompts",
+        help="Write complete model prompts and visible tool schemas to prompt_snapshots.jsonl.",
+    ),
 ):
     """Run the implementation coordinator — goal-driven specialist coordination.
 
@@ -216,6 +227,8 @@ def improve(
 
     if no_ask:
         os.environ["JANUS_NO_ASK_USER"] = "1"
+    if dump_prompts:
+        os.environ["JANUS_DUMP_PROMPTS"] = "1"
 
     _setup_module_flags(no_verify)
     tracing = "" if no_tracing else "langfuse"
@@ -234,6 +247,35 @@ def improve(
         env=resolved_env,
     )
     typer.echo(result)
+
+
+@app.command("prompts")
+def show_prompts(
+    session_dir: Path = typer.Argument(..., help="Janus run directory containing prompt_snapshots.jsonl."),
+    agent_role: str | None = typer.Option(None, "--agent-role", help="Filter snapshots by agent role."),
+) -> None:
+    """Render complete captured prompts and visible tool descriptions."""
+    snapshot_file = session_dir / "prompt_snapshots.jsonl"
+    if not snapshot_file.is_file():
+        raise typer.BadParameter(f"Missing {snapshot_file}; run Janus with --dump-prompts first.")
+
+    for line in snapshot_file.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        snapshot = json.loads(line)
+        if agent_role and snapshot.get("agent_role") != agent_role:
+            continue
+        typer.echo(f"\n# {snapshot.get('agent_role', 'unknown')} @ {snapshot.get('ts', '')}\n")
+        typer.echo("## System prompt\n")
+        typer.echo(snapshot.get("system_prompt", ""))
+        typer.echo("\n## Messages\n")
+        for message in snapshot.get("messages", []):
+            typer.echo(f"### {message.get('type', 'message')}\n\n{message.get('content', '')}\n")
+        typer.echo("## Tools\n")
+        for tool in snapshot.get("tools", []):
+            typer.echo(f"### {tool.get('name', 'unknown')}\n\n{tool.get('description', '')}\n")
+            if tool.get("parameters") or tool.get("args_schema"):
+                typer.echo(f"```json\n{json.dumps(tool.get('parameters', tool.get('args_schema')), ensure_ascii=False, default=str, indent=2)}\n```\n")
 
 
 if __name__ == "__main__":

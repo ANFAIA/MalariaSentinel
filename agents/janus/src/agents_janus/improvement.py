@@ -181,6 +181,9 @@ def run_improvement(
             session_mw.abort()
         raise
     finally:
+        session_mw = getattr(agent_mod, "GAWT_SESSION_MIDDLEWARE", None)
+        if session_mw is not None:
+            session_mw.abort()
         if langfuse_client is not None:
             try:
                 langfuse_client.flush()

@@ -10,6 +10,25 @@ from typing import Any
 from langchain.agents.middleware.types import AgentMiddleware, AgentState
 
 _log = logging.getLogger(__name__)
+_CURRENT_SESSION_ID: contextvars.ContextVar[str | None] = contextvars.ContextVar(
+    "janus_gawt_session_id", default=None
+)
+
+
+def set_current_session_id(session_id: str | None) -> None:
+    """Publish session identity to coordinator and compiled child graphs."""
+    if session_id:
+        _CURRENT_SESSION_ID.set(str(session_id))
+
+
+def current_session_id() -> str | None:
+    """Return session identity propagated through the active execution context."""
+    return _CURRENT_SESSION_ID.get()
+
+
+def clear_current_session_id() -> None:
+    """Clear session identity after Janus-owned session cleanup."""
+    _CURRENT_SESSION_ID.set(None)
 
 
 class GawtContextState(AgentState, total=False):
@@ -81,12 +100,13 @@ class GawtContextMiddleware(AgentMiddleware):
     @property
     def session_id(self) -> str | None:
         """Current GAWT session_id, if known."""
-        return self._session_id.get()
+        return self._session_id.get() or current_session_id()
 
     @session_id.setter
     def session_id(self, value: str | None) -> None:
         if value:
             self._session_id.set(str(value))
+            set_current_session_id(str(value))
 
     def _ensure_registered(self, state: Any = None) -> str:
         state_id = state.get("gawt_agent_id") if isinstance(state, dict) else None
@@ -102,7 +122,7 @@ class GawtContextMiddleware(AgentMiddleware):
             return str(current_id)
         # Pass session_id if we already have one (multi-session gawt 0.6.0).
         reg_args: dict[str, Any] = {"role": self.role}
-        sid = self._session_id.get()
+        sid = self.session_id
         if sid:
             reg_args["session_id"] = sid
         result = _parse_result(self.register_tool.invoke(reg_args))
@@ -150,7 +170,7 @@ class GawtContextMiddleware(AgentMiddleware):
         ) or self._agent_id.get()
         session_id = (
             state.get("gawt_session_id") if isinstance(state, dict) else None
-        ) or self._session_id.get()
+        ) or self.session_id
 
         if not name.startswith("mcp__gitagent__"):
             return request

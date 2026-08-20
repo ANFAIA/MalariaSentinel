@@ -27,11 +27,16 @@ from agents_janus.malariasim_backend import MalariasimShellBackend
 from agents_janus.middleware.dispatch_policy import DispatchPathMiddleware
 from agents_janus.middleware.gawt_context import GawtContextMiddleware
 from agents_janus.middleware.gawt_session import GawtSessionMiddleware
-from agents_janus.middleware.runtime_policy import BACKEND_TOOLS, ToolExposureMiddleware
+from agents_janus.middleware.runtime_policy import (
+    BACKEND_TOOLS,
+    COORDINATOR_GAWT_WRITE_TOOLS,
+    ToolExposureMiddleware,
+)
 from agents_janus.observability import (
     ObservabilityMiddleware,
     SubAgentObservabilityMiddleware,
 )
+from agents_janus.scope_guard import guard_gawt_tools
 
 # Module-level flags set by CLI before creating the agent
 VERIFY_FINALIZE: bool = True
@@ -339,6 +344,7 @@ def create_orchestrator(
         )
 
         router_middleware = []
+        router_obs = None
         if SESSION_LOGGER is not None:
             router_obs = ObservabilityMiddleware(
                 SESSION_LOGGER,
@@ -349,16 +355,18 @@ def create_orchestrator(
                 iteration=iteration,
                 mode=mode,
             )
-            router_middleware.append(router_obs)
             OBSERVABILITY_MIDDLEWARE = router_obs
 
         router_middleware.append(
             ToolExposureMiddleware(
                 allowed_backend_tools=frozenset(),
                 excluded_tools=frozenset({"write_todos"}),
+                allowed_tools=frozenset({"task"}),
             )
         )
         router_middleware.append(DispatchPathMiddleware())
+        if router_obs is not None:
+            router_middleware.append(router_obs)
 
         router = create_deep_agent(
             model=llm,
@@ -407,7 +415,6 @@ def create_orchestrator(
             iteration=iteration,
             mode=mode,
         )
-        middleware.append(obs)
         OBSERVABILITY_MIDDLEWARE = obs
     # Backend tools are injected by DeepAgents. Declarative policy filters them
     # at model exposure time; coordinator policy allows none.
@@ -418,11 +425,14 @@ def create_orchestrator(
             ToolExposureMiddleware(
                 allowed_backend_tools=frozenset(
                     set(coordinator_policy.tools) & set(BACKEND_TOOLS)
-                )
+                ),
+                excluded_tools=frozenset({"write_todos"}) | COORDINATOR_GAWT_WRITE_TOOLS,
             )
         )
         if mode == "implementation_coordinator":
             middleware.append(DispatchPathMiddleware())
+    if obs is not None:
+        middleware.append(obs)
 
     skills = []
     if PROJECT_SKILLS.is_dir():
@@ -496,6 +506,7 @@ def create_orchestrator(
         policy = agent_configuration.agents[name]
         all_tools = available_tools
         selected_tools = resolve_tools(all_tools, policy, agent_configuration)
+        selected_tools = guard_gawt_tools(selected_tools, policy.edits_allow)
         if mode == "research_coordinator":
             selected_tools = [
                 t for t in selected_tools
@@ -513,7 +524,8 @@ def create_orchestrator(
             ToolExposureMiddleware(
                 allowed_backend_tools=frozenset(
                     set(policy.tools) & set(BACKEND_TOOLS)
-                )
+                ),
+                excluded_tools=frozenset({"write_todos"}),
             )
         ]
         if mode != "research_coordinator" and register_tool is not None:

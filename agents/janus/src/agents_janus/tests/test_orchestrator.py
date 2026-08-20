@@ -33,7 +33,7 @@ class TestRenderPrompt:
     def test_implementation_prompt_has_gawt_protocol(self):
         prompt = _render_prompt("implementation_coordinator")
         assert "Janus Implementation Coordinator" in prompt
-        assert "mcp__gitagent__start_session" in prompt
+        assert "mcp__gitagent__start_session" not in prompt
         assert "mcp__gitagent__snapshot_session" in prompt
         assert "mcp__gitagent__snapshot_status" in prompt
         assert "[MODE:implementation]" in prompt

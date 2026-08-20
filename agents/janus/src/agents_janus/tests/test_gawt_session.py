@@ -104,6 +104,45 @@ def test_abort_noop_when_no_session():
     assert abort.calls == []
 
 
+def test_monitoring_tools_receive_current_session_id():
+    start = FakeTool({"session_id": "s_monitor"})
+    middleware = GawtSessionMiddleware(feature="test", start_tool=start)
+    middleware.wrap_tool_call(request("task"), lambda _: None)
+    req = SimpleNamespace(
+        tool_call={"name": "mcp__gitagent__list_edits", "args": {}},
+    )
+    req.override = lambda **kwargs: SimpleNamespace(**kwargs)
+    seen = {}
+    middleware.wrap_tool_call(req, lambda rewritten: seen.update(rewritten.tool_call["args"]))
+    assert seen == {"session_id": "s_monitor"}
+
+
+def test_model_start_session_is_clamped_and_propagated():
+    """Legacy/model calls cannot request lock TTL above 15 seconds."""
+    start = FakeTool({"session_id": "s_clamped"})
+    middleware = GawtSessionMiddleware(feature="test", start_tool=start)
+    request_obj = SimpleNamespace(
+        tool_call={
+            "name": "mcp__gitagent__start_session",
+            "args": {"feature": "test", "target_branch": "main", "lock_ttl_seconds": 300},
+        },
+    )
+    request_obj.override = lambda **kwargs: SimpleNamespace(**kwargs)
+
+    seen = {}
+    middleware.wrap_tool_call(
+        request_obj,
+        lambda rewritten: (seen.update(rewritten.tool_call["args"]) or {"session_id": "s_clamped"}),
+    )
+
+    assert seen == {
+        "feature": "test",
+        "target_branch": "main",
+        "lock_ttl_seconds": 15,
+    }
+    assert middleware.session_id == "s_clamped"
+
+
 class _Tool:
     def __init__(self, results=None):
         self.results = iter(results or [])

@@ -142,6 +142,32 @@ class SessionLogger:
             "response_preview": _truncate(response_preview, max_chars=500),
         })
 
+    def log_prompt_snapshot(
+        self,
+        *,
+        agent_role: str,
+        system_prompt: Any,
+        messages: list[Any],
+        tools: list[dict[str, Any]],
+    ) -> None:
+        """Write complete model-visible prompt and tool surface for inspection."""
+        payload = {
+            "ts": self._now_iso(),
+            "agent_role": agent_role,
+            "system_prompt": _full_text(system_prompt),
+            "messages": [
+                {
+                    "type": type(message).__name__,
+                    "content": _full_text(getattr(message, "content", message)),
+                }
+                for message in messages
+            ],
+            "tools": tools,
+        }
+        prompt_file = self.session_dir / "prompt_snapshots.jsonl"
+        with prompt_file.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(payload, ensure_ascii=False, default=str) + "\n")
+
     def log_agent_event(self, event_type: str, detail: str = "") -> None:
         """Log agent lifecycle event (start, end, error)."""
         self._append({
@@ -233,3 +259,12 @@ def _truncate(value: Any, max_chars: int = 4000) -> Any:
     if isinstance(value, str) and len(value) > max_chars:
         return value[:max_chars] + f"\n... ({len(value) - max_chars} chars truncated)"
     return value
+
+
+def _full_text(value: Any) -> str:
+    """Serialize message content without normal log truncation."""
+    if isinstance(value, str):
+        return value
+    if isinstance(value, list):
+        return json.dumps(value, ensure_ascii=False, default=str)
+    return str(value)

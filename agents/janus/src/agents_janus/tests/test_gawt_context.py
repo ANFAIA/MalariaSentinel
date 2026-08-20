@@ -3,7 +3,11 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from agents_janus.middleware.gawt_context import GawtContextMiddleware
+from agents_janus.middleware.gawt_context import (
+    GawtContextMiddleware,
+    clear_current_session_id,
+    set_current_session_id,
+)
 
 
 class _Tool:
@@ -108,3 +112,15 @@ def test_session_id_from_state():
     middleware = GawtContextMiddleware(role="abm", register_tool=register)
     middleware.before_agent({"gawt_agent_id": "from_state", "gawt_session_id": "s_from_state"}, None)
     assert middleware.session_id == "s_from_state"
+
+
+def test_global_session_id_reaches_compiled_child():
+    """Child middleware instances use coordinator ContextVar identity."""
+    register = _Tool([{"agent_id": "a_child"}])
+    middleware = GawtContextMiddleware(role="abm", register_tool=register)
+    try:
+        set_current_session_id("s_parent")
+        middleware.before_agent({}, None)
+        assert register.calls == [{"role": "abm", "session_id": "s_parent"}]
+    finally:
+        clear_current_session_id()

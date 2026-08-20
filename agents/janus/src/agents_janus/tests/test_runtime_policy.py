@@ -3,7 +3,10 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from agents_janus.middleware.runtime_policy import ToolExposureMiddleware
+from agents_janus.middleware.runtime_policy import (
+    COORDINATOR_GAWT_WRITE_TOOLS,
+    ToolExposureMiddleware,
+)
 
 
 def _make_request(name: str, args: dict | None = None) -> SimpleNamespace:
@@ -66,3 +69,49 @@ def test_allowed_backend_tools_still_visible():
     filtered = middleware._filter(tools)
 
     assert [t["name"] for t in filtered] == ["execute", "task"]
+
+
+def test_allowlist_hides_everything_except_router_task():
+    middleware = ToolExposureMiddleware(
+        allowed_backend_tools=frozenset(),
+        allowed_tools=frozenset({"task"}),
+    )
+    filtered = middleware._filter([
+        {"name": "task"},
+        {"name": "write_todos"},
+        {"name": "write_file"},
+        {"name": "ask_user"},
+    ])
+    assert [tool["name"] for tool in filtered] == ["task"]
+
+
+def test_model_prompt_receives_explicit_tool_policy():
+    middleware = ToolExposureMiddleware(
+        allowed_backend_tools=frozenset(),
+        allowed_tools=frozenset({"task"}),
+    )
+    request = SimpleNamespace(
+        tools=[{"name": "task"}, {"name": "write_file"}],
+        system_message="Janus router prompt",
+    )
+    request.override = lambda **kwargs: SimpleNamespace(**kwargs)
+    seen = {}
+    middleware.wrap_model_call(request, lambda rewritten: seen.update({
+        "tools": [tool["name"] for tool in rewritten.tools],
+        "system": rewritten.system_message,
+    }))
+    assert seen["tools"] == ["task"]
+    assert "only tools in current tool list" in seen["system"]
+
+
+def test_coordinator_gawt_mutators_are_excluded():
+    middleware = ToolExposureMiddleware(
+        allowed_backend_tools=frozenset(),
+        excluded_tools=COORDINATOR_GAWT_WRITE_TOOLS,
+    )
+    filtered = middleware._filter([
+        {"name": "task"},
+        {"name": "mcp__gitagent__write_file"},
+        {"name": "mcp__gitagent__list_edits"},
+    ])
+    assert [tool["name"] for tool in filtered] == ["task", "mcp__gitagent__list_edits"]

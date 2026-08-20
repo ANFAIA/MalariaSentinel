@@ -91,6 +91,10 @@ def run_onboarding(
 
     def _cleanup():
         agent_mod.SESSION_LOGGER = None
+        session_mw = getattr(agent_mod, "GAWT_SESSION_MIDDLEWARE", None)
+        if session_mw is not None:
+            session_mw.abort()
+            agent_mod.GAWT_SESSION_MIDDLEWARE = None
         if langfuse_client is not None:
             try:
                 langfuse_client.flush()
