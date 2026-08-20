@@ -150,19 +150,45 @@ EOF
 
 print_sim_run_help() {
   cat <<'EOF'
-hetzner-run sim-run — boot a ccx33, push repo+data, run a sim, pull results
+hetzner-run sim-run — boot a ccx33, git-clone the repo, optionally push ready
+AOI data, run an ABM simulation, pull results, destroy
 
 USAGE
-  hetzner-run sim-run [--name N] [--repo R] [--data D] [--cmd C]
-                      [--pull-to P] [--keep-vm] [--yes] [--dry-run]
+  hetzner-run sim-run [--name N] [--repo R] [--repo-url URL] [--branch B]
+                      [--data-ready DIR] [--cmd C]
+                      [--aoi A] [--year Y] [--month M] [--days D]
+                      [--seed S] [--n-rollouts N] [--snapshot-every E]
+                      [--run-name NAME] [--gif] [--pull-to P]
+                      [--keep-vm] [--yes] [--dry-run]
+
+REPO
+  The VM git-clones the repo (shallow) from --repo-url on --branch.
+  Defaults are read from the local checkout given by --repo (origin + the
+  current branch). The ready data folder (if any) is then rsynced in.
+
+DATA FLAG
+  --data-ready DIR  Local folder with the AOI's already-downloaded +
+                    ingested data (e.g. data/ghana). It is copied into the
+                    repo at data/<aoi>/ and the ABM runs directly.
+                    If omitted, the VM runs `malariasim download` + `ingest`
+                    first, then the ABM.
 
 DEFAULTS
-  --name       ms-<unix-ts>-<pid>
-  --repo       <monorepo root> (auto-detected)
-  --data       ./data
-  --cmd        cd /work/code/MalariaSentinel && uv sync &&
-               uv run malariasim abm --aoi ghana
-  --pull-to    ./runs/<timestamp>
+  --name            ms-<unix-ts>-<pid>
+  --repo            <monorepo root> (auto-detected)
+  --repo-url        <git origin of --repo>
+  --branch          <current branch of --repo>
+  --aoi             ghana
+  --year            2024
+  --month           1
+  --days            731
+  --seed            1
+  --n-rollouts      1
+  --snapshot-every  7
+  --run-name        <aoi>-<year>-<month>-seed<seed:04d>  (also default --pull-to dir)
+  --gif             off (add --gif to render an animation)
+  --cmd             (auto-built from the above; pass --cmd to override entirely)
+  --pull-to         ./runs/abm/<run-name>
 
 ENV
   HETZNER_RUN_ESTIMATE_HOURS  Worst-case hours used in the cost estimate.
@@ -283,31 +309,46 @@ cmd_pull() {
 }
 
 cmd_sim_run() {
-  local name="" repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)" data="./data" cmd=""
-  local pull_to="" keep_vm=0
+  local name="" repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+  local repo_url="" branch="" data_ready="" cmd="" pull_to="" keep_vm=0
+  local aoi="ghana" year="2024" month="1" days="731" seed="1"
+  local n_rollouts="1" snapshot_every="7" run_name="" gif=0
   while (( $# )); do
     case "$1" in
-      --name)     name="$2"; shift 2 ;;
-      --repo)     repo="$2"; shift 2 ;;
-      --data)     data="$2"; shift 2 ;;
-      --cmd)      cmd="$2"; shift 2 ;;
-      --pull-to)  pull_to="$2"; shift 2 ;;
-      --keep-vm)  keep_vm=1; shift ;;
-      --yes)      HETZNER_RUN_ASSUME_YES=1; shift ;;
-      -h|--help)  print_sim_run_help; return 0 ;;
+      --name)          name="$2"; shift 2 ;;
+      --repo)          repo="$2"; shift 2 ;;
+      --repo-url)      repo_url="$2"; shift 2 ;;
+      --branch)        branch="$2"; shift 2 ;;
+      --data-ready)    data_ready="$2"; shift 2 ;;
+      --cmd)           cmd="$2"; shift 2 ;;
+      --aoi)           aoi="$2"; shift 2 ;;
+      --year)          year="$2"; shift 2 ;;
+      --month)         month="$2"; shift 2 ;;
+      --days)          days="$2"; shift 2 ;;
+      --seed)          seed="$2"; shift 2 ;;
+      --n-rollouts)    n_rollouts="$2"; shift 2 ;;
+      --snapshot-every) snapshot_every="$2"; shift 2 ;;
+      --run-name)      run_name="$2"; shift 2 ;;
+      --gif)           gif=1; shift ;;
+      --pull-to)       pull_to="$2"; shift 2 ;;
+      --keep-vm)       keep_vm=1; shift ;;
+      --yes)           HETZNER_RUN_ASSUME_YES=1; shift ;;
+      -h|--help)       print_sim_run_help; return 0 ;;
       *) die "sim-run: unknown flag: $1" ;;
     esac
   done
   if [[ -z "$name" ]]; then
     name="ms-$(date +%s)-$$"
   fi
+  if [[ -z "$run_name" ]]; then
+    run_name="$(printf '%s-%s-%s-seed%04d' "$aoi" "$year" "$month" "$seed")"
+  fi
   if [[ -z "$pull_to" ]]; then
-    pull_to="./runs/$(date +%Y-%m-%dT%H-%M-%S)"
+    pull_to="./runs/abm/$run_name"
   fi
-  if [[ -z "$cmd" ]]; then
-    cmd="cd /work/code/MalariaSentinel && uv sync && uv run malariasim abm --aoi ghana"
-  fi
-  sim_run "$name" "$repo" "$data" "$cmd" "$pull_to" "$keep_vm"
+  sim_run "$name" "$repo" "$repo_url" "$branch" "$aoi" "$year" "$month" \
+    "$days" "$seed" "$n_rollouts" "$snapshot_every" "$run_name" "$gif" \
+    "$data_ready" "$cmd" "$pull_to" "$keep_vm"
 }
 
 cmd_train() {

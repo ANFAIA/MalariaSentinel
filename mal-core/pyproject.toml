@@ -5,17 +5,30 @@ description = "MalariaSentinel — unified SDSS pipeline (ABM + training + predi
 requires-python = ">=3.12"
 dependencies = [
     "mal-commonlib",
-    "torch>=2.0",
     "numpy>=2.0",
     "rasterio>=1.5.0",
-    "fastapi>=0.115",
-    "uvicorn>=0.30",
     "typer>=0.12",
     "pydantic>=2.7",
     "pyyaml>=6.0",
-    "langchain-openai>=1.4.0",
     "pytest>=9.1.1",
 ]
+
+# Optional dependency groups. These are NOT installed by a bare `uv sync`;
+# pull them explicitly when a feature needs them:
+#
+#   uv sync --package mal-core --group abm          # ABM + commonlib base (VM default)
+#   uv sync --package mal-core --group download     # download path
+#   uv sync --package mal-core --group ingest       # ingest path
+#   uv sync --package mal-core --group train        # U-Net training (torch)
+#   uv sync --package mal-core --group serve        # FastAPI server
+#
+# Dev default stays `uv sync --all-packages` (installs every group below).
+[dependency-groups]
+abm = []
+download = []
+ingest = []
+train = ["torch>=2.0"]
+serve = ["fastapi>=0.115", "uvicorn>=0.30"]
 
 [build-system]
 requires = ["hatchling"]

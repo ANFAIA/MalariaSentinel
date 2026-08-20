@@ -8,6 +8,26 @@ _resolve_repo_name() {
   basename "$p"
 }
 
+# _resolve_repo_url <repo-path>
+#   Returns the git remote URL (origin) of a local checkout, or dies.
+_resolve_repo_url() {
+  local url
+  url="$(git -C "$1" config --get remote.origin.url 2>/dev/null || true)"
+  if [[ -z "$url" ]]; then
+    die "no git remote 'origin' for repo: $1 (pass --repo-url to override)"
+  fi
+  printf '%s\n' "$url"
+}
+
+# _resolve_branch <repo-path>
+#   Returns the current branch of a local checkout (default: main).
+_resolve_branch() {
+  local b
+  b="$(git -C "$1" rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
+  [[ -n "$b" ]] || b="main"
+  printf '%s\n' "$b"
+}
+
 # _ensure_local_path <label> <path>
 #   Die with a friendly error if the path doesn't exist locally.
 _ensure_local_path() {
@@ -15,23 +35,63 @@ _ensure_local_path() {
   [[ -e "$p" ]] || die "$label path does not exist: $p"
 }
 
-# sim_run <name> <repo> <data> <cmd> <pull-to> <keep-vm>
-sim_run() {
-  local name="$1" repo="$2" data="$3" cmd="$4" pull_to="$5" keep_vm="$6"
+# _build_sim_cmd <repo_name> <aoi> <year> <month> <days> <seed> <n_rollouts> <snapshot_every> <run_name> <gif> <data_ready>
+#   Builds the remote command that runs the ABM (and, when the AOI data is
+#   not already present, the download+ingest prep). Uses the lightweight
+#   uv profile so torch/fastapi are not installed on the VM.
+_build_sim_cmd() {
+  local repo_name="$1" aoi="$2" year="$3" month="$4" days="$5" seed="$6"
+  local n_rollouts="$7" snapshot_every="$8" run_name="$9" gif="${10}" data_ready="${11}"
 
-  if [[ "${HETZNER_RUN_DRY_RUN:-0}" == "1" ]]; then
-    _ensure_local_path "repo" "$repo"
-    _ensure_local_path "data" "$data"
-  else
-    _ensure_local_path "repo" "$repo"
-    _ensure_local_path "data" "$data"
+  local sync_args="--package mal-core --group abm"
+  local gif_flag=""
+  if [[ "$gif" == "1" ]]; then
+    gif_flag=" --gif"
+  fi
+
+  local cmd="cd /work/code/$repo_name && uv sync $sync_args && bash mal-core/src/mal_core/abm/build.sh && "
+  if [[ -z "$data_ready" ]]; then
+    sync_args="$sync_args --group download --group ingest"
+    cmd="cd /work/code/$repo_name && uv sync $sync_args && bash mal-core/src/mal_core/abm/build.sh && uv run malariasim download --aoi $aoi && uv run malariasim ingest --aoi $aoi --year $year --month $month --data-dir data/$aoi --output-dir data/$aoi && "
+  fi
+  cmd="$cmd uv run malariasim abm --aoi $aoi --year $year --month $month --days $days --seed $seed --n-rollouts $n_rollouts --snapshot-every $snapshot_every --output-dir runs/abm/$run_name$gif_flag"
+  printf '%s' "$cmd"
+}
+
+# sim_run <name> <repo> <repo_url> <branch> <aoi> <year> <month> <days> <seed> <n_rollouts> <snapshot_every> <run_name> <gif> <data_ready> <cmd> <pull_to> <keep-vm>
+sim_run() {
+  local name="$1" repo="$2" repo_url="$3" branch="$4" aoi="$5" year="$6" month="$7"
+  local days="$8" seed="$9" n_rollouts="${10}" snapshot_every="${11}" run_name="${12}"
+  local gif="${13}" data_ready="${14}" cmd="${15}" pull_to="${16}" keep_vm="${17}"
+
+  _ensure_local_path "repo" "$repo"
+  if [[ -n "$data_ready" ]]; then
+    _ensure_local_path "data-ready" "$data_ready"
+    if [[ ! -f "$data_ready/manifest.json" ]]; then
+      die "data-ready folder has no manifest.json (is it a downloaded+ingested AOI dir?): $data_ready"
+    fi
+  fi
+  if [[ -z "$repo_url" ]]; then
+    repo_url="$(_resolve_repo_url "$repo")"
+  fi
+  if [[ -z "$branch" ]]; then
+    branch="$(_resolve_branch "$repo")"
   fi
 
   local repo_name
   repo_name="$(_resolve_repo_name "$repo")"
   local remote_repo="/work/code/$repo_name"
-  local remote_data="/work/data"
-  local remote_runs="/work/runs"
+  local remote_data_dir="$remote_repo/data/$aoi"
+  local remote_run_dir="$remote_repo/runs/abm/$run_name"
+
+  # The VM clones the repo from git (shallow), then optionally receives the
+  # ready data via rsync. Build the remote setup command.
+  local setup_cmd="rm -rf $remote_repo && git clone --depth 1 --branch '$branch' '$repo_url' '$remote_repo'"
+
+  # Build the command unless the caller overrode it with --cmd.
+  if [[ -z "$cmd" ]]; then
+    cmd="$(_build_sim_cmd "$repo_name" "$aoi" "$year" "$month" "$days" "$seed" "$n_rollouts" "$snapshot_every" "$run_name" "$gif" "$data_ready")"
+  fi
 
   # Cost estimate: assume HETZNER_RUN_ESTIMATE_HOURS worst case. The user
   # can pass --yes to skip the prompt.
@@ -43,10 +103,16 @@ sim_run() {
   if [[ "${HETZNER_RUN_DRY_RUN:-0}" == "1" ]]; then
     log_info "[dry-run] sim-run plan:"
     log_info "  name=$name"
-    log_info "  repo: $repo -> $remote_repo"
-    log_info "  data: $data -> $remote_data"
+    log_info "  clone: $repo_url (branch: $branch) -> $remote_repo"
+    log_info "  aoi:  $aoi  params: year=$year month=$month days=$days seed=$seed n-rollouts=$n_rollouts snapshot-every=$snapshot_every run-name=$run_name gif=$gif"
+    if [[ -n "$data_ready" ]]; then
+      log_info "  data: READY ($data_ready -> $remote_data_dir/)"
+    else
+      log_info "  data: NOT ready (download + ingest on VM)"
+    fi
+    log_info "  setup: $setup_cmd"
     log_info "  cmd:  $cmd"
-    log_info "  pull /work/runs -> $pull_to"
+    log_info "  pull $remote_run_dir/ -> $pull_to"
     if [[ "$keep_vm" == "1" ]]; then
       log_info "  end:  stop (--keep-vm)"
     else
@@ -72,12 +138,14 @@ sim_run() {
   start_vm "$name" "ccx33" "ubuntu-24.04" "fsn1" \
     "$(resolve_ssh_key_name "")"
 
-  push_path "$name" "$repo" "$remote_repo"
-  push_path "$name" "$data/" "$remote_data/"
+  exec_remote "$name" "bash -lc $(printf %q "$setup_cmd")"
+  if [[ -n "$data_ready" ]]; then
+    push_path "$name" "$data_ready/" "$remote_data_dir/"
+  fi
 
   exec_remote "$name" "bash -lc $(printf %q "$cmd")"
 
-  pull_path "$name" "$remote_runs/" "$pull_to/"
+  pull_path "$name" "$remote_run_dir/" "$pull_to/"
 
   if [[ "$keep_vm" == "1" ]]; then
     stop_vm "$name"

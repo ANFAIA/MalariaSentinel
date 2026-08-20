@@ -153,17 +153,49 @@ hdr "dry-run sim-run"
 # Pretend the default repo + data paths exist for the dry-run validation.
 TMP_REPO="$(mktemp -d -t hr-repo-XXXXXX)"
 TMP_DATA="$(mktemp -d -t hr-data-XXXXXX)"
-run_with_timeout "--dry-run sim-run" "$MAIN" --dry-run sim-run \
-  --name dryrun-sim --repo "$TMP_REPO" --data "$TMP_DATA"
+echo '{"datasets":{}}' > "$TMP_DATA/manifest.json"
+REPO_URL="https://github.com/ANFAIA/MalariaSentinel.git"
+
+# 5a. Data NOT ready -> git clone, download + ingest prep, then abm.
+run_with_timeout "--dry-run sim-run (no data)" "$MAIN" --dry-run sim-run \
+  --name dryrun-sim --repo "$TMP_REPO" --repo-url "$REPO_URL" --branch main --yes
 if [[ "$LAST_RC" == "0" ]]; then
-  ok "--dry-run sim-run exit 0"
+  ok "--dry-run sim-run (no data) exit 0"
 else
-  bad "--dry-run sim-run exit $LAST_RC: $LAST_ERR"
+  bad "--dry-run sim-run (no data) exit $LAST_RC: $LAST_ERR"
 fi
-assert_contains "--dry-run sim-run" "sim-run plan" "$LAST_ERR"
-assert_contains "--dry-run sim-run" "/work/code/" "$LAST_ERR"
-assert_contains "--dry-run sim-run" "uv sync" "$LAST_ERR"
-assert_contains "--dry-run sim-run" "malariasim abm" "$LAST_ERR"
+assert_contains "--dry-run sim-run (no data) plan" "sim-run plan" "$LAST_ERR"
+assert_contains "--dry-run sim-run (no data) clone" "git clone" "$LAST_ERR"
+assert_contains "--dry-run sim-run (no data) repo" "/work/code/" "$LAST_ERR"
+assert_contains "--dry-run sim-run (no data) uv profile" "uv sync --package mal-core --group abm --group download --group ingest" "$LAST_ERR"
+assert_contains "--dry-run sim-run (no data) download" "malariasim download" "$LAST_ERR"
+assert_contains "--dry-run sim-run (no data) ingest" "malariasim ingest" "$LAST_ERR"
+assert_contains "--dry-run sim-run (no data) abm" "malariasim abm" "$LAST_ERR"
+assert_contains "--dry-run sim-run (no data) build" "build.sh" "$LAST_ERR"
+assert_contains "--dry-run sim-run (no data) data-not-ready" "NOT ready" "$LAST_ERR"
+
+# 5b. Data ready -> push data/<aoi>, no download/ingest, optional --gif.
+run_with_timeout "--dry-run sim-run (data ready)" "$MAIN" --dry-run sim-run \
+  --name dryrun-sim --repo "$TMP_REPO" --repo-url "$REPO_URL" --branch main \
+  --data-ready "$TMP_DATA" \
+  --aoi ghana --days 10 --run-name ghana-test --gif --yes
+if [[ "$LAST_RC" == "0" ]]; then
+  ok "--dry-run sim-run (data ready) exit 0"
+else
+  bad "--dry-run sim-run (data ready) exit $LAST_RC: $LAST_ERR"
+fi
+assert_contains "--dry-run sim-run (data ready) plan" "sim-run plan" "$LAST_ERR"
+assert_contains "--dry-run sim-run (data ready) clone" "git clone" "$LAST_ERR"
+assert_contains "--dry-run sim-run (data ready) data-ready" "READY" "$LAST_ERR"
+assert_contains "--dry-run sim-run (data ready) uv profile" "uv sync --package mal-core --group abm" "$LAST_ERR"
+if printf '%s' "$LAST_ERR" | grep -q "malariasim download"; then
+  bad "--dry-run sim-run (data ready) should NOT include download"
+else
+  ok "--dry-run sim-run (data ready) skips download"
+fi
+assert_contains "--dry-run sim-run (data ready) run-name" "--output-dir runs/abm/ghana-test" "$LAST_ERR"
+assert_contains "--dry-run sim-run (data ready) gif" "--gif" "$LAST_ERR"
+assert_contains "--dry-run sim-run (data ready) pull" "runs/abm/ghana-test" "$LAST_ERR"
 rm -rf "$TMP_REPO" "$TMP_DATA"
 
 # 6. Cost calculator.

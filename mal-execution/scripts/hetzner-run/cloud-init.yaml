@@ -34,6 +34,17 @@ packages:
   - jq
   - ca-certificates
   - curl
+  # Build toolchain for mal_abm_fast (cmake + ninja + deps).
+  # build.sh writes bin/mal_abm_fast_linux after a successful build.
+  - cmake
+  - ninja-build
+  - g++
+  - libeigen3-dev
+  - libgdal-dev
+  - libcli11-dev
+  - nlohmann-json3-dev
+  - libomp-dev
+  - libgtest-dev
 
 runcmd:
   # Disable unattended-upgrades to avoid surprise reboots mid-job.

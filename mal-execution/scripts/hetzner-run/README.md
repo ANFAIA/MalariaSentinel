@@ -93,11 +93,56 @@ config; it calls `hcloud`, which reads the token from
 | `hetzner-run exec <name> <cmd...>` | `ssh root@<ip> <cmd>` with streaming output. |
 | `hetzner-run push <name> <local> <remote>` | `rsync -avz` local → VM. |
 | `hetzner-run pull <name> <remote> <local>` | `rsync -avz` VM → local. |
-| `hetzner-run sim-run [--repo R] [--data D] [--cmd C] [--keep-vm] [--yes]` | High-level: start, push repo+data, run `cmd`, pull `/work/runs`, destroy. |
+| `hetzner-run sim-run [--repo R] [--data-ready DIR] [--aoi A] [--year Y] [--month M] [--days D] [--seed S] [--n-rollouts N] [--snapshot-every E] [--run-name NAME] [--gif] [--cmd C] [--pull-to P] [--keep-vm] [--yes]` | High-level: start, push repo (+ optional ready data), run the ABM, pull results, destroy. See "sim-run" below. |
 | `hetzner-run train [--config Cfg] [--keep-vm]` | High-level: like `sim-run` but default cmd is `malariasim train`. |
 | `hetzner-run cost --type T --hours H` | Print the cost: e.g. `ccx33 × 2h = €0.060`. |
 | `hetzner-run cost --list` | Full per-hour price table. |
 | `hetzner-run --help` / `<sub> --help` | Usage text. |
+
+### `sim-run` — ABM job with optional ready data
+
+`sim-run` runs one continuous ABM. Two data modes, selected with
+`--data-ready`:
+
+- **`--data-ready <dir>`** — the folder holds an already-downloaded +
+  ingested AOI (e.g. `data/ghana`, must contain `manifest.json`). It is
+  rsynced into the repo at `data/<aoi>/` and the ABM runs immediately.
+  Only the lightweight `abm` uv profile is installed.
+- **No `--data-ready`** — the VM runs `malariasim download --aoi X` +
+  `malariasim ingest` first, then the ABM. The `download` + `ingest` uv
+  groups are installed too.
+
+Parameters (`--aoi --year --month --days --seed --n-rollouts
+--snapshot-every --run-name --gif`) build the command automatically. The
+defaults match a full 2024–2025 run. Results are pulled from
+`repo/runs/abm/<run-name>/` to `./runs/abm/<run-name>/` (override with
+`--pull-to`). Pass `--cmd '<cmd>'` to override the remote command entirely.
+
+```bash
+# Data already downloaded+ingested (copies data/ghana to the VM):
+hetzner-run sim-run --data-ready data/ghana --run-name 2024-2025-new-seed0001 --gif
+
+# Let the VM download + ingest first, 10-day smoke run:
+hetzner-run sim-run --days 10 --year 2024 --month 1 --run-name ghana-2024-10d
+```
+
+### uv profiles (lightweight sync)
+
+To keep the VM fast, the repo installs only the dependencies a stage
+needs. `uv sync --all-packages` still installs everything for local dev;
+the VM uses targeted profiles:
+
+| Profile | Installs |
+|---|---|
+| `uv sync --package mal-core --group abm` | ABM + commonlib base (no torch/fastapi) |
+| `+ --group download --group ingest` | adds the download/ingest path |
+| `uv sync --package mal-core --group train` | adds torch (U-Net training) |
+| `uv sync --package mal-core --group serve` | adds fastapi/uvicorn |
+
+The ABM is compiled on the VM (`build.sh` writes
+`bin/mal_abm_fast_linux`). First boot installs the build toolchain via
+cloud-init and compiles GDAL deps (~5–10 min); later runs can start from a
+snapshot of that VM (see "Snapshot strategy").
 
 ### Global flags
 

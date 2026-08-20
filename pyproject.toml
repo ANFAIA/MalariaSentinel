@@ -44,6 +44,14 @@ dev = [
 [tool.uv]
 package = false
 
+# Lightweight sync profiles for the remote (Hetzner) runner. Each installs
+# only the optional dependency groups a stage needs, skipping torch/fastapi
+# when they are not required. Dev default stays `uv sync --all-packages`.
+#
+#   uv sync --package mal-core --group abm            # ABM + commonlib base
+#   uv sync --package mal-core --group abm --group download --group ingest
+#   uv sync --package mal-core --group train          # U-Net training (torch)
+#   uv sync --package mal-core --group serve          # FastAPI server
 [tool.uv.workspace]
 members = [
     "mal-commonlib",

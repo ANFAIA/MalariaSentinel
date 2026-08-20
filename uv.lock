@@ -2120,33 +2120,44 @@ name = "mal-core"
 version = "0.2.0"
 source = { editable = "mal-core" }
 dependencies = [
-    { name = "fastapi" },
-    { name = "langchain-openai" },
     { name = "mal-commonlib" },
     { name = "numpy" },
     { name = "pydantic" },
     { name = "pytest" },
     { name = "pyyaml" },
     { name = "rasterio" },
-    { name = "torch" },
     { name = "typer" },
+]
+
+[package.dev-dependencies]
+serve = [
+    { name = "fastapi" },
     { name = "uvicorn" },
+]
+train = [
+    { name = "torch" },
 ]
 
 [package.metadata]
 requires-dist = [
-    { name = "fastapi", specifier = ">=0.115" },
-    { name = "langchain-openai", specifier = ">=1.4.0" },
     { name = "mal-commonlib", editable = "mal-commonlib" },
     { name = "numpy", specifier = ">=2.0" },
     { name = "pydantic", specifier = ">=2.7" },
     { name = "pytest", specifier = ">=9.1.1" },
     { name = "pyyaml", specifier = ">=6.0" },
     { name = "rasterio", specifier = ">=1.5.0" },
-    { name = "torch", specifier = ">=2.0" },
     { name = "typer", specifier = ">=0.12" },
+]
+
+[package.metadata.requires-dev]
+abm = []
+download = []
+ingest = []
+serve = [
+    { name = "fastapi", specifier = ">=0.115" },
     { name = "uvicorn", specifier = ">=0.30" },
 ]
+train = [{ name = "torch", specifier = ">=2.0" }]
 
 [[package]]
 name = "mal-data-explorer"
