@@ -210,6 +210,7 @@ def abm(
     timeout: int = typer.Option(3600, "--timeout", help="Subprocess timeout in seconds."),
     output_dir: Path = typer.Option(Path("runs/abm"), "--output-dir"),
     data_root: Path | None = typer.Option(None, "--data-root", help="Root containing AOI manifest"),
+    gif: bool = typer.Option(False, "--gif", help="Auto-generate an animation GIF after the run."),
 ) -> None:
     """Run the agent-based malaria simulation.
 
@@ -230,6 +231,31 @@ def abm(
 
     result = run_abm_from_manifest(aoi=aoi, year=year, month=month, seed=seed, days=days, n_rollouts=n_rollouts, snapshot_every=snapshot_every, cohort_log=cohort_log, timeout=timeout, output_dir=output_dir, data_root=data_root)
     typer.echo(f"ABM result: {result}")
+
+    if gif:
+        _render_animation(aoi=aoi, seed=seed, output_dir=output_dir, cohort_log=cohort_log)
+
+
+def _render_animation(
+    aoi: str,
+    seed: int,
+    output_dir: Path,
+    cohort_log: Path | None,
+) -> None:
+    """Generate the animation GIF for an ABM run (used by --gif)."""
+    from .abm.scripts.visualize_state import main as visualize_main
+
+    run_dir = Path(output_dir)
+    gif_path = run_dir / f"{aoi}_abm_seed{seed:04d}.gif"
+    cohort_path = cohort_log or run_dir / f"{aoi}_abm_seed{seed:04d}_cohort.json"
+    argv = ["--run-dir", str(run_dir), "--output", str(gif_path)]
+    if cohort_path.exists():
+        argv += ["--cohort-log", str(cohort_path)]
+    try:
+        visualize_main(argv)
+        typer.echo(f"Animation saved: {gif_path}")
+    except SystemExit as e:
+        typer.echo(f"Animation failed (exit {e.code}): no state_day*.tif snapshots?", err=True)
 
 
 @app.command()

@@ -708,6 +708,9 @@ OUTPUT
                     << ", \"n_alive\": " << s.n_alive
                     << ", \"n_adults\": " << s.n_adults
                     << ", \"n_larvae\": " << s.n_larvae
+                    << ", \"n_eggs\": " << s.n_eggs
+                    << ", \"n_pupae\": " << s.n_pupae
+                    << ", \"n_emerged\": " << s.n_emerged
                     << ", \"n_births\": " << s.n_births
                     << ", \"n_deaths\": " << s.n_deaths
                     << ", \"n_maturation\": " << s.n_maturation

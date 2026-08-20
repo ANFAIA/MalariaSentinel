@@ -91,10 +91,14 @@ def make_frame(
         alive = [d["n_alive"] for d in daily]
         adults = [d["n_adults"] for d in daily]
         larvae = [d["n_larvae"] for d in daily]
+        eggs = [d.get("n_eggs", 0) for d in daily]
+        pupae = [d.get("n_pupae", 0) for d in daily]
 
         ax_p.plot(days, alive, label="alive", color="#1f77b4")
         ax_p.plot(days, adults, label="adults", color="#ff7f0e")
         ax_p.plot(days, larvae, label="larvae", color="#2ca02c")
+        ax_p.plot(days, eggs, label="eggs", color="#d62728")
+        ax_p.plot(days, pupae, label="pupae", color="#9467bd")
 
         # vertical line at current day
         if 1 <= day_idx <= len(days):
@@ -121,12 +125,16 @@ def make_frame(
 def find_snapshot_files(run_dir: Path) -> list[tuple[Path, int]]:
     """Find state_dayNNN.tif files, sorted by day number.
 
+    Supports both the legacy ``state_dayNNN.tif`` convention and the
+    manifest-driven ``<stem>_seedNNNN_dayNNN.tif`` convention produced by
+    ``run_abm_from_manifest`` (e.g. ``ghana_abm_seed0001_day005.tif``).
+
     Returns list of (path, day_number) tuples.
     """
     import re
     results = []
-    for p in run_dir.glob("state_day*.tif"):
-        m = re.search(r"state_day(\d+)", p.name)
+    for p in run_dir.glob("*.tif"):
+        m = re.search(r"_day(\d+)\.tif$", p.name)
         if m:
             results.append((p, int(m.group(1))))
     results.sort(key=lambda x: x[1])
@@ -144,6 +152,10 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument(
         "--output", type=Path, required=True,
         help="Output GIF path.",
+    )
+    parser.add_argument(
+        "--cohort-log", type=Path, default=None,
+        help="Path to the cohort JSON. Defaults to <run-dir>/cohort.json.",
     )
     parser.add_argument(
         "--sample-every", type=int, default=1,
@@ -176,7 +188,7 @@ def main(argv: list[str] | None = None) -> None:
         print(f"error: no state_dayNNN.tif files found in {args.run_dir}", file=sys.stderr)
         sys.exit(1)
 
-    cohort_path = args.run_dir / "cohort.json"
+    cohort_path = args.cohort_log or (args.run_dir / "cohort.json")
     cohort = load_cohort(cohort_path) if cohort_path.exists() else None
     if cohort is None:
         print(f"warning: {cohort_path} not found; population panel will be empty", file=sys.stderr)

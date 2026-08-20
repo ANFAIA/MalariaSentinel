@@ -731,7 +731,7 @@ void MosquitoSubmodel::advance_day(const AOI& aoi,
     last_day_stats_.day          = day_idx;
     last_day_stats_.n_alive      = post_mort_n_alive;
     last_day_stats_.n_adults     = post_n_adults;
-    last_day_stats_.n_larvae     = 0;  // larvae are in cohort bank now
+    last_day_stats_.n_larvae     = cohort_bank_.count_by_stage(AquaticStage::LARVA);
     last_day_stats_.n_births     = n_emerged;  // emergence is the only "birth"
     last_day_stats_.n_deaths     = n_deaths;
     last_day_stats_.n_maturation = 0;
