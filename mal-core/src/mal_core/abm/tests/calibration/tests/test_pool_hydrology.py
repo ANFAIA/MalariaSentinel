@@ -7,24 +7,33 @@ Tests cover:
 """
 from __future__ import annotations
 
-import math
+import importlib.util
+import sys
+from pathlib import Path
 
-import pytest
+def _load_pool_module():
+    spec = importlib.util.spec_from_file_location(
+        "mal_core.abm.pool_hydrology",
+        Path(__file__).resolve().parents[3] / "pool_hydrology.py",
+    )
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = mod
+    spec.loader.exec_module(mod)
+    return mod
 
-from mal_core.abm.pool_hydrology import (
-    PoolState,
-    DailyForcing,
-    advance_pool,
-    desiccation_rate,
-    washout_fraction,
-    POOL_WATER_BREED_MM,
-    POOL_WATER_DRY_MM,
-    POOL_WATER_MAX_MM,
-    POOL_RAIN_WASH_MM,
-    POOL_WASH_FRACTION_MAX,
-    POOL_DESICCATION_GRACE_DAYS,
-    POOL_DESICC_BASE_DAILY,
-)
+_pool = _load_pool_module()
+PoolState = _pool.PoolState
+DailyForcing = _pool.DailyForcing
+advance_pool = _pool.advance_pool
+desiccation_rate = _pool.desiccation_rate
+washout_fraction = _pool.washout_fraction
+POOL_WATER_BREED_MM = _pool.POOL_WATER_BREED_MM
+POOL_WATER_DRY_MM = _pool.POOL_WATER_DRY_MM
+POOL_WATER_MAX_MM = _pool.POOL_WATER_MAX_MM
+POOL_RAIN_WASH_MM = _pool.POOL_RAIN_WASH_MM
+POOL_WASH_FRACTION_MAX = _pool.POOL_WASH_FRACTION_MAX
+POOL_DESICCATION_GRACE_DAYS = _pool.POOL_DESICCATION_GRACE_DAYS
+POOL_DESICC_BASE_DAILY = _pool.POOL_DESICC_BASE_DAILY
 
 
 # ---------------------------------------------------------------------------

@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import os
 import shutil
+import sys
 import tempfile
 from pathlib import Path
 
@@ -40,6 +41,17 @@ _REPO_ROOT = Path(__file__).resolve().parents[6]
 takes us back to the repo root."""
 
 MAL_ABM_FAST_DIR = _REPO_ROOT / "mal-core" / "src" / "mal_core" / "abm"
+
+# Make the workspace packages importable from the calibration venv.
+# The calibration package (mal-abm-fast-calibration) is a standalone package
+# whose pyproject does not depend on mal-core/mal-commonlib, so pytest's sys.path
+# does not include them. Add the src roots explicitly.
+_MAL_CORE_SRC = _REPO_ROOT / "mal-core" / "src"
+_MAL_COMMONLIB_SRC = _REPO_ROOT / "mal-commonlib" / "src"
+for _src in (_MAL_CORE_SRC, _MAL_COMMONLIB_SRC):
+    if str(_src) not in sys.path:
+        sys.path.insert(0, str(_src))
+
 CPP_BINARY_DEFAULT = MAL_ABM_FAST_DIR / "build" / "src" / "mal_abm_fast"
 # Use manifest-based resolution instead of hardcoded paths.
 # The NC file is the primary env; the old TIF is a fallback.
