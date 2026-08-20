@@ -10,7 +10,6 @@ Roles:
 """
 from __future__ import annotations
 
-import json
 import logging
 import os
 import sys
@@ -25,17 +24,21 @@ if str(_project_root) not in sys.path:
 
 from agents_janus.logger import SessionLogger
 from agents_janus.malariasim_backend import MalariasimShellBackend
-from agents_janus.middleware.gawt_context import GawtContextMiddleware
 from agents_janus.middleware.dispatch_policy import DispatchPathMiddleware
+from agents_janus.middleware.gawt_context import GawtContextMiddleware
 from agents_janus.middleware.gawt_session import GawtSessionMiddleware
 from agents_janus.middleware.runtime_policy import BACKEND_TOOLS, ToolExposureMiddleware
-from agents_janus.observability import ObservabilityMiddleware, SubAgentObservabilityMiddleware
+from agents_janus.observability import (
+    ObservabilityMiddleware,
+    SubAgentObservabilityMiddleware,
+)
 
 # Module-level flags set by CLI before creating the agent
 VERIFY_FINALIZE: bool = True
 CODEBASE_INDEX_ON_STARTUP: bool = True
 SESSION_LOGGER: SessionLogger | None = None
 OBSERVABILITY_MIDDLEWARE: ObservabilityMiddleware | None = None
+GAWT_SESSION_MIDDLEWARE: GawtSessionMiddleware | None = None
 
 AGENT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent.parent
@@ -185,9 +188,9 @@ def _get_implementation_tools():
     restricts it to `malariasim` only) — no custom ABM execution tools.
     """
     from agents_janus.tools import (
-        web_search,
-        memory_recall_kg,
         ask_user,
+        memory_recall_kg,
+        web_search,
     )
     return [
         _wrap_with_logging(web_search),
@@ -279,9 +282,9 @@ def create_orchestrator(
 
     try:
         from deepagents import (
-            create_deep_agent,
             GeneralPurposeSubagentProfile,
             HarnessProfile,
+            create_deep_agent,
             register_harness_profile,
         )
     except ImportError:
@@ -350,7 +353,10 @@ def create_orchestrator(
             OBSERVABILITY_MIDDLEWARE = router_obs
 
         router_middleware.append(
-            ToolExposureMiddleware(allowed_backend_tools=frozenset())
+            ToolExposureMiddleware(
+                allowed_backend_tools=frozenset(),
+                excluded_tools=frozenset({"write_todos"}),
+            )
         )
         router_middleware.append(DispatchPathMiddleware())
 
@@ -424,15 +430,18 @@ def create_orchestrator(
 
     # ── Subagent definitions (shared across both modes) ──────────────
     from agents_janus.agent_config import load_agent_configuration
-    from agents_janus.subagents.registry import load_registry
-    from agents_janus.subagents.builder import build_subagent_prompt
     from agents_janus.mcp_bridge import (
         get_mcp_tools_sync,
         load_janus_config,
     )
+    from agents_janus.subagents.builder import build_subagent_prompt
+    from agents_janus.subagents.registry import load_registry
     from agents_janus.tool_catalog import resolve_tools
     from agents_janus.tools.ask_user_tool import ask_user as ask_user_tool
-    from agents_janus.tools.resolve_conflict import make_resolve_conflict_tool, set_agent_ref
+    from agents_janus.tools.resolve_conflict import (
+        make_resolve_conflict_tool,
+        set_agent_ref,
+    )
 
     agent_configuration = load_agent_configuration()
     janus_config = load_janus_config()
@@ -440,8 +449,9 @@ def create_orchestrator(
 
     # Index codebase on startup if enabled (idempotent — no-op if already fresh)
     if CODEBASE_INDEX_ON_STARTUP:
-        from agents_janus.mcp_bridge import ensure_index_on_startup
         import asyncio
+
+        from agents_janus.mcp_bridge import ensure_index_on_startup
         try:
             asyncio.run(ensure_index_on_startup(janus_config, REPO_ROOT))
         except Exception as e:
@@ -464,15 +474,23 @@ def create_orchestrator(
     get_session_tool = next(
         (t for t in all_mcp_tools if t.name == "mcp__gitagent__get_session"), None
     )
+    abort_session_tool = next(
+        (t for t in all_mcp_tools if t.name == "mcp__gitagent__abort_session"), None
+    )
     if mode == "implementation_coordinator" and start_session_tool is not None:
-        middleware.insert(
-            0,
-            GawtSessionMiddleware(
-                feature=goal or "janus implementation",
-                start_tool=start_session_tool,
-                get_tool=get_session_tool,
-            ),
+        gawt_context_mws: list[GawtContextMiddleware] = []
+        session_mw = GawtSessionMiddleware(
+            feature=goal or "janus implementation",
+            start_tool=start_session_tool,
+            get_tool=get_session_tool,
+            abort_tool=abort_session_tool,
+            context_middlewares=gawt_context_mws,
         )
+        middleware.insert(0, session_mw)
+        global GAWT_SESSION_MIDDLEWARE
+        GAWT_SESSION_MIDDLEWARE = session_mw
+    else:
+        gawt_context_mws = []
     worker_defs: list[Any] = []
     for name, spec in registry.all().items():
         policy = agent_configuration.agents[name]
@@ -499,14 +517,13 @@ def create_orchestrator(
             )
         ]
         if mode != "research_coordinator" and register_tool is not None:
-            worker_middleware.insert(
-                0,
-                GawtContextMiddleware(
-                    role=policy.effective_gawt_role,
-                    register_tool=register_tool,
-                    unregister_tool=unregister_tool,
-                ),
+            ctx_mw = GawtContextMiddleware(
+                role=policy.effective_gawt_role,
+                register_tool=register_tool,
+                unregister_tool=unregister_tool,
             )
+            gawt_context_mws.append(ctx_mw)
+            worker_middleware.insert(0, ctx_mw)
 
         wd = {
             "name": name,

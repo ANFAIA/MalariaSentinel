@@ -32,7 +32,6 @@ from typing import Any
 
 from langchain.agents.middleware.types import AgentMiddleware
 
-
 # ── Tool category mapping ──────────────────────────────────────────────
 # Maps tool names to visual categories for Langfuse tags.
 _TOOL_CATEGORIES: dict[str, str] = {
@@ -445,6 +444,34 @@ class ObservabilityMiddleware(AgentMiddleware):
         })
 
     def wrap_model_call(self, request, handler):
+        # Langfuse: open generation BEFORE the handler so startTime is correct.
+        lf_gen = None
+        if self.langfuse and self._trace_context is not None:
+            try:
+                tags = self._build_base_tags(["stage:execute", "tool:llm"])
+                ctx = self._get_dispatch_context(self._current_agent_role)
+
+                model_name = "unknown"
+                if hasattr(request, "model"):
+                    model_name = getattr(request.model, "model_name", None) or str(request.model)
+
+                lf_gen = self.langfuse.start_observation(
+                    as_type="generation",
+                    name=f"llm:{self._current_agent_role}",
+                    model=model_name,
+                    input=[{"role": "system", "content": str(request.system_message)[:500]}
+                           ] + [{"role": "user", "content": str(m.content)[:300]}
+                                for m in request.messages[-3:] if hasattr(m, "content")],
+                    metadata={
+                        "step": self._llm_call_count + 1,
+                        "agent_role": self._current_agent_role,
+                        "tags": tags,
+                    },
+                    trace_context=ctx,
+                )
+            except Exception as e:
+                self._log_langfuse_error("start_observation(generation)", _LangfuseErrorMarker(e))
+
         start = time.monotonic()
         response = handler(request)
         elapsed = time.monotonic() - start
@@ -481,20 +508,10 @@ class ObservabilityMiddleware(AgentMiddleware):
             response_preview=response_preview,
         )
 
-        # Langfuse: emit a generation observation with tags
-        if self.langfuse and self._trace_context is not None:
+        # Langfuse: update and close the generation with real data.
+        if lf_gen is not None:
             try:
-                tags = self._build_base_tags(["stage:execute", "tool:llm"])
-
-                ctx = self._get_dispatch_context(self._current_agent_role)
-
-                gen = self.langfuse.start_observation(
-                    as_type="generation",
-                    name=f"llm:{self._current_agent_role}",
-                    model=model_name,
-                    input=[{"role": "system", "content": str(request.system_message)[:500]}
-                           ] + [{"role": "user", "content": str(m.content)[:300]}
-                                for m in request.messages[-3:] if hasattr(m, "content")],
+                lf_gen.update(
                     output=response_preview,
                     usage_details={
                         "input": prompt_tokens,
@@ -505,16 +522,12 @@ class ObservabilityMiddleware(AgentMiddleware):
                         "latency_s": round(elapsed, 3),
                         "step": self._llm_call_count,
                         "agent_role": self._current_agent_role,
-                        "tags": tags,
+                        "tags": self._build_base_tags(["stage:execute", "tool:llm"]),
                     },
-                    trace_context=ctx,
                 )
-                try:
-                    gen.end()
-                except Exception:
-                    pass
+                lf_gen.end()
             except Exception as e:
-                self._log_langfuse_error("start_observation(generation)", _LangfuseErrorMarker(e))
+                self._log_langfuse_error("end_observation(generation)", _LangfuseErrorMarker(e))
 
         return response
 

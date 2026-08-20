@@ -72,3 +72,39 @@ def test_model_cannot_override_registered_identity():
     middleware.wrap_tool_call(request, lambda rewritten: seen.update(rewritten.tool_call["args"]))
 
     assert seen["agent_id"] == "a_real"
+
+
+def test_session_id_injected_into_register_agent():
+    """register_agent receives session_id when context middleware has one."""
+    register = _Tool([{"agent_id": "a1", "session_id": "s_abc"}])
+    middleware = GawtContextMiddleware(role="abm", register_tool=register)
+    middleware.before_agent({}, None)
+    assert middleware.session_id == "s_abc"
+
+    # Now register_agent should include session_id on next registration.
+    register2 = _Tool([{"agent_id": "a2"}])
+    middleware2 = GawtContextMiddleware(role="scoring", register_tool=register2)
+    middleware2.session_id = "s_abc"
+    middleware2.before_agent({}, None)
+    assert register2.calls == [{"role": "scoring", "session_id": "s_abc"}]
+
+
+def test_session_id_injected_into_session_scoped_tools():
+    """snapshot_session, snapshot_status, abort_session get session_id."""
+    register = _Tool([{"agent_id": "a1", "session_id": "s_xyz"}])
+    middleware = GawtContextMiddleware(role="abm", register_tool=register)
+    middleware.before_agent({}, None)
+
+    for tool_name in ("mcp__gitagent__snapshot_session", "mcp__gitagent__snapshot_status", "mcp__gitagent__abort_session"):
+        request = _request(tool_name, {})
+        seen = {}
+        middleware.wrap_tool_call(request, lambda rewritten: seen.update(rewritten.tool_call["args"]))
+        assert seen.get("session_id") == "s_xyz", f"session_id not injected for {tool_name}"
+
+
+def test_session_id_from_state():
+    """session_id can be set via agent state dict."""
+    register = _Tool([{"agent_id": "a1"}])
+    middleware = GawtContextMiddleware(role="abm", register_tool=register)
+    middleware.before_agent({"gawt_agent_id": "from_state", "gawt_session_id": "s_from_state"}, None)
+    assert middleware.session_id == "s_from_state"

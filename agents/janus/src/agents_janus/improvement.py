@@ -93,8 +93,8 @@ def run_improvement(
     Returns:
         The orchestrator's final response.
     """
-    from pathlib import Path
     import json
+    from pathlib import Path
 
     import agents_janus.agent as agent_mod
     from agents_janus.live_panel import LivePanel
@@ -173,6 +173,13 @@ def run_improvement(
                 print(f"\n🔗 Langfuse trace: {trace_url}")
 
         return final_content
+    except Exception:
+        # Abort GAWT session on failure so next run doesn't hit
+        # "Multiple open sessions".
+        session_mw = getattr(agent_mod, "GAWT_SESSION_MIDDLEWARE", None)
+        if session_mw is not None:
+            session_mw.abort()
+        raise
     finally:
         if langfuse_client is not None:
             try:
@@ -182,6 +189,7 @@ def run_improvement(
         logger.close()
         agent_mod.SESSION_LOGGER = prev_logger
         agent_mod.OBSERVABILITY_MIDDLEWARE = prev_obs
+        agent_mod.GAWT_SESSION_MIDDLEWARE = None
 
 
 def _get_trace_url(agent_mod) -> str | None:

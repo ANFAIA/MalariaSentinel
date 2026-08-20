@@ -132,15 +132,23 @@ def test_llm_call_emits_generation(mock_langfuse):
     mw.after_model(state, runtime)
     mw.after_agent(state, runtime)
 
-    # v4: start_observation called with as_type="generation"
+    # v4: start_observation called BEFORE handler (no output/usage yet).
     calls = mock_langfuse.start_observation.call_args_list
     gen_calls = [c for c in calls if c.kwargs.get("as_type") == "generation"]
     assert len(gen_calls) == 1
     kwargs = gen_calls[0].kwargs
     assert kwargs["name"] == "llm:implementation_coordinator"
     assert kwargs["model"] == "mimo"
-    assert kwargs["usage_details"]["input"] == 100
-    assert kwargs["usage_details"]["output"] == 20
+    assert "output" not in kwargs
+    assert "usage_details" not in kwargs
+
+    # After handler: update() called with output + usage on the span object.
+    gen_span = mock_langfuse.start_observation.return_value
+    assert gen_span.updates
+    update_kw = gen_span.updates[0]
+    assert update_kw["usage_details"]["input"] == 100
+    assert update_kw["usage_details"]["output"] == 20
+    assert gen_span.ended is True
     mock_langfuse.flush.assert_called_once()
 
 
