@@ -19,7 +19,7 @@ graph LR
     end
 
     subgraph ETAPA3["Etapa 3: ABM"]
-        ABM["mal-core/abm (C++)<br/>o mal-ghana-sim (Py)<br/>9M+ agentes<br/>30 dias/rollout"]
+        ABM["mal-core/abm (C++)<br/>9M+ agentes<br/>30 dias/rollout"]
     end
 
     subgraph ETAPA4["Etapa 4: Dataset"]
@@ -74,7 +74,6 @@ MalariaSentinel/
   mal-data-explorer/      # Visualizacion de datasets, analisis de sesgo
   agents/                 # Infraestructura de agentes, memoria, loops, janus
   social-networks/        # Deep Agent para contenido social (carousel, LinkedIn, video)
-  mal-ghana-sim/          # [DEPRECATED] Experimento original
   data/                   # Datasets (gitignored raw data)
   papers/                 # Papers de investigacion
   terrain/                # DEM SRTM tiles
@@ -90,13 +89,11 @@ graph TB
     CL["mal-commonlib<br/>(sin dependencias)<br/>loaders, config, paths"]
     MC["mal-core<br/>ABM C++, U-Net, predict, server"]
     ME["mal-execution<br/>scripts CESGA/Hetzner"]
-    GS["mal-ghana-sim<br/>[DEPRECATED]"]
     DE["mal-data-explorer<br/>scripts sueltos"]
     SN["social-networks<br/>(independiente)"]
 
     CL --> MC
     MC --> ME
-    CL --> GS
 
     DE -.->|"sin deps"| DE
     SN -.->|"sin deps"| SN
@@ -104,7 +101,6 @@ graph TB
     style CL fill:#90EE90
     style MC fill:#87CEEB
     style ME fill:#87CEEB
-    style GS fill:#FFB6C1,stroke:#FF0000,stroke-width:2px
     style DE fill:#FFD700
     style SN fill:#DDA0DD
 ```
@@ -112,7 +108,7 @@ graph TB
 **Reglas de importacion**:
 - `mal-core` solo puede importar de `mal-commonlib`
 - `mal-execution` puede importar de `mal-core` y `mal-commonlib`
-- Los paquetes deprecated (`mal-ghana-sim`) no deben ser importados por paquetes activos
+- Los paquetes deprecated (experimentos eliminados, p. ej. `mal-ghana-sim`) no deben ser importados por paquetes activos
 
 ---
 
@@ -468,7 +464,7 @@ graph LR
 
 ### Que es?
 
-Re-implementacion en C++20 del ABM Python reference (`mal-ghana-sim/abm/`). El motor es **black-box equivalente**: dados los mismos inputs (env, habitat, seed, days), produce los mismos state COGs que el Python.
+Re-implementacion en C++20 del ABM Python reference (antes en `mal-ghana-sim/abm/`, experimento eliminado). El motor es **black-box equivalente**: dados los mismos inputs (env, habitat, seed, days), produce los mismos state COGs que el Python.
 
 ### Diagrama de modulos y flujo de datos
 

@@ -114,9 +114,9 @@ train_run() {
 
   local cmd
   if [[ -n "$remote_config" ]]; then
-    cmd="cd $remote_repo && uv sync && uv run python scripts/05_train.py --config $remote_config"
+    cmd="cd $remote_repo && uv sync && uv run malariasim train --run-dir runs/abm --epochs 50 --output-dir runs/training && cp $remote_config runs/training/config.yaml"
   else
-    cmd="cd $remote_repo && uv sync && uv run python scripts/05_train.py"
+    cmd="cd $remote_repo && uv sync && uv run malariasim train --run-dir runs/abm --epochs 50 --output-dir runs/training"
   fi
 
   if [[ "${HETZNER_RUN_DRY_RUN:-0}" == "1" ]]; then

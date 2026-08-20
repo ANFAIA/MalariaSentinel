@@ -5,12 +5,13 @@ description: Use the Agent-Based Model (ABM) engine for malaria simulation. The 
 
 # ABM Engine Skill
 
-Two implementations of the M1.5 thin-slice ABM for mosquito population dynamics and malaria spread simulation:
+The ABM engine is the C++ implementation of the M1.5 thin-slice ABM for mosquito population dynamics and malaria spread simulation:
 
 | Engine | Location | Use case |
 |---|---|---|
-| Python reference | `mal-ghana-sim/src/mal_ghana_sim/abm/` | Development, validation, prototyping (deprecated) |
 | C++ fast engine | `mal-core/src/mal_core/abm/` | Production runs, HPC (CESGA FT3), 100x faster |
+
+The former Python reference ABM lived in `mal-ghana-sim/src/mal_ghana_sim/abm/`; that experiment package has been removed. The C++ engine is the single source of truth for ABM behaviour.
 
 Both produce identical 2-band COG output (density + suitability) and sidecar JSON, validated by calibration scorers (10 scorers + LLM verdict).
 
@@ -23,73 +24,6 @@ Each day the model runs a 5-step loop:
 3. **Larva to adult** — emergence when EIP >= 110 growing-degree-days
 4. **Adult dispersal** — configurable % of adults move (clipped Gaussian, default sigma=450m, max=2km)
 5. **Birth** — binomial(n_females, fecundity) per active cell, temperature-dependent (Mordecai 2013)
-
----
-
-## Python ABM
-
-### Location
-
-`mal-ghana-sim/src/mal_ghana_sim/abm/`
-
-### Key files
-
-| File | Role |
-|---|---|
-| `run.py` | CLI entry point (`abm_run`), Typer app |
-| `model.py` | `AnophelesABM` facade — owns coordinator + submodel |
-| `coordinator.py` | `CoordinatorModel` — Mesa-Geo spatial layer, climate lookups, density aggregation |
-| `mosquito_submodel.py` | `MosquitoSubmodel` — Polars-backed vectorised population (larva/adult stages) |
-| `habitat_engine.py` | `HabitatEngine` — loads habitat patches from gpkg |
-| `climate.py` | `ClimateEngine` — 4-band env COG lookups (rain, temp, water_frac, ndvi) |
-| `eip.py` | EIP growing-degree-day accumulation |
-| `patch_state.py` | `PatchState` schema (Polars DataFrame columns) |
-| `agents.py` | Mesa agent definitions for HabitatPatch |
-| `scheduler.py` | `RandomActivationByTypeShim` — Mesa-Geo scheduler compatibility |
-
-### How to run
-
-```bash
-cd mal-ghana-sim
-
-# Using the Python module
-uv run python -m mal_ghana_sim.abm.run \
-    --aoi ghana --year 2024 --month 6 \
-    --env data/ghana/ghana_regional_2024_2025_env.nc \
-    --habitat data/ghana/ghana_regional_2024_06_habitat_patches.gpkg \
-    --seed 42 --days 30 \
-    --output runs/output/state.tif
-
-# Using the entry point (after uv sync)
-uv run abm_run \
-    --aoi ghana --year 2024 --month 6 \
-    --env data/ghana/ghana_regional_2024_2025_env.nc \
-    --habitat data/ghana/ghana_regional_2024_06_habitat_patches.gpkg \
-    --seed 42 --days 30 \
-    --output runs/output/state.tif
-```
-
-### CLI parameters
-
-| Flag | Default | Description |
-|---|---|---|
-| `--aoi` | `ghana` | AOI slug (registered in `_DEFAULT_REGISTRY`) |
-| `--bbox` | — | Custom bbox `W,S,E,N` (overrides `--aoi`) |
-| `--year` | required | Start year |
-| `--month` | required | Start month (1–12) |
-| `--seed` | 1 | PRNG seed |
-| `--days` | 30 | Simulation days (1–366) |
-| `--env` | required | Path to 4-band env COG (.tif) |
-| `--habitat` | required | Path to habitat patches gpkg |
-| `--output` | required | Output path for state COG (.tif) |
-| `--resolution-m` | 1000 | Ground resolution in metres |
-| `--scale` | `regional` | AOI scale |
-
-### Expected output
-
-```
-abm_run: AOI=ghana year=2024 month=06 seed=42 days=30 -> runs/output/state.tif
-```
 
 ---
 
@@ -347,10 +281,10 @@ cd mal-core/src/mal_core/abm/tests/calibration && uv run pytest -m fast -v
 # 10 scorers: D1-D15 + D16-D18 (fast tier)
 ```
 
-### Python smoke test
+### Python unit tests (calibration scorers)
 
 ```bash
-cd mal-ghana-sim && uv run pytest tests/test_abm_smoke.py -v
+cd mal-core/src/mal_core/abm/tests/calibration && uv run pytest tests/test_pool_hydrology.py -v
 ```
 
 ---
@@ -399,23 +333,17 @@ MONTH=6 YEAR=2024 N_ROLLOUTS=100 sbatch mal-core/src/mal_core/abm/slurm/short.sh
 NUM_MONTHS=24 N_ROLLOUTS=100 sbatch mal-core/src/mal_core/abm/slurm/long.sh
 ```
 
-### Python ABM on CESGA
+### Run the ABM on CESGA (manifest-driven CLI)
 
 ```bash
 cd $STORE/MalariaSentinel
 uv sync --all-packages
 
-# Build environment
-uv run python -m mal_ghana_sim.scripts.build_env \
-    --aoi ghana --year 2024 --month 6 --scale regional \
-    --output-dir $STORE/runs/ghana-sim/env/2024-06/
+# Build environment (env tensor + habitat patches) for the AOI
+uv run malariasim ingest --aoi ghana --year 2024 --month 6 --what env
 
-# Run ABM
-uv run python -m mal_ghana_sim.abm.run \
-    --env-cog $STORE/runs/ghana-sim/env/2024-06/env.tif \
-    --habitat-gpkg $STORE/runs/ghana-sim/env/2024-06/habitat.gpkg \
-    --seed 42 --days 30 \
-    --output $STORE/runs/ghana-sim/snapshots/2024-06/seed42/
+# Run the ABM (continuous, manifest-driven; outputs to runs/abm)
+uv run malariasim abm --aoi ghana --year 2024 --month 6 --seed 42 --days 30 --output-dir $STORE/runs/abm
 ```
 
 ---

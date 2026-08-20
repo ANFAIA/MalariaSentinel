@@ -49,7 +49,6 @@ members = [
     "mal-commonlib",
     "mal-core",
     "mal-execution",
-    "mal-ghana-sim",
     "mal-data-explorer",
     "social-networks",
     "agents/janus",

@@ -1,8 +1,9 @@
 """Pool hydrology — per-patch water-balance model (M14).
 
-Python parity with ``mal_abm_fast/pool_hydrology.hpp``. The constants
-must match the C++ header exactly so the two engines produce bit-for-bit
-identical outputs on the same (rain, temp) forcing sequences.
+Promoted from ``mal-ghana-sim`` (experiment) — Python parity with
+``mal_abm_fast/pool_hydrology.hpp``. The constants must match the C++
+header exactly so the two engines produce bit-for-bit identical outputs
+on the same (rain, temp) forcing sequences.
 
 Public surface
 --------------

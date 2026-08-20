@@ -187,8 +187,7 @@ rsync -avz --progress /local/path/MalariaSentinel/ cesga:$STORE/MalariaSentinel/
 ```bash
 cd $STORE/MalariaSentinel
 uv sync --all-packages
-uv run python -m mal_ghana_sim.scripts.build_env --help
-uv run python scripts/01_ingest.py --download
+uv run malariasim ingest --aoi ghana --year 2024 --month 6 --what env --help
 ```
 
 **Tip**: For a streamlined setup, use the automation scripts in `mal-execution/scripts/cesga-run/` instead of manual steps. See §8.1.
@@ -211,25 +210,19 @@ environment = "/home/<user>/store/MalariaSentinel/.venv"
 
 ### Pipeline overview
 
-The ABM runs one month at a time via the `abm_run` CLI. A 2-year simulation = 24 sequential monthly runs.
+The ABM runs a continuous multi-year simulation via the manifest-driven `malariasim` CLI. A 2-year simulation is a single run of 731 days (365 + 366).
 
-1. **`build_env`** — generates the environment tensor (COG) + habitat patches (gpkg) for a given AOI, year, month.
-2. **`abm_run`** — runs one month of the ABM with a given seed, producing a snapshot.
+1. **`ingest`** — generates the environment tensor (COG) + habitat patches (gpkg) for a given AOI, year, month.
+2. **`abm`** — runs the ABM continuously with a given seed, writing daily snapshots to the run output directory.
 
 ### Typical workflow
 
 ```bash
-# Step 1: Build environment for month 1
-uv run python -m mal_ghana_sim.scripts.build_env \
-    --aoi ghana --year 2024 --month 1 --scale regional \
-    --output-dir $STORE/runs/ghana-sim/env/
+# Step 1: Build environment for the starting month
+uv run malariasim ingest --aoi ghana --year 2024 --month 1 --what env
 
-# Step 2: Run ABM for that month
-uv run python -m mal_ghana_sim.abm.run \
-    --env-cog $STORE/runs/ghana-sim/env/2024-01/env.tif \
-    --habitat-gpkg $STORE/runs/ghana-sim/env/2024-01/habitat.gpkg \
-    --seed 42 --days 30 \
-    --output $STORE/runs/ghana-sim/snapshots/2024-01/seed42/
+# Step 2: Run the ABM (continuous)
+uv run malariasim abm --aoi ghana --year 2024 --month 1 --seed 42 --days 731 --output-dir $STORE/runs/abm
 ```
 
 ### Resource recommendations for ILK nodes
@@ -249,7 +242,7 @@ The `mal-execution/scripts/cesga-run/` directory contains shell scripts that aut
 | `cesga_config.sh` | Configuration: CESGA paths, SLURM partition, resource defaults |
 | `setup_env.sh` | One-time: install uv in `$STORE`, clone/rsync project, sync workspace |
 | `prepare_data.sh` | Transfer data to CESGA: rsync `data/` and `terrain/` to `$STORE` |
-| `run_abm.sh` | Submit ABM rollouts as SLURM job arrays (configurable month/year/seeds) |
+| `run_abm.sh` | Submit ABM runs via the manifest-driven `malariasim abm` CLI (configurable AOI, year, month, seed, days) |
 | `manage_jobs.sh` | Monitor (`status`), cancel (`cancel`), or view efficiency (`eff`) of jobs |
 
 ### Quick start with automation
@@ -271,9 +264,9 @@ rsync -avz --progress ./terrain/ cesga:$STORE/MalariaSentinel/terrain/
 # (or use prepare_data.sh if data is already partially on CESGA)
 bash prepare_data.sh
 
-# 4. Submit ABM rollouts
+# 4. Submit ABM runs
 bash run_abm.sh  # Uses defaults from cesga_config.sh
-# Or override: MONTH=6 YEAR=2024 N_ROLLOUTS=100 bash run_abm.sh
+# Or override: ABM_START_MONTH=6 ABM_START_YEAR=2024 ABM_SEED=42 bash run_abm.sh
 
 # 5. Monitor
 bash manage_jobs.sh status

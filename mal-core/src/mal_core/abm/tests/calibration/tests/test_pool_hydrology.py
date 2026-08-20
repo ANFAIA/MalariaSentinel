@@ -1,4 +1,4 @@
-"""Tests for M14 pool hydrology — Python parity with C++.
+"""Tests for M14 pool hydrology — Python parity with C++ (promoted from mal-ghana-sim).
 
 Tests cover:
   1. advance_pool — filling, drying, accumulation, capping
@@ -11,7 +11,7 @@ import math
 
 import pytest
 
-from mal_ghana_sim.abm.pool_hydrology import (
+from mal_core.abm.pool_hydrology import (
     PoolState,
     DailyForcing,
     advance_pool,

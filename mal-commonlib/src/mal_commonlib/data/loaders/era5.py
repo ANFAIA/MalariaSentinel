@@ -18,11 +18,10 @@ Auth:
 
 Notes:
     * v1 calibration parameters (T_OPT=25 °C, T_HALF_WIDTH=8 °C) are kept here
-      as the v1 reference. The casablanca version in
-      ``mal-ghana-sim/src/mal_ghana_sim/config.py`` (``temp_suitability``)
-      duplicates the same formula; a follow-up commit imports this one and
-      removes the casablanca copy. (Not done in M1.3a to keep the diff
-      scoped to the data layer.)
+      as the v1 reference. The same formula is implemented in the C++ ABM
+      engine (``mal-core/src/mal_core/abm/include/mal_abm_fast/climate.hpp``,
+      ``temp_suitability``); the former Python copy lived in the removed
+      ``mal-ghana-sim`` experiment package (config.py).
     * Output: ``temp_suitability`` ∈ [0, 1] by construction (per
       docs/abm-output-contract.md §2 channel 2). NoData: -9999.0.
     * This loader only emits a single channel (``temp_suitability``); the

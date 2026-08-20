@@ -94,7 +94,7 @@ config; it calls `hcloud`, which reads the token from
 | `hetzner-run push <name> <local> <remote>` | `rsync -avz` local → VM. |
 | `hetzner-run pull <name> <remote> <local>` | `rsync -avz` VM → local. |
 | `hetzner-run sim-run [--repo R] [--data D] [--cmd C] [--keep-vm] [--yes]` | High-level: start, push repo+data, run `cmd`, pull `/work/runs`, destroy. |
-| `hetzner-run train [--config Cfg] [--keep-vm]` | High-level: like `sim-run` but default cmd is `uv run python scripts/05_train.py`. |
+| `hetzner-run train [--config Cfg] [--keep-vm]` | High-level: like `sim-run` but default cmd is `malariasim train`. |
 | `hetzner-run cost --type T --hours H` | Print the cost: e.g. `ccx33 × 2h = €0.060`. |
 | `hetzner-run cost --list` | Full per-hour price table. |
 | `hetzner-run --help` / `<sub> --help` | Usage text. |

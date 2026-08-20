@@ -29,10 +29,6 @@ MalariaSentinel/
 │   ├── pyproject.toml
 │   ├── scripts/
 │   └── src/
-├── mal-ghana-sim/              # Ghana spread simulation + U-Net surrogate (research)
-│   ├── pyproject.toml
-│   ├── src/mal_ghana_sim/
-│   └── tests/
 ├── mal-data-explorer/          # Dataset visualization, mapping, bias analysis
 │   ├── pyproject.toml
 │   └── *.py                    # Standalone scripts (no src layout)
@@ -52,7 +48,6 @@ members = [
     "mal-commonlib",
     "mal-core",
     "mal-execution",
-    "mal-ghana-sim",
     "mal-data-explorer",
     "social-networks",
 ]
@@ -69,7 +64,6 @@ mal-core               ← depends on mal-commonlib
     ↑
 mal-execution          ← depends on mal-core + mal-commonlib (HPC/cloud automation scripts)
 
-mal-ghana-sim          ← depends on mal-commonlib ONLY (NOT mal-core)
 mal-data-explorer      ← no workspace deps (standalone scripts)
 ```
 
@@ -77,7 +71,6 @@ mal-data-explorer      ← no workspace deps (standalone scripts)
 - `mal-commonlib` is the foundation — no internal dependencies.
 - `mal-core` depends only on `mal-commonlib`.
 - `mal-execution` depends on `mal-core` + `mal-commonlib`. Its Python module (`mal_cli`) is minimal, but `scripts/` contains HPC automation (CESGA SLURM, Hetzner cloud) and training scripts.
-- `mal-ghana-sim` depends only on `mal-commonlib` — **never** on `mal-core`.
 - `mal-data-explorer` has no workspace dependencies.
 - **Nothing depends on research packages.** Research code promotes into core; it never flows downward.
 
@@ -89,7 +82,6 @@ mal-data-explorer      ← no workspace deps (standalone scripts)
 # Add to a specific package
 cd mal-commonlib && uv add <package>
 cd mal-core && uv add <package>
-cd mal-ghana-sim && uv add <package>
 
 # Sync all packages after changes
 uv sync --all-packages
@@ -180,15 +172,13 @@ tools/run_all_tests.sh
 # Run tests for a specific package
 cd mal-commonlib && uv run pytest
 cd mal-core && uv run pytest
-cd mal-ghana-sim && uv run pytest
-
 # C++ ABM engine (GoogleTest)
 cd mal-core/src/mal_core/abm && ctest --test-dir build --output-on-failure
 ```
 
 ### Testing conventions
 
-- **Python packages**: tests go in `tests/` at the package root (e.g., `mal-ghana-sim/tests/`) or `src/<package>/tests/` (e.g., `mal-commonlib/src/mal_commonlib/tests/`).
+- **Python packages**: tests go in `tests/` at the package root (e.g., `mal-core/src/mal_core/abm/tests/`) or `src/<package>/tests/` (e.g., `mal-commonlib/src/mal_commonlib/tests/`).
 - **Framework**: pytest for Python. GoogleTest for C++ (`mal-core/src/mal_core/abm/`).
 - **Dev dependencies**: declared in `[dependency-groups] dev = ["pytest>=8.0"]` in each package's `pyproject.toml`.
 - Every promoted module **must** have tests before it lands in `mal-core` or `mal-commonlib`.
@@ -214,7 +204,6 @@ Use prefixes that match the package tier:
 | `common/` | `mal-commonlib` |
 | `core/` | `mal-core` |
 | `exec/` | `mal-execution` |
-| `sim/` | `mal-ghana-sim` |
 | `data/` | `mal-data-explorer` |
 | `docs/` | Documentation |
 
@@ -225,7 +214,6 @@ Use prefixes that match the package tier:
 | `mal-commonlib` | `mal_commonlib` |
 | `mal-core` | `mal_core` |
 | `mal-execution` | (scripts only, no importable module) |
-| `mal-ghana-sim` | `mal_ghana_sim` |
 | `mal-data-explorer` | (standalone scripts, no importable module) |
 
 ### New experiments
@@ -253,9 +241,6 @@ HPC and cloud automation. Python module is minimal (`mal_cli/__init__.py`). Key 
 - `scripts/hetzner-run/` — Hetzner cloud automation (hetzner-run, cloud-init.yaml)
 - `scripts/train_unet.py`, `train_unet_subsample.py`, `validate_unet.py` — training scripts
 - `scripts/build_environment.py`, `build_hosts.py`, `build_mobility.py` — data preparation scripts
-
-### mal-ghana-sim
-Ghana spread simulation + U-Net surrogate. Modules: `config`, `dataset`, `ingest`, `predict`, `simulator`, `suitability`, `train`, `unet`, `viz`, `abm/` (agent-based model).
 
 ### mal-data-explorer
 Standalone visualization scripts (01-12). No src layout, no importable module.

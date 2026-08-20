@@ -93,10 +93,11 @@ for (( i=0; i<NUM; i++ )); do
   fi
 
   CMD=(
-    uv run python -m mal_ghana_sim.scripts.build_env
+    uv run malariasim ingest
     --aoi "$ABM_AOI"
     --year "$Y"
     --month "$M"
+    --what env
     --output-dir "$DATA_DIR"
   )
 
@@ -105,7 +106,7 @@ for (( i=0; i<NUM; i++ )); do
     continue
   fi
 
-  if "${CMD[@]}" 2>&1 | tee -a "$LOGS_DIR/build_env_${Y}_${M}.log"; then
+  if "${CMD[@]}" 2>&1 | tee -a "$LOGS_DIR/ingest_${Y}_${M}.log"; then
     if [[ -f "$ENV_TIF" && -f "$HAB_GPKG" ]]; then
       log "[OK]   $Y-$(printf '%02d' "$M")"
       BUILT=$((BUILT + 1))
@@ -114,7 +115,7 @@ for (( i=0; i<NUM; i++ )); do
       FAILED=$((FAILED + 1))
     fi
   else
-    log "[FAIL] $Y-$(printf '%02d' "$M") — build_env exited non-zero"
+    log "[FAIL] $Y-$(printf '%02d' "$M") — ingest exited non-zero"
     FAILED=$((FAILED + 1))
   fi
 done

@@ -163,7 +163,7 @@ fi
 assert_contains "--dry-run sim-run" "sim-run plan" "$LAST_ERR"
 assert_contains "--dry-run sim-run" "/work/code/" "$LAST_ERR"
 assert_contains "--dry-run sim-run" "uv sync" "$LAST_ERR"
-assert_contains "--dry-run sim-run" "scripts/03_simulate.py" "$LAST_ERR"
+assert_contains "--dry-run sim-run" "malariasim abm" "$LAST_ERR"
 rm -rf "$TMP_REPO" "$TMP_DATA"
 
 # 6. Cost calculator.

@@ -45,8 +45,8 @@ log "Sync complete."
 # --- 5. Verify installation -------------------------------------------------
 log "Verifying imports …"
 "$VENV_DIR/bin/python" -c "
-import mal_commonlib, mal_ghana_sim
+import mal_commonlib, mal_core
 print('mal_commonlib:', mal_commonlib.__file__)
-print('mal_ghana_sim:', mal_ghana_sim.__file__)
+print('mal_core:', mal_core.__file__)
 "
-log "Environment ready.  Run jobs with:  uv run python -m mal_ghana_sim.abm.run"
+log "Environment ready.  Run jobs with:  uv run malariasim abm --aoi ghana"

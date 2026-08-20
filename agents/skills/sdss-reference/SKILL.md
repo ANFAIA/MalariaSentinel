@@ -115,27 +115,26 @@ The Centinela implements a 5-stage pipeline:
 
 | SDSS component | Monorepo package | Role |
 |---|---|---|
-| **Data inputs** | `mal-ghana-sim/scripts/01_ingest.py` | Reproject & resample env rasters |
+| **Data inputs** | `mal-core/src/mal_core/ingest/` + CLI `malariasim ingest` | Reproject & resample env rasters |
 | **Baseline GIS layers** | `data/`, `terrain/`, `runs/layers/` | SRTM DEM, JRC water, CHIRPS rainfall, WorldClim temperature, MODIS NDVI |
 | **Expert knowledge** | `agents/`, `AGENTS.md`, knowledge graph | Accumulated conventions, patterns, pitfalls |
-| **Spatial analysis** | `mal-ghana-sim/scripts/02_suitability.py` | Weighted overlay + thermal curve |
-| **Modeling (ABM)** | `mal-ghana-sim/src/mal_ghana_sim/abm/` + `mal-core/src/mal_core/abm/` | Agent-based mosquito simulation |
-| **Modeling (KPP)** | `mal-ghana-sim/scripts/03_simulate.py` | Fisher-KPP reaction-diffusion |
-| **ML surrogate** | `mal-ghana-sim/scripts/05_train.py` + `06_predict_and_map.py` | U-Net transition model |
-| **Automated outputs** | `mal-execution/scripts/` | CLI entrypoints, batch jobs |
-| **Cyclical re-entry** | Calibration framework | Scorers feed outcomes back into parameter tuning |
-| **Risk maps** | `mal-ghana-sim/scripts/06_predict_and_map.py` | Side-by-side risk-expansion visualisation |
+| **Spatial analysis** | C++ ABM engine (`mal-core/src/mal_core/abm/`) | Suitability weights + thermal curve (climate.hpp) |
+| **Modeling (ABM)** | `mal-core/src/mal_core/abm/` | Agent-based mosquito simulation (C++ engine) |
+| **ML surrogate** | `mal-core/src/mal_core/training/` + CLI `malariasim train` | U-Net transition model trained on ABM rollouts |
+| **Automated outputs** | `mal-execution/scripts/` | CLI entrypoints, batch jobs, HPC/cloud automation |
+| **Cyclical re-entry** | Calibration framework (`mal-core/src/mal_core/abm/tests/calibration/`) | Scorers feed outcomes back into parameter tuning |
+| **Risk maps** | CLI `malariasim predict` + `mal-core/scripts/visualize_state.py` | Risk-expansion visualisation |
 
 ### Data flow
 
 ```
 GBIF occurrences ──┐
 REACT survey data ──┤
-VectorLink data ────┤──→ mal-ghana-sim ──→ suitability map
-SRTM DEM ───────────┤                    ──→ ABM / KPP simulation
-JRC water ──────────┤                    ──→ U-Net training data
-CHIRPS rainfall ────┤                    ──→ U-Net surrogate
-WorldClim temp ─────┤                    ──→ risk expansion map
+VectorLink data ────┤──→ ingest ──→ env tensor + habitat patches
+SRTM DEM ───────────┤              ──→ ABM (C++ engine) ──→ rollouts
+JRC water ──────────┤              ──→ U-Net training data
+CHIRPS rainfall ────┤              ──→ U-Net surrogate
+WorldClim temp ─────┤              ──→ risk expansion map
 MODIS NDVI ─────────┘
 ```
 
@@ -177,7 +176,7 @@ The SDSS supports planning and evaluating five intervention types:
 
 ### Parameterization conventions
 
-All intervention parameters live in `mal-ghana-sim/src/mal_ghana_sim/config.py` (suitability/simulation parameters) or are passed as CLI flags to the ABM engine. The calibration framework (`mal-core/src/mal_core/abm/tests/calibration/`) validates that parameterized interventions produce realistic population dynamics.
+All intervention parameters live in the C++ ABM engine (`mal-core/src/mal_core/abm/include/mal_abm_fast/wire.hpp`, `species_params.hpp`) or are passed as CLI flags to the ABM engine. The calibration framework (`mal-core/src/mal_core/abm/tests/calibration/`) validates that parameterized interventions produce realistic population dynamics.
 
 ---
 

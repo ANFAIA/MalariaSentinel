@@ -67,7 +67,7 @@ EXAMPLES
   hetzner-run --dry-run start --type ccx33 --name ms-test
   hetzner-run start --type ccx33 --name ms-1
   hetzner-run exec ms-1 'df -h /'
-  hetzner-run push ms-1 ./mal-ghana-sim /work/code/mal-ghana-sim
+  hetzner-run push ms-1 ./ /work/code/MalariaSentinel
   hetzner-run pull ms-1 /work/runs ./runs/2026-07-13
   hetzner-run destroy ms-1
 
@@ -158,10 +158,10 @@ USAGE
 
 DEFAULTS
   --name       ms-<unix-ts>-<pid>
-  --repo       mal-ghana-sim
-  --data       ./data/ghana
-  --cmd        cd /work/code/mal-ghana-sim && uv sync &&
-               uv run python scripts/03_simulate.py
+  --repo       <monorepo root> (auto-detected)
+  --data       ./data
+  --cmd        cd /work/code/MalariaSentinel && uv sync &&
+               uv run malariasim abm --aoi ghana
   --pull-to    ./runs/<timestamp>
 
 ENV
@@ -181,9 +181,9 @@ USAGE
 
 DEFAULTS
   --name       ms-<unix-ts>-<pid>
-  --repo       mal-ghana-sim
-  --data       ./data/ghana
-  --config     (none; if unset, train.py is called without --config)
+  --repo       <monorepo root> (auto-detected)
+  --data       ./data
+  --config     (none; if unset, malariasim train is called without a config)
   --pull-to    ./runs/<timestamp>
 EOF
 }
@@ -283,7 +283,7 @@ cmd_pull() {
 }
 
 cmd_sim_run() {
-  local name="" repo="mal-ghana-sim" data="./data/ghana" cmd=""
+  local name="" repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)" data="./data" cmd=""
   local pull_to="" keep_vm=0
   while (( $# )); do
     case "$1" in
@@ -305,13 +305,13 @@ cmd_sim_run() {
     pull_to="./runs/$(date +%Y-%m-%dT%H-%M-%S)"
   fi
   if [[ -z "$cmd" ]]; then
-    cmd="cd /work/code/mal-ghana-sim && uv sync && uv run python scripts/03_simulate.py"
+    cmd="cd /work/code/MalariaSentinel && uv sync && uv run malariasim abm --aoi ghana"
   fi
   sim_run "$name" "$repo" "$data" "$cmd" "$pull_to" "$keep_vm"
 }
 
 cmd_train() {
-  local name="" repo="mal-ghana-sim" data="./data/ghana" config=""
+  local name="" repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)" data="./data" config=""
   local pull_to="" keep_vm=0
   while (( $# )); do
     case "$1" in

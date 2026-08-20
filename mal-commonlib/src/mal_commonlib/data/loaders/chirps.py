@@ -16,8 +16,7 @@ Notes:
     * Returns raw mm (monthly total precipitation), NOT a P95-normalized
       value. The ABM compares the env band against
       ``RAIN_THRESHOLD_MM = 15`` to activate habitat patches, so the band
-      must be in mm. The suitability overlay in
-      ``mal-ghana-sim/src/mal_ghana_sim/suitability.py`` applies its own
+      must be in mm. The suitability overlay applies its own
       min-max normalization at consumption time — a previous version of
       this loader normalized the band in [0, 1] here, which both broke the
       ABM's threshold check and was redundant with the overlay's

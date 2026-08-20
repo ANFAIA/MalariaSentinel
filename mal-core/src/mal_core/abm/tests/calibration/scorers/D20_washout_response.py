@@ -36,7 +36,7 @@ class WashoutResponseScorer(Scorer):
           2. 30mm rain → washout fraction == 0.0 (below threshold)
           3. 80mm rain → washout fraction == 0.6 (at cap)
         """
-        from mal_ghana_sim.abm.pool_hydrology import (
+        from mal_core.abm.pool_hydrology import (
             washout_fraction,
             POOL_RAIN_WASH_MM,
             POOL_WASH_FRACTION_MAX,

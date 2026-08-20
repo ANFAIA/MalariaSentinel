@@ -18,7 +18,6 @@ members = [
     "mal-core",
     "mal-data-explorer",
     "mal-execution",
-    "mal-ghana-sim",
     "mal-janus",
     "malaria-sentinel",
     "social-networks-agent",
@@ -2190,59 +2189,6 @@ requires-dist = [
     { name = "mal-commonlib", editable = "mal-commonlib" },
     { name = "mal-core", editable = "mal-core" },
 ]
-
-[[package]]
-name = "mal-ghana-sim"
-version = "0.1.0"
-source = { editable = "mal-ghana-sim" }
-dependencies = [
-    { name = "cdsapi" },
-    { name = "earthaccess" },
-    { name = "fastapi" },
-    { name = "mal-commonlib" },
-    { name = "matplotlib" },
-    { name = "mesa-geo" },
-    { name = "numpy" },
-    { name = "pandas" },
-    { name = "polars" },
-    { name = "rasterio" },
-    { name = "rioxarray" },
-    { name = "scikit-learn" },
-    { name = "scipy" },
-    { name = "torch" },
-    { name = "typer" },
-    { name = "uvicorn" },
-    { name = "xarray" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "pytest" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "cdsapi", specifier = ">=0.7" },
-    { name = "earthaccess", specifier = ">=0.12" },
-    { name = "fastapi", specifier = ">=0.115" },
-    { name = "mal-commonlib", editable = "mal-commonlib" },
-    { name = "matplotlib", specifier = ">=3.11.0" },
-    { name = "mesa-geo", specifier = ">=0.9.3,<0.10" },
-    { name = "numpy", specifier = ">=2.5.0" },
-    { name = "pandas", specifier = ">=3.0.3" },
-    { name = "polars", specifier = ">=1.30.0" },
-    { name = "rasterio", specifier = ">=1.5.0" },
-    { name = "rioxarray", specifier = ">=0.22.0" },
-    { name = "scikit-learn", specifier = ">=1.9.0" },
-    { name = "scipy", specifier = ">=1.18.0" },
-    { name = "torch", specifier = ">=2.12.1" },
-    { name = "typer", specifier = ">=0.12" },
-    { name = "uvicorn", specifier = ">=0.30" },
-    { name = "xarray", specifier = ">=2024.7" },
-]
-
-[package.metadata.requires-dev]
-dev = [{ name = "pytest", specifier = ">=8.0" }]
 
 [[package]]
 name = "mal-janus"

@@ -41,7 +41,7 @@ class PoolPersistenceScorer(Scorer):
           - Pool becomes dry (< 1mm) within 10 days
           - Water level trajectory is monotonically decreasing during dry phase
         """
-        from mal_ghana_sim.abm.pool_hydrology import (
+        from mal_core.abm.pool_hydrology import (
             PoolState,
             DailyForcing,
             advance_pool,

@@ -112,7 +112,7 @@ runtime-output directories listed in §3. Specifically:
 `self_improve` does NOT edit:
 
 - **Domain code**: `mal-core/**`, `mal-commonlib/**`,
-  `mal-execution/**`, `mal-ghana-sim/**`, `mal-data-explorer/**`.
+  `mal-execution/**`, `mal-data-explorer/**`.
   These are owned by the corresponding specialists (`abm`, `scoring`,
   `ingest`, `download`, `prediction`, `training`, `data`, `commonlib`).
   If a janus bug is caused by a domain-code bug, dispatch the

@@ -29,7 +29,7 @@ cd MalariaSentinel
 uv sync --all-packages
 ```
 
-This installs all workspace packages (`mal-commonlib`, `mal-core`, `mal-execution`, `mal-ghana-sim`, `mal-data-explorer`, `social-networks`) and their Python dependencies. The first sync may take a few minutes for torch and other large wheels.
+This installs all workspace packages (`mal-commonlib`, `mal-core`, `mal-execution`, `mal-data-explorer`, `social-networks`) and their Python dependencies. The first sync may take a few minutes for torch and other large wheels.
 
 ## Data Restoration
 
@@ -63,13 +63,13 @@ uv run --with requests python scripts/restore_data.py colombia_vl
 
 ### What is NOT restored
 
-Model weights and result PNGs in `runs/` must be regenerated via the Ghana simulation pipeline:
+Model weights and result PNGs in `runs/` must be regenerated via the ABM pipeline:
 
 ```bash
-uv run python mal-ghana-sim/scripts/02_suitability.py
-uv run python mal-ghana-sim/scripts/03_simulate.py
-uv run python mal-ghana-sim/scripts/05_train.py
-uv run python mal-ghana-sim/scripts/06_predict_and_map.py
+uv run malariasim ingest --aoi ghana --year 2024 --month 6 --what env
+uv run malariasim abm --aoi ghana --year 2024 --month 6 --seed 1 --days 30
+uv run malariasim train --run-dir runs/abm --epochs 50
+uv run malariasim predict --aoi ghana --year 2026
 ```
 
 ## Verification
@@ -79,13 +79,11 @@ Quick import check:
 ```bash
 uv run python -c "
 from mal_commonlib import config as C
-from mal_ghana_sim import config as GC
 import mal_core, mal_cli
 import mal_data_explorer
 print('All workspace packages import OK')
 print('  REPO_ROOT:', C.REPO_ROOT)
 print('  DATA_DIR:', C.DATA_DIR)
-print('  OCCURRENCE:', GC.OCCURRENCE)
 "
 ```
 
@@ -106,7 +104,6 @@ Both should print `All packages import OK` and show the resolved paths.
 tools/run_all_tests.sh
 
 # Run tests for a specific package
-cd mal-ghana-sim && uv run pytest
 cd mal-commonlib && uv run pytest
 cd mal-core && uv run pytest
 

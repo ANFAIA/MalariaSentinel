@@ -6,7 +6,7 @@
 #SBATCH -t 2-23:59:00
 
 # run_abm.sh — SLURM batch script for MalariaSentinel ABM on CESGA
-# Runs 24 months (2 years) sequentially on an ILK node.
+# Runs a continuous ABM via the manifest-driven CLI (mal-core).
 #
 # Usage (interactive or from manage_jobs.sh):
 #   sbatch run_abm.sh
@@ -77,48 +77,27 @@ echo ""
 MONTHS_RUN=0
 MONTHS_FAILED=0
 
-for (( i=0; i<NUM_MONTHS; i++ )); do
-  M=$(( MONTH + i ))
-  Y=$(( YEAR + (M - 1) / 12 ))
-  M=$(( (M - 1) % 12 + 1 ))
+TOTAL_DAYS=$(( NUM_MONTHS * DAYS ))
 
-  MM=$(printf '%04d_%02d' "$Y" "$M")
-  ENV_TIF="${DATA_DIR}/${AOI}_regional_${MM}_env.tif"
-  HAB_GPKG="${DATA_DIR}/${AOI}_regional_${MM}_habitat_patches.gpkg"
-  OUT_TIF="${RUNS_DIR}/${AOI}_regional_${MM}_seed$(printf '%04d' "$SEED").tif"
+echo "--- Continuous run: $YEAR-$(printf '%02d' $MONTH) for $TOTAL_DAYS days, seed=$SEED ---"
 
-  echo "--- [$(( i + 1 ))/$NUM_MONTHS] $Y-$(printf '%02d' "$M") seed=$SEED ---"
+MONTH_START=$(date +%s)
 
-  if [[ ! -f "$ENV_TIF" ]]; then
-    echo "  ERROR: env COG missing: $ENV_TIF"
-    MONTHS_FAILED=$((MONTHS_FAILED + 1))
-    continue
-  fi
-  if [[ ! -f "$HAB_GPKG" ]]; then
-    echo "  ERROR: habitat gpkg missing: $HAB_GPKG"
-    MONTHS_FAILED=$((MONTHS_FAILED + 1))
-    continue
-  fi
+uv run malariasim abm \
+  --aoi "$AOI" \
+  --year "$YEAR" \
+  --month "$MONTH" \
+  --seed "$SEED" \
+  --days "$TOTAL_DAYS" \
+  --output-dir "$RUNS_DIR" \
+  --data-root "$PROJECT_ROOT"
 
-  MONTH_START=$(date +%s)
+MONTH_END=$(date +%s)
+ELAPSED=$(( MONTH_END - MONTH_START ))
+echo "  Done in $(( ELAPSED / 60 ))m $(( ELAPSED % 60 ))s -> $RUNS_DIR/${AOI}_abm_seed$(printf '%04d' "$SEED").tif"
+echo ""
 
-  uv run python -m mal_ghana_sim.abm.run \
-    --aoi "$AOI" \
-    --year "$Y" \
-    --month "$M" \
-    --env "$ENV_TIF" \
-    --habitat "$HAB_GPKG" \
-    --output "$OUT_TIF" \
-    --seed "$SEED" \
-    --days "$DAYS"
-
-  MONTH_END=$(date +%s)
-  ELAPSED=$(( MONTH_END - MONTH_START ))
-  echo "  Done in $(( ELAPSED / 60 ))m $(( ELAPSED % 60 ))s -> $OUT_TIF"
-  echo ""
-
-  MONTHS_RUN=$((MONTHS_RUN + 1))
-done
+MONTHS_RUN=$((MONTHS_RUN + 1))
 
 # --- Final summary -----------------------------------------------------------
 JOB_END=$(date +%s)
@@ -128,7 +107,7 @@ echo "=== Run complete ==="
 echo "Months run:    $MONTHS_RUN / $NUM_MONTHS"
 echo "Months failed: $MONTHS_FAILED"
 echo "Total time:    $(( TOTAL_ELAPSED / 3600 ))h $(( (TOTAL_ELAPSED % 3600) / 60 ))m $(( TOTAL_ELAPSED % 60 ))s"
-echo "Outputs:       $RUNS_DIR/${AOI}_regional_*_seed$(printf '%04d' "$SEED").tif"
+echo "Outputs:       $RUNS_DIR/${AOI}_abm_seed$(printf '%04d' "$SEED").tif"
 echo "===================="
 
 if [[ "$MONTHS_FAILED" -gt 0 ]]; then
