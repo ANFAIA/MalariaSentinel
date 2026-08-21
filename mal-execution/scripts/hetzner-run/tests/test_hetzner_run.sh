@@ -223,13 +223,13 @@ if [[ "$LAST_RC" == "0" ]]; then
 else
   bad "cost --type ccx33 --hours 2 exit $LAST_RC"
 fi
-assert_contains "cost ccx33×2" "€0.060" "$LAST_OUT"
+assert_contains "cost ccx33×2" "€0.5370" "$LAST_OUT"
 
 run_with_timeout "cost ccx33 1h" "$MAIN" cost --type ccx33 --hours 1
-assert_contains "cost ccx33×1" "€0.030" "$LAST_OUT"
+assert_contains "cost ccx33×1" "€0.2685" "$LAST_OUT"
 
 run_with_timeout "cost ccx63 1h" "$MAIN" cost --type ccx63 --hours 1
-assert_contains "cost ccx63×1" "€0.126" "$LAST_OUT"
+assert_contains "cost ccx63×1" "€1.6550" "$LAST_OUT"
 
 run_with_timeout "cost cx23 1h" "$MAIN" cost --type cx23 --hours 1
 assert_contains "cost cx23×1" "€0.0106" "$LAST_OUT"

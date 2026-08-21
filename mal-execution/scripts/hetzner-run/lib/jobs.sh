@@ -54,7 +54,7 @@ _build_sim_cmd() {
     sync_args="$sync_args --group download --group ingest"
     cmd="cd /work/code/$repo_name && uv sync $sync_args && bash mal-core/src/mal_core/abm/build.sh && uv run malariasim download --aoi $aoi && uv run malariasim ingest --aoi $aoi --year $year --month $month --data-dir data/$aoi --output-dir data/$aoi && "
   fi
-  cmd="$cmd uv run malariasim abm --aoi $aoi --year $year --month $month --days $days --seed $seed --n-rollouts $n_rollouts --snapshot-every $snapshot_every --timeout 172800 --output-dir runs/abm/$run_name$gif_flag"
+  cmd="$cmd uv run malariasim abm --aoi $aoi --year $year --month $month --days $days --seed $seed --n-rollouts $n_rollouts --snapshot-every $snapshot_every --timeout 2592000 --output-dir runs/abm/$run_name$gif_flag"
   printf '%s' "$cmd"
 }
 
@@ -144,7 +144,26 @@ sim_run() {
     push_path "$name" "$data_ready/" "$remote_data_dir/"
   fi
 
-  exec_remote "$name" "bash -lc $(printf %q "$cmd")"
+  # Run the job DETACHED on the VM (setsid + nohup) so it survives an ssh
+  # disconnect / laptop sleep. It logs to /work/<run>.log and touches
+  # /work/<run>.done when finished. We poll for the marker, then pull.
+  # If this local process dies overnight, the VM job keeps running and the
+  # results stay on the VM — the user can pull them later.
+  local done_marker="/work/${run_name}.done"
+  local job_log="/work/${run_name}.log"
+  local launch="setsid bash -c $(printf %q "$cmd && touch $done_marker") > $job_log 2>&1 < /dev/null &"
+  exec_remote "$name" "bash -lc $(printf %q "$launch")"
+
+  # Poll for completion (effectively unlimited: 30 days). If it finishes,
+  # break and pull.
+  local waited=0
+  while (( waited < 2592000 )); do
+    if exec_remote "$name" "test -f $done_marker"; then
+      break
+    fi
+    sleep 60
+    waited=$(( waited + 60 ))
+  done
 
   pull_path "$name" "$remote_run_dir/" "$pull_to/"
 

@@ -167,12 +167,12 @@ remove_cache() {
 PRICE_TABLE_EUR_PER_HOUR='{
   "cx23":  0.0106,
   "cx33":  0.0165,
-  "ccx13": 0.018,
-  "ccx23": 0.030,
-  "ccx33": 0.030,
-  "ccx43": 0.060,
-  "ccx53": 0.090,
-  "ccx63": 0.126
+  "ccx13": 0.0834,
+  "ccx23": 0.1667,
+  "ccx33": 0.2685,
+  "ccx43": 0.5352,
+  "ccx53": 1.0346,
+  "ccx63": 1.6550
 }'
 
 # Print price for a given type. Empty stdout if unknown.
