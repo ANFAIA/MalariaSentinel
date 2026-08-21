@@ -149,18 +149,18 @@ snapshot of that VM (see "Snapshot strategy").
 A single-rollout ABM (`--n-rollouts 1`) uses **~1 core and ~2 GB RAM**,
 so the old `ccx33` default (8 dedicated cores / 32 GB) was **overkill** —
 verified on the 10-day Ghana run (CPU peaked at ~110% = 1 core, ~2.1 GB
-RAM, load avg 0.72). Default is now the cheaper `cx32`; scale up only for
+RAM, load avg 0.72). Default is now the cheaper `cx33`; scale up only for
 `--n-rollouts > 1` ensembles or very long runs.
 
 | Type | vCPU | RAM | €/h | When |
 |---|---|---|---|---|
-| `cx22` | 2 (shared) | 4 GB | 0.011 | Tight but enough for 1 rollout |
-| **`cx32`** | **4 (shared)** | **8 GB** | **0.018** | **Default (recommended)** |
+| `cx23` | 2 (shared) | 4 GB | 0.0106 | Tight but enough for 1 rollout |
+| **`cx33`** | **4 (shared)** | **8 GB** | **0.0165** | **Default (recommended)** |
 | `ccx33` | 8 (dedicated) | 32 GB | 0.030 | Ensembles (`--n-rollouts>1`), long runs |
 | `ccx43`+ | 16+ | 64 GB+ | 0.060+ | Large ensembles / heavy snapshots |
 
 The build step (cmake + GDAL) is the heaviest phase; 4 GB RAM is the
-practical minimum so `g++` never OOMs. Pass `--vm-type cx22` to go
+practical minimum so `g++` never OOMs. Pass `--vm-type cx23` to go
 cheapest, `--vm-type ccx33` to match the old behaviour.
 
 ### Global flags
@@ -215,8 +215,8 @@ explicitly own.
 
 | Type | vCPU | RAM | SSD | €/h | typical 1 h run | typical 4 h run |
 |---|---|---|---|---|---|---|
-| `cx22` | 2 (shared) | 4 GB | 40 GB | 0.011 | €0.011 | €0.044 |
-| `cx32` | 4 (shared) | 8 GB | 80 GB | 0.018 | €0.018 | €0.072 |
+| `cx23` | 2 (shared) | 4 GB | 40 GB | 0.0106 | €0.0106 | €0.042 |
+| `cx33` | 4 (shared) | 8 GB | 80 GB | 0.0165 | €0.0165 | €0.066 |
 | `cpx22` | 2 (dedicated) | 4 GB | 80 GB | 0.020 | €0.020 | €0.080 |
 | `cpx32` | 4 (dedicated) | 8 GB | 160 GB | 0.040 | €0.040 | €0.160 |
 | `cpx52` | 8 (dedicated) | 16 GB | 240 GB | 0.125 | €0.125 | €0.500 |
@@ -228,7 +228,7 @@ explicitly own.
 | `ccx53` | 32 (dedicated, Intel) | 128 GB | 600 GB | 0.090 | €0.090 | €0.360 |
 | `ccx63` | 48 (dedicated, Intel) | 192 GB | 960 GB | 0.126 | €0.126 | €0.504 |
 
-The default for `sim-run` is now `cx32` (see "Hardware sizing"); `train`
+The default for `sim-run` is now `cx33` (see "Hardware sizing"); `train`
 still defaults to `ccx33` for multi-core training. Update the table at
 `lib/common.sh:PRICE_TABLE_EUR_PER_HOUR` when Hetzner adjusts prices.
 

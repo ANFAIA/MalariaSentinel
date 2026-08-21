@@ -63,7 +63,7 @@ sim_run() {
   local name="$1" repo="$2" repo_url="$3" branch="$4" aoi="$5" year="$6" month="$7"
   local days="$8" seed="$9" n_rollouts="${10}" snapshot_every="${11}" run_name="${12}"
   local gif="${13}" data_ready="${14}" cmd="${15}" pull_to="${16}" keep_vm="${17}" vm_type="${18}"
-  vm_type="${vm_type:-cx32}"
+  vm_type="${vm_type:-cx33}"
 
   _ensure_local_path "repo" "$repo"
   if [[ -n "$data_ready" ]]; then

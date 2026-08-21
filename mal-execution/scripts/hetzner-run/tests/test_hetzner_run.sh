@@ -231,8 +231,8 @@ assert_contains "cost ccx33×1" "€0.030" "$LAST_OUT"
 run_with_timeout "cost ccx63 1h" "$MAIN" cost --type ccx63 --hours 1
 assert_contains "cost ccx63×1" "€0.126" "$LAST_OUT"
 
-run_with_timeout "cost cx22 1h" "$MAIN" cost --type cx22 --hours 1
-assert_contains "cost cx22×1" "€0.011" "$LAST_OUT"
+run_with_timeout "cost cx23 1h" "$MAIN" cost --type cx23 --hours 1
+assert_contains "cost cx23×1" "€0.0106" "$LAST_OUT"
 
 # 7. cost --list.
 hdr "cost --list"
@@ -242,7 +242,7 @@ if [[ "$LAST_RC" == "0" ]]; then
 else
   bad "cost --list exit $LAST_RC"
 fi
-for t in ccx33 cpx62 cx22 cx32 ccx43 ccx63; do
+for t in ccx33 cx23 cx33 ccx43 ccx63; do
   assert_contains "cost --list includes $t" "$t" "$LAST_OUT"
 done
 

@@ -168,10 +168,10 @@ REPO
 
 VM TYPE (hardware)
   A single-rollout ABM uses ~1 core and ~2 GB RAM, so ccx33 (8 cores/32 GB)
-  is overkill. Default cx32 (4 shared cores/8 GB, €0.018/h) fits comfortably.
+  is overkill. Default cx33 (4 shared cores/8 GB, €0.0165/h) fits comfortably.
   Scale up only for --n-rollouts ensembles or very long runs:
-    cx22  €0.011/h   2 shared cores / 4 GB   (tight but enough for 1 rollout)
-    cx32  €0.018/h   4 shared cores / 8 GB   (default; recommended)
+    cx23  €0.0106/h  2 shared cores / 4 GB   (tight but enough for 1 rollout)
+    cx33  €0.0165/h  4 shared cores / 8 GB   (default; recommended)
     ccx33 €0.030/h   8 dedicated cores / 32 GB (ensembles, --n-rollouts>1)
 
 DATA FLAG
@@ -186,7 +186,7 @@ DEFAULTS
   --repo            <monorepo root> (auto-detected)
   --repo-url        <git origin of --repo>
   --branch          <current branch of --repo>
-  --vm-type         cx32
+  --vm-type         cx33
   --aoi             ghana
   --year            2024
   --month           1
@@ -321,7 +321,7 @@ cmd_sim_run() {
   local name="" repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
   local repo_url="" branch="" data_ready="" cmd="" pull_to="" keep_vm=0
   local aoi="ghana" year="2024" month="1" days="731" seed="1"
-  local n_rollouts="1" snapshot_every="7" run_name="" gif=0 vm_type="cx32"
+  local n_rollouts="1" snapshot_every="7" run_name="" gif=0 vm_type="cx33"
   while (( $# )); do
     case "$1" in
       --name)          name="$2"; shift 2 ;;

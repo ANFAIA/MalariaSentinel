@@ -165,12 +165,8 @@ remove_cache() {
 
 # Price table (€/h) for known server types. Add new types here.
 PRICE_TABLE_EUR_PER_HOUR='{
-  "cx22":  0.011,
-  "cx32":  0.018,
-  "cpx22": 0.020,
-  "cpx32": 0.040,
-  "cpx52": 0.125,
-  "cpx62": 0.252,
+  "cx23":  0.0106,
+  "cx33":  0.0165,
   "ccx13": 0.018,
   "ccx23": 0.030,
   "ccx33": 0.030,
