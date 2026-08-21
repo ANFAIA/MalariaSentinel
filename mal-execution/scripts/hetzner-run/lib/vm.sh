@@ -37,16 +37,25 @@ start_vm() {
   log_info "create call returned; waiting for status=running…"
 
   # Poll describe until status is running and we have an IPv4. Hetzner can
-  # take 2-4 min to reach running, so allow 300s (not 120).
-  local poll_status_cmd
-  poll_status_cmd='hcloud server describe "$1" --output json 2>/dev/null | jq -e ".status == \"running\" and .public_net.ipv4.ip != null and .public_net.ipv4.ip != \"\""'
-  if ! wait_until 2 300 "$poll_status_cmd" "$name"; then
-    die "server '$name' did not reach status=running within 300s"
+  # take 2-4 min to reach running, so allow 300s. This uses a real bash
+  # function instead of an eval'd string: the old `eval` form broke on the
+  # embedded double-quote-empty (`!= ""`) and always failed, so the VM was
+  # reported as not-running and left running.
+  local elapsed=0 ip=""
+  while (( elapsed <= 300 )); do
+    local st
+    st="$(hcloud server describe "$name" --output json 2>/dev/null \
+        | jq -r 'select(.status == "running") | .public_net.ipv4.ip // empty' 2>/dev/null || true)"
+    if [[ -n "$st" && "$st" != "null" ]]; then
+      ip="$st"
+      break
+    fi
+    sleep 2
+    elapsed=$(( elapsed + 2 ))
+  done
+  if [[ -z "$ip" ]]; then
+    die "server '$name' did not reach status=running with an IPv4 within 300s"
   fi
-
-  local ip
-  ip="$(hcloud server describe "$name" --output json | jq -r '.public_net.ipv4.ip')"
-  [[ -n "$ip" && "$ip" != "null" ]] || die "no IPv4 assigned to '$name'"
 
   log_info "server '$name' is running at $ip; waiting for SSH…"
   local ssh_id_args
