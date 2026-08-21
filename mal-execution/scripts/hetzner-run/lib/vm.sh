@@ -36,11 +36,12 @@ start_vm() {
   fi
   log_info "create call returned; waiting for status=running…"
 
-  # Poll describe until status is running and we have an IPv4.
+  # Poll describe until status is running and we have an IPv4. Hetzner can
+  # take 2-4 min to reach running, so allow 300s (not 120).
   local poll_status_cmd
   poll_status_cmd='hcloud server describe "$1" --output json 2>/dev/null | jq -e ".status == \"running\" and .public_net.ipv4.ip != null and .public_net.ipv4.ip != \"\""'
-  if ! wait_until 2 120 "$poll_status_cmd" "$name"; then
-    die "server '$name' did not reach status=running within 120s"
+  if ! wait_until 2 300 "$poll_status_cmd" "$name"; then
+    die "server '$name' did not reach status=running within 300s"
   fi
 
   local ip
