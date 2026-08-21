@@ -53,11 +53,10 @@ runcmd:
   - systemctl mask unattended-upgrades.service || true
   - |
     # Install uv (https://docs.astral.sh/uv/) for root. The standalone
-    # installer places it under $HOME/.local/bin. PIN the version to 0.6.13:
-    # newer uv (>=0.12) installs the workspace ROOT (which pulls torch) even
-    # with `--package mal-core --group abm`, so the lightweight profile
-    # breaks. 0.6.x resolves only the selected package + group.
-    curl -LsSf https://astral.sh/uv/0.6.13/install.sh | sh
+    # installer places it under $HOME/.local/bin; symlink into /usr/local/bin
+    # so it is on the default PATH. Use the LATEST installer: pinning an old
+    # version (0.6.13) silently failed to install on the VM.
+    curl -LsSf https://astral.sh/uv/install.sh | sh
     ln -sf /root/.local/bin/uv /usr/local/bin/uv || true
   - mkdir -p /work/code /work/data /work/runs
   - chmod 755 /work /work/code /work/data /work/runs
