@@ -54,7 +54,7 @@ _build_sim_cmd() {
     sync_args="$sync_args --group download --group ingest"
     cmd="cd /work/code/$repo_name && uv sync $sync_args && bash mal-core/src/mal_core/abm/build.sh && uv run malariasim download --aoi $aoi && uv run malariasim ingest --aoi $aoi --year $year --month $month --data-dir data/$aoi --output-dir data/$aoi && "
   fi
-  cmd="$cmd uv run malariasim abm --aoi $aoi --year $year --month $month --days $days --seed $seed --n-rollouts $n_rollouts --snapshot-every $snapshot_every --output-dir runs/abm/$run_name$gif_flag"
+  cmd="$cmd uv run malariasim abm --aoi $aoi --year $year --month $month --days $days --seed $seed --n-rollouts $n_rollouts --snapshot-every $snapshot_every --timeout 172800 --output-dir runs/abm/$run_name$gif_flag"
   printf '%s' "$cmd"
 }
 
