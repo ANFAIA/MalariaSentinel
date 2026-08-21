@@ -188,7 +188,17 @@ def main(argv: list[str] | None = None) -> None:
         print(f"error: no state_dayNNN.tif files found in {args.run_dir}", file=sys.stderr)
         sys.exit(1)
 
-    cohort_path = args.cohort_log or (args.run_dir / "cohort.json")
+    # Auto-detect the cohort log. The default is <run-dir>/cohort.json, but
+    # run_abm_from_manifest writes <stem>_seedNNNN_cohort.json (e.g.
+    # ghana_abm_seed0001_cohort.json). Fall back to the first matching
+    # *_cohort.json so the population panel is never silently empty.
+    cohort_path = args.cohort_log
+    if cohort_path is None:
+        cohort_path = args.run_dir / "cohort.json"
+        if not cohort_path.exists():
+            matches = sorted(args.run_dir.glob("*_cohort.json"))
+            if matches:
+                cohort_path = matches[0]
     cohort = load_cohort(cohort_path) if cohort_path.exists() else None
     if cohort is None:
         print(f"warning: {cohort_path} not found; population panel will be empty", file=sys.stderr)
