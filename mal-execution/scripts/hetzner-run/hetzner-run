@@ -354,7 +354,10 @@ cmd_sim_run() {
     run_name="$(printf '%s-%s-%s-seed%04d' "$aoi" "$year" "$month" "$seed")"
   fi
   if [[ -z "$pull_to" ]]; then
-    pull_to="./runs/abm/$run_name"
+    # Resolve relative to the repo root (not the CWD of the launch), so the
+    # results land in <repo>/runs/abm/<run-name> regardless of where the CLI
+    # was invoked from.
+    pull_to="$(cd "$repo" && pwd)/runs/abm/$run_name"
   fi
   sim_run "$name" "$repo" "$repo_url" "$branch" "$aoi" "$year" "$month" \
     "$days" "$seed" "$n_rollouts" "$snapshot_every" "$run_name" "$gif" \
