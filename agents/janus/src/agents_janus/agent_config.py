@@ -37,6 +37,7 @@ class AgentSpec(BaseModel):
     tools: tuple[str, ...] = ()
     deny_tools: tuple[str, ...] = ()
     edits_allow: tuple[str, ...] = ()
+    edits_deny: tuple[str, ...] = ()
     middleware: tuple[str, ...] = ()
     thread_id_prefix: str | None = None
 

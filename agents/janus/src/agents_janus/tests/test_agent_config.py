@@ -12,6 +12,14 @@ def test_single_declarative_config_loads():
     assert "mcp__gitagent__edit_file" in config.agents["abm"].tools
 
 
+def test_generic_agent_owns_unassigned_paths_only():
+    config = load_agent_configuration()
+    generic = config.agents["generic"]
+    assert generic.edits_allow == ("**",)
+    assert "mal-commonlib/**" in generic.edits_deny
+    assert "agents/janus/**" in generic.edits_deny
+
+
 def test_unknown_server_is_rejected(tmp_path: Path):
     path = tmp_path / "agents.yaml"
     path.write_text(

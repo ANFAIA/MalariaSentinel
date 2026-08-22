@@ -56,6 +56,17 @@ def dynamic_vmax(arr: np.ndarray, percentile: float = 99.0) -> float:
     return float(np.percentile(nz, percentile))
 
 
+def moving_average(values: list[int], window: int = 7) -> np.ndarray:
+    """Return trailing mean, preserving one value per simulation day."""
+    values_arr = np.asarray(values, dtype=float)
+    if len(values_arr) < 2 or window <= 1:
+        return values_arr
+    kernel = np.ones(min(window, len(values_arr)))
+    return np.convolve(values_arr, kernel, mode="same") / np.convolve(
+        np.ones(len(values_arr)), kernel, mode="same"
+    )
+
+
 def make_frame(
     density: np.ndarray,
     suitability: np.ndarray,
@@ -67,12 +78,13 @@ def make_frame(
     suit_cmap: str,
 ) -> Image.Image:
     """Build a single frame as a PIL Image."""
-    fig = plt.figure(figsize=(14, 7), dpi=100)
-    gs = fig.add_gridspec(2, 2, height_ratios=[3, 1], hspace=0.3, wspace=0.25)
+    fig = plt.figure(figsize=(14, 8), dpi=100)
+    gs = fig.add_gridspec(2, 2, height_ratios=[2.2, 1.8], hspace=0.42, wspace=0.28)
 
     ax_d = fig.add_subplot(gs[0, 0])
     ax_s = fig.add_subplot(gs[0, 1])
-    ax_p = fig.add_subplot(gs[1, :])
+    ax_a = fig.add_subplot(gs[1, 0])
+    ax_q = fig.add_subplot(gs[1, 1])
 
     # density heatmap
     im_d = ax_d.imshow(density, cmap=density_cmap, norm=density_norm, origin="lower")
@@ -88,34 +100,46 @@ def make_frame(
     if cohort and "daily" in cohort:
         daily = cohort["daily"]
         days = [d["day"] for d in daily]
-        alive = [d["n_alive"] for d in daily]
         adults = [d["n_adults"] for d in daily]
         larvae = [d["n_larvae"] for d in daily]
         eggs = [d.get("n_eggs", 0) for d in daily]
         pupae = [d.get("n_pupae", 0) for d in daily]
 
-        ax_p.plot(days, alive, label="alive", color="#1f77b4")
-        ax_p.plot(days, adults, label="adults", color="#ff7f0e")
-        ax_p.plot(days, larvae, label="larvae", color="#2ca02c")
-        ax_p.plot(days, eggs, label="eggs", color="#d62728")
-        ax_p.plot(days, pupae, label="pupae", color="#9467bd")
+        # Keep daily values visible, but use a trailing weekly mean for trend.
+        adult_color = "#1565c0"
+        ax_a.plot(days, adults, color=adult_color, alpha=0.28, linewidth=0.8)
+        ax_a.plot(days, moving_average(adults), label="adults (7d mean)",
+                  color=adult_color, linewidth=2.0)
+        ax_a.set_title("Adult mosquitoes")
+        ax_a.set_ylabel("Count (log scale)")
+        ax_a.set_yscale("log")
 
-        # vertical line at current day
-        if 1 <= day_idx <= len(days):
-            ax_p.axvline(day_idx, color="red", linestyle="--", alpha=0.6)
+        aquatic = (("eggs", eggs, "#d97706"), ("larvae", larvae, "#238636"),
+                   ("pupae", pupae, "#7c3aed"))
+        for label, values, color in aquatic:
+            daily_values = np.asarray(values, dtype=float)
+            daily_values[daily_values <= 0] = np.nan
+            ax_q.plot(days, daily_values, color=color, alpha=0.22, linewidth=0.8)
+            trend = moving_average(values)
+            trend[trend <= 0] = np.nan
+            ax_q.plot(days, trend, label=f"{label} (7d mean)", color=color,
+                      linewidth=2.0)
+        ax_q.set_title("Aquatic stages")
+        ax_q.set_yscale("log")
 
-        ax_p.set_xlabel("Day")
-        ax_p.set_ylabel("Population (log)")
-        # Aquatic stages (eggs/larvae) are 10-50x the adult count (each
-        # female lays ~100-200 eggs/cycle). A linear axis squashes the adult
-        # line to the bottom; symlog keeps 0-visible and both scales readable.
-        ax_p.set_yscale("symlog")
-        ax_p.legend(loc="upper left", fontsize="small")
-        ax_p.set_title("Population dynamics")
+        for axis in (ax_a, ax_q):
+            axis.set_xlim(days[0], days[-1])
+            axis.grid(True, which="both", alpha=0.18, linewidth=0.6)
+            axis.axvline(day_idx, color="#dc2626", linestyle="--", alpha=0.65,
+                         linewidth=1.2)
+            axis.set_xlabel("Day")
+            axis.legend(loc="upper left", fontsize="small", framealpha=0.9)
+
     else:
-        ax_p.text(0.5, 0.5, "No cohort.json", ha="center", va="center",
-                  transform=ax_p.transAxes, fontsize=12, color="gray")
-        ax_p.set_axis_off()
+        for axis in (ax_a, ax_q):
+            axis.text(0.5, 0.5, "No cohort.json", ha="center", va="center",
+                      transform=axis.transAxes, fontsize=12, color="gray")
+            axis.set_axis_off()
 
     fig.tight_layout()
 

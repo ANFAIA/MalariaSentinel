@@ -42,6 +42,19 @@ def test_multiple_tasks_reuse_session():
     assert len(start.calls) == 1
 
 
+def test_session_survives_fresh_contextvar_between_tool_calls():
+    start = FakeTool({"session_id": "s_stable"})
+    middleware = GawtSessionMiddleware(feature="fix malaria", start_tool=start)
+
+    middleware.wrap_tool_call(request("task"), lambda _: None)
+    middleware._session_open.set(False)
+    middleware._session_id.set(None)
+    middleware.wrap_tool_call(request("task"), lambda _: None)
+
+    assert len(start.calls) == 1
+    assert middleware.session_id == "s_stable"
+
+
 def test_existing_session_skips_start():
     start = FakeTool({"session_id": "new"})
     get = FakeTool({"session_id": "existing"})
@@ -117,6 +130,60 @@ def test_monitoring_tools_receive_current_session_id():
     assert seen == {"session_id": "s_monitor"}
 
 
+def test_all_worker_gawt_calls_receive_current_session_id():
+    start = FakeTool({"session_id": "s_worker"})
+    middleware = GawtSessionMiddleware(feature="test", start_tool=start)
+    middleware.wrap_tool_call(request("task"), lambda _: None)
+
+    seen = []
+    for name in (
+        "mcp__gitagent__start_intent",
+        "mcp__gitagent__read_file",
+        "mcp__gitagent__write_file",
+        "mcp__gitagent__get_current_intent",
+    ):
+        req = SimpleNamespace(tool_call={"name": name, "args": {}})
+        req.override = lambda **kwargs: SimpleNamespace(**kwargs)
+        middleware.wrap_tool_call(req, lambda rewritten: seen.append(rewritten.tool_call["args"]))
+
+    assert seen == [{"session_id": "s_worker"}] * 4
+
+
+def test_fake_tool_markup_is_rejected():
+    start = FakeTool({"session_id": "s_fake"})
+    middleware = GawtSessionMiddleware(feature="test", start_tool=start)
+
+    try:
+        middleware.wrap_tool_call(
+            request("task"),
+            lambda _: "<tool_call><tool_name>ls</tool_name></tool_call>",
+        )
+    except RuntimeError as exc:
+        assert "serialized tool-call markup" in str(exc)
+    else:
+        raise AssertionError("fake tool markup must fail closed")
+
+
+def test_snapshot_status_error_fails_closed():
+    start = FakeTool({"session_id": "s_snapshot"})
+    middleware = GawtSessionMiddleware(feature="test", start_tool=start)
+    middleware.wrap_tool_call(request("task"), lambda _: None)
+    req = SimpleNamespace(
+        tool_call={"name": "mcp__gitagent__snapshot_status", "args": {}},
+    )
+    req.override = lambda **kwargs: SimpleNamespace(**kwargs)
+
+    try:
+        middleware.wrap_tool_call(
+            req,
+            lambda _: "Error executing tool snapshot_status: missing worktree",
+        )
+    except RuntimeError as exc:
+        assert "snapshot_status failed" in str(exc)
+    else:
+        raise AssertionError("snapshot errors must stop the coordinator")
+
+
 def test_model_start_session_is_clamped_and_propagated():
     """Legacy/model calls cannot request lock TTL above 15 seconds."""
     start = FakeTool({"session_id": "s_clamped"})
@@ -130,17 +197,20 @@ def test_model_start_session_is_clamped_and_propagated():
     request_obj.override = lambda **kwargs: SimpleNamespace(**kwargs)
 
     seen = {}
-    middleware.wrap_tool_call(
-        request_obj,
-        lambda rewritten: (seen.update(rewritten.tool_call["args"]) or {"session_id": "s_clamped"}),
-    )
+    try:
+        middleware.wrap_tool_call(
+            request_obj,
+            lambda rewritten: (seen.update(rewritten.tool_call["args"]) or {"session_id": "s_clamped"}),
+        )
 
-    assert seen == {
-        "feature": "test",
-        "target_branch": "main",
-        "lock_ttl_seconds": 15,
-    }
-    assert middleware.session_id == "s_clamped"
+        assert seen == {
+            "feature": "test",
+            "target_branch": "main",
+            "lock_ttl_seconds": 15,
+        }
+        assert middleware.session_id == "s_clamped"
+    finally:
+        middleware.abort()
 
 
 class _Tool:

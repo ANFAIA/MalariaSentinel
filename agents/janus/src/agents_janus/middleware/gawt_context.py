@@ -77,9 +77,22 @@ class GawtContextMiddleware(AgentMiddleware):
     # Tools that require session_id injection (gawt 0.6.0 multi-session).
     _SESSION_TOOLS = (
         "register_agent",
+        "unregister_agent",
         "snapshot_session",
         "snapshot_status",
         "abort_session",
+        "get_session",
+        "list_agents",
+        "list_edits",
+        "list_intents",
+        "list_snapshots",
+        "start_intent",
+        "repurpose",
+        "get_current_intent",
+        "read_file",
+        "edit_file",
+        "write_file",
+        "delete_file",
     )
 
     def __init__(self, *, role: str, register_tool: Any, unregister_tool: Any | None = None) -> None:
@@ -155,7 +168,11 @@ class GawtContextMiddleware(AgentMiddleware):
             state.get("gawt_agent_id") if isinstance(state, dict) else None
         ) or self._agent_id.get()
         if agent_id is not None and self.unregister_tool is not None:
-            self.unregister_tool.invoke({"agent_id": agent_id})
+            args: dict[str, Any] = {"agent_id": agent_id}
+            sid = self.session_id
+            if sid:
+                args["session_id"] = sid
+            self.unregister_tool.invoke(args)
         token = self._agent_token.get()
         if token is not None:
             self._agent_id.reset(token)

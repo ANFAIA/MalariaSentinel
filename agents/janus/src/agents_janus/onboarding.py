@@ -90,6 +90,9 @@ def run_onboarding(
     messages: list[dict] = []
 
     def _cleanup():
+        obs = getattr(agent_mod, "OBSERVABILITY_MIDDLEWARE", None)
+        if obs is not None:
+            obs.close()
         agent_mod.SESSION_LOGGER = None
         session_mw = getattr(agent_mod, "GAWT_SESSION_MIDDLEWARE", None)
         if session_mw is not None:

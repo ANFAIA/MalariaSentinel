@@ -33,3 +33,22 @@ def test_dispatch_middleware_rewrites_only_task_description():
     assert rewritten.tool_call["args"]["description"] == (
         "Edit test/collision_test.txt"
     )
+
+
+def test_router_allows_only_one_coordinator_dispatch():
+    middleware = DispatchPathMiddleware(max_coordinator_dispatches=1)
+    request = SimpleNamespace(
+        tool_call={
+            "name": "task",
+            "id": "call-1",
+            "args": {"subagent_type": "implementation_coordinator", "description": "x"},
+        },
+    )
+    request.override = lambda **kwargs: SimpleNamespace(**kwargs)
+    seen = []
+
+    middleware.wrap_tool_call(request, lambda rewritten: seen.append(rewritten))
+    rejection = middleware.wrap_tool_call(request, lambda _: seen.append("unexpected"))
+
+    assert len(seen) == 1
+    assert "already selected one coordinator" in rejection.content

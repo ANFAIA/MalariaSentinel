@@ -28,6 +28,7 @@ from __future__ import annotations
 import os
 import threading
 import time
+from contextlib import nullcontext
 from typing import Any
 
 from langchain.agents.middleware.types import AgentMiddleware
@@ -141,6 +142,7 @@ class ObservabilityMiddleware(AgentMiddleware):
         self._env = env or os.environ.get("JANUS_ENV", "dev")
         self._iteration = iteration
         self._mode = mode  # request_router | research_coordinator | implementation_coordinator
+        self._gawt_session_id: str | None = None
 
         # Thread-local agent role — each subagent thread gets its own role
         # without cross-contamination when dispatching in parallel.
@@ -177,6 +179,22 @@ class ObservabilityMiddleware(AgentMiddleware):
         """
         self._current_agent_role = role
 
+    def set_session_id(self, session_id: str | None) -> None:
+        """Associate Langfuse observations with current GAWT session."""
+        if session_id:
+            self._gawt_session_id = str(session_id)
+
+    def _langfuse_session_context(self):
+        """Provide Langfuse trace session attribution for each observation."""
+        session_id = self._gawt_session_id or self.logger.session_dir.name
+        if not self.langfuse:
+            return nullcontext()
+        try:
+            from langfuse import propagate_attributes
+            return propagate_attributes(session_id=session_id)
+        except Exception:
+            return nullcontext()
+
     def get_trace_url(self) -> str | None:
         """Return the Langfuse trace URL for this session, or None."""
         if not self.langfuse or not self._lf_trace_id:
@@ -187,6 +205,26 @@ class ObservabilityMiddleware(AgentMiddleware):
         if not host:
             return None
         return f"{host.rstrip('/')}/trace/{self._lf_trace_id}"
+
+    def close(self) -> None:
+        """Close open Langfuse observations when graph exits with an error."""
+        if not self.langfuse:
+            return
+        for role in list(self._lf_dispatch_spans):
+            self.end_dispatch_span(role, error="run terminated before agent completion")
+        if self._lf_root_span is not None:
+            try:
+                self._lf_root_span.update(
+                    metadata={"closed_by_cleanup": True},
+                    output={"summary": "Run terminated; cleanup closed root observation"},
+                )
+                self._lf_root_span.end()
+            except Exception as exc:
+                self._log_langfuse_error("close.root_span", _LangfuseErrorMarker(exc))
+        try:
+            self.langfuse.flush()
+        except Exception as exc:
+            self._log_langfuse_error("close.flush", _LangfuseErrorMarker(exc))
 
     # ------------------------------------------------------------------
     # Helpers
@@ -233,17 +271,18 @@ class ObservabilityMiddleware(AgentMiddleware):
         if not self.langfuse or self._trace_context is None:
             return
         try:
-            span = self.langfuse.start_observation(
-                as_type="span",
-                name=f"dispatch:{agent_role}",
-                input={"task": task[:500]} if task else None,
-                metadata={
-                    "agent_role": agent_role,
-                    "stage": "dispatch",
-                    "tags": [f"agent:{agent_role}", f"env:{self._env}", "stage:dispatch"],
-                },
-                trace_context=self._trace_context,
-            )
+            with self._langfuse_session_context():
+                span = self.langfuse.start_observation(
+                    as_type="span",
+                    name=f"dispatch:{agent_role}",
+                    input={"task": task[:500]} if task else None,
+                    metadata={
+                        "agent_role": agent_role,
+                        "stage": "dispatch",
+                        "tags": [f"agent:{agent_role}", f"env:{self._env}", "stage:dispatch"],
+                    },
+                    trace_context=self._trace_context,
+                )
             self._lf_dispatch_spans[agent_role] = span
         except Exception as e:
             self._log_langfuse_error(f"start_dispatch({agent_role})", _LangfuseErrorMarker(e))
@@ -292,7 +331,7 @@ class ObservabilityMiddleware(AgentMiddleware):
 
         if self.langfuse:
             try:
-                session_id = self.logger.session_dir.name
+                session_id = self._gawt_session_id or self.logger.session_dir.name
                 initial_content = ""
                 if messages and hasattr(messages[-1], "content"):
                     content = messages[-1].content
@@ -323,11 +362,12 @@ class ObservabilityMiddleware(AgentMiddleware):
                 # avoids "Failed to detach context" when subagents run
                 # in parallel threads with different ContextVars).
                 root_metadata["tags"] = base_tags
-                self._lf_root_span = self.langfuse.start_observation(
-                    as_type="span",
-                    name="janus_session",
-                    metadata=root_metadata,
-                )
+                with self._langfuse_session_context():
+                    self._lf_root_span = self.langfuse.start_observation(
+                        as_type="span",
+                        name="janus_session",
+                        metadata=root_metadata,
+                    )
                 self._lf_trace_id = getattr(self._lf_root_span, "trace_id", None)
                 self._lf_root_span_id = getattr(self._lf_root_span, "id", None)
 
@@ -346,6 +386,34 @@ class ObservabilityMiddleware(AgentMiddleware):
                 self._lf_trace_id = None
                 self._lf_root_span_id = None
                 self._trace_context = None
+
+    def record_router_decision(
+        self, *, request: str, route: str, model: str, latency_s: float
+    ) -> None:
+        """Record one-shot router classification without agent middleware."""
+        if not self.langfuse or self._trace_context is None:
+            return
+        try:
+            with self._langfuse_session_context():
+                observation = self.langfuse.start_observation(
+                    as_type="generation",
+                    name="llm:request_router",
+                    model=model,
+                    input=[{"role": "user", "content": request[:1000]}],
+                    output={"route": route},
+                    metadata={
+                        "agent_role": "request_router",
+                        "tags": self._build_base_tags(["stage:route", "tool:llm"]),
+                        "latency_s": round(latency_s, 3),
+                    },
+                    trace_context=self._trace_context,
+                )
+                observation.end()
+            self.langfuse.flush()
+        except Exception as exc:
+            self._log_langfuse_error(
+                "record_router_decision", _LangfuseErrorMarker(exc)
+            )
 
     def after_agent(self, state, runtime):
         elapsed = time.monotonic() - self._agent_start_time if self._agent_start_time else 0
@@ -456,20 +524,21 @@ class ObservabilityMiddleware(AgentMiddleware):
                 if hasattr(request, "model"):
                     model_name = getattr(request.model, "model_name", None) or str(request.model)
 
-                lf_gen = self.langfuse.start_observation(
-                    as_type="generation",
-                    name=f"llm:{self._current_agent_role}",
-                    model=model_name,
-                    input=[{"role": "system", "content": str(request.system_message)[:500]}
-                           ] + [{"role": "user", "content": str(m.content)[:300]}
-                                for m in request.messages[-3:] if hasattr(m, "content")],
-                    metadata={
-                        "step": self._llm_call_count + 1,
-                        "agent_role": self._current_agent_role,
-                        "tags": tags,
-                    },
-                    trace_context=ctx,
-                )
+                with self._langfuse_session_context():
+                    lf_gen = self.langfuse.start_observation(
+                        as_type="generation",
+                        name=f"llm:{self._current_agent_role}",
+                        model=model_name,
+                        input=[{"role": "system", "content": str(request.system_message)[:500]}
+                               ] + [{"role": "user", "content": str(m.content)[:300]}
+                                    for m in request.messages[-3:] if hasattr(m, "content")],
+                        metadata={
+                            "step": self._llm_call_count + 1,
+                            "agent_role": self._current_agent_role,
+                            "tags": tags,
+                        },
+                        trace_context=ctx,
+                    )
             except Exception as e:
                 self._log_langfuse_error("start_observation(generation)", _LangfuseErrorMarker(e))
 
@@ -611,18 +680,19 @@ class ObservabilityMiddleware(AgentMiddleware):
 
                 ctx = self._get_dispatch_context(self._current_agent_role)
 
-                tool_span = self.langfuse.start_observation(
-                    as_type="span",
-                    name=f"tool:{tool_name}",
-                    input={"args": _safe_repr(tool_args)},
-                    metadata={
-                        "tool_name": tool_name,
-                        "tool_category": tool_category,
-                        "agent_role": self._current_agent_role,
-                        "tags": tags,
-                    },
-                    trace_context=ctx,
-                )
+                with self._langfuse_session_context():
+                    tool_span = self.langfuse.start_observation(
+                        as_type="span",
+                        name=f"tool:{tool_name}",
+                        input={"args": _safe_repr(tool_args)},
+                        metadata={
+                            "tool_name": tool_name,
+                            "tool_category": tool_category,
+                            "agent_role": self._current_agent_role,
+                            "tags": tags,
+                        },
+                        trace_context=ctx,
+                    )
             except Exception as e:
                 self._log_langfuse_error("tool.start_observation(span)", _LangfuseErrorMarker(e))
 

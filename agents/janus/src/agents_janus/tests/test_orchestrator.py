@@ -6,7 +6,9 @@ from agents_janus.agent import (
     _get_implementation_tools,
     _get_research_tools,
     _render_prompt,
+    _create_request_router,
 )
+from langchain_core.messages import AIMessage
 
 
 class TestModuleFlags:
@@ -53,3 +55,50 @@ class TestGetTools:
 
     def test_implementation_tools_not_empty(self):
         assert _get_implementation_tools()
+
+
+class _Classifier:
+    def __init__(self, route):
+        self.route = route
+        self.calls = []
+
+    def invoke(self, messages):
+        self.calls.append(messages)
+        return type("Decision", (), {"route": self.route})()
+
+
+class _RouterLLM:
+    def __init__(self, classifier):
+        self.classifier = classifier
+
+    def with_structured_output(self, _schema):
+        return self.classifier
+
+
+class _Child:
+    def __init__(self, text):
+        self.text = text
+        self.calls = []
+
+    def invoke(self, state, config=None):
+        self.calls.append((state, config))
+        return {"messages": [AIMessage(content=self.text)]}
+
+
+def test_request_router_classifies_once_and_dispatches_original_request():
+    classifier = _Classifier("implementation_coordinator")
+    research = _Child("research")
+    implementation = _Child("implementation")
+    router = _create_request_router(
+        _RouterLLM(classifier), research, implementation
+    )
+
+    result = router.invoke(
+        {"messages": [{"role": "user", "content": "Edit file"}]},
+        config={"configurable": {"thread_id": "router-test"}},
+    )
+
+    assert len(classifier.calls) == 1
+    assert not research.calls
+    assert implementation.calls[0][0]["messages"][0].content == "Edit file"
+    assert result["messages"][-1].content == "implementation"

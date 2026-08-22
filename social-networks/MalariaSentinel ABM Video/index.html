@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>MalariaSentinel — Data flow</title>
+  <style>
+    @font-face { font-family:"Space Grotesk"; font-weight:300 700; src:url("fonts/space-grotesk-latin.woff2") format("woff2"); }
+    :root { --bg:#2F404F; --deep:#283845; --surface:#3A4D5C; --fg:#F0F1EE; --muted:#C7DAD3; --dim:#B0BCC2; --accent:#3894A1; --bright:#6EC8D4; --rule:rgba(240,241,238,.16); }
+    * { box-sizing:border-box; margin:0; padding:0; }
+    html,body { width:1080px; height:1350px; overflow:hidden; background:var(--bg); color:var(--fg); font-family:"Space Grotesk",sans-serif; }
+    [data-composition-id="root"] { position:relative; width:1080px; height:1350px; overflow:hidden; background:var(--bg); }
+    .texture { position:absolute; inset:0; opacity:.5; background-image:linear-gradient(rgba(240,241,238,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(240,241,238,.025) 1px,transparent 1px); background-size:80px 80px; }
+    .glow { position:absolute; width:760px; height:760px; border-radius:50%; background:radial-gradient(circle,rgba(56,148,161,.27),rgba(56,148,161,0) 68%); pointer-events:none; }
+    .header,.footer { position:absolute; left:80px; right:80px; z-index:30; display:flex; justify-content:space-between; align-items:center; font:500 17px/1 monospace; letter-spacing:.14em; color:var(--dim); text-transform:uppercase; }
+    .header { top:62px; } .footer { bottom:62px; font-size:14px; }
+    .header .mark:before { content:""; display:inline-block; width:8px; height:8px; margin:0 12px 1px 0; border-radius:50%; background:var(--bright); box-shadow:0 0 14px var(--bright); }
+    .header .counter { color:var(--bright); }
+    .rule { position:absolute; left:80px; right:80px; height:1px; background:var(--rule); z-index:30; } .rule.top{top:100px}.rule.bottom{bottom:100px}
+    .viewport { position:absolute; left:0; top:0; width:1080px; height:1350px; overflow:hidden; }
+    .rail { position:absolute; left:0; top:0; width:6400px; height:1350px; will-change:transform; }
+    .rail-glow { position:absolute; left:430px; top:140px; width:900px; height:900px; border-radius:50%; background:radial-gradient(circle,rgba(56,148,161,.18),transparent 68%); }
+    .path-layer { position:absolute; left:0; top:0; width:6400px; height:1350px; overflow:visible; pointer-events:none; }
+    .path-layer path { fill:none; stroke:var(--accent); stroke-width:5; stroke-linecap:round; stroke-dasharray:14 18; opacity:.7; }
+    .packet { position:absolute; width:24px; height:24px; margin:-12px; border-radius:50%; background:var(--bright); box-shadow:0 0 28px var(--bright); z-index:10; }
+    .node { position:absolute; top:145px; width:920px; height:1020px; padding:56px 58px; display:flex; flex-direction:column; gap:22px; background:rgba(47,64,79,.92); border:2px solid var(--rule); box-shadow:0 22px 70px rgba(20,30,38,.22); }
+    .node[data-index="0"] { left:80px; } .node[data-index="1"] { left:1240px; } .node[data-index="2"] { left:2400px; } .node[data-index="3"] { left:3560px; } .node[data-index="4"] { left:4720px; }
+    .node:after { content:""; position:absolute; inset:18px; border:1px solid rgba(110,200,212,.12); pointer-events:none; }
+    .eyebrow { color:var(--bright); font:500 18px/1 monospace; letter-spacing:.16em; text-transform:uppercase; }
+    h1,h2,h3 { font-weight:700; letter-spacing:-.055em; line-height:.98; } h1{font-size:100px} h2{font-size:68px;max-width:800px} h3{font-size:40px;}
+    .node h2 { margin-top:0; } .lead { margin-top:6px; max-width:760px; color:var(--muted); font-size:31px; line-height:1.2; }
+    .data-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:64px; }
+    .data-chip { min-height:145px; padding:22px; border-left:5px solid var(--bright); background:rgba(58,77,92,.9); }
+    .data-chip strong { display:block; font-size:28px; } .data-chip span { display:block; margin-top:10px; color:var(--muted); font:17px/1.25 monospace; }
+    .caption { position:absolute; bottom:48px; left:58px; color:var(--dim); font:16px monospace; letter-spacing:.08em; }
+    .transform-stack { display:flex; flex-direction:column; gap:16px; margin-top:64px; }
+    .transform-row { display:grid; grid-template-columns:230px 1fr; align-items:center; gap:22px; min-height:120px; padding:20px 24px; background:rgba(58,77,92,.88); border-left:5px solid var(--accent); }
+    .transform-row strong { font-size:29px; } .transform-row span { color:var(--muted); font-size:24px; } .transform-row code { color:var(--bright); font:16px monospace; }
+    .abm-node { padding:48px 48px; } .abm-node h2 { margin-top:0; font-size:57px; max-width:820px; }
+    .abm-body { display:grid; grid-template-columns:1fr; gap:22px; margin-top:34px; }
+    .stage-list { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
+    .stage { padding:14px 16px; background:rgba(58,77,92,.9); border-top:4px solid var(--bright); }
+    .stage strong { display:block; font-size:22px; } .stage span { display:block; margin-top:5px; color:var(--muted); font:14px monospace; }
+    .video-slot { height:570px; padding:14px; border:2px solid var(--bright); background:var(--deep); box-shadow:0 0 45px rgba(56,148,161,.24); }
+    .video-slot .video-label { display:flex; justify-content:space-between; margin-bottom:10px; color:var(--bright); font:14px monospace; letter-spacing:.08em; }
+    #abm-video { position:absolute; left:2448px; top:650px; z-index:12; width:824px; height:auto; border:1px solid var(--rule); }
+    .abm-node .caption { top:470px; bottom:auto; color:var(--muted); }
+    .output-stack { display:flex; flex-direction:column; gap:18px; margin-top:72px; }
+    .output-card { min-height:150px; padding:25px 28px; display:grid; grid-template-columns:260px 1fr; align-items:center; gap:24px; background:rgba(58,77,92,.9); border-left:6px solid var(--bright); }
+    .output-card strong { font-size:32px; } .output-card span { color:var(--muted); font-size:24px; }
+    .next-grid { display:grid; grid-template-columns:1fr 1fr; gap:18px; margin-top:72px; }
+    .next-card { min-height:300px; padding:28px; background:rgba(58,77,92,.9); border-top:5px solid var(--bright); }
+    .next-card h3 { font-size:32px; } .next-card ul { list-style:none; margin-top:20px; color:var(--muted); font-size:24px; line-height:1.6; } .next-card li:before { content:"→"; color:var(--bright); margin-right:12px; }
+    .node[data-index="4"] .lead { max-width:700px; }
+    .transition { position:absolute; inset:0; z-index:40; background:var(--deep); opacity:0; pointer-events:none; }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/MotionPathPlugin.min.js"></script>
+</head>
+<body>
+  <div data-composition-id="root" data-width="1080" data-height="1350" data-duration="60" data-start="0" data-track-index="0">
+    <div class="texture"></div><div class="header"><span class="mark">MALARIASENTINEL</span><span class="counter">01 / 05</span></div><div class="footer"><span>SPATIAL DECISION SUPPORT</span><span>ANFAIA</span></div><div class="rule top"></div><div class="rule bottom"></div>
+    <div class="viewport">
+      <div class="rail" data-layout-allow-overflow="true"><div class="rail-glow"></div>
+        <svg class="path-layer" viewBox="0 0 6400 1350"><path id="flow-1" d="M1000 650 C1100 650 1120 650 1240 650"/><path id="flow-2" d="M2160 650 C2260 650 2300 650 2400 650"/><path id="flow-3" d="M3320 650 C3420 650 3460 650 3560 650"/><path id="flow-4" d="M4480 650 C4580 650 4620 650 4720 650"/></svg>
+        <div class="packet" id="packet-1" style="left:1000px;top:650px"></div><div class="packet" id="packet-2" style="left:2160px;top:650px"></div><div class="packet" id="packet-3" style="left:3320px;top:650px"></div><div class="packet" id="packet-4" style="left:4480px;top:650px"></div>
+        <section class="node" data-index="0"><div class="glow" style="left:420px;top:-260px"></div><span class="eyebrow">01 · collect</span><h1>Start with<br>the region.</h1><p class="lead">A decision-support system begins with many incomplete signals.</p><div class="data-grid"><div class="data-chip"><strong>Weather</strong><span>temperature · rainfall<br>humidity · wind</span></div><div class="data-chip"><strong>Terrain</strong><span>elevation · water<br>land cover</span></div><div class="data-chip"><strong>People</strong><span>host density<br>spatial context</span></div><div class="data-chip"><strong>Surveillance</strong><span>observations<br>epidemiological data</span></div></div><p class="caption">Different sources. One place. One timeline.</p></section>
+        <section class="node" data-index="1"><span class="eyebrow">02 · align</span><h2>Turn fragments<br>into a shared state.</h2><div class="transform-stack"><div class="transform-row"><strong>Ingest</strong><span>Download and register datasets</span><code>manifest</code></div><div class="transform-row"><strong>Normalize</strong><span>Put every signal on same grid</span><code>tensor</code></div><div class="transform-row"><strong>Suitability</strong><span>Estimate where mosquitoes can thrive</span><code>field</code></div></div><p class="caption">The map is no longer a picture. It is a state the model can evolve.</p></section>
+        <section class="node abm-node" data-index="2"><span class="eyebrow">03 · simulate</span><h2>The mosquito ecology unfolds, day by day.</h2><div class="abm-body"><div class="stage-list"><div class="stage"><strong>Adults</strong><span>agents</span></div><div class="stage"><strong>Eggs</strong><span>aquatic</span></div><div class="stage"><strong>Larvae</strong><span>aquatic</span></div><div class="stage"><strong>Pupae</strong><span>aquatic</span></div><div class="stage"><strong>Feeding</strong><span>host seeking</span></div><div class="stage"><strong>Dispersal</strong><span>spatial</span></div></div><div class="video-slot"></div></div><p class="caption">Temperature, habitat, survival and reproduction shape each transition.</p></section>
+        <section class="node" data-index="3"><span class="eyebrow">04 · learn</span><h2>Simulation becomes<br>training data.</h2><div class="output-stack"><div class="output-card"><strong>Snapshots</strong><span>Spatial states across time</span></div><div class="output-card"><strong>Cohorts</strong><span>Eggs, larvae, pupae and adults</span></div><div class="output-card"><strong>Surrogate model</strong><span>Fast inference from learned dynamics</span></div></div><p class="caption">Slow biological detail first. Fast operational inference next.</p></section>
+        <section class="node" data-index="4"><span class="eyebrow">05 · next</span><h2>From mosquito ecology<br>to malaria risk.</h2><p class="lead">The next connection is transmission.</p><div class="next-grid"><div class="next-card"><h3>Build next</h3><ul><li>Vector infection: SEI</li><li>Human infection: SEIR</li><li>Interventions</li></ul></div><div class="next-card"><h3>Validate</h3><ul><li>Field observations</li><li>Spatial calibration</li><li>Operational testing</li></ul></div></div><p class="caption">A system for any endemic region.</p></section>
+      </div>
+    </div>
+    <video id="abm-video" src="assets/abm-visualization.mp4" muted playsinline data-start="17" data-duration="28" data-track-index="2"></video>
+    <div class="transition" id="transition"></div>
+  </div>
+  <script>
+    window.__timelines = window.__timelines || {};
+    gsap.registerPlugin(MotionPathPlugin);
+    const tl = gsap.timeline({paused:true});
+    const stops = [0, 7, 17, 45, 54];
+    const cameras = [0, -1160, -2320, -3480, -4640];
+    const nodes = gsap.utils.toArray(".node");
+    tl.set(".rail", {x:0});
+    nodes.forEach((node,i)=>{
+      const t=stops[i];
+      tl.from(node,{scale:.94,opacity:0,duration:.6,ease:"power3.out"},t+.25);
+      if(i===0){tl.from(node.querySelector("h1"),{y:42,opacity:0,duration:.7,ease:"power3.out"},t+.4);tl.from(node.querySelector(".lead"),{y:25,opacity:0,duration:.55,ease:"power2.out"},t+1);tl.from(node.querySelectorAll(".data-chip"),{y:25,opacity:0,duration:.45,stagger:.12,ease:"back.out(1.25)"},t+1.4)}
+      if(i===1){tl.from(node.querySelector("h2"),{x:-36,opacity:0,duration:.6,ease:"expo.out"},t+.4);tl.from(node.querySelectorAll(".transform-row"),{x:-28,opacity:0,duration:.46,stagger:.16,ease:"back.out(1.25)"},t+1.1)}
+      if(i===2){tl.from(node.querySelector("h2"),{y:30,opacity:0,duration:.6,ease:"power3.out"},t+.35);tl.from(node.querySelectorAll(".stage"),{y:20,opacity:0,duration:.35,stagger:.08,ease:"power2.out"},t+1);tl.from(node.querySelector(".video-slot"),{scale:.96,opacity:0,duration:.7,ease:"back.out(1.2)"},t+1.15)}
+      if(i===3){tl.from(node.querySelector("h2"),{y:30,opacity:0,duration:.6,ease:"power3.out"},t+.35);tl.from(node.querySelectorAll(".output-card"),{y:28,opacity:0,duration:.5,stagger:.15,ease:"back.out(1.2)"},t+1.1)}
+      if(i===4){tl.from(node.querySelector("h2"),{y:32,opacity:0,duration:.6,ease:"power3.out"},t+.35);tl.from(node.querySelector(".lead"),{y:20,opacity:0,duration:.5,ease:"power2.out"},t+1);tl.from(node.querySelectorAll(".next-card"),{y:26,opacity:0,duration:.52,stagger:.15,ease:"back.out(1.2)"},t+1.35)}
+      if(i<4){
+        tl.to(".rail",{x:cameras[i+1],duration:1.15,ease:"power3.inOut"},stops[i+1]-.9);
+        tl.to("#abm-video",{x:cameras[i+1],duration:1.15,ease:"power3.inOut"},stops[i+1]-.9);
+      }
+    });
+    ["01 / 05", "02 / 05", "03 / 05", "04 / 05", "05 / 05"].forEach((label, i) => {
+      tl.add(() => { document.querySelector(".counter").textContent = label; }, stops[i] + .2);
+    });
+    [1,2,3,4].forEach((n,i)=>{tl.to(`#packet-${n}`,{motionPath:{path:`#flow-${n}`,align:`#flow-${n}`,alignOrigin:[.5,.5]},duration:1.35,ease:"power2.inOut"},stops[i]+.1)});
+    tl.to("#transition",{opacity:1,duration:.6,ease:"power2.inOut"},59.4);
+    window.__timelines.root=tl;
+  </script>
+</body>
+</html>

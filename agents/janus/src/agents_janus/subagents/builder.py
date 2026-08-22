@@ -56,6 +56,7 @@ def build_subagent_prompt(
         task=spec.description,
         manifest_path="agents/janus/src/agents_janus/config/agents.yaml",
         edits_allow=list(spec.edits_allow),
+        edits_deny=list(spec.edits_deny),
         skills=list(spec.skills),
         depends_on=[],
         spec_text=spec_text,

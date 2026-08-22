@@ -14,7 +14,7 @@ import logging
 import os
 import sys
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 _log = logging.getLogger("agents_janus.agent")
 
@@ -36,7 +36,7 @@ from agents_janus.observability import (
     ObservabilityMiddleware,
     SubAgentObservabilityMiddleware,
 )
-from agents_janus.scope_guard import guard_gawt_tools
+from agents_janus.scope_guard import ScopeViolationMiddleware, guard_gawt_tools
 
 # Module-level flags set by CLI before creating the agent
 VERIFY_FINALIZE: bool = True
@@ -215,12 +215,88 @@ def _get_research_tools():
 
 
 def _get_router_tools():
-    """Minimal tools for the request router.
-
-    The router only receives user input and delegates to one coordinator via
-    deepagents' built-in task tool. It must not inspect or edit the repository.
-    """
+    """Router has no tools; graph edge performs deterministic dispatch."""
     return []
+
+
+def _create_request_router(
+    llm,
+    research_agent=None,
+    implementation_agent=None,
+    *,
+    child_factory=None,
+    router_obs=None,
+    model_name="unknown",
+):
+    """Build one-shot classifier graph around coordinator runnables."""
+    from pydantic import BaseModel, Field
+    from langchain_core.messages import HumanMessage
+    from langchain_core.runnables import RunnableConfig
+    from langgraph.graph import END, START, MessagesState, StateGraph
+
+    class RouteDecision(BaseModel):
+        route: Literal["research_coordinator", "implementation_coordinator"] = Field(
+            description="Coordinator that must receive original user request"
+        )
+
+    class RouterState(MessagesState):
+        route: str
+
+    classifier = llm.with_structured_output(RouteDecision)
+    route_prompt = _render_prompt("request_router")
+
+    def route_node(state: RouterState) -> dict[str, str]:
+        user_messages = [
+            message for message in state["messages"]
+            if getattr(message, "type", None) == "human"
+            or (isinstance(message, dict) and message.get("role") == "user")
+        ]
+        if not user_messages:
+            raise ValueError("request router requires user message")
+        import time
+        if router_obs is not None:
+            router_obs.before_agent(state, None)
+        started = time.monotonic()
+        decision = classifier.invoke([
+            HumanMessage(content=f"{route_prompt}\n\nUser request:\n{user_messages[-1].content}"),
+        ])
+        if router_obs is not None:
+            router_obs.record_router_decision(
+                request=str(user_messages[-1].content),
+                route=decision.route,
+                model=str(getattr(llm, "model_name", None) or model_name),
+                latency_s=time.monotonic() - started,
+            )
+            router_obs.after_agent(state, None)
+        return {"route": decision.route}
+
+    def dispatch_node(state: RouterState, config: RunnableConfig) -> dict[str, Any]:
+        if child_factory is not None:
+            child = child_factory(state["route"])
+        else:
+            child = (
+                research_agent
+                if state["route"] == "research_coordinator"
+                else implementation_agent
+            )
+        if child is None:
+            raise RuntimeError(f"No coordinator configured for route {state['route']!r}")
+        user_message = next(
+            message
+            for message in reversed(state["messages"])
+            if getattr(message, "type", None) == "human"
+            or (isinstance(message, dict) and message.get("role") == "user")
+        )
+        result = child.invoke({"messages": [user_message]}, config=config)
+        return {"messages": result.get("messages", [])}
+
+    graph = StateGraph(RouterState)
+    graph.add_node("route", route_node)
+    graph.add_node("dispatch", dispatch_node)
+    graph.add_edge(START, "route")
+    graph.add_edge("route", "dispatch")
+    graph.add_edge("dispatch", END)
+    return graph.compile(checkpointer=_checkpointer())
 
 
 MEMORY_FILES = [str(AGENT_DIR / "AGENTS.md")]
@@ -320,30 +396,7 @@ def create_orchestrator(
 
     # Request router is intentionally minimal: its children own all capabilities.
     if mode == "request_router":
-        from deepagents import CompiledSubAgent
-
-        research_agent = create_orchestrator(
-            provider=provider,
-            model=model,
-            thread_id=f"{thread_id}-research",
-            langfuse_client=langfuse_client,
-            mode="research_coordinator",
-            goal=goal,
-            env=env,
-            iteration=iteration,
-        )
-        implementation_agent = create_orchestrator(
-            provider=provider,
-            model=model,
-            thread_id=f"{thread_id}-implementation",
-            langfuse_client=langfuse_client,
-            mode="implementation_coordinator",
-            goal=goal,
-            env=env,
-            iteration=iteration,
-        )
-
-        router_middleware = []
+        children: dict[str, Any] = {}
         router_obs = None
         if SESSION_LOGGER is not None:
             router_obs = ObservabilityMiddleware(
@@ -355,41 +408,30 @@ def create_orchestrator(
                 iteration=iteration,
                 mode=mode,
             )
-            OBSERVABILITY_MIDDLEWARE = router_obs
 
-        router_middleware.append(
-            ToolExposureMiddleware(
-                allowed_backend_tools=frozenset(),
-                excluded_tools=frozenset({"write_todos"}),
-                allowed_tools=frozenset({"task"}),
-            )
-        )
-        router_middleware.append(DispatchPathMiddleware())
-        if router_obs is not None:
-            router_middleware.append(router_obs)
+        def child_factory(route: str):
+            if route not in children:
+                children[route] = create_orchestrator(
+                    provider=provider,
+                    model=model,
+                    thread_id=f"{thread_id}-{route.removesuffix('_coordinator')}",
+                    langfuse_client=langfuse_client,
+                    mode=cast(
+                        Literal["research_coordinator", "implementation_coordinator"],
+                        route,
+                    ),
+                    goal=goal,
+                    env=env,
+                    iteration=iteration,
+                )
+            return children[route]
 
-        router = create_deep_agent(
-            model=llm,
-            tools=_get_router_tools(),
-            subagents=[
-                CompiledSubAgent(
-                    name="research_coordinator",
-                    description="Researches and explains the system. Never edits files.",
-                    runnable=research_agent,
-                ),
-                CompiledSubAgent(
-                    name="implementation_coordinator",
-                    description="Plans and implements repository changes through GAWT.",
-                    runnable=implementation_agent,
-                ),
-            ],
-            system_prompt=_render_prompt(mode),
-            skills=None,
-            name="janus-request-router",
-            middleware=router_middleware,
-            checkpointer=_checkpointer(),
+        return _create_request_router(
+            llm,
+            child_factory=child_factory,
+            router_obs=router_obs,
+            model_name=model,
         )
-        return router
 
     # MalariasimShellBackend exposes the built-in `execute` tool (bash) but
     # restricts it to `malariasim` commands via a policy hook. Filesystem
@@ -495,6 +537,7 @@ def create_orchestrator(
             get_tool=get_session_tool,
             abort_tool=abort_session_tool,
             context_middlewares=gawt_context_mws,
+            on_session_open=obs.set_session_id if obs is not None else None,
         )
         middleware.insert(0, session_mw)
         global GAWT_SESSION_MIDDLEWARE
@@ -506,7 +549,9 @@ def create_orchestrator(
         policy = agent_configuration.agents[name]
         all_tools = available_tools
         selected_tools = resolve_tools(all_tools, policy, agent_configuration)
-        selected_tools = guard_gawt_tools(selected_tools, policy.edits_allow)
+        selected_tools = guard_gawt_tools(
+            selected_tools, policy.edits_allow, policy.edits_deny
+        )
         if mode == "research_coordinator":
             selected_tools = [
                 t for t in selected_tools
@@ -528,6 +573,8 @@ def create_orchestrator(
                 excluded_tools=frozenset({"write_todos"}),
             )
         ]
+        if mode != "research_coordinator":
+            worker_middleware.append(ScopeViolationMiddleware())
         if mode != "research_coordinator" and register_tool is not None:
             ctx_mw = GawtContextMiddleware(
                 role=policy.effective_gawt_role,

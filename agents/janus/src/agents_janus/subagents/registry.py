@@ -53,6 +53,7 @@ def load_registry(config_path: Path | None = None) -> Registry:
             spec_path=entry.spec,
             skills=tuple(entry.skills),
             edits_allow=tuple(entry.edits_allow),
+            edits_deny=tuple(entry.edits_deny),
             thread_id_prefix=entry.thread_id_prefix or defaults.thread_id_prefix,
             gawt_role=entry.gawt_role,
             kind=entry.kind,

@@ -181,6 +181,9 @@ def run_improvement(
             session_mw.abort()
         raise
     finally:
+        obs = getattr(agent_mod, "OBSERVABILITY_MIDDLEWARE", None)
+        if obs is not None:
+            obs.close()
         session_mw = getattr(agent_mod, "GAWT_SESSION_MIDDLEWARE", None)
         if session_mw is not None:
             session_mw.abort()

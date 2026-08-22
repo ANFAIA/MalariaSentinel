@@ -33,12 +33,12 @@ dependencies = [
     "typer>=0.12",
     "uvicorn>=0.30",
     "xarray>=2024.7",
-    "gawt>=0.6.0",
+    "gawt>=0.6.3",
 ]
 
 [dependency-groups]
 dev = [
-    "gawt>=0.6.0",
+    "gawt>=0.6.3",
 ]
 
 [tool.uv]

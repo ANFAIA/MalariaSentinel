@@ -51,7 +51,10 @@ def test_identity_is_registered_for_each_task_invocation():
     middleware.after_agent({}, None)
 
     assert register.calls == [{"role": "commonlib"}, {"role": "commonlib"}]
-    assert unregister.calls == [{"agent_id": "a_red"}, {"agent_id": "a_blue"}]
+    assert unregister.calls == [
+        {"agent_id": "a_red"},
+        {"agent_id": "a_blue"},
+    ]
 
 
 def test_before_model_registers_nested_child():
@@ -94,12 +97,19 @@ def test_session_id_injected_into_register_agent():
 
 
 def test_session_id_injected_into_session_scoped_tools():
-    """snapshot_session, snapshot_status, abort_session get session_id."""
+    """All worker GAWT calls receive current session_id."""
     register = _Tool([{"agent_id": "a1", "session_id": "s_xyz"}])
     middleware = GawtContextMiddleware(role="abm", register_tool=register)
     middleware.before_agent({}, None)
 
-    for tool_name in ("mcp__gitagent__snapshot_session", "mcp__gitagent__snapshot_status", "mcp__gitagent__abort_session"):
+    for tool_name in (
+        "mcp__gitagent__snapshot_session",
+        "mcp__gitagent__snapshot_status",
+        "mcp__gitagent__abort_session",
+        "mcp__gitagent__start_intent",
+        "mcp__gitagent__read_file",
+        "mcp__gitagent__write_file",
+    ):
         request = _request(tool_name, {})
         seen = {}
         middleware.wrap_tool_call(request, lambda rewritten: seen.update(rewritten.tool_call["args"]))

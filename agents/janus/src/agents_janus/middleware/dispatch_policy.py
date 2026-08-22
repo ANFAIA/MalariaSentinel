@@ -2,9 +2,11 @@
 from __future__ import annotations
 
 import re
+import threading
 from typing import Any
 
 from langchain.agents.middleware.types import AgentMiddleware
+from langchain_core.messages import ToolMessage
 
 
 # GAWT paths are relative to its one shared worktree. Keep punctuation outside
@@ -36,6 +38,30 @@ def _tool_name(request: Any) -> str:
 class DispatchPathMiddleware(AgentMiddleware):
     """Normalize paths in child-task descriptions before model dispatch."""
 
+    def __init__(self, *, max_coordinator_dispatches: int | None = None):
+        super().__init__()
+        self.max_coordinator_dispatches = max_coordinator_dispatches
+        self._coordinator_dispatches = 0
+        self._dispatch_lock = threading.Lock()
+
+    def _reject_duplicate_coordinator(self, request: Any) -> ToolMessage | None:
+        if self.max_coordinator_dispatches is None or _tool_name(request) != "task":
+            return None
+        args = dict(request.tool_call.get("args") or {})
+        if args.get("subagent_type") not in {"research_coordinator", "implementation_coordinator"}:
+            return None
+        with self._dispatch_lock:
+            if self._coordinator_dispatches >= self.max_coordinator_dispatches:
+                return ToolMessage(
+                    content=(
+                        "Coordinator dispatch rejected: this router request already selected one coordinator. "
+                        "Do not dispatch another coordinator; return the selected coordinator result."
+                    ),
+                    tool_call_id=request.tool_call.get("id", ""),
+                )
+            self._coordinator_dispatches += 1
+        return None
+
     @staticmethod
     def _rewrite(request: Any) -> Any:
         if _tool_name(request) != "task":
@@ -48,7 +74,13 @@ class DispatchPathMiddleware(AgentMiddleware):
         return request.override(tool_call=call)
 
     def wrap_tool_call(self, request: Any, handler: Any) -> Any:
+        rejection = self._reject_duplicate_coordinator(request)
+        if rejection is not None:
+            return rejection
         return handler(self._rewrite(request))
 
     async def awrap_tool_call(self, request: Any, handler: Any) -> Any:
+        rejection = self._reject_duplicate_coordinator(request)
+        if rejection is not None:
+            return rejection
         return await handler(self._rewrite(request))
