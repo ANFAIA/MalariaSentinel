@@ -6,29 +6,36 @@
 
 ## Visual language
 
-- `bg`: #2F404F
-- `bg-deep`: #283845
-- `surface`: #3A4D5C
-- `fg`: #F0F1EE
-- `muted`: #C7DAD3
-- `dim`: #B0BCC2
-- `accent`: #3894A1 (lines, borders, glow)
-- `bright`: #6EC8D4 (labels and active data)
-- Font: Space Grotesk, local WOFF2
-- Mono: system monospace fallback
+- `bg`: #15222E (slate dark blue)
+- `bg-deep`: #0D1720
+- `surface`: rgba(27, 43, 57, 0.9)
+- `fg`: #F1F5F9
+- `muted`: #CBD5E1
+- `dim`: #94A3B8
+- `accent`: #0EA5E9 (cyan blue)
+- `bright`: #38BDF8 (electric sky)
+- `neon`: #5EE2E6 (glow active)
+- `mint`: #34D399 (verified state)
+- Font: Space Grotesk (local WOFF2)
+- Monospace: system monospace
 
 ## Story
 
-1. 0-7s: Question. Environmental data is fragmented.
-2. 7-17s: Data enters as a spatial stream and becomes analysis-ready tensors.
-3. 17-27s: Suitability turns those tensors into a living environmental field.
-4. 27-45s: The mosquito ABM evolves adults, eggs, larvae, pupae, development, mortality, feeding, oviposition, and dispersal. Its output is the hero MP4 asset.
-5. 45-54s: Daily snapshots and cohort data become a synthetic dataset for a fast surrogate model.
-6. 54-60s: Next step: couple vector infection and human SEIR dynamics for malaria transmission risk.
+1. 0-7s: Stage 01 · Multi-Source Signals. 6 heterogeneous environmental streams (ERA5 Climate, DEM Topography, Copernicus Land, Hydrology, WorldPop Hosts, DHIS2 Surveillance) converge into the Ingestion Engine conduit.
+2. 7-17s: Stage 02 · Ingestion Pipeline & Standardization. Connection to the Ingestion Engine: manifest integrity validation, 10km standard grid tensor resampling, and dynamic breeding suitability index $S(x,y,t)$.
+3. 17-45s: Stage 03 · Simulation Engine. Hero ABM run across 731 days in Ghana (2024–2025).
+   - Top: 6 mechanistic physical & biological model drivers (Thermal development Brière-1, Pool hydrology Penman-Monteith, Gonotrophic cycle, Wind dispersal, Host preference, Washout & mortality).
+   - Video with Vox-style callout annotations (Map, Aquatic development, Adult population) that highlight the components, then fade out for clean simulation run.
+   - Bottom: Simple direct explanation for non-experts.
+4. 45-54s: Stage 04 · Surrogate AI. Distilling 731 days of synthetic ABM data into fast spatial neural surrogates (<50ms, 10,000x acceleration).
+5. 54-60s: Stage 05 · Active Roadmap & Horizons.
+   - Immediate next step: SEI vector sporogony + SEIR human transmission model coupling.
+   - Neural operator integration (U-Net, FNO).
+   - Multi-species expansion (*An. funestus*, *An. gambiae s.s.*) and field validation.
 
 ## Motion
 
-Data nodes travel left to right on curved SVG paths. Each transformation keeps one visible data token and changes its label. The ABM asset is a video clip inside a framed node, with a synchronized day counter. Use entrance animations on every scene and fade transitions between scenes.
+One oversized horizontal rail carries logical blocks. The camera travels left to right instead of cutting between slides. Input packets converge into INGEST, then continue through the pipeline. Each stop is a single vertical mobile-safe panel without an outer slide frame. The ABM asset is a full-width video clip layered over its slot; the camera settles and zooms into it before continuing.
 
 ## Honest framing
 
