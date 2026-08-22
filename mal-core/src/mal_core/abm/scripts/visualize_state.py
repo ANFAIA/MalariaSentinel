@@ -105,7 +105,11 @@ def make_frame(
             ax_p.axvline(day_idx, color="red", linestyle="--", alpha=0.6)
 
         ax_p.set_xlabel("Day")
-        ax_p.set_ylabel("Population")
+        ax_p.set_ylabel("Population (log)")
+        # Aquatic stages (eggs/larvae) are 10-50x the adult count (each
+        # female lays ~100-200 eggs/cycle). A linear axis squashes the adult
+        # line to the bottom; symlog keeps 0-visible and both scales readable.
+        ax_p.set_yscale("symlog")
         ax_p.legend(loc="upper left", fontsize="small")
         ax_p.set_title("Population dynamics")
     else:
