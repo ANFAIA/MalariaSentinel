@@ -22,7 +22,9 @@ class CppAbmWrapper:
         build_path = pkg_dir / "build" / "src" / "mal_abm_fast"
         if build_path.exists():
             return build_path
-        raise FileNotFoundError(f"ABM binary not found. Run: bash {pkg_dir / 'build.sh'}")
+        raise FileNotFoundError(
+            f"ABM binary not found. Run: malariasim abm --compile (or bash {pkg_dir / 'build.sh'})"
+        )
 
     def _introspect_flags(self) -> dict[str, dict[str, Any]]:
         try:

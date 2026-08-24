@@ -30,6 +30,9 @@ Each stage reads artefacts written by the previous stage:
 ### Example: sequential run
 
 ```bash
+# Optional: compile C++ ABM engine (can be run from anywhere)
+malariasim abm --compile
+
 malariasim download --aoi ghana --years 2024,2025
 malariasim ingest --aoi ghana --year 2024 --month 6
 malariasim abm --aoi ghana --year 2024 --month 6 --days 90 --seed 1

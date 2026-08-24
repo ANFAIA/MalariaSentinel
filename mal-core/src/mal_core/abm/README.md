@@ -36,7 +36,16 @@ reference (`mal_ghana_sim.abm`). All F1 acceptance criteria are met:
 | `CMakeLists.txt` | Top-level CMake |
 | `docs/wire-spec.md` | Single source of truth for data contracts (424 lines) |
 
-## Build (macOS / local dev)
+## Build (via malariasim CLI)
+
+From anywhere in the repo (or from an environment with `mal_core` installed):
+
+```bash
+malariasim abm --compile           # Configure and build
+malariasim abm --compile --clean   # Clean build directory before building
+```
+
+## Build (macOS / local dev manual)
 
 ```bash
 brew install cmake ninja pkg-config gdal eigen cli11 nlohmann-json googletest

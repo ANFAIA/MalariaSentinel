@@ -199,37 +199,78 @@ def ingest(
 
 @app.command()
 def abm(
-    aoi: str = typer.Option(..., "--aoi", help="AOI slug"),
-    year: int = typer.Option(2024, "--year"),
-    month: int = typer.Option(1, "--month"),
-    seed: int = typer.Option(1, "--seed"),
-    days: int = typer.Option(30, "--days"),
-    n_rollouts: int = typer.Option(1, "--n-rollouts"),
+    aoi: str | None = typer.Option(None, "--aoi", help="AOI slug (e.g. ghana). Required for simulation."),
+    year: int = typer.Option(2024, "--year", help="Simulation start year."),
+    month: int = typer.Option(1, "--month", help="Simulation start month."),
+    seed: int = typer.Option(1, "--seed", help="PRNG seed for reproducibility."),
+    days: int = typer.Option(30, "--days", help="Simulation duration in days."),
+    n_rollouts: int = typer.Option(1, "--n-rollouts", help="Parallel rollouts for ensemble runs."),
     snapshot_every: int = typer.Option(1, "--snapshot-every", help="Snapshot interval in days (0=final only)."),
     cohort_log: Path | None = typer.Option(None, "--cohort-log", help="Daily cohort JSON path."),
     timeout: int = typer.Option(3600, "--timeout", help="Subprocess timeout in seconds."),
-    output_dir: Path = typer.Option(Path("runs/abm"), "--output-dir"),
-    data_root: Path | None = typer.Option(None, "--data-root", help="Root containing AOI manifest"),
+    output_dir: Path = typer.Option(Path("runs/abm"), "--output-dir", help="Output directory for simulation results."),
+    data_root: Path | None = typer.Option(None, "--data-root", help="Root containing AOI manifest."),
     gif: bool = typer.Option(False, "--gif", help="Auto-generate an animation GIF after the run."),
+    compile: bool = typer.Option(False, "--compile", "-c", help="Compile the C++ ABM engine (mal_abm_fast) from source."),
+    clean: bool = typer.Option(False, "--clean", help="Clean build directory before compiling (used with --compile)."),
 ) -> None:
-    """Run the agent-based malaria simulation.
+    """Run the agent-based malaria simulation or compile the C++ engine.
 
     Simulates Anopheles gambiae population dynamics, dispersal,
     and transmission potential using the mal_abm_fast C++ engine.
 
-    Key parameters:
+    Compilation:
+      malariasim abm --compile              # Compile the C++ ABM engine from any directory
+      malariasim abm --compile --clean      # Clean recompile from scratch
+      malariasim abm --compile --aoi ghana  # Compile then run simulation
+
+    Simulation parameters:
+      --aoi: AOI slug (e.g. ghana; required when not compiling only)
       --days: One continuous simulation (default 30, max 731; 2024+2025 = 731)
       --n-rollouts: Parallel rollouts for ensemble runs
       --seed: PRNG seed for reproducibility
       --snapshot-every: Intermediate output interval
       --cohort-log: Daily eggs/larvae/pupae/adult statistics JSON
+      --gif: Auto-generate an animation GIF after the run
 
     Use one invocation for multi-year runs. Splitting by month loses
     population, aquatic cohort, and engine state.
     """
+    if compile:
+        from .abm import compile_abm
+
+        typer.echo("Compiling C++ ABM engine (mal_abm_fast)...")
+        success, message = compile_abm(clean=clean)
+        if not success:
+            typer.echo(f"Compilation failed:\n{message}", err=True)
+            raise typer.Exit(code=1)
+        typer.echo(f"Compilation successful: {message}")
+        if not aoi:
+            return
+
+    if not aoi:
+        typer.echo(
+            "Error: Missing option '--aoi'. Specify --aoi <slug> to run simulation, "
+            "or pass --compile to build the engine.",
+            err=True,
+        )
+        raise typer.Exit(code=1)
+
     from .abm import run_abm_from_manifest
 
-    result = run_abm_from_manifest(aoi=aoi, year=year, month=month, seed=seed, days=days, n_rollouts=n_rollouts, snapshot_every=snapshot_every, cohort_log=cohort_log, timeout=timeout, output_dir=output_dir, data_root=data_root)
+    result = run_abm_from_manifest(
+        aoi=aoi,
+        year=year,
+        month=month,
+        seed=seed,
+        days=days,
+        n_rollouts=n_rollouts,
+        snapshot_every=snapshot_every,
+        cohort_log=cohort_log,
+        timeout=timeout,
+        output_dir=output_dir,
+        data_root=data_root,
+    )
     typer.echo(f"ABM result: {result}")
 
     if gif:

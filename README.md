@@ -54,6 +54,9 @@ MalariaSentinel/
 ## Running the Ghana Simulation (ABM pipeline)
 
 ```bash
+# Build C++ simulation engine (can be run from anywhere)
+uv run malariasim abm --compile
+
 uv run malariasim download --aoi ghana --datasets era5 --outputs wind_6hourly --years 2024,2025
 uv run malariasim ingest --aoi ghana --year 2024 --month 6
 uv run malariasim abm --aoi ghana --days 30
