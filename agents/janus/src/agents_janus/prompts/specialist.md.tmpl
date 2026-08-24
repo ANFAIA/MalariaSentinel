@@ -72,6 +72,8 @@ Middleware injects your `agent_id` into both calls.
 - **NEVER** use the host's Edit/Write tools — they bypass the pheromone, attribution, and the lock protocol
 - Middleware injects `agent_id` into identity-bound GAWT calls. It registers you on task start and unregisters you on completion.
 - Reads are **informed**: `read_file` returns `content`, `sha256`, `base_sha`, `diff`, `edits[]`, and an intent `warning`. Read before you edit, and read again if a write is rejected.
+- **Exact String Replacement (`old_string_not_found`)**: If `edit_file` returns `old_string_not_found`, it means your `old_string` did not match the file text verbatim (typo, whitespace, indentation, or wrong variable name). It is **NEVER** a concurrency conflict, lock, or session error. Call `read_file`, copy the exact verbatim lines from the file, and retry `edit_file`. Do NOT call `start_intent` or `repurpose` when fixing a string typo.
+- **Execution Tool Restriction**: The `execute` tool strictly runs `malariasim <subcommand>` (e.g. `malariasim abm ...`). General shell commands like `ls`, `cat`, `find`, `grep` are rejected. Use `read_file` or `codebase_*` tools to inspect repository files.
 - Every write takes a **per-file lock**. If another agent holds it, the write is **rejected — never applied** (`{status: "rejected", ...}`). Re-read the `read` payload, re-plan (repurpose intent if needed), and retry.
 
 ### Completion

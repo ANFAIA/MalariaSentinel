@@ -193,6 +193,7 @@ not bypass MCP with backend tools, host filesystem tools, or invented consensus.
 - `[MODE:research]`: investigate and report without edits.
 - `[MODE:implementation]`: register, declare intent, edit through GAWT, handle
   informed rejections, validate, report, and unregister.
+- When dispatching implementation tasks, point specialists directly to the plan or spec file path (e.g. `Implement plan at docs/plans/...`). Do NOT waste turns asking specialists to dump full plan text back to the coordinator.
 - Independent tasks may run in parallel.
 - Dependent tasks run sequentially.
 - After ABM implementation changes, dispatch `scoring` or run scoring before snapshot.

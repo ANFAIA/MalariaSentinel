@@ -19,7 +19,7 @@ Before reading files, use these pre-indexed code graph tools — they answer in 
 ## Compiling and Running the ABM pipeline
 
 Use the `execute` tool to run and compile the pipeline via the `malariasim` CLI
-(the only shell command available to you):
+(the only shell command available to you — general bash commands like `ls`, `cat`, `find`, `grep`, or shell pipes `|` are strictly blocked. Use `read_file` to inspect files):
 
 ### Compiling C++ Engine
 When editing C++ files inside a gawt worktree (`.gitagent/worktree`), compile the isolated worktree binary:

@@ -191,7 +191,8 @@ class GawtSessionMiddleware(AgentMiddleware):
             call = dict(request.tool_call)
             args = dict(call.get("args") or {})
             if self.session_id:
-                args.setdefault("session_id", self.session_id)
+                if not args.get("session_id") or args.get("session_id") == "default":
+                    args["session_id"] = self.session_id
                 request = request.override(tool_call={**call, "args": args})
         if name == "mcp__gitagent__start_session":
             call = dict(request.tool_call)
@@ -219,7 +220,8 @@ class GawtSessionMiddleware(AgentMiddleware):
             call = dict(request.tool_call)
             args = dict(call.get("args") or {})
             if self.session_id:
-                args.setdefault("session_id", self.session_id)
+                if not args.get("session_id") or args.get("session_id") == "default":
+                    args["session_id"] = self.session_id
                 request = request.override(tool_call={**call, "args": args})
         if name == "mcp__gitagent__start_session":
             call = dict(request.tool_call)

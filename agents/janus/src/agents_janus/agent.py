@@ -113,9 +113,8 @@ def _wrap_with_logging(tool_func):
 def _checkpointer():
     """Create the in-memory checkpointer for the orchestrator graph.
 
-    resolve_conflict forks the conversation via get_state/update_state/invoke,
-    which require a checkpointer. deepagents' create_deep_agent accepts a
-    checkpointer but doesn't default to one.
+    deepagents' create_deep_agent accepts a checkpointer for state persistence
+    and resuming conversations.
     """
     try:
         from langgraph.checkpoint.memory import MemorySaver
@@ -490,10 +489,6 @@ def create_orchestrator(
     from agents_janus.subagents.registry import load_registry
     from agents_janus.tool_catalog import resolve_tools
     from agents_janus.tools.ask_user_tool import ask_user as ask_user_tool
-    from agents_janus.tools.resolve_conflict import (
-        make_resolve_conflict_tool,
-        set_agent_ref,
-    )
 
     agent_configuration = load_agent_configuration()
     janus_config = load_janus_config()
@@ -509,11 +504,8 @@ def create_orchestrator(
         except Exception as e:
             _log.warning("ensure_index_on_startup failed (non-fatal): %s", e)
 
-    # Create resolve_conflict tool (lazy agent ref — populated after agent creation)
-    resolve_conflict_tool = make_resolve_conflict_tool()
-
     registry = load_registry()
-    available_tools = list(all_mcp_tools) + [ask_user_tool, resolve_conflict_tool]
+    available_tools = list(all_mcp_tools) + [ask_user_tool]
     register_tool = next(
         (t for t in all_mcp_tools if t.name == "mcp__gitagent__register_agent"), None
     )
@@ -621,8 +613,5 @@ def create_orchestrator(
         middleware=middleware,
         checkpointer=_checkpointer(),
     )
-
-    # Wire resolve_conflict lazy reference — tool can now access the agent graph
-    set_agent_ref(agent, {"configurable": {"thread_id": thread_id}})
 
     return agent

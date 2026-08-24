@@ -75,7 +75,6 @@ agents:
       - codebase_search_graph
       - codebase_get_code_snippet
       - ask_user
-      - resolve_conflict
       - execute
     edits_allow:
       - mal-core/src/mal_core/abm/**
@@ -96,7 +95,6 @@ agents:
       - codebase_search_graph
       - codebase_get_code_snippet
       - ask_user
-      - resolve_conflict
     edits_allow:
       - mal-core/src/mal_core/abm/tests/calibration/**
       - mal-core/src/mal_core/scoring/**
@@ -115,7 +113,6 @@ agents:
       - codebase_search_graph
       - codebase_get_code_snippet
       - ask_user
-      - resolve_conflict
     edits_allow: [mal-core/src/mal_core/ingest/**]
 
   download:
@@ -132,7 +129,6 @@ agents:
       - codebase_search_graph
       - codebase_get_code_snippet
       - ask_user
-      - resolve_conflict
     edits_allow:
       - mal-core/src/mal_core/download/**
       - mal-commonlib/src/mal_commonlib/data/loaders/**
@@ -151,7 +147,6 @@ agents:
       - codebase_search_graph
       - codebase_get_code_snippet
       - ask_user
-      - resolve_conflict
     edits_allow: [mal-core/src/mal_core/prediction/**]
 
   training:
@@ -168,7 +163,6 @@ agents:
       - codebase_search_graph
       - codebase_get_code_snippet
       - ask_user
-      - resolve_conflict
     edits_allow: [mal-core/src/mal_core/training/**]
 
   data:
@@ -185,7 +179,6 @@ agents:
       - codebase_search_graph
       - codebase_get_code_snippet
       - ask_user
-      - resolve_conflict
     edits_allow:
       - mal-commonlib/src/mal_commonlib/data/**
       - docs/specs/data/**
@@ -204,7 +197,6 @@ agents:
       - codebase_search_graph
       - codebase_get_code_snippet
       - ask_user
-      - resolve_conflict
     edits_allow: [mal-commonlib/**]
 
   self_improve:
@@ -221,7 +213,6 @@ agents:
       - codebase_search_graph
       - codebase_get_code_snippet
       - ask_user
-      - resolve_conflict
     edits_allow: [agents/janus/**]
 
   generic:
@@ -238,7 +229,6 @@ agents:
       - codebase_search_graph
       - codebase_get_code_snippet
       - ask_user
-      - resolve_conflict
     edits_allow: ["**"]
     edits_deny:
       - mal-core/src/mal_core/abm/**

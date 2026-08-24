@@ -22,7 +22,7 @@ CHECKS: list[Check] = [
     Check(name="session_snapshotted", description="mcp__gitagent__snapshot_session published a partial commit to the target branch"),
     Check(name="agents_unregistered", description="Agents called mcp__gitagent__unregister_agent before snapshot"),
     Check(name="no_orchestrator_arbitration", description="No orchestrator tool_call between specialist edits"),
-    Check(name="scan_markers_emitted", description="SCAN markers present in resolve_conflict output"),
+    Check(name="scan_markers_emitted", description="SCAN evaluation / informed rejection handling markers present"),
 ]
 
 
