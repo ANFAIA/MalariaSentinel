@@ -73,26 +73,42 @@ If a lifecycle call fails, stop and report the failure. Do not bypass it with
 ## Tools
 
 - `task(...)`: domain specialists.
-- `mcp__gitagent__list_agents`,
-  `mcp__gitagent__list_edits`, `mcp__gitagent__list_intents`,
-  `mcp__gitagent__snapshot_session`, `mcp__gitagent__snapshot_status`,
-  `mcp__gitagent__list_snapshots`, `mcp__gitagent__abort_session`: GAWT
-  lifecycle and snapshots.
+- `mcp__gitagent__list_sessions`, `mcp__gitagent__get_session`,
+  `mcp__gitagent__list_agents`, `mcp__gitagent__list_edits`,
+  `mcp__gitagent__list_intents`, `mcp__gitagent__snapshot_session`,
+  `mcp__gitagent__snapshot_status`, `mcp__gitagent__list_snapshots`,
+  `mcp__gitagent__abort_session`: GAWT lifecycle, session inspection, and snapshots.
 - `ask_user(...)`: clarification.
 
 The coordinator has no direct repository tools. Consensus happens through
 specialists, the pheromone (edits log), and GAWT state, not coordinator edits.
 
-Janus middleware injects the current `session_id` into every session-scoped
-GAWT call. Never inspect or select another session with `list_sessions`.
+Janus middleware injects your own unique `session_id` into session-scoped
+GAWT calls by default. You can inspect all active sessions across the repo using `list_sessions`.
 
 ## GAWT Consensus Protocol
 
 GAWT is a shared-worktree coordination protocol over a **single shared
-worktree** across all sessions. There is **no inbox**: coordination emerges
+worktree** across all sessions. Multiple independent sessions can run concurrently,
+each with its own distinct `session_id`. There is **no inbox**: coordination emerges
 from the **pheromone** (the `edits` log), **per-file write locks** with
 informed reads / informed rejection, and **partial snapshots**. You must drive
 the protocol with tools.
+
+### Multi-Session Protocol (Pre-Dispatch & Pre-Close)
+
+1. **Pre-Dispatch Inspection**:
+   - Call `list_sessions()` and `list_agents()` to inspect if other coordinators or specialists are currently active.
+   - If peer sessions exist, check active intents (`list_intents()`) and recent edits (`list_edits()`) to coordinate file boundaries and anticipate potential lock contention (`LOCKED`, `STALE_WRITE`).
+
+2. **Autonomous Execution**:
+   - Dispatch specialists with `task(...)`. Each specialist registers in your session, declares its intent, and edits through GAWT locks.
+
+3. **Pre-Close / Snapshot Protocol**:
+   - Verify that all specialists dispatched for your session have reported completion and unregistered (`list_agents`).
+   - Check snapshot readiness with `snapshot_status`.
+   - Publish your work with `snapshot_session` (only including files relevant to your task).
+   - When your session ends or aborts, GAWT aborts only your `session_id`. If other concurrent sessions are still running, GAWT preserves the shared worktree for them automatically.
 
 ### Coordinator State Machine
 
@@ -100,7 +116,9 @@ Follow this exact state machine:
 
 ```
 IDLE
-  -> Janus middleware opens session before first task
+  -> Janus middleware opens unique session before first task
+INSPECT_ENV
+  -> list_sessions() + list_agents() (check concurrent sessions/intents)
 SESSION_OPEN
   -> task(subagent_type="<specialist>", description="[MODE:implementation] ...")
 DISPATCHED

@@ -55,16 +55,40 @@ def test_session_survives_fresh_contextvar_between_tool_calls():
     assert middleware.session_id == "s_stable"
 
 
-def test_existing_session_skips_start():
-    start = FakeTool({"session_id": "new"})
-    get = FakeTool({"session_id": "existing"})
-    middleware = GawtSessionMiddleware(feature="fix malaria", start_tool=start, get_tool=get)
+def test_each_coordinator_starts_own_unique_session():
+    start_a = FakeTool({"session_id": "s_a"})
+    mw_a = GawtSessionMiddleware(feature="fix malaria 1", start_tool=start_a)
 
-    middleware.wrap_tool_call(request("task"), lambda _: None)
+    start_b = FakeTool({"session_id": "s_b"})
+    mw_b = GawtSessionMiddleware(feature="fix malaria 2", start_tool=start_b)
 
-    assert get.calls == [{}]
-    assert start.calls == []
-    assert middleware.session_id == "existing"
+    mw_a.wrap_tool_call(request("task"), lambda _: None)
+    mw_b.wrap_tool_call(request("task"), lambda _: None)
+
+    assert mw_a.session_id == "s_a"
+    assert mw_b.session_id == "s_b"
+    assert len(start_a.calls) == 1
+    assert len(start_b.calls) == 1
+
+
+def test_abort_one_coordinator_does_not_abort_other():
+    start_a = FakeTool({"session_id": "s_a"})
+    abort_a = FakeTool({"ok": True})
+    mw_a = GawtSessionMiddleware(feature="task 1", start_tool=start_a, abort_tool=abort_a)
+
+    start_b = FakeTool({"session_id": "s_b"})
+    abort_b = FakeTool({"ok": True})
+    mw_b = GawtSessionMiddleware(feature="task 2", start_tool=start_b, abort_tool=abort_b)
+
+    mw_a.wrap_tool_call(request("task"), lambda _: None)
+    mw_b.wrap_tool_call(request("task"), lambda _: None)
+
+    mw_a.abort()
+
+    assert abort_a.calls == [{"session_id": "s_a"}]
+    assert abort_b.calls == []
+    assert mw_a.session_id is None
+    assert mw_b.session_id == "s_b"
 
 
 def test_non_task_does_not_open_session():

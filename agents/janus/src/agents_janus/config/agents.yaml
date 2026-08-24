@@ -50,6 +50,8 @@ agents:
     servers: [gitagent]
     tools:
       - ask_user
+      - mcp__gitagent__list_sessions
+      - mcp__gitagent__get_session
       - mcp__gitagent__list_agents
       - mcp__gitagent__list_edits
       - mcp__gitagent__list_intents

@@ -146,13 +146,6 @@ class GawtSessionMiddleware(AgentMiddleware):
                 if self._active_session_id:
                     set_current_session_id(self._active_session_id)
                 return
-            if self.get_tool is not None:
-                current = _parse_result(self.get_tool.invoke({}))
-                existing_id = _extract_session_id(current)
-                if existing_id:
-                    self._propagate_session_id(existing_id)
-                    self._session_open.set(True)
-                    return
 
             result = _parse_result(
                 self.start_tool.invoke({
@@ -198,7 +191,7 @@ class GawtSessionMiddleware(AgentMiddleware):
             call = dict(request.tool_call)
             args = dict(call.get("args") or {})
             if self.session_id:
-                args["session_id"] = self.session_id
+                args.setdefault("session_id", self.session_id)
                 request = request.override(tool_call={**call, "args": args})
         if name == "mcp__gitagent__start_session":
             call = dict(request.tool_call)
@@ -226,7 +219,7 @@ class GawtSessionMiddleware(AgentMiddleware):
             call = dict(request.tool_call)
             args = dict(call.get("args") or {})
             if self.session_id:
-                args["session_id"] = self.session_id
+                args.setdefault("session_id", self.session_id)
                 request = request.override(tool_call={**call, "args": args})
         if name == "mcp__gitagent__start_session":
             call = dict(request.tool_call)
