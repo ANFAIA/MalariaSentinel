@@ -1,6 +1,7 @@
-"""M3-M4 — U-Net training loop."""
+"""M3-M4 & M7.4 — U-Net training loop for ABM transmission surrogates."""
 from __future__ import annotations
 
+import yaml
 from pathlib import Path
 
 import torch
@@ -19,7 +20,9 @@ def train_unet(
     device: str | None = None,
     subsample: float = 1.0,
     preload: bool = False,
-):
+    include_transmission: bool = True,
+    env_path: str | Path | None = None,
+) -> float:
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -31,9 +34,24 @@ def train_unet(
         else:
             device = "cpu"
 
-    train_loader, val_loader = get_dataloaders(run_dir, batch_size=batch_size, subsample=subsample, preload=preload)
+    train_loader, val_loader = get_dataloaders(
+        run_dir,
+        batch_size=batch_size,
+        subsample=subsample,
+        preload=preload,
+        include_transmission=include_transmission,
+        env_path=env_path,
+    )
 
-    model = UNet().to(device)
+    if len(train_loader.dataset) == 0:
+        raise ValueError(f"Train dataset in {run_dir} is empty. Check snapshot file paths.")
+
+    # Determine input / target channels from a sample
+    sample_x, sample_y = train_loader.dataset[0]
+    in_channels = sample_x.shape[0]
+    out_channels = sample_y.shape[0]
+
+    model = UNet(in_channels=in_channels, out_channels=out_channels).to(device)
     optimizer = Adam(model.parameters(), lr=lr)
 
     best_dice = 0.0
@@ -51,21 +69,21 @@ def train_unet(
 
             train_loss += loss.item()
 
-        train_loss /= len(train_loader)
+        train_loss /= max(1, len(train_loader))
 
         model.eval()
         val_dice = 0.0
-        with torch.no_grad():
-            for x, y in val_loader:
-                x, y = x.to(device), y.to(device)
-                pred = model(x)
-                val_dice += eval_dice(pred, y)
-
-        val_dice /= len(val_loader)
+        if len(val_loader) > 0:
+            with torch.no_grad():
+                for x, y in val_loader:
+                    x, y = x.to(device), y.to(device)
+                    pred = model(x)
+                    val_dice += eval_dice(pred, y)
+            val_dice /= len(val_loader)
 
         print(f"Epoch {epoch+1}/{epochs} - train_loss: {train_loss:.4f} - val_dice: {val_dice:.4f}")
 
-        if val_dice > best_dice:
+        if val_dice >= best_dice or epoch == 0:
             best_dice = val_dice
             torch.save(model.state_dict(), output_dir / "best_model.pt")
 
@@ -73,5 +91,19 @@ def train_unet(
             torch.save(model.state_dict(), output_dir / f"model_epoch_{epoch+1}.pt")
 
     torch.save(model.state_dict(), output_dir / "final_model.pt")
-    print(f"Training complete. Best val_dice: {best_dice:.4f}")
+
+    # Generate model.yaml manifest for ModelRegistry compatibility
+    model_manifest = {
+        "name": output_dir.name or "unet_surrogate",
+        "version": "1.0",
+        "contract_version": "1.1",
+        "in_channels": in_channels,
+        "out_channels": out_channels,
+        "checkpoint": "best_model.pt",
+        "description": f"U-Net surrogate model trained on {run_dir} (in_ch={in_channels}, out_ch={out_channels})",
+    }
+    with open(output_dir / "model.yaml", "w") as f:
+        yaml.safe_dump(model_manifest, f)
+
+    print(f"Training complete. Best val_dice: {best_dice:.4f}. Manifest saved -> {output_dir / 'model.yaml'}")
     return best_dice

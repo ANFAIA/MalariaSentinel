@@ -1,18 +1,18 @@
 """Model registry — load models from a directory via ``model.yaml`` manifests.
 
 Each model lives in its own subdirectory under the models root (default:
-``runs/models/``). The manifest declares name, version, input/output
+``runs/models/`` or ``runs/``). The manifest declares name, version, input/output
 contract, and checkpoint path.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Protocol
 
 import numpy as np
 import yaml
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from mal_commonlib.config import RUNS_DIR
 
@@ -23,10 +23,10 @@ class ModelProtocol(Protocol):
 
 class ModelManifest(BaseModel):
     name: str
-    version: str
+    version: str = "1.0"
     contract_version: str = "1.1"
-    in_channels: int = 5
-    out_channels: int = 1
+    in_channels: int = 10
+    out_channels: int = 6
     checkpoint: str = ""
     description: str = ""
 
@@ -40,8 +40,9 @@ class RegistryEntry:
 
 class DummyModel:
     def predict(self, state: np.ndarray, env: np.ndarray) -> np.ndarray:
+        out_ch = state.shape[0]
         h, w = state.shape[-2:]
-        return np.zeros((1, h, w), dtype=np.float32)
+        return np.zeros((out_ch, h, w), dtype=np.float32)
 
 
 class ModelRegistry:
@@ -51,39 +52,54 @@ class ModelRegistry:
 
     def scan(self) -> list[str]:
         self._entries.clear()
-        if not self.models_dir.exists():
-            return []
+        search_dirs = [self.models_dir, RUNS_DIR]
         found = []
-        for entry_dir in sorted(self.models_dir.iterdir()):
-            manifest_path = entry_dir / "model.yaml"
-            if manifest_path.exists():
-                raw = yaml.safe_load(manifest_path.read_text())
-                manifest = ModelManifest.model_validate(raw)
-                key = f"{manifest.name}@{manifest.version}"
-                self._entries[key] = RegistryEntry(manifest=manifest, path=entry_dir)
-                found.append(key)
+
+        for base in search_dirs:
+            if not base.exists():
+                continue
+            for manifest_path in sorted(base.rglob("model.yaml")):
+                try:
+                    raw = yaml.safe_load(manifest_path.read_text())
+                    manifest = ModelManifest.model_validate(raw)
+                    key = f"{manifest.name}@{manifest.version}"
+                    if key not in self._entries:
+                        self._entries[key] = RegistryEntry(manifest=manifest, path=manifest_path.parent)
+                        found.append(key)
+                except Exception:
+                    continue
+
         return found
 
     def get(self, name: str, version: str | None = None) -> RegistryEntry:
         if not self._entries:
             self.scan()
+
         if version:
             key = f"{name}@{version}"
         else:
             matches = [k for k in self._entries if k.startswith(f"{name}@")]
             if not matches:
-                raise KeyError(f"Model {name!r} not found in {self.models_dir}")
-            key = matches[-1]
+                # Try fallback matching name directly
+                if name in self._entries:
+                    key = name
+                else:
+                    raise KeyError(f"Model {name!r} not found in {self.models_dir} or {RUNS_DIR}")
+            else:
+                key = matches[-1]
+
         if key not in self._entries:
             raise KeyError(f"Model {key!r} not found in {self.models_dir}")
         return self._entries[key]
 
     def load(self, name: str, version: str | None = None) -> ModelProtocol:
+        if name == "dummy":
+            return DummyModel()
+
         entry = self.get(name, version)
         if entry.model is not None:
             return entry.model
 
-        # If the manifest points to a checkpoint, load the U-Net wrapper.
         if entry.manifest.checkpoint:
             from ..training.wrapper import UNetWrapper
             ckpt = entry.path / entry.manifest.checkpoint
@@ -91,7 +107,11 @@ class ModelRegistry:
                 raise FileNotFoundError(
                     f"Checkpoint not found: {ckpt} (model {name}@{entry.manifest.version})"
                 )
-            entry.model = UNetWrapper(ckpt)
+            entry.model = UNetWrapper(
+                ckpt,
+                in_channels=entry.manifest.in_channels,
+                out_channels=entry.manifest.out_channels,
+            )
         else:
             entry.model = DummyModel()
         return entry.model

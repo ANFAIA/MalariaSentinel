@@ -76,6 +76,9 @@ def predict(
     scenario_path: Path | None = typer.Option(
         None, "--scenario", "-s", help="Path to scenario YAML"
     ),
+    rollout_dir: Path | None = typer.Option(
+        None, "--rollout-dir", help="Optional path to directory with ABM rollout snapshots"
+    ),
 ) -> None:
     """Generate malaria risk predictions for an AOI.
 
@@ -107,6 +110,7 @@ def predict(
         month=month,
         model_name=model,
         scenario=scenario,
+        rollout_dir=rollout_dir,
     )
     typer.echo(f"Prediction saved: {out}")
 
@@ -357,6 +361,8 @@ def train(
     epochs: int = typer.Option(50, "--epochs", help="Training epochs"),
     batch_size: int = typer.Option(16, "--batch-size", help="Batch size"),
     lr: float = typer.Option(1e-3, "--lr", help="Learning rate"),
+    include_transmission: bool = typer.Option(True, "--include-transmission/--no-transmission", help="Include transmission state rasters in training data"),
+    env_path: Path | None = typer.Option(None, "--env-path", help="Optional environmental NetCDF/GeoTIFF raster path"),
 ) -> None:
     """Train the U-Net surrogate model.
 
@@ -368,10 +374,20 @@ def train(
       --epochs: Number of training epochs (default 50)
       --batch-size: Mini-batch size (default 16)
       --lr: Initial learning rate (default 1e-3)
+      --include-transmission: Include SEIR transmission states (default True)
+      --env-path: Path to climate NetCDF/GeoTIFF raster
     """
     from .training import train_unet
 
-    best_dice = train_unet(run_dir=run_dir, output_dir=output_dir, epochs=epochs, batch_size=batch_size, lr=lr)
+    best_dice = train_unet(
+        run_dir=run_dir,
+        output_dir=output_dir,
+        epochs=epochs,
+        batch_size=batch_size,
+        lr=lr,
+        include_transmission=include_transmission,
+        env_path=env_path,
+    )
     typer.echo(f"Training complete. Best val_dice: {best_dice:.4f}")
 
 

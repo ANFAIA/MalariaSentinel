@@ -2,9 +2,9 @@
 
 Orchestrates:
 1. Load model from registry
-2. Load or generate input state + env tensors
+2. Load or generate input state + env tensors (vector + transmission)
 3. Run inference (model.predict)
-4. Save output as GeoTIFF following the output contract v1.1
+4. Save multi-band output as GeoTIFF following output contract v1.1
 5. Return path to output
 """
 from __future__ import annotations
@@ -16,7 +16,7 @@ import numpy as np
 import rasterio
 from rasterio.transform import from_bounds
 
-from mal_commonlib.aoi import Scale
+from mal_commonlib.aoi import Scale, AOI
 from mal_commonlib.config import RUNS_DIR
 
 from .aggregator import get_aggregator, grid_shape, make_aoi
@@ -26,35 +26,52 @@ from ..scenario import ScenarioConfig, interventions_to_params
 from .state_loader import load_abm_state
 
 
-def _generate_dummy_inputs(h: int, w: int) -> tuple[np.ndarray, np.ndarray]:
-    state = np.zeros((2, h, w), dtype=np.float32)
+BAND_NAMES_MAP = {
+    1: ["predicted_risk"],
+    2: ["predicted_adult_density", "predicted_biting_pressure"],
+    6: [
+        "predicted_adult_density",
+        "predicted_biting_pressure",
+        "predicted_human_prevalence",
+        "predicted_human_incidence",
+        "predicted_infectious_pressure",
+        "predicted_transmission_focus",
+    ],
+}
+
+
+def _generate_dummy_inputs(h: int, w: int, state_channels: int = 6) -> tuple[np.ndarray, np.ndarray]:
+    state = np.zeros((state_channels, h, w), dtype=np.float32)
     env = np.zeros((ENV_CHANNELS, h, w), dtype=np.float32)
     return state, env
 
 
-def _load_real_inputs(aoi, month: int) -> tuple[np.ndarray, np.ndarray]:
+def _load_real_inputs(aoi: AOI, month: int, rollout_dir: str | Path | None = None) -> tuple[np.ndarray, np.ndarray]:
     """Load real ABM state and env stack for the given AOI and month."""
+    H, W = aoi.cells_per_side()
     try:
-        state = load_abm_state(aoi, month=month)
+        state = load_abm_state(aoi, month=month, rollout_dir=rollout_dir, include_transmission=True)
     except FileNotFoundError:
-        state = np.zeros((2, aoi.cells_per_side()[0], aoi.cells_per_side()[1]), dtype=np.float32)
+        state = np.zeros((6, H, W), dtype=np.float32)
+
     try:
         env = load_env_stack(aoi)
     except Exception:
-        h, w = aoi.cells_per_side()
-        env = np.zeros((ENV_CHANNELS, h, w), dtype=np.float32)
+        env = np.zeros((ENV_CHANNELS, H, W), dtype=np.float32)
+
     return state, env
 
 
 def run_prediction(
     aoi_slug: str,
-    scale: Scale,
-    year: int,
+    scale: Scale = Scale.REGIONAL,
+    year: int = 2026,
     month: int = 1,
     model_name: str = "dummy",
     model_version: str | None = None,
     scenario: ScenarioConfig | None = None,
     output_dir: Path | None = None,
+    rollout_dir: Path | None = None,
 ) -> Path:
     aoi = make_aoi(aoi_slug, scale)
     h, w = grid_shape(aoi)
@@ -62,8 +79,8 @@ def run_prediction(
     registry = ModelRegistry()
     model = registry.load(model_name, model_version)
 
-    # Use real ABM state + env stack; fall back to zeros if unavailable.
-    state, env = _load_real_inputs(aoi, month)
+    # Use real ABM state + env stack; fall back to zeros if unavailable
+    state, env = _load_real_inputs(aoi, month, rollout_dir=rollout_dir)
 
     if scenario is not None:
         params = interventions_to_params(scenario)
@@ -79,24 +96,23 @@ def run_prediction(
     fname = f"{aoi_slug}_{scale.value}_{year}_{month:02d}_risk.tif"
     out_path = out_dir / fname
 
-    w_res = (aoi.bbox[2] - aoi.bbox[0]) / max(w, 1)
-    h_res = (aoi.bbox[3] - aoi.bbox[1]) / max(h, 1)
     transform = from_bounds(aoi.bbox[0], aoi.bbox[1], aoi.bbox[2], aoi.bbox[3], w, h)
 
     if aggregated.ndim == 0:
-        aggregated = aggregated.reshape(1, 1)
-    if aggregated.ndim == 1:
+        aggregated = aggregated.reshape(1, 1, 1)
+    elif aggregated.ndim == 1:
         side = int(np.ceil(np.sqrt(aggregated.size)))
-        padded = np.zeros((side, side), dtype=np.float32)
+        padded = np.zeros((1, side, side), dtype=np.float32)
         padded.flat[: aggregated.size] = aggregated
         aggregated = padded
-    if aggregated.ndim == 2:
+    elif aggregated.ndim == 2:
         aggregated = aggregated[np.newaxis]
 
+    n_bands = aggregated.shape[0]
     profile = {
         "driver": "GTiff",
         "dtype": "float32",
-        "count": aggregated.shape[0],
+        "count": n_bands,
         "height": aggregated.shape[-2],
         "width": aggregated.shape[-1],
         "crs": aoi.crs,
@@ -109,7 +125,10 @@ def run_prediction(
     }
     with rasterio.open(str(out_path), "w", **profile) as dst:
         dst.write(aggregated.astype(np.float32))
-        dst.set_band_description(1, "risk")
+        band_names = BAND_NAMES_MAP.get(n_bands, [f"band_{i+1}" for i in range(n_bands)])
+        for b_idx, b_name in enumerate(band_names, start=1):
+            if b_idx <= n_bands:
+                dst.set_band_description(b_idx, b_name)
 
     sidecar = {
         "crs": aoi.crs,
@@ -118,6 +137,7 @@ def run_prediction(
         "scale": scale.value,
         "year": year,
         "month": month,
+        "bands": band_names[:n_bands],
         "model_name": model_name,
         "model_version": model_version or "latest",
         "contract_version": "1.1",

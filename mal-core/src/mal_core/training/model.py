@@ -60,25 +60,29 @@ class UNet(nn.Module):
         return self.head(x)
 
 
-def soft_dice_loss(pred, target, tau=0.1, thresh=0.01):
+def soft_dice_loss(pred: torch.Tensor, target: torch.Tensor, tau: float = 0.1, thresh: float = 0.01) -> torch.Tensor:
+    """Soft Dice loss computed across batch and spatial dims."""
     p = torch.sigmoid((pred - thresh) / tau)
     t = torch.sigmoid((target - thresh) / tau)
     inter = (p * t).sum()
     union = p.sum() + t.sum()
     dice = (2 * inter + 1e-6) / (union + 1e-6)
-    return 1 - dice
+    return 1.0 - dice
 
 
-def combined_loss(pred, target):
+def combined_loss(pred: torch.Tensor, target: torch.Tensor) -> tuple[torch.Tensor, float, float]:
+    """Combined MSE + Soft-Dice loss for multi-channel epidemiological state."""
     mse = F.mse_loss(pred, target)
-    sd = soft_dice_loss(pred, target)
-    return mse + 0.5 * sd, mse.item(), sd.item()
+    sd = soft_dice_loss(pred[:, :1], target[:, :1])  # focus Dice on density/sparse channel
+    loss = mse + 0.5 * sd
+    return loss, float(mse.item()), float(sd.item())
 
 
 @torch.no_grad()
-def eval_dice(pred, target, thresh=0.01):
-    p = (pred > thresh).float()
-    t = (target > thresh).float()
+def eval_dice(pred: torch.Tensor, target: torch.Tensor, thresh: float = 0.01) -> float:
+    """Evaluate hard Dice score on the primary channel (vector density)."""
+    p = (pred[:, :1] > thresh).float()
+    t = (target[:, :1] > thresh).float()
     inter = (p * t).sum()
     union = p.sum() + t.sum()
     return float((2 * inter + 1e-6) / (union + 1e-6))
