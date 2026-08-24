@@ -44,7 +44,8 @@ Engine::Engine(AOI aoi,
                RuntimeOverrides overrides,
                const std::string& hosts_path,
                const std::string& mobility_dir,
-               const std::string& wind_field_path)
+               const std::string& wind_field_path,
+               TransmissionParams transmission_params)
     : aoi_(std::move(aoi)),
       current_date_(start_date),
       start_date_(start_date),
@@ -202,6 +203,34 @@ Engine::Engine(AOI aoi,
         }
         sub_->set_wind_field(wind_field_.get());
     }
+
+    // -- M7.4 SEIR-SEI Transmission Model -----------------------------------
+    transmission_params_ = transmission_params;
+    if (transmission_params_.enabled) {
+        const int32_t h = cells_per_side_h(aoi_);
+        const int32_t w = aoi_.cells_per_side();
+        std::vector<float> res_h = residential_human_grid();
+        if (res_h.empty()) {
+            res_h.assign(static_cast<size_t>(h) * static_cast<size_t>(w), 1.0f);
+        }
+
+        const uint64_t trans_seed = rng.peek_state()[0];
+        (void)rng.uniform_double();
+
+        transmission_model_ = std::make_unique<TransmissionModel>();
+        transmission_model_->init(
+            h, w, res_h, transmission_params_, trans_seed);
+
+        if (transmission_params_.initial_vector_infected_frac > 0.0) {
+            transmission_model_->seed_vector_infections(
+                sub_->soa_mutable(),
+                transmission_params_.initial_vector_infected_frac);
+        }
+
+        sub_->set_human_compartment_grid(&transmission_model_->human_grid());
+        sub_->set_transmission_params(&transmission_model_->params());
+        std::cout << "Engine: initialized TransmissionModel (SEIR-SEI)\n";
+    }
 }
 
 Engine::Engine(AOI aoi,
@@ -213,7 +242,8 @@ Engine::Engine(AOI aoi,
                RuntimeOverrides overrides,
                const std::string& hosts_path,
                const std::string& mobility_dir,
-               const std::string& wind_field_path)
+               const std::string& wind_field_path,
+               TransmissionParams transmission_params)
     : aoi_(std::move(aoi)),
       climate_(std::move(shared_climate)),
       current_date_(start_date),
@@ -322,6 +352,34 @@ Engine::Engine(AOI aoi,
         }
         sub_->set_wind_field(wind_field_.get());
     }
+
+    // -- M7.4 SEIR-SEI Transmission Model -----------------------------------
+    transmission_params_ = transmission_params;
+    if (transmission_params_.enabled) {
+        const int32_t h = cells_per_side_h(aoi_);
+        const int32_t w = aoi_.cells_per_side();
+        std::vector<float> res_h = residential_human_grid();
+        if (res_h.empty()) {
+            res_h.assign(static_cast<size_t>(h) * static_cast<size_t>(w), 1.0f);
+        }
+
+        const uint64_t trans_seed = rng.peek_state()[0];
+        (void)rng.uniform_double();
+
+        transmission_model_ = std::make_unique<TransmissionModel>();
+        transmission_model_->init(
+            h, w, res_h, transmission_params_, trans_seed);
+
+        if (transmission_params_.initial_vector_infected_frac > 0.0) {
+            transmission_model_->seed_vector_infections(
+                sub_->soa_mutable(),
+                transmission_params_.initial_vector_infected_frac);
+        }
+
+        sub_->set_human_compartment_grid(&transmission_model_->human_grid());
+        sub_->set_transmission_params(&transmission_model_->params());
+        std::cout << "Engine: initialized TransmissionModel (SEIR-SEI)\n";
+    }
 }
 
 void Engine::step() {
@@ -344,6 +402,16 @@ void Engine::step() {
         sub_->set_current_day_index(day_index);
     }
     sub_->advance_day(aoi_, coord_->patch_states_today());
+
+    // 3b. Transmission step (M7.4): advance vector EIP, human infections, and record stats
+    if (transmission_model_ && transmission_model_->is_enabled()) {
+        transmission_model_->advance_vector_eip(
+            sub_->soa_mutable(), *climate_, coord_->patch_states_today(), aoi_);
+        transmission_model_->advance_human_transmission(
+            sub_->bite_ledger(), aoi_);
+        transmission_model_->record_daily_stats(
+            day_index, sub_->soa(), sub_->bite_ledger());
+    }
 
     // Divergence checks
     const int64_t n = sub_->total_agents();
@@ -424,6 +492,45 @@ void Engine::snapshot(const std::string& path,
         diag_path += "_aquatic.json";
         sub_->cohort_bank().write_diagnostics(diag_path, day_index);
     }
+}
+
+void Engine::snapshot_transmission(const std::string& path,
+                                   int32_t year,
+                                   int32_t month,
+                                   int32_t day,
+                                   int32_t seed,
+                                   int32_t n_rollouts,
+                                   int32_t rollout_index) {
+    if (!transmission_model_ || !transmission_model_->is_enabled()) return;
+
+    TransmissionCogMetadata meta;
+    meta.crs = aoi_.crs;
+    const int32_t W_aoi = aoi_.cells_per_side();
+    const int32_t H_aoi = cells_per_side_h(aoi_);
+    const double safe_w = (W_aoi > 0) ? static_cast<double>(W_aoi) : 1.0;
+    const double safe_h = (H_aoi > 0) ? static_cast<double>(H_aoi) : 1.0;
+    const double pixel_w = (aoi_.east - aoi_.west) / safe_w;
+    const double pixel_h = (aoi_.north - aoi_.south) / safe_h;
+    meta.transform = {pixel_w, 0.0, aoi_.west, 0.0, -pixel_h, aoi_.north};
+    meta.aoi_slug = aoi_.slug;
+    meta.scale = aoi_.scale;
+    meta.year = year;
+    meta.month = month;
+    meta.day = day;
+    meta.seed = seed;
+    meta.n_rollouts = n_rollouts;
+    meta.rollout_index = rollout_index;
+    meta.h = H_aoi;
+    meta.w = W_aoi;
+    meta.stats = transmission_model_->last_day_stats();
+
+    write_transmission_cog(
+        path,
+        transmission_model_->human_grid(),
+        transmission_model_->infectious_pressure_grid(),
+        transmission_params_.focus_threshold,
+        meta);
+    write_transmission_sidecar(path, meta);
 }
 
 int64_t Engine::total_agents() const {

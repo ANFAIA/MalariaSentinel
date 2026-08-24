@@ -47,6 +47,9 @@
 
 namespace mal_abm_fast {
 
+class HumanCompartmentGrid;
+struct TransmissionParams;
+
 /// Per-day population statistics, populated by advance_day().
 struct DailyStats {
     int64_t day             = 0;
@@ -99,6 +102,9 @@ public:
     // coordinator reads it for density aggregation).
     const MosquitoSoA& soa() const { return soa_; }
 
+    // Mutable access to the SoA (for transmission EIP / infection updates).
+    MosquitoSoA& soa_mutable() { return soa_; }
+
     // Read-only access to the aquatic cohort bank.
     const AquaticCohortBank& cohort_bank() const { return cohort_bank_; }
 
@@ -120,6 +126,10 @@ public:
     void set_host_seeking_model(const HostSeekingModel* h) { host_seeking_ = h; }
     void set_oviposition_seeking_model(const OvipositionSeekingModel* o) { oviposition_seeking_ = o; }
     void set_habitat_engine(const HabitatEngine* h) { habitat_engine_for_ovip_ = h; }
+
+    // Transmission (M7.4).
+    void set_human_compartment_grid(const HumanCompartmentGrid* h) { human_grid_ = h; }
+    void set_transmission_params(const TransmissionParams* p) { transmission_params_ = p; }
 
     // Species (M7.8): active species + params. Sets the default species_id
     // for newly created mosquitoes and the salinity context for breeding.
@@ -220,6 +230,10 @@ private:
     const OvipositionSeekingModel* oviposition_seeking_  = nullptr;
     const HabitatEngine*         habitat_engine_for_ovip_ = nullptr;
     EffectiveHostLandscape*      effective_hosts_        = nullptr;
+
+    // Transmission (M7.4 non-owning pointers).
+    const HumanCompartmentGrid*  human_grid_             = nullptr;
+    const TransmissionParams*    transmission_params_    = nullptr;
 
     // M7.8: active species params. Default = An. coluzzii.
     SpeciesParams species_params_ = species_params_for(MosquitoSpeciesId::ANOPHELES_COLUZZII);

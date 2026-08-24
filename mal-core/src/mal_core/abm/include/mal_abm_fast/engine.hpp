@@ -29,6 +29,8 @@
 #include "wind_field.hpp"
 #include "species_params.hpp"
 #include "effective_host_landscape.hpp"
+#include "transmission.hpp"
+#include "transmission_output.hpp"
 
 namespace mal_abm_fast {
 
@@ -71,7 +73,8 @@ public:
            RuntimeOverrides overrides = {},
            const std::string& hosts_path = "",
            const std::string& mobility_dir = "",
-           const std::string& wind_field_path = "");
+           const std::string& wind_field_path = "",
+           TransmissionParams transmission_params = TransmissionParams{});
 
     // Optimized constructor: accepts a pre-loaded shared ClimateEngine.
     // Used by multi-rollout simulations to share climate data across
@@ -87,7 +90,8 @@ public:
            RuntimeOverrides overrides = {},
            const std::string& hosts_path = "",
            const std::string& mobility_dir = "",
-           const std::string& wind_field_path = "");
+           const std::string& wind_field_path = "",
+           TransmissionParams transmission_params = TransmissionParams{});
 
     // Advance the model by one day. Mirrors `AnophelesABM.step()`:
     //   1. coord_->activate_patches()
@@ -127,6 +131,15 @@ public:
                   int32_t n_rollouts    = 1,
                   int32_t rollout_index = 0);
 
+    // M7.4: Write the 4-band transmission GeoTIFF + sidecar JSON.
+    void snapshot_transmission(const std::string& path,
+                               int32_t year,
+                               int32_t month,
+                               int32_t day,
+                               int32_t seed,
+                               int32_t n_rollouts    = 1,
+                               int32_t rollout_index = 0);
+
     // Accessors for tests and the CLI.
     const AOI&             aoi()          const { return aoi_; }
     int64_t                total_agents() const;
@@ -135,6 +148,9 @@ public:
     const HabitatEngine&   habitat()      const { return *habitat_; }
     const CoordinatorModel& coordinator() const { return *coord_; }
     const MosquitoSubmodel& submodel()    const { return *sub_; }
+
+    const TransmissionModel* transmission() const { return transmission_model_.get(); }
+    TransmissionModel* transmission_mutable() { return transmission_model_.get(); }
 
     // (patch_id, row, col) of the first detection-based seeding
     // instruction produced by the constructor. Returns {-1, 0, 0}
@@ -178,6 +194,10 @@ private:
     SpeciesParams species_params_ =
         species_params_for(MosquitoSpeciesId::ANOPHELES_COLUZZII);
     std::unique_ptr<EffectiveHostLandscape> effective_hosts_;
+
+    // M7.4: SEIR-SEI Transmission Model
+    TransmissionParams                      transmission_params_;
+    std::unique_ptr<TransmissionModel>      transmission_model_;
 
     // Extract per-cell residential human / livestock grids from the
     // loaded HostLandscape (row-major, length h*w). Used to configure

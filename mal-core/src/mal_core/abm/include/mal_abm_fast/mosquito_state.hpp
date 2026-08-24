@@ -22,6 +22,12 @@
 
 namespace mal_abm_fast {
 
+enum class VectorTransmissionState : uint8_t {
+    SUSCEPTIBLE = 0,
+    EXPOSED     = 1,
+    INFECTIOUS  = 2,
+};
+
 struct MosquitoSoA {
     std::vector<int64_t>  uid;                    // unique_id (stable for the agent's life)
     std::vector<int64_t>  patch_id;               // join key with PatchState
@@ -44,6 +50,7 @@ struct MosquitoSoA {
     std::vector<int32_t>  gonotrophic_cycles;     // completed gonotrophic cycles (first = 0)
     std::vector<float>    feeding_success;         // 1.0 if fed today, 0.0 otherwise
     std::vector<uint8_t>  species_id;              // MosquitoSpeciesId (0 = ANOPHELES_COLUZZII)
+    std::vector<uint8_t>  vector_state;            // VectorTransmissionState (0=SUSCEPTIBLE, 1=EXPOSED, 2=INFECTIOUS)
 
     // Patch tracking cache (Plan D Phase 4): last (row, col) passed to
     // update_patch_id(). If the agent hasn't moved since the last call,

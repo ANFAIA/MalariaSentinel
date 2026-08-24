@@ -219,6 +219,15 @@ def abm(
         "-w",
         help="Path to gawt worktree (e.g. .gitagent/worktree) for isolated compile and run.",
     ),
+    enable_transmission: bool = typer.Option(False, "--enable-transmission", help="Enable spatial SEIR-SEI malaria transmission model (M7.4)."),
+    initial_human_prevalence: float = typer.Option(0.05, "--initial-human-prevalence", help="Initial infectious fraction of human population."),
+    initial_vector_infected_frac: float = typer.Option(0.0, "--initial-vector-infected-frac", help="Initial infectious fraction of female mosquitoes."),
+    beta_hv: float = typer.Option(0.40, "--beta-hv", help="Human-to-vector transmission probability per bite."),
+    beta_vh: float = typer.Option(0.50, "--beta-vh", help="Vector-to-human transmission probability per bite."),
+    human_incubation_days: int = typer.Option(12, "--human-incubation-days", help="Human intrinsic incubation period in days."),
+    human_infectious_days: int = typer.Option(20, "--human-infectious-days", help="Human infectious duration in days."),
+    immunity_duration_days: int = typer.Option(180, "--immunity-duration-days", help="Duration of temporary human immunity in days."),
+    enable_immunity: bool = typer.Option(False, "--enable-immunity", help="Enable temporary human immunity waning."),
 ) -> None:
     """Run the agent-based malaria simulation or compile the C++ engine.
 
@@ -283,6 +292,15 @@ def abm(
         output_dir=output_dir,
         data_root=data_root,
         worktree=worktree,
+        enable_transmission=enable_transmission,
+        initial_human_prevalence=initial_human_prevalence,
+        initial_vector_infected_frac=initial_vector_infected_frac,
+        beta_hv=beta_hv,
+        beta_vh=beta_vh,
+        human_incubation_days=human_incubation_days,
+        human_infectious_days=human_infectious_days,
+        immunity_duration_days=immunity_duration_days,
+        enable_immunity=enable_immunity,
     )
     typer.echo(f"ABM result: {result}")
 

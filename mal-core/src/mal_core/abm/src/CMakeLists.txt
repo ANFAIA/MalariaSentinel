@@ -21,6 +21,9 @@ add_library(mal_abm_fast_core STATIC
     wind_field.cpp
     species_params.cpp
     effective_host_landscape.cpp
+    human_state.cpp
+    transmission.cpp
+    transmission_output.cpp
 )
 target_include_directories(mal_abm_fast_core
     PUBLIC

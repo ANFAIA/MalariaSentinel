@@ -51,6 +51,8 @@
 #include "prng.hpp"
 #include "seeding.hpp"
 #include "wire.hpp"
+#include "transmission.hpp"
+#include "transmission_output.hpp"
 
 namespace {
 
@@ -154,6 +156,51 @@ std::string rollout_day_path(const std::string& output_path, int day) {
         ? p.parent_path() : std::filesystem::path{};
     std::string stem = p.stem().string();
     std::string ext = p.has_extension() ? p.extension().string() : ".tif";
+    std::ostringstream name;
+    name << stem << "_day" << std::setw(3) << std::setfill('0') << day << ext;
+    return (parent / name.str()).string();
+}
+
+// Build the per-rollout transmission output path.
+std::string rollout_transmission_output_path(const std::string& output_path,
+                                            int rollout_index,
+                                            int n_rollouts) {
+    if (output_path.empty()) {
+        throw std::runtime_error("rollout_transmission_output_path: output path is empty");
+    }
+    const std::filesystem::path p(output_path);
+    const std::filesystem::path parent = p.has_parent_path()
+        ? p.parent_path() : std::filesystem::path{};
+    std::string stem = p.stem().string();
+    const std::string ext = p.has_extension() ? p.extension().string() : ".tif";
+
+    const size_t state_pos = stem.find("state");
+    if (state_pos != std::string::npos) {
+        stem.replace(state_pos, 5, "transmission");
+    } else {
+        stem += "_transmission";
+    }
+
+    std::ostringstream name;
+    if (n_rollouts == 1 && rollout_index == 0) {
+        name << stem << ext;
+    } else {
+        name << stem << "_seed" << std::setw(4) << std::setfill('0')
+             << rollout_index << ext;
+    }
+    return (parent / name.str()).string();
+}
+
+// Build the per-day intermediate transmission snapshot path.
+std::string rollout_transmission_day_path(const std::string& rollout_trans_path, int day) {
+    if (rollout_trans_path.empty()) {
+        throw std::runtime_error("rollout_transmission_day_path: path is empty");
+    }
+    const std::filesystem::path p(rollout_trans_path);
+    const std::filesystem::path parent = p.has_parent_path()
+        ? p.parent_path() : std::filesystem::path{};
+    std::string stem = p.stem().string();
+    const std::string ext = p.has_extension() ? p.extension().string() : ".tif";
     std::ostringstream name;
     name << stem << "_day" << std::setw(3) << std::setfill('0') << day << ext;
     return (parent / name.str()).string();
@@ -289,6 +336,20 @@ OUTPUT
 
     bool debug_population = false;
     std::string cohort_log_path;
+
+    // Transmission (M7.4 SEIR-SEI).
+    bool   enable_transmission          = false;
+    float  beta_hv                      = 0.40f;
+    float  beta_vh                      = 0.50f;
+    int    human_incubation_days        = 12;
+    int    human_infectious_days        = 20;
+    int    immunity_duration_days       = 180;
+    bool   enable_immunity              = false;
+    double initial_human_prevalence     = 0.05;
+    double initial_vector_infected_frac = 0.0;
+    float  transmission_focus_threshold = 0.01f;
+    int    transmission_snapshot_every  = 0;
+    std::string transmission_log_path;
 
     // ─── Spatial & Temporal ──────────────────────────────────────────────
     run->add_option("--aoi", aoi_slug,
@@ -467,6 +528,57 @@ OUTPUT
         ->default_val("")
         ->group("Output & Debug");
 
+    // ─── Transmission (SEIR-SEI) ─────────────────────────────────────────
+    run->add_flag("--enable-transmission", enable_transmission,
+                  "Enable spatial SEIR-SEI malaria transmission model.")
+        ->group("Transmission (SEIR-SEI)");
+    run->add_option("--beta-hv", beta_hv,
+                    "Human-to-vector transmission probability per bite (default 0.40).")
+        ->default_val(0.40f)
+        ->group("Transmission (SEIR-SEI)");
+    run->add_option("--beta-vh", beta_vh,
+                    "Vector-to-human transmission probability per bite (default 0.50).")
+        ->default_val(0.50f)
+        ->group("Transmission (SEIR-SEI)");
+    run->add_option("--human-incubation-days", human_incubation_days,
+                    "Human intrinsic incubation period E_H -> I_H in days (default 12).")
+        ->default_val(12)
+        ->check(CLI::PositiveNumber)
+        ->group("Transmission (SEIR-SEI)");
+    run->add_option("--human-infectious-days", human_infectious_days,
+                    "Human infectious duration I_H in days (default 20).")
+        ->default_val(20)
+        ->check(CLI::PositiveNumber)
+        ->group("Transmission (SEIR-SEI)");
+    run->add_option("--immunity-duration-days", immunity_duration_days,
+                    "Duration of temporary human immunity R_H in days (default 180).")
+        ->default_val(180)
+        ->check(CLI::PositiveNumber)
+        ->group("Transmission (SEIR-SEI)");
+    run->add_flag("--enable-immunity", enable_immunity,
+                  "Enable temporary human immunity (R_H -> S_H waning). Default false (SIS-like).")
+        ->group("Transmission (SEIR-SEI)");
+    run->add_option("--initial-human-prevalence", initial_human_prevalence,
+                    "Initial infectious fraction of human population (default 0.05).")
+        ->default_val(0.05)
+        ->group("Transmission (SEIR-SEI)");
+    run->add_option("--initial-vector-infected-frac", initial_vector_infected_frac,
+                    "Initial infectious fraction of adult female mosquitoes (default 0.0).")
+        ->default_val(0.0)
+        ->group("Transmission (SEIR-SEI)");
+    run->add_option("--transmission-focus-threshold", transmission_focus_threshold,
+                    "Prevalence threshold for active transmission focus band (default 0.01).")
+        ->default_val(0.01f)
+        ->group("Transmission (SEIR-SEI)");
+    run->add_option("--transmission-snapshot-every", transmission_snapshot_every,
+                    "Intermediate transmission snapshot interval in days (0 = matches --snapshot-every).")
+        ->default_val(0)
+        ->group("Transmission (SEIR-SEI)");
+    run->add_option("--emit-transmission-log", transmission_log_path,
+                    "Path for daily transmission log JSON.")
+        ->default_val("")
+        ->group("Transmission (SEIR-SEI)");
+
     CLI11_PARSE(app, argc, argv);
 
     // If no subcommand was given, print help and exit.
@@ -564,6 +676,19 @@ OUTPUT
         return EXIT_FAILURE;
     }
 
+    // -- Transmission config (M7.4) -----------------------------------
+    mal_abm_fast::TransmissionParams transmission_params;
+    transmission_params.enabled = enable_transmission;
+    transmission_params.beta_hv = beta_hv;
+    transmission_params.beta_vh = beta_vh;
+    transmission_params.human_incubation_days = human_incubation_days;
+    transmission_params.human_infectious_days = human_infectious_days;
+    transmission_params.immunity_duration_days = immunity_duration_days;
+    transmission_params.immunity_enabled = enable_immunity;
+    transmission_params.initial_human_prevalence = initial_human_prevalence;
+    transmission_params.initial_vector_infected_frac = initial_vector_infected_frac;
+    transmission_params.focus_threshold = transmission_focus_threshold;
+
     // -- Rollouts loop (F1.c) -------------------------------------------
     // Each rollout gets a fresh `Prng` instance seeded at
     // `seed_rollout = seed + i`. A new `Engine` is built per rollout
@@ -602,7 +727,7 @@ OUTPUT
             engine_ptr = std::make_unique<mal_abm_fast::Engine>(
                 aoi, thread_climate, habitat_path, rng, start_date,
                 seeding_config, overrides, hosts_path, mobility_dir,
-                wind_field_path);
+                wind_field_path, transmission_params);
         } catch (const std::exception& e) {
             std::cerr << "abm_run: rollout " << i
                       << " failed to build engine: " << e.what() << "\n";
@@ -667,6 +792,28 @@ OUTPUT
                               << " day=" << (d + 1) << "/" << days
                               << " -> " << day_path << std::endl;
                 }
+
+                // Intermediate transmission snapshot (M7.4)
+                const int effective_trans_snapshot = (transmission_snapshot_every > 0)
+                    ? transmission_snapshot_every : snapshot_every;
+                if (enable_transmission && effective_trans_snapshot > 0 &&
+                    (d + 1) % effective_trans_snapshot == 0) {
+                    const std::string trans_base =
+                        rollout_transmission_output_path(output_path, i, n_rollouts);
+                    const std::string trans_day_path =
+                        rollout_transmission_day_path(trans_base, d + 1);
+                    const std::filesystem::path trans_day_out(trans_day_path);
+                    if (trans_day_out.has_parent_path()) {
+                        std::error_code ec;
+                        std::filesystem::create_directories(trans_day_out.parent_path(), ec);
+                    }
+                    engine.snapshot_transmission(trans_day_path, year, month, d + 1,
+                                                 static_cast<int32_t>(seed_rollout),
+                                                 n_rollouts, i);
+                    std::cout << "abm_run: rollout " << i << "/" << n_rollouts
+                              << " transmission day=" << (d + 1) << "/" << days
+                              << " -> " << trans_day_path << std::endl;
+                }
             }
         } catch (const std::exception& e) {
             std::cerr << "abm_run: rollout " << i
@@ -725,6 +872,29 @@ OUTPUT
                       << " cohort log -> " << rollout_cohort_path << std::endl;
         }
 
+        // -- Write transmission log JSON (M7.4) ----------------------
+        if (!transmission_log_path.empty() && engine.transmission()) {
+            std::string rollout_trans_log;
+            if (n_rollouts == 1) {
+                rollout_trans_log = transmission_log_path;
+            } else {
+                const std::filesystem::path tp(transmission_log_path);
+                const std::filesystem::path tparent = tp.has_parent_path()
+                    ? tp.parent_path() : std::filesystem::path{};
+                const std::string tstem = tp.stem().string();
+                const std::string text  = tp.has_extension()
+                    ? tp.extension().string() : ".json";
+                std::ostringstream tname;
+                tname << "transmission_seed"
+                      << std::setw(4) << std::setfill('0') << i << text;
+                rollout_trans_log = (tparent / tname.str()).string();
+            }
+            mal_abm_fast::write_transmission_log(
+                rollout_trans_log, engine.transmission()->history(), days);
+            std::cout << "abm_run: rollout " << i << "/" << n_rollouts
+                      << " transmission log -> " << rollout_trans_log << std::endl;
+        }
+
         // -- Snapshot ------------------------------------------------
         try {
             // Ensure the output parent directory exists.
@@ -733,13 +903,26 @@ OUTPUT
                 std::error_code ec;
                 std::filesystem::create_directories(
                     out_path.parent_path(), ec);
-                // Ignore ec: if the dir already exists,
-                // create_directories returns false; if it cannot be
-                // created, snapshot() will surface the IO error.
             }
             engine.snapshot(rollout_path, year, month,
                             static_cast<int32_t>(seed_rollout),
                             n_rollouts, i);
+
+            // Final transmission snapshot (M7.4)
+            if (enable_transmission) {
+                const std::string trans_path =
+                    rollout_transmission_output_path(output_path, i, n_rollouts);
+                const std::filesystem::path tout_path(trans_path);
+                if (tout_path.has_parent_path()) {
+                    std::error_code ec;
+                    std::filesystem::create_directories(tout_path.parent_path(), ec);
+                }
+                engine.snapshot_transmission(trans_path, year, month, days,
+                                             static_cast<int32_t>(seed_rollout),
+                                             n_rollouts, i);
+                std::cout << "abm_run: rollout " << i << "/" << n_rollouts
+                          << " transmission -> " << trans_path << std::endl;
+            }
         } catch (const std::exception& e) {
             std::cerr << "abm_run: rollout " << i
                       << " snapshot failed: " << e.what() << "\n";

@@ -39,10 +39,42 @@
 #include "mal_abm_fast/multirate_scheduler.hpp"
 #include "mal_abm_fast/oviposition_seeking.hpp"
 #include "mal_abm_fast/wind_field.hpp"
+#include "mal_abm_fast/human_state.hpp"
+#include "mal_abm_fast/transmission.hpp"
 
 namespace mal_abm_fast {
 
 namespace {
+
+inline void record_female_feed(
+    size_t si, MosquitoSoA& soa, HostType host,
+    BiteLedger& bite_ledger,
+    const HumanCompartmentGrid* human_grid,
+    const TransmissionParams* transmission_params,
+    Prng& rng)
+{
+    const bool is_infectious =
+        (soa.vector_state[si] == static_cast<uint8_t>(VectorTransmissionState::INFECTIOUS));
+    if (is_infectious) {
+        bite_ledger.record_infectious_success(soa.row[si], soa.col[si], host);
+    } else {
+        bite_ledger.record_success(soa.row[si], soa.col[si], host);
+    }
+
+    if (host == HostType::HUMAN &&
+        soa.vector_state[si] == static_cast<uint8_t>(VectorTransmissionState::SUSCEPTIBLE) &&
+        human_grid && transmission_params && transmission_params->enabled)
+    {
+        const double prev = human_grid->prev_at(soa.row[si], soa.col[si]);
+        if (prev > 0.0) {
+            const double p_inf = static_cast<double>(transmission_params->beta_hv) * prev;
+            if (rng.uniform_double() < p_inf) {
+                soa.vector_state[si] = static_cast<uint8_t>(VectorTransmissionState::EXPOSED);
+                soa.parasite_eip_progress[si] = 0.0f;
+            }
+        }
+    }
+}
 
 // Swap agent `i` with agent `n-1` in every SoA vector. Caller must
 // ensure 0 <= i < n. No-op when i == n-1 (degenerate case: the agent
@@ -68,6 +100,7 @@ inline void swap_with_last(MosquitoSoA& soa, int64_t i, int64_t n) {
     std::swap(soa.gonotrophic_cycles[i], soa.gonotrophic_cycles[n - 1]);
     std::swap(soa.feeding_success[i],   soa.feeding_success[n - 1]);
     std::swap(soa.species_id[i],        soa.species_id[n - 1]);
+    std::swap(soa.vector_state[i],      soa.vector_state[n - 1]);
     std::swap(soa.last_patch_update_row[i], soa.last_patch_update_row[n - 1]);
     std::swap(soa.last_patch_update_col[i], soa.last_patch_update_col[n - 1]);
 }
@@ -95,6 +128,7 @@ inline void trim_soa(MosquitoSoA& soa, size_t new_size) {
     soa.gonotrophic_cycles.resize(new_size);
     soa.feeding_success.resize(new_size);
     soa.species_id.resize(new_size);
+    soa.vector_state.resize(new_size);
     soa.last_patch_update_row.resize(new_size);
     soa.last_patch_update_col.resize(new_size);
 }
@@ -189,6 +223,8 @@ MosquitoSubmodel::MosquitoSubmodel(int32_t n_patches, int32_t k_per_patch,
             soa_.feeding_success.push_back(0.0f);
             soa_.species_id.push_back(
                 static_cast<uint8_t>(species_params_.id));
+            soa_.vector_state.push_back(
+                static_cast<uint8_t>(VectorTransmissionState::SUSCEPTIBLE));
             soa_.last_patch_update_row.push_back(0);
             soa_.last_patch_update_col.push_back(0);
         }
@@ -262,6 +298,8 @@ MosquitoSubmodel::MosquitoSubmodel(int32_t n_patches, int32_t k_per_patch,
     soa_.gonotrophic_timer.reserve(cap);
     soa_.gonotrophic_cycles.reserve(cap);
     soa_.feeding_success.reserve(cap);
+    soa_.species_id.reserve(cap);
+    soa_.vector_state.reserve(cap);
     soa_.last_patch_update_row.reserve(cap);
     soa_.last_patch_update_col.reserve(cap);
 
@@ -294,6 +332,8 @@ MosquitoSubmodel::MosquitoSubmodel(int32_t n_patches, int32_t k_per_patch,
             soa_.feeding_success.push_back(0.0f);
             soa_.species_id.push_back(
                 static_cast<uint8_t>(species_params_.id));
+            soa_.vector_state.push_back(
+                static_cast<uint8_t>(VectorTransmissionState::SUSCEPTIBLE));
             soa_.last_patch_update_row.push_back(inst.row);
             soa_.last_patch_update_col.push_back(inst.col);
         }
@@ -445,6 +485,8 @@ void MosquitoSubmodel::advance_day(const AOI& aoi,
             soa_.feeding_success.push_back(0.0f);
             soa_.species_id.push_back(
                 static_cast<uint8_t>(species_params_.id));
+            soa_.vector_state.push_back(
+                static_cast<uint8_t>(VectorTransmissionState::SUSCEPTIBLE));
             soa_.last_patch_update_row.push_back(ev.row);
             soa_.last_patch_update_col.push_back(ev.col);
         }
@@ -636,8 +678,9 @@ void MosquitoSubmodel::advance_day(const AOI& aoi,
                         soa_.gonotrophic_timer[si] = g_timer;
                         soa_.feeding_success[si] = 1.0f;
                         n_successful_feeds++;
-                        bite_ledger_.record_success(
-                            soa_.row[si], soa_.col[si], host);
+                        record_female_feed(
+                            si, soa_, host, bite_ledger_,
+                            human_grid_, transmission_params_, rng_);
                     }
                 } else {
                     // Fallback: deterministic feeding with default host (HUMAN).
@@ -649,8 +692,9 @@ void MosquitoSubmodel::advance_day(const AOI& aoi,
                     soa_.gonotrophic_timer[si] = g_timer;
                     soa_.feeding_success[si] = 1.0f;
                     n_successful_feeds++;
-                    bite_ledger_.record_success(
-                        soa_.row[si], soa_.col[si], HostType::HUMAN);
+                    record_female_feed(
+                        si, soa_, HostType::HUMAN, bite_ledger_,
+                        human_grid_, transmission_params_, rng_);
                 }
             }
             // When phase_aware, feeding happens in the post-loop pass below;
@@ -710,8 +754,9 @@ void MosquitoSubmodel::advance_day(const AOI& aoi,
                     soa_.gonotrophic_timer[si] = 0;
                     soa_.feeding_success[si] = 1.0f;
                     n_successful_feeds++;
-                    bite_ledger_.record_success(
-                        soa_.row[si], soa_.col[si], host);
+                    record_female_feed(
+                        si, soa_, host, bite_ledger_,
+                        human_grid_, transmission_params_, rng_);
                     // BLOOD_FED: skip later phases for this female.
                 }
             }

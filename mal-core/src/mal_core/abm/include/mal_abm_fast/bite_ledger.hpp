@@ -21,6 +21,7 @@ struct BiteEventAggregate {
     HostType host          = HostType::HUMAN;
     int64_t attempts       = 0;
     int64_t successful_meals = 0;
+    int64_t infectious_meals = 0;  // successful meals delivered by infectious vectors (I_V)
     int64_t mosquito_deaths = 0;  // from ITN/IRS (future) or feeding failure
 };
 
@@ -45,6 +46,13 @@ public:
         agg.successful_meals++;
     }
 
+    /// Record a successful infectious blood meal at (row, col) (vector is I_V).
+    void record_infectious_success(int32_t row, int32_t col, HostType host) {
+        auto& agg = find_or_create(row, col, host);
+        agg.successful_meals++;
+        agg.infectious_meals++;
+    }
+
     /// Record a mosquito death during feeding (future: ITN/IRS).
     void record_death(int32_t row, int32_t col, HostType host) {
         auto& agg = find_or_create(row, col, host);
@@ -64,6 +72,15 @@ public:
         int64_t sum = 0;
         for (const auto& agg : today_) {
             sum += agg.successful_meals;
+        }
+        return sum;
+    }
+
+    /// Total infectious meals across all cells and host types today.
+    int64_t total_infectious_meals() const {
+        int64_t sum = 0;
+        for (const auto& agg : today_) {
+            sum += agg.infectious_meals;
         }
         return sum;
     }

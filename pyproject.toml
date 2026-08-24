@@ -3,7 +3,7 @@ name = "malaria-sentinel"
 version = "0.1.0"
 description = "MalariaSentinel — AI-driven predictive malaria surveillance (monorepo)"
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.12, <3.13"
 dependencies = [
     "cartopy>=0.24",
     "cdsapi>=0.7",
@@ -43,6 +43,7 @@ dev = [
 
 [tool.uv]
 package = false
+environments = ["sys_platform == 'darwin' and platform_machine == 'arm64'"]
 
 # Lightweight sync profiles for the remote (Hetzner) runner. Each installs
 # only the optional dependency groups a stage needs, skipping torch/fastapi
