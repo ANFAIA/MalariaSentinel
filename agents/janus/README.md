@@ -184,7 +184,7 @@ agents_janus/
 | Tool | Purpose |
 |---|---|
 | `mcp__gitagent__*` | gawt edit/read/list (shared worktree) |
-| `execute` | **abm specialist only** — shell restricted to `malariasim` |
+| `execute` | **abm specialist only** — shell restricted to `malariasim` (e.g. `malariasim abm --compile --worktree .gitagent/worktree`) |
 | `ask_user`, `resolve_conflict` | Interaction helpers |
 
 ## Sandboxing

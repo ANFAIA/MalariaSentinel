@@ -1,4 +1,5 @@
 """Unit tests for the C++ ABM compilation helper (mal_core.abm.compile)."""
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from mal_core.abm.compile import (
@@ -6,6 +7,7 @@ from mal_core.abm.compile import (
     _find_macos_prefixes,
     compile_abm,
     get_abm_dirs,
+    resolve_abm_dirs,
 )
 
 
@@ -15,6 +17,14 @@ def test_get_abm_dirs():
     assert (src_dir / "CMakeLists.txt").is_file()
     assert build_dir.name == "build"
     assert bin_dir.name == "bin"
+
+
+def test_resolve_abm_dirs_worktree():
+    wt_root = Path("/tmp/fake_worktree")
+    src_dir, build_dir, bin_dir = resolve_abm_dirs(worktree=wt_root)
+    assert src_dir == wt_root.resolve() / "mal-core" / "src" / "mal_core" / "abm"
+    assert build_dir == src_dir / "build"
+    assert bin_dir == src_dir / "bin"
 
 
 def test_detect_nproc():
@@ -38,6 +48,19 @@ def test_compile_abm_dry_run_or_mock():
         mock_run.return_value = MagicMock(returncode=0, stdout="OK", stderr="")
         success, _ = compile_abm()
         assert success is True
+
+
+def test_compile_abm_worktree_mock():
+    with (
+        patch("shutil.which", return_value="/usr/bin/cmake"),
+        patch("subprocess.run") as mock_run,
+        patch("shutil.copy2"),
+        patch("pathlib.Path.is_file", return_value=True),
+    ):
+        mock_run.return_value = MagicMock(returncode=0, stdout="OK", stderr="")
+        success, res_path = compile_abm(worktree="/tmp/fake_worktree")
+        assert success is True
+        assert "fake_worktree" in res_path
 
 
 def test_compile_abm_cmake_missing():

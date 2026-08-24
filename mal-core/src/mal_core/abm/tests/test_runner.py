@@ -186,3 +186,18 @@ class TestManifestWrapper:
                             # Check snapshot_every was in the call
                             call_kwargs = mock_instance.run.call_args[1]
                             assert call_kwargs.get("snapshot_every") == 1
+
+    def test_run_abm_passes_worktree(self):
+        """run_abm() should pass worktree to CppAbmWrapper."""
+        from mal_core.abm.runner import run_abm
+
+        with patch("mal_core.abm.runner.CppAbmWrapper") as MockWrapper:
+            mock_instance = MockWrapper.return_value
+            mock_instance.run.return_value = {
+                "stdout": "", "stderr": "", "returncode": 0,
+            }
+            run_abm(
+                aoi="ghana", year=2024, month=1,
+                days=7, seed=1, worktree="/tmp/fake_worktree",
+            )
+            MockWrapper.assert_called_once_with(worktree="/tmp/fake_worktree")

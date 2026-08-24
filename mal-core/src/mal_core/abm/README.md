@@ -41,8 +41,19 @@ reference (`mal_ghana_sim.abm`). All F1 acceptance criteria are met:
 From anywhere in the repo (or from an environment with `mal_core` installed):
 
 ```bash
-malariasim abm --compile           # Configure and build
-malariasim abm --compile --clean   # Clean build directory before building
+malariasim abm --compile                      # Configure and build in current environment
+malariasim abm --compile --clean              # Clean build directory before building
+malariasim abm --compile --worktree <path>    # Compile inside an isolated gawt worktree
+```
+
+## Run
+
+```bash
+# Standard simulation run
+malariasim abm --aoi ghana --days 30 --seed 1
+
+# Simulation run using binary from isolated gawt worktree
+malariasim abm --worktree .gitagent/worktree --aoi ghana --days 30 --seed 1
 ```
 
 ## Build (macOS / local dev manual)

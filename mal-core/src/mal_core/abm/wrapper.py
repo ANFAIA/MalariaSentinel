@@ -10,20 +10,42 @@ from typing import Any
 log = logging.getLogger(__name__)
 
 class CppAbmWrapper:
-    def __init__(self, binary_path: Path | None = None):
+    def __init__(
+        self,
+        binary_path: Path | None = None,
+        worktree: str | Path | None = None,
+    ):
+        self.worktree = Path(worktree).resolve() if worktree else None
         self.binary = binary_path or self._resolve_binary()
         self._flags_schema: dict[str, dict[str, Any]] | None = None
 
     def _resolve_binary(self) -> Path:
+        candidate_dirs: list[Path] = []
+        worktree = getattr(self, "worktree", None)
+        if worktree:
+            wt_abm = worktree / "mal-core" / "src" / "mal_core" / "abm"
+            if wt_abm.is_dir():
+                candidate_dirs.append(wt_abm)
+            elif (worktree / "CMakeLists.txt").is_file():
+                candidate_dirs.append(worktree)
+            else:
+                candidate_dirs.append(wt_abm)
         pkg_dir = Path(__file__).parent
-        bin_path = pkg_dir / "bin" / f"mal_abm_fast_{sys.platform}"
-        if bin_path.exists():
-            return bin_path
-        build_path = pkg_dir / "build" / "src" / "mal_abm_fast"
-        if build_path.exists():
-            return build_path
+        candidate_dirs.append(pkg_dir)
+
+        for base in candidate_dirs:
+            bin_path = base / "bin" / f"mal_abm_fast_{sys.platform}"
+            if bin_path.exists():
+                return bin_path
+            build_path = base / "build" / "src" / "mal_abm_fast"
+            if build_path.exists():
+                return build_path
+
+        err_hint = "malariasim abm --compile"
+        if worktree:
+            err_hint += f" --worktree {worktree}"
         raise FileNotFoundError(
-            f"ABM binary not found. Run: malariasim abm --compile (or bash {pkg_dir / 'build.sh'})"
+            f"ABM binary not found. Run: {err_hint} (or bash {pkg_dir / 'build.sh'})"
         )
 
     def _introspect_flags(self) -> dict[str, dict[str, Any]]:
@@ -73,6 +95,7 @@ def run_abm_from_manifest(
     output_dir: str | Path | None = None,
     data_root: str | Path | None = None,
     timeout: int = 3600,
+    worktree: str | Path | None = None,
     **kwargs,
 ) -> dict[str, Any]:
     """Run ABM using manifest to resolve data paths.
@@ -172,7 +195,7 @@ def run_abm_from_manifest(
     flags.update(kwargs)
 
     log.info("Running ABM for %s (year=%d, seed=%d)", aoi, year, seed)
-    wrapper = CppAbmWrapper()
+    wrapper = CppAbmWrapper(worktree=worktree)
     result = wrapper.run(**flags, _timeout=timeout)
 
     return {"output_path": str(output_path), **result}

@@ -2,6 +2,7 @@
 
 Enables compiling the C++ simulation engine from any directory via:
     malariasim abm --compile
+    malariasim abm --compile --worktree .gitagent/worktree
 """
 from __future__ import annotations
 
@@ -17,12 +18,33 @@ log = logging.getLogger(__name__)
 ABM_PKG_DIR = Path(__file__).resolve().parent
 
 
-def get_abm_dirs() -> tuple[Path, Path, Path]:
-    """Return (source_dir, build_dir, bin_dir) as absolute Paths."""
-    src_dir = ABM_PKG_DIR
-    build_dir = ABM_PKG_DIR / "build"
-    bin_dir = ABM_PKG_DIR / "bin"
+def resolve_abm_dirs(worktree: str | Path | None = None) -> tuple[Path, Path, Path]:
+    """Resolve (source_dir, build_dir, bin_dir) as absolute Paths.
+
+    If worktree is provided, looks for the ABM package inside the worktree
+    (e.g. <worktree>/mal-core/src/mal_core/abm or directly at <worktree>).
+    Otherwise defaults to the installed ABM_PKG_DIR.
+    """
+    if worktree:
+        wt = Path(worktree).resolve()
+        nested_abm = wt / "mal-core" / "src" / "mal_core" / "abm"
+        if (nested_abm / "CMakeLists.txt").is_file():
+            src_dir = nested_abm
+        elif (wt / "CMakeLists.txt").is_file():
+            src_dir = wt
+        else:
+            src_dir = nested_abm
+    else:
+        src_dir = ABM_PKG_DIR
+
+    build_dir = src_dir / "build"
+    bin_dir = src_dir / "bin"
     return src_dir, build_dir, bin_dir
+
+
+def get_abm_dirs(worktree: str | Path | None = None) -> tuple[Path, Path, Path]:
+    """Return (source_dir, build_dir, bin_dir) as absolute Paths."""
+    return resolve_abm_dirs(worktree)
 
 
 def _detect_nproc() -> int:
@@ -48,6 +70,7 @@ def _find_macos_prefixes() -> list[str]:
 
 def compile_abm(
     *,
+    worktree: str | Path | None = None,
     clean: bool = False,
     build_type: str = "Release",
     target: str | None = None,
@@ -57,6 +80,7 @@ def compile_abm(
     """Compile the C++ ABM binary (mal_abm_fast).
 
     Args:
+        worktree: Optional path to a gawt worktree root or ABM source directory.
         clean: If True, removes the build directory before configuring.
         build_type: CMake build type ("Release", "Debug", etc.).
         target: Specific CMake target to build (default: all).
@@ -66,7 +90,7 @@ def compile_abm(
     Returns:
         (success, message_or_binary_path)
     """
-    src_dir, build_dir, bin_dir = get_abm_dirs()
+    src_dir, build_dir, bin_dir = resolve_abm_dirs(worktree)
 
     if not (src_dir / "CMakeLists.txt").is_file():
         return False, f"CMakeLists.txt not found in {src_dir}"
@@ -161,7 +185,7 @@ def compile_abm(
         shutil.copy2(built_bin, dest_bin)
         dest_bin.chmod(0o755)
     except OSError as e:
-        log.warning("Could not copy binary to %s: %e", dest_bin, e)
+        log.warning("Could not copy binary to %s: %s", dest_bin, e)
         # Fall back to returning the built binary directly
         return True, str(built_bin)
 

@@ -200,7 +200,7 @@ class TestTailOutput:
         result = _tail_output(text, n=30)
         assert "70 lines truncated" in result
         assert "line99" in result
-        assert "line69" in result
+        assert "line70" in result
 
     def test_one_line_output(self):
         assert _tail_output("single\n", n=30) == "single\n"

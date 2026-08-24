@@ -1,14 +1,16 @@
 """ABM subpackage — C++ simulation engine + Python wrapper."""
-from .wrapper import CppAbmWrapper, run_abm_from_manifest
-from .runner import run_abm
+from .compile import compile_abm, get_abm_dirs, resolve_abm_dirs
 from .flags import ABM_FLAGS_SCHEMA, AbmFlags
-from .compile import compile_abm
+from .runner import run_abm
+from .wrapper import CppAbmWrapper, run_abm_from_manifest
 
 __all__ = [
-    "CppAbmWrapper",
-    "run_abm",
-    "run_abm_from_manifest",
     "ABM_FLAGS_SCHEMA",
     "AbmFlags",
+    "CppAbmWrapper",
     "compile_abm",
+    "get_abm_dirs",
+    "resolve_abm_dirs",
+    "run_abm",
+    "run_abm_from_manifest",
 ]

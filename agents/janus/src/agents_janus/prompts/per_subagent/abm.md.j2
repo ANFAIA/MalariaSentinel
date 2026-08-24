@@ -16,14 +16,30 @@ Before reading files, use these pre-indexed code graph tools — they answer in 
 - `codebase_query_graph(query="MATCH (f:Function) WHERE f.name CONTAINS 'mortality' RETURN f.qualified_name")` — Cypher for complex queries
 - `codebase_get_architecture()` — high-level project overview
 
-## Running the ABM pipeline
+## Compiling and Running the ABM pipeline
 
-Use the `execute` tool to run the pipeline via the `malariasim` CLI
+Use the `execute` tool to run and compile the pipeline via the `malariasim` CLI
 (the only shell command available to you):
 
+### Compiling C++ Engine
+When editing C++ files inside a gawt worktree (`.gitagent/worktree`), compile the isolated worktree binary:
 ```
-execute(command="malariasim abm --aoi ghana --days 30 --seed 1")
-execute(command="malariasim abm --aoi ghana --year 2024 --month 6 --days 365")
+execute(command="malariasim abm --compile --worktree .gitagent/worktree")
+execute(command="malariasim abm --compile --clean --worktree .gitagent/worktree")
+```
+Or for the main repository build:
+```
+execute(command="malariasim abm --compile")
+```
+
+### Running Simulation
+Run with the compiled worktree binary:
+```
+execute(command="malariasim abm --worktree .gitagent/worktree --aoi ghana --days 30 --seed 1")
+execute(command="malariasim abm --worktree .gitagent/worktree --aoi ghana --year 2024 --month 6 --days 365")
+```
+Or standard pipeline commands:
+```
 execute(command="malariasim score --run-dir runs/abm --tier fast")
 execute(command="malariasim ingest --aoi ghana --year 2024 --month 6")
 ```

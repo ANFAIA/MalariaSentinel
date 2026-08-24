@@ -213,6 +213,12 @@ def abm(
     gif: bool = typer.Option(False, "--gif", help="Auto-generate an animation GIF after the run."),
     compile: bool = typer.Option(False, "--compile", "-c", help="Compile the C++ ABM engine (mal_abm_fast) from source."),
     clean: bool = typer.Option(False, "--clean", help="Clean build directory before compiling (used with --compile)."),
+    worktree: Path | None = typer.Option(
+        None,
+        "--worktree",
+        "-w",
+        help="Path to gawt worktree (e.g. .gitagent/worktree) for isolated compile and run.",
+    ),
 ) -> None:
     """Run the agent-based malaria simulation or compile the C++ engine.
 
@@ -220,9 +226,13 @@ def abm(
     and transmission potential using the mal_abm_fast C++ engine.
 
     Compilation:
-      malariasim abm --compile              # Compile the C++ ABM engine from any directory
-      malariasim abm --compile --clean      # Clean recompile from scratch
-      malariasim abm --compile --aoi ghana  # Compile then run simulation
+      malariasim abm --compile                      # Compile main C++ engine
+      malariasim abm --compile --clean              # Clean recompile from scratch
+      malariasim abm --compile --worktree <path>    # Compile inside a gawt worktree
+      malariasim abm --compile --aoi ghana          # Compile then run simulation
+
+    Worktree isolation:
+      malariasim abm --worktree .gitagent/worktree --aoi ghana --days 30
 
     Simulation parameters:
       --aoi: AOI slug (e.g. ghana; required when not compiling only)
@@ -232,6 +242,7 @@ def abm(
       --snapshot-every: Intermediate output interval
       --cohort-log: Daily eggs/larvae/pupae/adult statistics JSON
       --gif: Auto-generate an animation GIF after the run
+      --worktree: Path to gawt worktree for isolated execution
 
     Use one invocation for multi-year runs. Splitting by month loses
     population, aquatic cohort, and engine state.
@@ -239,8 +250,9 @@ def abm(
     if compile:
         from .abm import compile_abm
 
-        typer.echo("Compiling C++ ABM engine (mal_abm_fast)...")
-        success, message = compile_abm(clean=clean)
+        wt_desc = f" in worktree {worktree}" if worktree else ""
+        typer.echo(f"Compiling C++ ABM engine (mal_abm_fast){wt_desc}...")
+        success, message = compile_abm(worktree=worktree, clean=clean)
         if not success:
             typer.echo(f"Compilation failed:\n{message}", err=True)
             raise typer.Exit(code=1)
@@ -270,6 +282,7 @@ def abm(
         timeout=timeout,
         output_dir=output_dir,
         data_root=data_root,
+        worktree=worktree,
     )
     typer.echo(f"ABM result: {result}")
 

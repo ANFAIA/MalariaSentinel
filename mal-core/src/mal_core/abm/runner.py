@@ -32,6 +32,7 @@ def run_abm(
     snapshot_every: int = 7,
     output_dir: Path | None = None,
     timeout: int = _DEFAULT_TIMEOUT,
+    worktree: str | Path | None = None,
     **extra_flags,
 ) -> dict[str, Any]:
     """Run the ABM for a single contiguous period.
@@ -55,6 +56,8 @@ def run_abm(
         Directory for output files.  Created if it does not exist.
     timeout : int
         Subprocess timeout in seconds (default 600).
+    worktree : str | Path | None
+        Optional path to a gawt worktree root for isolated binary resolution.
     **extra_flags
         Forwarded to the C++ binary as CLI flags.
 
@@ -66,7 +69,7 @@ def run_abm(
     if days < 1 or days > _CPP_MAX_DAYS:
         raise ValueError(f"days must be 1..{_CPP_MAX_DAYS}, got {days}")
 
-    wrapper = CppAbmWrapper()
+    wrapper = CppAbmWrapper(worktree=worktree)
     flags: dict[str, Any] = {
         "aoi": aoi,
         "year": year,
