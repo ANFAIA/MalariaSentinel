@@ -63,7 +63,7 @@ class CppAbmWrapper:
             flags[name] = {"type": tmap.get(ftype, str), "default": None, "help": desc}
         return flags
 
-    def run(self, _timeout: int = 600, **flags) -> dict[str, Any]:
+    def run(self, _timeout: int | None = None, **flags) -> dict[str, Any]:
         if self._flags_schema is None:
             self._flags_schema = self._introspect_flags()
         cmd = [str(self.binary), "run"]
@@ -94,7 +94,7 @@ def run_abm_from_manifest(
     n_rollouts: int = 1,
     output_dir: str | Path | None = None,
     data_root: str | Path | None = None,
-    timeout: int = 3600,
+    timeout: int | None = None,
     worktree: str | Path | None = None,
     **kwargs,
 ) -> dict[str, Any]:

@@ -21,7 +21,7 @@ def run(
     seed: int = typer.Option(1, help="Random seed."),
     snapshot_every: int = typer.Option(1, help="Snapshot interval in days (1=daily)."),
     output_dir: Path | None = typer.Option(None, help="Output directory."),
-    timeout: int = typer.Option(600, help="Subprocess timeout in seconds."),
+    timeout: int | None = typer.Option(None, help="Optional subprocess timeout in seconds (default: None)."),
 ) -> None:
     """Run an ABM simulation and print the result as JSON."""
     result = run_abm(

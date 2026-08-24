@@ -31,7 +31,7 @@ def run_abm(
     n_rollouts: int = 1,
     snapshot_every: int = 7,
     output_dir: Path | None = None,
-    timeout: int = _DEFAULT_TIMEOUT,
+    timeout: int | None = None,
     worktree: str | Path | None = None,
     **extra_flags,
 ) -> dict[str, Any]:

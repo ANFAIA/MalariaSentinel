@@ -207,7 +207,7 @@ def abm(
     n_rollouts: int = typer.Option(1, "--n-rollouts", help="Parallel rollouts for ensemble runs."),
     snapshot_every: int = typer.Option(1, "--snapshot-every", help="Snapshot interval in days (0=final only)."),
     cohort_log: Path | None = typer.Option(None, "--cohort-log", help="Daily cohort JSON path."),
-    timeout: int = typer.Option(3600, "--timeout", help="Subprocess timeout in seconds."),
+    timeout: int | None = typer.Option(None, "--timeout", help="Optional subprocess timeout in seconds (default: None)."),
     output_dir: Path = typer.Option(Path("runs/abm"), "--output-dir", help="Output directory for simulation results."),
     data_root: Path | None = typer.Option(None, "--data-root", help="Root containing AOI manifest."),
     gif: bool = typer.Option(False, "--gif", help="Auto-generate an animation GIF after the run."),
