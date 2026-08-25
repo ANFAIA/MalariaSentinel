@@ -32,12 +32,17 @@ Las atribuciones requeridas por cada licencia se detallan a continuación.
 | 18 | Agyekum TP, Arko-Mensah J, Botwe PK, Hogarh JN, Issah I, Dwomoh D, et al. Effects of elevated temperatures on the development of immature stages of *Anopheles gambiae* (s.l.) mosquitoes. *Tropical Medicine & International Health* (2022) 27(4):338–346 | **© Wiley** — Reproducido bajo fair use para investigación académica | [10.1111/tmi.13732](https://doi.org/10.1111/tmi.13732) |
 | 19 | Ouédraougou et al. *Anopheles* aquatic development kinetic and adults' longevity through different seasons in laboratory and semi-field conditions in Burkina Faso. *Parasites & Vectors* (2024) 17:Article 162 | **CC-BY 4.0** (BMC Open Access) | [10.1186/s13071-024-06260-2](https://doi.org/10.1186/s13071-024-06260-2) |
 | 20 | Diallo M, Dao A, Sanogo ZL, Cissé K, Coulibaly B, Samaké D, et al. Continuous mark-release recapture to improve estimates of movement and survival of the African malaria mosquitoes. *bioRxiv* preprint (2026) | **CC-BY 4.0** (bioRxiv preprint server) | [10.64898/2026.06.24.734339](https://doi.org/10.64898/2026.06.24.734339) |
+| 21 | CDC. Operational Guidance for Investigating Locally Acquired Mosquito-Transmitted Malaria — United States, 2026. *MMWR Recommendations and Reports* (2026) 75(1) | **Dominio público** (CDC) | [10.15585/mmwr.rr7501a1](https://doi.org/10.15585/mmwr.rr7501a1) |
+| 22 | Slimani Y, et al. Airport Malaria Cluster in Certified Malaria-Free Country, Libya, 2024. *Emerging Infectious Diseases* (2026) 32(2) | **Dominio público** (CDC) | [10.3201/eid3202.251508](https://doi.org/10.3201/eid3202.251508) |
+| 23 | Alemayehu G, et al. Autochthonous *Plasmodium vivax* Infections, Florida, USA, 2023. *Emerging Infectious Diseases* (2024) 30(6) | **Dominio público** (CDC) | [10.3201/eid3006.240336](https://doi.org/10.3201/eid3006.240336) |
+| 24 | Hallmaier-Wacker LK, van Eick MD, Briët O, et al. Airport and luggage (Odyssean) malaria in Europe: a systematic review. *Eurosurveillance* (2024) 29(41):2400237 | **CC-BY 4.0** | [10.2807/1560-7917.ES.2024.29.41.2400237](https://doi.org/10.2807/1560-7917.ES.2024.29.41.2400237) |
+| 25 | Nkemka SN, et al. Airport Malaria in Non-Endemic Areas: New Insights into Mosquito Vectors, Case Management and Major Challenges. *Microorganisms* (2021) 9(10):2160 | **CC-BY 4.0** (MDPI Open Access) | [10.3390/microorganisms9102160](https://doi.org/10.3390/microorganisms9102160) |
 
 ---
 
 ## Notas sobre las licencias
 
-### CC-BY 4.0 (Papers 1–7, 11, 13, 16, 17, 19, 20)
+### CC-BY 4.0 (Papers 1–7, 11, 13, 16, 17, 19, 20, 24, 25)
 Estos artículos pueden ser compartidos, copiados, y redistribuidos en cualquier
 medio o formato, y adaptados (remezclados, transformados, o construidos a partir
 del material) para cualquier propósito, incluso comercial. La atribución debe
@@ -107,3 +112,12 @@ Papers sobre biología, ecología y dinámica poblacional de los vectores *Anoph
 ### `papers/perplexity-investigations/`
 Notas de investigación generadas internamente mediante Perplexity AI.
 Sin restricciones de licencia — contenido original del proyecto.
+
+### `papers/outbreak-dynamics/`
+Investigación sobre mecanismos de reintroducción de malaria en países libres de la enfermedad.
+
+- **CDC 2026** — Guía operacional investigación brotes autoctonos EE.UU. (dominio público) [Paper 21] → `CDC-2026-guia-brotes.md`
+- **Slimani 2026** — Airport malaria cluster Libia (dominio público) [Paper 22] → `Slimani-2026-airport-malaria-libia.md`
+- **Alemayehu 2024** — Transmisión local P.vivax Florida (dominio público) [Paper 23] → `Alemayehu-2024-florida-pvivax.md`
+- **Hallmaier-Wacker 2024** — Revisión sistemática airport luggage malaria Europa (CC-BY 4.0) [Paper 24] → `Hallmaier-Wacker-2024-airport-malaria-europa.md`
+- **Nkemka 2021** — Airport malaria en áreas no endémicas (CC-BY 4.0) [Paper 25] → `Nkemka-2021-airport-malaria-review.md`

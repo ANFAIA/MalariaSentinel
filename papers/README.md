@@ -15,6 +15,7 @@ papers/
   abm-geospatial/         Agent-based models with geospatial integration
   abm-intervention/       ABMs for intervention evaluation (gene drives, SMC, metapopulation)
   anopheles-dynamics/     Vector population dynamics and thermal response
+  outbreak-dynamics/      Malaria reintroduction mechanisms (airport malaria, imported cases)
   risk-mapping/           Geospatial risk mapping and climate projections
   sdss-elimination/       SDSS implementations for malaria elimination
   perplexity-investigations/  Internal research notes (Anopheles biology, habitat data)
@@ -35,6 +36,7 @@ papers/
 | `anopheles-dynamics/` | Mordecai 2013 (thermal response), Greenwood 2014 (An. gambiae ABM), Rakotoarison 2025 (Madagascar), Bissett 2026 (Glasgow thesis) | Journal/thesis |
 | `risk-mapping/` | Senegal 2025 (hazard-vulnerability), Symons 2026 (climate change), Gbaguidi 2026 (Benin), Smith 2024 (hydrology), Aduvukha 2025 (biting probability), Eudaric 2026 (flood zones) | Journal websites |
 | `sdss-elimination/` | Kelly 2013 (Solomon Islands), Wangdi 2016 (Bhutan), Cambodia 2025 (CIMS), SNT Toolbox 2025 | Journal/institutional |
+| `outbreak-dynamics/` | CDC 2026 (MMWR), Slimani 2026 (Libya EID), Alemayehu 2024 (Florida EID), Hallmaier-Wacker 2024 (Eurosurveillance), Nkemka 2021 (MDPI) | CDC/Eurosurveillance/MDPI |
 
 ## Paper Categories
 
@@ -42,6 +44,7 @@ papers/
 - `core-hypothesis/` — environmental driver evidence
 - `spatial-analysis/` — spatial methodology foundation
 - `anopheles-dynamics/Mordecai-2013` — thermal response parameterization
+- `outbreak-dynamics/` — malaria reintroduction mechanisms and airport malaria
 
 ### Condensed (structured summaries from research harness)
 - `abm-geospatial/`, `abm-intervention/`, `risk-mapping/`, `sdss-elimination/`, `anopheles-dynamics/` (non-Mordecai)
