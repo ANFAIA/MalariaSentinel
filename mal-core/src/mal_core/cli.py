@@ -309,7 +309,13 @@ def abm(
     typer.echo(f"ABM result: {result}")
 
     if gif:
-        _render_animation(aoi=aoi, seed=seed, output_dir=output_dir, cohort_log=cohort_log)
+        _render_animation(
+            aoi=aoi,
+            seed=seed,
+            output_dir=output_dir,
+            cohort_log=cohort_log,
+            enable_transmission=enable_transmission,
+        )
 
 
 def _render_animation(
@@ -317,21 +323,40 @@ def _render_animation(
     seed: int,
     output_dir: Path,
     cohort_log: Path | None,
+    enable_transmission: bool = False,
 ) -> None:
-    """Generate the animation GIF for an ABM run (used by --gif)."""
-    from .abm.scripts.visualize_state import main as visualize_main
+    """Generate animation GIFs for an ABM run (used by --gif)."""
+    import shutil
+    from .abm.scripts.visualize_state import main as visualize_vectors
+    from .abm.scripts.visualize_transmission import main as visualize_trans
 
     run_dir = Path(output_dir)
-    gif_path = run_dir / f"{aoi}_abm_seed{seed:04d}.gif"
+    vector_gif = run_dir / f"{aoi}_abm_seed{seed:04d}_vectors.gif"
+    default_gif = run_dir / f"{aoi}_abm_seed{seed:04d}.gif"
     cohort_path = cohort_log or run_dir / f"{aoi}_abm_seed{seed:04d}_cohort.json"
-    argv = ["--run-dir", str(run_dir), "--output", str(gif_path)]
+
+    # 1. Vector Dynamics GIF
+    argv_v = ["--run-dir", str(run_dir), "--output", str(vector_gif)]
     if cohort_path.exists():
-        argv += ["--cohort-log", str(cohort_path)]
+        argv_v += ["--cohort-log", str(cohort_path)]
     try:
-        visualize_main(argv)
-        typer.echo(f"Animation saved: {gif_path}")
+        visualize_vectors(argv_v)
+        if vector_gif.exists():
+            shutil.copyfile(vector_gif, default_gif)
+        typer.echo(f"Vector animation saved: {vector_gif}")
     except SystemExit as e:
-        typer.echo(f"Animation failed (exit {e.code}): no state_day*.tif snapshots?", err=True)
+        typer.echo(f"Vector animation failed (exit {e.code}): no state snapshots?", err=True)
+
+    # 2. Transmission Dynamics GIF (if transmission was enabled or transmission rasters exist)
+    trans_files = list(run_dir.glob("*transmission*.tif"))
+    if enable_transmission or len(trans_files) > 0:
+        trans_gif = run_dir / f"{aoi}_abm_seed{seed:04d}_transmission.gif"
+        argv_t = ["--run-dir", str(run_dir), "--output", str(trans_gif)]
+        try:
+            visualize_trans(argv_t)
+            typer.echo(f"Transmission animation saved: {trans_gif}")
+        except SystemExit as e:
+            typer.echo(f"Transmission animation failed (exit {e.code}): no transmission snapshots?", err=True)
 
 
 @app.command()
