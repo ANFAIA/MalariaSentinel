@@ -12,7 +12,6 @@ import numpy as np
 from rasterio.transform import from_bounds
 
 from mal_commonlib.aoi import AOI
-from mal_commonlib.config import AOI_E, AOI_N, AOI_S, AOI_W, DST_CRS, DST_RES
 from mal_commonlib.data.host_utils import (
     aggregate_to_grid,
     build_host_static_nc,

@@ -3,12 +3,11 @@
 Wraps ``mal_commonlib.aoi.AOI`` / ``Scale`` and adds:
 - per-scale grid definitions (resolution, tile size)
 - aggregation logic (raw raster, GADM-2 mean-pool, GADM-0 scalars)
-- AOI catalogue (known AOIs with their default parameters)
+- ``make_aoi()``: scale-aware factory that reads from the YAML registry
 """
 from __future__ import annotations
 
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Protocol
 
 import numpy as np
@@ -30,29 +29,18 @@ SCALE_GRIDS: dict[Scale, GridDef] = {
 }
 
 
-AOI_CATALOGUE: dict[str, dict] = {
-    "ghana": {
-        "name": "Ghana NMCP AOI",
-        "bbox": (-2.966805555532119, 4.692916666659342, 0.787916666690601, 9.792361111104462),
-        "crs": "EPSG:4326",
-        "gadm_id": "GHA",
-    },
-}
-
-
 def make_aoi(slug: str, scale: Scale) -> AOI:
-    if slug not in AOI_CATALOGUE:
-        raise KeyError(f"Unknown AOI {slug!r}. Known: {list(AOI_CATALOGUE)}")
-    entry = AOI_CATALOGUE[slug]
+    """Build an AOI from the YAML registry, overriding resolution for the scale."""
+    aoi = AOI.from_slug(slug)
     grid = SCALE_GRIDS[scale]
     return AOI(
-        slug=slug,
-        name=entry["name"],
-        bbox=entry["bbox"],
-        crs=entry["crs"],
+        slug=aoi.slug,
+        name=aoi.name,
+        bbox=aoi.bbox,
+        crs=aoi.crs,
         resolution_m=grid.resolution_m,
         scale=scale,
-        gadm_id=entry.get("gadm_id"),
+        gadm_id=aoi.gadm_id,
     )
 
 

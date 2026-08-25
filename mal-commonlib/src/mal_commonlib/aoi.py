@@ -22,6 +22,7 @@ from typing import TYPE_CHECKING
 import geopandas as gpd
 import pyproj
 import shapely.geometry
+import yaml
 from pydantic import BaseModel, Field, field_validator
 
 if TYPE_CHECKING:
@@ -38,6 +39,26 @@ class Scale(str, Enum):
 
 # Mean Earth radius in metres (WGS-84 authalic sphere approximation).
 _EARTH_R = 6_371_008.8
+
+# --- YAML registry -----------------------------------------------------------
+
+_AOIS_YAML_PATH = Path(__file__).parent / "aois.yaml"
+_registry_cache: dict | None = None
+
+
+def _load_aois_yaml() -> dict:
+    """Load aois.yaml once, cache for the process lifetime."""
+    global _registry_cache
+    if _registry_cache is None:
+        with open(_AOIS_YAML_PATH) as f:
+            _registry_cache = yaml.safe_load(f)
+    return _registry_cache
+
+
+def clear_aoi_cache() -> None:
+    """Reset the cached YAML registry (useful for testing)."""
+    global _registry_cache
+    _registry_cache = None
 
 
 class AOI(BaseModel):
@@ -220,31 +241,29 @@ class AOI(BaseModel):
             gadm_id=None,
         )
 
-    # -- slug registry -------------------------------------------------------
+    # -- slug registry (reads from aois.yaml) --------------------------------
 
     @classmethod
     def from_slug(cls, slug: str) -> "AOI":
         """Build an AOI from a slug key (e.g. ``'ghana'``).
 
-        Raises ``ValueError`` if the slug is not in the registry.
+        Reads ``aois.yaml`` bundled alongside this module.  Raises
+        ``ValueError`` if the slug is not in the registry.
         """
-        registry = {
-            "ghana": {
-                "bbox": (-3.5, 4.5, 1.5, 11.5),
-                "crs": "EPSG:4326",
-                "resolution_m": 1000,
-                "name": "Ghana NMCP AOI",
-            },
-        }
+        registry = _load_aois_yaml()
         if slug not in registry:
             raise ValueError(
                 f"Unknown AOI slug {slug!r}; available: {sorted(registry)}"
             )
         cfg = registry[slug]
-        return cls.from_bbox(
-            *cfg["bbox"], crs=cfg["crs"], slug=slug,
-            resolution_m=cfg["resolution_m"],
+        return cls(
+            slug=slug,
             name=cfg.get("name", slug),
+            bbox=tuple(cfg["bbox"]),
+            crs=cfg["crs"],
+            resolution_m=cfg["resolution_m"],
+            scale=Scale(cfg.get("scale", "regional")),
+            gadm_id=cfg.get("gadm_id"),
         )
 
     @classmethod
@@ -308,4 +327,4 @@ class AOI(BaseModel):
         )
 
 
-__all__ = ["AOI", "Scale"]
+__all__ = ["AOI", "Scale", "clear_aoi_cache"]

@@ -16,11 +16,6 @@ log = logging.getLogger(__name__)
 
 NODATA_SENTINEL: float = -9999.0
 
-# Minimal slug registry (promoted from build_environment.py).
-_DEFAULT_REGISTRY: dict[str, AOI] = {
-    "ghana": AOI.from_bbox(-3.5, 4.5, 1.5, 11.5, "EPSG:4326", "ghana", 1000),
-}
-
 
 def resolve_aoi(
     aoi: str | None,
@@ -30,7 +25,7 @@ def resolve_aoi(
     scale: Scale,
     name: str | None,
 ) -> AOI:
-    """Build an AOI from either the slug registry or an explicit bbox."""
+    """Build an AOI from either the YAML slug registry or an explicit bbox."""
     if bbox is not None:
         parts = [p.strip() for p in bbox.split(",")]
         if len(parts) != 4:
@@ -44,12 +39,7 @@ def resolve_aoi(
         )
     if aoi is None:
         raise ValueError("either aoi or bbox is required")
-    if aoi in _DEFAULT_REGISTRY:
-        return _DEFAULT_REGISTRY[aoi]
-    raise ValueError(
-        f"unknown AOI slug {aoi!r}; pass bbox for a custom region, "
-        f"or use one of: {sorted(_DEFAULT_REGISTRY)}"
-    )
+    return AOI.from_slug(aoi)
 
 
 def safe_load(

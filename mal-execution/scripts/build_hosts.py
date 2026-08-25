@@ -19,16 +19,15 @@ def main() -> None:
 
     from mal_core.ingest.hosts import build_host_dataset
     from mal_commonlib.aoi import AOI
-    from mal_commonlib.config import AOI_E, AOI_N, AOI_S, AOI_W, DST_RES
 
     if args.bbox:
         parts = [p.strip() for p in args.bbox.split(",")]
         w, s, e, n = (float(x) for x in parts)
-        aoi_obj = AOI.from_bbox(w, s, e, n, "EPSG:4326", "custom", DST_RES)
+        aoi_obj = AOI.from_bbox(w, s, e, n, "EPSG:4326", "custom", 1000)
     elif args.aoi:
         aoi_obj = AOI.from_slug(args.aoi)
     else:
-        aoi_obj = AOI.from_bbox(AOI_W, AOI_S, AOI_E, AOI_N, "EPSG:4326", "ghana", DST_RES)
+        aoi_obj = AOI.from_slug("ghana")
 
     result = build_host_dataset(
         aoi=aoi_obj,

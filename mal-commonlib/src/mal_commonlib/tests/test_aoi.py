@@ -178,3 +178,25 @@ def test_equality() -> None:
     assert a1 == a2
     a3 = AOI.from_bbox(GHANA_W, GHANA_S, GHANA_E, GHANA_N, "EPSG:4326", "ghana", 2000)
     assert a1 != a3
+
+
+# --- from_slug (YAML registry) -----------------------------------------------
+
+def test_from_slug_ghana() -> None:
+    a = AOI.from_slug("ghana")
+    assert a.slug == "ghana"
+    assert a.name == "Ghana NMCP AOI"
+    assert a.bbox == (GHANA_W, GHANA_S, GHANA_E, GHANA_N)
+    assert a.crs == "EPSG:4326"
+    assert a.resolution_m == 1000
+    assert a.scale == Scale.REGIONAL
+
+
+def test_from_slug_unknown_raises() -> None:
+    with pytest.raises(ValueError, match="Unknown AOI slug"):
+        AOI.from_slug("atlantis")
+
+
+def test_from_slug_invalid_format_raises() -> None:
+    with pytest.raises(ValueError, match="Unknown AOI slug"):
+        AOI.from_slug("Ghana")  # uppercase not in YAML

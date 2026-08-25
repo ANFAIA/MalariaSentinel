@@ -36,11 +36,24 @@ def discover_downloaders() -> dict[str, DownloaderSpec]:
             if raw is None:
                 continue
             profile_defaults = {
+                # --- env tensor (ingest/env.py) ---
                 "chirps": ["rainfall_daily"],
-                "era5": ["water_temp"],
+                "era5": ["water_temp", "wind_6hourly"],
+                "jrc_gsw": ["water_occurrence"],
+                "modis": ["ndvi"],
                 "hydrolakes": ["permanent_lakes"],
+                # --- habitat patches (ingest/env.py) ---
+                "dem": ["elevation"],
+                # --- host density (ingest/hosts.py) ---
+                "worldpop": ["population"],
+                "glw": ["cattle", "goats", "sheep", "pigs", "chickens"],
+                "ghsl": ["urban_class"],
+                "buildings": ["building_fraction"],
+                "wildlife": ["wildlife_host_proxy"],
+                # --- explicitly excluded (not ABM defaults) ---
                 "hydrorivers": [],
                 "worldcover": [],
+                "smap": [],
             }
             profile_formats = {
                 "era5": {"wind_6hourly": "daily", "water_temp": "monthly"},

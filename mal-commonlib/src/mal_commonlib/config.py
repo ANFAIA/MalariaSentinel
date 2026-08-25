@@ -32,6 +32,8 @@ LAYER_DIR.mkdir(exist_ok=True)
 STACK_CACHE = RUNS / "env_stack.npz"
 
 # --- AOI & grid (from the SRTM DEM bounds; metres, not degrees) ---
+# DEPRECATED: use AOI.from_slug("ghana") from aois.yaml instead.
+# These constants are the SRTM DEM crop, not the full national bbox.
 AOI_W, AOI_E = -2.966805555532119, 0.787916666690601
 AOI_S, AOI_N = 4.692916666659342, 9.792361111104462
 DST_CRS = "EPSG:32630"          # UTM zone 30N (Ghana)

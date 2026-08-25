@@ -1,6 +1,6 @@
 # MalariaSentinel — Estado del Proyecto y Arquitectura
 
-> Actualizado: 2026-07-26 · ABM C++ (M9 consolidated in mal-core): **M7.2** · Pipeline: **M9 complete** · DeepAgent: **M10 skeleton** · Tests: **26 Python (mal-core) + 60+ C++ + 14 calibration scorers**
+> Actualizado: 2026-08-25 · ABM C++ (M9 consolidated in mal-core): **M7.4.1** · Pipeline: **M9 complete** · DeepAgent: **M10 skeleton** · Tests: **83 Python (mal-core) + 261 C++ + 14 calibration scorers**
 
 ---
 
@@ -583,10 +583,18 @@ graph TB
 | `ADULT_TEMP_FALLBACK_C` | 25.0 | — | Temp fallback NaN pixels |
 | `CONTRACT_VERSION` | **"2.0"** | — | Band rename: adult_occupancy + host_seeking_pressure |
 | `GENERATOR_VERSION` | **"m7.1-m7.2-multiscale"** | — | — |
+| `CONTRACT_VERSION_TRANSMISSION` | **"2.0-transmission"** | — | Contract version para transmission COG |
+| `BETA_HV` | **0.40** | — | Probabilidad transmision humano→vector |
+| `BETA_VH` | **0.50** | — | Probabilidad transmision vector→humano |
+| `HUMAN_INCUBATION_DAYS` | **12** | — | Periodo incubacion intrinseco (E_H → I_H) |
+| `HUMAN_INFECTIOUS_DAYS` | **20** | — | Duracion infecciosidad (I_H → R_H) |
+| `IMMUNITY_DURATION_DAYS` | **180** | — | Duracion inmunidad temporal (R_H → S_H) |
 | `LARVA_DESICCATION_GRACE_DAYS` | 5 | — | Dias gracia desecacion |
 | `LARVA_DESICCATION_DAILY_RATE` | 0.10 | — | Tasa desecacion |
 
 **Cambios clave M7 vs F1**: Dispersal mas conservador (5% prob, sigma=450m, cap=2km). Nacimiento reemplazado por Mordecai EFD termico (0.25 fecundity constante + curva cuadratica). Mortalidad adulta recalibrada (basal 0.93, sigma=15, caps). Pluvial pool rain threshold revertido a 15mm (era 50mm en F1). Contract v2.0: bandas renombradas.
+
+**Cambios clave M7.4**: Transmision Ross-Macdonald SEIR-SEI bidireccional. Humano SEIR con cohort queues discretos (no Markov). EIP Plasmodium grado-dias. 4-band transmission COG independiente del state COG. Focal outbreak con warm-up delay (M7.4.1). Female-only vector infection (M7.4.1).
 
 ### Operaciones diarias del submodel (M7: lifecycle completo)
 
@@ -611,10 +619,17 @@ graph TB
         GN3["8. oviposition<br/>egg_production_rate(Mordecai EFD)"]
     end
 
-    END["updated SoA + AquaticCohortBank + BiteLedger"]
+    subgraph TRANSMISSION["Transmision SEIR-SEI (M7.4)"]
+        TR1["9. advance_vector_eip<br/>E_V → I_V (grado-dias)"]
+        TR2["10. advance_human_transmission<br/>S_H → E_H → I_H → R_H"]
+        TR3["11. record_daily_stats<br/>prevalence, incidence, r_eff"]
+    end
+
+    END["updated SoA + AquaticCohortBank + BiteLedger + HumanGrid"]
 
     START --> AQ1 --> AQ2 --> AD1 --> AD2 --> AD3
-    AD3 --> GN1 --> GN2 --> GN3 --> END
+    AD3 --> GN1 --> GN2 --> GN3
+    GN3 --> TR1 --> TR2 --> TR3 --> END
 
     style AQUATIC fill:#B0E0E6
     style ADULT fill:#FFE4B5
@@ -633,6 +648,9 @@ graph TB
 | 6 | `host_seeking` | Busqueda de hospedador nocturna (CO2 plume 35m, 12 sub-pasos) |
 | 7 | `gonotrophic_cycle` | 11 estados (TENERAL→...→OVIPOSITING), BiteLedger |
 | 8 | `oviposition` | Deposicion de huevos (Mordecai EFD termica, batch 30-170) |
+| 9 | `advance_vector_eip` | EIP Plasmodium: E_V → I_V (grado-dias, M7.4) |
+| 10 | `advance_human_transmission` | SEIR humano: S_H → E_H → I_H → R_H (cohort queues, M7.4) |
+| 11 | `record_daily_stats` | Estadisticas diarias SEIR (prevalence, incidence, r_eff, M7.4) |
 
 **Nuevas en M7**: `aquatic_cohort_bank`, `host_seeking`, `gonotrophic_cycle`, `oviposition`. Ciclo acuatico completo (egg→larva→pupa→adult). Busqueda de hospedador nocturna (multirate scheduler). Ciclo gonotrofico de 11 estados.
 
@@ -683,6 +701,14 @@ sequenceDiagram
 
     SUB-->>ENG: updated SoA + BiteLedger
 
+    alt Transmision activa (M7.4)
+        ENG->>TRANS: advance_vector_eip(soa, climate, patches, aoi)
+        TRANS-->>ENG: E_V -> I_V transitions
+        ENG->>TRANS: advance_human_transmission(bite_ledger, aoi)
+        TRANS-->>ENG: S_H -> E_H -> I_H -> R_H transitions
+        ENG->>TRANS: record_daily_stats(day, soa, bite_ledger)
+    end
+
     alt Fin de mes
         ENG->>COORD: aggregate_density(sub)
         COORD-->>ENG: DensityGrid
@@ -715,9 +741,14 @@ sequenceDiagram
    → [nocturno] gonotrophic_cycle (11 estados, BiteLedger)
    → [nocturno] oviposition (Mordecai EFD termica)
 
+   → [si transmision activa] advance_vector_eip (E_V → I_V, grado-dias)
+   → [si transmision activa] advance_human_transmission (S_H → E_H → I_H → R_H)
+   → [si transmision activa] record_daily_stats
+
 4. snapshot(...) (fin de mes)
    → aggregate_density + suitability_grid
    → write_state_cog (2-band COG: adult_occupancy + host_seeking_pressure, contract v2.0)
+   → [si transmision] write_transmission_cog (4-band COG: prevalence + incidence + pressure + focus)
 ```
 
 ### CLI del motor C++
@@ -782,6 +813,15 @@ mal-core/src/mal_core/abm/bin/mal_abm_fast_darwin run --snapshot-every 1 --n-rol
 - **Band 1**: density (mosquitos / K_MAX ∈ [0,1])
 - **Band 2**: suitability (adult density by cell / K_MAX ∈ [0,1])
 - **Sidecar JSON**: crs, transform, seed, n_rollouts, rollout_index, contract_version, band_names, k_max, generator_version
+
+### Output: Transmission COG (v2.0-transmission, M7.4)
+
+- **Band 1**: human_prevalence (I_H / H ∈ [0,1])
+- **Band 2**: human_incidence (new E_H / H ∈ [0,1])
+- **Band 3**: infectious_vector_pressure (picaduras infecciosas hoy)
+- **Band 4**: active_focus (1.0 si prevalence > threshold o incidence > 0)
+- **Sidecar JSON**: crs, transform, seed, contract_version (2.0-transmission), band_names, generator_version
+- **Transmission log JSON**: historial diario SEIR stats
 
 ### Determinismo
 
@@ -922,7 +962,7 @@ graph TB
     subgraph DEEPAGENTS["Janus orchestrator (M10)"]
         DA["agents/janus/<br/>LangChain deepagents"]
         DA_CYCLES["3 cycles:<br/>calibration, feature, research"]
-        DA_TOOLS["5 tools:<br/>gitagent, pipeline,<br/>kg, improve, opencode"]
+        DA_TOOLS["4 tools:<br/>gitagent, pipeline,<br/>kg, opencode"]
     end
 
     subgraph MEMORIA["Memory module"]
@@ -979,7 +1019,7 @@ graph TB
 **Dependencias**: deepagents, langgraph, langchain-core, typer, rich
 **CLI**: `janus` (entry point) o `uv run python -m agents.janus`
 
-Orquestador LangChain DeepAgents para calibracion automatica del ABM. Usa gitagent para aislamiento en worktrees, OpenCode/Exa para busqueda web, y el pipeline de mal-core para scoring.
+Orquestador LangChain DeepAgents para calibracion automatica del ABM. Usa gitagent para aislamiento en worktrees, OpenCode/Exa para busqueda web, y el pipeline de mal-core para scoring. Sesiones gawt concurrentes aisladas. `resolve_conflict` tool eliminado.
 
 | Ciclo | Descripcion |
 |---|---|
@@ -992,7 +1032,6 @@ Orquestador LangChain DeepAgents para calibracion automatica del ABM. Usa gitage
 | `gitagent_tool.py` | Spawn, proposals, integrate, finalize worktrees |
 | `pipeline_tool.py` | Run calibration, compare scorecards |
 | `kg_tool.py` | Memory recall from knowledge graph |
-| `improve_tool.py` | Auto-apply improvements to prompts/tools |
 | `opencode_tool.py` | Web search via OpenCode/Exa |
 
 **Session logger**: registra cada paso del ciclo en JSON para auditoria.
@@ -1085,6 +1124,9 @@ Adult → [*]: muerte natural (Lardeux basal=0.93, sigma=15)
 | `MultirateScheduler` | 12 sub-pasos nocturnos (18:00-06:00) para host-seeking |
 | `ThermalResponses` | Curvas termicas Briere-1 (eggs/pupae) y quadratic (larvae) |
 | `BirthRate` | Mordecai EFD termica (reemplaza fecundity constante) |
+| `TransmissionModel` | Ross-Macdonald SEIR-SEI bidireccional (M7.4) |
+| `HumanCompartmentGrid` | SEIR humano con cohort queues discretos (M7.4) |
+| `TransmissionCogWriter` | 4-band transmission COG + sidecar + daily log (M7.4) |
 
 ### Simplificaciones (estado actual)
 
@@ -1179,7 +1221,7 @@ graph LR
 | ITN/IRS | No (BiteLedger mosquito_deaths preparado) | M8+ |
 | Poblacion | SoA + AquaticCohortBank | + mesa-frames |
 | Validacion | 14 calibration scorers (D1-D14) | 100+ rollouts |
-| Contract | v2.0 (adult_occupancy + host_seeking_pressure) | — |
+| Contract | v2.0 (state) + v2.0-transmission (4-band) | — |
 
 ---
 
@@ -1191,18 +1233,18 @@ graph LR
 
 **ABM C++ (mal-core/src/mal_core/abm/ M7.2)**: 60+ ctest + 14 calibration scorers (D1-D14), C++20 black-box equivalente, ciclo completo egg→larva→pupa→adult (cohort-based), ciclo gonotrofico 11 estados, host-seeking kernel (CO2 plume 35m), host data 9 variables, mobility OD matrices (CSR, 4 fases), Mortalidad Lardeux recalibrada (basal=0.93, sigma=15), nacimiento Mordecai EFD termico, PRNG xoshiro256** determinista, contract v2.0. Consolidado en mal-core (M9).
 
-**Host data pipeline (M7)**: WorldPop (poblacion), GLW4 (ganado), GHSL (urbano/rural), Overture Maps (building_fraction), wildlife proxy. Todo agrega a host_static.nc (9 variables). Mobility matrices via gravity model (build_mobility.py).
+**Host data pipeline (M7)**: WorldPop (poblacion), GLW4 (ganado), GHSL (urbano/rural), Overture Maps (building_fraction), wildlife proxy. Todo agrega a host_static.nc (9 variables). Mobility matrices via gravity model (build_mobility.py). Training/prediction adaptados para multi-channel transmission outputs (M7.4).
 
 **Pipeline SDSS (mal-core v0.2.0)**: U-Net 32-64-128-256, CLI `malariasim` (9 commands), FastAPI REST API, model registry, scenario config, AOI-driven data resolution. Subpackages: `pipeline/`, `prediction/`, `training/`, `scoring/`, `ingest/`, `abm/`. 26 Python tests.
 
-**Janus orchestrator (M10, skeleton)**: LangChain deepagents-based orchestrator para calibracion ABM. 3 cycles (calibration, feature, research), 5 tools (gitagent, pipeline, kg, improve, opencode), session logger, `--goal` flag. Registered en opencode.json como `janus-orchestrator`.
+**Janus orchestrator (M10, skeleton)**: LangChain deepagents-based orchestrator para calibracion ABM. 3 cycles (calibration, feature, research), 4 tools (gitagent, pipeline, kg, opencode), session logger, `--goal` flag. Registered en opencode.json como `janus-orchestrator`. Sesiones gawt concurrentes aisladas.
 
 ### Siguientes pasos
 
 1. **M7 completar**: Infeccion Plasmodium (parasite_eip_progress preparado), ITN/IRS (BiteLedger preparado), validacion 100+ rollouts
-2. **M3**: Generar 100+ rollouts con mal-core ABM → dataset → entrenar surrogate
+2. **M3**: Generar 100+ rollouts con mal-core ABM (con transmision) → dataset → entrenar surrogate
 3. **M4**: Integrar prediccion → risk maps mensuales
 4. **M5**: Interfaz SDSS para programas de eliminacion
 5. **M6**: Deployment en Ghana con datos en vivo
-6. **M8**: An. stephensi, resistencia kdr, Sharpe-DeMichele EIP
-7. **M10 completar**: DeepAgent cycles operacionales, integration con pipeline completo
+6. **M8**: An. stephensi, resistencia kdr, Sharpe-DeMichele EIP, ITN/IRS
+7. **M10 completar**: DeepAgent cycles operacionales, integration con pipeline completo, session isolation verificada

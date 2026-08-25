@@ -1,0 +1,27 @@
+# AOI registry — single source of truth for all slug → AOI mappings.
+# To add a new AOI: uncomment and edit the example below.
+# No code changes needed — AOI.from_slug() reads this file at runtime.
+#
+# Fields:
+#   slug          — [a-z0-9-], max 64 chars (used in filenames, CLI --aoi)
+#   name          — human-readable
+#   bbox          — [west, south, east, north] in CRS units
+#   crs           — EPSG code or WKT
+#   resolution_m  — cell size in metres
+#   scale         — regional | national | continental
+#   gadm_id       — optional GADM identifier
+
+ghana:
+  name: Ghana NMCP AOI
+  bbox: [-3.5, 4.5, 1.5, 11.5]
+  crs: "EPSG:4326"
+  resolution_m: 1000
+  scale: regional
+
+# --- Example: uncomment and edit for a new region ---
+# colombia-pacifico:
+#   name: Colombia Pacífico
+#   bbox: [-78.0, 1.5, -76.0, 4.0]
+#   crs: "EPSG:4326"
+#   resolution_m: 1000
+#   scale: regional
