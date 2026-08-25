@@ -50,7 +50,7 @@ class CppAbmWrapper:
 
     def _introspect_flags(self) -> dict[str, dict[str, Any]]:
         try:
-            result = subprocess.run([str(self.binary), "--help"], capture_output=True, text=True, timeout=10)
+            result = subprocess.run([str(self.binary), "--help"], capture_output=True, text=True)
             output = result.stdout + result.stderr
         except (subprocess.TimeoutExpired, FileNotFoundError):
             return {}

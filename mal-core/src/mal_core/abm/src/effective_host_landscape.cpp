@@ -76,6 +76,14 @@ EffectiveGrid EffectiveHostLandscape::sample_effective_hosts(
         if (frac > 0.0f && local.uniform_double() < frac) ++stock;
         if (stock <= 0) continue;
 
+        if (dests.size() == 1) {
+            const int32_t j = dests[0].first;
+            if (j >= 0 && j < n_cells_) {
+                out[static_cast<size_t>(j)] += static_cast<float>(stock);
+            }
+            continue;
+        }
+
         // Sequential multinomial draw over destinations, conserving stock
         // exactly by assigning the remainder to the last destination.
         double prob_remaining = 0.0;

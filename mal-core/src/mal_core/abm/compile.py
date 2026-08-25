@@ -74,7 +74,7 @@ def compile_abm(
     clean: bool = False,
     build_type: str = "Release",
     target: str | None = None,
-    timeout: int = 600,
+    timeout: int | None = None,
     verbose: bool = False,
 ) -> tuple[bool, str]:
     """Compile the C++ ABM binary (mal_abm_fast).
