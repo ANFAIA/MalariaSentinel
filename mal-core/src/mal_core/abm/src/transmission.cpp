@@ -8,6 +8,45 @@
 
 namespace mal_abm_fast {
 
+namespace {
+
+std::vector<std::tuple<int32_t, int32_t, double>> parse_explicit_foci(
+    const std::string& str, double default_cases)
+{
+    std::vector<std::tuple<int32_t, int32_t, double>> result;
+    if (str.empty()) return result;
+
+    size_t start = 0;
+    while (start < str.size()) {
+        size_t end = str.find(';', start);
+        if (end == std::string::npos) end = str.size();
+        std::string token = str.substr(start, end - start);
+        start = end + 1;
+
+        if (token.empty()) continue;
+        double cases = default_cases;
+        size_t colon_pos = token.find(':');
+        if (colon_pos != std::string::npos) {
+            try {
+                cases = std::stod(token.substr(colon_pos + 1));
+            } catch (...) {}
+            token = token.substr(0, colon_pos);
+        }
+
+        size_t comma_pos = token.find(',');
+        if (comma_pos != std::string::npos) {
+            try {
+                int32_t r = std::stoi(token.substr(0, comma_pos));
+                int32_t c = std::stoi(token.substr(comma_pos + 1));
+                result.push_back({r, c, cases});
+            } catch (...) {}
+        }
+    }
+    return result;
+}
+
+}  // namespace
+
 void TransmissionModel::init(
     int32_t h, int32_t w,
     const std::vector<float>& human_density,
@@ -24,6 +63,10 @@ void TransmissionModel::init(
     infectious_pressure_.assign(static_cast<size_t>(n_cells), 0.0f);
     history_.clear();
     last_day_stats_ = TransmissionDailyStats{};
+    outbreak_triggered_ = false;
+
+    double init_prev = (params_.human_seeding_mode == "uniform-legacy")
+        ? params_.initial_human_prevalence : 0.0;
 
     human_grid_.init(
         h_, w_, human_density,
@@ -31,7 +74,11 @@ void TransmissionModel::init(
         params_.human_infectious_days,
         params_.immunity_duration_days,
         params_.immunity_enabled,
-        params_.initial_human_prevalence);
+        init_prev);
+
+    if (params_.human_outbreak_day == 0 && params_.human_seeding_mode != "uniform-legacy") {
+        check_and_trigger_outbreak(0, {});
+    }
 }
 
 void TransmissionModel::seed_vector_infections(MosquitoSoA& soa, double fraction) {
@@ -51,6 +98,47 @@ void TransmissionModel::seed_vector_infections(MosquitoSoA& soa, double fraction
 
 void TransmissionModel::seed_human_infections(int32_t row, int32_t col, double count) {
     human_grid_.seed_infections(row, col, count);
+}
+
+std::vector<std::pair<int32_t, int32_t>> TransmissionModel::seed_random_viable_foci(
+    int32_t n_foci,
+    double cases_per_focus,
+    double min_pop,
+    const std::vector<float>& mosquito_density)
+{
+    return human_grid_.seed_random_viable_foci(n_foci, cases_per_focus, min_pop, mosquito_density, rng_);
+}
+
+void TransmissionModel::seed_explicit_foci(
+    const std::vector<std::tuple<int32_t, int32_t, double>>& foci)
+{
+    human_grid_.seed_explicit_foci(foci);
+}
+
+void TransmissionModel::check_and_trigger_outbreak(
+    int64_t day_index,
+    const std::vector<float>& mosquito_density)
+{
+    if (outbreak_triggered_) return;
+    if (day_index < params_.human_outbreak_day) return;
+    if (params_.human_seeding_mode == "none" || params_.human_seeding_mode == "uniform-legacy") {
+        outbreak_triggered_ = true;
+        return;
+    }
+
+    if (params_.human_seeding_mode == "random-viable") {
+        human_grid_.seed_random_viable_foci(
+            params_.human_outbreak_foci,
+            params_.human_outbreak_cases,
+            params_.human_min_cell_pop,
+            mosquito_density,
+            rng_);
+        outbreak_triggered_ = true;
+    } else if (params_.human_seeding_mode == "explicit") {
+        auto foci = parse_explicit_foci(params_.human_foci_coords, params_.human_outbreak_cases);
+        human_grid_.seed_explicit_foci(foci);
+        outbreak_triggered_ = true;
+    }
 }
 
 void TransmissionModel::advance_vector_eip(

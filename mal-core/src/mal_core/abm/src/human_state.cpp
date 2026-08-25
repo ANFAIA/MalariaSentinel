@@ -96,6 +96,63 @@ void HumanCompartmentGrid::seed_infections(int32_t row, int32_t col, double coun
     daily_prevalence_[c] = infectious_[c] / pop;
 }
 
+std::vector<std::pair<int32_t, int32_t>> HumanCompartmentGrid::seed_random_viable_foci(
+    int32_t n_foci,
+    double cases_per_focus,
+    double min_pop,
+    const std::vector<float>& mosquito_density,
+    Prng& rng)
+{
+    std::vector<std::pair<int32_t, int32_t>> seeded;
+    if (n_foci <= 0 || cases_per_focus <= 0.0) return seeded;
+
+    const int64_t n_cells = total_cells();
+    std::vector<int64_t> with_mosquitoes;
+    std::vector<int64_t> without_mosquitoes;
+
+    for (int64_t c = 0; c < n_cells; ++c) {
+        const size_t idx = static_cast<size_t>(c);
+        if (population_[idx] >= min_pop && susceptible_[idx] > 0.0) {
+            if (!mosquito_density.empty() && idx < mosquito_density.size() &&
+                mosquito_density[idx] > 0.0f)
+            {
+                with_mosquitoes.push_back(c);
+            } else {
+                without_mosquitoes.push_back(c);
+            }
+        }
+    }
+
+    std::vector<int64_t>& pool = (!with_mosquitoes.empty()) ? with_mosquitoes : without_mosquitoes;
+    if (pool.empty()) return seeded;
+
+    // Shuffle pool using Fisher-Yates
+    for (size_t i = pool.size() - 1; i > 0; --i) {
+        size_t j = static_cast<size_t>(rng.uniform_double() * static_cast<double>(i + 1));
+        if (j > i) j = i;
+        std::swap(pool[i], pool[j]);
+    }
+
+    const size_t count = std::min(static_cast<size_t>(n_foci), pool.size());
+    for (size_t i = 0; i < count; ++i) {
+        const int64_t c = pool[i];
+        const int32_t r = static_cast<int32_t>(c / w_);
+        const int32_t col = static_cast<int32_t>(c % w_);
+        seed_infections(r, col, cases_per_focus);
+        seeded.push_back({r, col});
+    }
+
+    return seeded;
+}
+
+void HumanCompartmentGrid::seed_explicit_foci(
+    const std::vector<std::tuple<int32_t, int32_t, double>>& foci)
+{
+    for (const auto& [r, c, cases] : foci) {
+        seed_infections(r, c, cases);
+    }
+}
+
 void HumanCompartmentGrid::advance_day(
     const std::vector<double>& force_of_infection,
     Prng& rng)

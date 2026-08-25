@@ -337,7 +337,7 @@ OUTPUT
     bool debug_population = false;
     std::string cohort_log_path;
 
-    // Transmission (M7.4 SEIR-SEI).
+    // Transmission (M7.4/M7.4.1 SEIR-SEI).
     bool   enable_transmission          = false;
     float  beta_hv                      = 0.40f;
     float  beta_vh                      = 0.50f;
@@ -347,6 +347,12 @@ OUTPUT
     bool   enable_immunity              = false;
     double initial_human_prevalence     = 0.05;
     double initial_vector_infected_frac = 0.0;
+    std::string human_seeding_mode      = "random-viable";
+    int    human_outbreak_day           = 0;
+    int    human_outbreak_foci          = 3;
+    double human_outbreak_cases         = 50.0;
+    double human_min_cell_pop           = 50.0;
+    std::string human_foci_coords       = "";
     float  transmission_focus_threshold = 0.01f;
     int    transmission_snapshot_every  = 0;
     std::string transmission_log_path;
@@ -562,6 +568,30 @@ OUTPUT
                     "Initial infectious fraction of human population (default 0.05).")
         ->default_val(0.05)
         ->group("Transmission (SEIR-SEI)");
+    run->add_option("--human-seeding-mode", human_seeding_mode,
+                    "Human infection seeding mode: 'random-viable' | 'explicit' | 'uniform-legacy' | 'none' (default 'random-viable').")
+        ->default_val("random-viable")
+        ->group("Transmission (SEIR-SEI)");
+    run->add_option("--human-outbreak-day", human_outbreak_day,
+                    "Day of simulation to trigger human outbreak (default 0).")
+        ->default_val(0)
+        ->group("Transmission (SEIR-SEI)");
+    run->add_option("--human-outbreak-foci", human_outbreak_foci,
+                    "Number of random foci for human outbreak (default 3).")
+        ->default_val(3)
+        ->group("Transmission (SEIR-SEI)");
+    run->add_option("--human-outbreak-cases", human_outbreak_cases,
+                    "Infectious human cases seeded per focus (default 50.0).")
+        ->default_val(50.0)
+        ->group("Transmission (SEIR-SEI)");
+    run->add_option("--human-min-cell-pop", human_min_cell_pop,
+                    "Minimum cell population to qualify as candidate focus (default 50.0).")
+        ->default_val(50.0)
+        ->group("Transmission (SEIR-SEI)");
+    run->add_option("--human-foci-coords", human_foci_coords,
+                    "Explicit foci coordinates 'r1,c1:N1;r2,c2:N2' for explicit mode.")
+        ->default_val("")
+        ->group("Transmission (SEIR-SEI)");
     run->add_option("--initial-vector-infected-frac", initial_vector_infected_frac,
                     "Initial infectious fraction of adult female mosquitoes (default 0.0).")
         ->default_val(0.0)
@@ -676,7 +706,7 @@ OUTPUT
         return EXIT_FAILURE;
     }
 
-    // -- Transmission config (M7.4) -----------------------------------
+    // -- Transmission config (M7.4/M7.4.1) ---------------------------
     mal_abm_fast::TransmissionParams transmission_params;
     transmission_params.enabled = enable_transmission;
     transmission_params.beta_hv = beta_hv;
@@ -687,6 +717,12 @@ OUTPUT
     transmission_params.immunity_enabled = enable_immunity;
     transmission_params.initial_human_prevalence = initial_human_prevalence;
     transmission_params.initial_vector_infected_frac = initial_vector_infected_frac;
+    transmission_params.human_seeding_mode = human_seeding_mode;
+    transmission_params.human_outbreak_day = human_outbreak_day;
+    transmission_params.human_outbreak_foci = human_outbreak_foci;
+    transmission_params.human_outbreak_cases = human_outbreak_cases;
+    transmission_params.human_min_cell_pop = human_min_cell_pop;
+    transmission_params.human_foci_coords = human_foci_coords;
     transmission_params.focus_threshold = transmission_focus_threshold;
 
     // -- Rollouts loop (F1.c) -------------------------------------------

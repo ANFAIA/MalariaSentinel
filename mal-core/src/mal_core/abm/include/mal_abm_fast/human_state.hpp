@@ -46,6 +46,21 @@ public:
     /// Seed explicit infectious humans at a specific cell (row, col).
     void seed_infections(int32_t row, int32_t col, double count);
 
+    /// Seed random viable foci: picks up to n_foci cells with population >= min_pop.
+    /// Prefers cells with mosquito_density > 0 if mosquito_density is non-empty.
+    /// Injects up to cases_per_focus into each selected cell as infectious humans (I_H).
+    /// Returns vector of selected (row, col) coordinates.
+    std::vector<std::pair<int32_t, int32_t>> seed_random_viable_foci(
+        int32_t n_foci,
+        double cases_per_focus,
+        double min_pop,
+        const std::vector<float>& mosquito_density,
+        Prng& rng);
+
+    /// Seed explicit foci list: vector of (row, col, cases).
+    void seed_explicit_foci(
+        const std::vector<std::tuple<int32_t, int32_t, double>>& foci);
+
     /// Advance one day given per-cell force of infection lambda_H in [0, 1].
     /// Computes new exposures S_H -> E_H via stochastic binomial sampling,
     /// advances discrete cohort queues E_H -> I_H, I_H -> R_H, R_H -> S_H,

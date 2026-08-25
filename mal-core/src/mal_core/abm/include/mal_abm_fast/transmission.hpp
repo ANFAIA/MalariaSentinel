@@ -41,9 +41,17 @@ struct TransmissionParams {
     bool    immunity_enabled       = false; // If false: SIS-like I_H -> S_H recovery
 
     // Initial infection conditions
-    double initial_human_prevalence     = 0.05; // Initial I_H fraction in inhabited cells
+    double initial_human_prevalence     = 0.05; // Initial I_H fraction in inhabited cells (used if mode == "uniform-legacy")
     double initial_vector_infected_frac = 0.0;  // Initial I_V fraction in adult females
     std::string initial_infected_path   = "";   // Optional raster/json path
+
+    // Focal seeding & outbreak control (M7.4.1)
+    std::string human_seeding_mode        = "random-viable"; // "random-viable" | "explicit" | "uniform-legacy" | "none"
+    int32_t     human_outbreak_day        = 0;               // Day to trigger human outbreak (0 = day 0)
+    int32_t     human_outbreak_foci       = 3;               // Number of random foci
+    double      human_outbreak_cases      = 50.0;            // Cases per focus
+    double      human_min_cell_pop        = 50.0;            // Minimum human population in candidate cell
+    std::string human_foci_coords         = "";              // "r1,c1:N1;r2,c2:N2"
 
     // Threshold for active transmission focus band
     float focus_threshold = 0.01f;
@@ -94,6 +102,22 @@ public:
     /// Seed explicit human infections at a specific cell.
     void seed_human_infections(int32_t row, int32_t col, double count);
 
+    /// Seed random viable foci: picks up to n_foci cells and injects cases.
+    std::vector<std::pair<int32_t, int32_t>> seed_random_viable_foci(
+        int32_t n_foci,
+        double cases_per_focus,
+        double min_pop,
+        const std::vector<float>& mosquito_density);
+
+    /// Seed explicit foci: vector of (row, col, cases).
+    void seed_explicit_foci(
+        const std::vector<std::tuple<int32_t, int32_t, double>>& foci);
+
+    /// Check and trigger human outbreak if day matches human_outbreak_day.
+    void check_and_trigger_outbreak(int64_t day_index, const std::vector<float>& mosquito_density);
+
+    bool outbreak_triggered() const { return outbreak_triggered_; }
+
     /// Advance extrinsic incubation period (EIP) for all exposed adult females (E_V -> I_V).
     void advance_vector_eip(MosquitoSoA& soa,
                             const ClimateEngine& climate,
@@ -137,6 +161,7 @@ private:
     std::vector<float>  infectious_pressure_;  // infectious bites per cell today
     TransmissionDailyStats last_day_stats_{};
     std::vector<TransmissionDailyStats> history_;
+    bool outbreak_triggered_ = false;
 };
 
 }  // namespace mal_abm_fast

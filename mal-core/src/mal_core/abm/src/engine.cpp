@@ -403,8 +403,11 @@ void Engine::step() {
     }
     sub_->advance_day(aoi_, coord_->patch_states_today());
 
-    // 3b. Transmission step (M7.4): advance vector EIP, human infections, and record stats
+    // 3b. Transmission step (M7.4/M7.4.1): advance vector EIP, human infections, and record stats
     if (transmission_model_ && transmission_model_->is_enabled()) {
+        const DensityGrid current_density = coord_->aggregate_density(*sub_, K_MAX);
+        transmission_model_->check_and_trigger_outbreak(
+            day_index, current_density.data);
         transmission_model_->advance_vector_eip(
             sub_->soa_mutable(), *climate_, coord_->patch_states_today(), aoi_);
         transmission_model_->advance_human_transmission(
