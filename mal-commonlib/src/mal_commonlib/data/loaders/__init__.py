@@ -1,12 +1,12 @@
 """Data loaders for the M1.3a env channels and host density layers."""
 
+from .coastline import load_coastline_land_mask
 from .jrc_gsw import load_jrc_gsw_water_frac
 from .worldpop import load_worldpop_population
 from .glw import load_glw_livestock
 from .ghsl import load_ghsl_urban_class
 from .wildlife import load_wildlife_host_proxy
 from .buildings import load_buildings_fraction
-from .hydrolakes import load_hydrolakes_permanent_lakes
 from .hydrorivers import load_hydrorivers_permanent_rivers, load_hydrorivers_river_proximity
 from .worldcover import (
     load_worldcover_landcover,
@@ -23,13 +23,13 @@ from .wildlife import WildlifeLoader
 from .buildings import BuildingsLoader
 
 __all__ = [
+    "load_coastline_land_mask",
     "load_jrc_gsw_water_frac",
     "load_worldpop_population",
     "load_glw_livestock",
     "load_ghsl_urban_class",
     "load_wildlife_host_proxy",
     "load_buildings_fraction",
-    "load_hydrolakes_permanent_lakes",
     "load_hydrorivers_permanent_rivers",
     "load_hydrorivers_river_proximity",
     "load_worldcover_landcover",

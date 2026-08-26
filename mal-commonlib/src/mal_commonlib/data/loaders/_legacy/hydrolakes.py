@@ -1,8 +1,18 @@
-"""HydroLAKES permanent lake mask loader (M12 — water dataset).
+"""HydroLAKES permanent lake mask loader (DEPRECATED — M12-fix 2026-08-26).
 
 Public surface
 --------------
 ``load_hydrolakes_permanent_lakes(aoi, *, year=2021, cache_dir=None) -> xr.DataArray``
+
+DEPRECATED
+----------
+This module is a JRC GSW threshold re-badge (>95% occurrence) and provides no
+additional signal over ``jrc_gsw.load_jrc_gsw_water_frac`` at the 1 km AOI grid.
+It has been moved to ``_legacy/`` and is **not** registered in
+``mal_core.download.registry``. Use ``jrc_gsw`` for permanent water; use the
+``coastline`` loader to filter out open-ocean cells.
+
+Retained for backward compatibility only; do not import from new code.
 
 The ``month`` parameter is accepted for signature uniformity with the other
 M1.3a loaders (``build_env`` calls every loader as ``loader(aoi, year, month)``

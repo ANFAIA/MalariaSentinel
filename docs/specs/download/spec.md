@@ -128,7 +128,8 @@ registry/auth/manifest plumbing, and the manifest would diverge.
 | `era5` | `cds` | `temp_suitability`, `water_temp`, `wind_6hourly` | `era5_temp`, `era5_water_temp`, `wind` | |
 | `chirps` | `none` | `rainfall`, `rainfall_daily` | `chirps_rainfall`, `chirps_rainfall_daily` | `formats`: `rainfall`=monthly, `rainfall_daily`=daily |
 | `dem` | `none` | `elevation` | `dem` | Falls back to NASADEM via Planetary Computer on MERIT auth failure |
-| `jrc_gsw` | `none` | `water_occurrence` | `jrc_water` | |
+| `jrc_gsw` | `none` | `water_occurrence` | `jrc_water` | Source of permanent water for the ABM profile |
+| `coastline` | `none` | `land_mask` | `coastline_land_mask` | GSHHG (Wessel & Smith 1996) shapefile archive (~149 MB, cached); rasterises land/coastal-water mask on AOI grid. Consumed by `daily_nc.py` saltwater filter (default 5 km buffer, override with `COASTLINE_BUFFER_M` env var; negative disables) |
 | `modis` | `earthdata` | `ndvi` | `modis_ndvi` | |
 | `smap` | `earthdata` | `salinity` | `smap_salinity` | RSS SMAP L3 SSS SMI Monthly V6.0 (PO.DAAC), `formats`: `salinity`=monthly_nc |
 | `worldpop` | `none` | `population` | `worldpop` | Accepts `AOI \| str`; optional `year` param (default 2019) |
@@ -136,15 +137,17 @@ registry/auth/manifest plumbing, and the manifest would diverge.
 | `ghsl` | `none` | `urban_class` | `ghsl_urban` | |
 | `wildlife` | `none` | `wildlife_host_proxy` | `wildlife_proxy` | Depends on jrc_gsw, buildings, worldcover |
 | `buildings` | `none` | `building_fraction` | `buildings` | Uses Overture Maps parquet tiles |
+| `hydrorivers` | `none` | `permanent_rivers`, `river_proximity` | `hydrorivers_rivers`, `hydrorivers_proximity` | Kept for future flux modelling; no ABM consumer yet (`abm_default_outputs=[]`). Currently re-badges JRC GSW with a 60% threshold; a real HydroRIVERS vector loader is future work |
 
 - **DEPRECATED**: `worldcover` — archived to `_legacy/worldcover.py`. Use `jrc_gsw` for `water_frac`.
+- **DEPRECATED**: `hydrolakes` — archived to `_legacy/hydrolakes.py`. Was a JRC GSW threshold re-badge (>95% occurrence); use `jrc_gsw` instead.
 
 - **REMOVED**: `opera_dswx_s1` — removed from registry and loader surface.
   OPERA DSWX-S1 had irregular Ghana acquisition coverage and could return
   partial monthly windows instead of complete month coverage. Making it part
   of the download contract created an unreliable dependency for water-stack
   and validation runs. M14 keeps using CHIRPS daily rainfall and ERA5
-  temperature as forcing, with JRC GSW plus permanent hydrography as water
+  temperature as forcing, with JRC GSW plus GSHHG coastline as water
   context.
 
 ## 6. Data contracts

@@ -9,7 +9,7 @@ log = logging.getLogger(__name__)
 LOADER_MODULES = [
     "era5", "chirps", "dem", "jrc_gsw", "modis",
     "worldpop", "glw", "ghsl", "wildlife", "buildings",
-    "hydrolakes", "hydrorivers", "worldcover",
+    "coastline", "hydrorivers",
     "smap",
 ]
 
@@ -41,7 +41,6 @@ def discover_downloaders() -> dict[str, DownloaderSpec]:
                 "era5": ["water_temp", "wind_6hourly"],
                 "jrc_gsw": ["water_occurrence"],
                 "modis": ["ndvi"],
-                "hydrolakes": ["permanent_lakes"],
                 # --- habitat patches (ingest/env.py) ---
                 "dem": ["elevation"],
                 # --- host density (ingest/hosts.py) ---
@@ -50,9 +49,10 @@ def discover_downloaders() -> dict[str, DownloaderSpec]:
                 "ghsl": ["urban_class"],
                 "buildings": ["building_fraction"],
                 "wildlife": ["wildlife_host_proxy"],
+                # --- saltwater filter (ingest/daily_nc.py) ---
+                "coastline": ["land_mask"],
                 # --- explicitly excluded (not ABM defaults) ---
                 "hydrorivers": [],
-                "worldcover": [],
                 "smap": [],
             }
             profile_formats = {

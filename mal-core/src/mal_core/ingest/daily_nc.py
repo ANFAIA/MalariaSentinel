@@ -7,11 +7,16 @@ Combines:
   - MODIS NDVI (vegetation index, clipped to [0, 1]) -> ndvi
   - SMAP salinity (optional, M7.8) -> salinity_ppt (degree of marine influence)
 
-Optional M12 enrichment (when TIF files are present in data_dir):
+Optional M12-fix enrichment (when TIF files are present in data_dir):
   - HydroLAKES permanent water mask ({aoi}_permanent_lakes.tif) -> merged
     into water_frac via np.maximum(JRC_GSW, permanent_water)
   - ESA WorldCover wetland mask ({aoi}_wc_wetland.tif) -> diagnostic
     variable (wetland contribution to water_frac is commented-out by default)
+  - GSHHG coastline ({aoi}_land_mask.tif) -> saltwater filter.
+    JRC cells outside the buffered land mask are dropped from water_frac so
+    coastal lagoons are kept but open ocean (where JRC sees permanent surf)
+    is rejected. Default buffer 5 km (configurable via
+    COASTLINE_BUFFER_M env var). See ``mal_commonlib.data.loaders.coastline``.
 
 Static layers are broadcast to every day (the ABM's daily slice has the same
 spatial climate each day; only rainfall changes per day in this version).
@@ -21,6 +26,7 @@ mal-core/src/mal_core/abm/include/mal_abm_fast/climate.hpp:80-86.
 """
 from __future__ import annotations
 
+import os
 import pathlib
 import re
 from typing import Tuple
@@ -31,6 +37,13 @@ import xarray as xr
 
 NODATA_SENTINEL = -9999.0
 WATER_FRAC_VIABILITY_THRESHOLD = 0.05
+
+# Saltwater filter (M12-fix 2026-08-26): cells outside the buffered GSHHG
+# land mask are dropped from water_frac. Default 5 km buffer keeps coastal
+# lagoons and estuaries while rejecting open ocean (where JRC GSW sees
+# permanent surf). Set ``COASTLINE_BUFFER_M=0`` to disable buffering
+# (use the raw coastline line), or negative to disable the filter entirely.
+COASTLINE_BUFFER_M_DEFAULT = 5_000.0
 
 
 def read_static_tif(
@@ -136,6 +149,53 @@ def build_daily_env_nc(
         water_frac_static = water_frac_static / 100.0
     water_frac_static = np.nan_to_num(water_frac_static, nan=0.0)
 
+    # --- M12-fix saltwater filter (2026-08-26) ---
+    # GSHHG coastline -> land_mask. Drop JRC cells outside the buffered
+    # land mask so coastal lagoons stay (buffer) but open ocean is rejected.
+    # Controlled by the COASTLINE_BUFFER_M env var; negative disables the
+    # filter entirely (legacy behaviour, useful for arid landlocked AOIs).
+    coastline_file = data_dir / f"{aoi}_land_mask.tif"
+    buffer_env = os.environ.get("COASTLINE_BUFFER_M")
+    buffer_m = float(buffer_env) if buffer_env is not None else COASTLINE_BUFFER_M_DEFAULT
+    coastline_applied = False
+    if coastline_file.exists() and buffer_m >= 0:
+        print(f"Reading coastline land mask: {coastline_file}")
+        land_mask = read_static_tif(coastline_file, target_shape)
+        land_mask = np.nan_to_num(land_mask, nan=0.0)
+        land_mask = (land_mask > 0.5).astype(np.float32)
+        if buffer_m > 0:
+            # Buffer is already applied inside the loader when produced via
+            # mal_commonlib.data.loaders.coastline.load_coastline_land_mask;
+            # here we only dilate if the user explicitly asks for it on a
+            # pre-baked file (rare).
+            from scipy import ndimage
+            cell_size_hint = None
+            try:
+                cell_size_hint = float(
+                    xr.open_dataset(rain_file).attrs.get("resolution_m", 1000.0)
+                )
+            except Exception:
+                cell_size_hint = 1000.0
+            radius_cells = max(1, int(np.ceil(buffer_m / cell_size_hint)))
+            structure = np.ones((2 * radius_cells + 1, 2 * radius_cells + 1), dtype=bool)
+            land_mask = ndimage.binary_dilation(
+                land_mask > 0.5, structure=structure
+            ).astype(np.float32)
+        before = float(water_frac_static.sum())
+        water_frac_static = water_frac_static * land_mask
+        after = float(water_frac_static.sum())
+        print(
+            f"Saltwater filter: JRC sum {before:.1f} -> {after:.1f} "
+            f"(coastline cells kept: {int(land_mask.sum())} of {land_mask.size})"
+        )
+        coastline_applied = True
+    elif not coastline_file.exists():
+        print(
+            "WARNING: no land_mask.tif found — saltwater filter "
+            "skipped. JRC GSW may include open-ocean cells. "
+            "Run: malariasim download --datasets coastline --outputs land_mask"
+        )
+
     # --- M12 enrichment: compose M12 water datasets into water_frac ---
     # Optional layers from hydrolakes / worldcover loaders.  When present
     # they improve the water_frac estimate; when absent the function falls
@@ -143,6 +203,20 @@ def build_daily_env_nc(
     permanent_water_mask = None
     wetland_mask = None
     component_masks: dict[str, np.ndarray] = {}
+
+    # M12-fix (2026-08-26): if no explicit M12 enrichment is present, derive
+    # ``permanent_water_mask`` from the JRC+coast result. Cells that survived
+    # the saltwater filter and still have ``water_frac == 1.0`` are
+    # JRC-classified permanent water on land. This is what ``env.py`` consumes
+    # to classify habitat patches as ``permanent_water`` rather than
+    # ``pluvial_pool``. Behaviour matches what the legacy hydrolakes loader
+    # produced via JRC GSW threshold >=95%.
+    jrc_permanent_water = (water_frac_static >= 1.0).astype(np.float32)
+    if permanent_water_mask is None:
+        permanent_water_mask = jrc_permanent_water
+    else:
+        permanent_water_mask = np.maximum(permanent_water_mask, jrc_permanent_water)
+    component_masks["jrc_permanent_water"] = jrc_permanent_water.copy()
 
     lakes_file = data_dir / f"{aoi}_permanent_lakes.tif"
     if lakes_file.exists():
