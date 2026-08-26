@@ -3,6 +3,7 @@ name = "malaria-sentinel"
 version = "0.1.0"
 description = "MalariaSentinel — AI-driven predictive malaria surveillance (monorepo)"
 readme = "README.md"
+license = "Apache-2.0"
 requires-python = ">=3.12, <3.13"
 dependencies = [
     "cartopy>=0.24",
@@ -34,6 +35,8 @@ dependencies = [
     "uvicorn>=0.30",
     "xarray>=2024.7",
     "gawt>=0.6.3",
+    "pyogrio>=0.13.0",
+    "fiona>=1.10.1",
 ]
 
 [dependency-groups]

@@ -9,6 +9,7 @@
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <link rel="manifest" href="site.webmanifest">
   <meta name="theme-color" content="#2d6a4f">
+  <meta name="description" content="SDSS abierto que integra simulaciones ABM, tensores climáticos satelitales y sustitutos neuronales para la erradicación de la malaria.">
   <style>
     /* ─── tokens ───────────────────────────────────────────────────────── */
     :root {
@@ -541,6 +542,21 @@
     .more-options-details[open] .more-options-summary .chevron-icon {
       transform: rotate(180deg);
     }
+
+    /* ─── language switcher ─────────────────────────────────────────── */
+    .lang-switch { display: inline-flex; gap: 2px; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 2px; }
+    .lang-btn {
+      padding: 4px 10px; border: none; border-radius: 6px;
+      font-family: var(--font-mono); font-size: 12px; font-weight: 600;
+      background: transparent; color: var(--muted); cursor: pointer;
+      transition: all 0.15s ease; letter-spacing: 0.04em; text-transform: uppercase;
+    }
+    .lang-btn.active { background: var(--accent); color: var(--surface); }
+    .lang-btn:hover:not(.active) { color: var(--fg); background: var(--fg-soft); }
+
+    /* hide elements when language is set */
+    [data-lang="es"] .en-only { display: none !important; }
+    [data-lang="en"] .es-only { display: none !important; }
   </style>
 </head>
 <body>
@@ -554,11 +570,15 @@
       
       <!-- Desktop Menu -->
       <nav class="nav-links-desktop" aria-label="Navegación principal">
-        <a href="#metodologia">Metodología</a>
-        <a href="#arquitectura">Arquitectura</a>
-        <a href="#configurador-abm">Configurador</a>
-        <a href="#hoja-de-ruta">Hoja de ruta</a>
-        <a href="#colaborar">Colaborar</a>
+        <a href="#metodologia" data-i18n="nav.methodology">Metodología</a>
+        <a href="#arquitectura" data-i18n="nav.architecture">Arquitectura</a>
+        <a href="#configurador-abm" data-i18n="nav.configurator">Configurador</a>
+        <a href="#hoja-de-ruta" data-i18n="nav.roadmap">Hoja de ruta</a>
+        <a href="#colaborar" data-i18n="nav.collaborate">Colaborar</a>
+        <div class="lang-switch" role="group" aria-label="Language selector">
+          <button class="lang-btn active" data-lang-btn="es">ES</button>
+          <button class="lang-btn" data-lang-btn="en">EN</button>
+        </div>
         <a href="https://github.com/ANFAIA/MalariaSentinel" target="_blank" rel="noopener" class="btn btn-secondary" style="padding: 6px 14px; font-size: 13px; display: inline-flex; align-items: center; gap: 6px;">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path></svg>
           GitHub
@@ -572,12 +592,18 @@
 
       <!-- Mobile Drawer Menu -->
       <div class="mobile-drawer" id="mobileDrawer">
-        <a href="#metodologia" class="mobile-nav-link">Metodología</a>
-        <a href="#arquitectura" class="mobile-nav-link">Arquitectura Técnica</a>
-        <a href="#configurador-abm" class="mobile-nav-link">Configurador ABM &amp; Emulador</a>
-        <a href="#hoja-de-ruta" class="mobile-nav-link">Hoja de Ruta</a>
-        <a href="#colaborar" class="mobile-nav-link">Cómo Colaborar</a>
-        <a href="https://github.com/ANFAIA/MalariaSentinel" target="_blank" rel="noopener" class="btn btn-primary" style="margin-top: 8px;">Ver en GitHub</a>
+        <a href="#metodologia" class="mobile-nav-link" data-i18n="nav.methodology">Metodología</a>
+        <a href="#arquitectura" class="mobile-nav-link" data-i18n="nav.architecture">Arquitectura Técnica</a>
+        <a href="#configurador-abm" class="mobile-nav-link" data-i18n="nav.configurator_abm">Configurador ABM &amp; Emulador</a>
+        <a href="#hoja-de-ruta" class="mobile-nav-link" data-i18n="nav.roadmap_long">Hoja de Ruta</a>
+        <a href="#colaborar" class="mobile-nav-link" data-i18n="nav.how_collaborate">Cómo Colaborar</a>
+        <div style="display: flex; align-items: center; gap: 12px; margin-top: 8px;">
+          <div class="lang-switch" role="group" aria-label="Language selector">
+            <button class="lang-btn active" data-lang-btn="es">ES</button>
+            <button class="lang-btn" data-lang-btn="en">EN</button>
+          </div>
+          <a href="https://github.com/ANFAIA/MalariaSentinel" target="_blank" rel="noopener" class="btn btn-primary" style="flex: 1;">Ver en GitHub</a>
+        </div>
       </div>
     </div>
   </header>
@@ -588,44 +614,47 @@
     <section class="section hero" data-od-id="hero-split">
       <div class="container hero-split">
         <div>
-          <p class="eyebrow">SISTEMA DE SOPORTE ESPACIAL A DECISIONES (SDSS) · CÓDIGO ABIERTO</p>
-          <h1>Modelado geoespacial y simulación predictiva para la erradicación de la malaria.</h1>
-          <p class="lead" style="margin-top: 20px;">
+          <p class="eyebrow" data-i18n="hero.eyebrow">SISTEMA DE SOPORTE ESPACIAL A DECISIONES (SDSS) · CÓDIGO ABIERTO</p>
+          <h1 data-i18n="hero.h1">Modelado geoespacial y simulación predictiva para la erradicación de la malaria.</h1>
+          <p class="lead" style="margin-top: 20px;" data-i18n="hero.lead">
             Plataforma colaborativa abierta en etapa inicial que integra simulaciones basadas en agentes (ABM), tensores climáticos satelitales y sustitutos neuronales de inferencia ultrarrápida para optimizar intervenciones de salud pública en territorio.
           </p>
           <div class="row" style="margin-top: 32px; flex-wrap: wrap;">
-            <a href="#configurador-abm" class="btn btn-primary">Probar Configurador Interactivo</a>
-            <a href="#arquitectura" class="btn btn-ghost btn-arrow">Ver arquitectura técnica</a>
+            <a href="#configurador-abm" class="btn btn-primary" data-i18n="hero.cta_config">Probar Configurador Interactivo</a>
+            <a href="#arquitectura" class="btn btn-ghost btn-arrow" data-i18n="hero.cta_arch">Ver arquitectura técnica</a>
+          </div>
+          <div class="row" style="margin-top: 16px; gap: 16px; flex-wrap: wrap; font-size: 13px; color: var(--muted);">
+            <span data-i18n="hero.institutions">Un proyecto realizado con el apoyo de <a href="https://www.anfaia.org/" target="_blank" rel="noopener" style="color: var(--accent); font-weight: 600;">ANFAIA</a> y <a href="https://www.cesga.es/" target="_blank" rel="noopener" style="color: var(--accent); font-weight: 600;">CESGA</a></span>
           </div>
         </div>
 
         <!-- Technical Pipeline Card Visual -->
         <div class="pipeline-diagram" aria-label="Diagrama del pipeline computacional de MalariaSentinel">
           <div class="pipeline-header">
-            <span class="pipeline-title">Pipeline Computacional Unificado</span>
+            <span class="pipeline-title" data-i18n="pipeline.title">Pipeline Computacional Unificado</span>
             
           </div>
           
           <div class="pipeline-block">
-            <div class="pipeline-step-tag">01 · Ingesta &amp; Tensores</div>
-            <div class="pipeline-step-name">Datos Satelitales e Hidrológicos</div>
-            <div class="pipeline-step-desc">ERA5 (temperatura y vientos), CHIRPS (precipitación), Sentinel-10m DSwX y MERIT DEM.</div>
+            <div class="pipeline-step-tag" data-i18n="pipeline.s1.tag">01 · Ingesta &amp; Tensores</div>
+            <div class="pipeline-step-name" data-i18n="pipeline.s1.name">Datos Satelitales e Hidrológicos</div>
+            <div class="pipeline-step-desc" data-i18n="pipeline.s1.desc">ERA5 (temperatura y vientos), CHIRPS (precipitación), Sentinel-10m DSwX y MERIT DEM.</div>
           </div>
 
           <div class="pipeline-flow-arrow">↓</div>
 
           <div class="pipeline-block">
-            <div class="pipeline-step-tag">02 · Generación de Datos (Profesor)</div>
-            <div class="pipeline-step-name">Motor ABM en C++ + 14 Scorers</div>
-            <div class="pipeline-step-desc">Simulación estocástica precisa de millones de agentes generando pares de entrenamiento.</div>
+            <div class="pipeline-step-tag" data-i18n="pipeline.s2.tag">02 · Generación de Datos (Profesor)</div>
+            <div class="pipeline-step-name" data-i18n="pipeline.s2.name">Motor ABM en C++ + 14 Scorers</div>
+            <div class="pipeline-step-desc" data-i18n="pipeline.s2.desc">Simulación estocástica precisa de millones de agentes generando pares de entrenamiento.</div>
           </div>
 
           <div class="pipeline-flow-arrow">↓</div>
 
           <div class="pipeline-block">
-            <div class="pipeline-step-tag">03 · Inferencia Operativa (Estudiante)</div>
-            <div class="pipeline-step-name">Emulador U-Net &amp; Asignación Óptima</div>
-            <div class="pipeline-step-desc">Predicción mensual 100× más rápida para barrido masivo de escenarios de intervención.</div>
+            <div class="pipeline-step-tag" data-i18n="pipeline.s3.tag">03 · Inferencia Operativa (Estudiante)</div>
+            <div class="pipeline-step-name" data-i18n="pipeline.s3.name">Emulador U-Net &amp; Asignación Óptima</div>
+            <div class="pipeline-step-desc" data-i18n="pipeline.s3.desc">Predicción mensual 100× más rápida para barrido masivo de escenarios de intervención.</div>
           </div>
         </div>
       </div>
@@ -635,9 +664,9 @@
     <section class="section" id="metodologia" data-od-id="methodology-breakdown">
       <div class="container stack" style="gap: 48px;">
         <div style="max-width: 50ch;">
-          <p class="eyebrow">METODOLOGÍA CIENTÍFICA</p>
-          <h2>Descomposición de Peligro vs. Vulnerabilidad.</h2>
-          <p class="lead" style="margin-top: 12px;">
+          <p class="eyebrow" data-i18n="methodology.eyebrow">METODOLOGÍA CIENTÍFICA</p>
+          <h2 data-i18n="methodology.h2">Descomposición de Peligro vs. Vulnerabilidad.</h2>
+          <p class="lead" style="margin-top: 12px;" data-i18n="methodology.lead">
             Siguiendo los avances de Morlighem et al. (2025) y Gbaguidi et al. (2026), MalariaSentinel desacopla la idoneidad del vector de la vulnerabilidad humana para producir mapas conjuntos de riesgo aplicables a toma de decisiones.
           </p>
         </div>
@@ -645,31 +674,31 @@
         <div class="grid-2">
           <div class="card">
             <div class="row-between" style="margin-bottom: 16px;">
-              <h3 style="font-size: 19px;">Peligro Vectorial (Hazard)</h3>
-              <span class="tag">Ecológico &amp; Climático</span>
+              <h3 style="font-size: 19px;" data-i18n="methodology.hazard.title">Peligro Vectorial (Hazard)</h3>
+              <span class="tag" data-i18n="methodology.hazard.tag">Ecológico &amp; Climático</span>
             </div>
-            <p style="color: var(--muted); font-size: 14px; margin-bottom: 16px;">
+            <p style="color: var(--muted); font-size: 14px; margin-bottom: 16px;" data-i18n="methodology.hazard.desc">
               Modelado biofísico de idoneidad y dinámica poblacional del mosquito:
             </p>
             <ul style="padding-left: 20px; color: var(--muted); font-size: 14px; margin: 0; line-height: 1.8;">
-              <li><strong>Procesos hidrológicos:</strong> Humedad del suelo, escorrentía superficial y charcas temporales (Smith et al. 2024).</li>
-              <li><strong>Especies clave:</strong> Parametrización térmica diferenciada para <em>An. coluzzii</em>, <em>An. gambiae</em>, <em>An. funestus</em> y <em>An. arabiensis</em>.</li>
-              <li><strong>Calendarios agrícolas:</strong> Influencia de cultivos de arroz en la proliferación estacional de vectores.</li>
+              <li data-i18n="methodology.hazard.li1"><strong>Procesos hidrológicos:</strong> Humedad del suelo, escorrentía superficial y charcas temporales (Smith et al. 2024).</li>
+              <li data-i18n="methodology.hazard.li2"><strong>Especies clave:</strong> Parametrización térmica diferenciada para <em>An. coluzzii</em>, <em>An. gambiae</em>, <em>An. funestus</em> y <em>An. arabiensis</em>.</li>
+              <li data-i18n="methodology.hazard.li3"><strong>Calendarios agrícolas:</strong> Influencia de cultivos de arroz en la proliferación estacional de vectores.</li>
             </ul>
           </div>
 
           <div class="card">
             <div class="row-between" style="margin-bottom: 16px;">
-              <h3 style="font-size: 19px;">Vulnerabilidad y Exposición</h3>
-              <span class="tag">Demográfico &amp; Sanitario</span>
+              <h3 style="font-size: 19px;" data-i18n="methodology.vuln.title">Vulnerabilidad y Exposición</h3>
+              <span class="tag" data-i18n="methodology.vuln.tag">Demográfico &amp; Sanitario</span>
             </div>
-            <p style="color: var(--muted); font-size: 14px; margin-bottom: 16px;">
+            <p style="color: var(--muted); font-size: 14px; margin-bottom: 16px;" data-i18n="methodology.vuln.desc">
               Factores humanos que modulan el impacto real y la eficacia de las medidas preventivas:
             </p>
             <ul style="padding-left: 20px; color: var(--muted); font-size: 14px; margin: 0; line-height: 1.8;">
-              <li><strong>Movilidad por fases:</strong> Desplazamientos humanos y ganaderos diurnos/nocturnos que alteran el contacto vector-hospedador.</li>
-              <li><strong>Resistencia a insecticidas:</strong> Mutaciones de insensibilidad y desintoxicación metabólica que reducen el efecto del rociado IRS.</li>
-              <li><strong>Cascada de efectividad:</strong> Tasa real de uso y durabilidad física de mosquiteros tratados (ITN IG2).</li>
+              <li data-i18n="methodology.vuln.li1"><strong>Movilidad por fases:</strong> Desplazamientos humanos y ganaderos diurnos/nocturnos que alteran el contacto vector-hospedador.</li>
+              <li data-i18n="methodology.vuln.li2"><strong>Resistencia a insecticidas:</strong> Mutaciones de insensibilidad y desintoxicación metabólica que reducen el efecto del rociado IRS.</li>
+              <li data-i18n="methodology.vuln.li3"><strong>Cascada de efectividad:</strong> Tasa real de uso y durabilidad física de mosquiteros tratados (ITN IG2).</li>
             </ul>
           </div>
         </div>
@@ -681,8 +710,8 @@
       <div class="container stack" style="gap: 40px;">
         <div class="row-between" style="flex-wrap: wrap; align-items: flex-end;">
           <div style="max-width: 48ch;">
-            <p class="eyebrow">ARQUITECTURA DEL MONOREPO</p>
-            <h2>Estructura técnica consolidada en mal-core.</h2>
+            <p class="eyebrow" data-i18n="arch.eyebrow">ARQUITECTURA DEL MONOREPO</p>
+            <h2 data-i18n="arch.h2">Estructura técnica consolidada en mal-core.</h2>
           </div>
           <span class="tag">Python 3.12+ · C++20 · Typer CLI</span>
         </div>
@@ -691,35 +720,35 @@
           <table class="ds-table" aria-label="Estructura de paquetes del monorepo">
             <thead>
               <tr>
-                <th>Paquete</th>
-                <th>Nivel</th>
-                <th>Rol y Responsabilidad</th>
-                <th>Dependencias</th>
+                <th data-i18n="arch.th.pkg">Paquete</th>
+                <th data-i18n="arch.th.level">Nivel</th>
+                <th data-i18n="arch.th.role">Rol y Responsabilidad</th>
+                <th data-i18n="arch.th.deps">Dependencias</th>
               </tr>
             </thead>
             <tbody>
               <tr>
                 <td><code>mal-core/</code></td>
-                <td><span class="pill">Producción</span></td>
-                <td>Núcleo consolidado: ABM en C++, red neuronal U-Net, predictores, scoring y servidor FastAPI.</td>
+                <td><span class="pill" data-i18n="arch.tier.prod">Producción</span></td>
+                <td data-i18n="arch.core.desc">Núcleo consolidado: ABM en C++, red neuronal U-Net, predictores, scoring y servidor FastAPI.</td>
                 <td><code>mal-commonlib</code></td>
               </tr>
               <tr>
                 <td><code>mal-commonlib/</code></td>
-                <td><span class="pill">Producción</span></td>
-                <td>Cargadores espaciales (CHIRPS, ERA5, Sentinel, DEM, WorldPop, GLW4), paths y schemas comunes.</td>
+                <td><span class="pill" data-i18n="arch.tier.prod">Producción</span></td>
+                <td data-i18n="arch.commonlib.desc">Cargadores espaciales (CHIRPS, ERA5, Sentinel, DEM, WorldPop, GLW4), paths y schemas comunes.</td>
                 <td>—</td>
               </tr>
               <tr>
                 <td><code>mal-execution/</code></td>
-                <td><span class="pill">Producción</span></td>
-                <td>Puntos de entrada CLI (<code>malariasim</code>) y scripts para orquestación de simulaciones batch.</td>
+                <td><span class="pill" data-i18n="arch.tier.prod">Producción</span></td>
+                <td data-i18n="arch.exec.desc">Puntos de entrada CLI (<code>malariasim</code>) y scripts para orquestación de simulaciones batch.</td>
                 <td><code>mal-core + mal-commonlib</code></td>
               </tr>
               <tr>
                 <td><code>mal-data-explorer/</code></td>
-                <td><span class="tag">Herramienta</span></td>
-                <td>Visualización de coberturas geoespaciales, mapas de idoneidad y análisis de sesgo territorial.</td>
+                <td><span class="tag" data-i18n="arch.tier.tool">Herramienta</span></td>
+                <td data-i18n="arch.explorer.desc">Visualización de coberturas geoespaciales, mapas de idoneidad y análisis de sesgo territorial.</td>
                 <td>—</td>
               </tr>
             </tbody>
@@ -729,19 +758,19 @@
         <!-- CLI Usage Box -->
         <div class="card" style="padding: 20px;">
           <div class="row-between" style="margin-bottom: 12px;">
-            <span class="meta">Comandos principales de malariasim</span>
+            <span class="meta" data-i18n="arch.cli.title">Comandos principales de malariasim</span>
             <span class="meta">uv run malariasim</span>
           </div>
           <div class="code-box">
-            <span class="comment"># Descarga de tensores ambientales para un área (perfiles por defecto)</span><br>
+            <span class="comment" data-i18n="arch.cli.c1"># Descarga de tensores ambientales para un área (perfiles por defecto)</span><br>
             <span class="cmd">malariasim download</span> --aoi ghana --years 2024,2025<br>
             <span class="cmd">malariasim ingest</span> --aoi ghana --year 2024 --month 6<br><br>
-            <span class="comment"># Ejecución de simulación ABM estocástica para generar rollouts</span><br>
+            <span class="comment" data-i18n="arch.cli.c2"># Ejecución de simulación ABM estocástica para generar rollouts</span><br>
             <span class="cmd">malariasim abm</span> --aoi ghana --days 30 --n-rollouts 5<br>
             <span class="cmd">malariasim score</span> --run-dir runs/abm --tier fast<br><br>
-            <span class="comment"># Entrenamiento del emulador neuronal U-Net con los datos del ABM</span><br>
+            <span class="comment" data-i18n="arch.cli.c3"># Entrenamiento del emulador neuronal U-Net con los datos del ABM</span><br>
             <span class="cmd">malariasim train</span> --run-dir runs/abm --epochs 50<br><br>
-            <span class="comment"># Predicción rápida de mapas de riesgo mensuales</span><br>
+            <span class="comment" data-i18n="arch.cli.c4"># Predicción rápida de mapas de riesgo mensuales</span><br>
             <span class="cmd">malariasim predict</span> --aoi ghana --year 2026
           </div>
         </div>
@@ -752,9 +781,9 @@
     <section class="section" id="avances" data-od-id="project-status">
       <div class="container stack" style="gap: 48px;">
         <div style="max-width: 50ch;">
-          <p class="eyebrow">ESTADO ACTUAL Y NÚCLEO CONSOLIDADO</p>
-          <h2>Avances consolidados en el paquete mal-core.</h2>
-          <p class="lead" style="margin-top: 12px;">
+          <p class="eyebrow" data-i18n="status.eyebrow">ESTADO ACTUAL Y NÚCLEO CONSOLIDADO</p>
+          <h2 data-i18n="status.h2">Avances consolidados en el paquete mal-core.</h2>
+          <p class="lead" style="margin-top: 12px;" data-i18n="status.lead">
             Todo el sistema principal de simulación, ingesta y evaluación se encuentra ya centralizado en <code>mal-core</code>, preparado para ejecuciones reproducibles y calibración científica continua.
           </p>
         </div>
@@ -764,24 +793,24 @@
             <div class="feature-mark">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
             </div>
-            <h3>Motor ABM en C++ de Alto Rendimiento</h3>
-            <p>Consolidado en <code>mal-core</code>, simula dinámicas de ciclos gonotróficos y búsqueda de hospedadores con más de 261 tests en C++ y 14 evaluadores de calibración automatizados.</p>
+            <h3 data-i18n="status.f1.title">Motor ABM en C++ de Alto Rendimiento</h3>
+            <p data-i18n="status.f1.desc">Consolidado en <code>mal-core</code>, simula dinámicas de ciclos gonotróficos y búsqueda de hospedadores con más de 261 tests en C++ y 14 evaluadores de calibración automatizados.</p>
           </div>
 
           <div class="feature card">
             <div class="feature-mark">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"></circle><path d="m4.93 4.93 4.24 4.24M14.83 9.17l4.24-4.24M14.83 14.83l4.24 4.24M9.17 14.83l-4.24 4.24"></path></svg>
             </div>
-            <h3>Ingesta y Tensores Ambientales Diarios</h3>
-            <p>Pipeline robusto en <code>mal-commonlib</code> que procesa series climáticas CHIRPS (34 años), reanálisis ERA5, capas de agua superficial Sentinel-10m y elevación MERIT DEM.</p>
+            <h3 data-i18n="status.f2.title">Ingesta y Tensores Ambientales Diarios</h3>
+            <p data-i18n="status.f2.desc">Pipeline robusto en <code>mal-commonlib</code> que procesa series climáticas CHIRPS (34 años), reanálisis ERA5, capas de agua superficial Sentinel-10m y elevación MERIT DEM.</p>
           </div>
 
           <div class="feature card">
             <div class="feature-mark">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M22 12h-4l-3 9L9 3l-3 9H2"></path></svg>
             </div>
-            <h3>Orquestación Modular &amp; API REST</h3>
-            <p>CLI <code>malariasim</code> unificado con 9 comandos para descarga, ingesta, entrenamiento y predicción, complementado con un servidor FastAPI para integración de servicios.</p>
+            <h3 data-i18n="status.f3.title">Orquestación Modular &amp; API REST</h3>
+            <p data-i18n="status.f3.desc">CLI <code>malariasim</code> unificado con 9 comandos para descarga, ingesta, entrenamiento y predicción, complementado con un servidor FastAPI para integración de servicios.</p>
           </div>
         </div>
       </div>
@@ -791,9 +820,9 @@
     <section class="section" id="configurador-abm" data-od-id="abm-interactive-builder">
       <div class="container stack" style="gap: 40px;">
         <div>
-          <p class="eyebrow">HERRAMIENTA VISUAL PARA INVESTIGADORES Y NOVELES</p>
-          <h2>Configurador Interactivo de Simulación ABM &amp; Flujo de Datos</h2>
-          <p class="lead" style="margin-top: 12px;">
+          <p class="eyebrow" data-i18n="config.eyebrow">HERRAMIENTA VISUAL PARA INVESTIGADORES Y NOVELES</p>
+          <h2 data-i18n="config.h2">Configurador Interactivo de Simulación ABM &amp; Flujo de Datos</h2>
+          <p class="lead" style="margin-top: 12px;" data-i18n="config.lead">
             Ajusta los parámetros de simulación o selecciona un escenario predefinido. El diagrama vectorial dinámico, las advertencias de datos requeridos y el manifiesto de salidas se actualizarán en tiempo real.
           </p>
         </div>
@@ -802,35 +831,35 @@
           
           <!-- Columna Izquierda: Presets y Controles de Formulario -->
           <div class="card" style="padding: 24px;">
-            <h3 style="font-size: 16px; margin-bottom: 12px;">1. Escenarios de Simulación Predefinidos</h3>
+            <h3 style="font-size: 16px; margin-bottom: 12px;" data-i18n="config.presets.title">1. Escenarios de Simulación Predefinidos</h3>
             
             <div class="preset-list" id="presetList">
               <button class="preset-chip active" data-preset="brote-anual">
                 <span class="preset-chip-title">
-                  Brote Focal Anual con Estabilización (365 días)
-                  <span class="pill" style="font-size: 9px; padding: 2px 6px;">Recomendado</span>
+                  <span data-i18n="config.p1.title">Brote Focal Anual con Estabilización (365 días)</span>
+                  <span class="pill" style="font-size: 9px; padding: 2px 6px;" data-i18n="config.p1.badge">Recomendado</span>
                 </span>
-                <span class="preset-chip-desc">6 meses de calentamiento para equilibrio de mosquitos + brote en 5 aldeas seleccionadas + animación GIF.</span>
+                <span class="preset-chip-desc" data-i18n="config.p1.desc">6 meses de calentamiento para equilibrio de mosquitos + brote en 5 aldeas seleccionadas + animación GIF.</span>
               </button>
 
               <button class="preset-chip" data-preset="incursion-vectorial">
-                <span class="preset-chip-title">Incursión de Mosquitos Portadores (90 días)</span>
-                <span class="preset-chip-desc">Llegada estacional de hembras infectadas (15%) en zonas de agua durante lluvias.</span>
+                <span class="preset-chip-title" data-i18n="config.p2.title">Incursión de Mosquitos Portadores (90 días)</span>
+                <span class="preset-chip-desc" data-i18n="config.p2.desc">Llegada estacional de hembras infectadas (15%) en zonas de agua durante lluvias.</span>
               </button>
 
               <button class="preset-chip" data-preset="focos-urbanos">
-                <span class="preset-chip-title">Brote en Centros Urbanos Específicos (180 días)</span>
-                <span class="preset-chip-desc">Inyección directa de casos clínicos importados en coordenadas de ciudades principales.</span>
+                <span class="preset-chip-title" data-i18n="config.p3.title">Brote en Centros Urbanos Específicos (180 días)</span>
+                <span class="preset-chip-desc" data-i18n="config.p3.desc">Inyección directa de casos clínicos importados en coordenadas de ciudades principales.</span>
               </button>
 
               <button class="preset-chip" data-preset="calibracion-rapida">
-                <span class="preset-chip-title">Calibración Rápida de Población de Vectores (30 días)</span>
-                <span class="preset-chip-desc">Simulación corta de 30 días para verificar dinámica de ciclo biológico sin malaria activa.</span>
+                <span class="preset-chip-title" data-i18n="config.p4.title">Calibración Rápida de Población de Vectores (30 días)</span>
+                <span class="preset-chip-desc" data-i18n="config.p4.desc">Simulación corta de 30 días para verificar dinámica de ciclo biológico sin malaria activa.</span>
               </button>
 
               <button class="preset-chip" data-preset="dataset-unet">
-                <span class="preset-chip-title">Generación de Dataset para Red Neuronal U-Net (Ensamble)</span>
-                <span class="preset-chip-desc">10 rollouts paralelos con distintas semillas para generar pares de entrenamiento.</span>
+                <span class="preset-chip-title" data-i18n="config.p5.title">Generación de Dataset para Red Neuronal U-Net (Ensamble)</span>
+                <span class="preset-chip-desc" data-i18n="config.p5.desc">10 rollouts paralelos con distintas semillas para generar pares de entrenamiento.</span>
               </button>
             </div>
 
@@ -838,7 +867,7 @@
               <summary class="more-options-summary">
                 <span style="font-weight: 600; font-size: 15px; color: var(--fg); display: flex; align-items: center; gap: 8px;">
                   <svg class="chevron-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"></path></svg>
-                  2. Más opciones
+                  <span data-i18n="config.more_options">2. Más opciones</span>
                 </span>
                 
               </summary>
@@ -846,80 +875,80 @@
 
                 <!-- Selector de Área de Interés (AOI) -->
                 <div class="form-group">
-                  <label class="form-label" for="paramAoi">Área de Interés (--aoi)</label>
+                  <label class="form-label" for="paramAoi" data-i18n="config.aoi.label">Área de Interés (--aoi)</label>
                   <select id="paramAoi" class="form-select">
-                    <option value="ghana" selected="">Ghana (Nacional predefinido · 9.466 celdas)</option>
-                    <option value="mozambique">Mozambique (Nacional predefinido)</option>
-                    <option value="custom">Personalizada (Nueva Región / Coordenadas BBOX)</option>
+                    <option value="ghana" selected="" data-i18n="config.aoi.ghana">Ghana (Nacional predefinido · 9.466 celdas)</option>
+                    <option value="mozambique" data-i18n="config.aoi.moz">Mozambique (Nacional predefinido)</option>
+                    <option value="custom" data-i18n="config.aoi.custom">Personalizada (Nueva Región / Coordenadas BBOX)</option>
                   </select>
                 </div>
 
                 <!-- Campos de AOI personalizada (ocultos por defecto) -->
                 <div id="customAoiContainer" style="display: none; background: var(--bg); padding: 14px; border-radius: var(--radius); border: 1px solid var(--border); margin-bottom: 18px;">
                   <div class="form-group" style="margin-bottom: 12px;">
-                    <label class="form-label" for="paramCustomSlug">Identificador de la Región (slug)</label>
+                    <label class="form-label" for="paramCustomSlug" data-i18n="config.slug.label">Identificador de la Región (slug)</label>
                     <input type="text" id="paramCustomSlug" class="form-input" value="colombia-pacifico" placeholder="ej. colombia-pacifico (solo minúsculas y guiones)">
-                    <p class="form-help">Identificador único en minúsculas sin espacios.</p>
+                    <p class="form-help" data-i18n="config.slug.help">Identificador único en minúsculas sin espacios.</p>
                   </div>
                   <div class="form-group" style="margin-bottom: 0;">
-                    <label class="form-label" for="paramCustomBbox">Límites Geográficos (Bounding Box)</label>
+                    <label class="form-label" for="paramCustomBbox" data-i18n="config.bbox.label">Límites Geográficos (Bounding Box)</label>
                     <input type="text" id="paramCustomBbox" class="form-input" value="-78.0, 1.5, -76.0, 4.0" placeholder="min_lon, min_lat, max_lon, max_lat">
-                    <p class="form-help">Formato WGS84 (EPSG:4326): <code>min_longitud, min_latitud, max_longitud, max_latitud</code>.</p>
+                    <p class="form-help" data-i18n="config.bbox.help">Formato WGS84 (EPSG:4326): <code>min_longitud, min_latitud, max_longitud, max_latitud</code>.</p>
                   </div>
                 </div>
 
                 <!-- Duración, Snapshots y Rollouts -->
                 <div class="grid-2" style="gap: 12px; margin-bottom: 16px;">
                   <div class="form-group" style="margin-bottom: 0;">
-                    <label class="form-label" for="paramDays">Duración (--days)</label>
+                    <label class="form-label" for="paramDays" data-i18n="config.days.label">Duración (--days)</label>
                     <select id="paramDays" class="form-select">
-                      <option value="30">30 días (1 mes)</option>
-                      <option value="60">60 días (2 meses)</option>
-                      <option value="90">90 días (3 meses)</option>
-                      <option value="180">180 días (6 meses)</option>
-                      <option value="365" selected="">365 días (1 año)</option>
-                      <option value="731">731 días (2 años)</option>
+                      <option value="30" data-i18n="config.days.30">30 días (1 mes)</option>
+                      <option value="60" data-i18n="config.days.60">60 días (2 meses)</option>
+                      <option value="90" data-i18n="config.days.90">90 días (3 meses)</option>
+                      <option value="180" data-i18n="config.days.180">180 días (6 meses)</option>
+                      <option value="365" selected="" data-i18n="config.days.365">365 días (1 año)</option>
+                      <option value="731" data-i18n="config.days.731">731 días (2 años)</option>
                     </select>
                   </div>
 
                   <div class="form-group" style="margin-bottom: 0;">
-                    <label class="form-label" for="paramSnapshot">Intervalo de Salida (--snapshot-every)</label>
+                    <label class="form-label" for="paramSnapshot" data-i18n="config.snap.label">Intervalo de Salida (--snapshot-every)</label>
                     <select id="paramSnapshot" class="form-select">
-                      <option value="1">Cada 1 día</option>
-                      <option value="7" selected="">Cada 7 días (semanal)</option>
-                      <option value="14">Cada 14 días (quincenal)</option>
-                      <option value="30">Cada 30 días (mensual)</option>
-                      <option value="0">Solo final (0)</option>
+                      <option value="1" data-i18n="config.snap.1">Cada 1 día</option>
+                      <option value="7" selected="" data-i18n="config.snap.7">Cada 7 días (semanal)</option>
+                      <option value="14" data-i18n="config.snap.14">Cada 14 días (quincenal)</option>
+                      <option value="30" data-i18n="config.snap.30">Cada 30 días (mensual)</option>
+                      <option value="0" data-i18n="config.snap.0">Solo final (0)</option>
                     </select>
                   </div>
                 </div>
 
                 <div class="grid-2" style="gap: 12px; margin-bottom: 16px;">
                   <div class="form-group" style="margin-bottom: 0;">
-                    <label class="form-label" for="paramRollouts">Nº de Rollouts (--n-rollouts)</label>
+                    <label class="form-label" for="paramRollouts" data-i18n="config.rollouts.label">Nº de Rollouts (--n-rollouts)</label>
                     <select id="paramRollouts" class="form-select">
-                      <option value="1" selected="">1 (Ejecución individual)</option>
-                      <option value="5">5 (Ensamble estocástico)</option>
-                      <option value="10">10 (Dataset para U-Net)</option>
-                      <option value="20">20 (Ensamble masivo)</option>
+                      <option value="1" selected="" data-i18n="config.rollouts.1">1 (Ejecución individual)</option>
+                      <option value="5" data-i18n="config.rollouts.5">5 (Ensamble estocástico)</option>
+                      <option value="10" data-i18n="config.rollouts.10">10 (Dataset para U-Net)</option>
+                      <option value="20" data-i18n="config.rollouts.20">20 (Ensamble masivo)</option>
                     </select>
-                    <p class="form-help">Simulaciones concurrentes con semillas independientes.</p>
+                    <p class="form-help" data-i18n="config.rollouts.help">Simulaciones concurrentes con semillas independientes.</p>
                   </div>
 
                   <div class="form-group" style="margin-bottom: 0;">
-                    <label class="form-label" for="paramSeed">Semilla Base (--seed)</label>
+                    <label class="form-label" for="paramSeed" data-i18n="config.seed.label">Semilla Base (--seed)</label>
                     <input type="number" id="paramSeed" class="form-input" value="1" min="1" max="99999">
-                    <p class="form-help">Para reproducibilidad científica.</p>
+                    <p class="form-help" data-i18n="config.seed.help">Para reproducibilidad científica.</p>
                   </div>
                 </div>
 
                 <!-- Siembra de Mosquitos -->
                 <div class="form-group">
-                  <label class="form-label" for="paramSeedingMode">Siembra Inicial de Mosquitos (--seeding-mode)</label>
+                  <label class="form-label" for="paramSeedingMode" data-i18n="config.seeding.label">Siembra Inicial de Mosquitos (--seeding-mode)</label>
                   <select id="paramSeedingMode" class="form-select">
-                    <option value="uniform" selected="">uniform (homogénea en cuerpos de agua)</option>
-                    <option value="random-viable">random-viable (en celdas con idoneidad ecológica &gt; 0)</option>
-                    <option value="explicit">explicit (en estaciones de muestreo fijas)</option>
+                    <option value="uniform" selected="" data-i18n="config.seeding.uniform">uniform (homogénea en cuerpos de agua)</option>
+                    <option value="random-viable" data-i18n="config.seeding.rv">random-viable (en celdas con idoneidad ecológica &gt; 0)</option>
+                    <option value="explicit" data-i18n="config.seeding.explicit">explicit (en estaciones de muestreo fijas)</option>
                   </select>
                 </div>
 
@@ -927,9 +956,9 @@
                 <div class="form-group" style="background: var(--bg); padding: 14px; border-radius: var(--radius); border: 1px solid var(--border);">
                   <label class="form-checkbox-label">
                     <input type="checkbox" id="paramEnableHosts" class="form-checkbox" checked="">
-                    <span>Capa de Hospedadores y Atracción Ganadera/Humana</span>
+                    <span data-i18n="config.hosts.label">Capa de Hospedadores y Atracción Ganadera/Humana</span>
                   </label>
-                  <p class="form-help" style="margin-left: 28px;">
+                  <p class="form-help" style="margin-left: 28px;" data-i18n="config.hosts.help">
                     Permite simular el movimiento y búsqueda de sangre de los mosquitos guiado por la densidad de ganado (vacas, cerdos, aves) y asentamientos humanos, incluso sin simular malaria.
                   </p>
                 </div>
@@ -938,37 +967,37 @@
                 <div class="form-group" style="background: var(--bg); padding: 14px; border-radius: var(--radius); border: 1px solid var(--border);">
                   <label class="form-checkbox-label">
                     <input type="checkbox" id="paramEnableTransmission" class="form-checkbox" checked="">
-                    <span>Transmisión Epidemiológica de Malaria (--enable-transmission)</span>
+                    <span data-i18n="config.trans.label">Transmisión Epidemiológica de Malaria (--enable-transmission)</span>
                   </label>
-                  <p class="form-help" style="margin-left: 28px;">
+                  <p class="form-help" style="margin-left: 28px;" data-i18n="config.trans.help">
                     Activa el ciclo bidireccional de infección entre mosquitos hembra (ingesta de gametocitos, incubación EIP) y población humana (incubación, recuperación e inmunidad).
                   </p>
 
                   <div id="transmissionOptions" style="margin-top: 14px; padding-left: 28px; display: flex; flex-direction: column; gap: 12px;">
                     <div>
-                      <label class="form-label" for="paramHumanSeeding">Modo de Siembra Humana (--human-seeding-mode)</label>
+                      <label class="form-label" for="paramHumanSeeding" data-i18n="config.hseed.label">Modo de Siembra Humana (--human-seeding-mode)</label>
                       <select id="paramHumanSeeding" class="form-select">
-                        <option value="random-viable" selected="">random-viable (focos en aldeas viables con mosquitos)</option>
-                        <option value="explicit">explicit (coordenadas de ciudades explícitas)</option>
-                        <option value="uniform-legacy">uniform-legacy (5% de prevalencia en todo el territorio)</option>
-                        <option value="none">none (sin humanos infectados al inicio)</option>
+                        <option value="random-viable" selected="" data-i18n="config.hseed.rv">random-viable (focos en aldeas viables con mosquitos)</option>
+                        <option value="explicit" data-i18n="config.hseed.explicit">explicit (coordenadas de ciudades explícitas)</option>
+                        <option value="uniform-legacy" data-i18n="config.hseed.ul">uniform-legacy (5% de prevalencia en todo el territorio)</option>
+                        <option value="none" data-i18n="config.hseed.none">none (sin humanos infectados al inicio)</option>
                       </select>
                     </div>
 
                     <div class="grid-2" style="gap: 10px;">
                       <div>
-                        <label class="form-label" for="paramOutbreakDay">Día del Brote (--human-outbreak-day)</label>
+                        <label class="form-label" for="paramOutbreakDay" data-i18n="config.obday.label">Día del Brote (--human-outbreak-day)</label>
                         <input type="number" id="paramOutbreakDay" class="form-input" value="180" min="0" max="700">
-                        <p class="form-help">Día en que se inyectan los casos índice.</p>
+                        <p class="form-help" data-i18n="config.obday.help">Día en que se inyectan los casos índice.</p>
                       </div>
                       <div>
-                        <label class="form-label" for="paramOutbreakFoci">Nº de Focos (--human-outbreak-foci)</label>
+                        <label class="form-label" for="paramOutbreakFoci" data-i18n="config.obfoci.label">Nº de Focos (--human-outbreak-foci)</label>
                         <input type="number" id="paramOutbreakFoci" class="form-input" value="5" min="1" max="20">
                       </div>
                     </div>
 
                     <div>
-                      <label class="form-label" for="paramOutbreakCases">Casos Infectados por Foco (--human-outbreak-cases)</label>
+                      <label class="form-label" for="paramOutbreakCases" data-i18n="config.obcases.label">Casos Infectados por Foco (--human-outbreak-cases)</label>
                       <input type="number" id="paramOutbreakCases" class="form-input" value="100" min="1" max="1000">
                     </div>
                   </div>
@@ -978,23 +1007,23 @@
                 <div class="form-group" style="background: var(--bg); padding: 14px; border-radius: var(--radius); border: 1px solid var(--border);">
                   <label class="form-checkbox-label" style="margin-bottom: 8px;">
                     <input type="checkbox" id="paramCohortLog" class="form-checkbox" checked="">
-                    <span>Registrar Censo Diario de Cohortes (--cohort-log)</span>
+                    <span data-i18n="config.cohort.label">Registrar Censo Diario de Cohortes (--cohort-log)</span>
                   </label>
-                  <p class="form-help" style="margin-left: 28px; margin-bottom: 12px;">
+                  <p class="form-help" style="margin-left: 28px; margin-bottom: 12px;" data-i18n="config.cohort.help">
                     Registra la evolución diaria de huevos, larvas, pupas y adultos. <strong>Imprescindible para graficar pirámides demográficas y generar animaciones GIF.</strong>
                   </p>
 
                   <label class="form-checkbox-label">
                     <input type="checkbox" id="paramGif" class="form-checkbox" checked="">
-                    <span>Generar Animación GIF Post-Ejecución (--gif)</span>
+                    <span data-i18n="config.gif.label">Generar Animación GIF Post-Ejecución (--gif)</span>
                   </label>
-                  <p class="form-help" style="margin-left: 28px;">
+                  <p class="form-help" style="margin-left: 28px;" data-i18n="config.gif.help">
                     Genera mapas animados de densidad de mosquitos y propagación de la infección.
                   </p>
                 </div>
 
                 <div class="form-group" style="margin-bottom: 0;">
-                  <label class="form-label" for="paramOutputDir">Directorio de Salida (--output-dir)</label>
+                  <label class="form-label" for="paramOutputDir" data-i18n="config.outdir.label">Directorio de Salida (--output-dir)</label>
                   <input type="text" id="paramOutputDir" class="form-input" value="runs/ghana/1year_focal_outbreak">
                 </div>
 
@@ -1010,7 +1039,7 @@
             <div class="warning-callout" id="dataPrerequisitesBox">
               <div class="warning-callout-header">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 9v4m0 4h.01M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"></path></svg>
-                <span>Prerrequisitos de Datos &amp; Guía de Configuración</span>
+                <span data-i18n="config.prereq.title">Prerrequisitos de Datos &amp; Guía de Configuración</span>
               </div>
               <div class="warning-callout-body" id="dataPrerequisitesText">
                 <!-- Se llena dinámicamente -->
@@ -1020,12 +1049,12 @@
             <!-- Comando CLI Generado Listo para Copiar -->
             <div class="card" style="padding: 20px; background: var(--fg); color: var(--surface); border: none;">
               <div class="row-between" style="margin-bottom: 12px;">
-                <span style="font-family: var(--font-mono); font-size: 12px; color: color-mix(in oklch, var(--surface) 70%, transparent); text-transform: uppercase; font-weight: 600;">
+                <span style="font-family: var(--font-mono); font-size: 12px; color: color-mix(in oklch, var(--surface) 70%, transparent); text-transform: uppercase; font-weight: 600;" data-i18n="config.cli.title">
                   Comando CLI Listo para Terminal
                 </span>
                 <button class="copy-btn" id="copyCliBtn" title="Copiar al portapapeles">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path></svg>
-                  <span id="copyBtnText">Copiar comando</span>
+                  <span id="copyBtnText" data-i18n="config.cli.copy">Copiar comando</span>
                 </button>
               </div>
               <pre id="cliCommandOutput" style="margin: 0; font-family: var(--font-mono); font-size: 12.5px; line-height: 1.6; white-space: pre-wrap; word-break: break-all; color: var(--surface);"></pre>
@@ -1033,21 +1062,21 @@
 
             <!-- Manifiesto de Salidas Estimadas -->
             <div class="card" style="padding: 20px;">
-              <span class="meta" style="font-weight: 700; color: var(--fg); text-transform: uppercase;">
+              <span class="meta" style="font-weight: 700; color: var(--fg); text-transform: uppercase;" data-i18n="config.manifest.title">
                 Manifiesto de Artefactos de Salida
               </span>
               <div class="grid-2" style="gap: 12px; margin-top: 12px; font-size: 13px;" id="outputSummaryGrid">
                 <div>
-                  <strong>GeoTIFFs de Población:</strong> <span id="summaryStateRasters" class="num">53 archivos</span>
+                  <strong data-i18n="config.manifest.pop">GeoTIFFs de Población:</strong> <span id="summaryStateRasters" class="num">53 archivos</span>
                 </div>
                 <div>
-                  <strong>GeoTIFFs de Malaria:</strong> <span id="summaryTransRasters" class="num">53 archivos (SEIR)</span>
+                  <strong data-i18n="config.manifest.mal">GeoTIFFs de Malaria:</strong> <span id="summaryTransRasters" class="num">53 archivos (SEIR)</span>
                 </div>
                 <div>
-                  <strong>Logs Demográficos:</strong> <span id="summaryCohortLog" class="num">1 archivo JSON</span>
+                  <strong data-i18n="config.manifest.logs">Logs Demográficos:</strong> <span id="summaryCohortLog" class="num">1 archivo JSON</span>
                 </div>
                 <div>
-                  <strong>Animaciones GIF:</strong> <span id="summaryGifs" class="num">2 archivos (.gif)</span>
+                  <strong data-i18n="config.manifest.gifs">Animaciones GIF:</strong> <span id="summaryGifs" class="num">2 archivos (.gif)</span>
                 </div>
               </div>
             </div>
@@ -1055,7 +1084,7 @@
             <!-- SVG Diagrama Dinámico -->
             <div class="svg-canvas-box" aria-label="Diagrama SVG dinámico del pipeline de simulación">
               <div class="row-between" style="margin-bottom: 16px;">
-                <span class="meta" style="font-weight: 700; color: var(--fg); text-transform: uppercase;">
+                <span class="meta" style="font-weight: 700; color: var(--fg); text-transform: uppercase;" data-i18n="config.svg.title">
                   Flujo de Datos Activo en Tiempo Real
                 </span>
                 <span class="pill" id="svgStatusPill">Transmisión Activa</span>
@@ -1065,9 +1094,9 @@
                 <rect width="740" height="390" fill="var(--bg)" rx="8"></rect>
 
                 <!-- Column Labels -->
-                <text x="70" y="28" font-family="var(--font-mono)" font-size="11" font-weight="700" fill="var(--muted)" text-anchor="middle">1. INPUTS &amp; DATOS</text>
-                <text x="370" y="28" font-family="var(--font-mono)" font-size="11" font-weight="700" fill="var(--muted)" text-anchor="middle">2. MOTOR ABM C++ (mal_core)</text>
-                <text x="630" y="28" font-family="var(--font-mono)" font-size="11" font-weight="700" fill="var(--muted)" text-anchor="middle">3. OUTPUTS GENERADOS</text>
+                <text x="70" y="28" font-family="var(--font-mono)" font-size="11" font-weight="700" fill="var(--muted)" text-anchor="middle" data-i18n="svg.col1">1. INPUTS &amp; DATOS</text>
+                <text x="370" y="28" font-family="var(--font-mono)" font-size="11" font-weight="700" fill="var(--muted)" text-anchor="middle" data-i18n="svg.col2">2. MOTOR ABM C++ (mal_core)</text>
+                <text x="630" y="28" font-family="var(--font-mono)" font-size="11" font-weight="700" fill="var(--muted)" text-anchor="middle" data-i18n="svg.col3">3. OUTPUTS GENERADOS</text>
 
                 <!-- Connecting Lines (Dynamic styling) -->
                 <!-- Input to Core lines -->
@@ -1087,28 +1116,28 @@
                 <g id="nodeEnv" transform="translate(10, 45)">
                   <rect width="130" height="50" rx="6" fill="var(--surface)" stroke="var(--accent)" stroke-width="2"></rect>
                   <text x="12" y="22" font-family="var(--font-mono)" font-size="10" font-weight="700" fill="var(--accent)">ERA5 &amp; CHIRPS</text>
-                  <text x="12" y="38" font-family="var(--font-body)" font-size="10" fill="var(--muted)">Lluvia, Viento, Temp</text>
+                  <text x="12" y="38" font-family="var(--font-body)" font-size="10" fill="var(--muted)" data-i18n="svg.node.env">Lluvia, Viento, Temp</text>
                 </g>
 
                 <!-- Node: Hidrología & DEM -->
                 <g id="nodeHydro" transform="translate(10, 115)">
                   <rect width="130" height="50" rx="6" fill="var(--surface)" stroke="var(--accent)" stroke-width="2"></rect>
                   <text x="12" y="22" font-family="var(--font-mono)" font-size="10" font-weight="700" fill="var(--accent)">SENTINEL &amp; DEM</text>
-                  <text x="12" y="38" font-family="var(--font-body)" font-size="10" fill="var(--muted)">Agua DSwX y Relieve</text>
+                  <text x="12" y="38" font-family="var(--font-body)" font-size="10" fill="var(--muted)" data-i18n="svg.node.hydro">Agua DSwX y Relieve</text>
                 </g>
 
                 <!-- Node: Grilla de Hospedadores -->
                 <g id="nodeHosts" transform="translate(10, 185)">
                   <rect width="130" height="50" rx="6" fill="var(--surface)" stroke="var(--accent)" stroke-width="2" id="rectHosts"></rect>
-                  <text x="12" y="22" font-family="var(--font-mono)" font-size="10" font-weight="700" fill="var(--accent)" id="textHostsTitle">HOSPEDADORES</text>
-                  <text x="12" y="38" font-family="var(--font-body)" font-size="10" fill="var(--muted)">Población &amp; Ganado</text>
+                  <text x="12" y="22" font-family="var(--font-mono)" font-size="10" font-weight="700" fill="var(--accent)" id="textHostsTitle" data-i18n="svg.node.hosts">HOSPEDADORES</text>
+                  <text x="12" y="38" font-family="var(--font-body)" font-size="10" fill="var(--muted)" data-i18n="svg.node.hostsdesc">Población &amp; Ganado</text>
                 </g>
 
                 <!-- Node: Movilidad CSR -->
                 <g id="nodeMobility" transform="translate(10, 255)">
                   <rect width="130" height="50" rx="6" fill="var(--surface)" stroke="var(--accent)" stroke-width="2" id="rectMobility"></rect>
-                  <text x="12" y="22" font-family="var(--font-mono)" font-size="10" font-weight="700" fill="var(--accent)" id="textMobilityTitle">MOVILIDAD DÍA/NOCHE</text>
-                  <text x="12" y="38" font-family="var(--font-body)" font-size="10" fill="var(--muted)">Desplazamientos OD</text>
+                  <text x="12" y="22" font-family="var(--font-mono)" font-size="10" font-weight="700" fill="var(--accent)" id="textMobilityTitle" data-i18n="svg.node.mobility">MOVILIDAD DÍA/NOCHE</text>
+                  <text x="12" y="38" font-family="var(--font-body)" font-size="10" fill="var(--muted)" data-i18n="svg.node.mobilitydesc">Desplazamientos OD</text>
                 </g>
 
                 <!-- 2. Central Engine Node -->
@@ -1119,18 +1148,18 @@
                   
                   <!-- Submodule: Ciclo Gonotrófico -->
                   <rect x="12" y="42" width="176" height="40" rx="4" fill="var(--bg)" stroke="var(--border)"></rect>
-                  <text x="20" y="58" font-family="var(--font-mono)" font-size="10" font-weight="700" fill="var(--accent)">CICLO BIOLÓGICO</text>
-                  <text x="20" y="72" font-family="var(--font-body)" font-size="9" fill="var(--muted)">Oviposición, desarrollo y vuelo</text>
+                  <text x="20" y="58" font-family="var(--font-mono)" font-size="10" font-weight="700" fill="var(--accent)" data-i18n="svg.sub.bio">CICLO BIOLÓGICO</text>
+                  <text x="20" y="72" font-family="var(--font-body)" font-size="9" fill="var(--muted)" data-i18n="svg.sub.biodesc">Oviposición, desarrollo y vuelo</text>
 
                   <!-- Submodule: Búsqueda de Hospedador -->
                   <rect x="12" y="90" width="176" height="42" rx="4" fill="var(--bg)" stroke="var(--border)" id="submoduleHostSeeking"></rect>
-                  <text x="20" y="106" font-family="var(--font-mono)" font-size="10" font-weight="700" fill="var(--fg)" id="textSubmoduleHost">ATRACCIÓN HOSPEDADORES</text>
-                  <text x="20" y="120" font-family="var(--font-body)" font-size="9" fill="var(--muted)" id="textSubmoduleHostDesc">Preferencia animal vs humano</text>
+                  <text x="20" y="106" font-family="var(--font-mono)" font-size="10" font-weight="700" fill="var(--fg)" id="textSubmoduleHost" data-i18n="svg.sub.host">ATRACCIÓN HOSPEDADORES</text>
+                  <text x="20" y="120" font-family="var(--font-body)" font-size="9" fill="var(--muted)" id="textSubmoduleHostDesc" data-i18n="svg.sub.hostdesc">Preferencia animal vs humano</text>
 
                   <!-- Submodule: Transmisión SEIR-SEI -->
                   <rect x="12" y="140" width="176" height="52" rx="4" fill="var(--accent-soft)" stroke="var(--accent)" id="submoduleTrans"></rect>
-                  <text x="20" y="158" font-family="var(--font-mono)" font-size="10" font-weight="700" fill="var(--accent)">TRANSMISIÓN DE MALARIA</text>
-                  <text x="20" y="172" font-family="var(--font-body)" font-size="9" fill="var(--fg)" id="submoduleTransText">Hembras I_V ↔ Humanos I_H</text>
+                  <text x="20" y="158" font-family="var(--font-mono)" font-size="10" font-weight="700" fill="var(--accent)" data-i18n="svg.sub.trans">TRANSMISIÓN DE MALARIA</text>
+                  <text x="20" y="172" font-family="var(--font-body)" font-size="9" fill="var(--fg)" id="submoduleTransText" data-i18n="svg.sub.transdesc">Hembras I_V ↔ Humanos I_H</text>
                   <text x="20" y="184" font-family="var(--font-mono)" font-size="8" fill="var(--muted)" id="submoduleTransFoci">Focos: 5 · Día Inyección: 180</text>
 
                   <!-- Submodule: Calentamiento & Warmup -->
@@ -1186,9 +1215,9 @@
     <section class="section" id="emulador-unet" data-od-id="unet-emulation">
       <div class="container stack" style="gap: 40px;">
         <div style="max-width: 52ch;">
-          <p class="eyebrow">EMULACIÓN NEURONAL EFICIENTE</p>
-          <h2>Generación masiva de escenarios sin el coste del ABM directo.</h2>
-          <p class="lead" style="margin-top: 12px;">
+          <p class="eyebrow" data-i18n="unet.eyebrow">EMULACIÓN NEURONAL EFICIENTE</p>
+          <h2 data-i18n="unet.h2">Generación masiva de escenarios sin el coste del ABM directo.</h2>
+          <p class="lead" style="margin-top: 12px;" data-i18n="unet.lead">
             Simular millones de mosquitos en el ABM es preciso pero computacionalmente pesado. MalariaSentinel utiliza el ABM como generador de datos para entrenar una red U-Net que predice el estado epidemiológico de forma instantánea.
           </p>
         </div>
@@ -1196,31 +1225,31 @@
         <div class="grid-2">
           <div class="card">
             <div class="row-between" style="margin-bottom: 14px;">
-              <h3 style="font-size: 18px;">1. Fase de Entrenamiento (ABM → Dataset)</h3>
-              <span class="tag">Generador de Verdad</span>
+              <h3 style="font-size: 18px;" data-i18n="unet.train.title">1. Fase de Entrenamiento (ABM → Dataset)</h3>
+              <span class="tag" data-i18n="unet.train.tag">Generador de Verdad</span>
             </div>
-            <p style="color: var(--muted); font-size: 14px; line-height: 1.6; margin-bottom: 16px;">
+            <p style="color: var(--muted); font-size: 14px; line-height: 1.6; margin-bottom: 16px;" data-i18n="unet.train.desc">
               El motor ABM en C++ ejecuta múltiples rollouts estocásticos con semillas variadas. El constructor de datasets extrae parches de 128×128 y pares temporales <code>t → t+1</code>.
             </p>
             <ul style="padding-left: 20px; color: var(--muted); font-size: 13px; margin: 0; line-height: 1.7;">
-              <li>Generación paralela de rollouts en clusters de cómputo.</li>
-              <li>Entrenamiento de arquitectura U-Net (32-64-128-256) con pérdida combinada MSE + soft-Dice.</li>
-              <li>Validación estricta de curvas de calibración frente al ABM base.</li>
+              <li data-i18n="unet.train.li1">Generación paralela de rollouts en clusters de cómputo.</li>
+              <li data-i18n="unet.train.li2">Entrenamiento de arquitectura U-Net (32-64-128-256) con pérdida combinada MSE + soft-Dice.</li>
+              <li data-i18n="unet.train.li3">Validación estricta de curvas de calibración frente al ABM base.</li>
             </ul>
           </div>
 
           <div class="card">
             <div class="row-between" style="margin-bottom: 14px;">
-              <h3 style="font-size: 18px;">2. Fase de Producción Operativa (U-Net)</h3>
-              <span class="pill">100× Más Rápido</span>
+              <h3 style="font-size: 18px;" data-i18n="unet.prod.title">2. Fase de Producción Operativa (U-Net)</h3>
+              <span class="pill" data-i18n="unet.prod.tag">100× Más Rápido</span>
             </div>
-            <p style="color: var(--muted); font-size: 14px; line-height: 1.6; margin-bottom: 16px;">
+            <p style="color: var(--muted); font-size: 14px; line-height: 1.6; margin-bottom: 16px;" data-i18n="unet.prod.desc">
               En producción, la U-Net entrenada reemplaza la simulación pesada del ABM. Puede generar mapas de riesgo mensuales en milisegundos y evaluar miles de combinaciones de intervención en tiempo real.
             </p>
             <ul style="padding-left: 20px; color: var(--muted); font-size: 13px; margin: 0; line-height: 1.7;">
-              <li>Inferencia ágil para la toma de decisiones sobre el terreno.</li>
-              <li>Exploración interactiva de presupuestos de rociado IRS y mosquiteros.</li>
-              <li>Integración directa mediante endpoints REST en el servidor de producción.</li>
+              <li data-i18n="unet.prod.li1">Inferencia ágil para la toma de decisiones sobre el terreno.</li>
+              <li data-i18n="unet.prod.li2">Exploración interactiva de presupuestos de rociado IRS y mosquiteros.</li>
+              <li data-i18n="unet.prod.li3">Integración directa mediante endpoints REST en el servidor de producción.</li>
             </ul>
           </div>
         </div>
@@ -1232,63 +1261,63 @@
       <div class="container">
         <div class="row-between" style="margin-bottom: 36px; flex-wrap: wrap;">
           <div>
-            <p class="eyebrow">HOJA DE RUTA TÉCNICA</p>
-            <h2>Orden de ejecución planificado hacia el producto funcional.</h2>
-            <p class="lead" style="margin-top: 8px;">
+            <p class="eyebrow" data-i18n="roadmap.eyebrow">HOJA DE RUTA TÉCNICA</p>
+            <h2 data-i18n="roadmap.h2">Orden de ejecución planificado hacia el producto funcional.</h2>
+            <p class="lead" style="margin-top: 8px;" data-i18n="roadmap.lead">
               La secuencia de desarrollo responde a dependencias biológicas y computacionales. Las fechas y plazos se definirán progresivamente en función de la acogida y las contribuciones de la comunidad.
             </p>
           </div>
-          <span class="pill">5 Hitos Secuenciales</span>
+          <span class="pill" data-i18n="roadmap.badge">5 Hitos Secuenciales</span>
         </div>
 
         <div>
           <article class="log-row">
-            <span class="meta">Hito 1 · Base</span>
+            <span class="meta" data-i18n="roadmap.m1.meta">Hito 1 · Base</span>
             <div>
-              <h3>Consolidación del Núcleo Computacional <span class="pill" style="margin-left: 8px; font-size: 10px;">Completado</span></h3>
-              <p>Unificación de código en <code>mal-core</code>, motor C++ ABM optimizado, suite de 14 evaluadores de calibración (PR gate), pipelines de ingesta satelital (ERA5, CHIRPS, Sentinel-10m) y CLI <code>malariasim</code>.</p>
+              <h3><span data-i18n="roadmap.m1.title">Consolidación del Núcleo Computacional</span> <span class="pill" style="margin-left: 8px; font-size: 10px;" data-i18n="roadmap.m1.tag">Completado</span></h3>
+              <p data-i18n="roadmap.m1.desc">Unificación de código en <code>mal-core</code>, motor C++ ABM optimizado, suite de 14 evaluadores de calibración (PR gate), pipelines de ingesta satelital (ERA5, CHIRPS, Sentinel-10m) y CLI <code>malariasim</code>.</p>
             </div>
-            <span class="pull meta">Infraestructura</span>
+            <span class="pull meta" data-i18n="roadmap.m1.pull">Infraestructura</span>
           </article>
 
           <article class="log-row">
-            <span class="meta">Hito 2 · Siguiente</span>
+            <span class="meta" data-i18n="roadmap.m2.meta">Hito 2 · Siguiente</span>
             <div>
-              <h3>Comportamiento Biológico Avanzado y Resistencia a Insecticidas <span class="tag" style="margin-left: 8px;">En proceso</span></h3>
-              <p>
+              <h3><span data-i18n="roadmap.m2.title">Comportamiento Biológico Avanzado y Resistencia a Insecticidas</span> <span class="tag" style="margin-left: 8px;" data-i18n="roadmap.m2.tag">En proceso</span></h3>
+              <p data-i18n="roadmap.m2.desc">
                 • <strong>Soporte Multi-Especie de Vectores</strong>: Integración de 4 especies de <em>Anopheles</em> (*coluzzii*, *gambiae*, *arabiensis*, *funestus*) con óptimos térmicos y hábitats específicos.
                 <br>• <strong>Resistencia a Insecticidas</strong>: Modelado genético y metabólico de resistencia a piretroides que reduce la efectividad de mosquiteros e IRS.
                 <br>• <strong>Movilidad Espacial por Fases</strong>: Matrices de movilidad humana y ganadera diurna/nocturna agregadas a la grilla territorial.
               </p>
             </div>
-            <span class="pull meta">Modelado</span>
+            <span class="pull meta" data-i18n="roadmap.m2.pull">Modelado</span>
           </article>
 
           <article class="log-row">
-            <span class="meta">Hito 3 · Secuencia</span>
+            <span class="meta" data-i18n="roadmap.m3.meta">Hito 3 · Secuencia</span>
             <div>
-              <h3>Emulación Masiva y Aceleración con Red Neuronal U-Net</h3>
-              <p>Orquestación de ejecuciones concurrentes del ABM para generar datasets de entrenamiento a gran escala, entrenamiento de la red U-Net y sustitución del ABM en producción para generar predicciones en milisegundos.</p>
+              <h3 data-i18n="roadmap.m3.title">Emulación Masiva y Aceleración con Red Neuronal U-Net</h3>
+              <p data-i18n="roadmap.m3.desc">Orquestación de ejecuciones concurrentes del ABM para generar datasets de entrenamiento a gran escala, entrenamiento de la red U-Net y sustitución del ABM en producción para generar predicciones en milisegundos.</p>
             </div>
-            <span class="pull meta">Machine Learning</span>
+            <span class="pull meta" data-i18n="roadmap.m3.pull">Machine Learning</span>
           </article>
 
           <article class="log-row">
-            <span class="meta">Hito 4 · Secuencia</span>
+            <span class="meta" data-i18n="roadmap.m4.meta">Hito 4 · Secuencia</span>
             <div>
-              <h3>Ingesta de Incidencia de Campo y Optimización Espacial</h3>
-              <p>Conexión continua con datos epidemiológicos rutinarios (DHIS2) y motor de asignación óptima de mosquiteros IG2 y rociado IRS en micro-cuadrículas de 100m.</p>
+              <h3 data-i18n="roadmap.m4.title">Ingesta de Incidencia de Campo y Optimización Espacial</h3>
+              <p data-i18n="roadmap.m4.desc">Conexión continua con datos epidemiológicos rutinarios (DHIS2) y motor de asignación óptima de mosquiteros IG2 y rociado IRS en micro-cuadrículas de 100m.</p>
             </div>
-            <span class="pull meta">Integración</span>
+            <span class="pull meta" data-i18n="roadmap.m4.pull">Integración</span>
           </article>
 
           <article class="log-row">
-            <span class="meta">Hito 5 · Objetivo</span>
+            <span class="meta" data-i18n="roadmap.m5.meta">Hito 5 · Objetivo</span>
             <div>
-              <h3>Plataforma Centinela Operativa</h3>
-              <p>Aplicación web interactiva completa para ministerios de salud y organizaciones en terreno: simulador visual de políticas sanitarias, evaluación de impacto por distrito y sistema de alertas tempranas estacionales.</p>
+              <h3 data-i18n="roadmap.m5.title">Plataforma Centinela Operativa</h3>
+              <p data-i18n="roadmap.m5.desc">Aplicación web interactiva completa para ministerios de salud y organizaciones en terreno: simulador visual de políticas sanitarias, evaluación de impacto por distrito y sistema de alertas tempranas estacionales.</p>
             </div>
-            <span class="pull meta">Producto Final</span>
+            <span class="pull meta" data-i18n="roadmap.m5.pull">Producto Final</span>
           </article>
         </div>
       </div>
@@ -1298,40 +1327,62 @@
     <section class="section" id="colaborar" data-od-id="collaboration-tracks">
       <div class="container stack" style="gap: 48px;">
         <div style="max-width: 50ch;">
-          <p class="eyebrow">CONTRIBUCIÓN ABIERTA</p>
-          <h2>Un proyecto construido por una comunidad multidisciplinar.</h2>
-          <p class="lead" style="margin-top: 12px;">
+          <p class="eyebrow" data-i18n="collab.eyebrow">CONTRIBUCIÓN ABIERTA</p>
+          <h2 data-i18n="collab.h2">Un proyecto construido por una comunidad multidisciplinar.</h2>
+          <p class="lead" style="margin-top: 12px;" data-i18n="collab.lead">
             Buscamos investigadoras, modeladores e ingenieros que deseen sumar esfuerzos en las distintas ramas técnicas del proyecto.
           </p>
         </div>
 
         <div class="grid-4">
           <div class="card">
-            <h3 style="font-size: 17px; margin-bottom: 8px;">Epidemiología &amp; Entomología</h3>
-            <p style="font-size: 13px; color: var(--muted); margin: 0; line-height: 1.5;">
+            <h3 style="font-size: 17px; margin-bottom: 8px;" data-i18n="collab.c1.title">Epidemiología &amp; Entomología</h3>
+            <p style="font-size: 13px; color: var(--muted); margin: 0; line-height: 1.5;" data-i18n="collab.c1.desc">
               Ajuste de parámetros biológicos de vectores, frecuencias de resistencia a insecticidas y curvas de picadura.
             </p>
           </div>
 
           <div class="card">
-            <h3 style="font-size: 17px; margin-bottom: 8px;">Ingeniería Geoespacial</h3>
-            <p style="font-size: 13px; color: var(--muted); margin: 0; line-height: 1.5;">
+            <h3 style="font-size: 17px; margin-bottom: 8px;" data-i18n="collab.c2.title">Ingeniería Geoespacial</h3>
+            <p style="font-size: 13px; color: var(--muted); margin: 0; line-height: 1.5;" data-i18n="collab.c2.desc">
               Pipelines satelitales automatizados, mallas espaciales Zarr/NetCDF y modelado de cuencas hidrológicas de alta resolución.
             </p>
           </div>
 
           <div class="card">
-            <h3 style="font-size: 17px; margin-bottom: 8px;">Machine Learning &amp; Simulación</h3>
-            <p style="font-size: 13px; color: var(--muted); margin: 0; line-height: 1.5;">
+            <h3 style="font-size: 17px; margin-bottom: 8px;" data-i18n="collab.c3.title">Machine Learning &amp; Simulación</h3>
+            <p style="font-size: 13px; color: var(--muted); margin: 0; line-height: 1.5;" data-i18n="collab.c3.desc">
               Entrenamiento de emuladores U-Net, paralelización en C++ y algoritmos de optimización bayesiana para políticas de salud.
             </p>
           </div>
 
           <div class="card">
-            <h3 style="font-size: 17px; margin-bottom: 8px;">Diseño &amp; Producto</h3>
-            <p style="font-size: 13px; color: var(--muted); margin: 0; line-height: 1.5;">
+            <h3 style="font-size: 17px; margin-bottom: 8px;" data-i18n="collab.c4.title">Diseño &amp; Producto</h3>
+            <p style="font-size: 13px; color: var(--muted); margin: 0; line-height: 1.5;" data-i18n="collab.c4.desc">
               Diseño de experiencia para la plataforma interactiva Centinela, visualización cartográfica de riesgo y accesibilidad.
             </p>
+          </div>
+        </div>
+
+        <!-- Institutional partners -->
+        <div class="card" style="background: var(--fg-soft); border-color: var(--accent);">
+          <div class="row-between" style="flex-wrap: wrap; gap: 20px;">
+            <div style="max-width: 50ch;">
+              <h3 style="font-size: 18px; margin-bottom: 8px;" data-i18n="collab.partners.title">Instituciones Colaboradoras</h3>
+              <p style="font-size: 14px; color: var(--muted); margin: 0; line-height: 1.6;" data-i18n="collab.partners.desc">
+                MalariaSentinel es posible gracias al apoyo institucional de organizaciones comprometidas con la ciencia abierta y la salud global.
+              </p>
+            </div>
+            <div class="row" style="gap: 16px; flex-wrap: wrap;">
+              <a href="https://www.anfaia.org/" target="_blank" rel="noopener" class="btn btn-secondary" style="font-weight: 600;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+                ANFAIA
+              </a>
+              <a href="https://www.cesga.es/" target="_blank" rel="noopener" class="btn btn-secondary" style="font-weight: 600;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
+                CESGA
+              </a>
+            </div>
           </div>
         </div>
 
@@ -1339,20 +1390,20 @@
         <div class="card-rule">
           <div class="grid-3" style="margin-top: 8px;">
             <div>
-              <span class="meta">Paso 1 · Clonar &amp; Sincronizar</span>
-              <p style="font-size: 14px; margin-top: 4px; color: var(--muted);">
+              <span class="meta" data-i18n="collab.step1.meta">Paso 1 · Clonar &amp; Sincronizar</span>
+              <p style="font-size: 14px; margin-top: 4px; color: var(--muted);" data-i18n="collab.step1.desc">
                 Clonar el repositorio y sincronizar dependencias de forma reproducible con <code>uv sync --all-packages</code>.
               </p>
             </div>
             <div>
-              <span class="meta">Paso 2 · Validar el Entorno</span>
-              <p style="font-size: 14px; margin-top: 4px; color: var(--muted);">
+              <span class="meta" data-i18n="collab.step2.meta">Paso 2 · Validar el Entorno</span>
+              <p style="font-size: 14px; margin-top: 4px; color: var(--muted);" data-i18n="collab.step2.desc">
                 Ejecutar la suite de pruebas y calibración con <code>uv run pytest</code> para verificar la integridad del sistema.
               </p>
             </div>
             <div>
-              <span class="meta">Paso 3 · Contribuir con un PR</span>
-              <p style="font-size: 14px; margin-top: 4px; color: var(--muted);">
+              <span class="meta" data-i18n="collab.step3.meta">Paso 3 · Contribuir con un PR</span>
+              <p style="font-size: 14px; margin-top: 4px; color: var(--muted);" data-i18n="collab.step3.desc">
                 Seleccionar un plan abierto en el repositorio y abrir un Pull Request tras pasar los checks automáticos.
               </p>
             </div>
@@ -1364,13 +1415,13 @@
     <!-- Closing CTA Strip -->
     <section class="section" data-od-id="cta-strip" style="text-align: center;">
       <div class="container" style="max-width: 640px;">
-        <h2>Construyamos juntos el Centinela para la erradicación de la malaria.</h2>
-        <p class="lead" style="margin: 16px auto 32px;">
-          Proyecto 100% abierto bajo licencia MIT. Código, planes de desarrollo y documentación técnica accesibles para toda la comunidad.
+        <h2 data-i18n="cta.h2">Construyamos juntos el Centinela para la erradicación de la malaria.</h2>
+        <p class="lead" style="margin: 16px auto 32px;" data-i18n="cta.lead">
+          Proyecto 100% abierto bajo licencia Apache 2.0. Código, planes de desarrollo y documentación técnica accesibles para toda la comunidad.
         </p>
         <div class="row" style="justify-content: center; gap: 12px; flex-wrap: wrap;">
-          <a href="https://github.com/ANFAIA/MalariaSentinel" class="btn btn-primary">Ver repositorio en GitHub</a>
-          <a href="https://github.com/ANFAIA/MalariaSentinel/discussions" class="btn btn-secondary">Unirse a la discusión</a>
+          <a href="https://github.com/ANFAIA/MalariaSentinel" class="btn btn-primary" data-i18n="cta.github">Ver repositorio en GitHub</a>
+          <a href="https://github.com/ANFAIA/MalariaSentinel/discussions" class="btn btn-secondary" data-i18n="cta.discuss">Unirse a la discusión</a>
         </div>
       </div>
     </section>
@@ -1383,19 +1434,25 @@
       <div class="row-between">
         <div>
           <span style="font-weight: 600; color: var(--fg);">MalariaSentinel</span>
-          <p style="margin: 4px 0 0; font-size: 12px; color: var(--muted);">
+          <p style="margin: 4px 0 0; font-size: 12px; color: var(--muted);" data-i18n="footer.subtitle">
             Spatial Decision Support System (SDSS) para la erradicación de la malaria · Basado en Kelly et al. (2012)
+          </p>
+          <p style="margin: 6px 0 0; font-size: 12px; color: var(--muted);">
+            <a href="https://www.anfaia.org/" target="_blank" rel="noopener" style="color: var(--accent);">ANFAIA</a>
+            &nbsp;·&nbsp;
+            <a href="https://www.cesga.es/" target="_blank" rel="noopener" style="color: var(--accent);">CESGA</a>
+            &nbsp;·&nbsp;
+            <a href="https://github.com/ANFAIA/MalariaSentinel/blob/main/LICENSE" target="_blank" rel="noopener" style="color: var(--muted);">Apache 2.0</a>
           </p>
         </div>
         <div class="row" style="gap: 20px; font-size: 13px; flex-wrap: wrap;">
-          <a href="#metodologia" style="color: var(--muted);">Metodología</a>
-          <a href="#arquitectura" style="color: var(--muted);">Arquitectura</a>
-          <a href="#avances" style="color: var(--muted);">Avances</a>
-          <a href="#configurador-abm" style="color: var(--muted);">Configurador ABM</a>
-          <a href="#emulador-unet" style="color: var(--muted);">U-Net</a>
-          <a href="#hoja-de-ruta" style="color: var(--muted);">Hoja de ruta</a>
-          <a href="#colaborar" style="color: var(--muted);">Colaborar</a>
-          <a href="https://github.com/ANFAIA/MalariaSentinel" style="color: var(--muted);">Licencia MIT</a>
+          <a href="#metodologia" style="color: var(--muted);" data-i18n="nav.methodology">Metodología</a>
+          <a href="#arquitectura" style="color: var(--muted);" data-i18n="nav.architecture">Arquitectura</a>
+          <a href="#avances" style="color: var(--muted);" data-i18n="footer.nav.status">Avances</a>
+          <a href="#configurador-abm" style="color: var(--muted);" data-i18n="footer.nav.config">Configurador ABM</a>
+          <a href="#emulador-unet" style="color: var(--muted);" data-i18n="footer.nav.unet">U-Net</a>
+          <a href="#hoja-de-ruta" style="color: var(--muted);" data-i18n="nav.roadmap">Hoja de ruta</a>
+          <a href="#colaborar" style="color: var(--muted);" data-i18n="nav.collaborate">Colaborar</a>
         </div>
       </div>
     </div>
@@ -1459,6 +1516,9 @@
       var summaryGifs = document.getElementById('summaryGifs');
 
       var presetChips = document.querySelectorAll('.preset-chip');
+
+      // i18n helper
+      function L(es, en) { return (localStorage.getItem('ms-lang') || 'es') === 'en' ? en : es; }
 
       // SVG Elements
       var svgStatusPill = document.getElementById('svgStatusPill');
@@ -1682,15 +1742,15 @@
         var totalCohortLogs = hasCohortLog ? rollouts : 0;
         var totalGifs = hasGif ? (rollouts * (hasTrans ? 2 : 1)) : 0;
 
-        summaryStateRasters.textContent = totalStateRasters + ' archivos (' + rollouts + ' rollouts × ' + numSnapshotsPerRollout + ')';
-        summaryTransRasters.textContent = hasTrans ? (totalTransRasters + ' archivos (SEIR)') : '0 archivos (desactivado)';
-        summaryCohortLog.textContent = totalCohortLogs > 0 ? (totalCohortLogs + ' archivo(s) JSON') : 'Desactivado';
-        summaryGifs.textContent = totalGifs > 0 ? (totalGifs + ' archivo(s) .gif') : 'Desactivado';
+        summaryStateRasters.textContent = totalStateRasters + L(' archivos (' + rollouts + ' rollouts × ' + numSnapshotsPerRollout + ')', ' files (' + rollouts + ' rollouts × ' + numSnapshotsPerRollout + ')');
+        summaryTransRasters.textContent = hasTrans ? (totalTransRasters + L(' archivos (SEIR)', ' files (SEIR)')) : L('0 archivos (desactivado)', '0 files (disabled)');
+        summaryCohortLog.textContent = totalCohortLogs > 0 ? (totalCohortLogs + L(' archivo(s) JSON', ' JSON file(s)')) : L('Desactivado', 'Disabled');
+        summaryGifs.textContent = totalGifs > 0 ? (totalGifs + L(' archivo(s) .gif', ' .gif file(s)')) : L('Desactivado', 'Disabled');
 
         // 3. Update Dynamic SVG
-        textRolloutsCount.textContent = rollouts > 1 ? (rollouts + ' Rollouts en Ensamble · Base ' + seed) : ('1 Rollout · Semilla ' + seed);
-        textSnapshotInterval.textContent = snapshot > 0 ? ('Snapshot: cada ' + snapshot + ' días') : 'Snapshot: solo final';
-        outCountVectors.textContent = totalStateRasters + ' GeoTIFFs (' + rollouts + 'x)';
+        textRolloutsCount.textContent = rollouts > 1 ? (rollouts + L(' Rollouts en Ensamble · Base ', ' Ensemble Rollouts · Base ') + seed) : ('1 ' + L('Rollout · Semilla ', 'Rollout · Seed ') + seed);
+        textSnapshotInterval.textContent = snapshot > 0 ? (L('Snapshot: cada ', 'Snapshot: every ') + snapshot + L(' días', ' days')) : L('Snapshot: solo final', 'Snapshot: final only');
+        outCountVectors.textContent = totalStateRasters + L(' GeoTIFFs (' + rollouts + 'x)', ' GeoTIFFs (' + rollouts + 'x)');
 
         // Environmental lines always active
         linkEnv.setAttribute('stroke', 'var(--accent)');
@@ -1711,7 +1771,7 @@
 
           submoduleHostSeeking.setAttribute('stroke', 'var(--accent)');
           textSubmoduleHost.setAttribute('fill', 'var(--accent)');
-          textSubmoduleHostDesc.textContent = 'Atracción ganadera + humana activa';
+          textSubmoduleHostDesc.textContent = L('Atracción ganadera + humana activa', 'Active livestock + human attraction');
         } else {
           linkHosts.setAttribute('stroke', 'var(--border)');
           linkHosts.setAttribute('stroke-dasharray', '4 4');
@@ -1725,52 +1785,52 @@
 
           submoduleHostSeeking.setAttribute('stroke', 'var(--border)');
           textSubmoduleHost.setAttribute('fill', 'var(--fg)');
-          textSubmoduleHostDesc.textContent = 'Solo búsqueda aleatoria de agua';
+          textSubmoduleHostDesc.textContent = L('Solo búsqueda aleatoria de agua', 'Random water search only');
         }
 
         // Transmission Box & lines
         if (hasTrans) {
-          svgStatusPill.textContent = 'Transmisión Activa';
+          svgStatusPill.textContent = L('Transmisión Activa', 'Active Transmission');
           svgStatusPill.style.color = 'var(--accent)';
 
           submoduleTrans.setAttribute('fill', 'var(--accent-soft)');
           submoduleTrans.setAttribute('stroke', 'var(--accent)');
-          submoduleTransText.textContent = 'Hembras I_V ↔ Humanos I_H';
-          submoduleTransFoci.textContent = 'Modo: ' + humanSeeding + (outbreakDay > 0 ? ' · Día: ' + outbreakDay : '');
+          submoduleTransText.textContent = L('Hembras I_V ↔ Humanos I_H', 'Female I_V ↔ Humans I_H');
+          submoduleTransFoci.textContent = L('Modo: ', 'Mode: ') + humanSeeding + (outbreakDay > 0 ? L(' · Día: ', ' · Day: ') + outbreakDay : '');
 
           linkOutTrans.setAttribute('stroke', 'var(--accent)');
           linkOutTrans.setAttribute('stroke-dasharray', 'none');
           outRectTrans.setAttribute('stroke', 'var(--accent)');
           outTextTransTitle.setAttribute('fill', 'var(--accent)');
-          outCountTrans.textContent = totalTransRasters + ' GeoTIFFs (8 bandas)';
+          outCountTrans.textContent = totalTransRasters + L(' GeoTIFFs (8 bandas)', ' GeoTIFFs (8 bands)');
 
           if (outbreakDay > 0) {
             submoduleWarmup.setAttribute('fill', 'var(--fg-soft)');
             submoduleWarmup.setAttribute('stroke', 'var(--fg)');
-            submoduleWarmupText.textContent = 'Warm-up ' + outbreakDay + 'd previo a brote';
+            submoduleWarmupText.textContent = L('Warm-up ', 'Warm-up ') + outbreakDay + L('d previo a brote', 'd before outbreak');
           } else {
             submoduleWarmup.setAttribute('fill', 'var(--bg)');
             submoduleWarmup.setAttribute('stroke', 'var(--border)');
-            submoduleWarmupText.textContent = 'Sin fase de estabilización diferida';
+            submoduleWarmupText.textContent = L('Sin fase de estabilización diferida', 'No deferred stabilisation phase');
           }
         } else {
-          svgStatusPill.textContent = hasHosts ? 'Dinámica Vectorial + Hospedadores' : 'Solo Dinámica Vectorial';
+          svgStatusPill.textContent = hasHosts ? L('Dinámica Vectorial + Hospedadores', 'Vector Dynamics + Hosts') : L('Solo Dinámica Vectorial', 'Vector Dynamics Only');
           svgStatusPill.style.color = 'var(--muted)';
 
           submoduleTrans.setAttribute('fill', 'var(--bg)');
           submoduleTrans.setAttribute('stroke', 'var(--border)');
-          submoduleTransText.textContent = 'Transmisión Desactivada';
-          submoduleTransFoci.textContent = 'Solo ecología de mosquitos';
+          submoduleTransText.textContent = L('Transmisión Desactivada', 'Transmission Disabled');
+          submoduleTransFoci.textContent = L('Solo ecología de mosquitos', 'Mosquito ecology only');
 
           submoduleWarmup.setAttribute('fill', 'var(--bg)');
           submoduleWarmup.setAttribute('stroke', 'var(--border)');
-          submoduleWarmupText.textContent = 'Simulación continua directa';
+          submoduleWarmupText.textContent = L('Simulación continua directa', 'Direct continuous simulation');
 
           linkOutTrans.setAttribute('stroke', 'var(--border)');
           linkOutTrans.setAttribute('stroke-dasharray', '4 4');
           outRectTrans.setAttribute('stroke', 'var(--border)');
           outTextTransTitle.setAttribute('fill', 'var(--muted)');
-          outCountTrans.textContent = 'Desactivado (0 archivos)';
+          outCountTrans.textContent = L('Desactivado (0 archivos)', 'Disabled (0 files)');
         }
 
         // Cohort log
@@ -1779,13 +1839,13 @@
           linkOutCohorts.setAttribute('stroke-dasharray', 'none');
           outRectCohorts.setAttribute('stroke', 'var(--accent)');
           outTextCohortsTitle.setAttribute('fill', 'var(--accent)');
-          outCountCohorts.textContent = totalCohortLogs + ' Serie(s) diaria(s)';
+          outCountCohorts.textContent = totalCohortLogs + L(' Serie(s) diaria(s)', ' Daily series');
         } else {
           linkOutCohorts.setAttribute('stroke', 'var(--border)');
           linkOutCohorts.setAttribute('stroke-dasharray', '4 4');
           outRectCohorts.setAttribute('stroke', 'var(--border)');
           outTextCohortsTitle.setAttribute('fill', 'var(--muted)');
-          outCountCohorts.textContent = 'Desactivado (0 archivos)';
+          outCountCohorts.textContent = L('Desactivado (0 archivos)', 'Disabled (0 files)');
         }
 
         // GIF outputs
@@ -1794,39 +1854,53 @@
           linkOutGifs.setAttribute('stroke-dasharray', 'none');
           outRectGif.setAttribute('stroke', 'var(--accent)');
           outTextGifTitle.setAttribute('fill', 'var(--accent)');
-          outCountGif.textContent = totalGifs + ' GIF(s) animados';
+          outCountGif.textContent = totalGifs + L(' GIF(s) animados', ' Animated GIF(s)');
         } else {
           linkOutGifs.setAttribute('stroke', 'var(--border)');
           linkOutGifs.setAttribute('stroke-dasharray', '4 4');
           outRectGif.setAttribute('stroke', 'var(--border)');
           outTextGifTitle.setAttribute('fill', 'var(--muted)');
-          outCountGif.textContent = 'Desactivado (0 archivos)';
+          outCountGif.textContent = L('Desactivado (0 archivos)', 'Disabled (0 files)');
         }
 
         // 4. Update Data Prerequisites & Warnings
-        var warningHtml = 'Para ejecutar este comando con ' + (hasTrans ? 'transmisión activa' : (hasHosts ? 'atracción de hospedadores' : 'dinámica ecológica')) + ' en <strong>' + aoi + '</strong>:';
+        var warningHtml = L(
+          'Para ejecutar este comando con ' + (hasTrans ? 'transmisión activa' : (hasHosts ? 'atracción de hospedadores' : 'dinámica ecológica')) + ' en <strong>' + aoi + '</strong>:',
+          'To run this command with ' + (hasTrans ? 'active transmission' : (hasHosts ? 'host attraction' : 'ecological dynamics')) + ' in <strong>' + aoi + '</strong>:'
+        );
         warningHtml += '<div style="margin-top: 10px; display: flex; flex-direction: column; gap: 8px;">';
 
         if (isCustomAoi) {
           warningHtml += '<div style="background: color-mix(in oklch, var(--fg) 5%, transparent); padding: 10px; border-radius: 6px; border-left: 3px solid var(--accent);">';
-          warningHtml += '<strong>💡 Cómo registrar una nueva área de interés permanente:</strong><br />';
-          warningHtml += 'Añade la nueva región en <code>mal-commonlib/src/mal_commonlib/aois.yaml</code> (fuente única de verdad, sin cambiar código):<br />';
+          warningHtml += L(
+            '<strong>💡 Cómo registrar una nueva área de interés permanente:</strong><br />Añade la nueva región en <code>mal-commonlib/src/mal_commonlib/aois.yaml</code> (fuente única de verdad, sin cambiar código):<br />',
+            '<strong>💡 How to register a new permanent area of interest:</strong><br />Add the new region in <code>mal-commonlib/src/mal_commonlib/aois.yaml</code> (single source of truth, no code changes):<br />'
+          );
           warningHtml += '<code style="font-size: 11px;">' + aoi + ':<br />&nbsp;&nbsp;name: ' + aoi + '<br />&nbsp;&nbsp;bbox: [' + customBbox + ']<br />&nbsp;&nbsp;crs: "EPSG:4326"<br />&nbsp;&nbsp;resolution_m: 1000<br />&nbsp;&nbsp;scale: regional</code>';
           warningHtml += '</div>';
         }
 
         warningHtml += '<div class="code-box" style="padding: 8px 12px; font-size: 12px; background: var(--surface);">';
-        warningHtml += '<span class="comment"># 1. Descarga de tensores ambientales para ' + aoi + ' (perfiles por defecto)</span><br />';
+        warningHtml += L(
+          '<span class="comment"># 1. Descarga de tensores ambientales para ' + aoi + ' (perfiles por defecto)</span><br />',
+          '<span class="comment"># 1. Download environmental tensors for ' + aoi + ' (default profiles)</span><br />'
+        );
         warningHtml += '<span class="cmd">uv run malariasim download</span> --aoi ' + aoi + ' --years 2024';
         warningHtml += '</div>';
 
         warningHtml += '<div class="code-box" style="padding: 8px 12px; font-size: 12px; background: var(--surface);">';
-        warningHtml += '<span class="comment"># 2. Ingesta de tensores ambientales ' + (hasHosts ? '+ capas de hospedadores humanos/ganado' : '') + '</span><br />';
+        warningHtml += L(
+          '<span class="comment"># 2. Ingesta de tensores ambientales ' + (hasHosts ? '+ capas de hospedadores humanos/ganado' : '') + '</span><br />',
+          '<span class="comment"># 2. Ingest environmental tensors ' + (hasHosts ? '+ human/livestock host layers' : '') + '</span><br />'
+        );
         warningHtml += '<span class="cmd">uv run malariasim ingest</span> --aoi ' + aoi + ' --year 2024 --month 1 --what ' + (hasHosts ? 'all' : 'env');
         warningHtml += '</div>';
 
         if (hasTrans) {
-          warningHtml += '<p style="margin: 4px 0 0; font-size: 12px; color: var(--muted);"><strong>Regla biológica:</strong> La transmisión ocurre exclusivamente a través de hembras adultas en celdas con presencia humana activa.</p>';
+          warningHtml += L(
+            '<p style="margin: 4px 0 0; font-size: 12px; color: var(--muted);"><strong>Regla biológica:</strong> La transmisión ocurre exclusivamente a través de hembras adultas en celdas con presencia humana activa.</p>',
+            '<p style="margin: 4px 0 0; font-size: 12px; color: var(--muted);"><strong>Biological rule:</strong> Transmission occurs exclusively through adult females in cells with active human presence.</p>'
+          );
         }
 
         warningHtml += '</div>';
@@ -1894,10 +1968,10 @@
           var textToCopy = cliCommandOutput.textContent;
           navigator.clipboard.writeText(textToCopy).then(function() {
             copyCliBtn.classList.add('copied');
-            copyBtnText.textContent = '¡Copiado!';
+            copyBtnText.textContent = L('¡Copiado!', 'Copied!');
             setTimeout(function() {
               copyCliBtn.classList.remove('copied');
-              copyBtnText.textContent = 'Copiar comando';
+              copyBtnText.textContent = L('Copiar comando', 'Copy command');
             }, 2000);
           });
         });
@@ -1905,6 +1979,394 @@
 
       // Initial execution
       updatePipeline();
+      window.updatePipeline = updatePipeline;
+    })();
+
+    // ─── i18n Engine ───────────────────────────────────────────────────
+    (function() {
+      var T = {
+        'es': {
+          // Nav
+          'nav.methodology': 'Metodología',
+          'nav.architecture': 'Arquitectura',
+          'nav.configurator': 'Configurador',
+          'nav.roadmap': 'Hoja de ruta',
+          'nav.collaborate': 'Colaborar',
+          'nav.configurator_abm': 'Configurador ABM & Emulador',
+          'nav.roadmap_long': 'Hoja de Ruta',
+          'nav.how_collaborate': 'Cómo Colaborar',
+          // Hero
+          'hero.eyebrow': 'SISTEMA DE SOPORTE ESPACIAL A DECISIONES (SDSS) · CÓDIGO ABIERTO',
+          'hero.h1': 'Modelado geoespacial y simulación predictiva para la erradicación de la malaria.',
+          'hero.lead': 'Plataforma colaborativa abierta en etapa inicial que integra simulaciones basadas en agentes (ABM), tensores climáticos satelitales y sustitutos neuronales de inferencia ultrarrápida para optimizar intervenciones de salud pública en territorio.',
+          'hero.cta_config': 'Probar Configurador Interactivo',
+          'hero.cta_arch': 'Ver arquitectura técnica',
+          'hero.institutions': 'Un proyecto realizado con el apoyo de <a href="https://www.anfaia.org/" target="_blank" rel="noopener" style="color: var(--accent); font-weight: 600;">ANFAIA</a> y <a href="https://www.cesga.es/" target="_blank" rel="noopener" style="color: var(--accent); font-weight: 600;">CESGA</a>',
+          // Pipeline
+          'pipeline.title': 'Pipeline Computacional Unificado',
+          'pipeline.s1.tag': '01 · Ingesta & Tensores',
+          'pipeline.s1.name': 'Datos Satelitales e Hidrológicos',
+          'pipeline.s1.desc': 'ERA5 (temperatura y vientos), CHIRPS (precipitación), Sentinel-10m DSwX y MERIT DEM.',
+          'pipeline.s2.tag': '02 · Generación de Datos (Profesor)',
+          'pipeline.s2.name': 'Motor ABM en C++ + 14 Scorers',
+          'pipeline.s2.desc': 'Simulación estocástica precisa de millones de agentes generando pares de entrenamiento.',
+          'pipeline.s3.tag': '03 · Inferencia Operativa (Estudiante)',
+          'pipeline.s3.name': 'Emulador U-Net & Asignación Óptima',
+          'pipeline.s3.desc': 'Predicción mensual 100× más rápida para barrido masivo de escenarios de intervención.',
+          // Methodology
+          'methodology.eyebrow': 'METODOLOGÍA CIENTÍFICA',
+          'methodology.h2': 'Descomposición de Peligro vs. Vulnerabilidad.',
+          'methodology.lead': 'Siguiendo los avances de Morlighem et al. (2025) y Gbaguidi et al. (2026), MalariaSentinel desacopla la idoneidad del vector de la vulnerabilidad humana para producir mapas conjuntos de riesgo aplicables a toma de decisiones.',
+          'methodology.hazard.title': 'Peligro Vectorial (Hazard)',
+          'methodology.hazard.tag': 'Ecológico & Climático',
+          'methodology.hazard.desc': 'Modelado biofísico de idoneidad y dinámica poblacional del mosquito:',
+          'methodology.hazard.li1': '<strong>Procesos hidrológicos:</strong> Humedad del suelo, escorrentía superficial y charcas temporales (Smith et al. 2024).',
+          'methodology.hazard.li2': '<strong>Especies clave:</strong> Parametrización térmica diferenciada para <em>An. coluzzii</em>, <em>An. gambiae</em>, <em>An. funestus</em> y <em>An. arabiensis</em>.',
+          'methodology.hazard.li3': '<strong>Calendarios agrícolas:</strong> Influencia de cultivos de arroz en la proliferación estacional de vectores.',
+          'methodology.vuln.title': 'Vulnerabilidad y Exposición',
+          'methodology.vuln.tag': 'Demográfico & Sanitario',
+          'methodology.vuln.desc': 'Factores humanos que modulan el impacto real y la eficacia de las medidas preventivas:',
+          'methodology.vuln.li1': '<strong>Movilidad por fases:</strong> Desplazamientos humanos y ganaderos diurnos/nocturnos que alteran el contacto vector-hospedador.',
+          'methodology.vuln.li2': '<strong>Resistencia a insecticidas:</strong> Mutaciones de insensibilidad y desintoxicación metabólica que reducen el efecto del rociado IRS.',
+          'methodology.vuln.li3': '<strong>Cascada de efectividad:</strong> Tasa real de uso y durabilidad física de mosquiteros tratados (ITN IG2).',
+          // Architecture
+          'arch.eyebrow': 'ARQUITECTURA DEL MONOREPO',
+          'arch.h2': 'Estructura técnica consolidada en mal-core.',
+          'arch.th.pkg': 'Paquete', 'arch.th.level': 'Nivel', 'arch.th.role': 'Rol y Responsabilidad', 'arch.th.deps': 'Dependencias',
+          'arch.tier.prod': 'Producción', 'arch.tier.tool': 'Herramienta',
+          'arch.core.desc': 'Núcleo consolidado: ABM en C++, red neuronal U-Net, predictores, scoring y servidor FastAPI.',
+          'arch.commonlib.desc': 'Cargadores espaciales (CHIRPS, ERA5, Sentinel, DEM, WorldPop, GLW4), paths y schemas comunes.',
+          'arch.exec.desc': 'Puntos de entrada CLI (<code>malariasim</code>) y scripts para orquestación de simulaciones batch.',
+          'arch.explorer.desc': 'Visualización de coberturas geoespaciales, mapas de idoneidad y análisis de sesgo territorial.',
+          'arch.cli.title': 'Comandos principales de malariasim',
+          'arch.cli.c1': '# Descarga de tensores ambientales para un área (perfiles por defecto)',
+          'arch.cli.c2': '# Ejecución de simulación ABM estocástica para generar rollouts',
+          'arch.cli.c3': '# Entrenamiento del emulador neuronal U-Net con los datos del ABM',
+          'arch.cli.c4': '# Predicción rápida de mapas de riesgo mensuales',
+          // Status
+          'status.eyebrow': 'ESTADO ACTUAL Y NÚCLEO CONSOLIDADO',
+          'status.h2': 'Avances consolidados en el paquete mal-core.',
+          'status.lead': 'Todo el sistema principal de simulación, ingesta y evaluación se encuentra ya centralizado en <code>mal-core</code>, preparado para ejecuciones reproducibles y calibración científica continua.',
+          'status.f1.title': 'Motor ABM en C++ de Alto Rendimiento',
+          'status.f1.desc': 'Consolidado en <code>mal-core</code>, simula dinámicas de ciclos gonotróficos y búsqueda de hospedadores con más de 261 tests en C++ y 14 evaluadores de calibración automatizados.',
+          'status.f2.title': 'Ingesta y Tensores Ambientales Diarios',
+          'status.f2.desc': 'Pipeline robusto en <code>mal-commonlib</code> que procesa series climáticas CHIRPS (34 años), reanálisis ERA5, capas de agua superficial Sentinel-10m y elevación MERIT DEM.',
+          'status.f3.title': 'Orquestación Modular & API REST',
+          'status.f3.desc': 'CLI <code>malariasim</code> unificado con 9 comandos para descarga, ingesta, entrenamiento y predicción, complementado con un servidor FastAPI para integración de servicios.',
+          // Configurator
+          'config.eyebrow': 'HERRAMIENTA VISUAL PARA INVESTIGADORES Y NOVELES',
+          'config.h2': 'Configurador Interactivo de Simulación ABM & Flujo de Datos',
+          'config.lead': 'Ajusta los parámetros de simulación o selecciona un escenario predefinido. El diagrama vectorial dinámico, las advertencias de datos requeridos y el manifiesto de salidas se actualizarán en tiempo real.',
+          'config.presets.title': '1. Escenarios de Simulación Predefinidos',
+          'config.p1.title': 'Brote Focal Anual con Estabilización (365 días)', 'config.p1.badge': 'Recomendado', 'config.p1.desc': '6 meses de calentamiento para equilibrio de mosquitos + brote en 5 aldeas seleccionadas + animación GIF.',
+          'config.p2.title': 'Incursión de Mosquitos Portadores (90 días)', 'config.p2.desc': 'Llegada estacional de hembras infectadas (15%) en zonas de agua durante lluvias.',
+          'config.p3.title': 'Brote en Centros Urbanos Específicos (180 días)', 'config.p3.desc': 'Inyección directa de casos clínicos importados en coordenadas de ciudades principales.',
+          'config.p4.title': 'Calibración Rápida de Población de Vectores (30 días)', 'config.p4.desc': 'Simulación corta de 30 días para verificar dinámica de ciclo biológico sin malaria activa.',
+          'config.p5.title': 'Generación de Dataset para Red Neuronal U-Net (Ensamble)', 'config.p5.desc': '10 rollouts paralelos con distintas semillas para generar pares de entrenamiento.',
+          'config.more_options': '2. Más opciones',
+          'config.aoi.label': 'Área de Interés (--aoi)', 'config.aoi.ghana': 'Ghana (Nacional predefinido · 9.466 celdas)', 'config.aoi.moz': 'Mozambique (Nacional predefinido)', 'config.aoi.custom': 'Personalizada (Nueva Región / Coordenadas BBOX)',
+          'config.slug.label': 'Identificador de la Región (slug)', 'config.slug.help': 'Identificador único en minúsculas sin espacios.',
+          'config.bbox.label': 'Límites Geográficos (Bounding Box)', 'config.bbox.help': 'Formato WGS84 (EPSG:4326): <code>min_longitud, min_latitud, max_longitud, max_latitud</code>.',
+          'config.days.label': 'Duración (--days)', 'config.days.30': '30 días (1 mes)', 'config.days.60': '60 días (2 meses)', 'config.days.90': '90 días (3 meses)', 'config.days.180': '180 días (6 meses)', 'config.days.365': '365 días (1 año)', 'config.days.731': '731 días (2 años)',
+          'config.snap.label': 'Intervalo de Salida (--snapshot-every)', 'config.snap.1': 'Cada 1 día', 'config.snap.7': 'Cada 7 días (semanal)', 'config.snap.14': 'Cada 14 días (quincenal)', 'config.snap.30': 'Cada 30 días (mensual)', 'config.snap.0': 'Solo final (0)',
+          'config.rollouts.label': 'Nº de Rollouts (--n-rollouts)', 'config.rollouts.1': '1 (Ejecución individual)', 'config.rollouts.5': '5 (Ensamble estocástico)', 'config.rollouts.10': '10 (Dataset para U-Net)', 'config.rollouts.20': '20 (Ensamble masivo)', 'config.rollouts.help': 'Simulaciones concurrentes con semillas independientes.',
+          'config.seed.label': 'Semilla Base (--seed)', 'config.seed.help': 'Para reproducibilidad científica.',
+          'config.seeding.label': 'Siembra Inicial de Mosquitos (--seeding-mode)', 'config.seeding.uniform': 'uniform (homogénea en cuerpos de agua)', 'config.seeding.rv': 'random-viable (en celdas con idoneidad ecológica > 0)', 'config.seeding.explicit': 'explicit (en estaciones de muestreo fijas)',
+          'config.hosts.label': 'Capa de Hospedadores y Atracción Ganadera/Humana', 'config.hosts.help': 'Permite simular el movimiento y búsqueda de sangre de los mosquitos guiado por la densidad de ganado (vacas, cerdos, aves) y asentamientos humanos, incluso sin simular malaria.',
+          'config.trans.label': 'Transmisión Epidemiológica de Malaria (--enable-transmission)', 'config.trans.help': 'Activa el ciclo bidireccional de infección entre mosquitos hembra (ingesta de gametocitos, incubación EIP) y población humana (incubación, recuperación e inmunidad).',
+          'config.hseed.label': 'Modo de Siembra Humana (--human-seeding-mode)', 'config.hseed.rv': 'random-viable (focos en aldeas viables con mosquitos)', 'config.hseed.explicit': 'explicit (coordenadas de ciudades explícitas)', 'config.hseed.ul': 'uniform-legacy (5% de prevalencia en todo el territorio)', 'config.hseed.none': 'none (sin humanos infectados al inicio)',
+          'config.obday.label': 'Día del Brote (--human-outbreak-day)', 'config.obday.help': 'Día en que se inyectan los casos índice.',
+          'config.obfoci.label': 'Nº de Focos (--human-outbreak-foci)',
+          'config.obcases.label': 'Casos Infectados por Foco (--human-outbreak-cases)',
+          'config.cohort.label': 'Registrar Censo Diario de Cohortes (--cohort-log)', 'config.cohort.help': 'Registra la evolución diaria de huevos, larvas, pupas y adultos. <strong>Imprescindible para graficar pirámides demográficas y generar animaciones GIF.</strong>',
+          'config.gif.label': 'Generar Animación GIF Post-Ejecución (--gif)', 'config.gif.help': 'Genera mapas animados de densidad de mosquitos y propagación de la infección.',
+          'config.outdir.label': 'Directorio de Salida (--output-dir)',
+          'config.prereq.title': 'Prerrequisitos de Datos & Guía de Configuración',
+          'config.cli.title': 'Comando CLI Listo para Terminal', 'config.cli.copy': 'Copiar comando',
+          'config.manifest.title': 'Manifiesto de Artefactos de Salida', 'config.manifest.pop': 'GeoTIFFs de Población:', 'config.manifest.mal': 'GeoTIFFs de Malaria:', 'config.manifest.logs': 'Logs Demográficos:', 'config.manifest.gifs': 'Animaciones GIF:',
+          'config.svg.title': 'Flujo de Datos Activo en Tiempo Real',
+          'svg.col1': '1. INPUTS & DATOS', 'svg.col2': '2. MOTOR ABM C++ (mal_core)', 'svg.col3': '3. OUTPUTS GENERADOS',
+          'svg.node.env': 'Lluvia, Viento, Temp', 'svg.node.hydro': 'Agua DSwX y Relieve', 'svg.node.hosts': 'HOSPEDADORES', 'svg.node.hostsdesc': 'Población & Ganado', 'svg.node.mobility': 'MOVILIDAD DÍA/NOCHE', 'svg.node.mobilitydesc': 'Desplazamientos OD',
+          'svg.sub.bio': 'CICLO BIOLÓGICO', 'svg.sub.biodesc': 'Oviposición, desarrollo y vuelo', 'svg.sub.host': 'ATRACCIÓN HOSPEDADORES', 'svg.sub.hostdesc': 'Preferencia animal vs humano', 'svg.sub.trans': 'TRANSMISIÓN DE MALARIA', 'svg.sub.transdesc': 'Hembras I_V ↔ Humanos I_H',
+          // U-Net
+          'unet.eyebrow': 'EMULACIÓN NEURONAL EFICIENTE',
+          'unet.h2': 'Generación masiva de escenarios sin el coste del ABM directo.',
+          'unet.lead': 'Simular millones de mosquitos en el ABM es preciso pero computacionalmente pesado. MalariaSentinel utiliza el ABM como generador de datos para entrenar una red U-Net que predice el estado epidemiológico de forma instantánea.',
+          'unet.train.title': '1. Fase de Entrenamiento (ABM → Dataset)',
+          'unet.train.tag': 'Generador de Verdad',
+          'unet.train.desc': 'El motor ABM en C++ ejecuta múltiples rollouts estocásticos con semillas variadas. El constructor de datasets extrae parches de 128×128 y pares temporales <code>t → t+1</code>.',
+          'unet.train.li1': 'Generación paralela de rollouts en clusters de cómputo.',
+          'unet.train.li2': 'Entrenamiento de arquitectura U-Net (32-64-128-256) con pérdida combinada MSE + soft-Dice.',
+          'unet.train.li3': 'Validación estricta de curvas de calibración frente al ABM base.',
+          'unet.prod.title': '2. Fase de Producción Operativa (U-Net)',
+          'unet.prod.tag': '100× Más Rápido',
+          'unet.prod.desc': 'En producción, la U-Net entrenada reemplaza la simulación pesada del ABM. Puede generar mapas de riesgo mensuales en milisegundos y evaluar miles de combinaciones de intervención en tiempo real.',
+          'unet.prod.li1': 'Inferencia ágil para la toma de decisiones sobre el terreno.',
+          'unet.prod.li2': 'Exploración interactiva de presupuestos de rociado IRS y mosquiteros.',
+          'unet.prod.li3': 'Integración directa mediante endpoints REST en el servidor de producción.',
+          // Roadmap
+          'roadmap.eyebrow': 'HOJA DE RUTA TÉCNICA',
+          'roadmap.h2': 'Orden de ejecución planificado hacia el producto funcional.',
+          'roadmap.lead': 'La secuencia de desarrollo responde a dependencias biológicas y computacionales. Las fechas y plazos se definirán progresivamente en función de la acogida y las contribuciones de la comunidad.',
+          'roadmap.badge': '5 Hitos Secuenciales',
+          'roadmap.m1.meta': 'Hito 1 · Base', 'roadmap.m1.title': 'Consolidación del Núcleo Computacional', 'roadmap.m1.tag': 'Completado',
+          'roadmap.m1.desc': 'Unificación de código en <code>mal-core</code>, motor C++ ABM optimizado, suite de 14 evaluadores de calibración (PR gate), pipelines de ingesta satelital (ERA5, CHIRPS, Sentinel-10m) y CLI <code>malariasim</code>.',
+          'roadmap.m1.pull': 'Infraestructura',
+          'roadmap.m2.meta': 'Hito 2 · Siguiente', 'roadmap.m2.title': 'Comportamiento Biológico Avanzado y Resistencia a Insecticidas', 'roadmap.m2.tag': 'En proceso',
+          'roadmap.m2.desc': '• <strong>Soporte Multi-Especie de Vectores</strong>: Integración de 4 especies de <em>Anopheles</em> con óptimos térmicos y hábitats específicos.<br>• <strong>Resistencia a Insecticidas</strong>: Modelado genético y metabólico de resistencia a piretroides.<br>• <strong>Movilidad Espacial por Fases</strong>: Matrices de movilidad humana y ganadera diurna/nocturna.',
+          'roadmap.m2.pull': 'Modelado',
+          'roadmap.m3.meta': 'Hito 3 · Secuencia', 'roadmap.m3.title': 'Emulación Masiva y Aceleración con Red Neuronal U-Net', 'roadmap.m3.pull': 'Machine Learning',
+          'roadmap.m3.desc': 'Orquestación de ejecuciones concurrentes del ABM para generar datasets de entrenamiento a gran escala, entrenamiento de la red U-Net y sustitución del ABM en producción para generar predicciones en milisegundos.',
+          'roadmap.m4.meta': 'Hito 4 · Secuencia', 'roadmap.m4.title': 'Ingesta de Incidencia de Campo y Optimización Espacial', 'roadmap.m4.pull': 'Integración',
+          'roadmap.m4.desc': 'Conexión continua con datos epidemiológicos rutinarios (DHIS2) y motor de asignación óptima de mosquiteros IG2 y rociado IRS en micro-cuadrículas de 100m.',
+          'roadmap.m5.meta': 'Hito 5 · Objetivo', 'roadmap.m5.title': 'Plataforma Centinela Operativa', 'roadmap.m5.pull': 'Producto Final',
+          'roadmap.m5.desc': 'Aplicación web interactiva completa para ministerios de salud y organizaciones en terreno: simulador visual de políticas sanitarias, evaluación de impacto por distrito y sistema de alertas tempranas estacionales.',
+          // Collaboration
+          'collab.eyebrow': 'CONTRIBUCIÓN ABIERTA',
+          'collab.h2': 'Un proyecto construido por una comunidad multidisciplinar.',
+          'collab.lead': 'Buscamos investigadoras, modeladores e ingenieros que deseen sumar esfuerzos en las distintas ramas técnicas del proyecto.',
+          'collab.c1.title': 'Epidemiología & Entomología', 'collab.c1.desc': 'Ajuste de parámetros biológicos de vectores, frecuencias de resistencia a insecticidas y curvas de picadura.',
+          'collab.c2.title': 'Ingeniería Geoespacial', 'collab.c2.desc': 'Pipelines satelitales automatizados, mallas espaciales Zarr/NetCDF y modelado de cuencas hidrológicas de alta resolución.',
+          'collab.c3.title': 'Machine Learning & Simulación', 'collab.c3.desc': 'Entrenamiento de emuladores U-Net, paralelización en C++ y algoritmos de optimización bayesiana para políticas de salud.',
+          'collab.c4.title': 'Diseño & Producto', 'collab.c4.desc': 'Diseño de experiencia para la plataforma interactiva Centinela, visualización cartográfica de riesgo y accesibilidad.',
+          'collab.partners.title': 'Instituciones Colaboradoras',
+          'collab.partners.desc': 'MalariaSentinel es posible gracias al apoyo institucional de organizaciones comprometidas con la ciencia abierta y la salud global.',
+          'collab.step1.meta': 'Paso 1 · Clonar & Sincronizar', 'collab.step1.desc': 'Clonar el repositorio y sincronizar dependencias de forma reproducible con <code>uv sync --all-packages</code>.',
+          'collab.step2.meta': 'Paso 2 · Validar el Entorno', 'collab.step2.desc': 'Ejecutar la suite de pruebas y calibración con <code>uv run pytest</code> para verificar la integridad del sistema.',
+          'collab.step3.meta': 'Paso 3 · Contribuir con un PR', 'collab.step3.desc': 'Seleccionar un plan abierto en el repositorio y abrir un Pull Request tras pasar los checks automáticos.',
+          // CTA
+          'cta.h2': 'Construyamos juntos el Centinela para la erradicación de la malaria.',
+          'cta.lead': 'Proyecto 100% abierto bajo licencia Apache 2.0. Código, planes de desarrollo y documentación técnica accesibles para toda la comunidad.',
+          'cta.github': 'Ver repositorio en GitHub',
+          'cta.discuss': 'Unirse a la discusión',
+          // Footer
+          'footer.subtitle': 'Spatial Decision Support System (SDSS) para la erradicación de la malaria · Basado en Kelly et al. (2012)',
+          'footer.nav.status': 'Avances',
+          'footer.nav.config': 'Configurador ABM',
+          'footer.nav.unet': 'U-Net',
+        },
+        'en': {
+          // Nav
+          'nav.methodology': 'Methodology',
+          'nav.architecture': 'Architecture',
+          'nav.configurator': 'Configurator',
+          'nav.roadmap': 'Roadmap',
+          'nav.collaborate': 'Collaborate',
+          'nav.configurator_abm': 'ABM Configurator & Emulator',
+          'nav.roadmap_long': 'Roadmap',
+          'nav.how_collaborate': 'How to Collaborate',
+          // Hero
+          'hero.eyebrow': 'SPATIAL DECISION SUPPORT SYSTEM (SDSS) · OPEN SOURCE',
+          'hero.h1': 'Geospatial modelling and predictive simulation for malaria eradication.',
+          'hero.lead': 'Open collaborative platform in its early stage integrating agent-based simulations (ABM), satellite climate tensors and ultra-fast neural surrogates to optimise public health interventions on the ground.',
+          'hero.cta_config': 'Try Interactive Configurator',
+          'hero.cta_arch': 'View technical architecture',
+          'hero.institutions': 'A project made with the support of <a href="https://www.anfaia.org/" target="_blank" rel="noopener" style="color: var(--accent); font-weight: 600;">ANFAIA</a> and <a href="https://www.cesga.es/" target="_blank" rel="noopener" style="color: var(--accent); font-weight: 600;">CESGA</a>',
+          // Pipeline
+          'pipeline.title': 'Unified Computational Pipeline',
+          'pipeline.s1.tag': '01 · Ingestion & Tensors',
+          'pipeline.s1.name': 'Satellite & Hydrological Data',
+          'pipeline.s1.desc': 'ERA5 (temperature & winds), CHIRPS (precipitation), Sentinel-10m DSwX and MERIT DEM.',
+          'pipeline.s2.tag': '02 · Data Generation (Teacher)',
+          'pipeline.s2.name': 'C++ ABM Engine + 14 Scorers',
+          'pipeline.s2.desc': 'Accurate stochastic simulation of millions of agents generating training pairs.',
+          'pipeline.s3.tag': '03 · Operational Inference (Student)',
+          'pipeline.s3.name': 'U-Net Surrogate & Optimal Allocation',
+          'pipeline.s3.desc': 'Monthly prediction 100× faster for massive sweep of intervention scenarios.',
+          // Methodology
+          'methodology.eyebrow': 'SCIENTIFIC METHODOLOGY',
+          'methodology.h2': 'Hazard vs. Vulnerability Decomposition.',
+          'methodology.lead': 'Following advances by Morlighem et al. (2025) and Gbaguidi et al. (2026), MalariaSentinel decouples vector suitability from human vulnerability to produce joint risk maps applicable to decision-making.',
+          'methodology.hazard.title': 'Vector Hazard',
+          'methodology.hazard.tag': 'Ecological & Climatic',
+          'methodology.hazard.desc': 'Biophysical modelling of mosquito suitability and population dynamics:',
+          'methodology.hazard.li1': '<strong>Hydrological processes:</strong> Soil moisture, surface runoff and temporary pools (Smith et al. 2024).',
+          'methodology.hazard.li2': '<strong>Key species:</strong> Differentiated thermal parametrisation for <em>An. coluzzii</em>, <em>An. gambiae</em>, <em>An. funestus</em> and <em>An. arabiensis</em>.',
+          'methodology.hazard.li3': '<strong>Agricultural calendars:</strong> Influence of rice cultivation on seasonal vector proliferation.',
+          'methodology.vuln.title': 'Vulnerability & Exposure',
+          'methodology.vuln.tag': 'Demographic & Health',
+          'methodology.vuln.desc': 'Human factors that modulate real-world impact and preventive intervention effectiveness:',
+          'methodology.vuln.li1': '<strong>Phased mobility:</strong> Diurnal/nocturnal human and livestock movements altering vector-host contact.',
+          'methodology.vuln.li2': '<strong>Insecticide resistance:</strong> Insensitivity mutations and metabolic detoxification reducing IRS spraying effect.',
+          'methodology.vuln.li3': '<strong>Effectiveness cascade:</strong> Real usage rate and physical durability of treated bed nets (ITN IG2).',
+          // Architecture
+          'arch.eyebrow': 'MONOREPO ARCHITECTURE',
+          'arch.h2': 'Technical structure consolidated in mal-core.',
+          'arch.th.pkg': 'Package', 'arch.th.level': 'Tier', 'arch.th.role': 'Role & Responsibility', 'arch.th.deps': 'Dependencies',
+          'arch.tier.prod': 'Production', 'arch.tier.tool': 'Tool',
+          'arch.core.desc': 'Consolidated core: C++ ABM, U-Net neural network, predictors, scoring and FastAPI server.',
+          'arch.commonlib.desc': 'Spatial loaders (CHIRPS, ERA5, Sentinel, DEM, WorldPop, GLW4), common paths and schemas.',
+          'arch.exec.desc': 'CLI entrypoints (<code>malariasim</code>) and scripts for batch simulation orchestration.',
+          'arch.explorer.desc': 'Geospatial coverage visualisation, suitability maps and territorial bias analysis.',
+          'arch.cli.title': 'Main malariasim commands',
+          'arch.cli.c1': '# Download environmental tensors for an area (default profiles)',
+          'arch.cli.c2': '# Run stochastic ABM simulation to generate rollouts',
+          'arch.cli.c3': '# Train U-Net neural emulator with ABM data',
+          'arch.cli.c4': '# Fast monthly risk map prediction',
+          // Status
+          'status.eyebrow': 'CURRENT STATUS & CONSOLIDATED CORE',
+          'status.h2': 'Advances consolidated in the mal-core package.',
+          'status.lead': 'The entire core simulation, ingestion and evaluation system is already centralised in <code>mal-core</code>, ready for reproducible runs and continuous scientific calibration.',
+          'status.f1.title': 'High-Performance C++ ABM Engine',
+          'status.f1.desc': 'Consolidated in <code>mal-core</code>, simulates gonotrophic cycle dynamics and host-seeking with 261+ C++ tests and 14 automated calibration scorers.',
+          'status.f2.title': 'Daily Environmental Tensors Ingestion',
+          'status.f2.desc': 'Robust pipeline in <code>mal-commonlib</code> processing CHIRPS climate series (34 years), ERA5 reanalysis, Sentinel-10m surface water and MERIT DEM elevation layers.',
+          'status.f3.title': 'Modular Orchestration & REST API',
+          'status.f3.desc': 'Unified <code>malariasim</code> CLI with 9 commands for download, ingestion, training and prediction, complemented by a FastAPI server for service integration.',
+          // Configurator
+          'config.eyebrow': 'VISUAL TOOL FOR RESEARCHERS AND BEGINNERS',
+          'config.h2': 'Interactive ABM Simulation Configurator & Data Flow',
+          'config.lead': 'Adjust simulation parameters or select a predefined scenario. The dynamic vector diagram, data requirement warnings and output manifest will update in real time.',
+          'config.presets.title': '1. Predefined Simulation Scenarios',
+          'config.p1.title': 'Annual Focal Outbreak with Stabilisation (365 days)', 'config.p1.badge': 'Recommended', 'config.p1.desc': '6 months of warm-up for mosquito equilibrium + outbreak in 5 selected villages + GIF animation.',
+          'config.p2.title': 'Carrier Mosquito Incursion (90 days)', 'config.p2.desc': 'Seasonal arrival of infected females (15%) in water zones during rains.',
+          'config.p3.title': 'Outbreak in Specific Urban Centres (180 days)', 'config.p3.desc': 'Direct injection of imported clinical cases at main city coordinates.',
+          'config.p4.title': 'Fast Vector Population Calibration (30 days)', 'config.p4.desc': 'Short 30-day simulation to verify biological cycle dynamics without active malaria.',
+          'config.p5.title': 'U-Net Neural Network Dataset Generation (Ensemble)', 'config.p5.desc': '10 parallel rollouts with different seeds to generate training pairs.',
+          'config.more_options': '2. More options',
+          'config.aoi.label': 'Area of Interest (--aoi)', 'config.aoi.ghana': 'Ghana (Predefined National · 9,466 cells)', 'config.aoi.moz': 'Mozambique (Predefined National)', 'config.aoi.custom': 'Custom (New Region / BBOX Coordinates)',
+          'config.slug.label': 'Region Identifier (slug)', 'config.slug.help': 'Unique lowercase identifier without spaces.',
+          'config.bbox.label': 'Geographic Bounds (Bounding Box)', 'config.bbox.help': 'WGS84 format (EPSG:4326): <code>min_lon, min_lat, max_lon, max_lat</code>.',
+          'config.days.label': 'Duration (--days)', 'config.days.30': '30 days (1 month)', 'config.days.60': '60 days (2 months)', 'config.days.90': '90 days (3 months)', 'config.days.180': '180 days (6 months)', 'config.days.365': '365 days (1 year)', 'config.days.731': '731 days (2 years)',
+          'config.snap.label': 'Output Interval (--snapshot-every)', 'config.snap.1': 'Every 1 day', 'config.snap.7': 'Every 7 days (weekly)', 'config.snap.14': 'Every 14 days (fortnightly)', 'config.snap.30': 'Every 30 days (monthly)', 'config.snap.0': 'Final only (0)',
+          'config.rollouts.label': 'No. of Rollouts (--n-rollouts)', 'config.rollouts.1': '1 (Individual run)', 'config.rollouts.5': '5 (Stochastic ensemble)', 'config.rollouts.10': '10 (U-Net dataset)', 'config.rollouts.20': '20 (Massive ensemble)', 'config.rollouts.help': 'Concurrent simulations with independent seeds.',
+          'config.seed.label': 'Base Seed (--seed)', 'config.seed.help': 'For scientific reproducibility.',
+          'config.seeding.label': 'Initial Mosquito Seeding (--seeding-mode)', 'config.seeding.uniform': 'uniform (homogeneous in water bodies)', 'config.seeding.rv': 'random-viable (in cells with ecological suitability > 0)', 'config.seeding.explicit': 'explicit (at fixed sampling stations)',
+          'config.hosts.label': 'Host Layer & Livestock/Human Attraction', 'config.hosts.help': 'Enables mosquito movement and blood-seeking guided by livestock (cattle, pigs, poultry) and human settlement density, even without malaria simulation.',
+          'config.trans.label': 'Malaria Epidemiological Transmission (--enable-transmission)', 'config.trans.help': 'Activates the bidirectional infection cycle between female mosquitoes (gametocyte ingestion, EIP incubation) and human population (incubation, recovery and immunity).',
+          'config.hseed.label': 'Human Seeding Mode (--human-seeding-mode)', 'config.hseed.rv': 'random-viable (foci in viable villages with mosquitoes)', 'config.hseed.explicit': 'explicit (explicit city coordinates)', 'config.hseed.ul': 'uniform-legacy (5% prevalence across territory)', 'config.hseed.none': 'none (no infected humans at start)',
+          'config.obday.label': 'Outbreak Day (--human-outbreak-day)', 'config.obday.help': 'Day when index cases are injected.',
+          'config.obfoci.label': 'No. of Foci (--human-outbreak-foci)',
+          'config.obcases.label': 'Infected Cases per Focus (--human-outbreak-cases)',
+          'config.cohort.label': 'Log Daily Cohort Census (--cohort-log)', 'config.cohort.help': 'Records daily evolution of eggs, larvae, pupae and adults. <strong>Essential for plotting demographic pyramids and generating GIF animations.</strong>',
+          'config.gif.label': 'Generate GIF Animation Post-Run (--gif)', 'config.gif.help': 'Generates animated maps of mosquito density and infection spread.',
+          'config.outdir.label': 'Output Directory (--output-dir)',
+          'config.prereq.title': 'Data Prerequisites & Configuration Guide',
+          'config.cli.title': 'CLI Command Ready for Terminal', 'config.cli.copy': 'Copy command',
+          'config.manifest.title': 'Output Artifact Manifest', 'config.manifest.pop': 'Population GeoTIFFs:', 'config.manifest.mal': 'Malaria GeoTIFFs:', 'config.manifest.logs': 'Demographic Logs:', 'config.manifest.gifs': 'GIF Animations:',
+          'config.svg.title': 'Active Data Flow in Real Time',
+          'svg.col1': '1. INPUTS & DATA', 'svg.col2': '2. C++ ABM ENGINE (mal_core)', 'svg.col3': '3. GENERATED OUTPUTS',
+          'svg.node.env': 'Rain, Wind, Temp', 'svg.node.hydro': 'DSwX Water & Relief', 'svg.node.hosts': 'HOSTS', 'svg.node.hostsdesc': 'Population & Livestock', 'svg.node.mobility': 'DAY/NIGHT MOBILITY', 'svg.node.mobilitydesc': 'OD Movements',
+          'svg.sub.bio': 'BIOLOGICAL CYCLE', 'svg.sub.biodesc': 'Oviposition, development & flight', 'svg.sub.host': 'HOST ATTRACTION', 'svg.sub.hostdesc': 'Animal vs human preference', 'svg.sub.trans': 'MALARIA TRANSMISSION', 'svg.sub.transdesc': 'Female I_V ↔ Humans I_H',
+          // U-Net
+          'unet.eyebrow': 'EFFICIENT NEURAL EMULATION',
+          'unet.h2': 'Massive scenario generation without the cost of direct ABM.',
+          'unet.lead': 'Simulating millions of mosquitoes in the ABM is accurate but computationally expensive. MalariaSentinel uses the ABM as a data generator to train a U-Net that predicts epidemiological state instantly.',
+          'unet.train.title': '1. Training Phase (ABM → Dataset)',
+          'unet.train.tag': 'Ground Truth Generator',
+          'unet.train.desc': 'The C++ ABM engine runs multiple stochastic rollouts with varied seeds. The dataset builder extracts 128×128 patches and temporal pairs <code>t → t+1</code>.',
+          'unet.train.li1': 'Parallel rollout generation on compute clusters.',
+          'unet.train.li2': 'U-Net architecture training (32-64-128-256) with combined MSE + soft-Dice loss.',
+          'unet.train.li3': 'Strict validation of calibration curves against the base ABM.',
+          'unet.prod.title': '2. Operational Production Phase (U-Net)',
+          'unet.prod.tag': '100× Faster',
+          'unet.prod.desc': 'In production, the trained U-Net replaces the heavy ABM simulation. It can generate monthly risk maps in milliseconds and evaluate thousands of intervention combinations in real time.',
+          'unet.prod.li1': 'Agile inference for on-the-ground decision-making.',
+          'unet.prod.li2': 'Interactive exploration of IRS spraying and bed net budgets.',
+          'unet.prod.li3': 'Direct integration via REST endpoints in the production server.',
+          // Roadmap
+          'roadmap.eyebrow': 'TECHNICAL ROADMAP',
+          'roadmap.h2': 'Planned execution order towards the functional product.',
+          'roadmap.lead': 'The development sequence responds to biological and computational dependencies. Dates and timelines will be defined progressively based on community uptake and contributions.',
+          'roadmap.badge': '5 Sequential Milestones',
+          'roadmap.m1.meta': 'Milestone 1 · Foundation', 'roadmap.m1.title': 'Computational Core Consolidation', 'roadmap.m1.tag': 'Completed',
+          'roadmap.m1.desc': 'Code unification in <code>mal-core</code>, optimised C++ ABM engine, suite of 14 calibration scorers (PR gate), satellite ingestion pipelines (ERA5, CHIRPS, Sentinel-10m) and <code>malariasim</code> CLI.',
+          'roadmap.m1.pull': 'Infrastructure',
+          'roadmap.m2.meta': 'Milestone 2 · Next', 'roadmap.m2.title': 'Advanced Biological Behaviour & Insecticide Resistance', 'roadmap.m2.tag': 'In progress',
+          'roadmap.m2.desc': '• <strong>Multi-Species Vector Support</strong>: Integration of 4 <em>Anopheles</em> species with differentiated thermal optima and habitats.<br>• <strong>Insecticide Resistance</strong>: Genetic and metabolic modelling of pyrethroid resistance.<br>• <strong>Phased Spatial Mobility</strong>: Diurnal/nocturnal human and livestock mobility matrices.',
+          'roadmap.m2.pull': 'Modelling',
+          'roadmap.m3.meta': 'Milestone 3 · Sequence', 'roadmap.m3.title': 'Mass Emulation & Neural Acceleration with U-Net', 'roadmap.m3.pull': 'Machine Learning',
+          'roadmap.m3.desc': 'Orchestration of concurrent ABM runs to generate large-scale training datasets, U-Net training and ABM replacement in production for millisecond predictions.',
+          'roadmap.m4.meta': 'Milestone 4 · Sequence', 'roadmap.m4.title': 'Field Incidence Ingestion & Spatial Optimisation', 'roadmap.m4.pull': 'Integration',
+          'roadmap.m4.desc': 'Continuous connection with routine epidemiological data (DHIS2) and optimal allocation engine for IG2 bed nets and IRS spraying in 100m micro-grids.',
+          'roadmap.m5.meta': 'Milestone 5 · Goal', 'roadmap.m5.title': 'Operational Sentinel Platform', 'roadmap.m5.pull': 'Final Product',
+          'roadmap.m5.desc': 'Complete interactive web application for health ministries and field organisations: visual health policy simulator, district-level impact assessment and seasonal early warning system.',
+          // Collaboration
+          'collab.eyebrow': 'OPEN CONTRIBUTION',
+          'collab.h2': 'A project built by a multidisciplinary community.',
+          'collab.lead': 'We seek researchers, modellers and engineers who wish to join efforts across the project\'s technical branches.',
+          'collab.c1.title': 'Epidemiology & Entomology', 'collab.c1.desc': 'Biological vector parameter tuning, insecticide resistance frequencies and biting rate curves.',
+          'collab.c2.title': 'Geospatial Engineering', 'collab.c2.desc': 'Automated satellite pipelines, Zarr/NetCDF spatial meshes and high-resolution hydrological basin modelling.',
+          'collab.c3.title': 'Machine Learning & Simulation', 'collab.c3.desc': 'U-Net surrogate training, C++ parallelisation and Bayesian optimisation algorithms for health policies.',
+          'collab.c4.title': 'Design & Product', 'collab.c4.desc': 'UX design for the interactive Sentinel platform, cartographic risk visualisation and accessibility.',
+          'collab.partners.title': 'Partner Institutions',
+          'collab.partners.desc': 'MalariaSentinel is made possible by institutional support from organisations committed to open science and global health.',
+          'collab.step1.meta': 'Step 1 · Clone & Sync', 'collab.step1.desc': 'Clone the repository and synchronise dependencies reproducibly with <code>uv sync --all-packages</code>.',
+          'collab.step2.meta': 'Step 2 · Validate Environment', 'collab.step2.desc': 'Run the test and calibration suite with <code>uv run pytest</code> to verify system integrity.',
+          'collab.step3.meta': 'Step 3 · Contribute with a PR', 'collab.step3.desc': 'Select an open plan in the repository and open a Pull Request after passing automated checks.',
+          // CTA
+          'cta.h2': 'Let\'s build the Sentinel together for malaria eradication.',
+          'cta.lead': '100% open project under Apache 2.0 license. Code, development plans and technical documentation accessible to the entire community.',
+          'cta.github': 'View repository on GitHub',
+          'cta.discuss': 'Join the discussion',
+          // Footer
+          'footer.subtitle': 'Spatial Decision Support System (SDSS) for malaria eradication · Based on Kelly et al. (2012)',
+          'footer.nav.status': 'Status',
+          'footer.nav.config': 'ABM Configurator',
+          'footer.nav.unet': 'U-Net',
+        }
+      };
+
+      function getLang() {
+        var saved = localStorage.getItem('ms-lang');
+        if (saved && T[saved]) return saved;
+        var nav = (navigator.languages || [navigator.language || 'es']).map(function(l) { return l.toLowerCase(); });
+        for (var i = 0; i < nav.length; i++) {
+          if (nav[i].startsWith('en')) return 'en';
+        }
+        return 'es';
+      }
+
+      function setLang(lang) {
+        if (!T[lang]) return;
+        localStorage.setItem('ms-lang', lang);
+        document.documentElement.lang = lang;
+        document.body.setAttribute('data-lang', lang);
+
+        // Update all data-i18n elements
+        var dict = T[lang];
+        document.querySelectorAll('[data-i18n]').forEach(function(el) {
+          var key = el.getAttribute('data-i18n');
+          if (dict[key] !== undefined) {
+            if (el.tagName === 'INPUT' && el.type !== 'checkbox') {
+              el.placeholder = dict[key];
+            } else {
+              el.innerHTML = dict[key];
+            }
+          }
+        });
+
+        // Update lang buttons
+        document.querySelectorAll('[data-lang-btn]').forEach(function(btn) {
+          btn.classList.toggle('active', btn.getAttribute('data-lang-btn') === lang);
+        });
+
+        // Update page title
+        document.title = lang === 'en'
+          ? 'MalariaSentinel · Open Spatial Decision Support System for Malaria Elimination'
+          : 'MalariaSentinel · Sistema Abierto de Soporte a Decisiones para la Eliminación de la Malaria';
+
+        // Update meta description
+        var metaDesc = document.querySelector('meta[name="description"]');
+        if (metaDesc) {
+          metaDesc.content = lang === 'en'
+            ? 'Open SDSS integrating ABM simulations, satellite climate tensors and neural surrogates for malaria eradication.'
+            : 'SDSS abierto que integra simulaciones ABM, tensores climáticos satelitales y sustitutos neuronales para la erradicación de la malaria.';
+        }
+
+        // Re-run dynamic pipeline update if it exists
+        if (typeof updatePipeline === 'function') updatePipeline();
+      }
+
+      // Wire up lang buttons
+      document.querySelectorAll('[data-lang-btn]').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+          setLang(btn.getAttribute('data-lang-btn'));
+        });
+      });
+
+      // Auto-detect on first visit
+      setLang(getLang());
     })();
   </script>
 

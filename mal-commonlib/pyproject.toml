@@ -2,6 +2,7 @@
 name = "mal-commonlib"
 version = "0.1.0"
 description = "MalariaSentinel — shared config, paths, data utilities, and data loaders (CHIRPS, ERA5-Land, MOD13A3, MERIT DEM, ESA WorldCover)"
+license = "Apache-2.0"
 requires-python = ">=3.12"
 dependencies = [
     "numpy>=2.5.0",
@@ -24,6 +25,7 @@ dependencies = [
     "pyarrow>=15.0.0",
     "pyogrio>=0.9.0",
     "pyyaml>=6.0",
+    "fiona>=1.10.1",
 ]
 
 [build-system]

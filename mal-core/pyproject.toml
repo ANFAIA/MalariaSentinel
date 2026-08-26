@@ -2,6 +2,7 @@
 name = "mal-core"
 version = "0.2.0"
 description = "MalariaSentinel — unified SDSS pipeline (ABM + training + prediction + scoring)"
+license = "Apache-2.0"
 requires-python = ">=3.12"
 dependencies = [
     "mal-commonlib",

@@ -144,3 +144,16 @@ uv run malariasim abm --aoi ghana --days 30
 
 See `data/README.md` for the dataset catalogue (sources, licenses, row counts)
 and `terrain/README.md` for the SRTM download details.
+
+---
+
+## Institutions & Support
+
+- **[ANFAIA](https://www.anfaia.org/)** — Artificial Intelligence Non-Profit Research Organization driving open-source AI solutions for global health.
+- **[CESGA](https://www.cesga.es/)** — Galicia Supercomputing Center (*Centro de Supercomputación de Galicia*), providing HPC infrastructure and computational support.
+
+---
+
+## License
+
+This project is licensed under the **Apache License 2.0** — see the [LICENSE](LICENSE) file for details.
