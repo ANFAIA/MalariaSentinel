@@ -89,10 +89,8 @@ void HumanCompartmentGrid::seed_infections(int32_t row, int32_t col, double coun
     susceptible_[c] -= to_infect;
     infectious_[c]  += to_infect;
 
-    const double per_day = to_infect / static_cast<double>(infectious_days_);
-    for (int32_t a = 0; a < infectious_days_; ++a) {
-        infectious_cohorts_[static_cast<size_t>(c * infectious_days_ + a)] += per_day;
-    }
+    // Imported cases enter at infectious age zero, not as an already-aged cohort.
+    infectious_cohorts_[static_cast<size_t>(c * infectious_days_)] += to_infect;
     daily_prevalence_[c] = infectious_[c] / pop;
 }
 
@@ -108,7 +106,6 @@ std::vector<std::pair<int32_t, int32_t>> HumanCompartmentGrid::seed_random_viabl
 
     const int64_t n_cells = total_cells();
     std::vector<int64_t> with_mosquitoes;
-    std::vector<int64_t> without_mosquitoes;
 
     for (int64_t c = 0; c < n_cells; ++c) {
         const size_t idx = static_cast<size_t>(c);
@@ -117,14 +114,14 @@ std::vector<std::pair<int32_t, int32_t>> HumanCompartmentGrid::seed_random_viabl
                 mosquito_density[idx] > 0.0f)
             {
                 with_mosquitoes.push_back(c);
-            } else {
-                without_mosquitoes.push_back(c);
             }
         }
     }
 
-    std::vector<int64_t>& pool = (!with_mosquitoes.empty()) ? with_mosquitoes : without_mosquitoes;
-    if (pool.empty()) return seeded;
+    // A viable outbreak focus needs local vectors; human-only fallback would
+    // falsely report transmission establishment.
+    if (with_mosquitoes.empty()) return seeded;
+    std::vector<int64_t>& pool = with_mosquitoes;
 
     // Shuffle pool using Fisher-Yates
     for (size_t i = pool.size() - 1; i > 0; --i) {

@@ -92,7 +92,9 @@ TEST(HumanState, InfectiousDurationAndRecoveryWithoutImmunity) {
 
     std::vector<double> zero_lambda = {0.0};
     // Advance infectious_days
-    for (int d = 1; d <= infectious_days; ++d) {
+    grid.advance_day(zero_lambda, rng);
+    EXPECT_NEAR(grid.i_at(0, 0), 20.0, 1e-5);
+    for (int d = 2; d <= infectious_days; ++d) {
         grid.advance_day(zero_lambda, rng);
     }
 

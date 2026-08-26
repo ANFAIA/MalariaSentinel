@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <iostream>
 #include <stdexcept>
 
 namespace mal_abm_fast {
@@ -76,9 +77,6 @@ void TransmissionModel::init(
         params_.immunity_enabled,
         init_prev);
 
-    if (params_.human_outbreak_day == 0 && params_.human_seeding_mode != "uniform-legacy") {
-        check_and_trigger_outbreak(0, {});
-    }
 }
 
 void TransmissionModel::seed_vector_infections(MosquitoSoA& soa, double fraction) {
@@ -127,17 +125,31 @@ void TransmissionModel::check_and_trigger_outbreak(
     }
 
     if (params_.human_seeding_mode == "random-viable") {
+        if (mosquito_density.empty()) {
+            std::cerr << "warning: outbreak not seeded: no current mosquito density\n";
+            return;
+        }
+        const double infectious_before = human_grid_.compute_stats().total_infectious;
         human_grid_.seed_random_viable_foci(
             params_.human_outbreak_foci,
             params_.human_outbreak_cases,
             params_.human_min_cell_pop,
             mosquito_density,
             rng_);
-        outbreak_triggered_ = true;
+        const double infectious_after = human_grid_.compute_stats().total_infectious;
+        outbreak_triggered_ = infectious_after > infectious_before;
+        if (!outbreak_triggered_) {
+            std::cerr << "warning: outbreak not seeded: no viable focus received cases\n";
+        }
     } else if (params_.human_seeding_mode == "explicit") {
         auto foci = parse_explicit_foci(params_.human_foci_coords, params_.human_outbreak_cases);
+        const double infectious_before = human_grid_.compute_stats().total_infectious;
         human_grid_.seed_explicit_foci(foci);
-        outbreak_triggered_ = true;
+        const double infectious_after = human_grid_.compute_stats().total_infectious;
+        outbreak_triggered_ = infectious_after > infectious_before;
+        if (!outbreak_triggered_) {
+            std::cerr << "warning: outbreak not seeded: explicit foci received no cases\n";
+        }
     }
 }
 

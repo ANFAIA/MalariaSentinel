@@ -273,6 +273,7 @@ TEST(TransmissionModel, ExplicitFociSeeding) {
 
     std::vector<float> human_pop = {100.0f, 100.0f, 100.0f, 100.0f};
     tm.init(2, 2, human_pop, params, 11);
+    tm.check_and_trigger_outbreak(0, {});
 
     EXPECT_DOUBLE_EQ(tm.human_grid().i_at(0, 0), 0.0);
     EXPECT_DOUBLE_EQ(tm.human_grid().i_at(0, 1), 25.0);

@@ -47,7 +47,7 @@ public:
     void seed_infections(int32_t row, int32_t col, double count);
 
     /// Seed random viable foci: picks up to n_foci cells with population >= min_pop.
-    /// Prefers cells with mosquito_density > 0 if mosquito_density is non-empty.
+    /// Requires cells with mosquito_density > 0 when density is provided.
     /// Injects up to cases_per_focus into each selected cell as infectious humans (I_H).
     /// Returns vector of selected (row, col) coordinates.
     std::vector<std::pair<int32_t, int32_t>> seed_random_viable_foci(
