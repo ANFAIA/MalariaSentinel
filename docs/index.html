@@ -1,9 +1,7 @@
-
 <!doctype html>
-<html lang="es">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+<html lang="es"><head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>MalariaSentinel · Sistema Abierto de Soporte a Decisiones para la Eliminación de la Malaria</title>
   <style>
     /* ─── tokens ───────────────────────────────────────────────────────── */
@@ -469,7 +467,6 @@
       border: 1px solid color-mix(in oklch, var(--accent) 35%, transparent);
       border-radius: var(--radius);
       padding: 16px;
-      margin-top: 20px;
     }
     .warning-callout-header {
       display: flex;
@@ -506,6 +503,29 @@
     }
     .copy-btn:hover { border-color: var(--fg); }
     .copy-btn.copied { background: var(--accent); color: var(--surface); border-color: var(--accent); }
+
+    /* ─── Collapsible Details ─────────────────────────────────────────── */
+    .more-options-details {
+      border-top: 1px solid var(--border);
+      padding-top: 16px;
+      margin-top: 20px;
+    }
+    .more-options-summary {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      list-style: none;
+      user-select: none;
+      padding: 6px 0;
+    }
+    .more-options-summary::-webkit-details-marker { display: none; }
+    .more-options-summary .chevron-icon {
+      transition: transform 0.2s ease;
+    }
+    .more-options-details[open] .more-options-summary .chevron-icon {
+      transform: rotate(180deg);
+    }
   </style>
 </head>
 <body>
@@ -520,31 +540,31 @@
       
       <!-- Desktop Menu -->
       <nav class="nav-links-desktop" aria-label="Navegación principal">
+        <a href="#metodologia">Metodología</a>
+        <a href="#arquitectura">Arquitectura</a>
         <a href="#avances">Avances</a>
         <a href="#configurador-abm">Configurador ABM</a>
-        <a href="#arquitectura">Arquitectura</a>
         <a href="#emulador-unet">Emulador U-Net</a>
-        <a href="#metodologia">Metodología</a>
         <a href="#hoja-de-ruta">Hoja de ruta</a>
         <a href="#colaborar">Colaborar</a>
-        <a href="https://github.com/MalariaSentinel" class="btn btn-secondary" style="padding: 6px 14px; font-size: 13px;">GitHub</a>
+        <a href="https://github.com/ANFAIA/MalariaSentinel" class="btn btn-secondary" style="padding: 6px 14px; font-size: 13px;">GitHub</a>
       </nav>
 
       <!-- Mobile Hamburger Button -->
       <button class="mobile-menu-btn" id="mobileMenuToggle" aria-label="Abrir menú de navegación" aria-expanded="false">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16"></path></svg>
       </button>
 
       <!-- Mobile Drawer Menu -->
       <div class="mobile-drawer" id="mobileDrawer">
-        <a href="#avances" class="mobile-nav-link">Avances y Estado</a>
-        <a href="#configurador-abm" class="mobile-nav-link">Configurador & Diagrama Interactivo</a>
-        <a href="#arquitectura" class="mobile-nav-link">Arquitectura (mal-core)</a>
-        <a href="#emulador-unet" class="mobile-nav-link">Emulador Neuronal U-Net</a>
         <a href="#metodologia" class="mobile-nav-link">Metodología Científica</a>
+        <a href="#arquitectura" class="mobile-nav-link">Arquitectura (mal-core)</a>
+        <a href="#avances" class="mobile-nav-link">Avances y Estado</a>
+        <a href="#configurador-abm" class="mobile-nav-link">Configurador &amp; Diagrama Interactivo</a>
+        <a href="#emulador-unet" class="mobile-nav-link">Emulador Neuronal U-Net</a>
         <a href="#hoja-de-ruta" class="mobile-nav-link">Hoja de Ruta (Orden de Ejecución)</a>
         <a href="#colaborar" class="mobile-nav-link">Cómo Colaborar</a>
-        <a href="https://github.com/MalariaSentinel" class="btn btn-primary" style="margin-top: 8px;">Ver en GitHub</a>
+        <a href="https://github.com/ANFAIA/MalariaSentinel" class="btn btn-primary" style="margin-top: 8px;">Ver en GitHub</a>
       </div>
     </div>
   </header>
@@ -570,11 +590,11 @@
         <div class="pipeline-diagram" aria-label="Diagrama del pipeline computacional de MalariaSentinel">
           <div class="pipeline-header">
             <span class="pipeline-title">Pipeline Computacional Unificado</span>
-            <span class="tag">mal-core · uv workspace</span>
+            
           </div>
           
           <div class="pipeline-block">
-            <div class="pipeline-step-tag">01 · Ingesta & Tensores</div>
+            <div class="pipeline-step-tag">01 · Ingesta &amp; Tensores</div>
             <div class="pipeline-step-name">Datos Satelitales e Hidrológicos</div>
             <div class="pipeline-step-desc">ERA5 (temperatura y vientos), CHIRPS (precipitación), Sentinel-10m DSwX y MERIT DEM.</div>
           </div>
@@ -591,498 +611,52 @@
 
           <div class="pipeline-block">
             <div class="pipeline-step-tag">03 · Inferencia Operativa (Estudiante)</div>
-            <div class="pipeline-step-name">Emulador U-Net & Asignación Óptima</div>
+            <div class="pipeline-step-name">Emulador U-Net &amp; Asignación Óptima</div>
             <div class="pipeline-step-desc">Predicción mensual 100× más rápida para barrido masivo de escenarios de intervención.</div>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- Estado Actual y Avances (Feature Triplet) -->
-    <section class="section" id="avances" data-od-id="project-status">
+    <!-- Fundamento Metodológico (Peligro vs Vulnerabilidad) -->
+    <section class="section" id="metodologia" data-od-id="methodology-breakdown">
       <div class="container stack" style="gap: 48px;">
         <div style="max-width: 50ch;">
-          <p class="eyebrow">ESTADO ACTUAL Y NÚCLEO CONSOLIDADO</p>
-          <h2>Avances consolidados en el paquete mal-core.</h2>
+          <p class="eyebrow">METODOLOGÍA CIENTÍFICA</p>
+          <h2>Descomposición de Peligro vs. Vulnerabilidad.</h2>
           <p class="lead" style="margin-top: 12px;">
-            Todo el sistema principal de simulación, ingesta y evaluación se encuentra ya centralizado en <code>mal-core</code>, preparado para ejecuciones reproducibles y calibración científica continua.
-          </p>
-        </div>
-
-        <div class="grid-3">
-          <div class="feature card">
-            <div class="feature-mark">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-            </div>
-            <h3>Motor ABM en C++ de Alto Rendimiento</h3>
-            <p>Consolidado en <code>mal-core</code>, simula dinámicas de ciclos gonotróficos y búsqueda de hospedadores con más de 261 tests en C++ y 14 evaluadores de calibración automatizados.</p>
-          </div>
-
-          <div class="feature card">
-            <div class="feature-mark">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><path d="m4.93 4.93 4.24 4.24M14.83 9.17l4.24-4.24M14.83 14.83l4.24 4.24M9.17 14.83l-4.24 4.24"/></svg>
-            </div>
-            <h3>Ingesta y Tensores Ambientales Diarios</h3>
-            <p>Pipeline robusto en <code>mal-commonlib</code> que procesa series climáticas CHIRPS (34 años), reanálisis ERA5, capas de agua superficial Sentinel-10m y elevación MERIT DEM.</p>
-          </div>
-
-          <div class="feature card">
-            <div class="feature-mark">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
-            </div>
-            <h3>Orquestación Modular & API REST</h3>
-            <p>CLI <code>malariasim</code> unificado con 9 comandos para descarga, ingesta, entrenamiento y predicción, complementado con un servidor FastAPI para integración de servicios.</p>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- SECCIÓN DE CONFIGURADOR & DIAGRAMA INTERACTIVO ABM -->
-    <section class="section" id="configurador-abm" data-od-id="abm-interactive-builder">
-      <div class="container stack" style="gap: 40px;">
-        <div>
-          <p class="eyebrow">HERRAMIENTA VISUAL PARA INVESTIGADORES Y NOVELES</p>
-          <h2>Configurador Interactivo de Simulación ABM & Flujo de Datos</h2>
-          <p class="lead" style="margin-top: 12px;">
-            Ajusta los parámetros de simulación o selecciona un escenario predefinido. El diagrama vectorial dinámico, las advertencias de datos requeridos y el manifiesto de salidas se actualizarán en tiempo real.
-          </p>
-        </div>
-
-        <div class="builder-grid">
-          
-          <!-- Columna Izquierda: Presets y Controles de Formulario -->
-          <div class="card" style="padding: 24px;">
-            <h3 style="font-size: 16px; margin-bottom: 12px;">1. Escenarios de Simulación Predefinidos</h3>
-            
-            <div class="preset-list" id="presetList">
-              <button class="preset-chip active" data-preset="brote-anual">
-                <span class="preset-chip-title">
-                  Brote Focal Anual con Estabilización (365 días)
-                  <span class="pill" style="font-size: 9px; padding: 2px 6px;">Recomendado</span>
-                </span>
-                <span class="preset-chip-desc">6 meses de calentamiento para equilibrio de mosquitos + brote en 5 aldeas seleccionadas + animación GIF.</span>
-              </button>
-
-              <button class="preset-chip" data-preset="incursion-vectorial">
-                <span class="preset-chip-title">Incursión de Mosquitos Portadores (90 días)</span>
-                <span class="preset-chip-desc">Llegada estacional de hembras infectadas (15%) en zonas de agua durante lluvias.</span>
-              </button>
-
-              <button class="preset-chip" data-preset="focos-urbanos">
-                <span class="preset-chip-title">Brote en Centros Urbanos Específicos (180 días)</span>
-                <span class="preset-chip-desc">Inyección directa de casos clínicos importados en coordenadas de ciudades principales.</span>
-              </button>
-
-              <button class="preset-chip" data-preset="calibracion-rapida">
-                <span class="preset-chip-title">Calibración Rápida de Población de Vectores (30 días)</span>
-                <span class="preset-chip-desc">Simulación corta de 30 días para verificar dinámica de ciclo biológico sin malaria activa.</span>
-              </button>
-
-              <button class="preset-chip" data-preset="dataset-unet">
-                <span class="preset-chip-title">Generación de Dataset para Red Neuronal U-Net (Ensamble)</span>
-                <span class="preset-chip-desc">10 rollouts paralelos con distintas semillas para generar pares de entrenamiento.</span>
-              </button>
-            </div>
-
-            <hr style="border: 0; border-top: 1px solid var(--border); margin: 20px 0;" />
-
-            <h3 style="font-size: 16px; margin-bottom: 16px;">2. Parámetros y Opciones de Simulación</h3>
-
-            <!-- Selector de Área de Interés (AOI) -->
-            <div class="form-group">
-              <label class="form-label" for="paramAoi">Área de Interés (--aoi)</label>
-              <select id="paramAoi" class="form-select">
-                <option value="ghana" selected>Ghana (Nacional predefinido · 9.466 celdas)</option>
-                <option value="mozambique">Mozambique (Nacional predefinido)</option>
-                <option value="custom">Personalizada (Nueva Región / Coordenadas BBOX)</option>
-              </select>
-            </div>
-
-            <!-- Campos de AOI personalizada (ocultos por defecto) -->
-            <div id="customAoiContainer" style="display: none; background: var(--bg); padding: 14px; border-radius: var(--radius); border: 1px solid var(--border); margin-bottom: 18px;">
-              <div class="form-group" style="margin-bottom: 12px;">
-                <label class="form-label" for="paramCustomSlug">Identificador de la Región (slug)</label>
-                <input type="text" id="paramCustomSlug" class="form-input" value="colombia-pacifico" placeholder="ej. colombia-pacifico (solo minúsculas y guiones)" />
-                <p class="form-help">Identificador único en minúsculas sin espacios.</p>
-              </div>
-              <div class="form-group" style="margin-bottom: 0;">
-                <label class="form-label" for="paramCustomBbox">Límites Geográficos (Bounding Box)</label>
-                <input type="text" id="paramCustomBbox" class="form-input" value="-78.0, 1.5, -76.0, 4.0" placeholder="min_lon, min_lat, max_lon, max_lat" />
-                <p class="form-help">Formato WGS84 (EPSG:4326): <code>min_longitud, min_latitud, max_longitud, max_latitud</code>.</p>
-              </div>
-            </div>
-
-            <!-- Duración, Snapshots y Rollouts -->
-            <div class="grid-2" style="gap: 12px; margin-bottom: 16px;">
-              <div class="form-group" style="margin-bottom: 0;">
-                <label class="form-label" for="paramDays">Duración (--days)</label>
-                <select id="paramDays" class="form-select">
-                  <option value="30">30 días (1 mes)</option>
-                  <option value="60">60 días (2 meses)</option>
-                  <option value="90">90 días (3 meses)</option>
-                  <option value="180">180 días (6 meses)</option>
-                  <option value="365" selected>365 días (1 año)</option>
-                  <option value="731">731 días (2 años)</option>
-                </select>
-              </div>
-
-              <div class="form-group" style="margin-bottom: 0;">
-                <label class="form-label" for="paramSnapshot">Intervalo de Salida (--snapshot-every)</label>
-                <select id="paramSnapshot" class="form-select">
-                  <option value="1">Cada 1 día</option>
-                  <option value="7" selected>Cada 7 días (semanal)</option>
-                  <option value="14">Cada 14 días (quincenal)</option>
-                  <option value="30">Cada 30 días (mensual)</option>
-                  <option value="0">Solo final (0)</option>
-                </select>
-              </div>
-            </div>
-
-            <div class="grid-2" style="gap: 12px; margin-bottom: 16px;">
-              <div class="form-group" style="margin-bottom: 0;">
-                <label class="form-label" for="paramRollouts">Nº de Rollouts (--n-rollouts)</label>
-                <select id="paramRollouts" class="form-select">
-                  <option value="1" selected>1 (Ejecución individual)</option>
-                  <option value="5">5 (Ensamble estocástico)</option>
-                  <option value="10">10 (Dataset para U-Net)</option>
-                  <option value="20">20 (Ensamble masivo)</option>
-                </select>
-                <p class="form-help">Simulaciones concurrentes con semillas independientes.</p>
-              </div>
-
-              <div class="form-group" style="margin-bottom: 0;">
-                <label class="form-label" for="paramSeed">Semilla Base (--seed)</label>
-                <input type="number" id="paramSeed" class="form-input" value="1" min="1" max="99999" />
-                <p class="form-help">Para reproducibilidad científica.</p>
-              </div>
-            </div>
-
-            <!-- Siembra de Mosquitos -->
-            <div class="form-group">
-              <label class="form-label" for="paramSeedingMode">Siembra Inicial de Mosquitos (--seeding-mode)</label>
-              <select id="paramSeedingMode" class="form-select">
-                <option value="uniform" selected>uniform (homogénea en cuerpos de agua)</option>
-                <option value="random-viable">random-viable (en celdas con idoneidad ecológica &gt; 0)</option>
-                <option value="explicit">explicit (en estaciones de muestreo fijas)</option>
-              </select>
-            </div>
-
-            <!-- Control 1: Capa de Hospedadores y Atracción Animal/Humana (Desacoplado) -->
-            <div class="form-group" style="background: var(--bg); padding: 14px; border-radius: var(--radius); border: 1px solid var(--border);">
-              <label class="form-checkbox-label">
-                <input type="checkbox" id="paramEnableHosts" class="form-checkbox" checked />
-                <span>Capa de Hospedadores y Atracción Ganadera/Humana</span>
-              </label>
-              <p class="form-help" style="margin-left: 28px;">
-                Permite simular el movimiento y búsqueda de sangre de los mosquitos guiado por la densidad de ganado (vacas, cerdos, aves) y asentamientos humanos, incluso sin simular malaria.
-              </p>
-            </div>
-
-            <!-- Control 2: Transmisión Epidemiológica de Malaria -->
-            <div class="form-group" style="background: var(--bg); padding: 14px; border-radius: var(--radius); border: 1px solid var(--border);">
-              <label class="form-checkbox-label">
-                <input type="checkbox" id="paramEnableTransmission" class="form-checkbox" checked />
-                <span>Transmisión Epidemiológica de Malaria (--enable-transmission)</span>
-              </label>
-              <p class="form-help" style="margin-left: 28px;">
-                Activa el ciclo bidireccional de infección entre mosquitos hembra (ingesta de gametocitos, incubación EIP) y población humana (incubación, recuperación e inmunidad).
-              </p>
-
-              <div id="transmissionOptions" style="margin-top: 14px; padding-left: 28px; display: flex; flex-direction: column; gap: 12px;">
-                <div>
-                  <label class="form-label" for="paramHumanSeeding">Modo de Siembra Humana (--human-seeding-mode)</label>
-                  <select id="paramHumanSeeding" class="form-select">
-                    <option value="random-viable" selected>random-viable (focos en aldeas viables con mosquitos)</option>
-                    <option value="explicit">explicit (coordenadas de ciudades explícitas)</option>
-                    <option value="uniform-legacy">uniform-legacy (5% de prevalencia en todo el territorio)</option>
-                    <option value="none">none (sin humanos infectados al inicio)</option>
-                  </select>
-                </div>
-
-                <div class="grid-2" style="gap: 10px;">
-                  <div>
-                    <label class="form-label" for="paramOutbreakDay">Día del Brote (--human-outbreak-day)</label>
-                    <input type="number" id="paramOutbreakDay" class="form-input" value="180" min="0" max="700" />
-                    <p class="form-help">Día en que se inyectan los casos índice.</p>
-                  </div>
-                  <div>
-                    <label class="form-label" for="paramOutbreakFoci">Nº de Focos (--human-outbreak-foci)</label>
-                    <input type="number" id="paramOutbreakFoci" class="form-input" value="5" min="1" max="20" />
-                  </div>
-                </div>
-
-                <div>
-                  <label class="form-label" for="paramOutbreakCases">Casos Infectados por Foco (--human-outbreak-cases)</label>
-                  <input type="number" id="paramOutbreakCases" class="form-input" value="100" min="1" max="1000" />
-                </div>
-              </div>
-            </div>
-
-            <!-- Control 3: Log Demográfico y Animación GIF -->
-            <div class="form-group" style="background: var(--bg); padding: 14px; border-radius: var(--radius); border: 1px solid var(--border);">
-              <label class="form-checkbox-label" style="margin-bottom: 8px;">
-                <input type="checkbox" id="paramCohortLog" class="form-checkbox" checked />
-                <span>Registrar Censo Diario de Cohortes (--cohort-log)</span>
-              </label>
-              <p class="form-help" style="margin-left: 28px; margin-bottom: 12px;">
-                Registra la evolución diaria de huevos, larvas, pupas y adultos. <strong>Imprescindible para graficar pirámides demográficas y generar animaciones GIF.</strong>
-              </p>
-
-              <label class="form-checkbox-label">
-                <input type="checkbox" id="paramGif" class="form-checkbox" checked />
-                <span>Generar Animación GIF Post-Ejecución (--gif)</span>
-              </label>
-              <p class="form-help" style="margin-left: 28px;">
-                Genera mapas animados de densidad de mosquitos y propagación de la infección.
-              </p>
-            </div>
-
-            <div class="form-group" style="margin-bottom: 0;">
-              <label class="form-label" for="paramOutputDir">Directorio de Salida (--output-dir)</label>
-              <input type="text" id="paramOutputDir" class="form-input" value="runs/ghana/1year_focal_outbreak" />
-            </div>
-
-          </div>
-
-          <!-- Columna Derecha: Diagrama Dinámico SVG + Requisitos de Datos + Manifiesto de Salidas + Comando -->
-          <div class="stack" style="gap: 20px;">
-            
-            <!-- SVG Diagrama Dinámico -->
-            <div class="svg-canvas-box" aria-label="Diagrama SVG dinámico del pipeline de simulación">
-              <div class="row-between" style="margin-bottom: 16px;">
-                <span class="meta" style="font-weight: 700; color: var(--fg); text-transform: uppercase;">
-                  Flujo de Datos Activo en Tiempo Real
-                </span>
-                <span class="pill" id="svgStatusPill">Transmisión Activa</span>
-              </div>
-
-              <svg viewBox="0 0 740 390" class="interactive-svg" id="pipelineSvg">
-                <rect width="740" height="390" fill="var(--bg)" rx="8" />
-
-                <!-- Column Labels -->
-                <text x="70" y="28" font-family="var(--font-mono)" font-size="11" font-weight="700" fill="var(--muted)" text-anchor="middle">1. INPUTS & DATOS</text>
-                <text x="370" y="28" font-family="var(--font-mono)" font-size="11" font-weight="700" fill="var(--muted)" text-anchor="middle">2. MOTOR ABM C++ (mal_core)</text>
-                <text x="630" y="28" font-family="var(--font-mono)" font-size="11" font-weight="700" fill="var(--muted)" text-anchor="middle">3. OUTPUTS GENERADOS</text>
-
-                <!-- Connecting Lines (Dynamic styling) -->
-                <!-- Input to Core lines -->
-                <path d="M 140 70 C 210 70, 220 100, 270 100" fill="none" stroke="var(--accent)" stroke-width="2.5" id="linkEnv" />
-                <path d="M 140 140 C 210 140, 220 100, 270 100" fill="none" stroke="var(--accent)" stroke-width="2.5" id="linkHydro" />
-                <path d="M 140 210 C 210 210, 220 220, 270 220" fill="none" stroke="var(--accent)" stroke-width="2.5" id="linkHosts" />
-                <path d="M 140 280 C 210 280, 220 220, 270 220" fill="none" stroke="var(--accent)" stroke-width="2.5" id="linkMobility" />
-
-                <!-- Core to Output lines -->
-                <path d="M 470 100 C 510 100, 520 70, 560 70" fill="none" stroke="var(--accent)" stroke-width="2.5" id="linkOutVectors" />
-                <path d="M 470 160 C 510 160, 520 140, 560 140" fill="none" stroke="var(--accent)" stroke-width="2.5" id="linkOutTrans" />
-                <path d="M 470 220 C 510 220, 520 210, 560 210" fill="none" stroke="var(--accent)" stroke-width="2.5" id="linkOutCohorts" />
-                <path d="M 470 280 C 510 280, 520 280, 560 280" fill="none" stroke="var(--accent)" stroke-width="2.5" id="linkOutGifs" />
-
-                <!-- 1. Inputs Nodes -->
-                <!-- Node: Tensores Climáticos -->
-                <g id="nodeEnv" transform="translate(10, 45)">
-                  <rect width="130" height="50" rx="6" fill="var(--surface)" stroke="var(--accent)" stroke-width="2" />
-                  <text x="12" y="22" font-family="var(--font-mono)" font-size="10" font-weight="700" fill="var(--accent)">ERA5 & CHIRPS</text>
-                  <text x="12" y="38" font-family="var(--font-body)" font-size="10" fill="var(--muted)">Lluvia, Viento, Temp</text>
-                </g>
-
-                <!-- Node: Hidrología & DEM -->
-                <g id="nodeHydro" transform="translate(10, 115)">
-                  <rect width="130" height="50" rx="6" fill="var(--surface)" stroke="var(--accent)" stroke-width="2" />
-                  <text x="12" y="22" font-family="var(--font-mono)" font-size="10" font-weight="700" fill="var(--accent)">SENTINEL & DEM</text>
-                  <text x="12" y="38" font-family="var(--font-body)" font-size="10" fill="var(--muted)">Agua DSwX y Relieve</text>
-                </g>
-
-                <!-- Node: Grilla de Hospedadores -->
-                <g id="nodeHosts" transform="translate(10, 185)">
-                  <rect width="130" height="50" rx="6" fill="var(--surface)" stroke="var(--accent)" stroke-width="2" id="rectHosts" />
-                  <text x="12" y="22" font-family="var(--font-mono)" font-size="10" font-weight="700" fill="var(--accent)" id="textHostsTitle">HOSPEDADORES</text>
-                  <text x="12" y="38" font-family="var(--font-body)" font-size="10" fill="var(--muted)">Población & Ganado</text>
-                </g>
-
-                <!-- Node: Movilidad CSR -->
-                <g id="nodeMobility" transform="translate(10, 255)">
-                  <rect width="130" height="50" rx="6" fill="var(--surface)" stroke="var(--accent)" stroke-width="2" id="rectMobility" />
-                  <text x="12" y="22" font-family="var(--font-mono)" font-size="10" font-weight="700" fill="var(--accent)" id="textMobilityTitle">MOVILIDAD DÍA/NOCHE</text>
-                  <text x="12" y="38" font-family="var(--font-body)" font-size="10" fill="var(--muted)">Desplazamientos OD</text>
-                </g>
-
-                <!-- 2. Central Engine Node -->
-                <g id="nodeEngine" transform="translate(270, 45)">
-                  <rect width="200" height="300" rx="8" fill="var(--surface)" stroke="var(--fg)" stroke-width="2" />
-                  <rect width="200" height="32" rx="8" fill="var(--fg-soft)" />
-                  <text x="100" y="21" font-family="var(--font-mono)" font-size="11" font-weight="700" fill="var(--fg)" text-anchor="middle">MOTOR ABM ESTOCÁSTICO</text>
-                  
-                  <!-- Submodule: Ciclo Gonotrófico -->
-                  <rect x="12" y="42" width="176" height="40" rx="4" fill="var(--bg)" stroke="var(--border)" />
-                  <text x="20" y="58" font-family="var(--font-mono)" font-size="10" font-weight="700" fill="var(--accent)">CICLO BIOLÓGICO</text>
-                  <text x="20" y="72" font-family="var(--font-body)" font-size="9" fill="var(--muted)">Oviposición, desarrollo y vuelo</text>
-
-                  <!-- Submodule: Búsqueda de Hospedador -->
-                  <rect x="12" y="90" width="176" height="42" rx="4" fill="var(--bg)" stroke="var(--border)" id="submoduleHostSeeking" />
-                  <text x="20" y="106" font-family="var(--font-mono)" font-size="10" font-weight="700" fill="var(--fg)" id="textSubmoduleHost">ATRACCIÓN HOSPEDADORES</text>
-                  <text x="20" y="120" font-family="var(--font-body)" font-size="9" fill="var(--muted)" id="textSubmoduleHostDesc">Preferencia animal vs humano</text>
-
-                  <!-- Submodule: Transmisión SEIR-SEI -->
-                  <rect x="12" y="140" width="176" height="52" rx="4" fill="var(--accent-soft)" stroke="var(--accent)" id="submoduleTrans" />
-                  <text x="20" y="158" font-family="var(--font-mono)" font-size="10" font-weight="700" fill="var(--accent)">TRANSMISIÓN DE MALARIA</text>
-                  <text x="20" y="172" font-family="var(--font-body)" font-size="9" fill="var(--fg)" id="submoduleTransText">Hembras I_V ↔ Humanos I_H</text>
-                  <text x="20" y="184" font-family="var(--font-mono)" font-size="8" fill="var(--muted)" id="submoduleTransFoci">Focos: 5 · Día Inyección: 180</text>
-
-                  <!-- Submodule: Calentamiento & Warmup -->
-                  <rect x="12" y="200" width="176" height="36" rx="4" fill="var(--bg)" stroke="var(--border)" id="submoduleWarmup" />
-                  <text x="20" y="216" font-family="var(--font-mono)" font-size="9" font-weight="700" fill="var(--fg)">FASE DE ESTABILIZACIÓN</text>
-                  <text x="20" y="228" font-family="var(--font-body)" font-size="8" fill="var(--muted)" id="submoduleWarmupText">Equilibrio previo al brote</text>
-
-                  <!-- Submodule: Generador de Snapshots -->
-                  <rect x="12" y="244" width="176" height="44" rx="4" fill="var(--bg)" stroke="var(--border)" />
-                  <text x="100" y="260" font-family="var(--font-mono)" font-size="9" font-weight="700" fill="var(--fg)" text-anchor="middle" id="textRolloutsCount">1 Rollout · Semilla 1</text>
-                  <text x="100" y="276" font-family="var(--font-mono)" font-size="8.5" fill="var(--muted)" text-anchor="middle" id="textSnapshotInterval">Snapshot: cada 7 días</text>
-                </g>
-
-                <!-- 3. Output Nodes -->
-                <!-- Output: GeoTIFFs Vectores -->
-                <g id="outNodeVectors" transform="translate(560, 45)">
-                  <rect width="170" height="48" rx="6" fill="var(--surface)" stroke="var(--accent)" stroke-width="2" />
-                  <text x="12" y="20" font-family="var(--font-mono)" font-size="10" font-weight="700" fill="var(--accent)">state_dayXXX.tif</text>
-                  <text x="12" y="36" font-family="var(--font-body)" font-size="10" fill="var(--muted)" id="outCountVectors">53 GeoTIFFs (2 bandas)</text>
-                </g>
-
-                <!-- Output: GeoTIFFs Transmisión -->
-                <g id="outNodeTrans" transform="translate(560, 115)">
-                  <rect width="170" height="48" rx="6" fill="var(--surface)" stroke="var(--accent)" stroke-width="2" id="outRectTrans" />
-                  <text x="12" y="20" font-family="var(--font-mono)" font-size="10" font-weight="700" fill="var(--accent)" id="outTextTransTitle">transmission_dayXXX.tif</text>
-                  <text x="12" y="36" font-family="var(--font-body)" font-size="10" fill="var(--muted)" id="outCountTrans">53 GeoTIFFs (8 bandas)</text>
-                </g>
-
-                <!-- Output: JSON Cohortes -->
-                <g id="outNodeCohorts" transform="translate(560, 185)">
-                  <rect width="170" height="48" rx="6" fill="var(--surface)" stroke="var(--accent)" stroke-width="2" id="outRectCohorts" />
-                  <text x="12" y="20" font-family="var(--font-mono)" font-size="10" font-weight="700" fill="var(--accent)" id="outTextCohortsTitle">cohort.json</text>
-                  <text x="12" y="36" font-family="var(--font-body)" font-size="10" fill="var(--muted)" id="outCountCohorts">1 Serie demográfica</text>
-                </g>
-
-                <!-- Output: Animaciones GIF -->
-                <g id="outNodeGif" transform="translate(560, 255)">
-                  <rect width="170" height="48" rx="6" fill="var(--surface)" stroke="var(--accent)" stroke-width="2" id="outRectGif" />
-                  <text x="12" y="20" font-family="var(--font-mono)" font-size="10" font-weight="700" fill="var(--accent)" id="outTextGifTitle">Animaciones .gif</text>
-                  <text x="12" y="36" font-family="var(--font-body)" font-size="10" fill="var(--muted)" id="outCountGif">2 GIFs (Vectores + Malaria)</text>
-                </g>
-
-              </svg>
-            </div>
-
-            <!-- Avisos y Prerrequisitos de Datos Necesarios -->
-            <div class="warning-callout" id="dataPrerequisitesBox">
-              <div class="warning-callout-header">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 9v4m0 4h.01M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>
-                <span>Prerrequisitos de Datos & Guía de Configuración</span>
-              </div>
-              <div class="warning-callout-body" id="dataPrerequisitesText">
-                <!-- Se llena dinámicamente -->
-              </div>
-            </div>
-
-            <!-- Manifiesto de Salidas Estimadas -->
-            <div class="card" style="padding: 20px;">
-              <span class="meta" style="font-weight: 700; color: var(--fg); text-transform: uppercase;">
-                Manifiesto de Artefactos de Salida
-              </span>
-              <div class="grid-2" style="gap: 12px; margin-top: 12px; font-size: 13px;" id="outputSummaryGrid">
-                <div>
-                  <strong>GeoTIFFs de Población:</strong> <span id="summaryStateRasters" class="num">53 archivos</span>
-                </div>
-                <div>
-                  <strong>GeoTIFFs de Malaria:</strong> <span id="summaryTransRasters" class="num">53 archivos (SEIR)</span>
-                </div>
-                <div>
-                  <strong>Logs Demográficos:</strong> <span id="summaryCohortLog" class="num">1 archivo JSON</span>
-                </div>
-                <div>
-                  <strong>Animaciones GIF:</strong> <span id="summaryGifs" class="num">2 archivos (.gif)</span>
-                </div>
-              </div>
-            </div>
-
-            <!-- Comando CLI Generado Listo para Copiar -->
-            <div class="card" style="padding: 20px; background: var(--fg); color: var(--surface); border: none;">
-              <div class="row-between" style="margin-bottom: 12px;">
-                <span style="font-family: var(--font-mono); font-size: 12px; color: color-mix(in oklch, var(--surface) 70%, transparent); text-transform: uppercase; font-weight: 600;">
-                  Comando CLI Listo para Terminal
-                </span>
-                <button class="copy-btn" id="copyCliBtn" title="Copiar al portapapeles">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
-                  <span id="copyBtnText">Copiar comando</span>
-                </button>
-              </div>
-              <pre id="cliCommandOutput" style="margin: 0; font-family: var(--font-mono); font-size: 12.5px; line-height: 1.6; white-space: pre-wrap; word-break: break-all; color: var(--surface);"></pre>
-            </div>
-
-          </div>
-
-        </div>
-      </div>
-    </section>
-
-    <!-- Métricas Reales y Evidencia (Stat Billboard) -->
-    <section class="section" data-od-id="key-metrics">
-      <div class="container">
-        <p class="eyebrow" style="margin-bottom: 36px;">EVIDENCIA CUANTITATIVA Y RENDIMIENTO</p>
-        <div class="grid-3">
-          <div class="stat">
-            <div class="stat-num num">14<span class="stat-unit">scorers</span></div>
-            <p class="stat-label">Evaluadores de calibración cuantitativa integrados en el pipeline continuo para validar fidelidad epidemiológica.</p>
-          </div>
-          <div class="stat">
-            <div class="stat-num num">100<span class="stat-unit">×</span></div>
-            <p class="stat-label">Aceleración de inferencia proyectada con el emulador U-Net frente a simulaciones estocásticas directas.</p>
-          </div>
-          <div class="stat">
-            <div class="stat-num num">100<span class="stat-unit">m</span></div>
-            <p class="stat-label">Resolución de cuadrícula espacial objetivo para la micro-focalización de mosquiteros IG2 y rociado IRS.</p>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Sección Especial: Aceleración con Emulador U-Net -->
-    <section class="section" id="emulador-unet" data-od-id="unet-emulation">
-      <div class="container stack" style="gap: 40px;">
-        <div style="max-width: 52ch;">
-          <p class="eyebrow">EMULACIÓN NEURONAL EFICIENTE</p>
-          <h2>Generación masiva de escenarios sin el coste del ABM directo.</h2>
-          <p class="lead" style="margin-top: 12px;">
-            Simular millones de mosquitos en el ABM es preciso pero computacionalmente pesado. MalariaSentinel utiliza el ABM como generador de datos para entrenar una red U-Net que predice el estado epidemiológico de forma instantánea.
+            Siguiendo los avances de Morlighem et al. (2025) y Gbaguidi et al. (2026), MalariaSentinel desacopla la idoneidad del vector de la vulnerabilidad humana para producir mapas conjuntos de riesgo aplicables a toma de decisiones.
           </p>
         </div>
 
         <div class="grid-2">
           <div class="card">
-            <div class="row-between" style="margin-bottom: 14px;">
-              <h3 style="font-size: 18px;">1. Fase de Entrenamiento (ABM → Dataset)</h3>
-              <span class="tag">Generador de Verdad</span>
+            <div class="row-between" style="margin-bottom: 16px;">
+              <h3 style="font-size: 19px;">Peligro Vectorial (Hazard)</h3>
+              <span class="tag">Ecológico &amp; Climático</span>
             </div>
-            <p style="color: var(--muted); font-size: 14px; line-height: 1.6; margin-bottom: 16px;">
-              El motor ABM en C++ ejecuta múltiples rollouts estocásticos con semillas variadas. El constructor de datasets extrae parches de 128×128 y pares temporales <code>t → t+1</code>.
+            <p style="color: var(--muted); font-size: 14px; margin-bottom: 16px;">
+              Modelado biofísico de idoneidad y dinámica poblacional del mosquito:
             </p>
-            <ul style="padding-left: 20px; color: var(--muted); font-size: 13px; margin: 0; line-height: 1.7;">
-              <li>Generación paralela de rollouts en clusters de cómputo.</li>
-              <li>Entrenamiento de arquitectura U-Net (32-64-128-256) con pérdida combinada MSE + soft-Dice.</li>
-              <li>Validación estricta de curvas de calibración frente al ABM base.</li>
+            <ul style="padding-left: 20px; color: var(--muted); font-size: 14px; margin: 0; line-height: 1.8;">
+              <li><strong>Procesos hidrológicos:</strong> Humedad del suelo, escorrentía superficial y charcas temporales (Smith et al. 2024).</li>
+              <li><strong>Especies clave:</strong> Parametrización térmica diferenciada para <em>An. coluzzii</em>, <em>An. gambiae</em>, <em>An. funestus</em> y <em>An. arabiensis</em>.</li>
+              <li><strong>Calendarios agrícolas:</strong> Influencia de cultivos de arroz en la proliferación estacional de vectores.</li>
             </ul>
           </div>
 
           <div class="card">
-            <div class="row-between" style="margin-bottom: 14px;">
-              <h3 style="font-size: 18px;">2. Fase de Producción Operativa (U-Net)</h3>
-              <span class="pill">100× Más Rápido</span>
+            <div class="row-between" style="margin-bottom: 16px;">
+              <h3 style="font-size: 19px;">Vulnerabilidad y Exposición</h3>
+              <span class="tag">Demográfico &amp; Sanitario</span>
             </div>
-            <p style="color: var(--muted); font-size: 14px; line-height: 1.6; margin-bottom: 16px;">
-              En producción, la U-Net entrenada reemplaza la simulación pesada del ABM. Puede generar mapas de riesgo mensuales en milisegundos y evaluar miles de combinaciones de intervención en tiempo real.
+            <p style="color: var(--muted); font-size: 14px; margin-bottom: 16px;">
+              Factores humanos que modulan el impacto real y la eficacia de las medidas preventivas:
             </p>
-            <ul style="padding-left: 20px; color: var(--muted); font-size: 13px; margin: 0; line-height: 1.7;">
-              <li>Inferencia ágil para la toma de decisiones sobre el terreno.</li>
-              <li>Exploración interactiva de presupuestos de rociado IRS y mosquiteros.</li>
-              <li>Integración directa mediante endpoints REST en el servidor de producción.</li>
+            <ul style="padding-left: 20px; color: var(--muted); font-size: 14px; margin: 0; line-height: 1.8;">
+              <li><strong>Movilidad por fases:</strong> Desplazamientos humanos y ganaderos diurnos/nocturnos que alteran el contacto vector-hospedador.</li>
+              <li><strong>Resistencia a insecticidas:</strong> Mutaciones de insensibilidad y desintoxicación metabólica que reducen el efecto del rociado IRS.</li>
+              <li><strong>Cascada de efectividad:</strong> Tasa real de uso y durabilidad física de mosquiteros tratados (ITN IG2).</li>
             </ul>
           </div>
         </div>
@@ -1146,60 +720,494 @@
             <span class="meta">uv run malariasim</span>
           </div>
           <div class="code-box">
-            <span class="comment"># Descarga de tensores ambientales para un área (perfiles por defecto)</span><br />
-            <span class="cmd">malariasim download</span> --aoi ghana --years 2024,2025<br />
-            <span class="cmd">malariasim ingest</span> --aoi ghana --year 2024 --month 6<br /><br />
-            <span class="comment"># Ejecución de simulación ABM estocástica para generar rollouts</span><br />
-            <span class="cmd">malariasim abm</span> --aoi ghana --days 30 --n-rollouts 5<br />
-            <span class="cmd">malariasim score</span> --run-dir runs/abm --tier fast<br /><br />
-            <span class="comment"># Entrenamiento del emulador neuronal U-Net con los datos del ABM</span><br />
-            <span class="cmd">malariasim train</span> --run-dir runs/abm --epochs 50<br /><br />
-            <span class="comment"># Predicción rápida de mapas de riesgo mensuales</span><br />
+            <span class="comment"># Descarga de tensores ambientales para un área (perfiles por defecto)</span><br>
+            <span class="cmd">malariasim download</span> --aoi ghana --years 2024,2025<br>
+            <span class="cmd">malariasim ingest</span> --aoi ghana --year 2024 --month 6<br><br>
+            <span class="comment"># Ejecución de simulación ABM estocástica para generar rollouts</span><br>
+            <span class="cmd">malariasim abm</span> --aoi ghana --days 30 --n-rollouts 5<br>
+            <span class="cmd">malariasim score</span> --run-dir runs/abm --tier fast<br><br>
+            <span class="comment"># Entrenamiento del emulador neuronal U-Net con los datos del ABM</span><br>
+            <span class="cmd">malariasim train</span> --run-dir runs/abm --epochs 50<br><br>
+            <span class="comment"># Predicción rápida de mapas de riesgo mensuales</span><br>
             <span class="cmd">malariasim predict</span> --aoi ghana --year 2026
           </div>
         </div>
       </div>
     </section>
 
-    <!-- Fundamento Metodológico (Peligro vs Vulnerabilidad) -->
-    <section class="section" id="metodologia" data-od-id="methodology-breakdown">
+    <!-- Estado Actual y Avances (Feature Triplet) -->
+    <section class="section" id="avances" data-od-id="project-status">
       <div class="container stack" style="gap: 48px;">
         <div style="max-width: 50ch;">
-          <p class="eyebrow">METODOLOGÍA CIENTÍFICA</p>
-          <h2>Descomposición de Peligro vs. Vulnerabilidad.</h2>
+          <p class="eyebrow">ESTADO ACTUAL Y NÚCLEO CONSOLIDADO</p>
+          <h2>Avances consolidados en el paquete mal-core.</h2>
           <p class="lead" style="margin-top: 12px;">
-            Siguiendo los avances de Morlighem et al. (2025) y Gbaguidi et al. (2026), MalariaSentinel desacopla la idoneidad del vector de la vulnerabilidad humana para producir mapas conjuntos de riesgo aplicables a toma de decisiones.
+            Todo el sistema principal de simulación, ingesta y evaluación se encuentra ya centralizado en <code>mal-core</code>, preparado para ejecuciones reproducibles y calibración científica continua.
+          </p>
+        </div>
+
+        <div class="grid-3">
+          <div class="feature card">
+            <div class="feature-mark">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+            </div>
+            <h3>Motor ABM en C++ de Alto Rendimiento</h3>
+            <p>Consolidado en <code>mal-core</code>, simula dinámicas de ciclos gonotróficos y búsqueda de hospedadores con más de 261 tests en C++ y 14 evaluadores de calibración automatizados.</p>
+          </div>
+
+          <div class="feature card">
+            <div class="feature-mark">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"></circle><path d="m4.93 4.93 4.24 4.24M14.83 9.17l4.24-4.24M14.83 14.83l4.24 4.24M9.17 14.83l-4.24 4.24"></path></svg>
+            </div>
+            <h3>Ingesta y Tensores Ambientales Diarios</h3>
+            <p>Pipeline robusto en <code>mal-commonlib</code> que procesa series climáticas CHIRPS (34 años), reanálisis ERA5, capas de agua superficial Sentinel-10m y elevación MERIT DEM.</p>
+          </div>
+
+          <div class="feature card">
+            <div class="feature-mark">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M22 12h-4l-3 9L9 3l-3 9H2"></path></svg>
+            </div>
+            <h3>Orquestación Modular &amp; API REST</h3>
+            <p>CLI <code>malariasim</code> unificado con 9 comandos para descarga, ingesta, entrenamiento y predicción, complementado con un servidor FastAPI para integración de servicios.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECCIÓN DE CONFIGURADOR & DIAGRAMA INTERACTIVO ABM -->
+    <section class="section" id="configurador-abm" data-od-id="abm-interactive-builder">
+      <div class="container stack" style="gap: 40px;">
+        <div>
+          <p class="eyebrow">HERRAMIENTA VISUAL PARA INVESTIGADORES Y NOVELES</p>
+          <h2>Configurador Interactivo de Simulación ABM &amp; Flujo de Datos</h2>
+          <p class="lead" style="margin-top: 12px;">
+            Ajusta los parámetros de simulación o selecciona un escenario predefinido. El diagrama vectorial dinámico, las advertencias de datos requeridos y el manifiesto de salidas se actualizarán en tiempo real.
+          </p>
+        </div>
+
+        <div class="builder-grid">
+          
+          <!-- Columna Izquierda: Presets y Controles de Formulario -->
+          <div class="card" style="padding: 24px;">
+            <h3 style="font-size: 16px; margin-bottom: 12px;">1. Escenarios de Simulación Predefinidos</h3>
+            
+            <div class="preset-list" id="presetList">
+              <button class="preset-chip active" data-preset="brote-anual">
+                <span class="preset-chip-title">
+                  Brote Focal Anual con Estabilización (365 días)
+                  <span class="pill" style="font-size: 9px; padding: 2px 6px;">Recomendado</span>
+                </span>
+                <span class="preset-chip-desc">6 meses de calentamiento para equilibrio de mosquitos + brote en 5 aldeas seleccionadas + animación GIF.</span>
+              </button>
+
+              <button class="preset-chip" data-preset="incursion-vectorial">
+                <span class="preset-chip-title">Incursión de Mosquitos Portadores (90 días)</span>
+                <span class="preset-chip-desc">Llegada estacional de hembras infectadas (15%) en zonas de agua durante lluvias.</span>
+              </button>
+
+              <button class="preset-chip" data-preset="focos-urbanos">
+                <span class="preset-chip-title">Brote en Centros Urbanos Específicos (180 días)</span>
+                <span class="preset-chip-desc">Inyección directa de casos clínicos importados en coordenadas de ciudades principales.</span>
+              </button>
+
+              <button class="preset-chip" data-preset="calibracion-rapida">
+                <span class="preset-chip-title">Calibración Rápida de Población de Vectores (30 días)</span>
+                <span class="preset-chip-desc">Simulación corta de 30 días para verificar dinámica de ciclo biológico sin malaria activa.</span>
+              </button>
+
+              <button class="preset-chip" data-preset="dataset-unet">
+                <span class="preset-chip-title">Generación de Dataset para Red Neuronal U-Net (Ensamble)</span>
+                <span class="preset-chip-desc">10 rollouts paralelos con distintas semillas para generar pares de entrenamiento.</span>
+              </button>
+            </div>
+
+            <details class="more-options-details" id="moreOptionsDetails">
+              <summary class="more-options-summary">
+                <span style="font-weight: 600; font-size: 15px; color: var(--fg); display: flex; align-items: center; gap: 8px;">
+                  <svg class="chevron-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"></path></svg>
+                  2. Más opciones
+                </span>
+                
+              </summary>
+              <div style="padding-top: 16px;">
+
+                <!-- Selector de Área de Interés (AOI) -->
+                <div class="form-group">
+                  <label class="form-label" for="paramAoi">Área de Interés (--aoi)</label>
+                  <select id="paramAoi" class="form-select">
+                    <option value="ghana" selected="">Ghana (Nacional predefinido · 9.466 celdas)</option>
+                    <option value="mozambique">Mozambique (Nacional predefinido)</option>
+                    <option value="custom">Personalizada (Nueva Región / Coordenadas BBOX)</option>
+                  </select>
+                </div>
+
+                <!-- Campos de AOI personalizada (ocultos por defecto) -->
+                <div id="customAoiContainer" style="display: none; background: var(--bg); padding: 14px; border-radius: var(--radius); border: 1px solid var(--border); margin-bottom: 18px;">
+                  <div class="form-group" style="margin-bottom: 12px;">
+                    <label class="form-label" for="paramCustomSlug">Identificador de la Región (slug)</label>
+                    <input type="text" id="paramCustomSlug" class="form-input" value="colombia-pacifico" placeholder="ej. colombia-pacifico (solo minúsculas y guiones)">
+                    <p class="form-help">Identificador único en minúsculas sin espacios.</p>
+                  </div>
+                  <div class="form-group" style="margin-bottom: 0;">
+                    <label class="form-label" for="paramCustomBbox">Límites Geográficos (Bounding Box)</label>
+                    <input type="text" id="paramCustomBbox" class="form-input" value="-78.0, 1.5, -76.0, 4.0" placeholder="min_lon, min_lat, max_lon, max_lat">
+                    <p class="form-help">Formato WGS84 (EPSG:4326): <code>min_longitud, min_latitud, max_longitud, max_latitud</code>.</p>
+                  </div>
+                </div>
+
+                <!-- Duración, Snapshots y Rollouts -->
+                <div class="grid-2" style="gap: 12px; margin-bottom: 16px;">
+                  <div class="form-group" style="margin-bottom: 0;">
+                    <label class="form-label" for="paramDays">Duración (--days)</label>
+                    <select id="paramDays" class="form-select">
+                      <option value="30">30 días (1 mes)</option>
+                      <option value="60">60 días (2 meses)</option>
+                      <option value="90">90 días (3 meses)</option>
+                      <option value="180">180 días (6 meses)</option>
+                      <option value="365" selected="">365 días (1 año)</option>
+                      <option value="731">731 días (2 años)</option>
+                    </select>
+                  </div>
+
+                  <div class="form-group" style="margin-bottom: 0;">
+                    <label class="form-label" for="paramSnapshot">Intervalo de Salida (--snapshot-every)</label>
+                    <select id="paramSnapshot" class="form-select">
+                      <option value="1">Cada 1 día</option>
+                      <option value="7" selected="">Cada 7 días (semanal)</option>
+                      <option value="14">Cada 14 días (quincenal)</option>
+                      <option value="30">Cada 30 días (mensual)</option>
+                      <option value="0">Solo final (0)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div class="grid-2" style="gap: 12px; margin-bottom: 16px;">
+                  <div class="form-group" style="margin-bottom: 0;">
+                    <label class="form-label" for="paramRollouts">Nº de Rollouts (--n-rollouts)</label>
+                    <select id="paramRollouts" class="form-select">
+                      <option value="1" selected="">1 (Ejecución individual)</option>
+                      <option value="5">5 (Ensamble estocástico)</option>
+                      <option value="10">10 (Dataset para U-Net)</option>
+                      <option value="20">20 (Ensamble masivo)</option>
+                    </select>
+                    <p class="form-help">Simulaciones concurrentes con semillas independientes.</p>
+                  </div>
+
+                  <div class="form-group" style="margin-bottom: 0;">
+                    <label class="form-label" for="paramSeed">Semilla Base (--seed)</label>
+                    <input type="number" id="paramSeed" class="form-input" value="1" min="1" max="99999">
+                    <p class="form-help">Para reproducibilidad científica.</p>
+                  </div>
+                </div>
+
+                <!-- Siembra de Mosquitos -->
+                <div class="form-group">
+                  <label class="form-label" for="paramSeedingMode">Siembra Inicial de Mosquitos (--seeding-mode)</label>
+                  <select id="paramSeedingMode" class="form-select">
+                    <option value="uniform" selected="">uniform (homogénea en cuerpos de agua)</option>
+                    <option value="random-viable">random-viable (en celdas con idoneidad ecológica &gt; 0)</option>
+                    <option value="explicit">explicit (en estaciones de muestreo fijas)</option>
+                  </select>
+                </div>
+
+                <!-- Control 1: Capa de Hospedadores y Atracción Animal/Humana (Desacoplado) -->
+                <div class="form-group" style="background: var(--bg); padding: 14px; border-radius: var(--radius); border: 1px solid var(--border);">
+                  <label class="form-checkbox-label">
+                    <input type="checkbox" id="paramEnableHosts" class="form-checkbox" checked="">
+                    <span>Capa de Hospedadores y Atracción Ganadera/Humana</span>
+                  </label>
+                  <p class="form-help" style="margin-left: 28px;">
+                    Permite simular el movimiento y búsqueda de sangre de los mosquitos guiado por la densidad de ganado (vacas, cerdos, aves) y asentamientos humanos, incluso sin simular malaria.
+                  </p>
+                </div>
+
+                <!-- Control 2: Transmisión Epidemiológica de Malaria -->
+                <div class="form-group" style="background: var(--bg); padding: 14px; border-radius: var(--radius); border: 1px solid var(--border);">
+                  <label class="form-checkbox-label">
+                    <input type="checkbox" id="paramEnableTransmission" class="form-checkbox" checked="">
+                    <span>Transmisión Epidemiológica de Malaria (--enable-transmission)</span>
+                  </label>
+                  <p class="form-help" style="margin-left: 28px;">
+                    Activa el ciclo bidireccional de infección entre mosquitos hembra (ingesta de gametocitos, incubación EIP) y población humana (incubación, recuperación e inmunidad).
+                  </p>
+
+                  <div id="transmissionOptions" style="margin-top: 14px; padding-left: 28px; display: flex; flex-direction: column; gap: 12px;">
+                    <div>
+                      <label class="form-label" for="paramHumanSeeding">Modo de Siembra Humana (--human-seeding-mode)</label>
+                      <select id="paramHumanSeeding" class="form-select">
+                        <option value="random-viable" selected="">random-viable (focos en aldeas viables con mosquitos)</option>
+                        <option value="explicit">explicit (coordenadas de ciudades explícitas)</option>
+                        <option value="uniform-legacy">uniform-legacy (5% de prevalencia en todo el territorio)</option>
+                        <option value="none">none (sin humanos infectados al inicio)</option>
+                      </select>
+                    </div>
+
+                    <div class="grid-2" style="gap: 10px;">
+                      <div>
+                        <label class="form-label" for="paramOutbreakDay">Día del Brote (--human-outbreak-day)</label>
+                        <input type="number" id="paramOutbreakDay" class="form-input" value="180" min="0" max="700">
+                        <p class="form-help">Día en que se inyectan los casos índice.</p>
+                      </div>
+                      <div>
+                        <label class="form-label" for="paramOutbreakFoci">Nº de Focos (--human-outbreak-foci)</label>
+                        <input type="number" id="paramOutbreakFoci" class="form-input" value="5" min="1" max="20">
+                      </div>
+                    </div>
+
+                    <div>
+                      <label class="form-label" for="paramOutbreakCases">Casos Infectados por Foco (--human-outbreak-cases)</label>
+                      <input type="number" id="paramOutbreakCases" class="form-input" value="100" min="1" max="1000">
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Control 3: Log Demográfico y Animación GIF -->
+                <div class="form-group" style="background: var(--bg); padding: 14px; border-radius: var(--radius); border: 1px solid var(--border);">
+                  <label class="form-checkbox-label" style="margin-bottom: 8px;">
+                    <input type="checkbox" id="paramCohortLog" class="form-checkbox" checked="">
+                    <span>Registrar Censo Diario de Cohortes (--cohort-log)</span>
+                  </label>
+                  <p class="form-help" style="margin-left: 28px; margin-bottom: 12px;">
+                    Registra la evolución diaria de huevos, larvas, pupas y adultos. <strong>Imprescindible para graficar pirámides demográficas y generar animaciones GIF.</strong>
+                  </p>
+
+                  <label class="form-checkbox-label">
+                    <input type="checkbox" id="paramGif" class="form-checkbox" checked="">
+                    <span>Generar Animación GIF Post-Ejecución (--gif)</span>
+                  </label>
+                  <p class="form-help" style="margin-left: 28px;">
+                    Genera mapas animados de densidad de mosquitos y propagación de la infección.
+                  </p>
+                </div>
+
+                <div class="form-group" style="margin-bottom: 0;">
+                  <label class="form-label" for="paramOutputDir">Directorio de Salida (--output-dir)</label>
+                  <input type="text" id="paramOutputDir" class="form-input" value="runs/ghana/1year_focal_outbreak">
+                </div>
+
+              </div>
+            </details>
+
+          </div>
+
+          <!-- Columna Derecha: Requisitos de Datos + Comando + Manifiesto de Salidas + Diagrama Dinámico SVG -->
+          <div class="stack" style="gap: 20px;">
+            
+            <!-- Avisos y Prerrequisitos de Datos Necesarios -->
+            <div class="warning-callout" id="dataPrerequisitesBox">
+              <div class="warning-callout-header">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 9v4m0 4h.01M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"></path></svg>
+                <span>Prerrequisitos de Datos &amp; Guía de Configuración</span>
+              </div>
+              <div class="warning-callout-body" id="dataPrerequisitesText">
+                <!-- Se llena dinámicamente -->
+              </div>
+            </div>
+
+            <!-- Comando CLI Generado Listo para Copiar -->
+            <div class="card" style="padding: 20px; background: var(--fg); color: var(--surface); border: none;">
+              <div class="row-between" style="margin-bottom: 12px;">
+                <span style="font-family: var(--font-mono); font-size: 12px; color: color-mix(in oklch, var(--surface) 70%, transparent); text-transform: uppercase; font-weight: 600;">
+                  Comando CLI Listo para Terminal
+                </span>
+                <button class="copy-btn" id="copyCliBtn" title="Copiar al portapapeles">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path></svg>
+                  <span id="copyBtnText">Copiar comando</span>
+                </button>
+              </div>
+              <pre id="cliCommandOutput" style="margin: 0; font-family: var(--font-mono); font-size: 12.5px; line-height: 1.6; white-space: pre-wrap; word-break: break-all; color: var(--surface);"></pre>
+            </div>
+
+            <!-- Manifiesto de Salidas Estimadas -->
+            <div class="card" style="padding: 20px;">
+              <span class="meta" style="font-weight: 700; color: var(--fg); text-transform: uppercase;">
+                Manifiesto de Artefactos de Salida
+              </span>
+              <div class="grid-2" style="gap: 12px; margin-top: 12px; font-size: 13px;" id="outputSummaryGrid">
+                <div>
+                  <strong>GeoTIFFs de Población:</strong> <span id="summaryStateRasters" class="num">53 archivos</span>
+                </div>
+                <div>
+                  <strong>GeoTIFFs de Malaria:</strong> <span id="summaryTransRasters" class="num">53 archivos (SEIR)</span>
+                </div>
+                <div>
+                  <strong>Logs Demográficos:</strong> <span id="summaryCohortLog" class="num">1 archivo JSON</span>
+                </div>
+                <div>
+                  <strong>Animaciones GIF:</strong> <span id="summaryGifs" class="num">2 archivos (.gif)</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- SVG Diagrama Dinámico -->
+            <div class="svg-canvas-box" aria-label="Diagrama SVG dinámico del pipeline de simulación">
+              <div class="row-between" style="margin-bottom: 16px;">
+                <span class="meta" style="font-weight: 700; color: var(--fg); text-transform: uppercase;">
+                  Flujo de Datos Activo en Tiempo Real
+                </span>
+                <span class="pill" id="svgStatusPill">Transmisión Activa</span>
+              </div>
+
+              <svg viewBox="0 0 740 390" class="interactive-svg" id="pipelineSvg">
+                <rect width="740" height="390" fill="var(--bg)" rx="8"></rect>
+
+                <!-- Column Labels -->
+                <text x="70" y="28" font-family="var(--font-mono)" font-size="11" font-weight="700" fill="var(--muted)" text-anchor="middle">1. INPUTS &amp; DATOS</text>
+                <text x="370" y="28" font-family="var(--font-mono)" font-size="11" font-weight="700" fill="var(--muted)" text-anchor="middle">2. MOTOR ABM C++ (mal_core)</text>
+                <text x="630" y="28" font-family="var(--font-mono)" font-size="11" font-weight="700" fill="var(--muted)" text-anchor="middle">3. OUTPUTS GENERADOS</text>
+
+                <!-- Connecting Lines (Dynamic styling) -->
+                <!-- Input to Core lines -->
+                <path d="M 140 70 C 210 70, 220 100, 270 100" fill="none" stroke="var(--accent)" stroke-width="2.5" id="linkEnv"></path>
+                <path d="M 140 140 C 210 140, 220 100, 270 100" fill="none" stroke="var(--accent)" stroke-width="2.5" id="linkHydro"></path>
+                <path d="M 140 210 C 210 210, 220 220, 270 220" fill="none" stroke="var(--accent)" stroke-width="2.5" id="linkHosts"></path>
+                <path d="M 140 280 C 210 280, 220 220, 270 220" fill="none" stroke="var(--accent)" stroke-width="2.5" id="linkMobility"></path>
+
+                <!-- Core to Output lines -->
+                <path d="M 470 100 C 510 100, 520 70, 560 70" fill="none" stroke="var(--accent)" stroke-width="2.5" id="linkOutVectors"></path>
+                <path d="M 470 160 C 510 160, 520 140, 560 140" fill="none" stroke="var(--accent)" stroke-width="2.5" id="linkOutTrans"></path>
+                <path d="M 470 220 C 510 220, 520 210, 560 210" fill="none" stroke="var(--accent)" stroke-width="2.5" id="linkOutCohorts"></path>
+                <path d="M 470 280 C 510 280, 520 280, 560 280" fill="none" stroke="var(--accent)" stroke-width="2.5" id="linkOutGifs"></path>
+
+                <!-- 1. Inputs Nodes -->
+                <!-- Node: Tensores Climáticos -->
+                <g id="nodeEnv" transform="translate(10, 45)">
+                  <rect width="130" height="50" rx="6" fill="var(--surface)" stroke="var(--accent)" stroke-width="2"></rect>
+                  <text x="12" y="22" font-family="var(--font-mono)" font-size="10" font-weight="700" fill="var(--accent)">ERA5 &amp; CHIRPS</text>
+                  <text x="12" y="38" font-family="var(--font-body)" font-size="10" fill="var(--muted)">Lluvia, Viento, Temp</text>
+                </g>
+
+                <!-- Node: Hidrología & DEM -->
+                <g id="nodeHydro" transform="translate(10, 115)">
+                  <rect width="130" height="50" rx="6" fill="var(--surface)" stroke="var(--accent)" stroke-width="2"></rect>
+                  <text x="12" y="22" font-family="var(--font-mono)" font-size="10" font-weight="700" fill="var(--accent)">SENTINEL &amp; DEM</text>
+                  <text x="12" y="38" font-family="var(--font-body)" font-size="10" fill="var(--muted)">Agua DSwX y Relieve</text>
+                </g>
+
+                <!-- Node: Grilla de Hospedadores -->
+                <g id="nodeHosts" transform="translate(10, 185)">
+                  <rect width="130" height="50" rx="6" fill="var(--surface)" stroke="var(--accent)" stroke-width="2" id="rectHosts"></rect>
+                  <text x="12" y="22" font-family="var(--font-mono)" font-size="10" font-weight="700" fill="var(--accent)" id="textHostsTitle">HOSPEDADORES</text>
+                  <text x="12" y="38" font-family="var(--font-body)" font-size="10" fill="var(--muted)">Población &amp; Ganado</text>
+                </g>
+
+                <!-- Node: Movilidad CSR -->
+                <g id="nodeMobility" transform="translate(10, 255)">
+                  <rect width="130" height="50" rx="6" fill="var(--surface)" stroke="var(--accent)" stroke-width="2" id="rectMobility"></rect>
+                  <text x="12" y="22" font-family="var(--font-mono)" font-size="10" font-weight="700" fill="var(--accent)" id="textMobilityTitle">MOVILIDAD DÍA/NOCHE</text>
+                  <text x="12" y="38" font-family="var(--font-body)" font-size="10" fill="var(--muted)">Desplazamientos OD</text>
+                </g>
+
+                <!-- 2. Central Engine Node -->
+                <g id="nodeEngine" transform="translate(270, 45)">
+                  <rect width="200" height="300" rx="8" fill="var(--surface)" stroke="var(--fg)" stroke-width="2"></rect>
+                  <rect width="200" height="32" rx="8" fill="var(--fg-soft)"></rect>
+                  <text x="100" y="21" font-family="var(--font-mono)" font-size="11" font-weight="700" fill="var(--fg)" text-anchor="middle">MOTOR ABM ESTOCÁSTICO</text>
+                  
+                  <!-- Submodule: Ciclo Gonotrófico -->
+                  <rect x="12" y="42" width="176" height="40" rx="4" fill="var(--bg)" stroke="var(--border)"></rect>
+                  <text x="20" y="58" font-family="var(--font-mono)" font-size="10" font-weight="700" fill="var(--accent)">CICLO BIOLÓGICO</text>
+                  <text x="20" y="72" font-family="var(--font-body)" font-size="9" fill="var(--muted)">Oviposición, desarrollo y vuelo</text>
+
+                  <!-- Submodule: Búsqueda de Hospedador -->
+                  <rect x="12" y="90" width="176" height="42" rx="4" fill="var(--bg)" stroke="var(--border)" id="submoduleHostSeeking"></rect>
+                  <text x="20" y="106" font-family="var(--font-mono)" font-size="10" font-weight="700" fill="var(--fg)" id="textSubmoduleHost">ATRACCIÓN HOSPEDADORES</text>
+                  <text x="20" y="120" font-family="var(--font-body)" font-size="9" fill="var(--muted)" id="textSubmoduleHostDesc">Preferencia animal vs humano</text>
+
+                  <!-- Submodule: Transmisión SEIR-SEI -->
+                  <rect x="12" y="140" width="176" height="52" rx="4" fill="var(--accent-soft)" stroke="var(--accent)" id="submoduleTrans"></rect>
+                  <text x="20" y="158" font-family="var(--font-mono)" font-size="10" font-weight="700" fill="var(--accent)">TRANSMISIÓN DE MALARIA</text>
+                  <text x="20" y="172" font-family="var(--font-body)" font-size="9" fill="var(--fg)" id="submoduleTransText">Hembras I_V ↔ Humanos I_H</text>
+                  <text x="20" y="184" font-family="var(--font-mono)" font-size="8" fill="var(--muted)" id="submoduleTransFoci">Focos: 5 · Día Inyección: 180</text>
+
+                  <!-- Submodule: Calentamiento & Warmup -->
+                  <rect x="12" y="200" width="176" height="36" rx="4" fill="var(--bg)" stroke="var(--border)" id="submoduleWarmup"></rect>
+                  <text x="20" y="216" font-family="var(--font-mono)" font-size="9" font-weight="700" fill="var(--fg)">FASE DE ESTABILIZACIÓN</text>
+                  <text x="20" y="228" font-family="var(--font-body)" font-size="8" fill="var(--muted)" id="submoduleWarmupText">Equilibrio previo al brote</text>
+
+                  <!-- Submodule: Generador de Snapshots -->
+                  <rect x="12" y="244" width="176" height="44" rx="4" fill="var(--bg)" stroke="var(--border)"></rect>
+                  <text x="100" y="260" font-family="var(--font-mono)" font-size="9" font-weight="700" fill="var(--fg)" text-anchor="middle" id="textRolloutsCount">1 Rollout · Semilla 1</text>
+                  <text x="100" y="276" font-family="var(--font-mono)" font-size="8.5" fill="var(--muted)" text-anchor="middle" id="textSnapshotInterval">Snapshot: cada 7 días</text>
+                </g>
+
+                <!-- 3. Output Nodes -->
+                <!-- Output: GeoTIFFs Vectores -->
+                <g id="outNodeVectors" transform="translate(560, 45)">
+                  <rect width="170" height="48" rx="6" fill="var(--surface)" stroke="var(--accent)" stroke-width="2"></rect>
+                  <text x="12" y="20" font-family="var(--font-mono)" font-size="10" font-weight="700" fill="var(--accent)">state_dayXXX.tif</text>
+                  <text x="12" y="36" font-family="var(--font-body)" font-size="10" fill="var(--muted)" id="outCountVectors">53 GeoTIFFs (2 bandas)</text>
+                </g>
+
+                <!-- Output: GeoTIFFs Transmisión -->
+                <g id="outNodeTrans" transform="translate(560, 115)">
+                  <rect width="170" height="48" rx="6" fill="var(--surface)" stroke="var(--accent)" stroke-width="2" id="outRectTrans"></rect>
+                  <text x="12" y="20" font-family="var(--font-mono)" font-size="10" font-weight="700" fill="var(--accent)" id="outTextTransTitle">transmission_dayXXX.tif</text>
+                  <text x="12" y="36" font-family="var(--font-body)" font-size="10" fill="var(--muted)" id="outCountTrans">53 GeoTIFFs (8 bandas)</text>
+                </g>
+
+                <!-- Output: JSON Cohortes -->
+                <g id="outNodeCohorts" transform="translate(560, 185)">
+                  <rect width="170" height="48" rx="6" fill="var(--surface)" stroke="var(--accent)" stroke-width="2" id="outRectCohorts"></rect>
+                  <text x="12" y="20" font-family="var(--font-mono)" font-size="10" font-weight="700" fill="var(--accent)" id="outTextCohortsTitle">cohort.json</text>
+                  <text x="12" y="36" font-family="var(--font-body)" font-size="10" fill="var(--muted)" id="outCountCohorts">1 Serie demográfica</text>
+                </g>
+
+                <!-- Output: Animaciones GIF -->
+                <g id="outNodeGif" transform="translate(560, 255)">
+                  <rect width="170" height="48" rx="6" fill="var(--surface)" stroke="var(--accent)" stroke-width="2" id="outRectGif"></rect>
+                  <text x="12" y="20" font-family="var(--font-mono)" font-size="10" font-weight="700" fill="var(--accent)" id="outTextGifTitle">Animaciones .gif</text>
+                  <text x="12" y="36" font-family="var(--font-body)" font-size="10" fill="var(--muted)" id="outCountGif">2 GIFs (Vectores + Malaria)</text>
+                </g>
+
+              </svg>
+            </div>
+
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+    <!-- Sección Especial: Aceleración con Emulador U-Net -->
+    <section class="section" id="emulador-unet" data-od-id="unet-emulation">
+      <div class="container stack" style="gap: 40px;">
+        <div style="max-width: 52ch;">
+          <p class="eyebrow">EMULACIÓN NEURONAL EFICIENTE</p>
+          <h2>Generación masiva de escenarios sin el coste del ABM directo.</h2>
+          <p class="lead" style="margin-top: 12px;">
+            Simular millones de mosquitos en el ABM es preciso pero computacionalmente pesado. MalariaSentinel utiliza el ABM como generador de datos para entrenar una red U-Net que predice el estado epidemiológico de forma instantánea.
           </p>
         </div>
 
         <div class="grid-2">
           <div class="card">
-            <div class="row-between" style="margin-bottom: 16px;">
-              <h3 style="font-size: 19px;">Peligro Vectorial (Hazard)</h3>
-              <span class="tag">Ecológico & Climático</span>
+            <div class="row-between" style="margin-bottom: 14px;">
+              <h3 style="font-size: 18px;">1. Fase de Entrenamiento (ABM → Dataset)</h3>
+              <span class="tag">Generador de Verdad</span>
             </div>
-            <p style="color: var(--muted); font-size: 14px; margin-bottom: 16px;">
-              Modelado biofísico de idoneidad y dinámica poblacional del mosquito:
+            <p style="color: var(--muted); font-size: 14px; line-height: 1.6; margin-bottom: 16px;">
+              El motor ABM en C++ ejecuta múltiples rollouts estocásticos con semillas variadas. El constructor de datasets extrae parches de 128×128 y pares temporales <code>t → t+1</code>.
             </p>
-            <ul style="padding-left: 20px; color: var(--muted); font-size: 14px; margin: 0; line-height: 1.8;">
-              <li><strong>Procesos hidrológicos:</strong> Humedad del suelo, escorrentía superficial y charcas temporales (Smith et al. 2024).</li>
-              <li><strong>Especies clave:</strong> Parametrización térmica diferenciada para <em>An. coluzzii</em>, <em>An. gambiae</em>, <em>An. funestus</em> y <em>An. arabiensis</em>.</li>
-              <li><strong>Calendarios agrícolas:</strong> Influencia de cultivos de arroz en la proliferación estacional de vectores.</li>
+            <ul style="padding-left: 20px; color: var(--muted); font-size: 13px; margin: 0; line-height: 1.7;">
+              <li>Generación paralela de rollouts en clusters de cómputo.</li>
+              <li>Entrenamiento de arquitectura U-Net (32-64-128-256) con pérdida combinada MSE + soft-Dice.</li>
+              <li>Validación estricta de curvas de calibración frente al ABM base.</li>
             </ul>
           </div>
 
           <div class="card">
-            <div class="row-between" style="margin-bottom: 16px;">
-              <h3 style="font-size: 19px;">Vulnerabilidad y Exposición</h3>
-              <span class="tag">Demográfico & Sanitario</span>
+            <div class="row-between" style="margin-bottom: 14px;">
+              <h3 style="font-size: 18px;">2. Fase de Producción Operativa (U-Net)</h3>
+              <span class="pill">100× Más Rápido</span>
             </div>
-            <p style="color: var(--muted); font-size: 14px; margin-bottom: 16px;">
-              Factores humanos que modulan el impacto real y la eficacia de las medidas preventivas:
+            <p style="color: var(--muted); font-size: 14px; line-height: 1.6; margin-bottom: 16px;">
+              En producción, la U-Net entrenada reemplaza la simulación pesada del ABM. Puede generar mapas de riesgo mensuales en milisegundos y evaluar miles de combinaciones de intervención en tiempo real.
             </p>
-            <ul style="padding-left: 20px; color: var(--muted); font-size: 14px; margin: 0; line-height: 1.8;">
-              <li><strong>Movilidad por fases:</strong> Desplazamientos humanos y ganaderos diurnos/nocturnos que alteran el contacto vector-hospedador.</li>
-              <li><strong>Resistencia a insecticidas:</strong> Mutaciones de insensibilidad y desintoxicación metabólica que reducen el efecto del rociado IRS.</li>
-              <li><strong>Cascada de efectividad:</strong> Tasa real de uso y durabilidad física de mosquiteros tratados (ITN IG2).</li>
+            <ul style="padding-left: 20px; color: var(--muted); font-size: 13px; margin: 0; line-height: 1.7;">
+              <li>Inferencia ágil para la toma de decisiones sobre el terreno.</li>
+              <li>Exploración interactiva de presupuestos de rociado IRS y mosquiteros.</li>
+              <li>Integración directa mediante endpoints REST en el servidor de producción.</li>
             </ul>
           </div>
         </div>
@@ -1236,8 +1244,8 @@
               <h3>Comportamiento Biológico Avanzado y Resistencia a Insecticidas <span class="tag" style="margin-left: 8px;">En proceso</span></h3>
               <p>
                 • <strong>Soporte Multi-Especie de Vectores</strong>: Integración de 4 especies de <em>Anopheles</em> (*coluzzii*, *gambiae*, *arabiensis*, *funestus*) con óptimos térmicos y hábitats específicos.
-                <br />• <strong>Resistencia a Insecticidas</strong>: Modelado genético y metabólico de resistencia a piretroides que reduce la efectividad de mosquiteros e IRS.
-                <br />• <strong>Movilidad Espacial por Fases</strong>: Matrices de movilidad humana y ganadera diurna/nocturna agregadas a la grilla territorial.
+                <br>• <strong>Resistencia a Insecticidas</strong>: Modelado genético y metabólico de resistencia a piretroides que reduce la efectividad de mosquiteros e IRS.
+                <br>• <strong>Movilidad Espacial por Fases</strong>: Matrices de movilidad humana y ganadera diurna/nocturna agregadas a la grilla territorial.
               </p>
             </div>
             <span class="pull meta">Modelado</span>
@@ -1286,7 +1294,7 @@
 
         <div class="grid-4">
           <div class="card">
-            <h3 style="font-size: 17px; margin-bottom: 8px;">Epidemiología & Entomología</h3>
+            <h3 style="font-size: 17px; margin-bottom: 8px;">Epidemiología &amp; Entomología</h3>
             <p style="font-size: 13px; color: var(--muted); margin: 0; line-height: 1.5;">
               Ajuste de parámetros biológicos de vectores, frecuencias de resistencia a insecticidas y curvas de picadura.
             </p>
@@ -1300,14 +1308,14 @@
           </div>
 
           <div class="card">
-            <h3 style="font-size: 17px; margin-bottom: 8px;">Machine Learning & Simulación</h3>
+            <h3 style="font-size: 17px; margin-bottom: 8px;">Machine Learning &amp; Simulación</h3>
             <p style="font-size: 13px; color: var(--muted); margin: 0; line-height: 1.5;">
               Entrenamiento de emuladores U-Net, paralelización en C++ y algoritmos de optimización bayesiana para políticas de salud.
             </p>
           </div>
 
           <div class="card">
-            <h3 style="font-size: 17px; margin-bottom: 8px;">Diseño & Producto</h3>
+            <h3 style="font-size: 17px; margin-bottom: 8px;">Diseño &amp; Producto</h3>
             <p style="font-size: 13px; color: var(--muted); margin: 0; line-height: 1.5;">
               Diseño de experiencia para la plataforma interactiva Centinela, visualización cartográfica de riesgo y accesibilidad.
             </p>
@@ -1318,7 +1326,7 @@
         <div class="card-rule">
           <div class="grid-3" style="margin-top: 8px;">
             <div>
-              <span class="meta">Paso 1 · Clonar & Sincronizar</span>
+              <span class="meta">Paso 1 · Clonar &amp; Sincronizar</span>
               <p style="font-size: 14px; margin-top: 4px; color: var(--muted);">
                 Clonar el repositorio y sincronizar dependencias de forma reproducible con <code>uv sync --all-packages</code>.
               </p>
@@ -1348,8 +1356,8 @@
           Proyecto 100% abierto bajo licencia MIT. Código, planes de desarrollo y documentación técnica accesibles para toda la comunidad.
         </p>
         <div class="row" style="justify-content: center; gap: 12px; flex-wrap: wrap;">
-          <a href="https://github.com/MalariaSentinel" class="btn btn-primary">Ver repositorio en GitHub</a>
-          <a href="https://github.com/MalariaSentinel/discussions" class="btn btn-secondary">Unirse a la discusión</a>
+          <a href="https://github.com/ANFAIA/MalariaSentinel" class="btn btn-primary">Ver repositorio en GitHub</a>
+          <a href="https://github.com/ANFAIA/MalariaSentinel/discussions" class="btn btn-secondary">Unirse a la discusión</a>
         </div>
       </div>
     </section>
@@ -1367,13 +1375,14 @@
           </p>
         </div>
         <div class="row" style="gap: 20px; font-size: 13px; flex-wrap: wrap;">
+          <a href="#metodologia" style="color: var(--muted);">Metodología</a>
+          <a href="#arquitectura" style="color: var(--muted);">Arquitectura</a>
           <a href="#avances" style="color: var(--muted);">Avances</a>
           <a href="#configurador-abm" style="color: var(--muted);">Configurador ABM</a>
-          <a href="#arquitectura" style="color: var(--muted);">Arquitectura</a>
           <a href="#emulador-unet" style="color: var(--muted);">U-Net</a>
-          <a href="#metodologia" style="color: var(--muted);">Metodología</a>
           <a href="#hoja-de-ruta" style="color: var(--muted);">Hoja de ruta</a>
-          <a href="https://github.com/MalariaSentinel" style="color: var(--muted);">Licencia MIT</a>
+          <a href="#colaborar" style="color: var(--muted);">Colaborar</a>
+          <a href="https://github.com/ANFAIA/MalariaSentinel" style="color: var(--muted);">Licencia MIT</a>
         </div>
       </div>
     </div>
@@ -1886,5 +1895,6 @@
     })();
   </script>
 
-</body>
-</html>
+
+
+</body></html>
