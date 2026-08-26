@@ -122,21 +122,30 @@
       align-items: center;
       justify-content: space-between;
       padding-block: 14px;
+      gap: var(--gap-md);
       position: relative;
     }
-    .topnav .brand-group { display: flex; align-items: center; gap: 10px; }
-    .topnav .logo { font-family: var(--font-display); font-size: 20px; font-weight: 700; letter-spacing: -0.01em; color: var(--fg); }
+    .topnav .brand-group { display: flex; align-items: center; }
+    .topnav .logo {
+      font-family: var(--font-display);
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      color: var(--fg);
+      text-decoration: none;
+    }
     
     .nav-links-desktop {
       display: flex;
       align-items: center;
-      gap: 20px;
+      gap: 22px;
     }
     .nav-links-desktop a {
       font-size: 14px;
       color: var(--muted);
       transition: color 0.15s ease;
       font-weight: 500;
+      text-decoration: none;
     }
     .nav-links-desktop a:hover { color: var(--fg); }
 
@@ -534,20 +543,20 @@
   <header class="topnav" data-od-id="topnav">
     <div class="container topnav-inner">
       <div class="brand-group">
-        <span class="logo">MalariaSentinel</span>
-        <span class="pill"><span class="pill-dot"></span> Open Source · SDSS</span>
+        <a href="#" class="logo">MalariaSentinel</a>
       </div>
       
       <!-- Desktop Menu -->
       <nav class="nav-links-desktop" aria-label="Navegación principal">
         <a href="#metodologia">Metodología</a>
         <a href="#arquitectura">Arquitectura</a>
-        <a href="#avances">Avances</a>
-        <a href="#configurador-abm">Configurador ABM</a>
-        <a href="#emulador-unet">Emulador U-Net</a>
+        <a href="#configurador-abm">Configurador</a>
         <a href="#hoja-de-ruta">Hoja de ruta</a>
         <a href="#colaborar">Colaborar</a>
-        <a href="https://github.com/ANFAIA/MalariaSentinel" class="btn btn-secondary" style="padding: 6px 14px; font-size: 13px;">GitHub</a>
+        <a href="https://github.com/ANFAIA/MalariaSentinel" target="_blank" rel="noopener" class="btn btn-secondary" style="padding: 6px 14px; font-size: 13px; display: inline-flex; align-items: center; gap: 6px;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path></svg>
+          GitHub
+        </a>
       </nav>
 
       <!-- Mobile Hamburger Button -->
@@ -557,14 +566,12 @@
 
       <!-- Mobile Drawer Menu -->
       <div class="mobile-drawer" id="mobileDrawer">
-        <a href="#metodologia" class="mobile-nav-link">Metodología Científica</a>
-        <a href="#arquitectura" class="mobile-nav-link">Arquitectura (mal-core)</a>
-        <a href="#avances" class="mobile-nav-link">Avances y Estado</a>
-        <a href="#configurador-abm" class="mobile-nav-link">Configurador &amp; Diagrama Interactivo</a>
-        <a href="#emulador-unet" class="mobile-nav-link">Emulador Neuronal U-Net</a>
-        <a href="#hoja-de-ruta" class="mobile-nav-link">Hoja de Ruta (Orden de Ejecución)</a>
+        <a href="#metodologia" class="mobile-nav-link">Metodología</a>
+        <a href="#arquitectura" class="mobile-nav-link">Arquitectura Técnica</a>
+        <a href="#configurador-abm" class="mobile-nav-link">Configurador ABM &amp; Emulador</a>
+        <a href="#hoja-de-ruta" class="mobile-nav-link">Hoja de Ruta</a>
         <a href="#colaborar" class="mobile-nav-link">Cómo Colaborar</a>
-        <a href="https://github.com/ANFAIA/MalariaSentinel" class="btn btn-primary" style="margin-top: 8px;">Ver en GitHub</a>
+        <a href="https://github.com/ANFAIA/MalariaSentinel" target="_blank" rel="noopener" class="btn btn-primary" style="margin-top: 8px;">Ver en GitHub</a>
       </div>
     </div>
   </header>
