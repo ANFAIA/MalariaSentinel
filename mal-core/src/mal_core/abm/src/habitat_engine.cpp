@@ -2,15 +2,17 @@
 // habitat_engine.cpp — read the habitat patches gpkg via OGR.
 //
 // The gpkg is a single-layer OGR datasource with one Point feature per
-// patch. The M1.5 thin slice honours `hab_type == 'pluvial_pool'`
-// only. Columns read per feature:
+// patch. The loader accepts both `hab_type == 'pluvial_pool'` and
+// `hab_type == 'permanent_water'`; the subtype is captured in the
+// `is_permanent` flag. Columns read per feature:
 //
-//   * `hab_type`  (string) — filter to 'pluvial_pool' (others skipped)
-//   * `K`         (int32)  — carrying capacity, default = K_MAX
-//   * `twi_value` (float)  — static TWI value, default = 0
-//   * `row`       (int32)  — pre-computed cell row (F1.3b build_env)
-//   * `col`       (int32)  — pre-computed cell col (F1.3b build_env)
-//   * geometry    (Point)  — EPSG:4326 lon/lat
+//   * `hab_type`    (string) — accepted: 'pluvial_pool' or 'permanent_water'
+//   * `is_permanent` (int32) — optional, defaults to 0; 1 if hab_type is 'permanent_water'
+//   * `K`           (int32)  — carrying capacity, default = K_MAX
+//   * `twi_value`   (float)  — static TWI value, default = 0
+//   * `row`         (int32)  — pre-computed cell row (F1.3b build_env)
+//   * `col`         (int32)  — pre-computed cell col (F1.3b build_env)
+//   * geometry      (Point)  — EPSG:4326 lon/lat
 //
 // The (row, col) columns are read when present and valid; we do not
 // derive them in the thin slice (rasterio::rowcol equivalent would
@@ -163,6 +165,7 @@ void HabitatEngine::load_from_gpkg(const std::string& path,
     const int twi_idx      = FieldIndex(fdefn, "twi_value");
     const int row_idx      = FieldIndex(fdefn, "row");
     const int col_idx      = FieldIndex(fdefn, "col");
+    const int permanent_idx = FieldIndex(fdefn, "is_permanent");
     if (hab_type_idx < 0) {
         // No hab_type column: every feature is treated as pluvial_pool
         // (M1 only honours that subtype anyway, and the Python loader
@@ -181,13 +184,11 @@ void HabitatEngine::load_from_gpkg(const std::string& path,
          raw_feat = OGR_L_GetNextFeature(layer)) {
         FeatureDestroyer feat(raw_feat);
 
-        // Filter to hab_type == 'pluvial_pool'. If the column is
-        // missing, we accept every feature (M1.5 honours only that
-        // subtype, so the M1.5 gpkg without hab_type is implicitly
-        // all-pools).
+        // Accept temporary and permanent aquatic habitat. Legacy files
+        // without hab_type remain implicitly pluvial pools.
         if (hab_type_idx >= 0) {
             const std::string ht = GetStringField(feat.f, hab_type_idx);
-            if (ht != "pluvial_pool") continue;
+            if (ht != "pluvial_pool" && ht != "permanent_water") continue;
         }
         ++pluvial_pool_seen;
 
@@ -233,6 +234,7 @@ void HabitatEngine::load_from_gpkg(const std::string& path,
         patch.lon             = lon;
         patch.lat             = lat;
         patch.hab_pluvial_pool = true;
+        patch.is_permanent = GetIntField(feat.f, permanent_idx, 0) != 0;
 
         const int64_t new_idx = static_cast<int64_t>(patches_.size());
         id_to_idx_.emplace(patch.patch_id, new_idx);

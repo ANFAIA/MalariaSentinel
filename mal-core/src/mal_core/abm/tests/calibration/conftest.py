@@ -56,7 +56,7 @@ CPP_BINARY_DEFAULT = MAL_ABM_FAST_DIR / "build" / "src" / "mal_abm_fast"
 # Use manifest-based resolution instead of hardcoded paths.
 # The NC file is the primary env; the old TIF is a fallback.
 GHANA_ENV_PATH = _REPO_ROOT / "data" / "ghana" / "ghana_regional_2024_2025_env.nc"
-GHANA_HABITAT_PATH = _REPO_ROOT / "data" / "ghana" / "ghana_regional_2018_06_habitat_patches.gpkg"
+GHANA_HABITAT_PATH = _REPO_ROOT / "data" / "ghana" / "ghana_habitat_patches.gpkg"
 
 CALIBRATION_TIER_ENV = "CALIBRATION_TIER"
 """Env var selecting the test tier: ``fast`` (default) or ``full``."""

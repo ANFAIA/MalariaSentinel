@@ -261,11 +261,13 @@ struct PatchState {
     float   pool_water_mm = 0.0f;     // current pool water depth (mm)
     int     pool_days_dry = 0;        // consecutive dry days
     float   salinity_ppt  = 0.0f;     // env water salinity (psu); 0 = freshwater
+    bool    is_permanent  = false;    // permanent water; bypasses drying
 };
 
 // A single habitat patch loaded from the gpkg. Carries the cell (row, col),
 // the carrying capacity K, the (static) TWI value, and a flag for the
-// patch subtype. M1 only honours hab_type == "pluvial_pool".
+// patch subtype. The loader accepts both hab_type == "pluvial_pool" and
+// hab_type == "permanent_water"; the subtype is captured in is_permanent.
 //
 // Note: this struct is forward-declared in habitat_engine.hpp; the
 // canonical definition lives in wire.hpp to keep all shared data types
@@ -280,6 +282,7 @@ struct HabitatPatch {
     double  lon       = 0.0;   // EPSG:4326 deg
     double  lat       = 0.0;   // EPSG:4326 deg
     bool    hab_pluvial_pool = true;
+    bool    is_permanent = false;     // explicit hydrologic permanence
 };
 
 // Two-band density grid (mosquitoes / K_MAX, clipped to [0, 1]).

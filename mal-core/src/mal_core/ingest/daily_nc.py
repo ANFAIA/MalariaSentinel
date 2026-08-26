@@ -333,18 +333,26 @@ def build_daily_env_nc(
             {"long_name": "SMAP RSS L3 monthly sea surface salinity (broadcast)",
              "units": "psu"},
         )
+    # M12 component masks: one NC variable per contributing source
+    # (e.g. m12_jrc_permanent_water, m12_permanent_lakes, m12_permanent_rivers,
+    #  m12_worldcover_permanent_water). Currently Ghana only contributes
+    # jrc_permanent_water; the others activate when their TIFs land. These
+    # are diagnostic — the C++ ABM reader does not consume them today.
     for name, component in component_masks.items():
         ds[f"m12_{name}"] = (
             ["time", "y", "x"], np.broadcast_to(component, (n_days, h, w)).copy(),
             {"long_name": f"M12 {name} mask", "units": "1"},
         )
 
-    # Optional diagnostic variables (C++ reader ignores them via GDAL)
+    # Canonical permanent water mask — the one the ABM actually consumes.
+    # Built from the union of all M12 component masks (max() across sources)
+    # so adding HydroLAKES / WorldCover enrichment is additive and backward
+    # compatible.
     if permanent_water_mask is not None:
         pw_broadcast = np.broadcast_to(permanent_water_mask, (n_days, h, w)).copy()
         ds["permanent_water_mask"] = (
             ["time", "y", "x"], pw_broadcast,
-            {"long_name": "Permanent water mask (JRC GSW ≥95%)", "units": "1"},
+            {"long_name": "Permanent water mask (union of M12 component sources)", "units": "1"},
         )
 
 
