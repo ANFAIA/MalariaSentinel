@@ -252,6 +252,7 @@ void HostLandscape::load_from_nc(const std::string& path, const AOI& aoi) {
                                      ? c.building_fraction
                                      : c.indoor_fraction * 0.8f;
         c.urbanicity           = urban_class_to_urbanicity(uc);
+        c.urban_class          = static_cast<int32_t>(uc);
     }
     has_data_ = true;
 }

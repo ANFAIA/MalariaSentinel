@@ -228,9 +228,21 @@ MosquitoSubmodel::MosquitoSubmodel(int32_t n_patches, int32_t k_per_patch,
             soa_.last_patch_update_row.push_back(0);
             soa_.last_patch_update_col.push_back(0);
         }
-        // Eggs in cohort bank
+        // Stagger egg development while preserving the legacy egg count.
+        // Seeding every egg at age zero creates an artificial emergence wave.
         if (n_eggs > 0) {
-            cohort_bank_.add_eggs(p, n_eggs);
+            const int64_t n0 = n_eggs / 5;
+            const int64_t n1 = n_eggs / 5;
+            const int64_t n2 = n_eggs / 5;
+            const int64_t n3 = n_eggs / 5;
+            const int64_t n4 = n_eggs - n0 - n1 - n2 - n3;
+            // Distinct instar keys keep these egg cohorts independent; egg
+            // instar is ignored by promotion and does not change biology.
+            cohort_bank_.seed_stage(p, AquaticStage::EGG, 0, n0, 0.00f);
+            cohort_bank_.seed_stage(p, AquaticStage::EGG, 1, n1, 0.20f);
+            cohort_bank_.seed_stage(p, AquaticStage::EGG, 2, n2, 0.40f);
+            cohort_bank_.seed_stage(p, AquaticStage::EGG, 3, n3, 0.60f);
+            cohort_bank_.seed_stage(p, AquaticStage::EGG, 4, n4, 0.80f);
         }
         total_adults += n_adults;
         total_eggs += n_eggs;

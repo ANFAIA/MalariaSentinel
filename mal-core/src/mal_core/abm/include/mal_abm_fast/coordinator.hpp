@@ -50,6 +50,7 @@
 // The facade in `src/main.cpp` orchestrates the 6 steps in a loop.
 #pragma once
 
+#include <array>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
@@ -62,6 +63,7 @@
 #include "aoi.hpp"
 #include "climate.hpp"
 #include "habitat_engine.hpp"
+#include "host_landscape.hpp"
 #include "pool_hydrology.hpp"
 #include "prng.hpp"
 #include "seeding.hpp"
@@ -124,7 +126,23 @@ public:
     // passes the active species' `salinity_hi_tol_ppt` during wiring;
     // default = coluzzii 30.0 psu (freshwater runs are unchanged).
     void set_salinity_hi_tol_ppt(float ppt) { salinity_hi_tol_ppt_ = ppt; }
+    void set_host_landscape(const HostLandscape* hosts) { host_landscape_ = hosts; }
     float salinity_hi_tol_ppt() const { return salinity_hi_tol_ppt_; }
+
+    // Urban rule setters (plan §6.3-6.6). All values have constexpr
+    // defaults in wire.hpp; these setters let calibration override them
+    // without recompiling.
+    void set_urban_b_min(float v)             { urban_b_min_ = v; }
+    void set_urban_r_min_mm(float v)          { urban_r_min_mm_ = v; }
+    void set_urban_twi_min(float v)           { urban_twi_min_ = v; }
+    void set_urban_density_cap(float v)       { urban_density_cap_ = v; }
+
+    // Update the trailing 7-day antecedent rainfall buffer. Called once
+    // per step() by the Engine with today's per-cell rainfall vector.
+    // The buffer holds the last 7 days (inclusive of today).
+    void update_rain_antecedent(const std::vector<float>& today_rain_mm);
+    // Sum of the trailing 7-day rainfall buffer at (row, col), in mm.
+    float rain_7d_at(int32_t row, int32_t col) const;
 
     // Update patch.activated from climate. For M1 with monthly env,
     // day is constant per month and may be ignored. The
@@ -193,6 +211,17 @@ private:
     std::vector<PatchState>                   cached_states_;  // per-day snapshot
     // Species salinity high-tolerance (psu); default = coluzzii 30.0.
     float                                     salinity_hi_tol_ppt_ = 30.0f;
+    const HostLandscape*                      host_landscape_ = nullptr;
+    // Urban rule config (plan §6.3-6.6); overridable via setters.
+    float                                     urban_b_min_      = URBAN_B_MIN;
+    float                                     urban_r_min_mm_   = URBAN_R_MIN_MM;
+    float                                     urban_twi_min_    = URBAN_TWI_MIN;
+    float                                     urban_density_cap_= URBAN_DENSITY_CAP_FRACTION;
+    // Trailing 7-day per-cell rainfall buffer (plan §6.3 antecedent_rain_7d).
+    // Outer dim = day-slot (0=today, 6=6-days-ago); inner dim = row-major cells.
+    // Slots are circular: oldest slot overwritten each update_rain_antecedent().
+    std::array<std::vector<float>, 7>         rain_7d_buffer_{};
+    int32_t                                   rain_7d_count_    = 0;
     // Pool hydrology (M14): per-patch water state, keyed by patch_id.
     std::unordered_map<int64_t, PoolState>     pool_states_;
 };

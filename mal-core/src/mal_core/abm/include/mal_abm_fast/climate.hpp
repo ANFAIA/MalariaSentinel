@@ -72,6 +72,7 @@ public:
     // salinity data was loaded (TIF path, or a pre-salinity NC), every
     // cell reads 0.0 — the salinity factor is inert, as before.
     float salinity_at(int32_t row, int32_t col) const;
+    float permanent_water_at(int32_t row, int32_t col) const;
 
     // TWI grid (per-cell, static). Setter is for the habitat engine
     // (it loads TWI from the gpkg) or the loader (it reads a
@@ -111,6 +112,7 @@ private:
     std::vector<float>   water_;
     std::vector<float>   ndvi_;
     std::vector<float>   salinity_; // psu; empty = freshwater everywhere
+    std::vector<float>   permanent_water_;
     std::vector<float>   twi_;      // optional 5th band; empty = zeros
     // Daily NC state - shared across threads via shared_ptr
     std::shared_ptr<std::vector<float>>   rain_nc_;      // n_days * h * w
@@ -118,6 +120,7 @@ private:
     std::shared_ptr<std::vector<float>>   water_frac_nc_;// n_days * h * w
     std::shared_ptr<std::vector<float>>   ndvi_nc_;      // n_days * h * w
     std::shared_ptr<std::vector<float>>   salinity_nc_;  // n_days * h * w (psu)
+    std::shared_ptr<std::vector<float>>   permanent_water_nc_; // optional mask
     int32_t              n_days_ = 1;
     int32_t              cur_day_ = 0;
 };

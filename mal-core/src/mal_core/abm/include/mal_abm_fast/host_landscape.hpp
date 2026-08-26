@@ -34,6 +34,7 @@ struct HostCell {
     float indoor_fraction      = 0.5f;   // 0.72 for urban, 0.30 for rural (gambiae)
     float residential_fraction = 0.5f;
     float urbanicity           = 0.0f;   // 1.0 = urban, 0.0 = rural
+    int32_t urban_class        = 0;      // GHS-SMOD (30=urban, 50=rural, 0=unset)
 };
 
 /// Grid-wide host density landscape.  Loads from `host_static.nc` or

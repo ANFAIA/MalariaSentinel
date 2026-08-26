@@ -147,6 +147,7 @@ Engine::Engine(AOI aoi,
         host_landscape_->load_from_nc(hosts_path, aoi_);
         std::cout << "Engine: loaded HostLandscape from " << hosts_path << "\n";
     }
+    if (host_landscape_) coord_->set_host_landscape(host_landscape_.get());
     if (!mobility_dir.empty()) {
         mobility_schedule_ = std::make_unique<MobilitySchedule>();
         mobility_schedule_->load_from_directory(mobility_dir, aoi_);
@@ -296,6 +297,7 @@ Engine::Engine(AOI aoi,
         host_landscape_->load_from_nc(hosts_path, aoi_);
         std::cout << "Engine: loaded HostLandscape from " << hosts_path << "\n";
     }
+    if (host_landscape_) coord_->set_host_landscape(host_landscape_.get());
     if (!mobility_dir.empty()) {
         mobility_schedule_ = std::make_unique<MobilitySchedule>();
         mobility_schedule_->load_from_directory(mobility_dir, aoi_);

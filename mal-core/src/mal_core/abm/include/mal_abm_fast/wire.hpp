@@ -167,6 +167,21 @@ inline constexpr float  PLUVIAL_POOL_RAIN_THRESHOLD_MM = 15.0f;
 inline constexpr float  PLUVIAL_POOL_TWI_THRESHOLD  = 8.0f;
 inline constexpr float  PLUVIAL_POOL_WATER_FRAC_MIN = 0.0f;  // strictly > 0
 
+// Urban temporary habitat rule (plan §6.3):
+//   urban_class == 30 AND building_fraction >= B_min AND
+//   (rain >= R_min OR rain_7d >= R7_min) AND (TWI >= TWI_urban_min OR lowland)
+// Plus capacity scaling (plan §6.4):
+//   urban_capacity = base_capacity * f(building_fraction, urban_class)
+// Plus density cap (plan §6.6) to prevent explosion: at most
+// URBAN_DENSITY_CAP_FRACTION of total cells can be urban patches.
+inline constexpr float  URBAN_B_MIN                = 0.05f;   // §6.3
+inline constexpr float  URBAN_R_MIN_MM             = 12.0f;   // §6.3 (mid-range of 10-15)
+inline constexpr float  URBAN_TWI_MIN              = 7.0f;    // §6.3 (mid-range of 6-8)
+inline constexpr int32_t URBAN_CLASS_THRESHOLD      = 30;      // GHS-SMOD urban = 30
+inline constexpr float  URBAN_CAPACITY_FLOOR       = 0.30f;   // §6.4 monotonic, min 30% of base
+inline constexpr float  URBAN_CAPACITY_CEIL        = 1.00f;   // §6.4 monotonic, cap 100% of base
+inline constexpr float  URBAN_DENSITY_CAP_FRACTION = 0.05f;   // §6.6 max 5% of grid cells
+
 // Pool hydrology (M14) — per-patch water-balance model.
 // All water amounts in mm (same units as CHIRPS daily rainfall).
 // Activation: patch is active when water_mm >= POOL_WATER_BREED_MM.
@@ -262,6 +277,11 @@ struct PatchState {
     int     pool_days_dry = 0;        // consecutive dry days
     float   salinity_ppt  = 0.0f;     // env water salinity (psu); 0 = freshwater
     bool    is_permanent  = false;    // permanent water; bypasses drying
+    // Urban capacity factor (plan §6.4): in [URBAN_CAPACITY_FLOOR,
+    // URBAN_CAPACITY_CEIL] for urban-sourced patches; 1.0 for terrain
+    // patches. Currently informational; the per-patch seed path does
+    // not yet consume this — the global k_per_patch_ cap dominates.
+    float   urban_capacity_factor = 1.0f;
 };
 
 // A single habitat patch loaded from the gpkg. Carries the cell (row, col),

@@ -186,7 +186,7 @@ def run_abm_from_manifest(
     if kwargs.get("enable_transmission") or kwargs.get("enable-transmission"):
         trans_log = kwargs.pop("emit_transmission_log", None) or kwargs.pop("transmission_log", None)
         if trans_log is None:
-            trans_log = output_dir / f"{aoi}_abm_seed{seed:04d}_transmission.json"
+            trans_log = output_dir / f"{aoi}_abm_seed{seed:04d}_transmission_daily.json"
         flags["emit_transmission_log"] = str(trans_log)
 
     if hosts_path:

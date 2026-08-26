@@ -346,6 +346,14 @@ DailyEnvBands read_env_nc(const std::string& path, int32_t max_days) {
         out.salinity_ppt = std::move(v);
     }
 
+    if (subdatasets.count("permanent_water_mask") != 0) {
+        out.permanent_water_mask = read_variable("permanent_water_mask");
+        for (float& x : out.permanent_water_mask) {
+            if (!std::isfinite(x) || x < 0.0f) x = 0.0f;
+            else if (x > 1.0f) x = 1.0f;
+        }
+    }
+
     if (out.h <= 0 || out.w <= 0) {
         throw std::runtime_error(
             "env_reader::read_env_nc: dataset has no rasters");

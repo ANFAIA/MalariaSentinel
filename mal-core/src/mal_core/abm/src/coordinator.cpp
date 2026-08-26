@@ -60,6 +60,32 @@ void CoordinatorModel::activate_patches() {
     // becomes a mutable field (e.g. for site-fidelity extensions).
 }
 
+void CoordinatorModel::update_rain_antecedent(
+    const std::vector<float>& today_rain_mm) {
+    const size_t n = today_rain_mm.size();
+    // Shift older slots: oldest is index 6, we drop it.
+    for (int32_t slot = 6; slot > 0; --slot) {
+        rain_7d_buffer_[slot] = std::move(rain_7d_buffer_[slot - 1]);
+    }
+    rain_7d_buffer_[0] = today_rain_mm;  // today = slot 0
+    if (rain_7d_count_ < 7) ++rain_7d_count_;
+}
+
+float CoordinatorModel::rain_7d_at(int32_t row, int32_t col) const {
+    const ClimateEngine* ce = climate_.get();
+    const int32_t W = ce->w();
+    const size_t idx = static_cast<size_t>(row) * static_cast<size_t>(W) +
+                       static_cast<size_t>(col);
+    float sum = 0.0f;
+    const int32_t n = rain_7d_count_;
+    for (int32_t slot = 0; slot < n; ++slot) {
+        if (idx < rain_7d_buffer_[slot].size()) {
+            sum += rain_7d_buffer_[slot][idx];
+        }
+    }
+    return sum;
+}
+
 std::vector<PatchState> CoordinatorModel::to_dataframe() {
     // Use the current day for daily climate lookups.
     // climate_->set_day() is called by the engine step loop before
@@ -90,8 +116,9 @@ std::vector<PatchState> CoordinatorModel::to_dataframe() {
         union_cells.insert({patch.row, patch.col});
     }
 
-    // Dynamic ephemeral pool rule: TWI > 8 AND water_frac > 0 AND
-    // rain > 15mm. Cells satisfying this get a PoolState tracked.
+    // Dynamic ephemeral pool rule: terrain (TWI + water_frac) or urban
+    // (building_fraction + GHS-SMOD urban_class) plus rain. Permanent
+    // water bypasses the rain gate (plan §5.3).
     const std::vector<float> twi = climate_->twi_grid();
     const bool has_twi = (twi.size() == hw);
     for (int32_t r = 0; r < H; ++r) {
@@ -102,10 +129,78 @@ std::vector<PatchState> CoordinatorModel::to_dataframe() {
             const float twi_val = has_twi ? twi[idx] : 0.0f;
             const float water_frac_val = climate_->water_frac_at(r, c);
             const float rain_val = climate_->rain_at(r, c);
-            if (twi_val > PLUVIAL_POOL_TWI_THRESHOLD &&
-                water_frac_val > PLUVIAL_POOL_WATER_FRAC_MIN &&
-                rain_val > PLUVIAL_POOL_RAIN_THRESHOLD_MM) {
+            const float rain_7d_val = rain_7d_at(r, c);
+
+            const bool permanent = climate_->permanent_water_at(r, c) > 0.0f;
+            const bool terrain_candidate = twi_val > PLUVIAL_POOL_TWI_THRESHOLD &&
+                water_frac_val > PLUVIAL_POOL_WATER_FRAC_MIN;
+            // Urban rule per plan §6.3: GHS-SMOD urban (== 30) AND
+            // building_fraction >= B_min AND (rain >= R_min OR
+            // antecedent_rain_7d >= R_min) AND TWI >= TWI_urban_min.
+            // The TWI term uses the urban-specific lower threshold
+            // because drainage is imperfect in built-up cells.
+            bool urban_candidate = false;
+            if (host_landscape_ != nullptr) {
+                const HostCell hc = host_landscape_->at(r, c);
+                urban_candidate = hc.urban_class == URBAN_CLASS_THRESHOLD &&
+                    hc.building_fraction >= urban_b_min_ &&
+                    (rain_val >= urban_r_min_mm_ ||
+                     rain_7d_val >= urban_r_min_mm_) &&
+                    twi_val >= urban_twi_min_;
+            }
+
+            if (permanent || ((terrain_candidate || urban_candidate) &&
+                              rain_val > PLUVIAL_POOL_RAIN_THRESHOLD_MM)) {
                 union_cells.insert({r, c});
+            }
+        }
+    }
+
+    // Urban density cap (plan §6.6): at most URBAN_DENSITY_CAP_FRACTION
+    // of grid cells can be urban-sourced patches. Applied post-loop so
+    // we always pick the highest-building_fraction urban cells first
+    // (deterministic priority — not random sampling, which would make
+    // calibration noisy).
+    const size_t grid_total = static_cast<size_t>(H) * static_cast<size_t>(W);
+    const size_t urban_cap_count = static_cast<size_t>(
+        static_cast<float>(grid_total) * urban_density_cap_);
+    if (urban_cap_count > 0 && host_landscape_ != nullptr) {
+        // Collect urban candidate cells with their building_fraction.
+        std::vector<std::tuple<int32_t, int32_t, float>> urban_cells;
+        for (int32_t r = 0; r < H; ++r) {
+            for (int32_t c = 0; c < W; ++c) {
+                const HostCell hc = host_landscape_->at(r, c);
+                if (hc.urban_class == URBAN_CLASS_THRESHOLD &&
+                    hc.building_fraction >= urban_b_min_) {
+                    const auto cell = std::make_pair(r, c);
+                    if (union_cells.count(cell) > 0) {
+                        urban_cells.emplace_back(r, c,
+                                                 hc.building_fraction);
+                    }
+                }
+            }
+        }
+        if (urban_cells.size() > urban_cap_count) {
+            // Keep top urban_cap_count by building_fraction.
+            std::sort(urban_cells.begin(), urban_cells.end(),
+                      [](const auto& a, const auto& b) {
+                          return std::get<2>(a) > std::get<2>(b);
+                      });
+            std::unordered_set<std::pair<int32_t, int32_t>, PairHash>
+                keep_urbans;
+            for (size_t i = 0; i < urban_cap_count; ++i) {
+                keep_urbans.insert({std::get<0>(urban_cells[i]),
+                                    std::get<1>(urban_cells[i])});
+            }
+            for (auto it = union_cells.begin(); it != union_cells.end(); ) {
+                const HostCell hc = host_landscape_->at(it->first,
+                                                        it->second);
+                if (hc.urban_class == URBAN_CLASS_THRESHOLD &&
+                    keep_urbans.count(*it) == 0) {
+                    it = union_cells.erase(it);
+                } else {
+                    ++it;
+                }
             }
         }
     }
@@ -132,7 +227,18 @@ std::vector<PatchState> CoordinatorModel::to_dataframe() {
         DailyForcing forcing{rain_val, temp_val};
 
         auto pool_it = pool_states_.find(pid);
-        if (pool_it == pool_states_.end()) {
+        const bool pre_existing = (pre_it != pre_rowcol_to_pid.end());
+        const bool is_permanent = pre_existing
+            ? habitat_.patches()[static_cast<size_t>(pid)].is_permanent
+            : climate_->permanent_water_at(cell.first, cell.second) > 0.0f;
+        if (is_permanent) {
+            // Permanent water is not governed by the temporary-pool drying model.
+            PoolState stable;
+            stable.water_mm = POOL_WATER_MAX_MM;
+            stable.days_dry = 0;
+            stable.days_since_fill = 0;
+            pool_states_[pid] = stable;
+        } else if (pool_it == pool_states_.end()) {
             // First day this patch is tracked — initialise from rain.
             PoolState init;
             init.water_mm = rain_val;
@@ -160,11 +266,23 @@ std::vector<PatchState> CoordinatorModel::to_dataframe() {
         // deactivates coastal brackish cells for freshwater-limited
         // species and also disables oviposition site search (which
         // reads ps.activated) at those cells.
-        if (ps.salinity_ppt > salinity_hi_tol_ppt_) {
+        if (ps.salinity_ppt >= salinity_hi_tol_ppt_) {
             ps.activated = false;
         }
         ps.pool_water_mm = pool.water_mm;
         ps.pool_days_dry = pool.days_dry;
+        ps.is_permanent = is_permanent;
+        // Urban capacity scaling (plan §6.4): f(building_fraction) clamped
+        // to [URBAN_CAPACITY_FLOOR, URBAN_CAPACITY_CEIL]. For non-urban
+        // patches the factor stays at 1.0.
+        if (host_landscape_ != nullptr) {
+            const HostCell hc = host_landscape_->at(cell.first, cell.second);
+            if (hc.urban_class == URBAN_CLASS_THRESHOLD) {
+                ps.urban_capacity_factor = std::clamp(
+                    hc.building_fraction, URBAN_CAPACITY_FLOOR,
+                    URBAN_CAPACITY_CEIL);
+            }
+        }
         states.push_back(ps);
     }
 

@@ -132,12 +132,19 @@ void ClimateEngine::load_from_env_nc(const std::string& path,
     } else {
         salinity_nc_.reset();
     }
+    if (!bands.permanent_water_mask.empty()) {
+        permanent_water_nc_ = std::make_shared<std::vector<float>>(
+            std::move(bands.permanent_water_mask));
+    } else {
+        permanent_water_nc_.reset();
+    }
 
     // Populate single-day accessors for day 0 (backwards compat).
     rain_.assign(h_ * w_, 0.0f);
     temp_.assign(h_ * w_, 25.0f);
     water_.assign(h_ * w_, 0.0f);
     ndvi_.assign(h_ * w_, 0.0f);
+    permanent_water_.assign(h_ * w_, 0.0f);
     if (salinity_nc_) {
         salinity_.assign(h_ * w_, 0.0f);
     } else {
@@ -150,6 +157,7 @@ void ClimateEngine::load_from_env_nc(const std::string& path,
         temp_[i]  = (*water_temp_nc_)[i];
         water_[i] = (*water_frac_nc_)[i];
         ndvi_[i]  = (*ndvi_nc_)[i];
+        if (permanent_water_nc_) permanent_water_[i] = (*permanent_water_nc_)[i];
         if (salinity_nc_) salinity_[i] = (*salinity_nc_)[i];
     }
 }
@@ -167,6 +175,7 @@ void ClimateEngine::set_day(int32_t day) {
         temp_[i]  = (*water_temp_nc_)[offset + i];
         water_[i] = (*water_frac_nc_)[offset + i];
         ndvi_[i]  = (*ndvi_nc_)[offset + i];
+        if (permanent_water_nc_) permanent_water_[i] = (*permanent_water_nc_)[offset + i];
         if (salinity_nc_) salinity_[i] = (*salinity_nc_)[offset + i];
     }
 }
@@ -184,12 +193,14 @@ std::shared_ptr<ClimateEngine> ClimateEngine::clone_for_thread() const {
     clone->water_frac_nc_ = water_frac_nc_;
     clone->ndvi_nc_ = ndvi_nc_;
     clone->salinity_nc_ = salinity_nc_;
+    clone->permanent_water_nc_ = permanent_water_nc_;
     
     // Independent single-day arrays (thread-local)
     clone->rain_.assign(h_ * w_, 0.0f);
     clone->temp_.assign(h_ * w_, 25.0f);
     clone->water_.assign(h_ * w_, 0.0f);
     clone->ndvi_.assign(h_ * w_, 0.0f);
+    clone->permanent_water_.assign(h_ * w_, 0.0f);
     if (salinity_nc_) {
         clone->salinity_.assign(h_ * w_, 0.0f);
     } else {
@@ -204,6 +215,7 @@ std::shared_ptr<ClimateEngine> ClimateEngine::clone_for_thread() const {
             clone->temp_[i]  = (*water_temp_nc_)[i];
             clone->water_[i] = (*water_frac_nc_)[i];
             clone->ndvi_[i]  = (*ndvi_nc_)[i];
+            if (permanent_water_nc_) clone->permanent_water_[i] = (*permanent_water_nc_)[i];
             if (salinity_nc_) clone->salinity_[i] = (*salinity_nc_)[i];
         }
     } else {
@@ -218,10 +230,16 @@ std::shared_ptr<ClimateEngine> ClimateEngine::clone_for_thread() const {
         clone->water_ = water_;
         clone->ndvi_  = ndvi_;
         clone->salinity_ = salinity_;
+        clone->permanent_water_ = permanent_water_;
         clone->twi_   = twi_;
     }
 
     return clone;
+}
+
+float ClimateEngine::permanent_water_at(int32_t row, int32_t col) const {
+    if (row < 0 || col < 0 || row >= h_ || col >= w_ || permanent_water_.empty()) return 0.0f;
+    return permanent_water_[static_cast<size_t>(row) * static_cast<size_t>(w_) + static_cast<size_t>(col)];
 }
 
 }  // namespace mal_abm_fast

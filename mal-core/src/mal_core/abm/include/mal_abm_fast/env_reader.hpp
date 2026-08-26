@@ -72,6 +72,7 @@ struct DailyEnvBands {
     std::vector<float>  ndvi;           // [0, 1]
     std::vector<float>  salinity_ppt;   // psu; empty if the NC has no
                                         // salinity_ppt variable (= freshwater)
+    std::vector<float>  permanent_water_mask; // optional 0..1 mask
     int32_t             n_days = 0;
     int32_t             h      = 0;
     int32_t             w      = 0;
