@@ -1144,7 +1144,7 @@
                 <g id="nodeEngine" transform="translate(270, 45)">
                   <rect width="200" height="300" rx="8" fill="var(--surface)" stroke="var(--fg)" stroke-width="2"></rect>
                   <rect width="200" height="32" rx="8" fill="var(--fg-soft)"></rect>
-                  <text x="100" y="21" font-family="var(--font-mono)" font-size="11" font-weight="700" fill="var(--fg)" text-anchor="middle">MOTOR ABM ESTOCÁSTICO</text>
+                  <text x="100" y="21" font-family="var(--font-mono)" font-size="11" font-weight="700" fill="var(--fg)" text-anchor="middle" data-i18n="svg.engine.title">MOTOR ABM ESTOCÁSTICO</text>
                   
                   <!-- Submodule: Ciclo Gonotrófico -->
                   <rect x="12" y="42" width="176" height="40" rx="4" fill="var(--bg)" stroke="var(--border)"></rect>
@@ -1164,7 +1164,7 @@
 
                   <!-- Submodule: Calentamiento & Warmup -->
                   <rect x="12" y="200" width="176" height="36" rx="4" fill="var(--bg)" stroke="var(--border)" id="submoduleWarmup"></rect>
-                  <text x="20" y="216" font-family="var(--font-mono)" font-size="9" font-weight="700" fill="var(--fg)">FASE DE ESTABILIZACIÓN</text>
+                  <text x="20" y="216" font-family="var(--font-mono)" font-size="9" font-weight="700" fill="var(--fg)" data-i18n="svg.sub.warmup">FASE DE ESTABILIZACIÓN</text>
                   <text x="20" y="228" font-family="var(--font-body)" font-size="8" fill="var(--muted)" id="submoduleWarmupText">Equilibrio previo al brote</text>
 
                   <!-- Submodule: Generador de Snapshots -->
@@ -2088,6 +2088,8 @@
           'svg.col1': '1. INPUTS & DATOS', 'svg.col2': '2. MOTOR ABM C++ (mal_core)', 'svg.col3': '3. OUTPUTS GENERADOS',
           'svg.node.env': 'Lluvia, Viento, Temp', 'svg.node.hydro': 'Agua DSwX y Relieve', 'svg.node.hosts': 'HOSPEDADORES', 'svg.node.hostsdesc': 'Población & Ganado', 'svg.node.mobility': 'MOVILIDAD DÍA/NOCHE', 'svg.node.mobilitydesc': 'Desplazamientos OD',
           'svg.sub.bio': 'CICLO BIOLÓGICO', 'svg.sub.biodesc': 'Oviposición, desarrollo y vuelo', 'svg.sub.host': 'ATRACCIÓN HOSPEDADORES', 'svg.sub.hostdesc': 'Preferencia animal vs humano', 'svg.sub.trans': 'TRANSMISIÓN DE MALARIA', 'svg.sub.transdesc': 'Hembras I_V ↔ Humanos I_H',
+          'svg.engine.title': 'MOTOR ABM ESTOCÁSTICO',
+          'svg.sub.warmup': 'FASE DE ESTABILIZACIÓN',
           // U-Net
           'unet.eyebrow': 'EMULACIÓN NEURONAL EFICIENTE',
           'unet.h2': 'Generación masiva de escenarios sin el coste del ABM directo.',
@@ -2248,6 +2250,8 @@
           'svg.col1': '1. INPUTS & DATA', 'svg.col2': '2. C++ ABM ENGINE (mal_core)', 'svg.col3': '3. GENERATED OUTPUTS',
           'svg.node.env': 'Rain, Wind, Temp', 'svg.node.hydro': 'DSwX Water & Relief', 'svg.node.hosts': 'HOSTS', 'svg.node.hostsdesc': 'Population & Livestock', 'svg.node.mobility': 'DAY/NIGHT MOBILITY', 'svg.node.mobilitydesc': 'OD Movements',
           'svg.sub.bio': 'BIOLOGICAL CYCLE', 'svg.sub.biodesc': 'Oviposition, development & flight', 'svg.sub.host': 'HOST ATTRACTION', 'svg.sub.hostdesc': 'Animal vs human preference', 'svg.sub.trans': 'MALARIA TRANSMISSION', 'svg.sub.transdesc': 'Female I_V ↔ Humans I_H',
+          'svg.engine.title': 'STOCHASTIC ABM ENGINE',
+          'svg.sub.warmup': 'STABILISATION PHASE',
           // U-Net
           'unet.eyebrow': 'EFFICIENT NEURAL EMULATION',
           'unet.h2': 'Massive scenario generation without the cost of direct ABM.',
