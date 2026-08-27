@@ -897,6 +897,17 @@
                   </div>
                 </div>
 
+                <!-- Año de Inicio -->
+                <div class="form-group">
+                  <label class="form-label" for="paramYear" data-i18n="config.year.label">Año de Inicio (--year)</label>
+                  <select id="paramYear" class="form-select">
+                    <option value="2024" selected="">2024</option>
+                    <option value="2025">2025</option>
+                    <option value="2026">2026</option>
+                    <option value="2027">2027</option>
+                  </select>
+                </div>
+
                 <!-- Duración, Snapshots y Rollouts -->
                 <div class="grid-2" style="gap: 12px; margin-bottom: 16px;">
                   <div class="form-group" style="margin-bottom: 0;">
@@ -1024,7 +1035,8 @@
 
                 <div class="form-group" style="margin-bottom: 0;">
                   <label class="form-label" for="paramOutputDir" data-i18n="config.outdir.label">Directorio de Salida (--output-dir)</label>
-                  <input type="text" id="paramOutputDir" class="form-input" value="runs/ghana/1year_focal_outbreak">
+                  <input type="text" id="paramOutputDir" class="form-input" value="runs/ghana/2024/365d_focal_outbreak" readonly="" style="background: var(--bg); color: var(--muted); cursor: not-allowed;">
+                  <p class="form-help" data-i18n="config.outdir.help">Generado automáticamente a partir de AOI, año y duración.</p>
                 </div>
 
               </div>
@@ -1466,6 +1478,7 @@
       var paramCustomBbox = document.getElementById('paramCustomBbox');
 
       var paramDays = document.getElementById('paramDays');
+      var paramYear = document.getElementById('paramYear');
       var paramSnapshot = document.getElementById('paramSnapshot');
       var paramRollouts = document.getElementById('paramRollouts');
       var paramSeed = document.getElementById('paramSeed');
@@ -1482,6 +1495,7 @@
       var paramCohortLog = document.getElementById('paramCohortLog');
       var paramGif = document.getElementById('paramGif');
       var paramOutputDir = document.getElementById('paramOutputDir');
+      var currentSlug = 'focal_outbreak';
 
       var cliCommandOutput = document.getElementById('cliCommandOutput');
       var copyCliBtn = document.getElementById('copyCliBtn');
@@ -1556,7 +1570,8 @@
           outbreakCases: 100,
           cohortLog: true,
           gif: true,
-          outputDir: 'runs/ghana/1year_focal_outbreak'
+          year: 2024,
+          slug: 'focal_outbreak'
         },
         'incursion-vectorial': {
           aoi: 'ghana',
@@ -1573,7 +1588,8 @@
           outbreakCases: 50,
           cohortLog: true,
           gif: true,
-          outputDir: 'runs/ghana/vector_incursion'
+          year: 2024,
+          slug: 'vector_incursion'
         },
         'focos-urbanos': {
           aoi: 'ghana',
@@ -1590,7 +1606,8 @@
           outbreakCases: 150,
           cohortLog: true,
           gif: false,
-          outputDir: 'runs/ghana/explicit_foci'
+          year: 2024,
+          slug: 'explicit_foci'
         },
         'calibracion-rapida': {
           aoi: 'ghana',
@@ -1607,7 +1624,8 @@
           outbreakCases: 50,
           cohortLog: true,
           gif: false,
-          outputDir: 'runs/ghana/fast_calib'
+          year: 2024,
+          slug: 'fast_calib'
         },
         'dataset-unet': {
           aoi: 'ghana',
@@ -1624,7 +1642,8 @@
           outbreakCases: 80,
           cohortLog: true,
           gif: false,
-          outputDir: 'runs/ghana/unet_rollouts'
+          year: 2024,
+          slug: 'unet_rollouts'
         }
       };
 
@@ -1664,7 +1683,9 @@
           hasCohortLog = true;
         }
 
-        var outputDir = paramOutputDir.value || 'runs/abm';
+        var year = parseInt(paramYear.value, 10) || 2024;
+        var outputDir = 'runs/' + aoi + '/' + year + '/' + days + 'd_' + currentSlug;
+        paramOutputDir.value = outputDir;
 
         // Toggle transmission sub-options visibility
         transmissionOptions.style.display = hasTrans ? 'flex' : 'none';
@@ -1684,7 +1705,7 @@
           cmd += ' \\\n  --seed ' + seed;
         }
 
-        cmd += ' \\\n  --year 2024 \\\n  --month 1';
+        cmd += ' \\\n  --year ' + year + ' \\\n  --month 1';
         cmd += ' \\\n  --seeding-mode ' + seeding;
 
         if (hasTrans) {
@@ -1863,7 +1884,7 @@
           '<span class="comment"># 1. Descarga de tensores ambientales para ' + aoi + ' (perfiles por defecto)</span><br />',
           '<span class="comment"># 1. Download environmental tensors for ' + aoi + ' (default profiles)</span><br />'
         );
-        warningHtml += '<span class="cmd">uv run malariasim download</span> --aoi ' + aoi + ' --years 2024';
+        warningHtml += '<span class="cmd">uv run malariasim download</span> --aoi ' + aoi + ' --years ' + year;
         warningHtml += '</div>';
 
         warningHtml += '<div class="code-box" style="padding: 8px 12px; font-size: 12px; background: var(--surface);">';
@@ -1871,7 +1892,7 @@
           '<span class="comment"># 2. Ingesta de tensores ambientales ' + (hasHosts ? '+ capas de hospedadores humanos/ganado' : '') + '</span><br />',
           '<span class="comment"># 2. Ingest environmental tensors ' + (hasHosts ? '+ human/livestock host layers' : '') + '</span><br />'
         );
-        warningHtml += '<span class="cmd">uv run malariasim ingest</span> --aoi ' + aoi + ' --year 2024 --month 1 --what ' + (hasHosts ? 'all' : 'env');
+        warningHtml += '<span class="cmd">uv run malariasim ingest</span> --aoi ' + aoi + ' --year ' + year + ' --month 1 --what ' + (hasHosts ? 'all' : 'env');
         warningHtml += '</div>';
 
         if (hasTrans) {
@@ -1906,7 +1927,7 @@
 
       paramCohortLog.addEventListener('change', updatePipeline);
       paramGif.addEventListener('change', updatePipeline);
-      paramOutputDir.addEventListener('input', updatePipeline);
+      paramYear.addEventListener('change', updatePipeline);
 
       // Preset click handler
       presetChips.forEach(function(chip) {
@@ -1933,7 +1954,8 @@
 
             paramCohortLog.checked = pData.cohortLog;
             paramGif.checked = pData.gif;
-            paramOutputDir.value = pData.outputDir;
+            paramYear.value = pData.year;
+            currentSlug = pData.slug;
 
             updatePipeline();
           }
@@ -2059,6 +2081,8 @@
           'config.cohort.label': 'Registrar Censo Diario de Cohortes (--cohort-log)', 'config.cohort.help': 'Registra la evolución diaria de huevos, larvas, pupas y adultos. <strong>Imprescindible para graficar pirámides demográficas y generar animaciones GIF.</strong>',
           'config.gif.label': 'Generar Animación GIF Post-Ejecución (--gif)', 'config.gif.help': 'Genera mapas animados de densidad de mosquitos y propagación de la infección.',
           'config.outdir.label': 'Directorio de Salida (--output-dir)',
+          'config.outdir.help': 'Generado automáticamente a partir de AOI, año y duración.',
+          'config.year.label': 'Año de Inicio (--year)',
           'config.prereq.title': 'Prerrequisitos de Datos & Guía de Configuración',
           'config.cli.title': 'Comando CLI Listo para Terminal', 'config.cli.copy': 'Copiar comando',
           'config.manifest.title': 'Manifiesto de Artefactos de Salida', 'config.manifest.pop': 'GeoTIFFs de Población:', 'config.manifest.mal': 'GeoTIFFs de Malaria:', 'config.manifest.logs': 'Logs Demográficos:', 'config.manifest.gifs': 'Animaciones GIF:',
@@ -2221,6 +2245,8 @@
           'config.cohort.label': 'Log Daily Cohort Census (--cohort-log)', 'config.cohort.help': 'Records daily evolution of eggs, larvae, pupae and adults. <strong>Essential for plotting demographic pyramids and generating GIF animations.</strong>',
           'config.gif.label': 'Generate GIF Animation Post-Run (--gif)', 'config.gif.help': 'Generates animated maps of mosquito density and infection spread.',
           'config.outdir.label': 'Output Directory (--output-dir)',
+          'config.outdir.help': 'Automatically generated from AOI, year and duration.',
+          'config.year.label': 'Start Year (--year)',
           'config.prereq.title': 'Data Prerequisites & Configuration Guide',
           'config.cli.title': 'CLI Command Ready for Terminal', 'config.cli.copy': 'Copy command',
           'config.manifest.title': 'Output Artifact Manifest', 'config.manifest.pop': 'Population GeoTIFFs:', 'config.manifest.mal': 'Malaria GeoTIFFs:', 'config.manifest.logs': 'Demographic Logs:', 'config.manifest.gifs': 'GIF Animations:',
