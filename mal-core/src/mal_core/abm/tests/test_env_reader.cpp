@@ -169,7 +169,11 @@ void WriteSyntheticEnvNC(const fs::path& path, int n_days) {
         const float rain = rain_vals[d % 3];
         const float temp = temp_vals[d % 3];
 
-        std::fill(buf, buf + kH * kW, rain);
+        for (int r = 0; r < kH; ++r) {
+            for (int c = 0; c < kW; ++c) {
+                buf[r * kW + c] = rain + static_cast<float>(r);
+            }
+        }
         ASSERT_EQ(nc_put_vara_float(ncid, vid[0], start, count, buf), NC_NOERR);
 
         std::fill(buf, buf + kH * kW, temp);
@@ -283,15 +287,15 @@ TEST(EnvReader, ReadsDailyNetCDF) {
     EXPECT_EQ(b.water_frac.size(),   static_cast<size_t>(3 * kH * kW));
     EXPECT_EQ(b.ndvi.size(),         static_cast<size_t>(3 * kH * kW));
 
-    // Day 0: rain=20.0 everywhere
-    for (int i = 0; i < kH * kW; ++i)
-        EXPECT_FLOAT_EQ(b.rainfall[0 * kH * kW + i], 20.0f);
-    // Day 1: rain=5.0 everywhere
-    for (int i = 0; i < kH * kW; ++i)
-        EXPECT_FLOAT_EQ(b.rainfall[1 * kH * kW + i], 5.0f);
-    // Day 2: rain=25.0 everywhere
-    for (int i = 0; i < kH * kW; ++i)
-        EXPECT_FLOAT_EQ(b.rainfall[2 * kH * kW + i], 25.0f);
+    // Vertical gradients verify NetCDF rows remain aligned with producer
+    // row-major order after GDAL's north-up conversion.
+    for (int d = 0; d < 3; ++d) {
+        const float base = d == 0 ? 20.0f : (d == 1 ? 5.0f : 25.0f);
+        for (int r = 0; r < kH; ++r)
+            for (int c = 0; c < kW; ++c)
+                EXPECT_FLOAT_EQ(b.rainfall[d * kH * kW + r * kW + c],
+                                base + static_cast<float>(r));
+    }
 
     // Water temp in °C (NO Mordecai inverse applied)
     // Day 0: 25.0, Day 1: 20.0, Day 2: 30.0
@@ -357,9 +361,11 @@ TEST(EnvReader, NetCDFSingleDay) {
     EXPECT_EQ(b.h, kH);
     EXPECT_EQ(b.w, kW);
     EXPECT_EQ(b.rainfall.size(), static_cast<size_t>(kH * kW));
-    // Day 0: rain=20.0
-    for (int i = 0; i < kH * kW; ++i)
-        EXPECT_FLOAT_EQ(b.rainfall[i], 20.0f);
+    // Day 0: vertical gradient starts at 20.0 in producer row order.
+    for (int r = 0; r < kH; ++r)
+        for (int c = 0; c < kW; ++c)
+            EXPECT_FLOAT_EQ(b.rainfall[r * kW + c],
+                            20.0f + static_cast<float>(r));
 
     fs::remove(path);
 }

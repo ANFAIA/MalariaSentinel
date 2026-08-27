@@ -93,7 +93,8 @@ def make_transmission_frame(
     d_vis[~land_mask | (d_vis <= 0)] = np.nan
 
     ax_map.set_facecolor("#0f172a")  # Dark slate background
-    im = ax_map.imshow(d_vis, cmap=cmap, norm=map_norm, origin="lower")
+    # Raster row 0 is the northern edge; keep geographic north at top.
+    im = ax_map.imshow(d_vis, cmap=cmap, norm=map_norm, origin="upper")
 
     # Current snapshot metadata
     curr_meta_idx = all_days.index(current_day) if current_day in all_days else 0

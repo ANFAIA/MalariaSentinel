@@ -24,8 +24,10 @@
 
 #include "env_reader.hpp"
 
+#include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstddef>
 #include <cstring>
 #include <stdexcept>
 #include <string>
@@ -87,6 +89,21 @@ BandRead ReadBand(GDALRasterBandH band) {
             + CPLGetLastErrorMsg());
     }
     return out;
+}
+
+// GDAL's netCDF driver exposes an index-ordered y dimension from south to
+// north as a north-up raster, so RasterIO returns the vertical order reversed
+// relative to the row-major arrays written by daily_nc.py. Restore the
+// producer's row order before the ABM aligns climate cells with habitat rows.
+void FlipVertical(BandRead& band) {
+    for (int32_t row = 0; row < band.h / 2; ++row) {
+        const int32_t other = band.h - 1 - row;
+        auto first = band.data.begin() +
+            static_cast<std::ptrdiff_t>(row) * band.w;
+        auto second = band.data.begin() +
+            static_cast<std::ptrdiff_t>(other) * band.w;
+        std::swap_ranges(first, first + band.w, second);
+    }
 }
 
 // Apply the Mordecai inverse element-wise to `v` in place.
@@ -301,6 +318,7 @@ DailyEnvBands read_env_nc(const std::string& path, int32_t max_days) {
         std::vector<float> result;
         for (int i = 1; i <= bands_to_read; ++i) {
             BandRead br = ReadBand(GDALGetRasterBand(ds, i));
+            FlipVertical(br);
             if (out.h == 0) { out.h = br.h; out.w = br.w; }
             else if (out.h != br.h || out.w != br.w) {
                 throw std::runtime_error(

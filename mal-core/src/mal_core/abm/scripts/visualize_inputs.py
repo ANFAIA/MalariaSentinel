@@ -58,7 +58,7 @@ def plot_host_panel(ds: xr.Dataset, output: Path) -> None:
 
         if var == "urban_class":
             # categorical
-            im = ax.imshow(arr, cmap=cmap, origin="lower", interpolation="nearest")
+            im = ax.imshow(arr, cmap=cmap, origin="upper", interpolation="nearest")
         else:
             # continuous, log scale if range > 1 order of magnitude
             nz = arr[~np.isnan(arr) & (arr > 0)]
@@ -68,7 +68,7 @@ def plot_host_panel(ds: xr.Dataset, output: Path) -> None:
             else:
                 norm = mcolors.Normalize(vmin=np.nanpercentile(arr, 1),
                                          vmax=np.nanpercentile(arr, 99))
-            im = ax.imshow(arr, cmap=cmap, origin="lower", norm=norm)
+            im = ax.imshow(arr, cmap=cmap, origin="upper", norm=norm)
 
         ax.set_title(title, fontsize=13)
         fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
@@ -104,7 +104,7 @@ def make_climate_frame(
     ]
 
     for ax, data, title, cmap, norm in panels:
-        im = ax.imshow(data, cmap=cmap, origin="lower", norm=norm)
+        im = ax.imshow(data, cmap=cmap, origin="upper", norm=norm)
         ax.set_title(title, fontsize=13)
         fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
         ax.set_axis_off()

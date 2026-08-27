@@ -66,7 +66,8 @@ def make_vector_frame(
     d_vis[d_vis <= 0] = np.nan
 
     ax_map.set_facecolor("#0f172a")  # Dark slate background for maximum glow contrast
-    im = ax_map.imshow(d_vis, cmap=cmap, norm=density_norm, origin="lower")
+    # Raster row 0 is the northern edge; keep geographic north at top.
+    im = ax_map.imshow(d_vis, cmap=cmap, norm=density_norm, origin="upper")
 
     active_foci = int(np.count_nonzero(density > 0))
     adult_count = 0
