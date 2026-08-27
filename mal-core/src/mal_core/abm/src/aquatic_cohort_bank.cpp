@@ -269,8 +269,26 @@ void AquaticCohortBank::larva_mortality_density(
     for (auto& c : cohorts_) {
         if (c.count <= 0 || c.stage != AquaticStage::LARVA) continue;
         const int64_t N = larva_per_patch[c.patch_id];
-        double p = static_cast<double>(LARVA_BH_S0) * K /
-            (K + static_cast<double>(overrides.larva_bh_alpha) * static_cast<double>(N));
+        // M17.4 PR-C: per-patch K_eff from the host landscape grid
+        // (built once by CoordinatorModel::build_K_eff_grid()). Urban
+        // cells have K_eff in [0.30, 1.00] (plan §6.4); terrain cells
+        // have K_eff = 1.0 (equivalent to the legacy K_MAX). The
+        // lookup uses the cohort's patch_id via cell_id (resolved in
+        // patch_to_cell). If the view is empty (legacy wiring), K_eff
+        // = 1.0 and behaviour matches the pre-PR-C code exactly.
+        double K_eff = 1.0;
+        int32_t r = 0, col = 0;
+        if (patch_to_cell(c.patch_id, patch_states, r, col) &&
+            K_eff_data_ != nullptr &&
+            r >= 0 && r < K_eff_H_ && col >= 0 && col < K_eff_W_) {
+            K_eff = static_cast<double>(
+                K_eff_data_[static_cast<size_t>(r) *
+                                static_cast<size_t>(K_eff_W_) +
+                            static_cast<size_t>(col)]);
+        }
+        const double K_patch = K * K_eff;
+        double p = static_cast<double>(LARVA_BH_S0) * K_patch /
+            (K_patch + static_cast<double>(overrides.larva_bh_alpha) * static_cast<double>(N));
         // Independent salinity suitability multiplier (Fase 6).
         auto it = salinity_by_patch.find(c.patch_id);
         const float psu = (it == salinity_by_patch.end()) ? 0.0f : it->second;

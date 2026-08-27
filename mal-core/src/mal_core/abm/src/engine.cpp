@@ -148,6 +148,18 @@ Engine::Engine(AOI aoi,
         std::cout << "Engine: loaded HostLandscape from " << hosts_path << "\n";
     }
     if (host_landscape_) coord_->set_host_landscape(host_landscape_.get());
+    // M17.4 PR-C: build the per-cell K_eff grid once from the static
+    // host data, then pass a non-owning view to the cohort bank so
+    // `larva_mortality_density` can apply per-patch Beverton-Holt
+    // capacity scaling. No-op when host_landscape_ is null.
+    if (host_landscape_ && coord_) {
+        coord_->build_K_eff_grid();
+        const auto v = coord_->k_eff_grid_view();
+        if (v.data != nullptr && v.width > 0 && v.height > 0 && sub_) {
+            sub_->cohort_bank_mutable().set_K_eff_view(
+                v.data, v.width, v.height);
+        }
+    }
     if (!mobility_dir.empty()) {
         mobility_schedule_ = std::make_unique<MobilitySchedule>();
         mobility_schedule_->load_from_directory(mobility_dir, aoi_);
@@ -298,6 +310,18 @@ Engine::Engine(AOI aoi,
         std::cout << "Engine: loaded HostLandscape from " << hosts_path << "\n";
     }
     if (host_landscape_) coord_->set_host_landscape(host_landscape_.get());
+    // M17.4 PR-C: build the per-cell K_eff grid once from the static
+    // host data, then pass a non-owning view to the cohort bank so
+    // `larva_mortality_density` can apply per-patch Beverton-Holt
+    // capacity scaling. No-op when host_landscape_ is null.
+    if (host_landscape_ && coord_) {
+        coord_->build_K_eff_grid();
+        const auto v = coord_->k_eff_grid_view();
+        if (v.data != nullptr && v.width > 0 && v.height > 0 && sub_) {
+            sub_->cohort_bank_mutable().set_K_eff_view(
+                v.data, v.width, v.height);
+        }
+    }
     if (!mobility_dir.empty()) {
         mobility_schedule_ = std::make_unique<MobilitySchedule>();
         mobility_schedule_->load_from_directory(mobility_dir, aoi_);

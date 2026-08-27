@@ -320,8 +320,18 @@ MosquitoSubmodel::MosquitoSubmodel(int32_t n_patches, int32_t k_per_patch,
         // carrying capacity. Adults above K_MAX die faster than they
         // can reproduce (K_MAX-limited births), causing a population
         // crash that has nothing to do with biology.
-        const int32_t n_adults_capped = std::min(
-            inst.n_adults, k_per_patch > 0 ? k_per_patch : K_MAX);
+        //
+        // M17.4 PR-B: per-patch capacity scaling. Urban-sourced
+        // patches carry `urban_capacity_factor` in [0.30, 1.00]
+        // (plan §6.4); the cap is K_MAX * factor so dense urban
+        // centres seed close to full K while sparse suburbs seed
+        // ~30% of K. Terrain patches keep the legacy global cap
+        // (factor = 1.0). Back-compat preserved for any caller that
+        // constructs SeedInstruction without setting the field.
+        const int32_t cap = static_cast<int32_t>(
+            static_cast<float>(k_per_patch > 0 ? k_per_patch : K_MAX) *
+            std::max(0.0f, inst.urban_capacity_factor));
+        const int32_t n_adults_capped = std::min(inst.n_adults, cap);
         for (int32_t j = 0; j < n_adults_capped; ++j) {
             soa_.uid.push_back(static_cast<int64_t>(soa_.uid.size()));
             soa_.patch_id.push_back(inst.patch_id);

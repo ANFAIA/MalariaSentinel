@@ -47,6 +47,52 @@ void CoordinatorModel::set_climate_day(int32_t day_index) {
     climate_->set_day(day_index);
 }
 
+void CoordinatorModel::build_K_eff_grid() {
+    // M17.4 PR-C (plan §3 / §6.4): build the per-cell K_eff array
+    // once. Inputs (`building_fraction`, `urban_class`) are static
+    // host data loaded by `set_host_landscape()`; this method MUST
+    // be called after that. Output is row-major float[H*W].
+    //
+    // Cost: ~O(H*W) = 429K ops for Ghana, <10ms. Negligible relative
+    // to the 56M-cohort aquatic loop.
+    if (host_landscape_ == nullptr) {
+        throw std::runtime_error(
+            "CoordinatorModel::build_K_eff_grid: host_landscape_ is null. "
+            "Call set_host_landscape() first.");
+    }
+    const int32_t H = climate_->h();
+    const int32_t W = climate_->w();
+    H_ = H;
+    W_ = W;
+    if (H <= 0 || W <= 0) {
+        K_eff_grid_.clear();
+        return;
+    }
+    const size_t hw = static_cast<size_t>(H) * static_cast<size_t>(W);
+    K_eff_grid_.assign(hw, 1.0f);
+    for (int32_t r = 0; r < H; ++r) {
+        for (int32_t c = 0; c < W; ++c) {
+            const size_t idx = static_cast<size_t>(r) *
+                                   static_cast<size_t>(W) +
+                               static_cast<size_t>(c);
+            const HostCell hc = host_landscape_->at(r, c);
+            if (hc.urban_class == URBAN_CLASS_THRESHOLD) {
+                K_eff_grid_[idx] = std::clamp(
+                    hc.building_fraction, URBAN_CAPACITY_FLOOR,
+                    URBAN_CAPACITY_CEIL);
+            }
+        }
+    }
+}
+
+float CoordinatorModel::K_eff_at(int32_t row, int32_t col) const {
+    if (K_eff_grid_.empty() || W_ <= 0) return 1.0f;
+    if (row < 0 || row >= H_ || col < 0 || col >= W_) return 1.0f;
+    return K_eff_grid_[static_cast<size_t>(row) *
+                           static_cast<size_t>(W_) +
+                       static_cast<size_t>(col)];
+}
+
 void CoordinatorModel::activate_patches() {
     // F1.b note: the activation check is re-done in to_dataframe()
     // (line 75-77 below) which constructs PatchState with
@@ -336,9 +382,26 @@ std::vector<SeedInstruction> CoordinatorModel::build_seed_instructions(
     //    coordinator owns the per-rollout Prng, so the random
     //    selection in RANDOM_VIABLE mode goes through it (keeping
     //    the stream reproducible).
-    return build_seed_instructions_for_patches(config, viable_ids,
-                                               viable_lonlat, viable_rowcol,
-                                               rng_);
+    std::vector<SeedInstruction> out = build_seed_instructions_for_patches(
+        config, viable_ids, viable_lonlat, viable_rowcol, rng_);
+
+    // 3. M17.4 PR-A: stamp the urban_capacity_factor from the host
+    //    landscape onto each instruction. Mirrors the calculation in
+    //    to_dataframe() (lines ~280-285): clamp(building_fraction,
+    //    URBAN_CAPACITY_FLOOR, URBAN_CAPACITY_CEIL) for urban cells,
+    //    1.0 for terrain. The submodel uses this in PR-B to cap
+    //    adult counts per patch by K_MAX * factor.
+    if (host_landscape_ != nullptr && !out.empty()) {
+        for (auto& inst : out) {
+            const HostCell hc = host_landscape_->at(inst.row, inst.col);
+            if (hc.urban_class == URBAN_CLASS_THRESHOLD) {
+                inst.urban_capacity_factor = std::clamp(
+                    hc.building_fraction, URBAN_CAPACITY_FLOOR,
+                    URBAN_CAPACITY_CEIL);
+            }
+        }
+    }
+    return out;
 }
 
 DensityGrid CoordinatorModel::aggregate_density(const MosquitoSubmodel& sub,

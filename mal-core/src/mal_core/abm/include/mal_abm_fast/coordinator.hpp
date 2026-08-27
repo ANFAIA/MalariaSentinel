@@ -150,6 +150,31 @@ public:
     // `current_date_`.
     void activate_patches();
 
+    // Build the per-patch K_eff array once, from static host data.
+    //
+    // M17.4 PR-C (plan §3 / §6.4): for each cell (r, c), K_eff[r, c]
+    // equals `clamp(building_fraction, URBAN_CAPACITY_FLOOR,
+    // URBAN_CAPACITY_CEIL)` if `urban_class == URBAN_CLASS_THRESHOLD`,
+    // else 1.0 (terrain default). The grid is row-major float[H*W]
+    // and never changes after build (host data is static). Aquatic
+    // stages consume it via `K_eff_grid_view()`. Must be called after
+    // `set_host_landscape()` — throws otherwise.
+    void build_K_eff_grid();
+
+    // Read-only view of the K_eff grid (ptr + W). Null/0 if not
+    // built yet. Designed to be passed once to consumers at wiring
+    // time, then read in hot loops as a flat array indexed by
+    // `r * W + c` (O(1), cache-friendly).
+    struct KEffView {
+        const float* data = nullptr;
+        int32_t     width = 0;
+        int32_t     height = 0;
+    };
+    KEffView k_eff_grid_view() const { return {K_eff_grid_.data(), W_, H_}; }
+    // K_eff at (row, col), or 1.0 if the grid is uninitialised. Used
+    // by tests + diagnostics; production paths use the view directly.
+    float K_eff_at(int32_t row, int32_t col) const;
+
     // -- per-day: per-patch state vector ------------------------------------
 
     // Build the per-patch state vector. The output is the union of
@@ -224,6 +249,13 @@ private:
     int32_t                                   rain_7d_count_    = 0;
     // Pool hydrology (M14): per-patch water state, keyed by patch_id.
     std::unordered_map<int64_t, PoolState>     pool_states_;
+    // M17.4 PR-C: per-cell K_eff array (row-major float[H*W]).
+    // Built once by `build_K_eff_grid()` after `set_host_landscape()`
+    // (host data is static). Empty until built; consumers must check
+    // for emptiness or fall back to K_MAX.
+    std::vector<float>                         K_eff_grid_;
+    int32_t                                    H_ = 0;
+    int32_t                                    W_ = 0;
 };
 
 }  // namespace mal_abm_fast

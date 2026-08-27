@@ -17,6 +17,7 @@ DEFAULT_WEIGHTS: dict[str, float] = {
     "D21_spread_rate": 0.15,
     "D22_host_clustering": 0.10,
     "D23_oviposition_fidelity": 0.10,
+    "D24_urban_productivity_ratio": 0.05,  # M17.4 PR-D guardrail
 }
 
 def geometric_mean(scores: dict[str, ScorerResult], weights: dict[str, float] | None = None) -> float:

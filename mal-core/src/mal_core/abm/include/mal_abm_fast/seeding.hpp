@@ -86,6 +86,12 @@ struct SeedInstruction {
     double  lat      = 0.0;
     int32_t n_adults = 0;
     int32_t n_larvae = 0;
+    // Urban capacity factor (plan §6.4, M17.4 PR-A): in
+    // [URBAN_CAPACITY_FLOOR, URBAN_CAPACITY_CEIL] for urban-sourced
+    // patches, 1.0 for terrain patches. Mirrors PatchState::urban_capacity_factor.
+    // Carried here so the submodel's seed loop can cap adult counts
+    // by K_MAX * factor (per-patch) rather than the global K_MAX.
+    float   urban_capacity_factor = 1.0f;
 };
 
 // Build a list of SeedInstructions from a SeedingConfig + habitat info.

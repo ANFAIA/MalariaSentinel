@@ -85,6 +85,21 @@ public:
     void set_species(const SpeciesParams& sp) { species_ = sp; }
     const SpeciesParams& species() const { return species_; }
 
+    // Set per-cell K_eff view (M17.4 PR-C). The bank reads
+    // `K_eff_grid_view_[r * W_ + c]` in `larva_mortality_density`
+    // instead of the global `K_MAX` literal. If the view is empty
+    // (null data), the global K_MAX is used as fallback (back-compat).
+    // The view points into CoordinatorModel's grid (which is rebuilt
+    // only on host changes — never mid-run today).
+    void set_K_eff_view(const float* data, int32_t width, int32_t height) {
+        K_eff_data_ = data;
+        K_eff_W_    = width;
+        K_eff_H_    = height;
+    }
+    const float* K_eff_data() const { return K_eff_data_; }
+    int32_t K_eff_width() const { return K_eff_W_; }
+    int32_t K_eff_height() const { return K_eff_H_; }
+
     // Collect emerged adults. Returns a list of EmergenceEvents
     // (one per patch with emergences). Removes emerged pupae
     // from the bank. Call AFTER advance_day().
@@ -111,6 +126,13 @@ private:
     // Active species for salinity response (defaults to coluzzii: the
     // struct's in-class defaults give id + canonical_name = coluzzii).
     SpeciesParams species_{};
+
+    // M17.4 PR-C: per-cell K_eff view (non-owning). nullptr + 0
+    // means "use global K_MAX" (legacy default). Setter is called
+    // once at Engine wiring time (after build_K_eff_grid).
+    const float* K_eff_data_ = nullptr;
+    int32_t      K_eff_W_    = 0;
+    int32_t      K_eff_H_    = 0;
 
     // Index: (patch_id, stage, instar) -> index into cohorts_
     using CohortKey = std::pair<int64_t, std::pair<uint8_t, uint8_t>>;
