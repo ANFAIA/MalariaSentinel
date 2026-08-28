@@ -9,14 +9,21 @@ them to a building-fraction layer (fraction of each ABM cell covered by
 building footprints).
 
 Source: Overture Maps Foundation (https://overturemaps.org/)
-Format: GeoParquet hosted on S3, one row per building footprint.
+Format: GeoParquet hosted on S3 (``s3://overturemaps-us-west-2``), one row
+per building footprint.
 
-Notes:
-    * Values are in [0, 1] (fraction of cell area covered by buildings).
-    * NoData value is -9999.0.
-    * The loader caches downloads locally; re-runs skip the download.
-    * Conservative (sum-preserving) aggregation is used when rasterizing
-      high-res footprints to the ABM grid.
+Implementation notes:
+    * Downloads go through DuckDB (httpfs + spatial): the S3 parquet dataset
+      is read with bbox predicate pushdown (row-group pruning via the ``bbox``
+      struct column) and rasterized inside SQL (footprint centroid -> cell
+      index). Python never materialises the full footprint set (Ghana alone
+      is ~17M footprints).
+    * The Overture layout is release-based (``release/YYYY-MM-DD.N``); the
+      newest release is resolved by listing the S3 bucket.
+    * The resulting raster is cached as ``.npz`` keyed by AOI + release;
+      re-runs skip the download entirely.
+    * Values are in [0, 1] (1.0 = at least one footprint centroid in cell).
+    * NoData value is -9999.0 (cells with no buildings).
 """
 from __future__ import annotations
 
@@ -26,10 +33,8 @@ import warnings
 from typing import TYPE_CHECKING
 
 import numpy as np
-import rasterio
 import rioxarray  # noqa: F401
 import xarray as xr
-from rasterio.features import geometry_mask
 from rasterio.transform import from_bounds
 
 if TYPE_CHECKING:
@@ -37,6 +42,10 @@ if TYPE_CHECKING:
 
 
 __all__ = ["load_buildings_fraction", "BuildingsLoader", "DOWNLOADER"]
+
+_OVERTURE_S3_BUCKET = "overturemaps-us-west-2"
+_OVERTURE_S3_REGION = "us-west-2"
+_NODATA = -9999.0
 
 
 def _default_cache_dir() -> pathlib.Path:
@@ -57,149 +66,102 @@ def _aoi_to_src_bbox(aoi: AOI) -> tuple[float, float, float, float]:
     return (float(w), float(s), float(e), float(n))
 
 
-def _download_buildings_overturemaestro(
-    bbox_wgs84: tuple[float, float, float, float],
-    cache_dir: pathlib.Path,
-) -> pathlib.Path:
-    """Download building footprints via overturemaestro (preferred).
+def _resolve_latest_release() -> str:
+    """List Overture S3 releases and return the newest (YYYY-MM-DD.N)."""
+    import pyarrow.fs as fs
 
-    Returns the path to a cached GeoJSON file.
-    """
-    from overturemaestro import create_overture_maestro
-
-    w, s, e, n = bbox_wgs84
-    client = create_overture_maestro()
-    buildings_gdf = client.get_buildings(
-        bbox=(w, s, e, n),
-    )
-    if buildings_gdf is None or len(buildings_gdf) == 0:
-        cache_dir.mkdir(parents=True, exist_ok=True)
-        empty_path = cache_dir / "buildings.geojson"
-        import geopandas as gpd
-        gpd.GeoDataFrame(geometry=[], crs="EPSG:4326").to_file(empty_path, driver="GeoJSON")
-        return empty_path
-
-    cache_dir.mkdir(parents=True, exist_ok=True)
-    geojson_path = cache_dir / "buildings.geojson"
-    buildings_gdf.to_file(geojson_path, driver="GeoJSON")
-    return geojson_path
+    s3 = fs.S3FileSystem(anonymous=True, region=_OVERTURE_S3_REGION)
+    selector = fs.FileSelector(f"{_OVERTURE_S3_BUCKET}/release", recursive=False)
+    versions = [
+        info.path.rsplit("/", 1)[-1]
+        for info in s3.get_file_info(selector)
+        if info.path.rsplit("/", 1)[-1][0].isdigit()
+    ]
+    if not versions:
+        raise RuntimeError("No Overture releases found in S3 bucket")
+    return max(versions)  # 'YYYY-MM-DD.N' sorts lexically
 
 
-def _download_buildings_parquet(
-    bbox_wgs84: tuple[float, float, float, float],
-    cache_dir: pathlib.Path,
-) -> pathlib.Path:
-    """Download building footprints from Overture S3 via pyarrow + geopandas."""
-    try:
-        import pyarrow.parquet as pq
-        from pyogrio import read_dataframe
-    except ImportError:
-        raise ImportError(
-            "Building loader requires 'pyarrow' and 'pyogrio'. "
-            "Install with: uv add pyarrow pyogrio"
-        )
-
-    w, s, e, n = bbox_wgs84
-
-    # Overture release bucket path — use the latest stable release
-    version = "1.1.0"
-    base_url = f"https://data.overturemaps.org/data/{version}"
-    parquet_url = f"{base_url}/theme=buildings/type=building"
-
-    # Use pyarrow to read the parquet dataset with bbox filtering
-    import pyarrow as pa
-
-    dataset = pq.ParquetDataset(
-        parquet_url,
-        filesystem=None,
-        filters=[
-            ("bbox.xmin", "<=", e),
-            ("bbox.xmax", ">=", w),
-            ("bbox.ymin", "<=", n),
-            ("bbox.ymax", ">=", s),
-        ],
-    )
-    table = dataset.read()
-
-    # Convert to geopandas for geometry handling
-    import geopandas as gpd
-    from shapely import wkb
-
-    df = table.to_pandas()
-    if "geometry" in df.columns:
-        df["geometry"] = df["geometry"].apply(
-            lambda g: wkb.loads(g) if g is not None else None
-        )
-    elif "id" in df.columns:
-        # Overture stores geometry as WKB in a dedicated column
-        for col in df.columns:
-            if df[col].dtype == object and len(df) > 0:
-                try:
-                    sample = df[col].iloc[0]
-                    if isinstance(sample, bytes) and len(sample) > 20:
-                        df["geometry"] = df[col].apply(
-                            lambda g: wkb.loads(g) if g is not None else None
-                        )
-                        break
-                except Exception:
-                    continue
-
-    gdf = gpd.GeoDataFrame(df, geometry="geometry", crs="EPSG:4326")
-
-    # Clip to bbox
-    from shapely.geometry import box
-
-    bbox_poly = box(w, s, e, n)
-    gdf = gdf[gdf.geometry.intersects(bbox_poly)]
-
-    cache_dir.mkdir(parents=True, exist_ok=True)
-    geojson_path = cache_dir / "buildings.geojson"
-    gdf.to_file(geojson_path, driver="GeoJSON")
-    return geojson_path
+def _aoi_crs_epsg(aoi: AOI) -> int:
+    epsg = aoi.crs_obj.to_epsg()
+    if epsg is None:
+        raise ValueError(f"AOI CRS has no EPSG code: {aoi.crs}")
+    return epsg
 
 
-def _rasterize_footprints(
-    geojson_path: pathlib.Path,
-    aoi: AOI,
-    bbox_wgs84: tuple[float, float, float, float],
-) -> np.ndarray:
-    """Rasterize building footprints to building-fraction on the AOI grid.
-
-    Uses conservative (sum-preserving) aggregation: each footprint's area
-    contribution to a cell is proportional to the overlap fraction.
-    """
-    import geopandas as gpd
-
-    if isinstance(geojson_path, pathlib.Path):
-        gdf = gpd.read_file(geojson_path)
-    else:
-        gdf = gpd.GeoDataFrame.from_features(geojson_path, crs="EPSG:4326")
-
-    if len(gdf) == 0:
+def _cell_size(aoi: AOI) -> tuple[float, float]:
+    """Cell size in AOI CRS units (meters for projected, degrees for 4326)."""
+    if _aoi_crs_epsg(aoi) == 4326:
         h, w_cells = aoi.cells_per_side()
-        return np.full((h, w_cells), -9999.0, dtype=np.float32)
+        w_deg, s_deg, e_deg, n_deg = aoi.bbox
+        return ((e_deg - w_deg) / w_cells, (n_deg - s_deg) / h)
+    return (float(aoi.resolution_m), float(aoi.resolution_m))
 
-    h, w_cells = aoi.cells_per_side()
-    dst_transform = from_bounds(*aoi.bbox, w_cells, h)
 
-    # Rasterize: count pixels covered by any footprint
-    footprints_mask = geometry_mask(
-        gdf.geometry,
-        out_shape=(h, w_cells),
-        transform=dst_transform,
-        invert=True,  # True = pixels inside geometry are True
+def _download_and_rasterize(
+    bbox_wgs84: tuple[float, float, float, float],
+    aoi: AOI,
+    cache_dir: pathlib.Path,
+) -> np.ndarray:
+    """Download Overture buildings and rasterize to the AOI grid via DuckDB."""
+    import duckdb
+
+    release = _resolve_latest_release()
+    parquet_glob = (
+        f"s3://{_OVERTURE_S3_BUCKET}/release/{release}/"
+        f"theme=buildings/type=building/*.zstd.parquet"
     )
+    w, s, e, n = bbox_wgs84
+    w0, s0, e0, n0 = aoi.bbox
+    cell_w, cell_h = _cell_size(aoi)
+    nrows, ncols = aoi.cells_per_side()
+    epsg = _aoi_crs_epsg(aoi)
+    target_crs = f"EPSG:{epsg}"
 
-    # Convert to fraction (binary in, but we can weight by area later)
-    # For a first pass: 1.0 if any footprint covers the cell, 0.0 otherwise.
-    # A more accurate approach would compute area overlap, but this is a
-    # reasonable approximation at ABM grid resolution.
-    fraction = footprints_mask.astype(np.float32)
+    con = duckdb.connect()
+    try:
+        con.execute("INSTALL httpfs; LOAD httpfs;")
+        con.execute("INSTALL spatial; LOAD spatial;")
+        con.execute(f"SET s3_region='{_OVERTURE_S3_REGION}';")
+        rows = con.execute(
+            """
+            SELECT DISTINCT cx, cy FROM (
+                SELECT
+                    CAST(floor((ST_X(pt) - $w0) / $cell_w) AS BIGINT) AS cx,
+                    CAST(floor(($n0 - ST_Y(pt)) / $cell_h) AS BIGINT) AS cy
+                FROM (
+                    SELECT ST_Transform(
+                        ST_Centroid(geometry),
+                        'EPSG:4326', $target_crs
+                    ) AS pt
+                    FROM read_parquet($parquet_glob)
+                    WHERE bbox.xmin <= $e AND bbox.xmax >= $w
+                      AND bbox.ymin <= $n AND bbox.ymax >= $s
+                      AND geometry IS NOT NULL
+                )
+            )
+            WHERE cx >= 0 AND cx < $ncols AND cy >= 0 AND cy < $nrows
+            """,
+            {
+                "parquet_glob": parquet_glob,
+                "w": w, "s": s, "e": e, "n": n,
+                "w0": w0, "n0": n0,
+                "cell_w": cell_w, "cell_h": cell_h,
+                "target_crs": target_crs,
+                "ncols": ncols, "nrows": nrows,
+            },
+        ).fetchall()
+    finally:
+        con.close()
 
-    # Set NoData where there's no overlap with the source data extent
-    # (cells completely outside the AOI bbox should be nodata)
-    fraction = np.where(fraction == 0, -9999.0, fraction)
+    fraction = np.full((nrows, ncols), _NODATA, dtype=np.float32)
+    for cx, cy in rows:
+        fraction[cy, cx] = 1.0
 
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    np.savez_compressed(
+        cache_dir / f"buildings_{aoi.slug}_{release}.npz", fraction=fraction
+    )
     return fraction
 
 
@@ -216,7 +178,7 @@ def load_buildings_fraction(
 
     Returns:
         xr.DataArray with dims (y, x), dtype float32, CRS = aoi.crs.
-        Values in [0, 1] (fraction of cell covered by buildings).
+        Values in [0, 1] (1.0 = building centroid present in cell).
         ``-9999.0`` for cells with no data.
     """
     if isinstance(aoi, str):
@@ -224,15 +186,16 @@ def load_buildings_fraction(
         aoi = AOI.from_slug(aoi)
 
     cdir = pathlib.Path(cache_dir) if cache_dir is not None else _default_cache_dir()
-    bbox_wgs84 = _aoi_to_src_bbox(aoi)
 
-    # Try overturemaestro first, fall back to pyarrow
-    try:
-        geojson_path = _download_buildings_overturemaestro(bbox_wgs84, cdir)
-    except ImportError:
-        geojson_path = _download_buildings_parquet(bbox_wgs84, cdir)
-
-    fraction = _rasterize_footprints(geojson_path, aoi, bbox_wgs84)
+    # Cached raster for this AOI + latest release?
+    release = _resolve_latest_release()
+    cache_path = cdir / f"buildings_{aoi.slug}_{release}.npz"
+    if cache_path.exists():
+        with np.load(cache_path) as z:
+            fraction = z["fraction"].astype(np.float32, copy=False)
+    else:
+        bbox_wgs84 = _aoi_to_src_bbox(aoi)
+        fraction = _download_and_rasterize(bbox_wgs84, aoi, cdir)
 
     da = xr.DataArray(
         fraction,
@@ -242,12 +205,13 @@ def load_buildings_fraction(
             "long_name": "Building footprint fraction",
             "units": "fraction [0, 1]",
             "source": "Overture Maps Foundation",
-            "nodata": -9999.0,
+            "overture_release": release,
+            "nodata": _NODATA,
         },
     )
     da.rio.write_crs(aoi.crs_obj, inplace=True)
     da.rio.write_transform(from_bounds(*aoi.bbox, *aoi.cells_per_side()[::-1]), inplace=True)
-    da.rio.write_nodata(-9999.0, inplace=True)
+    da.rio.write_nodata(_NODATA, inplace=True)
     return da
 
 
