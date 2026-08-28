@@ -1,0 +1,33 @@
+# MalariaSentinel — idle CLI box. No pipeline / malariasim on start.
+#
+#   docker compose -f docker/docker-compose.yml up -d --build
+#   docker exec -it malariasim malariasim --help
+#   docker exec -it malariasim bash
+#
+# Repo bind-mounted at /app. Named volume keeps the Linux venv from the image
+# (host macOS .venv would break the container). ABM compile is on-demand:
+#   docker exec -it malariasim malariasim abm --compile
+services:
+  malaria:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    image: malariasim:local
+    container_name: malariasim
+    environment:
+      AOI: ${AOI:-ghana}
+      YEAR: ${YEAR:-2024}
+      MONTH: ${MONTH:-6}
+      DAYS: ${DAYS:-30}
+      SEED: ${SEED:-1}
+      CDSAPI_URL: ${CDSAPI_URL:-}
+      CDSAPI_KEY: ${CDSAPI_KEY:-}
+      EARTHDATA_TOKEN: ${EARTHDATA_TOKEN:-}
+    volumes:
+      - ..:/app
+      - malariasim-venv:/app/.venv
+    stdin_open: true
+    tty: true
+
+volumes:
+  malariasim-venv:
