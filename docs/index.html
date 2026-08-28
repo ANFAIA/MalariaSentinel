@@ -897,6 +897,17 @@
                   </div>
                 </div>
 
+                <!-- Control 0: Compilación del Motor C++ (activada por defecto, desactivable en opciones avanzadas) -->
+                <div class="form-group" style="background: var(--bg); padding: 14px; border-radius: var(--radius); border: 1px solid var(--border);">
+                  <label class="form-checkbox-label">
+                    <input type="checkbox" id="paramCompile" class="form-checkbox" checked="">
+                    <span data-i18n="config.compile.label">Compilar Motor C++ Antes de Ejecutar (--compile)</span>
+                  </label>
+                  <p class="form-help" style="margin-left: 28px;" data-i18n="config.compile.help">
+                    Construye el binario <code>mal_abm_fast</code> desde el código fuente antes de lanzar la simulación. Desmárcalo si el motor ya está compilado para saltar la fase de build.
+                  </p>
+                </div>
+
                 <!-- Año de Inicio -->
                 <div class="form-group">
                   <label class="form-label" for="paramYear" data-i18n="config.year.label">Año de Inicio (--year)</label>
@@ -1483,6 +1494,7 @@
       var paramRollouts = document.getElementById('paramRollouts');
       var paramSeed = document.getElementById('paramSeed');
       var paramSeedingMode = document.getElementById('paramSeedingMode');
+      var paramCompile = document.getElementById('paramCompile');
 
       var paramEnableHosts = document.getElementById('paramEnableHosts');
       var paramEnableTransmission = document.getElementById('paramEnableTransmission');
@@ -1571,6 +1583,7 @@
           cohortLog: true,
           gif: true,
           year: 2024,
+          compile: true,
           slug: 'focal_outbreak'
         },
         'incursion-vectorial': {
@@ -1589,6 +1602,7 @@
           cohortLog: true,
           gif: true,
           year: 2024,
+          compile: true,
           slug: 'vector_incursion'
         },
         'focos-urbanos': {
@@ -1607,6 +1621,7 @@
           cohortLog: true,
           gif: false,
           year: 2024,
+          compile: true,
           slug: 'explicit_foci'
         },
         'calibracion-rapida': {
@@ -1625,6 +1640,7 @@
           cohortLog: true,
           gif: false,
           year: 2024,
+          compile: true,
           slug: 'fast_calib'
         },
         'dataset-unet': {
@@ -1643,6 +1659,7 @@
           cohortLog: true,
           gif: false,
           year: 2024,
+          compile: true,
           slug: 'unet_rollouts'
         }
       };
@@ -1659,6 +1676,7 @@
         var rollouts = parseInt(paramRollouts.value, 10);
         var seed = parseInt(paramSeed.value, 10) || 1;
         var seeding = paramSeedingMode.value;
+        var hasCompile = paramCompile.checked;
 
         var hasHosts = paramEnableHosts.checked;
         var hasTrans = paramEnableTransmission.checked;
@@ -1691,7 +1709,11 @@
         transmissionOptions.style.display = hasTrans ? 'flex' : 'none';
 
         // 1. Build CLI Command string
-        var cmd = 'uv run malariasim abm \\\n  --aoi ' + aoi + ' \\\n  --days ' + days;
+        var cmd = 'uv run malariasim abm';
+        if (hasCompile) {
+          cmd += ' \\\n  --compile';
+        }
+        cmd += ' \\\n  --aoi ' + aoi + ' \\\n  --days ' + days;
         if (snapshot > 0) {
           cmd += ' \\\n  --snapshot-every ' + snapshot;
         } else {
@@ -1917,6 +1939,7 @@
       paramRollouts.addEventListener('change', updatePipeline);
       paramSeed.addEventListener('input', updatePipeline);
       paramSeedingMode.addEventListener('change', updatePipeline);
+      paramCompile.addEventListener('change', updatePipeline);
 
       paramEnableHosts.addEventListener('change', updatePipeline);
       paramEnableTransmission.addEventListener('change', updatePipeline);
@@ -1944,6 +1967,7 @@
             paramRollouts.value = pData.rollouts;
             paramSeed.value = pData.seed;
             paramSeedingMode.value = pData.seeding;
+            paramCompile.checked = pData.compile;
 
             paramEnableHosts.checked = pData.hosts;
             paramEnableTransmission.checked = pData.transmission;
@@ -2072,6 +2096,7 @@
           'config.rollouts.label': 'Nº de Rollouts (--n-rollouts)', 'config.rollouts.1': '1 (Ejecución individual)', 'config.rollouts.5': '5 (Ensamble estocástico)', 'config.rollouts.10': '10 (Dataset para U-Net)', 'config.rollouts.20': '20 (Ensamble masivo)', 'config.rollouts.help': 'Simulaciones concurrentes con semillas independientes.',
           'config.seed.label': 'Semilla Base (--seed)', 'config.seed.help': 'Para reproducibilidad científica.',
           'config.seeding.label': 'Siembra Inicial de Mosquitos (--seeding-mode)', 'config.seeding.uniform': 'uniform (homogénea en cuerpos de agua)', 'config.seeding.rv': 'random-viable (en celdas con idoneidad ecológica > 0)', 'config.seeding.explicit': 'explicit (en estaciones de muestreo fijas)',
+          'config.compile.label': 'Compilar Motor C++ Antes de Ejecutar (--compile)', 'config.compile.help': 'Construye el binario <code>mal_abm_fast</code> desde el código fuente antes de lanzar la simulación. Desmárcalo si el motor ya está compilado para saltar la fase de build.',
           'config.hosts.label': 'Capa de Hospedadores y Atracción Ganadera/Humana', 'config.hosts.help': 'Permite simular el movimiento y búsqueda de sangre de los mosquitos guiado por la densidad de ganado (vacas, cerdos, aves) y asentamientos humanos, incluso sin simular malaria.',
           'config.trans.label': 'Transmisión Epidemiológica de Malaria (--enable-transmission)', 'config.trans.help': 'Activa el ciclo bidireccional de infección entre mosquitos hembra (ingesta de gametocitos, incubación EIP) y población humana (incubación, recuperación e inmunidad).',
           'config.hseed.label': 'Modo de Siembra Humana (--human-seeding-mode)', 'config.hseed.rv': 'random-viable (focos en aldeas viables con mosquitos)', 'config.hseed.explicit': 'explicit (coordenadas de ciudades explícitas)', 'config.hseed.ul': 'uniform-legacy (5% de prevalencia en todo el territorio)', 'config.hseed.none': 'none (sin humanos infectados al inicio)',
@@ -2236,6 +2261,7 @@
           'config.rollouts.label': 'No. of Rollouts (--n-rollouts)', 'config.rollouts.1': '1 (Individual run)', 'config.rollouts.5': '5 (Stochastic ensemble)', 'config.rollouts.10': '10 (U-Net dataset)', 'config.rollouts.20': '20 (Massive ensemble)', 'config.rollouts.help': 'Concurrent simulations with independent seeds.',
           'config.seed.label': 'Base Seed (--seed)', 'config.seed.help': 'For scientific reproducibility.',
           'config.seeding.label': 'Initial Mosquito Seeding (--seeding-mode)', 'config.seeding.uniform': 'uniform (homogeneous in water bodies)', 'config.seeding.rv': 'random-viable (in cells with ecological suitability > 0)', 'config.seeding.explicit': 'explicit (at fixed sampling stations)',
+          'config.compile.label': 'Compile C++ Engine Before Running (--compile)', 'config.compile.help': 'Builds the <code>mal_abm_fast</code> binary from source before launching the simulation. Uncheck it if the engine is already compiled to skip the build phase.',
           'config.hosts.label': 'Host Layer & Livestock/Human Attraction', 'config.hosts.help': 'Enables mosquito movement and blood-seeking guided by livestock (cattle, pigs, poultry) and human settlement density, even without malaria simulation.',
           'config.trans.label': 'Malaria Epidemiological Transmission (--enable-transmission)', 'config.trans.help': 'Activates the bidirectional infection cycle between female mosquitoes (gametocyte ingestion, EIP incubation) and human population (incubation, recovery and immunity).',
           'config.hseed.label': 'Human Seeding Mode (--human-seeding-mode)', 'config.hseed.rv': 'random-viable (foci in viable villages with mosquitoes)', 'config.hseed.explicit': 'explicit (explicit city coordinates)', 'config.hseed.ul': 'uniform-legacy (5% prevalence across territory)', 'config.hseed.none': 'none (no infected humans at start)',
