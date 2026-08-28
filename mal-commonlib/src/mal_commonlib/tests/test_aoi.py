@@ -200,3 +200,63 @@ def test_from_slug_unknown_raises() -> None:
 def test_from_slug_invalid_format_raises() -> None:
     with pytest.raises(ValueError, match="Unknown AOI slug"):
         AOI.from_slug("Ghana")  # uppercase not in YAML
+
+
+# --- iso3 field (country-scoped loaders) -------------------------------------
+
+def test_from_bbox_with_iso3() -> None:
+    a = AOI.from_bbox(
+        GHANA_W, GHANA_S, GHANA_E, GHANA_N, "EPSG:4326", "ghana", 1000, iso3="GHA",
+    )
+    assert a.iso3 == "GHA"
+    assert a.require_iso3() == "GHA"
+
+
+def test_iso3_lowercase_is_normalized_to_uppercase() -> None:
+    # ISO 3166-1 alpha-3 codes are uppercase by convention.
+    a = AOI.from_bbox(
+        GHANA_W, GHANA_S, GHANA_E, GHANA_N, "EPSG:4326", "ghana", 1000, iso3="gha",
+    )
+    assert a.iso3 == "GHA"
+
+
+def test_iso3_must_be_three_letters() -> None:
+    with pytest.raises(ValidationError):
+        AOI.from_bbox(
+            GHANA_W, GHANA_S, GHANA_E, GHANA_N, "EPSG:4326", "ghana", 1000, iso3="GHANA",
+        )
+    with pytest.raises(ValidationError):
+        AOI.from_bbox(
+            GHANA_W, GHANA_S, GHANA_E, GHANA_N, "EPSG:4326", "ghana", 1000, iso3="GH",
+        )
+    with pytest.raises(ValidationError):
+        AOI.from_bbox(
+            GHANA_W, GHANA_S, GHANA_E, GHANA_N, "EPSG:4326", "ghana", 1000, iso3="GH1",
+        )
+
+
+def test_iso3_optional_on_from_bbox() -> None:
+    a = AOI.from_bbox(GHANA_W, GHANA_S, GHANA_E, GHANA_N, "EPSG:4326", "ghana", 1000)
+    assert a.iso3 is None
+
+
+def test_require_iso3_raises_when_missing() -> None:
+    a = AOI.from_bbox(GHANA_W, GHANA_S, GHANA_E, GHANA_N, "EPSG:4326", "ghana", 1000)
+    with pytest.raises(ValueError, match="has no iso3"):
+        a.require_iso3()
+
+
+def test_from_slug_ghana_has_iso3_from_yaml() -> None:
+    # aois.yaml includes `iso3: GHA` for ghana.
+    a = AOI.from_slug("ghana")
+    assert a.iso3 == "GHA"
+
+
+def test_to_from_file_roundtrip_preserves_iso3(tmp_path: Path) -> None:
+    a = AOI.from_bbox(
+        GHANA_W, GHANA_S, GHANA_E, GHANA_N, "EPSG:4326", "ghana", 1000, iso3="GHA",
+    )
+    p = a.to_file(tmp_path / "aoi.json")
+    a2 = AOI.from_file(p)
+    assert a2.iso3 == "GHA"
+    assert a2 == a

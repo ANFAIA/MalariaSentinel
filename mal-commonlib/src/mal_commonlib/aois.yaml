@@ -9,7 +9,9 @@
 #   crs           — EPSG code or WKT
 #   resolution_m  — cell size in metres
 #   scale         — regional | national | continental
-#   gadm_id       — optional GADM identifier
+#   gadm_id       — optional GADM identifier (e.g. "GHA" for country, "GHA.1_1" for region)
+#   iso3          — ISO 3166-1 alpha-3 country code, REQUIRED for country-scoped
+#                   loaders (WorldPop, GADM, livestock). Exactly 3 uppercase letters.
 
 ghana:
   name: Ghana NMCP AOI
@@ -17,6 +19,8 @@ ghana:
   crs: "EPSG:4326"
   resolution_m: 1000
   scale: regional
+  gadm_id: GHA
+  iso3: GHA
 
 # --- Example: uncomment and edit for a new region ---
 # colombia-pacifico:
@@ -25,3 +29,5 @@ ghana:
 #   crs: "EPSG:4326"
 #   resolution_m: 1000
 #   scale: regional
+#   gadm_id: COL
+#   iso3: COL

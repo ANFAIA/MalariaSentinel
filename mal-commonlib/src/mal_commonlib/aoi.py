@@ -78,6 +78,9 @@ class AOI(BaseModel):
         scale: REGIONAL/NATIONAL/CONTINENTAL — see ``Scale`` enum.
         gadm_id: optional GADM identifier (e.g. "GHA" for Ghana, "GHA.1_1" for region).
                  When set, ``from_gadm()`` can be used to populate bbox from GADM boundaries.
+        iso3: ISO 3166-1 alpha-3 country code (e.g. "GHA"). Required for country-scoped
+              data loaders (WorldPop, GADM, livestock); raises ValueError if absent when
+              needed. Always lowercase, exactly 3 letters.
     """
 
     slug: str = Field(..., min_length=1, max_length=64)
@@ -87,6 +90,7 @@ class AOI(BaseModel):
     resolution_m: int = Field(..., gt=0)
     scale: Scale = Scale.REGIONAL
     gadm_id: str | None = None
+    iso3: str | None = None
 
     model_config = {"frozen": True}
 
@@ -98,6 +102,18 @@ class AOI(BaseModel):
         if not re.fullmatch(r"[a-z0-9]+(-[a-z0-9]+)*", v):
             raise ValueError(
                 f"slug must be lowercase [a-z0-9-], no leading/trailing/consecutive hyphens; got {v!r}"
+            )
+        return v
+
+    @field_validator("iso3")
+    @classmethod
+    def _iso3_format(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        v = v.strip().upper()
+        if not re.fullmatch(r"[A-Z]{3}", v):
+            raise ValueError(
+                f"iso3 must be 3 letters (ISO 3166-1 alpha-3); got {v!r}"
             )
         return v
 
@@ -199,6 +215,7 @@ class AOI(BaseModel):
             "resolution_m": self.resolution_m,
             "scale": self.scale.value,
             "gadm_id": self.gadm_id,
+            "iso3": self.iso3,
         }
         p.parent.mkdir(parents=True, exist_ok=True)
         p.write_text(json.dumps(payload, indent=2))
@@ -217,6 +234,7 @@ class AOI(BaseModel):
             resolution_m=int(payload["resolution_m"]),
             scale=Scale(payload["scale"]),
             gadm_id=payload.get("gadm_id"),
+            iso3=payload.get("iso3"),
         )
 
     # -- constructors --------------------------------------------------------
@@ -229,8 +247,17 @@ class AOI(BaseModel):
         *,
         name: str | None = None,
         scale: Scale = Scale.REGIONAL,
+        iso3: str | None = None,
+        gadm_id: str | None = None,
     ) -> "AOI":
-        """Build an AOI from an explicit bbox."""
+        """Build an AOI from an explicit bbox.
+
+        Args:
+            iso3: ISO 3166-1 alpha-3 country code (e.g. "GHA"). Required to use
+                country-scoped loaders (WorldPop, GADM, livestock); can be set
+                later via ``with_iso3()``.
+            gadm_id: optional GADM identifier for subnational AOIs.
+        """
         return cls(
             slug=slug,
             name=name if name is not None else slug,
@@ -238,7 +265,8 @@ class AOI(BaseModel):
             crs=crs,
             resolution_m=resolution_m,
             scale=scale,
-            gadm_id=None,
+            gadm_id=gadm_id,
+            iso3=iso3,
         )
 
     # -- slug registry (reads from aois.yaml) --------------------------------
@@ -264,6 +292,7 @@ class AOI(BaseModel):
             resolution_m=cfg["resolution_m"],
             scale=Scale(cfg.get("scale", "regional")),
             gadm_id=cfg.get("gadm_id"),
+            iso3=cfg.get("iso3"),
         )
 
     @classmethod
@@ -274,6 +303,7 @@ class AOI(BaseModel):
         gadm_path: Path | str | None = None,
         name: str | None = None,
         scale: Scale = Scale.REGIONAL,
+        iso3: str | None = None,
     ) -> "AOI":
         """Load an AOI from a GADM file.
 
@@ -284,6 +314,9 @@ class AOI(BaseModel):
             3. otherwise: ``FileNotFoundError`` with a clear message.
 
         The id is matched against any ``GID_<n>`` column (GADM-0..GADM-5).
+        For country-level ids (e.g. "GHA"), pass ``iso3="GHA"`` so country-scoped
+        data loaders work; if omitted, it is inferred from the first three chars
+        of the GADM id (uppercased).
         """
         if gadm_path is None:
             env = os.environ.get("MAL_GADM_PATH")
@@ -316,6 +349,10 @@ class AOI(BaseModel):
             geom = geom.to_crs(crs)
         minx, miny, maxx, maxy = geom.total_bounds
 
+        # Infer ISO-3 from the first three chars of the GADM id when not given.
+        if iso3 is None and re.fullmatch(r"[A-Z]{3}", gadm_id[:3]):
+            iso3 = gadm_id[:3]
+
         return cls(
             slug=slug,
             name=name if name is not None else f"{slug} ({gadm_id})",
@@ -324,7 +361,22 @@ class AOI(BaseModel):
             resolution_m=resolution_m,
             scale=scale,
             gadm_id=gadm_id,
+            iso3=iso3,
         )
+
+    def require_iso3(self) -> str:
+        """Return ``iso3`` or raise ``ValueError`` if missing.
+
+        Country-scoped data loaders (WorldPop, GADM, livestock) need the ISO-3
+        country code to build download URLs. Call this at the top of any
+        loader that requires a country-level identifier.
+        """
+        if not self.iso3:
+            raise ValueError(
+                f"AOI {self.slug!r} has no iso3; pass iso3='XXX' to "
+                f"from_bbox/from_slug/from_gadm or set it in aois.yaml"
+            )
+        return self.iso3
 
 
 __all__ = ["AOI", "Scale", "clear_aoi_cache"]
