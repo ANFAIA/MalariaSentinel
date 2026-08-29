@@ -154,17 +154,20 @@ void TransmissionModel::check_and_trigger_outbreak(
             double best_pop = params_.human_min_cell_pop;
             const float core_min_density = (params_.human_outbreak_min_density > 0.0f)
                 ? params_.human_outbreak_min_density : 1e-6f;
+            const double max_core_pop = (params_.human_cluster_max_core_pop > 0.0)
+                ? params_.human_cluster_max_core_pop : 1e18;
             for (int64_t c = 0; c < h_ * w_; ++c) {
                 const size_t idx = static_cast<size_t>(c);
                 if (pop[idx] <= best_pop) continue;
+                if (pop[idx] > max_core_pop) continue;  // too dense: vectors dilute
                 if (idx >= mosquito_density.size() ||
                     mosquito_density[idx] < core_min_density) continue;
                 best = c;
                 best_pop = pop[idx];
             }
             if (best < 0) {
-                std::cerr << "warning: outbreak not seeded: no cell has "
-                             "pop >= min and density >= "
+                std::cerr << "warning: outbreak not seeded: no cell with "
+                             "min_pop < pop <= max_core_pop and density >= "
                           << core_min_density << " yet\n";
                 return;  // retry tomorrow
             }

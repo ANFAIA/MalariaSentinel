@@ -67,6 +67,13 @@ struct TransmissionParams {
     // ≈ 100 females in the cell). Guarantees the concentrated outbreak
     // lands where the vector population is actually established.
     float       human_outbreak_min_density = 0.0f;
+    // Core population cap (M7.4.1): cells above this population are NOT
+    // cluster cores — in dense urban cells the seeded vectors dilute
+    // across thousands of humans (m = vectors/human << 1) and the chain
+    // mathematically cannot reach R >= 1. Rural/periurban cells of a few
+    // thousand people with established vectors are the sustainable
+    // outbreak archetype. 0 = no cap.
+    double      human_cluster_max_core_pop = 0.0;
 
     // Threshold for active transmission focus band
     float focus_threshold = 0.01f;

@@ -356,6 +356,7 @@ OUTPUT
     double human_min_cell_pop           = 50.0;
     double human_cluster_radius_km      = 0.0;
     float  human_outbreak_min_density   = 0.0f;
+    double human_cluster_max_core_pop   = 0.0;
     std::string human_foci_coords       = "";
     float  transmission_focus_threshold = 0.01f;
     int    transmission_snapshot_every  = 0;
@@ -632,6 +633,13 @@ OUTPUT
         ->default_val(0.0f)
         ->check(CLI::NonNegativeNumber)
         ->group("Transmission (SEIR-SEI)");
+    run->add_option("--human-cluster-max-core-pop", human_cluster_max_core_pop,
+                    "Cluster core population cap: cells denser than this "
+                    "are not cores (vectors dilute across thousands of "
+                    "humans, R<<1). 0 = no cap.")
+        ->default_val(0.0)
+        ->check(CLI::NonNegativeNumber)
+        ->group("Transmission (SEIR-SEI)");
     run->add_option("--initial-vector-infected-frac", initial_vector_infected_frac,
                     "Initial infectious fraction of adult female mosquitoes (default 0.0).")
         ->default_val(0.0)
@@ -784,7 +792,7 @@ OUTPUT
                   << human_outbreak_cases << "\n";
     }
     transmission_params.human_outbreak_min_density = human_outbreak_min_density;
-    transmission_params.focus_threshold = transmission_focus_threshold;
+    transmission_params.human_cluster_max_core_pop = human_cluster_max_core_pop;    transmission_params.focus_threshold = transmission_focus_threshold;
 
     // -- Rollouts loop (F1.c) -------------------------------------------
     // Each rollout gets a fresh `Prng` instance seeded at

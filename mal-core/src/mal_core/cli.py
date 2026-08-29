@@ -35,7 +35,8 @@ app = typer.Typer(
 
 
 class Tier(str, Enum):
-    """Tier choice for calibration scoring."""
+    """Legacy tier choice (calibration pytest harness)."""
+
     FAST = "fast"
     FULL = "full"
 
@@ -238,6 +239,7 @@ def abm(
     human_foci_coords: str = typer.Option("", "--human-foci-coords", help="Explicit foci coordinates 'r1,c1:N1;r2,c2:N2'."),
     human_cluster_radius_km: float = typer.Option(0.0, "--human-cluster-radius-km", help="Concentrated-outbreak mode: ONE spatial cluster (core = max-pop viable cell or explicit coord), cases split ~ cell population within this radius. 0 = independent foci."),
     human_outbreak_min_density: float = typer.Option(0.0, "--human-outbreak-min-density", help="Adaptive trigger: outbreak waits until best viable cell reaches this normalized mosquito density (agents/K_MAX; 0.1 ~ 100 females). 0 = exact day."),
+    human_cluster_max_core_pop: float = typer.Option(0.0, "--human-cluster-max-core-pop", help="Cluster core population cap: denser cells are not cores (vectors dilute, R<<1). 0 = no cap."),
     initial_human_prevalence: float = typer.Option(0.05, "--initial-human-prevalence", help="Initial infectious fraction of human population (used in uniform-legacy mode)."),
     initial_vector_infected_frac: float = typer.Option(0.0, "--initial-vector-infected-frac", help="Initial infectious fraction of female mosquitoes."),
     beta_hv: float = typer.Option(0.40, "--beta-hv", help="Human-to-vector transmission probability per bite."),
@@ -325,6 +327,7 @@ def abm(
         human_foci_coords=human_foci_coords,
         human_cluster_radius_km=human_cluster_radius_km,
         human_outbreak_min_density=human_outbreak_min_density,
+        human_cluster_max_core_pop=human_cluster_max_core_pop,
         initial_human_prevalence=initial_human_prevalence,
         initial_vector_infected_frac=initial_vector_infected_frac,
         beta_hv=beta_hv,
@@ -387,24 +390,311 @@ def _render_animation(
             typer.echo(f"Transmission animation failed (exit {e.code}): no transmission snapshots?", err=True)
 
 
-@app.command()
-def score(
+@app.command("score")
+def score_cmd(
     run_dir: Path = typer.Option(..., "--run-dir", help="Directory with ABM outputs"),
-    tier: Tier = typer.Option(Tier.FAST, "--tier", help="Test tier: fast (10 scorers) or full (+LLM)"),
+    aoi: str | None = typer.Option(None, "--aoi", help="AOI slug (auto-detected from run metadata if omitted)"),
+    only: str = typer.Option("", "--only", help="Comma-separated scorer names to run (e.g. d2,d15)"),
+    skip: str = typer.Option("", "--skip", help="Comma-separated scorer names to exclude"),
+    enable: str = typer.Option("", "--enable", help="Comma-separated MANUAL (AOI-dependent) scorers to activate, e.g. d16_suitability_auc,d25_occurrence_auc"),
+    config: Path | None = typer.Option(None, "--config", help="Optional scorers YAML config"),
+    list_scorers: bool = typer.Option(False, "--list", help="List registered scorers and exit"),
 ) -> None:
-    """Run calibration scorers against ABM outputs.
+    """Score a completed ABM run and save scorecard.json inside the run dir.
 
-    Compares simulated epidemic curves, seasonality, and spatial patterns
-    against observed data to produce a composite score.
+    Runs every registered scorer against the run's artifacts (state COGs,
+    cohort/aquatic JSONs), computes the composite (weighted geometric mean
+    of biological + external-validation dimensions), reports binary gates
+    apart, and writes scorecard.json into --run-dir.
 
-    Key parameters:
-      --run-dir: Path to ABM output directory
-      --tier: 'fast' (10 scorers, ~1s) or 'full' (10 scorers + LLM, ~30s)
+    AOI-dependent scorers (occurrence AUC, urban ratio, case-data match)
+    are MANUAL: they never run unless explicitly activated with --enable
+    or enabled: true in a scoring YAML — they need per-AOI datasets that
+    not every AOI has.
+
+    Examples:
+      malariasim score --run-dir runs/abm/2024-2025-seed0001
+      malariasim score --run-dir runs/abm --only d2_survival,d15_persistence
+      malariasim score --run-dir runs/abm --enable d25_occurrence_auc
+      malariasim score --run-dir runs/abm --skip g24_urban_ratio --list
     """
-    from .scoring import run_calibration
+    from .scoring import format_summary, list_scorers as ls, run_scoring
 
-    result = run_calibration(run_dir=run_dir, tier=tier.value)
-    typer.echo(f"Scoring result: {result}")
+    if list_scorers:
+        for row in ls():
+            typer.echo(
+                f"{row['kind']:9s} {row['name']:28s} w={row['weight']} "
+                f"manual={row['manual']}  {row['description']}"
+            )
+        return
+
+    only_list = [s.strip() for s in only.split(",") if s.strip()] or None
+    skip_list = [s.strip() for s in skip.split(",") if s.strip()] or None
+    enable_list = [s.strip() for s in enable.split(",") if s.strip()] or None
+    scorecard = run_scoring(
+        run_dir=run_dir,
+        aoi=aoi,
+        config_path=config,
+        only=only_list,
+        skip=skip_list,
+        enable=enable_list,
+    )
+    typer.echo(format_summary(scorecard))
+
+
+@app.command("validate-detections")
+def validate_detections(
+    aoi: str = typer.Option(..., "--aoi", help="AOI slug (explicit; e.g. ghana)"),
+    occurrence: Path | None = typer.Option(
+        None, "--occurrence", help="Detection spots TSV (default: AOI occurrence dataset)"
+    ),
+    days: int = typer.Option(365, "--days", help="Simulation length (>= 365 recommended)"),
+    year: int = typer.Option(2024, "--year", help="Simulation start year"),
+    seed: int = typer.Option(1, "--seed", help="PRNG seed"),
+    radius_km: float = typer.Option(5.0, "--radius-km", help="Seed snap + coverage radius (km)"),
+    n_adults: int = typer.Option(500, "--n-adults-per-detection", help="Adults seeded per spot"),
+    n_larvae: int = typer.Option(200, "--n-larvae-per-detection", help="Larvae seeded per spot"),
+    snapshot_every: int = typer.Option(30, "--snapshot-every", help="Snapshot interval in days"),
+    output_dir: Path = typer.Option(
+        Path("runs/validate-detections"), "--output-dir", help="Where to place the run"
+    ),
+    compile: bool = typer.Option(False, "--compile", "-c", help="Compile the engine first"),
+) -> None:
+    """Launch-and-measure detection coverage validation (feeds D16).
+
+    Seeds mosquitoes at the AOI's real detection spots (explicit seeding
+    mode), runs the ABM for --days, then scores D16_detection_coverage:
+    the fraction of spots whose surroundings (radius_km) hold simulated
+    adults in the final state. This is the only validation that RUNS a
+    simulation instead of scoring an existing run.
+
+    Example:
+      malariasim validate-detections --aoi ghana --days 365 --seed 1
+    """
+    from .scoring import format_summary, run_scoring
+    from .scoring.scorers.base import load_occurrence_spots
+
+    if occurrence is None:
+        for pattern in (
+            f"data/{aoi}/{aoi}_occurrence.txt",
+            f"data/{aoi}_idit/occurrence.txt",
+        ):
+            p = Path(pattern)
+            if p.exists():
+                occurrence = p
+                break
+    if occurrence is None or not occurrence.exists():
+        typer.echo(f"Error: occurrence dataset not found for AOI {aoi!r}", err=True)
+        raise typer.Exit(code=1)
+
+    lats, lons = load_occurrence_spots(occurrence)
+    if len(lats) == 0:
+        typer.echo("Error: no valid detection spots in occurrence dataset", err=True)
+        raise typer.Exit(code=1)
+    detection_points = ";".join(f"{la:.6f},{lo:.6f}" for la, lo in zip(lats, lons))
+    typer.echo(f"Seeding {len(lats)} detection spots (radius {radius_km} km)...")
+
+    if compile:
+        from .abm import compile_abm
+
+        success, message = compile_abm()
+        if not success:
+            typer.echo(f"Compilation failed:\n{message}", err=True)
+            raise typer.Exit(code=1)
+        typer.echo(f"Compilation successful: {message}")
+
+    from .abm import run_abm_from_manifest
+
+    run_dir = output_dir / f"{aoi}-{days}d-seed{seed:04d}"
+    result = run_abm_from_manifest(
+        aoi=aoi,
+        year=year,
+        month=1,
+        seed=seed,
+        days=days,
+        n_rollouts=1,
+        snapshot_every=snapshot_every,
+        timeout=None,
+        output_dir=run_dir,
+        data_root=None,
+        worktree=None,
+        seeding_mode="explicit",
+        detection_points=detection_points,
+        detection_radius_km=radius_km,
+        n_adults_per_detection=n_adults,
+        n_larvae_per_detection=n_larvae,
+    )
+    typer.echo(f"Validation run complete: {result}")
+
+    scorecard = run_scoring(
+        run_dir=run_dir,
+        aoi=aoi,
+        enable=["D16_detection_coverage"],
+    )
+    typer.echo(format_summary(scorecard))
+
+
+@app.command("validate-cases")
+def validate_cases(
+    aoi: str = typer.Option("ghana", "--aoi", help="AOI slug (explicit; dataset-dependent, ghana-only score)"),
+    start_year: int = typer.Option(2022, "--start-year", help="First simulation year (warm-up)"),
+    n_years: int = typer.Option(2, "--n-years", help="Number of years to simulate (last year = contrast)"),
+    seed: int = typer.Option(1, "--seed", help="PRNG seed"),
+    warmup_months: int = typer.Option(12, "--warmup-months", help="Initial months discarded before the comparison"),
+    init_frac: float = typer.Option(0.30, "--init-frac", help="UNIFORM seeding: fraction of K seeded per patch"),
+    vector_infected_frac: float = typer.Option(1.0, "--vector-infected-frac", help="Initial infected fraction of the vector pool"),
+    snapshot_every: int = typer.Option(30, "--snapshot-every", help="Snapshot interval in days"),
+    output_dir: Path = typer.Option(Path("runs/validate-cases"), "--output-dir", help="Output root"),
+    compile: bool = typer.Option(False, "--compile", "-c", help="Compile the engine first"),
+    skip_download: bool = typer.Option(False, "--skip-download", help="Skip the auto download/ingest step"),
+) -> None:
+    """Launch-and-measure reported-cases validation (feeds D25).
+
+    Runs the ABM with country-wide uniform mosquito seeding and the whole
+    vector pool initially infected (--enable-transmission), for
+    --n-years. The first --warmup-months are warm-up; the last full
+    simulated year is compared against the DHIMS-II reported cases of
+    the SAME calendar year (Ghana-only dataset, auto-downloaded).
+
+    Example:
+      malariasim validate-cases --aoi ghana --start-year 2022 --n-years 2
+    """
+    from .scoring import format_summary, run_scoring
+
+    years = [start_year + i for i in range(n_years)]
+    env_nc = _ensure_env_stack(aoi, years, skip=skip_download)
+    typer.echo(f"Env stack ready: {env_nc}")
+
+    if compile:
+        from .abm import compile_abm
+
+        success, message = compile_abm()
+        if not success:
+            typer.echo(f"Compilation failed:\n{message}", err=True)
+            raise typer.Exit(code=1)
+        typer.echo(f"Compilation successful: {message}")
+
+    from .abm import run_abm_from_manifest
+
+    run_dir = output_dir / f"{aoi}-{years[0]}-{years[-1]}-seed{seed:04d}"
+    result = run_abm_from_manifest(
+        aoi=aoi,
+        year=start_year,
+        month=1,
+        days=n_years * 365,
+        seed=seed,
+        n_rollouts=1,
+        snapshot_every=snapshot_every,
+        timeout=None,
+        output_dir=run_dir,
+        data_root=None,
+        worktree=None,
+        seeding_mode="uniform",
+        init_frac=init_frac,
+        enable_transmission=True,
+        human_seeding_mode="none",
+        initial_vector_infected_frac=vector_infected_frac,
+        env=str(env_nc),
+    )
+    typer.echo(f"Validation run complete: {result['output_path']}")
+
+    scorecard = run_scoring(
+        run_dir=run_dir,
+        aoi=aoi,
+        enable=["D25_cases_ghana"],
+        ctx_extras={"warmup_months": warmup_months},
+    )
+    typer.echo(format_summary(scorecard))
+
+
+def _ensure_env_stack(aoi: str, years: list[int], skip: bool = False) -> Path:
+    """Ensure the env NC covering ``years`` (and ABM inputs) exist.
+
+    Downloads raw datasets via the plugin registry and builds the daily
+    env NC + habitat/hosts/mobility artifacts when missing. Returns the
+    env NC path.
+    """
+    from pathlib import Path as P
+
+    data_dir = P("data") / aoi
+    y_min, y_max = min(years), max(years)
+    env_nc = data_dir / f"{aoi}_regional_{y_min}_{y_max}_env.nc"
+    if env_nc.exists():
+        return env_nc
+    if skip:
+        raise FileNotFoundError(f"env NC missing and --skip-download set: {env_nc}")
+
+    from .download import run_download
+    from .ingest.daily_nc import build_daily_env_nc
+
+    typer.echo(f"Auto-download: raw datasets for {y_min}-{y_max}...")
+    run_download(
+        aoi=aoi,
+        datasets=["chirps", "era5", "modis"],
+        outputs=["rainfall_daily", "temp_suitability", "water_temp", "wind_6hourly", "ndvi"],
+        years=years,
+        months=None,
+        output_dir=data_dir,
+    )
+    for dataset, outputs in (
+        ("jrc_gsw", ["water_occurrence"]),
+        ("dem", ["elevation"]),
+        ("worldpop", ["population"]),
+        ("glw", ["cattle", "goats", "sheep", "pigs", "chickens"]),
+        ("ghsl", ["urban_class"]),
+        ("buildings", ["building_fraction"]),
+        ("wildlife", ["wildlife_host_proxy"]),
+        ("coastline", ["land_mask"]),
+    ):
+        run_download(aoi=aoi, datasets=[dataset], outputs=outputs, years=None, months=None, output_dir=data_dir)
+
+    typer.echo("Building daily env NC...")
+    info = build_daily_env_nc(aoi=aoi, data_dir=data_dir)
+    built = P(str(info.get("env_path", env_nc)))
+    if not env_nc.exists() and built.exists():
+        env_nc = built
+    if not env_nc.exists():
+        raise FileNotFoundError(f"env NC build failed: {built}")
+
+    _ensure_abm_inputs(aoi, data_dir)
+    return env_nc
+
+
+def _ensure_abm_inputs(aoi: str, data_dir: Path) -> None:
+    """Ensure habitat patches, host grid and mobility matrices exist."""
+    from mal_commonlib.aoi import AOI
+    from .ingest import build_host_dataset, build_mobility_dataset
+
+    habitat = data_dir / f"{aoi}_habitat_patches.gpkg"
+    if not habitat.exists():
+        from .ingest import build_env_tensor
+
+        typer.echo("Building habitat patches (env builder)...")
+        build_env_tensor(
+            aoi=aoi,
+            year=2024,
+            month=1,
+            output_dir=data_dir,
+            data_root=data_dir.parent,
+        )
+        built = data_dir / f"{aoi}_regional_2024_01_habitat_patches.gpkg"
+        if not habitat.exists():
+            if built.exists():
+                built.replace(habitat)
+            else:
+                raise FileNotFoundError("habitat patch gpkg build failed")
+
+    hosts = data_dir / f"{aoi}_host_static.nc"
+    if not hosts.exists():
+        typer.echo("Building host grid (WorldPop + livestock)...")
+        build_host_dataset(AOI.from_slug(aoi), output_dir=data_dir)
+
+    csr = list(data_dir.glob(f"{aoi}_mobility_*.csr"))
+    if len(csr) < 2:
+        typer.echo("Building mobility matrices (this can take a while)...")
+        build_mobility_dataset(
+            hosts_path=hosts, output_dir=data_dir, aoi_slug=aoi
+        )
 
 
 @app.command()
@@ -449,19 +739,19 @@ def feedback(
     run_dir: Path = typer.Option(..., "--run-dir", help="Directory with ABM outputs"),
     baseline_dir: Path | None = typer.Option(None, "--baseline", help="Baseline for comparison"),
 ) -> None:
-    """Generate feedback from calibration results.
+    """Generate feedback from scoring results.
 
-    Produces a human-readable summary of where the simulation diverges
-    from observed data, with optional baseline comparison.
+    Produces a human-readable summary of the weakest dimensions, failed
+    gates, and optional baseline comparison.
 
     Key parameters:
-      --run-dir: Path to scored ABM output directory
+      --run-dir: Path to a scored ABM output directory
       --baseline: Optional baseline run directory for comparison
     """
-    from .scoring import get_feedback, run_calibration
+    from .scoring import get_feedback, run_scoring
 
-    scorecard = run_calibration(run_dir=run_dir)
-    baseline = run_calibration(run_dir=baseline_dir) if baseline_dir else None
+    scorecard = run_scoring(run_dir=run_dir)
+    baseline = run_scoring(run_dir=baseline_dir) if baseline_dir else None
     fb = get_feedback(scorecard, baseline)
     typer.echo(fb)
 

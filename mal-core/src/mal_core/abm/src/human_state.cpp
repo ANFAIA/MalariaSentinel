@@ -184,26 +184,36 @@ std::vector<std::pair<int32_t, int32_t>> HumanCompartmentGrid::seed_outbreak_clu
     }
     if (cands.empty()) return seeded;
 
-    // 2. Total cluster population → proportional share per cell. Cells
-    //    can receive at most their susceptible count (seed_infections
-    //    truncates); redistribute the remainder over the next-largest
-    //    cells so a small-core cluster still concentrates the cases.
-    double pop_total = 0.0;
-    for (const auto& cd : cands) pop_total += cd.pop;
-    if (pop_total <= 0.0) return seeded;
-
+    // 2. Share per cell ∝ pop × (0.05 + mosquito density): cases
+    //    concentrate where humans AND vectors coexist — the imported
+    //    cases land in the transmission-receptive part of the cluster,
+    //    not in the densest (most diluting) cell. The 0.05 floor keeps
+    //    temporarily vector-free cells in the pool. Cells can receive
+    //    at most their susceptible count (seed_infections truncates);
+    //    redistribute the remainder over the next-largest cells so a
+    //    small-core cluster still concentrates the cases.
     std::vector<double> shares(cands.size());
-    double remaining = total_cases;
+    double w_total = 0.0;
     for (size_t i = 0; i < cands.size(); ++i) {
-        shares[i] = total_cases * (cands[i].pop / pop_total);
+        const size_t idx = static_cast<size_t>(cands[i].r) *
+            static_cast<size_t>(w_) + static_cast<size_t>(cands[i].c);
+        const float dens = (idx < mosquito_density.size())
+            ? mosquito_density[idx] : 0.0f;
+        const double wt = static_cast<double>(cands[i].pop) *
+            (0.05 + static_cast<double>(dens));
+        shares[i] = wt;
+        w_total += wt;
     }
-    // Largest-share-first seeding: big cells take their full share, then
-    // leftovers flow to smaller cells (two-pass greedy).
+    if (w_total <= 0.0) return seeded;
+    for (double& s : shares) s = total_cases * (s / w_total);
+    // Largest-share-first seeding: receptive cells take their full
+    // share, then leftovers flow to the rest (two-pass greedy).
     std::vector<size_t> order(cands.size());
     for (size_t i = 0; i < order.size(); ++i) order[i] = i;
     std::sort(order.begin(), order.end(), [&](size_t a, size_t b) {
         return shares[a] > shares[b];
     });
+    double remaining = total_cases;
     for (size_t k = 0; k < order.size() && remaining > 1e-9; ++k) {
         const size_t i = order[k];
         const size_t idx = static_cast<size_t>(cands[i].r) *
