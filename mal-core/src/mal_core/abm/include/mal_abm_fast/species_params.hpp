@@ -38,9 +38,14 @@ struct SpeciesParams {
     float pref_sheep    = 0.001f;
     float pref_wildlife = 0.001f;
 
-    // Host-seeking kernel scale/radius (metres).
-    float host_seeking_scale_m  = 100.0f;
-    float host_seeking_radius_m = 300.0f;
+    // Host-seeking kernel scale/radius (metres). Radius 1500 m: An.
+    // gambiae host-seeking flight is 0.5-2 km (Gillies & Wilkes 1970;
+    // Costantini 1996 MRR; see papers/anopheles-dynamics/
+    // biting-rate-eip-gonotrophic-parameters-reference.md) — the old
+    // 300 m default left females on water cells unable to reach hosts
+    // one cell away (a_effective 0.006/d vs literature 0.3/d).
+    float host_seeking_scale_m  = 300.0f;
+    float host_seeking_radius_m = 1500.0f;
 
     // Salinity response (psu). salinity_suitability() below maps a psu
     // value to a habitat-fitness multiplier in [0,1].

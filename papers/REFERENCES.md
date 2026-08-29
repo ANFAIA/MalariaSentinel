@@ -108,6 +108,7 @@ Papers sobre biología, ecología y dinámica poblacional de los vectores *Anoph
 - **Agyekum 2022** — Datos Ghana temperatura inmaduros (© Wiley — fair use) [Paper 18]
 - **Ouédraogo 2024** — Desarrollo acuático Burkina Faso (CC-BY 4.0) [Paper 19]
 - **Diallo 2026** — Continuous MRR Mali (CC-BY 4.0 — preprint) [Paper 20]
+- **biting-rate-eip-gonotrophic-parameters-reference.md** — Nota interna: tasa de picadura (a), EIP (Detinova 111/(T−16)), ciclo gonotrófico, supervivencia y valores usados por ABMs (Eckhoff 2011, Griffin 2010, Bomblies 2008, Smith & McKenzie 2004). Fuentes web compiladas (Malar J, PLoS, Nat Comms, WRR).
 
 ### `papers/perplexity-investigations/`
 Notas de investigación generadas internamente mediante Perplexity AI.
