@@ -61,6 +61,12 @@ struct TransmissionParams {
     // (independent foci wherever viability picks them).
     double      human_cluster_radius_km   = 0.0;
     int32_t     human_cluster_radius_cells = 0;               // derived by the CLI from radius_km / resolution
+    // Adaptive trigger (M7.4.1): when > 0, the outbreak waits (daily
+    // retry) until the best viable core cell reaches this normalized
+    // mosquito density (grid = agents / K_MAX, clipped to [0,1]; 0.1
+    // ≈ 100 females in the cell). Guarantees the concentrated outbreak
+    // lands where the vector population is actually established.
+    float       human_outbreak_min_density = 0.0f;
 
     // Threshold for active transmission focus band
     float focus_threshold = 0.01f;

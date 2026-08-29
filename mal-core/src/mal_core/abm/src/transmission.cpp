@@ -125,6 +125,16 @@ void TransmissionModel::check_and_trigger_outbreak(
         return;
     }
 
+    // Adaptive gate (M7.4.1): wait until some viable cell carries a
+    // meaningful vector population before seeding the outbreak.
+    if (params_.human_outbreak_min_density > 0.0f) {
+        float max_density = 0.0f;
+        for (const float d : mosquito_density) {
+            if (d > max_density) max_density = d;
+        }
+        if (max_density < params_.human_outbreak_min_density) return;  // retry tomorrow
+    }
+
     if (params_.human_seeding_mode == "random-viable") {
         if (mosquito_density.empty()) {
             std::cerr << "warning: outbreak not seeded: no current mosquito density\n";

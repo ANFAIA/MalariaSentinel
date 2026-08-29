@@ -355,6 +355,7 @@ OUTPUT
     double human_outbreak_cases         = 50.0;
     double human_min_cell_pop           = 50.0;
     double human_cluster_radius_km      = 0.0;
+    float  human_outbreak_min_density   = 0.0f;
     std::string human_foci_coords       = "";
     float  transmission_focus_threshold = 0.01f;
     int    transmission_snapshot_every  = 0;
@@ -623,6 +624,14 @@ OUTPUT
         ->default_val(0.0)
         ->check(CLI::NonNegativeNumber)
         ->group("Transmission (SEIR-SEI)");
+    run->add_option("--human-outbreak-min-density", human_outbreak_min_density,
+                    "Adaptive trigger: outbreak waits until the best viable "
+                    "cell reaches this normalized mosquito density "
+                    "(agents/K_MAX; 0.1 ~ 100 females). 0 = trigger "
+                    "exactly on --human-outbreak-day.")
+        ->default_val(0.0f)
+        ->check(CLI::NonNegativeNumber)
+        ->group("Transmission (SEIR-SEI)");
     run->add_option("--initial-vector-infected-frac", initial_vector_infected_frac,
                     "Initial infectious fraction of adult female mosquitoes (default 0.0).")
         ->default_val(0.0)
@@ -774,6 +783,7 @@ OUTPUT
                   << " cells (" << human_cluster_radius_km << " km), total cases "
                   << human_outbreak_cases << "\n";
     }
+    transmission_params.human_outbreak_min_density = human_outbreak_min_density;
     transmission_params.focus_threshold = transmission_focus_threshold;
 
     // -- Rollouts loop (F1.c) -------------------------------------------
