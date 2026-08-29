@@ -25,8 +25,8 @@ SpeciesParams species_params_for(MosquitoSpeciesId id) {
             sp.pref_goat          = 0.003f;
             sp.pref_sheep         = 0.001f;
             sp.pref_wildlife      = 0.001f;
-            sp.host_seeking_scale_m  = 100.0f;
-            sp.host_seeking_radius_m = 300.0f;
+            sp.host_seeking_scale_m  = 300.0f;
+            sp.host_seeking_radius_m = 1500.0f;
             sp.salinity_opt_ppt   = 0.0f;
             sp.salinity_hi_tol_ppt = 30.0f;
             sp.salinity_slope     = 0.08f;
@@ -41,8 +41,8 @@ SpeciesParams species_params_for(MosquitoSpeciesId id) {
             sp.pref_goat          = 0.003f;
             sp.pref_sheep         = 0.001f;
             sp.pref_wildlife      = 0.001f;
-            sp.host_seeking_scale_m  = 100.0f;
-            sp.host_seeking_radius_m = 300.0f;
+            sp.host_seeking_scale_m  = 300.0f;
+            sp.host_seeking_radius_m = 1500.0f;
             sp.salinity_opt_ppt   = 0.0f;
             sp.salinity_hi_tol_ppt = 20.0f;
             sp.salinity_slope     = 0.12f;
@@ -57,8 +57,8 @@ SpeciesParams species_params_for(MosquitoSpeciesId id) {
             sp.pref_goat          = 0.003f;
             sp.pref_sheep         = 0.001f;
             sp.pref_wildlife      = 0.001f;
-            sp.host_seeking_scale_m  = 100.0f;
-            sp.host_seeking_radius_m = 300.0f;
+            sp.host_seeking_scale_m  = 300.0f;
+            sp.host_seeking_radius_m = 1500.0f;
             sp.salinity_opt_ppt   = 0.0f;
             sp.salinity_hi_tol_ppt = 15.0f;
             sp.salinity_slope     = 0.15f;
@@ -74,7 +74,7 @@ SpeciesParams species_params_for(MosquitoSpeciesId id) {
             sp.pref_sheep         = 0.10f;
             sp.pref_wildlife      = 0.05f;
             sp.host_seeking_scale_m  = 120.0f;
-            sp.host_seeking_radius_m = 300.0f;
+            sp.host_seeking_radius_m = 1500.0f;
             sp.salinity_opt_ppt   = 0.0f;
             sp.salinity_hi_tol_ppt = 15.0f;
             sp.salinity_slope     = 0.15f;
@@ -90,8 +90,8 @@ SpeciesParams species_params_for(MosquitoSpeciesId id) {
             sp.pref_goat          = 0.003f;
             sp.pref_sheep         = 0.001f;
             sp.pref_wildlife      = 0.001f;
-            sp.host_seeking_scale_m  = 100.0f;
-            sp.host_seeking_radius_m = 300.0f;
+            sp.host_seeking_scale_m  = 300.0f;
+            sp.host_seeking_radius_m = 1500.0f;
             sp.salinity_opt_ppt   = 0.0f;
             sp.salinity_hi_tol_ppt = 38.0f;
             sp.salinity_slope     = 0.02f;
@@ -105,8 +105,8 @@ SpeciesParams species_params_for(MosquitoSpeciesId id) {
             sp.pref_goat          = 0.05f;
             sp.pref_sheep         = 0.05f;
             sp.pref_wildlife      = 0.05f;
-            sp.host_seeking_scale_m  = 100.0f;
-            sp.host_seeking_radius_m = 300.0f;
+            sp.host_seeking_scale_m  = 300.0f;
+            sp.host_seeking_radius_m = 1500.0f;
             sp.salinity_opt_ppt   = 0.0f;
             sp.salinity_hi_tol_ppt = 20.0f;
             sp.salinity_slope     = 0.15f;
