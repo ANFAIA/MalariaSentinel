@@ -290,7 +290,11 @@ DailyEnvBands read_env_nc(const std::string& path, int32_t max_days) {
     DailyEnvBands out;
     out.transform.fill(0.0);
 
-    auto read_variable = [&](const char* varname) -> std::vector<float> {
+    // `static_plane=true` reads a single-plane variable (e.g. static
+    // TWI) and skips the n_days consistency check that time-series
+    // variables must satisfy.
+    auto read_variable = [&](const char* varname,
+                             bool static_plane = false) -> std::vector<float> {
         auto it = subdatasets.find(varname);
         if (it == subdatasets.end()) {
             throw std::runtime_error(
@@ -313,7 +317,9 @@ DailyEnvBands read_env_nc(const std::string& path, int32_t max_days) {
         }
 
         // Determine how many bands to read
-        const int bands_to_read = (max_days > 0 && max_days < nbands) ? max_days : nbands;
+        const int bands_to_read = static_plane
+            ? nbands
+            : ((max_days > 0 && max_days < nbands) ? max_days : nbands);
 
         std::vector<float> result;
         for (int i = 1; i <= bands_to_read; ++i) {
@@ -328,13 +334,15 @@ DailyEnvBands read_env_nc(const std::string& path, int32_t max_days) {
             result.insert(result.end(), br.data.begin(), br.data.end());
         }
 
-        if (out.n_days == 0) {
-            out.n_days = bands_to_read;
-        } else if (out.n_days != bands_to_read) {
-            throw std::runtime_error(
-                std::string("env_reader::read_env_nc: variable '")
-                + varname + "' has " + std::to_string(bands_to_read)
-                + " time steps, expected " + std::to_string(out.n_days));
+        if (!static_plane) {
+            if (out.n_days == 0) {
+                out.n_days = bands_to_read;
+            } else if (out.n_days != bands_to_read) {
+                throw std::runtime_error(
+                    std::string("env_reader::read_env_nc: variable '")
+                    + varname + "' has " + std::to_string(bands_to_read)
+                    + " time steps, expected " + std::to_string(out.n_days));
+            }
         }
         return result;
     };
@@ -369,6 +377,41 @@ DailyEnvBands read_env_nc(const std::string& path, int32_t max_days) {
         for (float& x : out.permanent_water_mask) {
             if (!std::isfinite(x) || x < 0.0f) x = 0.0f;
             else if (x > 1.0f) x = 1.0f;
+        }
+    }
+
+    // Optional static TWI (plan §6.3 pluvial-pool rules; M7.4.1).
+    // Static variable: single band (no time dimension). A file without
+    // 'twi' must load identically (twi stays empty; the coordinator
+    // treats missing TWI as 0 and the urban rule falls back to
+    // rain + building-cover gating).
+    if (subdatasets.count("twi") != 0) {
+        std::vector<float> v = read_variable("twi", /*static_plane=*/true);
+        const size_t expected =
+            static_cast<size_t>(out.h) * static_cast<size_t>(out.w);
+        if (v.size() == expected) {
+            for (float& x : v) {
+                if (!std::isfinite(x) || x < 0.0f) x = 0.0f;
+            }
+            out.twi = std::move(v);
+        }
+        // Size mismatch (e.g. stale variable) → leave empty, warn-free:
+        // the simulation proceeds with the documented fallback.
+    }
+
+    // Optional static per-cell capacity multiplier (M7.4.1): feeds the
+    // Beverton-Holt larval cap K_patch = K_MAX × mult through the
+    // coordinator's K_eff view. Absent → legacy urban-only K_eff.
+    if (subdatasets.count("k_capacity_mult") != 0) {
+        std::vector<float> v =
+            read_variable("k_capacity_mult", /*static_plane=*/true);
+        const size_t expected =
+            static_cast<size_t>(out.h) * static_cast<size_t>(out.w);
+        if (v.size() == expected) {
+            for (float& x : v) {
+                if (!std::isfinite(x) || x < 0.0f) x = 0.0f;
+            }
+            out.k_capacity_mult = std::move(v);
         }
     }
 

@@ -118,6 +118,22 @@ public:
 
     bool outbreak_triggered() const { return outbreak_triggered_; }
 
+    /// Audit record for one seeded focus (plan §5.2: foci must be logged).
+    struct FociLogEntry {
+        int32_t row  = 0;
+        int32_t col  = 0;
+        double  cases           = 0.0;  // actually seeded (post-truncation)
+        double  cell_population = 0.0;  // human population of the cell
+        float   mosquito_density = 0.0f; // adult density in the cell at seed time
+        bool    truncated = false;      // true when cases were capped by cell pop
+    };
+
+    /// Foci seeded by the most recent (successful) outbreak trigger.
+    const std::vector<FociLogEntry>& last_foci_log() const { return last_foci_log_; }
+
+    /// Dump the last foci log to `path` as a small JSON sidecar.
+    void write_foci_log(const std::string& path) const;
+
     /// Advance extrinsic incubation period (EIP) for all exposed adult females (E_V -> I_V).
     void advance_vector_eip(MosquitoSoA& soa,
                             const ClimateEngine& climate,
@@ -162,6 +178,7 @@ private:
     TransmissionDailyStats last_day_stats_{};
     std::vector<TransmissionDailyStats> history_;
     bool outbreak_triggered_ = false;
+    std::vector<FociLogEntry> last_foci_log_;
 };
 
 }  // namespace mal_abm_fast

@@ -39,7 +39,13 @@ namespace mal_abm_fast {
 enum class SeedingMode {
     UNIFORM,        // backward compat: init_frac of K in all patches
     RANDOM_VIABLE,  // N random points from viable patches
-    EXPLICIT        // user-provided lat/lon
+    EXPLICIT,       // user-provided lat/lon
+    HOST_WEIGHTED   // N viable patches sampled ∝ nearby host abundance
+                    // weighted by species host preferences (mirrors
+                    // HostSeekingModel::cell_attraction, no decay cap).
+                    // Places the initial population where blood meals
+                    // actually are; subsequent dispersal/oviposition
+                    // behaviour is the model's own (M7.4.1 iteration).
 };
 
 // A user-supplied detection point. In EXPLICIT mode the (lat, lon)
@@ -50,6 +56,22 @@ struct DetectionPoint {
     double  lon       = 0.0;
     int32_t n_adults  = 500;
     int32_t n_larvae  = 200;
+};
+
+// Species host preference weights used by HOST_WEIGHTED seeding.
+// Mirror of the SpeciesParams pref_* model attraction weights (plan §5.3).
+// Defaults are ZERO on purpose: the canonical values live in the C++
+// registry `species_params_for()` (species_params.cpp, literature-sourced)
+// and the Engine always stamps them in from `species_params_` — the same
+// object that drives runtime host-seeking. Zero defaults make an
+// unfilled config fail loudly (nothing seeded) instead of silently
+// seeding with stale copies of species constants.
+struct HostPrefWeights {
+    float human    = 0.0f;
+    float cattle   = 0.0f;
+    float goat     = 0.0f;
+    float sheep    = 0.0f;
+    float wildlife = 0.0f;
 };
 
 // Configuration for the detection-based seeding subsystem.
@@ -74,6 +96,12 @@ struct SeedingConfig {
     // Viability filter (applies to RANDOM_VIABLE).
     float min_water_frac = 0.05f;
     float min_twi        = 8.0f;
+
+    // For HOST_WEIGHTED:
+    double host_weight_radius_km = 5.0;  // search radius around each patch
+    float  host_seeking_scale_m  = 100.0f;  // Gaussian decay scale (metres);
+                                            // mirror SpeciesParams::host_seeking_scale_m
+    HostPrefWeights host_prefs;          // species host preferences
 };
 
 // Per-patch seeding instruction. Built by the coordinator and
@@ -115,6 +143,29 @@ std::vector<SeedInstruction> build_seed_instructions_for_patches(
     const std::vector<int32_t>& viable_patch_ids,
     const std::vector<std::array<double, 2>>& patch_lonlat,
     const std::vector<std::array<int32_t, 2>>& patch_rowcol,
+    Prng& rng);
+
+// HOST_WEIGHTED mode builder.
+//
+// `cell_host_score` — flat (h × w) per-cell host attractiveness:
+//   Σ_k hosts_k(x) · pref_k · indoor_mod · urban_mod   (no decay yet;
+//   decay is applied per-patch below). Computed by the coordinator
+//   from the HostLandscape using config.host_prefs.
+//
+// Patch weight W_p = Σ_{c within radius} score(c) · exp(-dist(p,c)/scale).
+// Patches are sampled without replacement ∝ W_p (roulette with removal),
+// up to config.n_detections; each chosen patch receives
+// n_adults_per_detection adults + n_larvae_per_detection larvae.
+// Patches with zero weight (no hosts within radius) are never sampled.
+std::vector<SeedInstruction> build_seed_instructions_host_weighted(
+    const SeedingConfig& config,
+    const std::vector<int32_t>& viable_patch_ids,
+    const std::vector<std::array<double, 2>>& patch_lonlat,
+    const std::vector<std::array<int32_t, 2>>& patch_rowcol,
+    const std::vector<float>& cell_host_score,
+    int32_t grid_h,
+    int32_t grid_w,
+    float cell_size_m,
     Prng& rng);
 
 }  // namespace mal_abm_fast

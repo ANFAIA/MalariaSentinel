@@ -69,6 +69,23 @@ void CoordinatorModel::build_K_eff_grid() {
         return;
     }
     const size_t hw = static_cast<size_t>(H) * static_cast<size_t>(W);
+
+    // M7.4.1: literature-anchored per-cell capacity from the env NC
+    // (`k_capacity_mult`, computed at ingest from water area × NDVI ×
+    // urban/shallow modifiers). K_patch = K_MAX × mult, so an empty
+    // entry means "no productive water" and the multiplier carries the
+    // absolute scale (values > 1 are expected and intended).
+    const std::vector<float> kcm = climate_->k_capacity_mult();
+    if (kcm.size() == hw) {
+        K_eff_grid_.assign(hw, 0.0f);
+        for (size_t i = 0; i < hw; ++i) {
+            K_eff_grid_[i] = kcm[i];
+        }
+        return;
+    }
+
+    // Legacy path: host-landscape-only urban clamp (back-compat for
+    // env NCs without k_capacity_mult).
     K_eff_grid_.assign(hw, 1.0f);
     for (int32_t r = 0; r < H; ++r) {
         for (int32_t c = 0; c < W; ++c) {
@@ -185,14 +202,26 @@ std::vector<PatchState> CoordinatorModel::to_dataframe() {
             // antecedent_rain_7d >= R_min) AND TWI >= TWI_urban_min.
             // The TWI term uses the urban-specific lower threshold
             // because drainage is imperfect in built-up cells.
+            //
+            // TWI-missing fallback (M7.4.1 iteration): the env NC
+            // contract does not carry a TWI band, so twi_val reads 0
+            // everywhere and the urban rule could never fire — leaving
+            // the model with no aquatic habitats near cities (the gpkg
+            // patch set is rural-surface-water derived). When TWI data
+            // is absent we gate urban pools on rain + built cover only;
+            // the URBAN_DENSITY_CAP_FRACTION cap and the rain gate keep
+            // the rule bounded. With TWI present, behaviour is unchanged.
             bool urban_candidate = false;
             if (host_landscape_ != nullptr) {
                 const HostCell hc = host_landscape_->at(r, c);
+                const bool twi_ok = has_twi
+                    ? (twi_val >= urban_twi_min_)
+                    : true;
                 urban_candidate = hc.urban_class == URBAN_CLASS_THRESHOLD &&
                     hc.building_fraction >= urban_b_min_ &&
                     (rain_val >= urban_r_min_mm_ ||
                      rain_7d_val >= urban_r_min_mm_) &&
-                    twi_val >= urban_twi_min_;
+                    twi_ok;
             }
 
             if (permanent || ((terrain_candidate || urban_candidate) &&
@@ -382,8 +411,55 @@ std::vector<SeedInstruction> CoordinatorModel::build_seed_instructions(
     //    coordinator owns the per-rollout Prng, so the random
     //    selection in RANDOM_VIABLE mode goes through it (keeping
     //    the stream reproducible).
-    std::vector<SeedInstruction> out = build_seed_instructions_for_patches(
-        config, viable_ids, viable_lonlat, viable_rowcol, rng_);
+    std::vector<SeedInstruction> out;
+    if (config.mode == SeedingMode::HOST_WEIGHTED) {
+        // HOST_WEIGHTED: compute per-cell host attractiveness from the
+        // host landscape using the species' preference weights, then
+        // let the builder weigh each viable patch by the nearby host
+        // field (Gaussian decay, mirroring host-seeking attraction).
+        if (host_landscape_ == nullptr) {
+            throw std::runtime_error(
+                "build_seed_instructions: HOST_WEIGHTED seeding requires "
+                "--hosts (HostLandscape) to be loaded");
+        }
+        const int32_t gh = host_landscape_->h();
+        const int32_t gw = host_landscape_->w();
+        std::vector<float> cell_host_score(
+            static_cast<size_t>(gh) * static_cast<size_t>(gw), 0.0f);
+        const HostPrefWeights& prefs = config.host_prefs;
+        for (int32_t r = 0; r < gh; ++r) {
+            for (int32_t c = 0; c < gw; ++c) {
+                const HostCell cell = host_landscape_->at(r, c);
+                // Same structure as HostSeekingModel::cell_attraction
+                // (host_seeking.cpp): hosts × pref × indoor × urban,
+                // without the per-cell distance decay (applied per patch).
+                const float indoor_mod =
+                    1.0f + cell.indoor_fraction * 0.72f;
+                const float urban_mod = 1.0f + 0.2f * cell.urbanicity;
+                const float mod = indoor_mod * urban_mod;
+                float att = 0.0f;
+                att += cell.humans_present    * prefs.human;
+                att += cell.cattle_present    * prefs.cattle;
+                att += cell.goats_present     * prefs.goat;
+                att += cell.sheep_present     * prefs.sheep;
+                att += cell.pigs_present      * prefs.cattle;   // pigs ≈ cattle
+                att += cell.chickens_present  * prefs.wildlife; // chickens ≈ other
+                att += cell.wildlife_proxy    * prefs.wildlife;
+                att *= mod;
+                if (att > 0.0f) {
+                    cell_host_score[static_cast<size_t>(r) *
+                        static_cast<size_t>(gw) + static_cast<size_t>(c)] = att;
+                }
+            }
+        }
+        const float cell_size_m = static_cast<float>(aoi_.resolution_m);
+        out = build_seed_instructions_host_weighted(
+            config, viable_ids, viable_lonlat, viable_rowcol,
+            cell_host_score, gh, gw, cell_size_m, rng_);
+    } else {
+        out = build_seed_instructions_for_patches(
+            config, viable_ids, viable_lonlat, viable_rowcol, rng_);
+    }
 
     // 3. M17.4 PR-A: stamp the urban_capacity_factor from the host
     //    landscape onto each instruction. Mirrors the calculation in

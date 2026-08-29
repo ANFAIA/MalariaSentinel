@@ -14,6 +14,7 @@
 
 #include <cmath>
 #include <cstdint>
+#include <iostream>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -139,6 +140,30 @@ void ClimateEngine::load_from_env_nc(const std::string& path,
         permanent_water_nc_.reset();
     }
 
+    // Optional static TWI grid (plan §6.3 pluvial-pool rules). Static:
+    // single h*w plane, no time dimension.
+    if (bands.twi.size() == static_cast<size_t>(bands.h) *
+        static_cast<size_t>(bands.w)) {
+        twi_ = std::move(bands.twi);
+        std::cout << "ClimateEngine: env NC carries static TWI grid ("
+                  << h_ << "x" << w_ << ")\n";
+    } else {
+        twi_.clear();
+    }
+
+    // Optional static per-cell capacity multiplier (M7.4.1): consumed by
+    // CoordinatorModel::build_K_eff_grid to set the Beverton-Holt larval
+    // cap K_patch = K_MAX × mult per cell (literature-anchored formula
+    // computed at ingest time).
+    if (bands.k_capacity_mult.size() == static_cast<size_t>(bands.h) *
+        static_cast<size_t>(bands.w)) {
+        k_capacity_mult_ = std::move(bands.k_capacity_mult);
+        std::cout << "ClimateEngine: env NC carries static k_capacity_mult "
+                  << "grid (" << h_ << "x" << w_ << ")\n";
+    } else {
+        k_capacity_mult_.clear();
+    }
+
     // Populate single-day accessors for day 0 (backwards compat).
     rain_.assign(h_ * w_, 0.0f);
     temp_.assign(h_ * w_, 25.0f);
@@ -231,8 +256,14 @@ std::shared_ptr<ClimateEngine> ClimateEngine::clone_for_thread() const {
         clone->ndvi_  = ndvi_;
         clone->salinity_ = salinity_;
         clone->permanent_water_ = permanent_water_;
-        clone->twi_   = twi_;
     }
+
+    // Static grids are shared read-only with the clone (M7.4.1).
+    // NOTE: twi_/k_capacity_mult_ may come from either the env NC
+    // (load_from_env_nc on the shared engine) or the COG path — copy
+    // them unconditionally so both branches behave identically.
+    clone->twi_ = twi_;
+    clone->k_capacity_mult_ = k_capacity_mult_;
 
     return clone;
 }

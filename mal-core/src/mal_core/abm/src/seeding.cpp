@@ -26,6 +26,7 @@
 #include <array>
 #include <cmath>
 #include <cstdint>
+#include <iostream>
 #include <stdexcept>
 #include <vector>
 
@@ -82,6 +83,112 @@ inline int32_t find_nearest_patch(
 }
 
 }  // namespace
+
+std::vector<SeedInstruction> build_seed_instructions_host_weighted(
+    const SeedingConfig& config,
+    const std::vector<int32_t>& viable_patch_ids,
+    const std::vector<std::array<double, 2>>& patch_lonlat,
+    const std::vector<std::array<int32_t, 2>>& patch_rowcol,
+    const std::vector<float>& cell_host_score,
+    int32_t grid_h,
+    int32_t grid_w,
+    float cell_size_m,
+    Prng& rng) {
+    std::vector<SeedInstruction> out;
+    const size_t n_patches = viable_patch_ids.size();
+    if (n_patches == 0 || cell_host_score.empty() ||
+        grid_h <= 0 || grid_w <= 0 || !(cell_size_m > 0.0f)) {
+        return out;
+    }
+    if (cell_host_score.size() !=
+        static_cast<size_t>(grid_h) * static_cast<size_t>(grid_w)) {
+        throw std::runtime_error(
+            "build_seed_instructions_host_weighted: cell_host_score size "
+            "does not match grid dimensions");
+    }
+
+    // -- 1. Per-patch weight: Σ nearby host score with Gaussian decay ---
+    // Mirrors HostSeekingModel::cell_attraction's distance kernel
+    // (exp(-dist/scale)) but sums host density rather than a single
+    // target cell: patches surrounded by preferred hosts weigh most.
+    const double scale_m = (config.host_seeking_scale_m > 0.0f)
+        ? static_cast<double>(config.host_seeking_scale_m) : 100.0;
+    const double radius_km = std::max(0.05, config.host_weight_radius_km);
+    const int32_t search_cells = static_cast<int32_t>(
+        std::ceil(radius_km * 1000.0 / static_cast<double>(cell_size_m)));
+    const double radius_m = radius_km * 1000.0;
+
+    std::vector<double> weights(n_patches, 0.0);
+    for (size_t i = 0; i < n_patches; ++i) {
+        const int32_t pr = patch_rowcol[i][0];
+        const int32_t pc = patch_rowcol[i][1];
+        if (pr < 0 || pr >= grid_h || pc < 0 || pc >= grid_w) continue;
+        const int32_t r_min = std::max(0, pr - search_cells);
+        const int32_t r_max = std::min(grid_h - 1, pr + search_cells);
+        const int32_t c_min = std::max(0, pc - search_cells);
+        const int32_t c_max = std::min(grid_w - 1, pc + search_cells);
+        double w = 0.0;
+        for (int32_t r = r_min; r <= r_max; ++r) {
+            const double dy = (static_cast<double>(r) - static_cast<double>(pr))
+                * static_cast<double>(cell_size_m);
+            for (int32_t c = c_min; c <= c_max; ++c) {
+                const double dx = (static_cast<double>(c) - static_cast<double>(pc))
+                    * static_cast<double>(cell_size_m);
+                const double dist_m = std::sqrt(dx * dx + dy * dy);
+                if (dist_m > radius_m) continue;
+                const float score = cell_host_score[static_cast<size_t>(r) *
+                    static_cast<size_t>(grid_w) + static_cast<size_t>(c)];
+                if (score <= 0.0f) continue;
+                w += static_cast<double>(score) * std::exp(-dist_m / scale_m);
+            }
+        }
+        weights[i] = w;
+    }
+
+    double total = 0.0;
+    for (const double w : weights) total += w;
+    if (total <= 0.0) {
+        std::cerr << "seeding: host-weighted mode found no hosts within "
+                  << radius_km << " km of any viable patch; nothing seeded\n";
+        return out;
+    }
+
+    // -- 2. Weighted sampling without replacement (roulette w/ removal) --
+    std::vector<double> remaining = weights;
+    const int32_t n = std::min<int32_t>(
+        config.n_detections, static_cast<int32_t>(n_patches));
+    out.reserve(static_cast<size_t>(n));
+    for (int32_t k = 0; k < n; ++k) {
+        double tot = 0.0;
+        for (const double w : remaining) tot += w;
+        if (tot <= 0.0) break;
+        const double draw = rng.uniform_double() * tot;
+        size_t chosen = n_patches;
+        double cum = 0.0;
+        for (size_t i = 0; i < n_patches; ++i) {
+            cum += remaining[i];
+            if (cum >= draw) { chosen = i; break; }
+        }
+        if (chosen == n_patches) {
+            // Floating-point edge: fall back to the last non-zero patch.
+            for (size_t i = n_patches; i-- > 0;) {
+                if (remaining[i] > 0.0) { chosen = i; break; }
+            }
+            if (chosen == n_patches) break;
+        }
+        SeedInstruction inst;
+        inst.patch_id = viable_patch_ids[chosen];
+        inst.row      = patch_rowcol[chosen][0];
+        inst.col      = patch_rowcol[chosen][1];
+        inst.lon      = patch_lonlat[chosen][0];
+        inst.lat      = patch_lonlat[chosen][1];
+        inst.n_adults = config.n_adults_per_detection;
+        inst.n_larvae = config.n_larvae_per_detection;
+        out.push_back(inst);
+        remaining[chosen] = 0.0;  // removal: spread across distinct patches
+    }
+    return out;
+}
 
 std::vector<SeedInstruction> build_seed_instructions_for_patches(
     const SeedingConfig& config,

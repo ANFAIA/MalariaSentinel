@@ -79,6 +79,7 @@ def build_daily_env_nc(
     water_temp_file: pathlib.Path | None = None,
     ndvi_file: pathlib.Path | None = None,
     salinity_file: pathlib.Path | None = None,
+    dem_file: pathlib.Path | None = None,
 ) -> dict:
     """Build the daily env NC for an AOI. Returns manifest-ready dict.
 
@@ -92,6 +93,13 @@ def build_daily_env_nc(
             conventional ``{aoi}_salinity_<start>_<end>_monthly.nc`` discovered
             in data_dir. When absent, no ``salinity_ppt`` variable is emitted
             (backward compatible).
+        dem_file: optional static DEM GeoTIFF. When present, a static
+            ``twi`` variable (Topographic Wetness Index, plan §6.3) is
+            computed via ``mal_commonlib.terrain.twi.compute_twi`` and
+            embedded in the NC so the C++ pluvial-pool urban rule can gate
+            on real terrain data. Defaults to ``{aoi}_elevation.tif``
+            (the DEM downloader's manifest output). When absent, no
+            ``twi`` variable is emitted (backward compatible).
 
     Returns:
         dict with 'env_path' (str), 'format' ('nc'), 'aoi_slug', 'n_days',
@@ -248,7 +256,6 @@ def build_daily_env_nc(
     # Merge: permanent water always has water_frac = 1.0
     if permanent_water_mask is not None:
         water_frac_static = np.maximum(water_frac_static, permanent_water_mask)
-
     # Optionally add wetland contribution (uncomment to enable)
     # if wetland_mask is not None:
     #     water_frac_static = np.clip(water_frac_static + 0.3 * wetland_mask, 0.0, 1.0)
@@ -301,6 +308,142 @@ def build_daily_env_nc(
             if arr is not None:
                 # Cells without SMAP data (land, fill, mission gap) -> freshwater 0.0.
                 salinity_ppt[index] = np.nan_to_num(arr, nan=0.0)
+
+    # --- M7.4.1: static TWI from DEM (plan §6.3 pluvial-pool rules) ------
+    # Embedded as a single-plane ('y', 'x') variable so the C++ env reader
+    # can gate the urban dynamic-pool rule on real terrain. Discovery
+    # follows the DEM downloader manifest output ({aoi}_elevation.tif).
+    dem_file = dem_file or (data_dir / f"{aoi}_elevation.tif")
+    twi_static: np.ndarray | None = None
+    if dem_file.exists():
+        from mal_commonlib.terrain.twi import compute_twi
+
+        print(f"Computing TWI from DEM: {dem_file}")
+        dem_arr = read_static_tif(dem_file, target_shape)
+        dem_arr = dem_arr.astype(np.float32)
+        dem_arr[dem_arr <= NODATA_SENTINEL + 1] = np.nan
+        dem_da = xr.DataArray(
+            dem_arr, dims=("y", "x"), coords={"y": y, "x": x}
+        )
+        # x/y coords are in degrees (EPSG:4326) for regional AOIs:
+        # convert the median degree step to metres (equatorial latitude).
+        deg_step = float(np.median(np.abs(np.diff(x))))
+        cell_size_m = deg_step * 111_320.0 if deg_step > 0 else 1000.0
+        twi_da = compute_twi(dem_da, cell_size_m=cell_size_m)
+        twi_static = np.asarray(twi_da.values, dtype=np.float32)
+        twi_static = np.nan_to_num(twi_static, nan=0.0)
+        twi_static[twi_static < 0.0] = 0.0
+        print(
+            f"TWI: min={twi_static.min():.2f} mean={twi_static.mean():.2f} "
+            f"max={twi_static.max():.2f} | cells TWI>7: "
+            f"{int((twi_static > 7.0).sum())} of {twi_static.size}"
+        )
+    else:
+        print(
+            f"WARNING: no DEM found ({dem_file}) — no 'twi' variable in the "
+            "env NC; the urban pluvial-pool rule will fall back to "
+            "rain + building-cover gating (no terrain gate)."
+        )
+
+    # --- M7.4.1: static per-cell larval→adult capacity multiplier ---------
+    # Literature-anchored (see papers/anopheles-dynamics/depinay-2004-*,
+    # papers/anopheles-dynamics/costantini-1996-*, KB notes):
+    #   * Adult equilibrium per m² of productive water:
+    #       E_daily × τ_adult = 0.143 × 9.3 ≈ 1.33 adults/m²
+    #     E_daily = 0.143/m²/d is the midpoint of field emergence traps
+    #     (0.74-1.8 An. gambiae s.l. adults/m²/week: Ndenga/Fillinger 2011
+    #     PLoS ONE; Fillinger 2009 Malar J 8:62 Gambia).
+    #     τ_adult = 9.3 d (basal survival 0.95/d @27.5 °C; MRR field range
+    #     4.5-14.3 d: Costantini 1996; Diallo 2026).
+    #   * Biomass cross-check (Depinay 2004 K = L_Max·S, L_Max = 300 mg/m²;
+    #     Bomblies 2008: 300→30 mg/m² seasonal): 300-600 larvae/m² ×
+    #     1.8-6.8% egg→adult × (τ/T_larva) ≈ 1.2 adults/m²/week — converges.
+    #   * Permanent water (JRC=1.0) is margin-productive only:
+    #     f_shallow = 0.10 of the cell water area (littoral strips).
+    #     Temporary/rain pools are fully productive (f_shallow = 1.0).
+    #   * Urban cells without standing water get a pluvial-pool water
+    #     proxy (2% of cell × (1 − 0.5·building_fraction)): urban pools
+    #     are as or more productive per m² than natural ones (Accra
+    #     13.7 larvae/dip; Kumasi urban agriculture >80% of city mosquitoes).
+    #   * f_NDVI: tent peaked at NDVI 0.4-0.6 (optimum band; dominant
+    #     suitability predictor with ~2-week lag in field studies).
+    # The NC carries `k_capacity_mult` = K_abs / K_MAX_C(m=1000) so the
+    # C++ Beverton-Holt larval cap K_patch = K_MAX × K_eff picks it up
+    # via the existing per-cell K_eff view.
+    K_E_DAILY = 0.143
+    K_TAU_ADULT_D = 9.3
+    K_A_CELL_M2 = 1.0e6
+    K_SHALLOW_PERMANENT = 0.10
+    K_URBAN_POOL_FRAC = 0.02
+    K_MAX_C = 1000.0
+
+    ndvi_mean = ndvi.mean(axis=0) if ndvi.ndim == 3 else ndvi
+
+    # Static urban structure (from the host dataset): building_fraction
+    # and GHS-SMOD urban_class drive the urban pluvial-pool proxy and
+    # the building cover reduction of effective water area.
+    bldg_static = np.zeros((h, w), dtype=np.float32)
+    urban_class_static = np.zeros((h, w), dtype=np.int32)
+    hosts_nc = data_dir / f"{aoi}_host_static.nc"
+    if hosts_nc.exists():
+        hds = xr.open_dataset(hosts_nc)
+        if "building_fraction" in hds:
+            bldg_static = np.asarray(
+                hds["building_fraction"].squeeze(), dtype=np.float32
+            )
+        if "urban_class" in hds:
+            urban_class_static = np.asarray(
+                hds["urban_class"].squeeze()
+            ).astype(np.int32)
+        hds.close()
+    else:
+        print(
+            "WARNING: no host_static.nc found — k_capacity_mult computed "
+            "without urban modifiers (buildings/urban pools)."
+        )
+
+    def _f_ndvi(v: np.ndarray) -> np.ndarray:
+        f = np.full_like(v, 0.3, dtype=np.float32)
+        rising = (v >= 0.2) & (v < 0.4)
+        f[rising] = 0.3 + 0.7 * (v[rising] - 0.2) / 0.2
+        f[(v >= 0.4) & (v <= 0.6)] = 1.0
+        falling = (v > 0.6) & (v <= 0.8)
+        f[falling] = 1.0 - 0.6 * (v[falling] - 0.6) / 0.2
+        f[v > 0.8] = 0.4
+        return f
+
+    if permanent_water_mask is not None:
+        perm = np.asarray(permanent_water_mask) > 0.5
+    else:
+        perm = water_frac_static >= 1.0
+    f_urban_water = 1.0 - 0.5 * np.clip(bldg_static, 0.0, 1.0)
+
+    water_eff = water_frac_static * _f_ndvi(ndvi_mean) * f_urban_water
+    water_eff = np.where(perm, water_eff * K_SHALLOW_PERMANENT, water_eff)
+
+    # Urban pluvial-pool proxy: built-up cells with no standing water
+    # still produce rain pools after storms (drainage, tyre tracks,
+    # construction sites).
+    urban_no_water = (
+        (urban_class_static == 30) if urban_class_static is not None
+        else np.zeros_like(water_frac_static, dtype=bool)
+    ) & (water_frac_static < 0.05) & (bldg_static >= 0.05)
+    urban_water_proxy = (
+        K_URBAN_POOL_FRAC
+        * (1.0 - 0.5 * np.clip(bldg_static, 0.0, 1.0))
+        * _f_ndvi(ndvi_mean)
+    )
+    water_eff = np.where(urban_no_water, urban_water_proxy, water_eff)
+
+    k_abs = K_E_DAILY * K_TAU_ADULT_D * K_A_CELL_M2 * water_eff
+    k_capacity_mult = (k_abs / K_MAX_C).astype(np.float32)
+    k_capacity_mult = np.clip(k_capacity_mult, 0.0, 500.0)  # sane cap
+    n_k_cells = int((k_capacity_mult >= 1.0).sum())
+    print(
+        "k_capacity_mult: cells with K>=1000 adults: "
+        f"{n_k_cells}; median K on habitat cells: "
+        f"{float(np.median(k_capacity_mult[k_capacity_mult > 0]) * K_MAX_C):.0f}"
+    )
 
     ds = xr.Dataset(
         {
@@ -363,6 +506,22 @@ def build_daily_env_nc(
             {"long_name": "Wetland mask (ESA WorldCover class 90)", "units": "1"},
         )
 
+    if twi_static is not None:
+        ds["twi"] = (
+            ["y", "x"], twi_static,
+            {"long_name": "Topographic Wetness Index (static, from DEM)",
+             "units": "1"},
+        )
+
+    ds["k_capacity_mult"] = (
+        ["y", "x"], k_capacity_mult,
+        {"long_name": "Per-cell adult capacity multiplier "
+                      "(K_patch = K_MAX * mult; literature-anchored: "
+                      "emergence 0.143/m2/d x tau 9.3 d x water area "
+                      "x NDVI/urban/shallow modifiers)",
+         "units": "1"},
+    )
+
     # Core variables are always written with zlib; diagnostic vars too
     encoding_vars = ["water_frac", "rainfall", "water_temp_c", "ndvi"]
     if salinity_ppt is not None:
@@ -371,6 +530,9 @@ def build_daily_env_nc(
         encoding_vars.append("permanent_water_mask")
     if wetland_mask is not None:
         encoding_vars.append("wetland_mask")
+    if twi_static is not None:
+        encoding_vars.append("twi")
+    encoding_vars.append("k_capacity_mult")
 
     encoding = {v: {"dtype": "float32", "zlib": True, "complevel": 4}
                 for v in encoding_vars}

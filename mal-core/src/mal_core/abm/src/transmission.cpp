@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <fstream>
 #include <iostream>
 #include <stdexcept>
 
@@ -130,7 +131,7 @@ void TransmissionModel::check_and_trigger_outbreak(
             return;
         }
         const double infectious_before = human_grid_.compute_stats().total_infectious;
-        human_grid_.seed_random_viable_foci(
+        const auto seeded = human_grid_.seed_random_viable_foci(
             params_.human_outbreak_foci,
             params_.human_outbreak_cases,
             params_.human_min_cell_pop,
@@ -140,6 +141,21 @@ void TransmissionModel::check_and_trigger_outbreak(
         outbreak_triggered_ = infectious_after > infectious_before;
         if (!outbreak_triggered_) {
             std::cerr << "warning: outbreak not seeded: no viable focus received cases\n";
+            return;
+        }
+        last_foci_log_.clear();
+        for (const auto& [r, c] : seeded) {
+            const size_t idx = static_cast<size_t>(r) * static_cast<size_t>(w_) +
+                               static_cast<size_t>(c);
+            FociLogEntry e;
+            e.row = r;
+            e.col = c;
+            e.cell_population = human_grid_.population()[idx];
+            e.mosquito_density = (idx < mosquito_density.size())
+                ? mosquito_density[idx] : 0.0f;
+            e.cases = std::min(params_.human_outbreak_cases, e.cell_population);
+            e.truncated = e.cell_population < params_.human_outbreak_cases;
+            last_foci_log_.push_back(e);
         }
     } else if (params_.human_seeding_mode == "explicit") {
         auto foci = parse_explicit_foci(params_.human_foci_coords, params_.human_outbreak_cases);
@@ -149,6 +165,22 @@ void TransmissionModel::check_and_trigger_outbreak(
         outbreak_triggered_ = infectious_after > infectious_before;
         if (!outbreak_triggered_) {
             std::cerr << "warning: outbreak not seeded: explicit foci received no cases\n";
+            return;
+        }
+        last_foci_log_.clear();
+        for (const auto& [r, c, cases] : foci) {
+            if (r < 0 || r >= h_ || c < 0 || c >= w_) continue;
+            const size_t idx = static_cast<size_t>(r) * static_cast<size_t>(w_) +
+                               static_cast<size_t>(c);
+            FociLogEntry e;
+            e.row = r;
+            e.col = c;
+            e.cell_population = human_grid_.population()[idx];
+            e.mosquito_density = (idx < mosquito_density.size())
+                ? mosquito_density[idx] : 0.0f;
+            e.cases = cases;
+            e.truncated = e.cell_population < cases;
+            last_foci_log_.push_back(e);
         }
     }
 }
@@ -281,6 +313,29 @@ void TransmissionModel::record_daily_stats(
 
     last_day_stats_ = stats;
     history_.push_back(stats);
+}
+
+void TransmissionModel::write_foci_log(const std::string& path) const {
+    if (path.empty() || last_foci_log_.empty()) return;
+    std::ofstream out(path);
+    if (!out) {
+        std::cerr << "warning: cannot write foci log to '" << path << "'\n";
+        return;
+    }
+    out << "{\n  \"day\": " << last_day_stats_.day << ",\n";
+    out << "  \"seeding_mode\": \"" << params_.human_seeding_mode << "\",\n";
+    out << "  \"foci\": [\n";
+    for (size_t i = 0; i < last_foci_log_.size(); ++i) {
+        const auto& e = last_foci_log_[i];
+        out << "    {\"row\": " << e.row
+            << ", \"col\": " << e.col
+            << ", \"cases\": " << e.cases
+            << ", \"cell_population\": " << e.cell_population
+            << ", \"mosquito_density\": " << e.mosquito_density
+            << ", \"truncated\": " << (e.truncated ? "true" : "false")
+            << "}" << (i + 1 < last_foci_log_.size() ? "," : "") << "\n";
+    }
+    out << "  ]\n}\n";
 }
 
 }  // namespace mal_abm_fast

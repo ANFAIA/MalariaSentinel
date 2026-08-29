@@ -121,10 +121,38 @@ Engine::Engine(AOI aoi,
     // test harness.
     const int32_t n_patches = static_cast<int32_t>(habitat_->patches().size());
 
+    // HOST_WEIGHTED seeding needs the host landscape before the
+    // submodel is constructed (patch weights come from nearby host
+    // abundance). Load it early in that mode; the generic load below
+    // then skips because host_landscape_ is already set.
+    if (seeding_config.mode == SeedingMode::HOST_WEIGHTED &&
+        !hosts_path.empty() && !host_landscape_) {
+        host_landscape_ = std::make_unique<HostLandscape>();
+        host_landscape_->load_from_nc(hosts_path, aoi_);
+        coord_->set_host_landscape(host_landscape_.get());
+        std::cout << "Engine: loaded HostLandscape (early, HOST_WEIGHTED "
+                  << "seeding) from " << hosts_path << "\n";
+    }
+
+    // Stamp the species' host preferences + host-seeking decay scale
+    // into the seeding config so HOST_WEIGHTED patch weighting mirrors
+    // the runtime host-seeking attraction model.
+    seeding_config.host_prefs = HostPrefWeights{
+        species_params_.pref_human,
+        species_params_.pref_cattle,
+        species_params_.pref_goat,
+        species_params_.pref_sheep,
+        species_params_.pref_wildlife,
+    };
+    seeding_config.host_seeking_scale_m = species_params_.host_seeking_scale_m;
+
     if (seeding_config.mode == SeedingMode::UNIFORM) {
-        // Legacy path: init_frac of K in every patch.
+        // Legacy path: init_frac of K in every patch. The fraction
+        // comes from the seeding config (CLI --init-frac) with the
+        // historical 0.30 default preserved.
         sub_ = std::make_unique<MosquitoSubmodel>(
-            n_patches, K_PER_PATCH_DEFAULT, INIT_FRAC, sub_seed, overrides_);
+            n_patches, K_PER_PATCH_DEFAULT, seeding_config.init_frac,
+            sub_seed, overrides_);
     } else {
         // Detection-based path: ask the coordinator to filter
         // habitat patches by viability (water_frac / TWI) and
@@ -142,7 +170,7 @@ Engine::Engine(AOI aoi,
     }
 
     // -- Optional host-seeking components -----------------------------------
-    if (!hosts_path.empty()) {
+    if (!hosts_path.empty() && !host_landscape_) {
         host_landscape_ = std::make_unique<HostLandscape>();
         host_landscape_->load_from_nc(hosts_path, aoi_);
         std::cout << "Engine: loaded HostLandscape from " << hosts_path << "\n";
@@ -164,7 +192,7 @@ Engine::Engine(AOI aoi,
         mobility_schedule_ = std::make_unique<MobilitySchedule>();
         mobility_schedule_->load_from_directory(mobility_dir, aoi_);
         if (mobility_schedule_->has_data()) {
-            std::cout << "Engine: loaded MobilitySchedule (" 
+            std::cout << "Engine: loaded MobilitySchedule ("
                       << mobility_schedule_->n_matrices() << " matrices) from "
                       << mobility_dir << "\n";
         }
@@ -288,9 +316,38 @@ Engine::Engine(AOI aoi,
 
     const int32_t n_patches = static_cast<int32_t>(habitat_->patches().size());
 
+    // HOST_WEIGHTED seeding needs the host landscape before the
+    // submodel is constructed (patch weights come from nearby host
+    // abundance). Load it early in that mode; the generic load below
+    // then skips because host_landscape_ is already set.
+    if (seeding_config.mode == SeedingMode::HOST_WEIGHTED &&
+        !hosts_path.empty() && !host_landscape_) {
+        host_landscape_ = std::make_unique<HostLandscape>();
+        host_landscape_->load_from_nc(hosts_path, aoi_);
+        coord_->set_host_landscape(host_landscape_.get());
+        std::cout << "Engine: loaded HostLandscape (early, HOST_WEIGHTED "
+                  << "seeding) from " << hosts_path << "\n";
+    }
+
+    // Stamp the species' host preferences + host-seeking decay scale
+    // into the seeding config so HOST_WEIGHTED patch weighting mirrors
+    // the runtime host-seeking attraction model.
+    seeding_config.host_prefs = HostPrefWeights{
+        species_params_.pref_human,
+        species_params_.pref_cattle,
+        species_params_.pref_goat,
+        species_params_.pref_sheep,
+        species_params_.pref_wildlife,
+    };
+    seeding_config.host_seeking_scale_m = species_params_.host_seeking_scale_m;
+
     if (seeding_config.mode == SeedingMode::UNIFORM) {
+        // Legacy path: init_frac of K in every patch. The fraction
+        // comes from the seeding config (CLI --init-frac) with the
+        // historical 0.30 default preserved.
         sub_ = std::make_unique<MosquitoSubmodel>(
-            n_patches, K_PER_PATCH_DEFAULT, INIT_FRAC, sub_seed, overrides_);
+            n_patches, K_PER_PATCH_DEFAULT, seeding_config.init_frac,
+            sub_seed, overrides_);
     } else {
         const std::vector<SeedInstruction> instructions =
             coord_->build_seed_instructions(seeding_config);
@@ -304,7 +361,7 @@ Engine::Engine(AOI aoi,
     }
 
     // -- Optional host-seeking components -----------------------------------
-    if (!hosts_path.empty()) {
+    if (!hosts_path.empty() && !host_landscape_) {
         host_landscape_ = std::make_unique<HostLandscape>();
         host_landscape_->load_from_nc(hosts_path, aoi_);
         std::cout << "Engine: loaded HostLandscape from " << hosts_path << "\n";
@@ -434,6 +491,10 @@ void Engine::step() {
         const DensityGrid current_density = coord_->aggregate_density(*sub_, K_MAX);
         transmission_model_->check_and_trigger_outbreak(
             day_index, current_density.data);
+        if (transmission_model_->outbreak_triggered() &&
+            !foci_log_path_.empty()) {
+            transmission_model_->write_foci_log(foci_log_path_);
+        }
         transmission_model_->advance_vector_eip(
             sub_->soa_mutable(), *climate_, coord_->patch_states_today(), aoi_);
         transmission_model_->advance_human_transmission(

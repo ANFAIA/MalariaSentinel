@@ -152,6 +152,11 @@ public:
     const TransmissionModel* transmission() const { return transmission_model_.get(); }
     TransmissionModel* transmission_mutable() { return transmission_model_.get(); }
 
+    /// Optional JSON sidecar path: when set, a successful focal outbreak
+    /// trigger dumps its foci audit log (row/col/cases/pop/density) there
+    /// (plan §5.2). Empty disables.
+    void set_foci_log_path(std::string path) { foci_log_path_ = std::move(path); }
+
     // (patch_id, row, col) of the first detection-based seeding
     // instruction produced by the constructor. Returns {-1, 0, 0}
     // for UNIFORM mode (no detection-based seeding). Used by the
@@ -198,6 +203,7 @@ private:
     // M7.4: SEIR-SEI Transmission Model
     TransmissionParams                      transmission_params_;
     std::unique_ptr<TransmissionModel>      transmission_model_;
+    std::string                             foci_log_path_;
 
     // Extract per-cell residential human / livestock grids from the
     // loaded HostLandscape (row-major, length h*w). Used to configure

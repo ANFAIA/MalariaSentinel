@@ -73,6 +73,12 @@ struct DailyEnvBands {
     std::vector<float>  salinity_ppt;   // psu; empty if the NC has no
                                         // salinity_ppt variable (= freshwater)
     std::vector<float>  permanent_water_mask; // optional 0..1 mask
+    std::vector<float>  twi;            // optional static TWI grid (h*w);
+                                        // empty if the NC has no twi variable
+                                        // (pluvial-pool urban rule falls back)
+    std::vector<float>  k_capacity_mult; // optional static per-cell capacity
+                                        // multiplier (h*w); K_patch =
+                                        // K_MAX × mult. Empty = legacy.
     int32_t             n_days = 0;
     int32_t             h      = 0;
     int32_t             w      = 0;

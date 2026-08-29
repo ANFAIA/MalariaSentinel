@@ -81,6 +81,11 @@ public:
     std::vector<float> twi_grid() const { return twi_; }
     void set_twi_grid(std::vector<float> t) { twi_ = std::move(t); }
 
+    /// Optional static per-cell capacity multiplier (M7.4.1): the env NC
+    /// `k_capacity_mult` variable — K_patch = K_MAX × mult via the
+    /// coordinator's K_eff view. Empty = legacy behaviour (urban clamp).
+    std::vector<float> k_capacity_mult() const { return k_capacity_mult_; }
+
     // -- Daily NetCDF support (daily-env-netcdf feature) ----------------------
 
     // Read a NetCDF daily env file and populate multi-day bands. The NC
@@ -114,6 +119,8 @@ private:
     std::vector<float>   salinity_; // psu; empty = freshwater everywhere
     std::vector<float>   permanent_water_;
     std::vector<float>   twi_;      // optional 5th band; empty = zeros
+    std::vector<float>   k_capacity_mult_;  // optional static capacity
+                                            // multiplier; empty = legacy
     // Daily NC state - shared across threads via shared_ptr
     std::shared_ptr<std::vector<float>>   rain_nc_;      // n_days * h * w
     std::shared_ptr<std::vector<float>>   water_temp_nc_;// n_days * h * w (deg C, no inverse)

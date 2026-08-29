@@ -317,6 +317,8 @@ OUTPUT
     int         n_adults_per_detection = 50;
     int         n_larvae_per_detection = 30;
     std::string detection_points_str;
+    float       init_frac = 0.30f;               // UNIFORM mode
+    double      host_seeding_radius_km = 5.0;    // HOST_WEIGHTED mode
 
     // Host data (optional; if not provided, no host-seeking).
     std::string hosts_path;
@@ -447,8 +449,26 @@ OUTPUT
                     "each seeded with adults + larvae\n"
                     "  uniform — init_frac of K in every patch\n"
                     "  explicit — user lat/lon points snapped to nearest "
-                    "habitat patch")
+                    "habitat patch\n"
+                    "  host-weighted — N viable patches sampled in "
+                    "proportion to nearby host abundance weighted by the "
+                    "species' host preferences (requires --hosts)")
         ->default_val("random-viable")
+        ->group("Seeding");
+    run->add_option("--init-frac", init_frac,
+                    "UNIFORM mode: fraction of K seeded in every patch "
+                    "(legacy constant was 0.30). Higher values shorten the "
+                    "vector population warm-up but do not change the "
+                    "carrying-capacity equilibrium.")
+        ->default_val(0.30f)
+        ->check(CLI::Bound(0.0f, 1.0f))
+        ->group("Seeding");
+    run->add_option("--host-seeding-radius-km", host_seeding_radius_km,
+                    "HOST_WEIGHTED mode: search radius (km) around each "
+                    "viable patch for host cells when computing its seed "
+                    "weight.")
+        ->default_val(5.0)
+        ->check(CLI::PositiveNumber)
         ->group("Seeding");
     run->add_option("--detection-radius-km", detection_radius_km,
                     "Max snap distance (km) from explicit point to "
@@ -637,16 +657,20 @@ OUTPUT
                          "at least one point in --detection-points\n";
             return EXIT_FAILURE;
         }
+    } else if (seeding_mode == "host-weighted") {
+        seeding_config.mode = mal_abm_fast::SeedingMode::HOST_WEIGHTED;
     } else {
         std::cerr << "abm_run: unknown --seeding-mode '" << seeding_mode
-                  << "' (expected 'random-viable', 'uniform', or "
-                     "'explicit')\n";
+                  << "' (expected 'random-viable', 'uniform', "
+                      "'explicit', or 'host-weighted')\n";
         return EXIT_FAILURE;
     }
     seeding_config.detection_radius_km  = detection_radius_km;
     seeding_config.n_detections         = n_detections;
     seeding_config.n_adults_per_detection = n_adults_per_detection;
     seeding_config.n_larvae_per_detection = n_larvae_per_detection;
+    seeding_config.init_frac            = init_frac;
+    seeding_config.host_weight_radius_km = host_seeding_radius_km;
 
     // -- Runtime overrides for dispersal / larval parameters -----------
     mal_abm_fast::RuntimeOverrides overrides;
@@ -715,6 +739,11 @@ OUTPUT
     transmission_params.human_infectious_days = human_infectious_days;
     transmission_params.immunity_duration_days = immunity_duration_days;
     transmission_params.immunity_enabled = enable_immunity;
+    if (!enable_immunity) {
+        std::cerr << "abm_run: NOTE --enable-immunity not set: humans "
+                     "recover I_H -> S_H directly (SIS); R_H stays 0 and "
+                     "--immunity-duration-days is ignored.\n";
+    }
     transmission_params.initial_human_prevalence = initial_human_prevalence;
     transmission_params.initial_vector_infected_frac = initial_vector_infected_frac;
     transmission_params.human_seeding_mode = human_seeding_mode;
@@ -789,6 +818,21 @@ OUTPUT
         // -- Rollout output path --------------------------------------
         const std::string rollout_path =
             rollout_output_path(output_path, i, n_rollouts);
+
+        // -- Foci audit log sidecar (plan §5.2) ------------------------
+        if (enable_transmission && !rollout_path.empty()) {
+            std::string foci_path = rollout_path;
+            const std::string suffix = ".tif";
+            if (foci_path.size() > suffix.size() &&
+                foci_path.compare(foci_path.size() - suffix.size(),
+                                  suffix.size(), suffix) == 0) {
+                foci_path.replace(foci_path.size() - suffix.size(),
+                                  suffix.size(), "_foci.json");
+            } else {
+                foci_path += "_foci.json";
+            }
+            engine.set_foci_log_path(foci_path);
+        }
 
         // -- Cohort log collection -----------------------------------
         std::vector<mal_abm_fast::DailyStats> cohort_log;
