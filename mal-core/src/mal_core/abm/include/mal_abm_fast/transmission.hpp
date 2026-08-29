@@ -52,6 +52,15 @@ struct TransmissionParams {
     double      human_outbreak_cases      = 50.0;            // Cases per focus
     double      human_min_cell_pop        = 50.0;            // Minimum human population in candidate cell
     std::string human_foci_coords         = "";              // "r1,c1:N1;r2,c2:N2"
+    // Cluster mode (M7.4.1 iteration): when > 0, all outbreak cases are
+    // seeded as ONE spatially concentrated outbreak — a single core cell
+    // (random-viable: highest-population viable cell; explicit: the given
+    // coordinate) plus satellite cells within this radius (in grid cells;
+    // a 1 km cell ⇒ radius_km * 1000 / resolution_m). Cases are split
+    // across cluster cells ∝ cell population. 0 = legacy behaviour
+    // (independent foci wherever viability picks them).
+    double      human_cluster_radius_km   = 0.0;
+    int32_t     human_cluster_radius_cells = 0;               // derived by the CLI from radius_km / resolution
 
     // Threshold for active transmission focus band
     float focus_threshold = 0.01f;

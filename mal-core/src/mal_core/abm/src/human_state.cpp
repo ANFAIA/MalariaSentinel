@@ -150,6 +150,74 @@ void HumanCompartmentGrid::seed_explicit_foci(
     }
 }
 
+std::vector<std::pair<int32_t, int32_t>> HumanCompartmentGrid::seed_outbreak_cluster(
+    int32_t core_row,
+    int32_t core_col,
+    double total_cases,
+    int32_t radius_cells,
+    double min_pop,
+    const std::vector<float>& mosquito_density,
+    Prng& rng)
+{
+    std::vector<std::pair<int32_t, int32_t>> seeded;
+    if (total_cases <= 0.0 || radius_cells < 0) return seeded;
+    if (core_row < 0 || core_row >= h_ || core_col < 0 || core_col >= w_) {
+        return seeded;
+    }
+
+    // 1. Candidate cluster cells: Chebyshev window around the core,
+    //    human pop >= min_pop. Core always included (min(pop, cases)).
+    struct Candidate { int32_t r, c; double pop; };
+    std::vector<Candidate> cands;
+    const int32_t r0 = std::max(0, core_row - radius_cells);
+    const int32_t r1 = std::min(h_ - 1, core_row + radius_cells);
+    const int32_t c0 = std::max(0, core_col - radius_cells);
+    const int32_t c1 = std::min(w_ - 1, core_col + radius_cells);
+    for (int32_t r = r0; r <= r1; ++r) {
+        for (int32_t c = c0; c <= c1; ++c) {
+            const size_t idx = static_cast<size_t>(r) * static_cast<size_t>(w_) +
+                               static_cast<size_t>(c);
+            if (population_[idx] >= min_pop) {
+                cands.push_back({r, c, population_[idx]});
+            }
+        }
+    }
+    if (cands.empty()) return seeded;
+
+    // 2. Total cluster population → proportional share per cell. Cells
+    //    can receive at most their susceptible count (seed_infections
+    //    truncates); redistribute the remainder over the next-largest
+    //    cells so a small-core cluster still concentrates the cases.
+    double pop_total = 0.0;
+    for (const auto& cd : cands) pop_total += cd.pop;
+    if (pop_total <= 0.0) return seeded;
+
+    std::vector<double> shares(cands.size());
+    double remaining = total_cases;
+    for (size_t i = 0; i < cands.size(); ++i) {
+        shares[i] = total_cases * (cands[i].pop / pop_total);
+    }
+    // Largest-share-first seeding: big cells take their full share, then
+    // leftovers flow to smaller cells (two-pass greedy).
+    std::vector<size_t> order(cands.size());
+    for (size_t i = 0; i < order.size(); ++i) order[i] = i;
+    std::sort(order.begin(), order.end(), [&](size_t a, size_t b) {
+        return shares[a] > shares[b];
+    });
+    for (size_t k = 0; k < order.size() && remaining > 1e-9; ++k) {
+        const size_t i = order[k];
+        const size_t idx = static_cast<size_t>(cands[i].r) *
+            static_cast<size_t>(w_) + static_cast<size_t>(cands[i].c);
+        const double want = std::min(shares[i], remaining);
+        const double before = infectious_[idx];
+        seed_infections(cands[i].r, cands[i].c, want);
+        remaining -= (infectious_[idx] - before);
+        seeded.push_back({cands[i].r, cands[i].c});
+    }
+    (void)rng;  // deterministic distribution; rng kept for API symmetry
+    return seeded;
+}
+
 void HumanCompartmentGrid::advance_day(
     const std::vector<double>& force_of_infection,
     Prng& rng)

@@ -131,6 +131,60 @@ void TransmissionModel::check_and_trigger_outbreak(
             return;
         }
         const double infectious_before = human_grid_.compute_stats().total_infectious;
+
+        if (params_.human_cluster_radius_cells > 0) {
+            // Cluster mode: ONE concentrated outbreak. Core = viable cell
+            // with the largest human population (mosquitoes must be
+            // present, so the chain can actually start); cases spread ∝
+            // population over the neighbourhood window.
+            const auto& pop = human_grid_.population();
+            int64_t best = -1;
+            double best_pop = params_.human_min_cell_pop;
+            for (int64_t c = 0; c < h_ * w_; ++c) {
+                const size_t idx = static_cast<size_t>(c);
+                if (pop[idx] <= best_pop) continue;
+                if (idx >= mosquito_density.size() ||
+                    mosquito_density[idx] <= 0.0f) continue;
+                best = c;
+                best_pop = pop[idx];
+            }
+            if (best < 0) {
+                std::cerr << "warning: outbreak not seeded: no viable "
+                             "cluster core (pop >= min and mosquitoes present)\n";
+                return;
+            }
+            const int32_t br = static_cast<int32_t>(best / w_);
+            const int32_t bc = static_cast<int32_t>(best % w_);
+            const auto seeded = human_grid_.seed_outbreak_cluster(
+                br, bc,
+                params_.human_outbreak_cases,
+                params_.human_cluster_radius_cells,
+                /*min_pop=*/1.0,
+                mosquito_density,
+                rng_);
+            const double infectious_after = human_grid_.compute_stats().total_infectious;
+            outbreak_triggered_ = infectious_after > infectious_before;
+            if (!outbreak_triggered_) {
+                std::cerr << "warning: outbreak not seeded: cluster received no cases\n";
+                return;
+            }
+            last_foci_log_.clear();
+            for (const auto& [r, c] : seeded) {
+                const size_t idx = static_cast<size_t>(r) * static_cast<size_t>(w_) +
+                                   static_cast<size_t>(c);
+                FociLogEntry e;
+                e.row = r;
+                e.col = c;
+                e.cell_population = human_grid_.population()[idx];
+                e.mosquito_density = (idx < mosquito_density.size())
+                    ? mosquito_density[idx] : 0.0f;
+                e.cases = human_grid_.infectious()[idx];
+                e.truncated = e.cell_population < e.cases;
+                last_foci_log_.push_back(e);
+            }
+            return;
+        }
+
         const auto seeded = human_grid_.seed_random_viable_foci(
             params_.human_outbreak_foci,
             params_.human_outbreak_cases,
@@ -160,6 +214,58 @@ void TransmissionModel::check_and_trigger_outbreak(
     } else if (params_.human_seeding_mode == "explicit") {
         auto foci = parse_explicit_foci(params_.human_foci_coords, params_.human_outbreak_cases);
         const double infectious_before = human_grid_.compute_stats().total_infectious;
+
+        if (params_.human_cluster_radius_cells > 0 && !foci.empty()) {
+            // Cluster mode with explicit coords: core = the given cell
+            // with the largest population; total cases = sum of the
+            // given per-cell cases. One concentrated outbreak.
+            int32_t core_i = 0;
+            double core_pop = -1.0;
+            double total_cases = 0.0;
+            for (size_t i = 0; i < foci.size(); ++i) {
+                const auto& [r, c, cases] = foci[i];
+                total_cases += cases;
+                if (r >= 0 && r < h_ && c >= 0 && c < w_) {
+                    const size_t idx = static_cast<size_t>(r) * static_cast<size_t>(w_) +
+                                       static_cast<size_t>(c);
+                    if (human_grid_.population()[idx] > core_pop) {
+                        core_pop = human_grid_.population()[idx];
+                        core_i = static_cast<int32_t>(i);
+                    }
+                }
+            }
+            const auto& [cr, cc, ccase] = foci[static_cast<size_t>(core_i)];
+            (void)ccase;
+            const auto seeded = human_grid_.seed_outbreak_cluster(
+                cr, cc,
+                total_cases,
+                params_.human_cluster_radius_cells,
+                /*min_pop=*/1.0,
+                mosquito_density,
+                rng_);
+            const double infectious_after = human_grid_.compute_stats().total_infectious;
+            outbreak_triggered_ = infectious_after > infectious_before;
+            if (!outbreak_triggered_) {
+                std::cerr << "warning: outbreak not seeded: cluster received no cases\n";
+                return;
+            }
+            last_foci_log_.clear();
+            for (const auto& [r, c] : seeded) {
+                const size_t idx = static_cast<size_t>(r) * static_cast<size_t>(w_) +
+                                   static_cast<size_t>(c);
+                FociLogEntry e;
+                e.row = r;
+                e.col = c;
+                e.cell_population = human_grid_.population()[idx];
+                e.mosquito_density = (idx < mosquito_density.size())
+                    ? mosquito_density[idx] : 0.0f;
+                e.cases = human_grid_.infectious()[idx];
+                e.truncated = e.cell_population < e.cases;
+                last_foci_log_.push_back(e);
+            }
+            return;
+        }
+
         human_grid_.seed_explicit_foci(foci);
         const double infectious_after = human_grid_.compute_stats().total_infectious;
         outbreak_triggered_ = infectious_after > infectious_before;

@@ -61,6 +61,22 @@ public:
     void seed_explicit_foci(
         const std::vector<std::tuple<int32_t, int32_t, double>>& foci);
 
+    /// Seed ONE spatially concentrated outbreak cluster (M7.4.1):
+    /// `total_cases` split ∝ cell population across the core cell and
+    /// satellites within `radius_cells` (Chebyshev window, candidates
+    /// require population >= min_pop; when mosquito density is provided
+    /// the core must have density > 0 so the cluster lands where the
+    /// chain can actually start). Returns the seeded (row, col) cells
+    /// (core first). Deterministic given (rng, population layout).
+    std::vector<std::pair<int32_t, int32_t>> seed_outbreak_cluster(
+        int32_t core_row,
+        int32_t core_col,
+        double total_cases,
+        int32_t radius_cells,
+        double min_pop,
+        const std::vector<float>& mosquito_density,
+        Prng& rng);
+
     /// Advance one day given per-cell force of infection lambda_H in [0, 1].
     /// Computes new exposures S_H -> E_H via stochastic binomial sampling,
     /// advances discrete cohort queues E_H -> I_H, I_H -> R_H, R_H -> S_H,

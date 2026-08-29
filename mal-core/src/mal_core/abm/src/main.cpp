@@ -354,6 +354,7 @@ OUTPUT
     int    human_outbreak_foci          = 3;
     double human_outbreak_cases         = 50.0;
     double human_min_cell_pop           = 50.0;
+    double human_cluster_radius_km      = 0.0;
     std::string human_foci_coords       = "";
     float  transmission_focus_threshold = 0.01f;
     int    transmission_snapshot_every  = 0;
@@ -612,6 +613,16 @@ OUTPUT
                     "Explicit foci coordinates 'r1,c1:N1;r2,c2:N2' for explicit mode.")
         ->default_val("")
         ->group("Transmission (SEIR-SEI)");
+    run->add_option("--human-cluster-radius-km", human_cluster_radius_km,
+                    "Concentrated-outbreak mode: ONE spatial cluster (core "
+                    "= highest-population viable cell, or the explicit "
+                    "coord) with cases split ~ cell population over "
+                    "satellites within this radius. 0 = legacy independent "
+                    "foci. --human-outbreak-cases is the TOTAL cluster "
+                    "size in this mode.")
+        ->default_val(0.0)
+        ->check(CLI::NonNegativeNumber)
+        ->group("Transmission (SEIR-SEI)");
     run->add_option("--initial-vector-infected-frac", initial_vector_infected_frac,
                     "Initial infectious fraction of adult female mosquitoes (default 0.0).")
         ->default_val(0.0)
@@ -752,6 +763,17 @@ OUTPUT
     transmission_params.human_outbreak_cases = human_outbreak_cases;
     transmission_params.human_min_cell_pop = human_min_cell_pop;
     transmission_params.human_foci_coords = human_foci_coords;
+    // Cluster radius in grid cells (1 km cells ⇒ km*1000/resolution_m).
+    if (human_cluster_radius_km > 0.0) {
+        const float res_m = static_cast<float>(aoi.resolution_m);
+        transmission_params.human_cluster_radius_cells =
+            static_cast<int32_t>(std::llround(
+                human_cluster_radius_km * 1000.0 / static_cast<double>(res_m)));
+        std::cout << "abm_run: cluster mode ON — one concentrated outbreak, "
+                  << "radius " << transmission_params.human_cluster_radius_cells
+                  << " cells (" << human_cluster_radius_km << " km), total cases "
+                  << human_outbreak_cases << "\n";
+    }
     transmission_params.focus_threshold = transmission_focus_threshold;
 
     // -- Rollouts loop (F1.c) -------------------------------------------
