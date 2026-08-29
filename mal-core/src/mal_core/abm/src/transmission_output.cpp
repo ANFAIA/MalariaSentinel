@@ -193,6 +193,7 @@ void write_transmission_sidecar(
     j["vector_infectious"]      = meta.stats.vector_i;
     j["vector_total"]           = meta.stats.vector_total;
     j["total_infectious_bites"] = meta.stats.infectious_bites;
+    j["total_bites_on_humans"]  = meta.stats.total_bites_on_humans;
     j["r_eff_approx"]           = meta.stats.r_eff_approx;
 
     const std::string sidecar_path = sidecar_path_for(tif_path);

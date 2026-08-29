@@ -144,24 +144,29 @@ void TransmissionModel::check_and_trigger_outbreak(
 
         if (params_.human_cluster_radius_cells > 0) {
             // Cluster mode: ONE concentrated outbreak. Core = viable cell
-            // with the largest human population (mosquitoes must be
-            // present, so the chain can actually start); cases spread ∝
-            // population over the neighbourhood window.
+            // with the largest human population among cells whose OWN
+            // mosquito density clears the adaptive threshold (min_density
+            // > 0) or any presence (min_density == 0) — the outbreak must
+            // land where humans AND an established vector population
+            // coexist, so the chain can actually start.
             const auto& pop = human_grid_.population();
             int64_t best = -1;
             double best_pop = params_.human_min_cell_pop;
+            const float core_min_density = (params_.human_outbreak_min_density > 0.0f)
+                ? params_.human_outbreak_min_density : 1e-6f;
             for (int64_t c = 0; c < h_ * w_; ++c) {
                 const size_t idx = static_cast<size_t>(c);
                 if (pop[idx] <= best_pop) continue;
                 if (idx >= mosquito_density.size() ||
-                    mosquito_density[idx] <= 0.0f) continue;
+                    mosquito_density[idx] < core_min_density) continue;
                 best = c;
                 best_pop = pop[idx];
             }
             if (best < 0) {
-                std::cerr << "warning: outbreak not seeded: no viable "
-                             "cluster core (pop >= min and mosquitoes present)\n";
-                return;
+                std::cerr << "warning: outbreak not seeded: no cell has "
+                             "pop >= min and density >= "
+                          << core_min_density << " yet\n";
+                return;  // retry tomorrow
             }
             const int32_t br = static_cast<int32_t>(best / w_);
             const int32_t bc = static_cast<int32_t>(best % w_);
