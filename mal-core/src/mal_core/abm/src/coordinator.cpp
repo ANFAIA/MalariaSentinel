@@ -212,20 +212,35 @@ std::vector<PatchState> CoordinatorModel::to_dataframe() {
             // the URBAN_DENSITY_CAP_FRACTION cap and the rain gate keep
             // the rule bounded. With TWI present, behaviour is unchanged.
             bool urban_candidate = false;
+            bool urban_persistent = false;
             if (host_landscape_ != nullptr) {
                 const HostCell hc = host_landscape_->at(r, c);
                 const bool twi_ok = has_twi
                     ? (twi_val >= urban_twi_min_)
                     : true;
-                urban_candidate = hc.urban_class == URBAN_CLASS_THRESHOLD &&
+                const bool is_urban =
+                    hc.urban_class == URBAN_CLASS_THRESHOLD;
+                urban_candidate = is_urban &&
                     hc.building_fraction >= urban_b_min_ &&
                     (rain_val >= urban_r_min_mm_ ||
                      rain_7d_val >= urban_r_min_mm_) &&
                     twi_ok;
+                // Urban persistent baseline (M7.4.1 fix): built-up cells
+                // with real building cover carry a year-round standing-
+                // water stock (gutters, broken pipes, irrigation —
+                // Klinkenberg 2008 Accra) that is NOT rain-gated. They
+                // join the patch union every day so POOL_URBAN_BASELINE_MM
+                // (6 mm >= BREED 5 mm) and the water-availability capacity
+                // scaling can act through the dry season. Without this,
+                // the daily union rebuild erased urban patches on any day
+                // with rain <= 15 mm, making the baseline dead code.
+                urban_persistent = is_urban &&
+                    hc.building_fraction >= urban_b_min_;
             }
 
-            if (permanent || ((terrain_candidate || urban_candidate) &&
-                              rain_val > PLUVIAL_POOL_RAIN_THRESHOLD_MM)) {
+            if (permanent || urban_persistent ||
+                ((terrain_candidate || urban_candidate) &&
+                 rain_val > PLUVIAL_POOL_RAIN_THRESHOLD_MM)) {
                 union_cells.insert({r, c});
             }
         }
