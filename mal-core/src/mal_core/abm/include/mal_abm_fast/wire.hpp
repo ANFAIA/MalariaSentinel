@@ -204,6 +204,15 @@ inline constexpr float  POOL_CATCHMENT_RURAL        = 2.0f;
 // puddles (~40% reduction; drainage ditches stay wet 1-3 weeks —
 // Sattler 2005 urban larval habitats, Accra/Kumasi studies).
 inline constexpr float  POOL_EVAP_URBAN_SCALE       = 0.6f;
+// Urban permanent standing-water floor (M7.4.1): canals/gutters with
+// residual flow, broken pipes, standpipe spillage, lawn/garden
+// irrigation keep a small but PERMANENT stock of water in built-up
+// cells through the dry season (Klinkenberg 2008 Accra: urban malaria
+// persists year-round). Floor sits just above POOL_WATER_BREED_MM so
+// the baseline habitat is breeding-capable; rains amplify it, the dry
+// season does not erase it. Depth kept small: the baseline supports a
+// modest urban vector population, not a permanent-water habitat class.
+inline constexpr float  POOL_URBAN_BASELINE_MM      = 6.0f;
 inline constexpr float  POOL_RAIN_WASH_MM           = 40.0f;   // heavy rain: washout event
 inline constexpr float  POOL_DESICCATION_GRACE_DAYS = 5.0f;    // grace before desiccation starts
 inline constexpr float  POOL_EVAP_REF_MM            = 5.0f;    // reference evap at 30°C (mm/day)

@@ -302,9 +302,11 @@ std::vector<PatchState> CoordinatorModel::to_dataframe() {
         const float rain_val = climate_->rain_at(cell.first, cell.second);
         const float temp_val = climate_->temp_at(cell.first, cell.second);
         DailyForcing forcing{rain_val, temp_val, POOL_CATCHMENT_RURAL, 1.0f};
+        bool is_urban = false;
         if (host_landscape_ != nullptr) {
             const HostCell hc0 = host_landscape_->at(cell.first, cell.second);
             if (hc0.urban_class == URBAN_CLASS_THRESHOLD) {
+                is_urban = true;
                 forcing.catchment_factor = POOL_CATCHMENT_URBAN;
                 forcing.evap_scale = POOL_EVAP_URBAN_SCALE;
             }
@@ -332,6 +334,17 @@ std::vector<PatchState> CoordinatorModel::to_dataframe() {
             pool_states_[pid] = init;
         } else {
             pool_states_[pid] = advance_pool(pool_it->second, forcing);
+        }
+
+        // Urban permanent baseline (M7.4.1): canals/gutters, broken
+        // pipes and irrigation keep a small standing-water stock in
+        // built-up cells year-round — rains amplify it, the dry season
+        // does not erase it (Klinkenberg 2008 Accra).
+        if (is_urban) {
+            PoolState& pooled = pool_states_[pid];
+            pooled.water_mm = std::max(pooled.water_mm,
+                                       POOL_URBAN_BASELINE_MM);
+            pooled.days_dry = 0;
         }
 
         const PoolState& pool = pool_states_[pid];
