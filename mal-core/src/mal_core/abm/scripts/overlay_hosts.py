@@ -36,7 +36,7 @@ def _norm_log(a: np.ndarray, q: float = 99.0) -> np.ndarray:
     return np.clip(v / (hi or 1.0), 0.0, 1.0)
 
 
-def _static_layers(aoi: str) -> tuple[np.ndarray, np.ndarray]:
+def _static_layers(aoi: str) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     host_nc = Path(f"data/{aoi}/{aoi}_host_static.nc")
     ds = xr.open_dataset(host_nc)
     human = np.asarray(ds["human"].squeeze(), dtype=float)
@@ -46,16 +46,30 @@ def _static_layers(aoi: str) -> tuple[np.ndarray, np.ndarray]:
         + np.asarray(ds["sheep"].squeeze())
         + np.asarray(ds["pigs"].squeeze())
     )
-    return _norm_log(human), _norm_log(livestock)
+    env_nc = Path(f"data/{aoi}/{aoi}_regional_2024_2025_env.nc")
+    water = None
+    if env_nc.exists():
+        env = xr.open_dataset(env_nc)
+        for key in ("permanent_water_mask", "m12_jrc_permanent_water",
+                    "water_frac"):
+            if key in env:
+                v = np.asarray(env[key].squeeze(), dtype=float)
+                if v.ndim == 3:  # time series → fraction of wet days
+                    v = (v > 0.2).mean(axis=0)
+                water = (v > 0.05).astype(float)
+                break
+    return _norm_log(human), _norm_log(livestock), (
+        water if water is not None else np.zeros_like(human))
 
 
 def render_overlay(run_dir: str | Path, aoi: str, output: str | Path,
                    fps: int = 2) -> Path:
     run_dir = Path(run_dir)
-    H, L = _static_layers(aoi)
+    H, L, W = _static_layers(aoi)
     base = np.clip(
         np.stack([H * 0.15, H * 0.85, H * 0.35], -1)
-        + np.stack([L * 0.75, L * 0.55, L * 0.20], -1),
+        + np.stack([L * 0.75, L * 0.55, L * 0.20], -1)
+        + np.stack([W * 0.10, W * 0.45, W * 0.95], -1),  # agua cian
         0.0, 1.0,
     )
 
@@ -97,6 +111,8 @@ def render_overlay(run_dir: str | Path, aoi: str, output: str | Path,
                markerfacecolor=(0.15, 0.85, 0.35), ms=10, label="Humanos"),
         Line2D([0], [0], marker="s", color="w",
                markerfacecolor=(0.75, 0.55, 0.20), ms=10, label="Ganado"),
+        Line2D([0], [0], marker="s", color="w",
+               markerfacecolor=(0.1, 0.45, 0.95), ms=10, label="Agua perm."),
         Line2D([0], [0], marker="s", color="w",
                markerfacecolor=(0.2, 0.2, 0.95), ms=10, label="Mosquitos"),
         Line2D([0], [0], marker="s", color="w",
