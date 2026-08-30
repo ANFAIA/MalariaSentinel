@@ -1610,6 +1610,11 @@ abm = [
     { name = "matplotlib" },
     { name = "pillow" },
 ]
+scoring = [
+    { name = "netcdf4" },
+    { name = "pyproj" },
+    { name = "xarray" },
+]
 serve = [
     { name = "fastapi" },
     { name = "uvicorn" },
@@ -1636,6 +1641,11 @@ abm = [
 ]
 download = []
 ingest = []
+scoring = [
+    { name = "netcdf4", specifier = ">=1.6" },
+    { name = "pyproj", specifier = ">=3.6" },
+    { name = "xarray", specifier = ">=2024.1" },
+]
 serve = [
     { name = "fastapi", specifier = ">=0.115" },
     { name = "uvicorn", specifier = ">=0.30" },

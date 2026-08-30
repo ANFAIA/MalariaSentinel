@@ -1,10 +1,16 @@
 from typing import TypedDict, Any
 
+
 class ScoringFlags(TypedDict, total=False):
-    tier: str
-    experiment_name: str
+    aoi: str
+    only: str
+    skip: str
+    config_path: str
+
 
 SCORING_FLAGS_SCHEMA: dict[str, dict[str, Any]] = {
-    "tier": {"type": str, "default": "fast", "help": "Test tier (fast/full)"},
-    "experiment_name": {"type": str, "default": "pipeline_run", "help": "Experiment name"},
+    "aoi": {"type": str, "default": None, "help": "AOI slug (auto from run metadata)"},
+    "only": {"type": str, "default": "", "help": "Comma-separated scorer names to run"},
+    "skip": {"type": str, "default": "", "help": "Comma-separated scorer names to skip"},
+    "config_path": {"type": str, "default": None, "help": "Scorers YAML config path"},
 }

@@ -1,6 +1,15 @@
-"""Scoring stage — run calibration scorers against ABM output."""
-from .runner import run_calibration
+"""Scoring subpackage: post-run scorers, registry, config, runner."""
+from .config import ScoringConfig, load_config
 from .feedback import get_feedback
-from .flags import SCORING_FLAGS_SCHEMA, ScoringFlags
+from .registry import build_registry, list_scorers
+from .runner import format_summary, run_scoring
 
-__all__ = ["run_calibration", "get_feedback", "SCORING_FLAGS_SCHEMA", "ScoringFlags"]
+__all__ = [
+    "ScoringConfig",
+    "load_config",
+    "get_feedback",
+    "build_registry",
+    "list_scorers",
+    "format_summary",
+    "run_scoring",
+]
