@@ -36,8 +36,21 @@ struct PoolState {
 // DailyForcing — daily climate inputs for one patch
 // ---------------------------------------------------------------------------
 struct DailyForcing {
-    float rain_mm = 0.0f;           // today's daily rainfall (mm, CHIRPS)
+    float rain_mm = 0.0f;           // today's daily rainfall (mm, ERA5)
     float temp_c  = 25.0f;          // today's mean air temp (°C, ERA5)
+    // Catchment runoff factor (M7.4.1 fondo-fix): a pool does not fill
+    // only from the rain falling on its own footprint — it collects the
+    // runoff of its catchment. Bomblies 2008 (HYDREMATS, Niger) models
+    // pond volume as rain x catchment_area x runoff coefficient, with
+    // catchment:pond ratios of 10-50x. Urban cells: impervious cover
+    // (40-80%) concentrates drainage into depressions/ditches, so the
+    // factor is high; rural soils infiltrate most of the storm, so the
+    // factor is small. 1.0 = direct rainfall only (old behaviour).
+    float catchment_factor = 1.0f;
+    // Evaporation scale: shaded, organic-lined urban pools (drainage
+    // ditches, tyre ruts, construction pits) lose water more slowly
+    // than an open sun-exposed rural puddle.
+    float evap_scale = 1.0f;
 };
 
 // ---------------------------------------------------------------------------
@@ -55,9 +68,12 @@ inline PoolState advance_pool(const PoolState& prev, const DailyForcing& f) {
     float evap = POOL_EVAP_REF_MM *
         (1.0f + POOL_EVAP_T_COEFF * (f.temp_c - POOL_EVAP_REF_T));
     if (evap < 0.5f) evap = 0.5f;  // floor: even cold dry days lose some water
+    evap *= f.evap_scale;
 
-    // 2. Water update.
-    float w = prev.water_mm + f.rain_mm - evap;
+    // 2. Water update — rainfall amplified by the catchment runoff
+    //    factor (see DailyForcing note).
+    const float rain_in = f.rain_mm * f.catchment_factor;
+    float w = prev.water_mm + rain_in - evap;
     if (w < 0.0f) w = 0.0f;
     if (w > POOL_WATER_MAX_MM) w = POOL_WATER_MAX_MM;
     next.water_mm = w;

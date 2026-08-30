@@ -296,10 +296,19 @@ std::vector<PatchState> CoordinatorModel::to_dataframe() {
             }
         }
 
-        // Advance pool hydrology for this patch.
+        // Advance pool hydrology for this patch. Catchment/evap factors
+        // come from land cover: urban pools collect concentrated
+        // impervious runoff and evaporate slower (see pool_hydrology.hpp).
         const float rain_val = climate_->rain_at(cell.first, cell.second);
         const float temp_val = climate_->temp_at(cell.first, cell.second);
-        DailyForcing forcing{rain_val, temp_val};
+        DailyForcing forcing{rain_val, temp_val, POOL_CATCHMENT_RURAL, 1.0f};
+        if (host_landscape_ != nullptr) {
+            const HostCell hc0 = host_landscape_->at(cell.first, cell.second);
+            if (hc0.urban_class == URBAN_CLASS_THRESHOLD) {
+                forcing.catchment_factor = POOL_CATCHMENT_URBAN;
+                forcing.evap_scale = POOL_EVAP_URBAN_SCALE;
+            }
+        }
 
         auto pool_it = pool_states_.find(pid);
         const bool pre_existing = (pre_it != pre_rowcol_to_pid.end());
@@ -316,7 +325,7 @@ std::vector<PatchState> CoordinatorModel::to_dataframe() {
         } else if (pool_it == pool_states_.end()) {
             // First day this patch is tracked — initialise from rain.
             PoolState init;
-            init.water_mm = rain_val;
+            init.water_mm = rain_val * forcing.catchment_factor;
             init.days_dry = (rain_val < POOL_WATER_DRY_MM) ? 1 : 0;
             init.days_since_fill = (rain_val > PLUVIAL_POOL_RAIN_THRESHOLD_MM)
                 ? 0 : 1;

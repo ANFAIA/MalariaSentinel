@@ -193,6 +193,17 @@ inline constexpr float  URBAN_DENSITY_CAP_FRACTION = 0.05f;   // §6.6 max 5% of
 inline constexpr float  POOL_WATER_BREED_MM         = 5.0f;    // min depth for oviposition
 inline constexpr float  POOL_WATER_DRY_MM           = 1.0f;    // below this: larvae desiccate
 inline constexpr float  POOL_WATER_MAX_MM           = 500.0f;  // cap to prevent runaway accumulation
+// Catchment runoff factors (M7.4.1 fondo-fix). A pool receives the
+// runoff of its catchment, not just direct rainfall — Bomblies 2008
+// (HYDREMATS) pond model, catchment:pond 10-50x. Urban: impervious
+// drainage concentration (roof/street runoff into ditches, ruts and
+// pits). Rural: soils infiltrate most of the storm.
+inline constexpr float  POOL_CATCHMENT_URBAN        = 10.0f;
+inline constexpr float  POOL_CATCHMENT_RURAL        = 2.0f;
+// Shaded/organic-lined urban pools evaporate slower than open rural
+// puddles (~40% reduction; drainage ditches stay wet 1-3 weeks —
+// Sattler 2005 urban larval habitats, Accra/Kumasi studies).
+inline constexpr float  POOL_EVAP_URBAN_SCALE       = 0.6f;
 inline constexpr float  POOL_RAIN_WASH_MM           = 40.0f;   // heavy rain: washout event
 inline constexpr float  POOL_DESICCATION_GRACE_DAYS = 5.0f;    // grace before desiccation starts
 inline constexpr float  POOL_EVAP_REF_MM            = 5.0f;    // reference evap at 30°C (mm/day)
