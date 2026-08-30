@@ -35,13 +35,19 @@ _ensure_local_path() {
   [[ -e "$p" ]] || die "$label path does not exist: $p"
 }
 
-# _build_sim_cmd <repo_name> <aoi> <year> <month> <days> <seed> <n_rollouts> <snapshot_every> <run_name> <gif> <data_ready>
+# _build_sim_cmd <repo_name> <aoi> <year> <month> <days> <seed> <n_rollouts> <snapshot_every> <run_name> <gif> <data_ready> <verify_env_bands>
 #   Builds the remote command that runs the ABM (and, when the AOI data is
 #   not already present, the download+ingest prep). Uses the lightweight
 #   uv profile so torch/fastapi are not installed on the VM.
+#   verify_env_bands=1: inject a 1-day ABM probe that FAILS unless the
+#   binary logs that the env NC static bands (twi / k_capacity_mult /
+#   catchment_ratio) were loaded — guards against GDAL driver versions
+#   that do not expose plain 2-D NetCDF variables (the netCDF-C fallback
+#   in env_reader must also have worked).
 _build_sim_cmd() {
   local repo_name="$1" aoi="$2" year="$3" month="$4" days="$5" seed="$6"
   local n_rollouts="$7" snapshot_every="$8" run_name="$9" gif="${10}" data_ready="${11}"
+  local verify_env_bands="${12:-0}"
 
   local sync_args="--package mal-core --group abm"
   local gif_flag=""
@@ -49,7 +55,16 @@ _build_sim_cmd() {
     gif_flag=" --gif"
   fi
 
+  local verify_cmd=""
+  if [[ "$verify_env_bands" == "1" ]]; then
+    local bin="mal-core/src/mal_core/abm/bin/mal_abm_fast_$(uname -s | tr '[:upper:]' '[:lower:]')"
+    verify_cmd="bash $bin run --aoi $aoi --env data/$aoi/${aoi}_regional_2024_2025_env.nc --habitat data/$aoi/${aoi}_habitat_patches.gpkg --year $year --month $month --days 1 --seed 1 --n-rollouts 1 --snapshot-every 1 --output /tmp/verify_d1.tif --hosts data/$aoi/${aoi}_host_static.nc --seeding-mode host-weighted 2>&1 | tee /work/verify_env_bands.log | grep -aq 'carries static catchment_ratio' && grep -aq 'carries static k_capacity_mult' /work/verify_env_bands.log && grep -aq 'carries static TWI' /work/verify_env_bands.log && echo '[verify-env-bands] OK' && "
+  fi
+
   local cmd="cd /work/code/$repo_name && uv sync $sync_args && bash mal-core/src/mal_core/abm/build.sh && "
+  if [[ -n "$verify_cmd" ]]; then
+    cmd="$cmd$verify_cmd"
+  fi
   if [[ -z "$data_ready" ]]; then
     sync_args="$sync_args --group download --group ingest"
     cmd="cd /work/code/$repo_name && uv sync $sync_args && bash mal-core/src/mal_core/abm/build.sh && uv run malariasim download --aoi $aoi && uv run malariasim ingest --aoi $aoi --year $year --month $month --data-dir data/$aoi --output-dir data/$aoi && "
@@ -63,6 +78,11 @@ sim_run() {
   local name="$1" repo="$2" repo_url="$3" branch="$4" aoi="$5" year="$6" month="$7"
   local days="$8" seed="$9" n_rollouts="${10}" snapshot_every="${11}" run_name="${12}"
   local gif="${13}" data_ready="${14}" cmd="${15}" pull_to="${16}" keep_vm="${17}" vm_type="${18}"
+  # Extra flags appended VERBATIM to the remote `malariasim abm` command
+  # (arg 19; everything the user put after `--` on the CLI). sim-run does
+  # not interpret them.
+  local passthrough_args="${19:-}"
+  local verify_env_bands="${20:-0}"
   vm_type="${vm_type:-cx33}"
 
   _ensure_local_path "repo" "$repo"
@@ -91,7 +111,10 @@ sim_run() {
 
   # Build the command unless the caller overrode it with --cmd.
   if [[ -z "$cmd" ]]; then
-    cmd="$(_build_sim_cmd "$repo_name" "$aoi" "$year" "$month" "$days" "$seed" "$n_rollouts" "$snapshot_every" "$run_name" "$gif" "$data_ready")"
+    cmd="$(_build_sim_cmd "$repo_name" "$aoi" "$year" "$month" "$days" "$seed" "$n_rollouts" "$snapshot_every" "$run_name" "$gif" "$data_ready" "$verify_env_bands")"
+    if [[ -n "$passthrough_args" ]]; then
+      cmd="$cmd $passthrough_args"
+    fi
   fi
 
   # Cost estimate: assume HETZNER_RUN_ESTIMATE_HOURS worst case. The user

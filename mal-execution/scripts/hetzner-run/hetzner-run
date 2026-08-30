@@ -322,6 +322,9 @@ cmd_sim_run() {
   local repo_url="" branch="" data_ready="" cmd="" pull_to="" keep_vm=0
   local aoi="ghana" year="2024" month="1" days="731" seed="1"
   local n_rollouts="1" snapshot_every="7" run_name="" gif=0 vm_type="cx33"
+  # Everything after `--` is passed VERBATIM to the remote
+  # `malariasim abm` invocation — sim-run does not interpret it.
+  local passthrough_args="" verify_env_bands=0
   while (( $# )); do
     case "$1" in
       --name)          name="$2"; shift 2 ;;
@@ -340,9 +343,11 @@ cmd_sim_run() {
       --snapshot-every) snapshot_every="$2"; shift 2 ;;
       --run-name)      run_name="$2"; shift 2 ;;
       --gif)           gif=1; shift ;;
+      --verify-env-bands) verify_env_bands=1; shift ;;
       --pull-to)       pull_to="$2"; shift 2 ;;
       --keep-vm)       keep_vm=1; shift ;;
       --yes)           HETZNER_RUN_ASSUME_YES=1; shift ;;
+      --)              shift; passthrough_args="$*"; break ;;
       -h|--help)       print_sim_run_help; return 0 ;;
       *) die "sim-run: unknown flag: $1" ;;
     esac
@@ -361,7 +366,8 @@ cmd_sim_run() {
   fi
   sim_run "$name" "$repo" "$repo_url" "$branch" "$aoi" "$year" "$month" \
     "$days" "$seed" "$n_rollouts" "$snapshot_every" "$run_name" "$gif" \
-    "$data_ready" "$cmd" "$pull_to" "$keep_vm" "$vm_type"
+    "$data_ready" "$cmd" "$pull_to" "$keep_vm" "$vm_type" "$passthrough_args" \
+    "$verify_env_bands"
 }
 
 cmd_train() {
