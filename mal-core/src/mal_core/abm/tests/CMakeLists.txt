@@ -59,6 +59,13 @@ target_link_libraries(test_coordinator
 )
 gtest_discover_tests(test_coordinator DISCOVERY_TIMEOUT 30)
 
+# M7.4.1: catchment-runoff pool physics (water balance regression).
+add_executable(test_pool_water test_pool_water.cpp)
+target_link_libraries(test_pool_water
+    PRIVATE mal_abm_fast_core GTest::gtest GTest::gtest_main mal_abm_fast::warnings
+)
+gtest_discover_tests(test_pool_water DISCOVERY_TIMEOUT 30)
+
 # F1.b: mosquito submodel.
 add_executable(test_mosquito_submodel test_mosquito_submodel.cpp)
 target_link_libraries(test_mosquito_submodel

@@ -209,6 +209,74 @@ def _slope_radians(z: np.ndarray, cell_size_m: float) -> np.ndarray:
     return np.arctan(np.sqrt(dz_dx * dz_dx + dz_dy * dz_dy).astype(np.float32))
 
 
+# Upper clip for the catchment-to-cell area ratio. Values beyond this
+# only arise from flat-artifact slopes (tanβ → 0 with large TWI) and
+# would make a single cell drain an implausible fraction of the map.
+CATCHMENT_RATIO_MAX = 50.0
+
+
+def compute_catchment_ratio(
+    dem: xr.DataArray, *, cell_size_m: float | None = None
+) -> xr.DataArray:
+    """Catchment-to-cell area ratio CR(cell) from the DEM (M7.4.1).
+
+    Physical meaning: CR = A_c / A_cell — how many cells of the same
+    size drain through this cell (upslope contribution). Computed with
+    the same D8 routing as ``compute_twi`` (``_d8_flow_direction`` +
+    ``_flow_accumulation``), but DIRECTLY from the accumulation counts
+    rather than through TWI (the repo's TWI uses a = contributing area
+    in m², whose exp() overflows the useful range and carries -9999
+    nodata sentinels that would zero out the ratio).
+
+    CR = N_upslope (dimensionless, clipped to [0, ``CATCHMENT_RATIO_MAX``]).
+
+    A depression at the bottom of a converging slope has CR >> 1 and
+    receives the storm runoff of the area above it; a ridge-top cell
+    has CR ≈ 1. This is the physical input of the pool
+    catchment-runoff model (Bomblies 2008 HYDREMATS).
+
+    Returns an xr.DataArray (float32) with dims (y, x) like the DEM.
+    """
+    if "y" not in dem.dims or "x" not in dem.dims:
+        raise ValueError(f"dem must have dims (y, x); got {dem.dims}")
+    z_in = np.asarray(dem.values, dtype=np.float32)
+    if z_in.ndim != 2:
+        raise ValueError(f"dem must be 2-D (y, x); got shape {z_in.shape}")
+    if cell_size_m is None:
+        cell_size_m = _infer_cell_size_m(dem)
+    if not (cell_size_m > 0):
+        raise ValueError(f"cell_size_m must be positive; got {cell_size_m}")
+
+    # Fill NaN with the map mean so gradients and routing are finite
+    # everywhere (same treatment compute_twi applies internally).
+    z = np.where(np.isfinite(z_in), z_in,
+                 np.float32(np.nanmean(z_in[z_in > -32768])
+                            if np.isfinite(z_in[z_in > -32768]).any()
+                            else 0.0))
+    fdir = _d8_flow_direction(z)
+    counts = _flow_accumulation(z, fdir)
+    cr = np.clip(counts.astype(np.float32), 0.0,
+                 CATCHMENT_RATIO_MAX).astype(np.float32)
+    out = xr.DataArray(cr, dims=("y", "x"),
+                       coords={"y": dem["y"], "x": dem["x"]})
+    try:
+        out.rio.write_crs(dem.rio.crs, inplace=True)
+    except Exception:
+        # Caller's DataArray may be a plain y/x grid without a CRS
+        # (ingest path) — the values are what matter downstream.
+        pass
+    return out
+    out = xr.DataArray(cr, dims=("y", "x"),
+                       coords={"y": dem["y"], "x": dem["x"]})
+    try:
+        out.rio.write_crs(dem.rio.crs, inplace=True)
+    except Exception:
+        # Caller's DataArray may be a plain y/x grid without a CRS
+        # (ingest path) — the values are what matter downstream.
+        pass
+    return out
+
+
 def compute_twi(dem: xr.DataArray, *, cell_size_m: float | None = None) -> xr.DataArray:
     """Compute the Topographic Wetness Index from a DEM.
 

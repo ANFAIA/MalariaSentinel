@@ -164,6 +164,17 @@ void ClimateEngine::load_from_env_nc(const std::string& path,
         k_capacity_mult_.clear();
     }
 
+    // Optional static catchment-to-cell area ratio (M7.4.1): consumed by
+    // CoordinatorModel's pool hydrology (catchment-runoff model).
+    if (bands.catchment_ratio.size() == static_cast<size_t>(bands.h) *
+        static_cast<size_t>(bands.w)) {
+        catchment_ratio_ = std::move(bands.catchment_ratio);
+        std::cout << "ClimateEngine: env NC carries static catchment_ratio "
+                  << "grid (" << h_ << "x" << w_ << ")\n";
+    } else {
+        catchment_ratio_.clear();
+    }
+
     // Populate single-day accessors for day 0 (backwards compat).
     rain_.assign(h_ * w_, 0.0f);
     temp_.assign(h_ * w_, 25.0f);
@@ -264,6 +275,7 @@ std::shared_ptr<ClimateEngine> ClimateEngine::clone_for_thread() const {
     // them unconditionally so both branches behave identically.
     clone->twi_ = twi_;
     clone->k_capacity_mult_ = k_capacity_mult_;
+    clone->catchment_ratio_ = catchment_ratio_;
 
     return clone;
 }

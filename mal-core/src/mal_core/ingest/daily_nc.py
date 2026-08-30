@@ -344,8 +344,12 @@ def build_daily_env_nc(
     # follows the DEM downloader manifest output ({aoi}_elevation.tif).
     dem_file = dem_file or (data_dir / f"{aoi}_elevation.tif")
     twi_static: np.ndarray | None = None
+    catchment_static: np.ndarray | None = None
     if dem_file.exists():
-        from mal_commonlib.terrain.twi import compute_twi
+        from mal_commonlib.terrain.twi import (
+            compute_catchment_ratio,
+            compute_twi,
+        )
 
         print(f"Computing TWI from DEM: {dem_file}")
         dem_arr = read_static_tif(dem_file, target_shape)
@@ -362,10 +366,21 @@ def build_daily_env_nc(
         twi_static = np.asarray(twi_da.values, dtype=np.float32)
         twi_static = np.nan_to_num(twi_static, nan=0.0)
         twi_static[twi_static < 0.0] = 0.0
+        # M7.4.1: catchment-to-cell area ratio (exp(TWI)·tanβ/c) —
+        # physical input of the pool catchment-runoff model.
+        cr_da = compute_catchment_ratio(dem_da, cell_size_m=cell_size_m)
+        catchment_static = np.asarray(cr_da.values, dtype=np.float32)
+        catchment_static = np.nan_to_num(catchment_static, nan=0.0)
         print(
             f"TWI: min={twi_static.min():.2f} mean={twi_static.mean():.2f} "
             f"max={twi_static.max():.2f} | cells TWI>7: "
             f"{int((twi_static > 7.0).sum())} of {twi_static.size}"
+        )
+        print(
+            f"catchment_ratio: mean={catchment_static.mean():.2f} "
+            f"p95={float(np.percentile(catchment_static, 95)):.2f} "
+            f"max={catchment_static.max():.2f} | cells CR>2: "
+            f"{int((catchment_static > 2.0).sum())}"
         )
     else:
         print(
@@ -550,6 +565,14 @@ def build_daily_env_nc(
                       "x NDVI/urban/shallow modifiers)",
          "units": "1"},
     )
+
+    if catchment_static is not None:
+        ds["catchment_ratio"] = (
+            ["y", "x"], catchment_static,
+            {"long_name": "Catchment-to-cell area ratio exp(TWI)*tan(beta)/c "
+                          "(pool catchment-runoff model input)",
+             "units": "1"},
+        )
 
     # Core variables are always written with zlib; diagnostic vars too
     encoding_vars = ["water_frac", "rainfall", "water_temp_c", "ndvi"]

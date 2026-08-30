@@ -296,21 +296,58 @@ std::vector<PatchState> CoordinatorModel::to_dataframe() {
             }
         }
 
-        // Advance pool hydrology for this patch. Catchment/evap factors
-        // come from land cover: urban pools collect concentrated
-        // impervious runoff and evaporate slower (see pool_hydrology.hpp).
+        // Advance pool hydrology for this patch. The catchment-runoff
+        // factor is DERIVED from data (M7.4.1): CR(cell) from the DEM
+        // (env NC `catchment_ratio` band) times the runoff coefficient
+        // C = f(building_fraction, NDVI, antecedent 7-day rain).
+        // Fallback when the band is absent: land-cover constants.
         const float rain_val = climate_->rain_at(cell.first, cell.second);
         const float temp_val = climate_->temp_at(cell.first, cell.second);
-        DailyForcing forcing{rain_val, temp_val, POOL_CATCHMENT_RURAL, 1.0f};
         bool is_urban = false;
+        float bldg = 0.0f;
         if (host_landscape_ != nullptr) {
             const HostCell hc0 = host_landscape_->at(cell.first, cell.second);
-            if (hc0.urban_class == URBAN_CLASS_THRESHOLD) {
-                is_urban = true;
-                forcing.catchment_factor = POOL_CATCHMENT_URBAN;
-                forcing.evap_scale = POOL_EVAP_URBAN_SCALE;
-            }
+            is_urban = hc0.urban_class == URBAN_CLASS_THRESHOLD;
+            bldg = hc0.building_fraction;
         }
+        // Terrain runoff coefficient: impervious cover drives urban C
+        // (ASCE urban hydrology: dense cover 0.7-0.95, medium 0.5);
+        // rural C falls with vegetation (bare soil 0.35, lush ~0.05).
+        const size_t cidx = static_cast<size_t>(cell.first) *
+            static_cast<size_t>(climate_->w()) + static_cast<size_t>(cell.second);
+        const std::vector<float>& ndvi_band = climate_->ndvi();
+        const float ndvi_cell =
+            (cidx < ndvi_band.size()) ? ndvi_band[cidx] : 0.0f;
+        const float ndvi_n = std::clamp(ndvi_cell, 0.0f, 1.0f);
+        const float c_terrain = is_urban
+            ? POOL_RUNOFF_URBAN_BASE +
+              POOL_RUNOFF_URBAN_SLOPE * std::clamp(bldg, 0.0f, 1.0f)
+            : std::max(POOL_RUNOFF_RURAL_FLOOR,
+                       POOL_RUNOFF_RURAL_BASE -
+                       POOL_RUNOFF_RURAL_NDVI_SLOPE * ndvi_n);
+        // Antecedent-moisture boost: saturated ground sheds more
+        // runoff (SCS-CN AMC logic), linear in the last 7 days of rain.
+        const float rain_7d = rain_7d_at(cell.first, cell.second);
+        const float c_moist = POOL_RUNOFF_SAT_MIN +
+            (1.0f - POOL_RUNOFF_SAT_MIN) *
+            std::min(1.0f, rain_7d / POOL_RUNOFF_SAT_REF_MM);
+        const float c_eff = c_terrain * c_moist;
+
+        const std::vector<float>& cr_band = climate_->catchment_ratio();
+        float catchment_factor;
+        if (!cr_band.empty() && cidx < cr_band.size()) {
+            catchment_factor = 1.0f + cr_band[cidx] * c_eff;
+        } else {
+            catchment_factor = is_urban ? POOL_CATCHMENT_URBAN
+                                        : POOL_CATCHMENT_RURAL;
+        }
+        // Shaded microhabitats lose water slower: dense vegetation and
+        // built-up shade both reduce open-water evaporation.
+        float evap_scale = 1.0f - POOL_EVAP_NDVI_SCALE * ndvi_n -
+            (is_urban ? POOL_EVAP_URBAN_EXTRA : 0.0f);
+        evap_scale = std::clamp(evap_scale, 0.55f, 1.0f);
+        DailyForcing forcing{rain_val, temp_val, catchment_factor,
+                             evap_scale};
 
         auto pool_it = pool_states_.find(pid);
         const bool pre_existing = (pre_it != pre_rowcol_to_pid.end());

@@ -86,6 +86,11 @@ public:
     /// coordinator's K_eff view. Empty = legacy behaviour (urban clamp).
     std::vector<float> k_capacity_mult() const { return k_capacity_mult_; }
 
+    /// Optional static catchment-to-cell area ratio (M7.4.1): the env NC
+    /// `catchment_ratio` variable — pool catchment-runoff factor input.
+    /// Empty = coordinator falls back to land-cover constant factors.
+    std::vector<float> catchment_ratio() const { return catchment_ratio_; }
+
     // -- Daily NetCDF support (daily-env-netcdf feature) ----------------------
 
     // Read a NetCDF daily env file and populate multi-day bands. The NC
@@ -120,6 +125,7 @@ private:
     std::vector<float>   permanent_water_;
     std::vector<float>   twi_;      // optional 5th band; empty = zeros
     std::vector<float>   k_capacity_mult_;  // optional static capacity
+    std::vector<float>   catchment_ratio_;  // optional static catchment ratio
                                             // multiplier; empty = legacy
     // Daily NC state - shared across threads via shared_ptr
     std::shared_ptr<std::vector<float>>   rain_nc_;      // n_days * h * w

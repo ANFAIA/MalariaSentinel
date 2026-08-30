@@ -193,17 +193,35 @@ inline constexpr float  URBAN_DENSITY_CAP_FRACTION = 0.05f;   // §6.6 max 5% of
 inline constexpr float  POOL_WATER_BREED_MM         = 5.0f;    // min depth for oviposition
 inline constexpr float  POOL_WATER_DRY_MM           = 1.0f;    // below this: larvae desiccate
 inline constexpr float  POOL_WATER_MAX_MM           = 500.0f;  // cap to prevent runaway accumulation
-// Catchment runoff factors (M7.4.1 fondo-fix). A pool receives the
-// runoff of its catchment, not just direct rainfall — Bomblies 2008
-// (HYDREMATS) pond model, catchment:pond 10-50x. Urban: impervious
-// drainage concentration (roof/street runoff into ditches, ruts and
-// pits). Rural: soils infiltrate most of the storm.
+// Catchment-runoff model constants (M7.4.1). A pool receives the
+// runoff of its catchment: factor = 1 + CR(cell) * C_eff, with
+// CR = exp(TWI)*tan(beta)/cell_m (env NC `catchment_ratio` band) and
+// C_eff = C_terrain * C_moisture below. The urban/rural constants are
+// ONLY the fallback when the band is absent.
+//   C_terrain urban: impervious cover (ASCE urban hydrology — dense
+//   cover 0.7-0.95, medium 0.5). Rural: bare soil 0.35, falls with
+//   NDVI (vegetated ~0.05).
+//   C_moisture: antecedent-moisture boost (SCS-CN AMC): saturated
+//   ground sheds more runoff, linear in 7-day rain up to REF_MM.
+//   Evaporation scale: shaded microhabitats lose water slower —
+//   dense vegetation (NDVI) and built-up shade.
 inline constexpr float  POOL_CATCHMENT_URBAN        = 10.0f;
 inline constexpr float  POOL_CATCHMENT_RURAL        = 2.0f;
-// Shaded/organic-lined urban pools evaporate slower than open rural
-// puddles (~40% reduction; drainage ditches stay wet 1-3 weeks —
-// Sattler 2005 urban larval habitats, Accra/Kumasi studies).
-inline constexpr float  POOL_EVAP_URBAN_SCALE       = 0.6f;
+inline constexpr float  POOL_RUNOFF_URBAN_BASE      = 0.40f;
+inline constexpr float  POOL_RUNOFF_URBAN_SLOPE     = 0.50f;
+inline constexpr float  POOL_RUNOFF_RURAL_BASE      = 0.35f;
+inline constexpr float  POOL_RUNOFF_RURAL_FLOOR     = 0.05f;
+inline constexpr float  POOL_RUNOFF_RURAL_NDVI_SLOPE = 0.30f;
+inline constexpr float  POOL_RUNOFF_SAT_MIN         = 0.60f;
+inline constexpr float  POOL_RUNOFF_SAT_REF_MM      = 25.0f;
+inline constexpr float  POOL_EVAP_NDVI_SCALE        = 0.30f;
+inline constexpr float  POOL_EVAP_URBAN_EXTRA       = 0.15f;
+// Larval habitat capacity scales with the pool's water stock: a
+// 60 mm flooded depression presents more breeding surface than a
+// 6 mm gutter film (habitat size grows with depression volume).
+// K_patch is multiplied by min(1, water_mm / SAT_MM); permanent
+// water (500 mm) saturates at 1.0.
+inline constexpr float  POOL_WATER_CAPACITY_SAT_MM  = 50.0f;
 // Urban permanent standing-water floor (M7.4.1): canals/gutters with
 // residual flow, broken pipes, standpipe spillage, lawn/garden
 // irrigation keep a small but PERMANENT stock of water in built-up

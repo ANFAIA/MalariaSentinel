@@ -415,6 +415,22 @@ DailyEnvBands read_env_nc(const std::string& path, int32_t max_days) {
         }
     }
 
+    // Optional static catchment-to-cell area ratio (M7.4.1): physical
+    // input of the pool catchment-runoff model. Absent → the
+    // coordinator falls back to the land-cover constant factors.
+    if (subdatasets.count("catchment_ratio") != 0) {
+        std::vector<float> v =
+            read_variable("catchment_ratio", /*static_plane=*/true);
+        const size_t expected =
+            static_cast<size_t>(out.h) * static_cast<size_t>(out.w);
+        if (v.size() == expected) {
+            for (float& x : v) {
+                if (!std::isfinite(x) || x < 0.0f) x = 0.0f;
+            }
+            out.catchment_ratio = std::move(v);
+        }
+    }
+
     if (out.h <= 0 || out.w <= 0) {
         throw std::runtime_error(
             "env_reader::read_env_nc: dataset has no rasters");

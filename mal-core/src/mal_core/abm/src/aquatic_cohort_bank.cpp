@@ -260,8 +260,11 @@ void AquaticCohortBank::larva_mortality_density(
 
     // Patch salinity lookup (missing patch => 0.0 freshwater => s_hat = 1.0)
     std::unordered_map<int64_t, float> salinity_by_patch;
+    // Patch pool-water lookup (M7.4.1 water-availability K scaling).
+    std::unordered_map<int64_t, float> pool_water_by_patch;
     for (const auto& ps : patch_states) {
         salinity_by_patch[ps.patch_id] = ps.salinity_ppt;
+        pool_water_by_patch[ps.patch_id] = ps.pool_water_mm;
     }
 
     const double K = static_cast<double>(K_MAX);
@@ -286,7 +289,20 @@ void AquaticCohortBank::larva_mortality_density(
                                 static_cast<size_t>(K_eff_W_) +
                             static_cast<size_t>(col)]);
         }
-        const double K_patch = K * K_eff;
+        const double K_patch_base = K * K_eff;
+        // Water-availability capacity scaling (M7.4.1): habitat size
+        // grows with the pool's water stock — a flooded depression
+        // offers more breeding surface than a gutter film. Linear up
+        // to POOL_WATER_CAPACITY_SAT_MM, then saturated at 1.0.
+        // Permanent-water patches sit at POOL_WATER_MAX_MM → 1.0.
+        double water_factor = 1.0;
+        const auto w_it = pool_water_by_patch.find(c.patch_id);
+        if (w_it != pool_water_by_patch.end()) {
+            water_factor = std::min(
+                1.0, static_cast<double>(w_it->second) /
+                static_cast<double>(POOL_WATER_CAPACITY_SAT_MM));
+        }
+        const double K_patch = K_patch_base * water_factor;
         double p = static_cast<double>(LARVA_BH_S0) * K_patch /
             (K_patch + static_cast<double>(overrides.larva_bh_alpha) * static_cast<double>(N));
         // Independent salinity suitability multiplier (Fase 6).

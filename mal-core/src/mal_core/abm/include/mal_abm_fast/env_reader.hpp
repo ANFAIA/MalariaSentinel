@@ -77,6 +77,7 @@ struct DailyEnvBands {
                                         // empty if the NC has no twi variable
                                         // (pluvial-pool urban rule falls back)
     std::vector<float>  k_capacity_mult; // optional static per-cell capacity
+    std::vector<float>  catchment_ratio; // optional static catchment-to-cell area ratio
                                         // multiplier (h*w); K_patch =
                                         // K_MAX × mult. Empty = legacy.
     int32_t             n_days = 0;
