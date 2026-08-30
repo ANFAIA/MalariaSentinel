@@ -53,5 +53,6 @@ mal-abm-fast/build/
 
 # Agent/tool caches
 .cache/
+.cortexkit/
 conversation_history/
 social-networks/MalariaSentinel ABM Video/work-*/
