@@ -34,9 +34,10 @@ target_link_libraries(mal_abm_fast_core
     PUBLIC mal_abm_fast::warnings
 )
 # F1.b deps: GDAL (env_reader, climate, habitat_engine, output_contract),
+# netCDF (env_reader static-band fallback independent of GDAL drivers),
 # nlohmann_json (output_contract sidecar), Eigen (numerical helpers in F2).
 target_link_libraries(mal_abm_fast_core
-    PUBLIC GDAL::GDAL nlohmann_json::nlohmann_json Eigen3::Eigen
+    PUBLIC GDAL::GDAL netCDF::netcdf nlohmann_json::nlohmann_json Eigen3::Eigen
 )
 if(OpenMP_CXX_FOUND)
     target_link_libraries(mal_abm_fast_core PUBLIC OpenMP::OpenMP_CXX)

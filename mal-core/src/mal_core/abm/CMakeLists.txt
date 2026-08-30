@@ -10,6 +10,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 find_package(Eigen3 REQUIRED CONFIG)
 find_package(GDAL   REQUIRED)
+find_package(netCDF REQUIRED)
 find_package(CLI11  REQUIRED CONFIG)
 find_package(nlohmann_json REQUIRED)
 find_package(OpenMP REQUIRED)

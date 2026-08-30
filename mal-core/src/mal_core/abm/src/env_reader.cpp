@@ -24,6 +24,8 @@
 
 #include "env_reader.hpp"
 
+#include <netcdf.h>
+
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -430,6 +432,40 @@ DailyEnvBands read_env_nc(const std::string& path, int32_t max_days) {
             out.catchment_ratio = std::move(v);
         }
     }
+
+    // Static-band netCDF-C fallback (M7.4.1): older GDAL netCDF drivers
+    // do not expose plain 2-D (y, x) variables as SUBDATASETS, which
+    // silently zeroed twi / k_capacity_mult / catchment_ratio on such
+    // systems. Read them straight from the file by variable name.
+    auto read_static_netcdf = [&](const char* varname,
+                                  std::vector<float>& dst) {
+        if (!dst.empty()) return;  // GDAL path already delivered it
+        int ncid = -1;
+        if (nc_open(path.c_str(), NC_NOWRITE, &ncid) != NC_NOERR) return;
+        int varid = -1;
+        int ndims = 0;
+        int dimids[2] = {-1, -1};
+        size_t dims[2] = {0, 0};
+        if (nc_inq_varid(ncid, varname, &varid) == NC_NOERR &&
+            nc_inq_var(ncid, varid, nullptr, nullptr, &ndims, dimids,
+                       nullptr) == NC_NOERR && ndims == 2 &&
+            nc_inq_dimlen(ncid, dimids[0], &dims[0]) == NC_NOERR &&
+            nc_inq_dimlen(ncid, dimids[1], &dims[1]) == NC_NOERR &&
+            dims[0] == static_cast<size_t>(out.h) &&
+            dims[1] == static_cast<size_t>(out.w)) {
+            std::vector<float> v(dims[0] * dims[1], 0.0f);
+            if (nc_get_var_float(ncid, varid, v.data()) == NC_NOERR) {
+                for (float& x : v) {
+                    if (!std::isfinite(x) || x < 0.0f) x = 0.0f;
+                }
+                dst = std::move(v);
+            }
+        }
+        nc_close(ncid);
+    };
+    read_static_netcdf("twi", out.twi);
+    read_static_netcdf("k_capacity_mult", out.k_capacity_mult);
+    read_static_netcdf("catchment_ratio", out.catchment_ratio);
 
     if (out.h <= 0 || out.w <= 0) {
         throw std::runtime_error(

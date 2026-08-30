@@ -591,6 +591,35 @@ def build_daily_env_nc(
 
     years_in_data = np.unique(times.astype("datetime64[Y]")).astype(int) + 1970
     output_path = output_dir / f"{aoi}_regional_{years_in_data.min()}_{years_in_data.max()}_env.nc"
+    # CF-compliant georeferencing (M7.4.1): explicit lat/lon coordinate
+    # variables + grid_mapping (crs). Older GDAL netCDF drivers do not
+    # expose plain 2-D (y, x) variables as SUBDATASETS unless the file
+    # carries these — the C++ env reader would silently miss the static
+    # bands (twi, k_capacity_mult, catchment_ratio) on those systems.
+    y_m = float(np.median(np.abs(np.diff(y)))) if len(y) > 1 else 0.0
+    x_m = float(np.median(np.abs(np.diff(x)))) if len(x) > 1 else 0.0
+    if y_m > 0 and x_m > 0 and y_m < 1 and x_m < 1:  # degree grids
+        lat_2d, lon_2d = np.meshgrid(y, x, indexing="ij")
+        ds = ds.assign_coords(
+            lat=(("y", "x"), lat_2d.astype(np.float64)),
+            lon=(("y", "x"), lon_2d.astype(np.float64)),
+        )
+        ds["lat"].attrs = {"standard_name": "latitude", "units": "degrees_north"}
+        ds["lon"].attrs = {"standard_name": "longitude", "units": "degrees_east"}
+        ds["crs"] = int(0)
+        ds["crs"].attrs = {
+            "grid_mapping_name": "latitude_longitude",
+            "longitude_of_prime_meridian": 0.0,
+            "semi_major_axis": 6378137.0,
+            "inverse_flattening": 298.257223563,
+            "spatial_ref": 'GEOGCS["WGS 84",DATUM["WGS_1984",'
+                           'SPHEROID["WGS 84",6378137,298.257223563]],'
+                           'PRIMEM["Greenwich",0],UNIT["degree",0.0174532925199433]]',
+        }
+        for var in ds.data_vars:
+            if "y" in ds[var].dims and "x" in ds[var].dims:
+                ds[var].attrs["grid_mapping"] = "crs"
+                ds[var].attrs["coordinates"] = "lat lon"
     print(f"Writing: {output_path}")
     ds.to_netcdf(output_path, encoding=encoding)
 
