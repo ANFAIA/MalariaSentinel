@@ -216,6 +216,7 @@ def abm(
     output_dir: Path = typer.Option(Path("runs/abm"), "--output-dir", help="Output directory for simulation results."),
     data_root: Path | None = typer.Option(None, "--data-root", help="Root containing AOI manifest."),
     gif: bool = typer.Option(False, "--gif", help="Auto-generate an animation GIF after the run."),
+    debug: bool = typer.Option(False, "--debug", help="Post-run debug visualisation: hosts-vs-vectors overlay GIF (humans green, livestock brown, mosquitoes blue, I_V red)."),
     compile: bool = typer.Option(False, "--compile", "-c", help="Compile the C++ ABM engine (mal_abm_fast) from source."),
     clean: bool = typer.Option(False, "--clean", help="Clean build directory before compiling (used with --compile)."),
     worktree: Path | None = typer.Option(
@@ -347,6 +348,13 @@ def abm(
             cohort_log=cohort_log,
             enable_transmission=enable_transmission,
         )
+
+    if debug:
+        from .abm.scripts.overlay_hosts import render_overlay
+        try:
+            render_overlay(output_dir, aoi, output_dir / "overlay_hosts.gif")
+        except Exception as e:  # noqa: BLE001 — debug aid must never fail the run
+            typer.echo(f"overlay debug GIF failed (run unaffected): {e}")
 
 
 def _render_animation(
@@ -596,6 +604,13 @@ def validate_cases(
         initial_vector_infected_frac=vector_infected_frac,
         env=str(env_nc),
     )
+    rc = result.get("returncode")
+    if rc not in (0, None):
+        typer.echo(
+            f"ABM engine failed (rc={rc}):\n{result.get('stderr','')[-1500:]}",
+            err=True,
+        )
+        raise typer.Exit(code=1)
     typer.echo(f"Validation run complete: {result['output_path']}")
 
     scorecard = run_scoring(
@@ -628,10 +643,14 @@ def _ensure_env_stack(aoi: str, years: list[int], skip: bool = False) -> Path:
     from .ingest.daily_nc import build_daily_env_nc
 
     typer.echo(f"Auto-download: raw datasets for {y_min}-{y_max}...")
+    # Only what build_daily_env_nc + the engine actually consume:
+    # rainfall (chirps daily), water_temp + wind (era5), ndvi (modis),
+    # water_frac (jrc), twi/k_capacity (dem), land_mask (coastline),
+    # hosts/mobility inputs (worldpop, glw, ghsl, buildings, wildlife).
     run_download(
         aoi=aoi,
         datasets=["chirps", "era5", "modis"],
-        outputs=["rainfall_daily", "temp_suitability", "water_temp", "wind_6hourly", "ndvi"],
+        outputs=["rainfall_daily", "water_temp", "wind_6hourly", "ndvi"],
         years=years,
         months=None,
         output_dir=data_dir,

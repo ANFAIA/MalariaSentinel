@@ -141,14 +141,43 @@ def build_daily_env_nc(
     n_days, h, w = rainfall_raw.shape
     target_shape = (h, w)
 
-    # Mask rainfall nodata (-9999) -> 0.0. NaN rainfall propagates through
-    # the C++ climate engine and breaks aquatic dynamics; 0.0 is the safe
-    # replacement (treats nodata as "no rain that day").
+    # Mask rainfall nodata (-9999) with the NEAREST VALID CELL's value for
+    # that day (M7.4.1-fix). The old behaviour filled with 0.0, which
+    # silently killed the pluvial-pool hydrology wherever ERA5 has gaps —
+    # notably the south-eastern coastal strip where Accra sits, leaving
+    # cities with synthetic zero rain and no temporary pools.
+    # Open ocean (land_mask == 0) still gets 0.0: no pools on the sea.
     rainfall = rainfall_raw.astype(np.float32)
     nodata_mask = rainfall_raw == NODATA_SENTINEL
     nodata_count = int(nodata_mask.sum())
-    rainfall[nodata_mask] = 0.0
+    # Reliable donor cells: filled <50% of days.
+    fill_frac = nodata_mask.mean(axis=0)
+    valid_cells = fill_frac < 0.5
+    if valid_cells.any() and not valid_cells.all():
+        from scipy.ndimage import distance_transform_edt
+        _, (donor_i, donor_j) = distance_transform_edt(
+            ~valid_cells, return_indices=True)
+        for d in range(n_days):
+            nm = nodata_mask[d]
+            if nm.any():
+                rainfall[d][nm] = rainfall[d][donor_i[nm], donor_j[nm]]
+    elif not valid_cells.any():
+        rainfall[nodata_mask] = 0.0  # degenerate: everything filled
     rainfall[rainfall < 0] = 0.0
+
+    # Open ocean -> 0 rain (and the land mask is reused further down for
+    # the saltwater filter).
+    coastline_file = data_dir / f"{aoi}_land_mask.tif"
+    ocean_mask = None
+    if coastline_file.exists():
+        try:
+            lm = read_static_tif(coastline_file, target_shape)
+            lm = np.nan_to_num(lm, nan=0.0)
+            ocean_mask = lm <= 0.5
+            for d in range(n_days):
+                rainfall[d][ocean_mask] = 0.0
+        except Exception as e:
+            print(f"warning: could not read {coastline_file}: {e}")
 
     # JRC GSW water occurrence -> water_frac (static, broadcast to all days)
     print(f"Reading water_frac: {water_frac_file}")
