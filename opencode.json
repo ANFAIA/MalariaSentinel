@@ -546,5 +546,5 @@
         "question": "allow"
       }
     }
-  }
+  },"compaction": {"auto":false,"prune":false}
 }

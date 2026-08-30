@@ -17,15 +17,13 @@
 | 2 | 0:35–1:20 | Why | La malaria sigue siendo una emergencia humana |
 | 3 | 1:20–2:05 | Why | El sistema reacciona cuando deberia anticipar |
 | 4 | 2:05–2:45 | Why | La pregunta es donde actuar primero |
-| 5 | 2:45–3:20 | Why | Creencia: anticipacion sin reemplazar conocimiento local |
-| 6 | 3:20–4:05 | How | Muchos datos, una decision |
-| 7 | 4:05–4:55 | How | ABM convierte condiciones en mecanismos |
-| 8 | 4:55–5:40 | How | U-Net convierte detalle en velocidad |
-| 9 | 5:40–6:30 | How | Cadena completa, calibrable y explicable |
-| 10 | 6:30–7:25 | What | Existe pipeline ejecutable para Ghana |
-| 11 | 7:25–8:20 | What | Demo: del territorio al mapa |
-| 12 | 8:20–9:05 | What | Honestidad: prototipo, no predictor clinico |
-| 13 | 9:05–10:00 | Cierre | Validar juntos una decision real |
+| 5 | 3:20–4:05 | How | Muchos datos, una decision |
+| 6 | 4:05–4:55 | How | El ABM por dentro: entorno, bucle biologico, rollouts |
+| 7 | 4:55–5:40 | How | U-Net convierte detalle en velocidad |
+| 8 | 5:40–6:30 | How | Cadena completa, calibrable y explicable |
+| 9 | 6:30–7:25 | What | Ghana: pipeline real y salida real de la demo |
+| 10 | 7:25–8:20 | What | Demo abierta: ustedes pueden ejecutarla |
+| 11 | 9:05–10:00 | Cierre | Contribucion abierta: 4 ramas tecnicas + piloto de campo |
 
 ---
 
@@ -114,33 +112,7 @@
 >
 > MalariaSentinel nace para ayudar a responder una pregunta concreta: **¿donde deberiamos mirar y actuar primero, y como podemos comprobar despues si acertamos?**
 
-**Transicion:** Esta pregunta define nuestro por que.
-
-## Slide 5 — Antes del caso
-
-**Tiempo:** 2:45–3:20  
-**Bloque:** Why  
-**Visual:** Una ventana de tiempo: condiciones → riesgo → caso. El caso queda al final, pequeno.
-
-**Texto visible:** `Antes del caso`.
-
-**Nota mental:** **Anticipar. Explicar. Colaborar.**
-
-**Guion:**
-
-> Creemos que las comunidades no deberian esperar a que el daño sea visible para recibir una respuesta.
->
-> Si los factores que favorecen la transmision cambian en el espacio y en el tiempo, la vigilancia tambien tiene que cambiar.
->
-> No queremos reemplazar a los programas de salud ni al conocimiento de quienes trabajan en el territorio.
->
-> Queremos añadir una capa: anticipacion, explicacion y comparacion de escenarios.
->
-> Ese es nuestro **Why**. Ahora, ¿como intentamos hacerlo?
-
----
-
-## Slide 6 — Muchos datos, una decision
+## Slide 5 — Muchos datos, una decision
 
 **Tiempo:** 3:20–4:05  
 **Bloque:** How  
@@ -164,29 +136,78 @@
 
 **Transicion:** Para representar el mecanismo usamos un modelo basado en agentes.
 
-## Slide 7 — El profesor
+## Slide 6 — El profesor, por dentro
 
 **Tiempo:** 4:05–4:55  
 **Bloque:** How  
-**Visual:** Animacion o captura de muchos puntos/agentes moviendose sobre una grilla. Evitar codigo.
+**Visual:** Diagrama de las tripas del ABM (mermaid abajo): tres columnas — entorno que entra, bucle diario del motor, rollouts que salen. Una columna por idea. Senalar cada columna mientras se habla.
 
 **Texto visible:** `ABM`.
 
-**Nota mental:** **ABM = detalle biologico.**
+**Nota mental:** **Entra entorno. Bucle diario. Salen rollouts.**
 
 **Guion:**
 
-> La primera pieza es un ABM, un modelo de simulacion basado en agentes.
+> La primera pieza es un ABM, un modelo de simulacion basado en agentes. Vamos a abrirlo para mirar sus tripas.
 >
-> En lugar de tratar todo el territorio como un promedio, el modelo puede representar poblaciones de mosquitos, condiciones ambientales, habitat y estados de transmision sobre una grilla espacial.
+> A la izquierda entra el territorio: lluvia de CHIRPS; temperatura y viento de ERA5; agua observada de JRC GSW y vegetacion de MODIS; el relieve de MERIT DEM, que decide donde se acumula el agua; poblacion humana y ganado de WorldPop y GLW; y movilidad de dia y de noche.
 >
-> Esto nos permite preguntar: si cambia la lluvia, si cambia la temperatura, si aplicamos una intervencion, ¿como podria cambiar la dinamica?
+> En el centro, el motor. Cada dia, celda a celda, ejecuta un bucle biologico: activa las charcas que la hidrologia permite; desarrolla huevos, larvas y pupas al ritmo que marca la temperatura; las hembras adultas buscan hospedador, se alimentan y oviponen; se dispersan empujadas por el viento.
 >
-> El ABM funciona como un profesor: es detallado y biologicamente explicito, pero cada escenario cuesta tiempo de computacion.
+> Y si hay malaria, la infeccion va del mosquito al humano y vuelve, con un periodo de incubacion que tambien depende de la temperatura.
+>
+> A la derecha salen los rollouts: mapas diarios de vectores y de infeccion, y la demografia de cada cohorte.
+>
+> El ABM funciona como un profesor: biologicamente explicito e inspeccionable, pero cada escenario cuesta tiempo de computacion.
 
 **Transicion:** Para tomar decisiones operativas necesitamos conservar el aprendizaje y reducir el tiempo.
 
-## Slide 8 — El estudiante
+**Diagrama de la diapositiva (mermaid):**
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"background":"#F8FBF8","primaryColor":"#FFFFFF","primaryBorderColor":"#D3DAD3","primaryTextColor":"#101911","secondaryColor":"#E6F2EA","tertiaryColor":"#F8FBF8","lineColor":"#505B52","clusterBkg":"#F8FBF8","clusterBorder":"#D3DAD3","fontSize":"14px"}}}%%
+flowchart LR
+    subgraph ENT["ENTORNO · tensores diarios"]
+        direction TB
+        A["CHIRPS<br/>lluvia diaria"]
+        B["ERA5<br/>temperatura · viento 6-horal"]
+        C["JRC GSW · MODIS<br/>agua observada · NDVI"]
+        D["MERIT DEM<br/>relieve · TWI → charcas"]
+        E["WorldPop · GLW4 · GHSL<br/>poblacion · ganado"]
+        F["Movilidad<br/>origen-destino dia y noche"]
+    end
+
+    subgraph MOTOR["MOTOR ABM C++ · bucle diario por celda"]
+        direction TB
+        E1["Habitat<br/>charcas activas segun hidrologia"]
+        E2["Ciclo acuatico<br/>huevo · larva · pupa · adulto<br/>al ritmo de la temperatura"]
+        E3["Ciclo gonotrofico<br/>buscar hospedador · sangre · oviposicion"]
+        E4["Dispersion<br/>vuelo guiado por el viento"]
+        E5["Transmision SEIR-SEI<br/>mosquito a humano y vuelta · EIP termico"]
+        E1 --> E2 --> E3 --> E4 --> E5
+        E5 -.->|"dia siguiente"| E1
+    end
+
+    subgraph SAL["SALIDA · rollouts"]
+        direction TB
+        F1["Mapas diarios de vectores<br/>state_dayNNN.tif"]
+        F2["Mapas diarios de infeccion<br/>transmission_dayNNN.tif"]
+        F3["Demografia por cohorte<br/>cohort.json"]
+    end
+
+    ENT --> MOTOR
+    MOTOR --> SAL
+
+    classDef dato fill:#FFFFFF,stroke:#D3DAD3,color:#505B52
+    classDef paso fill:#FFFFFF,stroke:#D3DAD3,color:#101911
+    classDef salida fill:#E6F2EA,stroke:#D3DAD3,color:#101911
+    class A,B,C,D,E,F dato
+    class E1,E2,E3,E4,E5 paso
+    class F1,F2,F3 salida
+    style MOTOR fill:#F8FBF8,stroke:#006622,stroke-width:2px,color:#006622
+```
+
+## Slide 7 — El estudiante
 
 **Tiempo:** 4:55–5:40  
 **Bloque:** How  
@@ -208,7 +229,7 @@
 
 **Transicion:** Las dos piezas forman parte de una cadena mayor.
 
-## Slide 9 — De datos a riesgo
+## Slide 8 — De datos a riesgo
 
 **Tiempo:** 5:40–6:30  
 **Bloque:** How  
@@ -238,15 +259,15 @@
 
 ---
 
-## Slide 10 — Ghana
+## Slide 9 — Ghana
 
 **Tiempo:** 6:30–7:25  
 **Bloque:** What  
-**Visual:** Mapa de Ghana con capas que aparecen una a una. Usar captura real si esta disponible.
+**Visual:** Resultado real de la demo: mapa o animacion del escenario "Brote Focal Anual" en Ghana (captura de malariasentinel.com). Capas que aparecen una a una: densidad de vectores y propagacion de la infeccion.
 
 **Texto visible:** `Ghana`.
 
-**Nota mental:** **Ya corre de extremo a extremo.**
+**Nota mental:** **Ya corre de extremo a extremo. Salida real en pantalla.**
 
 **Guion:**
 
@@ -258,55 +279,99 @@
 >
 > Las etapas se pueden ejecutar desde una CLI: `download`, `ingest`, `abm`, `score`, `train` y `predict`.
 >
+> Lo que ven en pantalla no es un mockup: es la salida de una ejecucion real. Un brote focal anual simulado sobre Ghana, con mapas diarios de vectores e infeccion.
+>
 > Esto no significa que el problema este resuelto. Significa que ya tenemos una base sobre la que se puede medir, corregir y validar con datos de programa.
 
-**Transicion:** Veamos como se convierte esa cadena en una historia territorial.
+**Transicion:** Y esta demo la puede ejecutar cualquiera de ustedes. Veamos como.
 
-## Slide 11 — Del territorio al mapa
+## Slide 10 — Ejecuten ustedes la demo
 
 **Tiempo:** 7:25–8:20  
 **Bloque:** What  
-**Visual:** Demo de cinco pasos: territorio → capas → simulacion → aprendizaje → mapa final.
+**Visual:** Diagrama del flujo del configurador interactivo (mermaid abajo). Enlace grande y visible: `malariasentinel.com` (seccion Configurador ABM). Reserva: captura del configurador con el escenario recomendado.
 
-**Texto visible:** `¿Que zona primero?`
+**Texto visible:** `Pruebenla: malariasentinel.com`.
 
-**Nota mental:** **Mostrar, no explicar repositorio.**
+**Nota mental:** **Escenario. Comando. Artefactos.**
 
 **Guion:**
 
-> En una demostracion no queremos enseñar un repositorio ni una lista de modulos.
+> Todo lo que acaban de ver es reproducible, y no hace falta pertenecer al equipo.
 >
-> Queremos seguir una decision.
+> En malariasentinel.com hay un configurador interactivo de simulacion. Entran, eligen un escenario predefinido —por ejemplo, un brote focal anual en Ghana— o ajustan parametros: zona, duracion, numero de simulaciones, semilla, focos del brote.
 >
-> Partimos de una zona y un periodo. Mostramos las condiciones ambientales que entran al modelo. Vemos como el ABM genera estados de transmision. Enseñamos como esos escenarios entrenan al sustituto. Y terminamos con un mapa.
+> El configurador genera en vivo el comando exacto para terminal. Lo copian, lo ejecutan, y obtienen los mismos artefactos que acabamos de ver: mapas diarios de vectores, mapas de infeccion, demografia por cohorte y las animaciones.
 >
-> Ese mapa no dice "aqui habra un caso".
+> Cuando lo ejecuten, lean el resultado como nosotros: el mapa no dice "aqui habra un caso"; dice "bajo estos datos y estos supuestos, esta zona merece atencion prioritaria".
 >
-> Dice: "bajo estos datos y estos supuestos, esta zona merece atencion prioritaria".
->
-> Y la siguiente pregunta es igual de importante: ¿que dato de campo necesitamos para comprobarlo?
+> No es una demo cerrada ni un video. Es un instrumento abierto que cualquiera puede poner a prueba con su propia region.
 
-## Slide 12 — Validar juntos
+**Transicion:** Y la unica forma de comprobarlo de verdad es con una zona y una decision reales.
+
+**Diagrama de la diapositiva (mermaid):**
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"background":"#F8FBF8","primaryColor":"#FFFFFF","primaryBorderColor":"#D3DAD3","primaryTextColor":"#101911","secondaryColor":"#E6F2EA","tertiaryColor":"#F8FBF8","lineColor":"#505B52","clusterBkg":"#F8FBF8","clusterBorder":"#D3DAD3","fontSize":"14px"}}}%%
+flowchart LR
+    subgraph PASO1["1 · CONFIGURAR — malariasentinel.com"]
+        direction TB
+        ESC["Escenario recomendado<br/>Brote Focal Anual · 365 dias · 5 aldeas"]
+        PAR["O parametros libres<br/>zona · duracion · rollouts · semilla<br/>transmision · focos y casos del brote"]
+    end
+
+    subgraph PASO2["2 · EJECUTAR"]
+        direction TB
+        CMD["Comando listo para copiar<br/>malariasim abm --aoi ghana --days 365"]
+        RUN["Motor ABM C++<br/>simulacion estocastica en la grilla"]
+    end
+
+    subgraph PASO3["3 · RESULTADO — artefactos"]
+        direction TB
+        A1["Mapas de vectores<br/>53 GeoTIFFs"]
+        A2["Mapas de infeccion SEIR<br/>53 GeoTIFFs"]
+        A3["Demografia por cohorte<br/>cohort.json"]
+        A4["Animaciones de propagacion<br/>2 GIFs"]
+    end
+
+    PASO1 --> PASO2
+    CMD --> RUN
+    PASO2 --> PASO3
+    PASO3 --> MAP["El mapa que<br/>acabamos de ver"]
+
+    classDef destacado fill:#E6F2EA,stroke:#D3DAD3,color:#101911
+    classDef web fill:#FFFFFF,stroke:#D3DAD3,color:#101911
+    classDef paso fill:#FFFFFF,stroke:#D3DAD3,color:#101911
+    classDef artefacto fill:#FFFFFF,stroke:#D3DAD3,color:#505B52
+    classDef focal fill:#006622,stroke:#006622,color:#FFFFFF
+    class ESC destacado
+    class PAR web
+    class CMD,RUN paso
+    class A1,A2,A3,A4 artefacto
+    class MAP focal
+```
+
+## Slide 11 — Contribuyan: codigo y territorio
 
 **Tiempo:** 9:05–10:00  
 **Bloque:** Cierre  
-**Visual:** Dos manos o dos puntos conectados: datos de campo ↔ mapa. QR y enlace solo al final.
+**Visual:** Cuatro tarjetas de contribucion tecnica (epidemiologia-entomologia, ingenieria geoespacial, ML-simulacion, diseno-producto) + una tarjeta destacada de piloto de campo. Tres pasos de entrada: clonar → pytest → PR. QR y enlace solo al final.
 
-**Texto visible:** `Una zona. Una decision. Un piloto.`
+**Texto visible:** `github.com/ANFAIA/MalariaSentinel` + `Una zona. Una decision. Un piloto.`
 
-**Nota mental:** **ONG + zona + datos + decision.**
+**Nota mental:** **Proyecto abierto. Cuatro ramas tecnicas. Un piloto.**
 
 **Guion:**
 
-> Buscamos una ONG o un programa de malaria con una zona piloto, datos historicos y una decision operativa concreta.
+> Todo lo que han visto es abierto: codigo Apache 2.0, plan de desarrollo y hoja de ruta publicos. Y hay cuatro frentes donde sumarse.
 >
-> No proponemos empezar intentando modelar todo un pais.
+> Epidemiologia y entomologia: parametros biologicos, resistencia a insecticidas, curvas de picadura. Ingenieria geoespacial: pipelines satelitales, mallas Zarr y NetCDF, cuencas hidrologicas. Machine learning y simulacion: el emulador U-Net y la paralelizacion en C++. Y diseno de producto: la plataforma Centinela y su cartografia de riesgo.
 >
-> Proponemos elegir una zona, definir una decision, generar una salida de riesgo y comprobarla con datos de campo.
+> Entrar es corto: clonar el repositorio, sincronizar con uv, validar la suite con pytest y abrir un PR.
 >
-> Si funciona, aprendemos que parte del sistema es util. Si falla, aprendemos exactamente donde corregirlo.
+> Y si su capital es territorio y no codigo, la invitacion es la misma: una zona, una decision operativa, datos de campo. Un piloto, no un pais.
 >
-> MalariaSentinel no pretende reemplazar el conocimiento local. Pretende ayudar a que ese conocimiento llegue antes a la decision.
+> MalariaSentinel no reemplaza el conocimiento local; ayuda a que ese conocimiento llegue antes a la decision.
 >
 > La pregunta final es: **¿que podriamos anticipar juntos si el mapa de riesgo llegara antes que el brote?**
 >
@@ -323,13 +388,14 @@ Para ensayar sin memorizar todo:
 3. **Brecha:** datos existen, decision llega tarde.
 4. **Creencia:** anticipar sin reemplazar conocimiento local.
 5. **Metodo:** observar, entender mecanismos, decidir.
-6. **ABM:** detalle biologico, profesor lento.
+6. **ABM:** entra entorno, bucle biologico diario, salen rollouts; profesor lento.
 7. **U-Net:** velocidad, estudiante aproximado.
 8. **Pipeline:** datos → habitat → ABM → calibracion → U-Net → riesgo.
-9. **Producto:** Ghana ya corre de extremo a extremo.
-10. **Honestidad:** Dice 0,24; no predictor clinico.
-11. **Peticion:** una zona, una decision, datos de campo.
-12. **Cierre:** anticipar antes del brote.
+9. **Producto:** Ghana ya corre de extremo a extremo; slide 10 muestra salida real.
+10. **Demo:** configurador web → comando → artefactos; ejecutable por cualquiera.
+11. **Honestidad:** Dice 0,24; no predictor clinico.
+12. **Peticion:** contribuidores tecnicos (4 ramas); ONG: una zona, una decision, datos de campo.
+13. **Cierre:** anticipar antes del brote.
 
 ## Ensayo y control
 
@@ -338,6 +404,7 @@ Para ensayar sin memorizar todo:
 - Cronometrar cada slide; cortar ejemplos antes que principios.
 - Dejar pausas despues de `¿podemos llegar antes?`, `¿donde primero?` y `0,24`.
 - Sustituir capturas genericas por resultados reales antes de presentar.
+- Probar el configurador de malariasentinel.com en vivo; llevar captura del escenario recomendado como reserva.
 - Confirmar cifra global con OMS.
 - Preparar respuesta para tres preguntas: validacion, datos necesarios y utilidad para una ONG.
 - QR y enlace deben estar probados; llevar capturas offline.

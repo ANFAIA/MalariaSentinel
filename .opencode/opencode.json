@@ -2,5 +2,5 @@
   "$schema": "https://opencode.ai/config.json",
   "plugin": [
     "opencode-speech-to-text"
-  ]
+  ],"compaction": {"auto":false,"prune":false}
 }
