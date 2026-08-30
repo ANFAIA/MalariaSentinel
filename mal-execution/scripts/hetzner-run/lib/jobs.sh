@@ -57,8 +57,9 @@ _build_sim_cmd() {
 
   local verify_cmd=""
   if [[ "$verify_env_bands" == "1" ]]; then
-    local bin="mal-core/src/mal_core/abm/bin/mal_abm_fast_$(uname -s | tr '[:upper:]' '[:lower:]')"
-    verify_cmd="$bin run --aoi $aoi --env data/$aoi/${aoi}_regional_2024_2025_env.nc --habitat data/$aoi/${aoi}_habitat_patches.gpkg --year $year --month $month --days 1 --seed 1 --n-rollouts 1 --snapshot-every 1 --output /tmp/verify_d1.tif --hosts data/$aoi/${aoi}_host_static.nc --seeding-mode host-weighted 2>&1 | tee /work/verify_env_bands.log | grep -aq 'carries static catchment_ratio' && grep -aq 'carries static k_capacity_mult' /work/verify_env_bands.log && grep -aq 'carries static TWI' /work/verify_env_bands.log && echo '[verify-env-bands] OK' && "
+    # NOTE: use the freshly built binary (build/src/mal_abm_fast) — the
+    # bin/ copy carries a platform suffix that must be resolved ON the VM.
+    verify_cmd="mal-core/src/mal_core/abm/build/src/mal_abm_fast run --aoi $aoi --env data/$aoi/${aoi}_regional_2024_2025_env.nc --habitat data/$aoi/${aoi}_habitat_patches.gpkg --year $year --month $month --days 1 --seed 1 --n-rollouts 1 --snapshot-every 1 --output /tmp/verify_d1.tif --hosts data/$aoi/${aoi}_host_static.nc --seeding-mode host-weighted 2>&1 | tee /work/verify_env_bands.log | grep -aq 'carries static catchment_ratio' && grep -aq 'carries static k_capacity_mult' /work/verify_env_bands.log && grep -aq 'carries static TWI' /work/verify_env_bands.log && echo '[verify-env-bands] OK' && "
   fi
 
   local cmd="cd /work/code/$repo_name && uv sync $sync_args && bash mal-core/src/mal_core/abm/build.sh && "
