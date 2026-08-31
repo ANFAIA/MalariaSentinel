@@ -1314,6 +1314,7 @@
                 <path d="M 470 160 C 510 160, 520 140, 560 140" fill="none" stroke="var(--accent)" stroke-width="2.5" id="linkOutTrans"></path>
                 <path d="M 470 220 C 510 220, 520 210, 560 210" fill="none" stroke="var(--accent)" stroke-width="2.5" id="linkOutCohorts"></path>
                 <path d="M 470 280 C 510 280, 520 280, 560 280" fill="none" stroke="var(--accent)" stroke-width="2.5" id="linkOutGifs"></path>
+                <path d="M 470 300 C 510 300, 520 325, 560 325" fill="none" stroke="var(--border)" stroke-width="2.5" stroke-dasharray="4 4" id="linkOutDebug"></path>
 
                 <!-- 1. Inputs Nodes -->
                 <!-- Node: Tensores Climáticos -->
@@ -1404,6 +1405,13 @@
                   <rect width="170" height="48" rx="6" fill="var(--surface)" stroke="var(--accent)" stroke-width="2" id="outRectGif"></rect>
                   <text x="12" y="20" font-family="var(--font-mono)" font-size="10" font-weight="700" fill="var(--accent)" id="outTextGifTitle">Animaciones .gif</text>
                   <text x="12" y="36" font-family="var(--font-body)" font-size="10" fill="var(--muted)" id="outCountGif">2 GIFs (Vectores + Malaria)</text>
+                </g>
+
+                <!-- Output: GIF de Depuración -->
+                <g id="outNodeDebug" transform="translate(560, 325)">
+                  <rect width="170" height="48" rx="6" fill="var(--surface)" stroke="var(--border)" stroke-width="2" id="outRectDebug"></rect>
+                  <text x="12" y="20" font-family="var(--font-mono)" font-size="10" font-weight="700" fill="var(--muted)" id="outTextDebugTitle">overlay_hosts.gif</text>
+                  <text x="12" y="36" font-family="var(--font-body)" font-size="10" fill="var(--muted)" id="outCountDebug" data-i18n="svg.node.debug">Overlay de depuración</text>
                 </g>
 
               </svg>
@@ -1781,6 +1789,11 @@
       var outRectGif = document.getElementById('outRectGif');
       var outTextGifTitle = document.getElementById('outTextGifTitle');
       var outCountGif = document.getElementById('outCountGif');
+
+      var linkOutDebug = document.getElementById('linkOutDebug');
+      var outRectDebug = document.getElementById('outRectDebug');
+      var outTextDebugTitle = document.getElementById('outTextDebugTitle');
+      var outCountDebug = document.getElementById('outCountDebug');
 
       // Presets Dictionary (espejo exacto de los defaults del CLI: cli.py::abm)
       var presets = {
@@ -2162,7 +2175,8 @@
         var totalStateRasters = numSnapshotsPerRollout * rollouts;
         var totalTransRasters = numTransSnapshotsPerRollout * rollouts;
         var totalCohortLogs = hasCohortLog ? rollouts : 0;
-        var totalGifs = hasGif ? (rollouts * (hasTrans ? 2 : 1)) : 0;
+        var totalGifs = (hasGif ? rollouts * (hasTrans ? 2 : 1) : 0) + (hasDebug ? 1 : 0);
+        var animGifs = hasGif ? rollouts * (hasTrans ? 2 : 1) : 0;
 
         summaryStateRasters.textContent = totalStateRasters + L(' archivos (' + rollouts + ' rollouts × ' + numSnapshotsPerRollout + ')', ' files (' + rollouts + ' rollouts × ' + numSnapshotsPerRollout + ')');
         summaryTransRasters.textContent = hasTrans ? (totalTransRasters + L(' archivos (' + rollouts + ' rollouts × ' + numTransSnapshotsPerRollout + ' · SEIR)', ' files (' + rollouts + ' rollouts × ' + numTransSnapshotsPerRollout + ' · SEIR)')) : L('0 archivos (desactivado)', '0 files (disabled)');
@@ -2276,13 +2290,28 @@
           linkOutGifs.setAttribute('stroke-dasharray', 'none');
           outRectGif.setAttribute('stroke', 'var(--accent)');
           outTextGifTitle.setAttribute('fill', 'var(--accent)');
-          outCountGif.textContent = totalGifs + L(' GIF(s) animados', ' Animated GIF(s)');
+          outCountGif.textContent = animGifs + L(' GIF(s) animados', ' Animated GIF(s)');
         } else {
           linkOutGifs.setAttribute('stroke', 'var(--border)');
           linkOutGifs.setAttribute('stroke-dasharray', '4 4');
           outRectGif.setAttribute('stroke', 'var(--border)');
           outTextGifTitle.setAttribute('fill', 'var(--muted)');
           outCountGif.textContent = L('Desactivado (0 archivos)', 'Disabled (0 files)');
+        }
+
+        // Debug overlay GIF output
+        if (hasDebug) {
+          linkOutDebug.setAttribute('stroke', 'var(--accent)');
+          linkOutDebug.setAttribute('stroke-dasharray', 'none');
+          outRectDebug.setAttribute('stroke', 'var(--accent)');
+          outTextDebugTitle.setAttribute('fill', 'var(--accent)');
+          outCountDebug.textContent = L('1 overlay de depuración', '1 debug overlay');
+        } else {
+          linkOutDebug.setAttribute('stroke', 'var(--border)');
+          linkOutDebug.setAttribute('stroke-dasharray', '4 4');
+          outRectDebug.setAttribute('stroke', 'var(--border)');
+          outTextDebugTitle.setAttribute('fill', 'var(--muted)');
+          outCountDebug.textContent = L('Desactivado (0 archivos)', 'Disabled (0 files)');
         }
 
         // 4. Update Data Prerequisites & Warnings
@@ -2597,6 +2626,7 @@
           'svg.sub.bio': 'CICLO BIOLÓGICO', 'svg.sub.biodesc': 'Oviposición, desarrollo y vuelo', 'svg.sub.host': 'ATRACCIÓN HOSPEDADORES', 'svg.sub.hostdesc': 'Preferencia animal vs humano', 'svg.sub.trans': 'TRANSMISIÓN DE MALARIA', 'svg.sub.transdesc': 'Hembras I_V ↔ Humanos I_H',
           'svg.engine.title': 'MOTOR ABM ESTOCÁSTICO',
           'svg.sub.warmup': 'FASE DE ESTABILIZACIÓN',
+          'svg.node.debug': 'Overlay de depuración',
           // U-Net
           'unet.eyebrow': 'EMULACIÓN NEURONAL EFICIENTE',
           'unet.h2': 'Generación masiva de escenarios sin el coste del ABM directo.',
@@ -2789,6 +2819,7 @@
           'svg.sub.bio': 'BIOLOGICAL CYCLE', 'svg.sub.biodesc': 'Oviposition, development & flight', 'svg.sub.host': 'HOST ATTRACTION', 'svg.sub.hostdesc': 'Animal vs human preference', 'svg.sub.trans': 'MALARIA TRANSMISSION', 'svg.sub.transdesc': 'Female I_V ↔ Humans I_H',
           'svg.engine.title': 'STOCHASTIC ABM ENGINE',
           'svg.sub.warmup': 'STABILISATION PHASE',
+          'svg.node.debug': 'Debug overlay',
           // U-Net
           'unet.eyebrow': 'EFFICIENT NEURAL EMULATION',
           'unet.h2': 'Massive scenario generation without the cost of direct ABM.',
