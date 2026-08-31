@@ -350,10 +350,9 @@ def abm(
             aoi=aoi,
             seed=seed,
             output_dir=output_dir,
-            cohort_log=cohort_log,
+        cohort_log=cohort_log,
         enable_transmission=enable_transmission,
-        transmission_snapshot_every=transmission_snapshot_every,
-        )
+    )
 
     if debug:
         from .abm.scripts.overlay_hosts import render_overlay
