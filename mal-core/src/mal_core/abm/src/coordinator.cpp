@@ -554,6 +554,70 @@ std::vector<SeedInstruction> CoordinatorModel::build_seed_instructions(
     return out;
 }
 
+std::vector<SeedInstruction>
+CoordinatorModel::build_uniform_seed_instructions(
+    float init_frac, int32_t k_per_patch) {
+    std::vector<SeedInstruction> out;
+    if (init_frac <= 0.0f || k_per_patch <= 0) return out;
+
+    // Per-patch agent count — identical to the legacy round-robin
+    // uniform path (n = n_patches * k_per_patch * init_frac, evenly
+    // divided). Split 10% adults / 90% eggs (G3 lifecycle), matching
+    // MosquitoSubmodel's legacy constructor.
+    const int64_t per_patch = std::max<int64_t>(
+        1, static_cast<int64_t>(std::llround(
+               static_cast<double>(k_per_patch) *
+               static_cast<double>(init_frac))));
+    constexpr float kUniformAdultFrac = 0.10f;
+    const int64_t n_adults = static_cast<int64_t>(std::llround(
+        static_cast<double>(per_patch) * kUniformAdultFrac));
+    const int64_t n_larvae = per_patch - n_adults;
+    if (n_adults <= 0 && n_larvae <= 0) return out;
+
+    // Day-0 union via to_dataframe(): also registers the dynamic
+    // patch ids in dynamic_patch_registry_ with exactly the pid
+    // space the daily loop will use afterwards.
+    const std::vector<PatchState> states = to_dataframe();
+    const int64_t n_pre =
+        static_cast<int64_t>(habitat_.patches().size());
+
+    // Cell-centre lon/lat from the AOI bounds (same derivation as
+    // write_state_cog's transform).
+    const int32_t W = climate_->w() > 0 ? climate_->w() : 1;
+    const int32_t H = climate_->h() > 0 ? climate_->h() : 1;
+    const double pixel_w = (aoi_.east - aoi_.west) / W;
+    const double pixel_h = (aoi_.north - aoi_.south) / H;
+
+    out.reserve(states.size());
+    for (const auto& ps : states) {
+        const bool pre_existing =
+            ps.patch_id < n_pre && ps.patch_id >= 0;
+        bool urban_persistent = false;
+        if (host_landscape_ != nullptr) {
+            const HostCell hc = host_landscape_->at(ps.row, ps.col);
+            urban_persistent =
+                hc.urban_class == URBAN_CLASS_THRESHOLD &&
+                hc.building_fraction >= urban_b_min_;
+        }
+        // Seed pre-existing patches (legacy parity) plus the urban
+        // persistent baseline patches. Rain-day-only dynamic patches
+        // are left to natural colonisation.
+        if (!pre_existing && !urban_persistent) continue;
+
+        SeedInstruction inst;
+        inst.patch_id = static_cast<int32_t>(ps.patch_id);
+        inst.row      = ps.row;
+        inst.col      = ps.col;
+        inst.lon      = aoi_.west + (ps.col + 0.5) * pixel_w;
+        inst.lat      = aoi_.north - (ps.row + 0.5) * pixel_h;
+        inst.n_adults = static_cast<int32_t>(n_adults);
+        inst.n_larvae = static_cast<int32_t>(n_larvae);
+        inst.urban_capacity_factor = ps.urban_capacity_factor;
+        out.push_back(inst);
+    }
+    return out;
+}
+
 DensityGrid CoordinatorModel::aggregate_density(const MosquitoSubmodel& sub,
                                                 int32_t k_max) const {
     const int32_t H = climate_->h();

@@ -194,6 +194,19 @@ public:
     std::vector<SeedInstruction> build_seed_instructions(
         const SeedingConfig& config);
 
+    // UNIFORM-mode seeding over the day-0 patch union: every
+    // pre-existing habitat patch PLUS the dynamic urban-persistent
+    // baseline patches (urban_class == 30 && building_fraction >=
+    // URBAN_B_MIN). Per-patch counts match the legacy round-robin
+    // path (init_frac * k_per_patch agents, 10% adults / 90% eggs).
+    // Rain-day-only dynamic patches are intentionally NOT seeded:
+    // they are naturally colonised during the wet season. Without
+    // this, urban-baseline patches start empty and can never be
+    // colonised (adult dispersal max 2 km leaves them unreachable
+    // from distant permanent water — the Accra dry-season failure).
+    std::vector<SeedInstruction> build_uniform_seed_instructions(
+        float init_frac, int32_t k_per_patch);
+
     // -- density aggregation ------------------------------------------------
 
     // (H, W) density grid: bincount over (row, col) of all agents by

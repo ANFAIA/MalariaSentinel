@@ -150,9 +150,42 @@ Engine::Engine(AOI aoi,
         // Legacy path: init_frac of K in every patch. The fraction
         // comes from the seeding config (CLI --init-frac) with the
         // historical 0.30 default preserved.
-        sub_ = std::make_unique<MosquitoSubmodel>(
-            n_patches, K_PER_PATCH_DEFAULT, seeding_config.init_frac,
-            sub_seed, overrides_);
+        //
+        // M7.4.1 fix: the legacy round-robin constructor only covers
+        // the pre-existing habitat patches, so dynamic day-0 union
+        // patches — notably the urban persistent baseline — started
+        // empty and could never be colonised (adult dispersal max
+        // 2 km). Seed instructions over the day-0 union instead
+        // (pre-existing + urban-persistent), keeping per-patch counts
+        // identical to the legacy path.
+        if (!hosts_path.empty() && !host_landscape_) {
+            host_landscape_ = std::make_unique<HostLandscape>();
+            host_landscape_->load_from_nc(hosts_path, aoi_);
+            coord_->set_host_landscape(host_landscape_.get());
+            std::cout << "Engine: loaded HostLandscape (early, UNIFORM "
+                      << "seeding) from " << hosts_path << "\n";
+        }
+        std::vector<SeedInstruction> uniform_instructions;
+        if (coord_ != nullptr) {
+            uniform_instructions = coord_->build_uniform_seed_instructions(
+                seeding_config.init_frac, K_PER_PATCH_DEFAULT);
+        }
+        if (!uniform_instructions.empty()) {
+            seeding_patch_.patch_id = uniform_instructions.front().patch_id;
+            seeding_patch_.row      = uniform_instructions.front().row;
+            seeding_patch_.col      = uniform_instructions.front().col;
+            sub_ = std::make_unique<MosquitoSubmodel>(
+                n_patches, K_PER_PATCH_DEFAULT, uniform_instructions,
+                sub_seed, overrides_);
+            std::cout << "Engine: UNIFORM seeding over "
+                      << uniform_instructions.size()
+                      << " day-0 union patches (pre-existing + urban "
+                      << "persistent baseline)\n";
+        } else {
+            sub_ = std::make_unique<MosquitoSubmodel>(
+                n_patches, K_PER_PATCH_DEFAULT, seeding_config.init_frac,
+                sub_seed, overrides_);
+        }
     } else {
         // Detection-based path: ask the coordinator to filter
         // habitat patches by viability (water_frac / TWI) and
@@ -345,9 +378,42 @@ Engine::Engine(AOI aoi,
         // Legacy path: init_frac of K in every patch. The fraction
         // comes from the seeding config (CLI --init-frac) with the
         // historical 0.30 default preserved.
-        sub_ = std::make_unique<MosquitoSubmodel>(
-            n_patches, K_PER_PATCH_DEFAULT, seeding_config.init_frac,
-            sub_seed, overrides_);
+        //
+        // M7.4.1 fix: the legacy round-robin constructor only covers
+        // the pre-existing habitat patches, so dynamic day-0 union
+        // patches — notably the urban persistent baseline — started
+        // empty and could never be colonised (adult dispersal max
+        // 2 km). Seed instructions over the day-0 union instead
+        // (pre-existing + urban-persistent), keeping per-patch counts
+        // identical to the legacy path.
+        if (!hosts_path.empty() && !host_landscape_) {
+            host_landscape_ = std::make_unique<HostLandscape>();
+            host_landscape_->load_from_nc(hosts_path, aoi_);
+            coord_->set_host_landscape(host_landscape_.get());
+            std::cout << "Engine: loaded HostLandscape (early, UNIFORM "
+                      << "seeding) from " << hosts_path << "\n";
+        }
+        std::vector<SeedInstruction> uniform_instructions;
+        if (coord_ != nullptr) {
+            uniform_instructions = coord_->build_uniform_seed_instructions(
+                seeding_config.init_frac, K_PER_PATCH_DEFAULT);
+        }
+        if (!uniform_instructions.empty()) {
+            seeding_patch_.patch_id = uniform_instructions.front().patch_id;
+            seeding_patch_.row      = uniform_instructions.front().row;
+            seeding_patch_.col      = uniform_instructions.front().col;
+            sub_ = std::make_unique<MosquitoSubmodel>(
+                n_patches, K_PER_PATCH_DEFAULT, uniform_instructions,
+                sub_seed, overrides_);
+            std::cout << "Engine: UNIFORM seeding over "
+                      << uniform_instructions.size()
+                      << " day-0 union patches (pre-existing + urban "
+                      << "persistent baseline)\n";
+        } else {
+            sub_ = std::make_unique<MosquitoSubmodel>(
+                n_patches, K_PER_PATCH_DEFAULT, seeding_config.init_frac,
+                sub_seed, overrides_);
+        }
     } else {
         const std::vector<SeedInstruction> instructions =
             coord_->build_seed_instructions(seeding_config);
