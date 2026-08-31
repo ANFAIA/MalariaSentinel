@@ -342,6 +342,7 @@ def abm(
         human_infectious_days=human_infectious_days,
         immunity_duration_days=immunity_duration_days,
         enable_immunity=enable_immunity,
+        transmission_snapshot_every=transmission_snapshot_every,
     )
     typer.echo(f"ABM result: {result}")
 
@@ -350,9 +351,9 @@ def abm(
             aoi=aoi,
             seed=seed,
             output_dir=output_dir,
-        cohort_log=cohort_log,
-        enable_transmission=enable_transmission,
-    )
+            cohort_log=cohort_log,
+            enable_transmission=enable_transmission,
+        )
 
     if debug:
         from .abm.scripts.overlay_hosts import render_overlay
