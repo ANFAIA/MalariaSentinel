@@ -5,6 +5,7 @@ SRTM DEM tiles and download scripts for all study regions.
 ## ⚠️ Recovery Notice
 
 The original SRTM tiles were lost (2026-07-03). Re-download using the scripts below.
+Raw `.tif` tiles are gitignored — only tracked PNGs stay in git.
 
 ## Contents
 

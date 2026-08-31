@@ -1,6 +1,6 @@
 # MalariaSentinel Janus
 
-Multi-agent orchestration system for ABM calibration, feature development, and research — built on [deepagents](https://docs.langchain.com/oss/python/deepagents) + [gitagent](https://github.com/nicholaswatertank/gitagent) for isolated worktree workflows.
+Multi-agent orchestration system for ABM calibration, feature development, and research — built on [deepagents](https://docs.langchain.com/oss/python/deepagents) + [gawt](https://github.com/nicholaswatertank/gitagent) (`gitagent-mcp`) for shared-worktree, per-file-locked editing.
 
 ## Quick start
 
@@ -8,253 +8,151 @@ Multi-agent orchestration system for ABM calibration, feature development, and r
 # Install (from repo root)
 uv sync --all-packages
 
-# Set your OpenRouter API key
+# Set your LLM API key
 export OPENROUTER_API_KEY="sk-or-..."
 
-# Run a calibration cycle (interactive)
-uv run python -m agents_janus calibration
+# Start the request-router REPL (research + dispatch; no args)
+uv run janus
 
-# Run with a goal + no human-in-the-loop
-uv run python -m agents_janus calibration -g "Fix D2 scorer regression" --no-verify
+# Goal-driven implementation coordinator (edits via gawt, finalizes changes)
+uv run janus improve -g "Fix D2 scorer regression"
+uv run janus improve -g "Improve spatial scorers" --plan docs/plans/calibration.md
 
-# Dry run (print prompt, don't execute)
-uv run python -m agents_janus calibration -g "Improve spatial scorers" --dry-run
+# Inspect rendered prompts + tool schemas
+uv run janus prompts
 ```
+
+## CLI
+
+`janus` is the entry point (`agents_janus.cli:app`, package `mal-janus`).
+
+| Command | What it does |
+|---|---|
+| `janus` | **Request router REPL** — routes each request to a coordinator: runs ABM/pipeline stages via `malariasim`, asks specialists, dispatches implementation work. |
+| `janus improve` | **Implementation coordinator** — decomposes a goal, opens a gawt session, dispatches specialists, monitors the pheromone, snapshots changes. |
+| `janus prompts` | Print rendered prompts and visible tool schemas. |
+
+Global flags: `--no-tracing` (Langfuse tracing is ON by default), `--no-codebase-index` (skip codebase-memory index on startup), `--env dev|staging|production`, `--dump-prompts` (write prompts to `prompt_snapshots.jsonl`).
+
+`janus improve` options: `--goal/-g`, `--plan`, `--provider/-p` (openrouter, openai, anthropic), `--model/-m` (default `xiaomi/mimo-v2.5`), `--no-verify` (skip approval gates).
+
+> The old `calibration` / `feature` / `research` subcommands were removed —
+> everything goes through the request router (`janus`) or the implementation
+> coordinator (`janus improve`).
 
 ## Architecture
 
 ```
 ┌──────────────────────────────────────────────────────────┐
-│ ORCHESTRATOR (LLM)                                       │
+│ REQUEST ROUTER (centinela)                               │
 │ Backend: MalariasimShellBackend(virtual_mode=True)       │
-│ execute tool (bash) → malariasim only                   │
-│ + gawt MCP, search, kg, ask_user                        │
+│ execute tool (bash) → malariasim only                    │
+│ + onboard tools, memory_kg, ask_user, task()             │
 └───────────┬──────────────────────────────────────────────┘
-            │ gitagent spawn → worktree
+            │ delegate_to_dispatcher() → gawt session
             ▼
 ┌──────────────────────────────────────────────────────────┐
-│ WORKER (LLM)                                             │
-│ Backend: MalariasimShellBackend(virtual_mode=True)       │
-│ abm specialist: execute → malariasim only               │
-│ others: execute filtered out (ToolFilterMiddleware)     │
-│ No secrets/data/git writes (backend policy hooks).       │
+│ IMPLEMENTATION COORDINATOR (dispatcher)                  │
+│ start_session → register_agent + dispatch specialists    │
+│ monitor via pheromone (list_edits) + list_agents         │
+│ snapshot_session → partial commit on target branch       │
+└───────────┬──────────────────────────────────────────────┘
+            ▼
+┌──────────────────────────────────────────────────────────┐
+│ SPECIALISTS (8, from config/subagents.yaml)              │
+│ abm · scoring · ingest · download · prediction ·         │
+│ training · data · commonlib                              │
+│ abm only: execute → malariasim (ToolFilterMiddleware     │
+│ filters it out for every other specialist)               │
 └──────────────────────────────────────────────────────────┘
 ```
 
-Shell access is the deepagents built-in `execute` tool — restricted to
-`malariasim` commands via the `MalariasimShellBackend` policy hook. The old
-custom ABM tools (`abm_run`, `abm_test`, `abm_score`) and pipeline tools were
-removed.
+Both coordinator modes run on `MalariasimShellBackend` — the deepagents
+built-in `execute` tool restricted to `malariasim` commands. Filesystem deny
+rules (secrets, `/data/**`, `/.git/**`) are backend policy hooks, not
+`FilesystemPermission` (incompatible with execution backends).
 
-### The gitagent workflow (gawt v0.6.0)
+### Delegation model
+
+- **Research tasks**: the router dispatches specialists directly via `task()` (no gawt session).
+- **Implementation tasks**: the router calls `delegate_to_dispatcher()`; the dispatcher owns the gawt session lifecycle.
+- **Quick questions**: `onboard_ask_subagent(name, question)` — single LLM call.
+
+### The gawt workflow (gawt v0.6.0)
 
 ```
-orchestrator start_session(session_id) → register_agent + dispatch specialists →
-specialists declare intent, edit via mcp__gitagent__* (per-file lock + informed read) →
-orchestrator monitor via pheromone (list_edits) + list_agents →
-orchestrator snapshot_session(session_id, message, files) → partial commit on main →
-orchestrator abort_session(session_id)
+start_session → register_agent + dispatch specialists →
+specialists declare intent (start_intent), edit via mcp__gitagent__*
+(per-file locks + informed reads) →
+coordinator monitors pheromone (list_edits) + list_agents →
+snapshot_session (partial commit) → abort_session (last open session removes worktree)
 ```
 
-In gawt v0.6.0 multiple sessions share **one** global worktree
-(`.gitagent/worktree/`). There is **no inbox** — coordination emerges from the
-pheromone (the SQLite `edits` log), per-file write locks with informed reads
+gawt v0.6.0 has **no inbox**: coordination emerges from the pheromone (the
+SQLite `edits` log), per-file write locks with informed reads
 (`read_file` returns `content`, `sha256`, `base_sha`, `diff`, `edits[]`,
-`warning`), and partial snapshots (`snapshot_session`). `finalize_session`,
-`check_inbox`, and `send_message` no longer exist. The orchestrator reviews
-informed reads and rejection payloads and decides.
-
-## CLI commands
-
-### `calibration` — ABM calibration improvement
-
-```bash
-uv run python -m agents_janus calibration [OPTIONS]
-```
-
-| Flag | Default | Description |
-|---|---|---|
-| `-g, --goal` | (interactive) | Goal for this calibration run |
-| `-n, --max-iterations` | 10 | Maximum improvement iterations |
-| `-p, --provider` | openrouter | LLM provider |
-| `-m, --model` | xiaomi/mimo-v2.5 | Model identifier |
-| `-t, --thread-id` | calibration-session | Thread ID for checkpointing |
-| `--dry-run` | false | Print prompt without executing |
-| `--no-verify` | false | Skip ALL human-in-the-loop approval gates |
-
-### `feature` — Feature development
-
-```bash
-uv run python -m agents_janus feature <name> <description> [OPTIONS]
-```
-
-| Flag | Default | Description |
-|---|---|---|
-| `-g, --goal` | (interactive) | Goal for this feature run |
-| `-p, --provider` | openrouter | LLM provider |
-| `-m, --model` | xiaomi/mimo-v2.5 | Model identifier |
-| `--dry-run` | false | Print prompt without executing |
-| `--no-verify` | false | Skip ALL human-in-the-loop approval gates |
-
-### `research` — Research + improvement
-
-```bash
-uv run python -m agents_janus research <topic> [OPTIONS]
-```
-
-| Flag | Default | Description |
-|---|---|---|
-| `-g, --goal` | (interactive) | Goal for this research run |
-| `-c, --cycles` | 1 | Number of research cycles |
-| `-p, --provider` | openrouter | LLM provider |
-| `-m, --model` | xiaomi/mimo-v2.5 | Model identifier |
-| `--dry-run` | false | Print prompt without executing |
-| `--no-verify` | false | Skip ALL human-in-the-loop approval gates |
-
-### `--no-verify` semantics
-
-When `--no-verify` is set:
-- Skips the approval prompt before `gitagent_integrate`
-- Skips the approval prompt before `gitagent_finalize`
-- No human interaction required — fully autonomous
-
-When `--no-verify` is NOT set (default):
-- Requires `[y/N]` confirmation before `gitagent_integrate`
-- Requires `[y/N]` confirmation before `gitagent_finalize`
+`warning`), and partial snapshots. Write rejections (`{status: "rejected"}`)
+mean re-read, re-plan, retry — never blind-retry.
 
 ## Project structure
 
 ```
-agents_janus/
-├── __init__.py
-├── __main__.py              # python -m agents_janus
-├── agent.py                 # create_orchestrator(), create_abm_worker_subagent()
-├── cli.py                   # Typer CLI (calibration, feature, research)
-├── logger.py                # SessionLogger — JSONL append-only logs
-├── pyproject.toml           # Package metadata (mal-janus)
-├── AGENTS.md                # Agent conventions and pitfalls
-│
-├── tools/                   # Custom tools for the orchestrator
-│   ├── __init__.py          # Exports all tools
-│   ├── web_search.py        # Web search via OpenRouter/Perplexity
-│   ├── kg_tool.py           # Knowledge graph recall (Neo4j)
-│   ├── onboard_tools.py     # Status, list components, delegate, ask_subagent
-│   └── ask_user_tool.py     # Ask the user
-│
-├── malariasim_backend.py    # MalariasimShellBackend — execute → malariasim only
-│
-├── middleware/              # Agent middleware (scope, inbox, tool filter)
-│   ├── inbox_check.py
-│   └── tool_filter.py       # Excludes execute from non-abm subagents
-│
-├── cycles/                  # High-level workflows
-│   ├── calibration_cycle.py # Calibration improvement cycle (9 steps)
-│   ├── feature_cycle.py     # Feature development cycle
-│   └── research_cycle.py    # Research + improvement cycle
-│
-├── prompts/                 # Prompt templates + patches
-│   ├── templates/           # Per-worker prompt templates
-│   └── patches/             # Self-improvement patches
-│
-└── tests/                   # E2E tests (all mocked)
-    ├── conftest.py          # sys.path setup for imports
-    ├── test_orchestrator.py
-    ├── test_cli.py
-    └── test_permissions.py  # Backend policy hooks (execute + fs denies)
+agents/janus/
+├── src/agents_janus/
+│   ├── agent.py                 # create_orchestrator (dual-mode: centinela + dispatcher)
+│   ├── cli.py                   # Typer CLI (janus, improve, prompts)
+│   ├── improvement.py           # run_improvement (dispatcher stream)
+│   ├── onboarding.py            # centinela REPL
+│   ├── live_panel.py            # LivePanel + MultiAgentPanel
+│   ├── observability.py         # ObservabilityMiddleware (mode tags, Langfuse)
+│   ├── logger.py                # SessionLogger (JSONL)
+│   ├── scope_validator.py       # validate_edit_scope
+│   ├── manifest.py              # session manifest CRUD
+│   ├── malariasim_backend.py    # execute → malariasim-only policy hooks
+│   ├── middleware/              # ToolFilterMiddleware (execute only for abm)
+│   ├── config/subagents.yaml    # 8 specialist definitions
+│   ├── plugins/                 # Plugin chain (per-domain)
+│   ├── subagents/               # Registry, builder, base types
+│   ├── tools/                   # KG recall, ask_user, delegate_to_dispatcher, onboard_tools
+│   ├── prompts/                 # orchestrator.md.j2, specialist templates, per-subagent/
+│   └── tests/                   # unit, integration, LLM-as-judge tests
+├── pyproject.toml               # Package metadata (mal-janus) + `janus` script
+├── AGENTS.md                    # Agent conventions, tool matrix, pitfalls
+└── README.md                    # This file
 ```
 
 ## Tools reference
 
-### Orchestrator tools
-
-| Tool | Purpose | Category |
-|---|---|---|
-| `execute` | Shell — **only `malariasim`** (built-in, restricted by backend) | abm |
-| `web_search` | Web search via Perplexity | search |
-| `memory_recall_kg` | Recall from Neo4j knowledge graph | kg |
-| `ask_user` | Ask the user for clarification | user |
-| `onboard_status` | Show system status (centinela) | pipeline |
-| `onboard_list_components` | List registered subagents (centinela) | pipeline |
-| `delegate_to_dispatcher` | Hand off implementation to dispatcher (centinela) | dispatch |
-| `onboard_ask_subagent` | Quick specialist question (centinela) | user |
-| `mcp__gitagent__*` | gawt session lifecycle (dispatcher) | gawt |
-
-### Worker tools (subagents)
-
-| Tool | Purpose |
-|---|---|
-| `mcp__gitagent__*` | gawt edit/read/list (shared worktree) |
-| `execute` | **abm specialist only** — shell restricted to `malariasim` (e.g. `malariasim abm --compile --worktree .gitagent/worktree`) |
-| `ask_user` | Interaction helper |
+| Tool | Router | Dispatcher | Specialists |
+|---|---|---|---|
+| `ask_user` | ✅ | ✅ | ✅ |
+| `memory_recall_kg` (Neo4j knowledge graph) | ✅ | ✅ | via plugin |
+| `execute` (bash → `malariasim` only) | ✅ | ✅ | abm only |
+| `onboard_status`, `onboard_ask_subagent` | ✅ | ❌ | ❌ |
+| `delegate_to_dispatcher` | ✅ | ❌ | ❌ |
+| `gawt_mcp_*` (session lifecycle, edits) | ❌ | ✅ | ✅ |
+| `task()` (subagent dispatch) | ✅ | ✅ | ❌ |
 
 ## Sandboxing
 
-Shell access is the deepagents built-in `execute` tool, restricted to
-`malariasim` via the `MalariasimShellBackend` policy hook
-(`malariasim_backend.py`). Only the orchestrator and the `abm` specialist see
-`execute`; every other subagent has it filtered out by `ToolFilterMiddleware`.
-Filesystem deny rules are enforced as backend policy hooks (not
-`FilesystemPermission`, which is incompatible with execution backends):
-
-### Backend policy hooks (all agents)
-
-| Path | Operation | Mode |
+| Path / command | Operation | Mode |
 |---|---|---|
 | `/.env`, `/**/.env`, `/**/*secret*`, `/**/*credential*` | read | deny |
 | `/.gitagent/worktree/**` | write, edit | allow |
-| `/data/**`, `/.git/**`, anything else | write, edit | deny |
+| `/data/**`, `/.git/**`, everything else | write, edit | deny |
 | shell commands not starting with `malariasim` | execute | deny |
 
-Agents cannot:
-- Read `.env` files or secrets
-- Modify input datasets in `/data/`
-- Touch gitagent metadata or git internals
-- Run any shell command other than `malariasim`
+## Observability
 
-## Session logging
-
-Every run creates a JSONL log at `runs/deepagent-<timestamp>/session.jsonl`:
-
-```jsonl
-{"event": "session_start", "ts": "2026-07-26T10:00:00+00:00", "session_dir": "runs/deepagent-20260726-100000"}
-{"event": "tool_call", "ts": "...", "step": 0, "tool": "gitagent_init", "input": {}, "output": "{\"status\": \"initialized\"}", "latency_s": 0.12}
-{"event": "decision", "ts": "...", "step": 1, "decision": "session_start", "reason": "calibration cycle, goal=Fix D2"}
-{"event": "summary", "ts": "...", "step": 10, "summary": "Calibration complete. Composite improved from 0.65 to 0.72."}
-{"event": "session_end", "ts": "...", "total_steps": 11, "elapsed_s": 45.2}
-```
+- **LivePanel / MultiAgentPanel** — terminal panels (own stream / per-agent rows).
+- **SessionLogger** — JSONL at `runs/<session>/session.jsonl`.
+- **Langfuse** — on by default (`--no-tracing` to disable); nested spans for LLM calls, tool calls, specialist dispatches; tags `agent:<role>`, `env:<env>`, `mode:centinela|dispatcher`, `stage:<phase>`.
 
 ## Running tests
 
 ```bash
-# DeepAgents E2E tests (all mocked, no LLM/gitagent needed)
-uv run pytest agents_janus/tests/ -v
-
-# ABM calibration tests (1 seed, fast tier)
-cd mal-core/src/mal_core/abm/tests/calibration
-uv run pytest -m fast -v
-```
-
-## Provider setup
-
-### OpenRouter (default)
-
-```bash
-export OPENROUTER_API_KEY="sk-or-..."
-# or
-export OPENROUTER_KEY="sk-or-..."
-```
-
-### Other providers
-
-```bash
-# Anthropic
-uv run python -m agents_janus calibration -p anthropic -m claude-sonnet-4-20250514
-
-# OpenAI
-uv run python -m agents_janus calibration -p openai -m gpt-4o
-
-# Google
-uv run python -m agents_janus calibration -p google_genai -m gemini-2.0-flash
+uv run pytest agents/janus/src/agents_janus/tests/ -v   # all mocked, no LLM/gawt needed
+cd mal-core/src/mal_core/abm/tests/calibration && uv run pytest -m fast -v
 ```
 
 ## Dependencies

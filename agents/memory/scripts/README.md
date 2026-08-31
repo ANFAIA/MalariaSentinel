@@ -16,10 +16,10 @@ required the 2026-07-04 wipe of 261 mis-labelled nodes:
 A thin shell wrapper around `neo4j-cli` (v1.10+) that:
 
 - Is **project-agnostic**: the project name (Neo4j `group_id`) is read
-  from `agents/memory/scripts/.project` (a single line, one source of truth). The
+  from `agents/memory/.project` (a single line, one source of truth). The
   initializing agent picks the slug; every script reads it. See
   "Project resolution" below.
-- Validates every label against `memory/config/config.yaml` (lines 81-99)
+- Validates every label against `agents/memory/runtime/config/config.yaml`
   before issuing Cypher.
 - Uses parameterised Cypher (`--param NAME=VALUE`) for every user-supplied
   string. No string interpolation of labels or values. No injection.
@@ -80,13 +80,13 @@ agent could write whatever shape it wanted and the schema invariant
 
 ## Project resolution (`.project`)
 
-The project name (Neo4j `group_id`) lives in `agents/memory/scripts/.project` —
+The project name (Neo4j `group_id`) lives in `agents/memory/.project` —
 one line, no extension. This file is gitignored (per-machine runtime
 state). The initializing agent writes it:
 
 ```bash
 make -f agents/memory/scripts/Makefile set-project PROJECT=myslug
-# writes 'myslug' to agents/memory/scripts/.project
+# writes 'myslug' to agents/memory/.project
 ```
 
 Every other target reads it. Override on a single command with
@@ -96,7 +96,7 @@ Resolution order inside every script (first non-empty wins):
 
 1. explicit `--group-id <gid>` on the CLI
 2. `$GROUP_ID` env var
-3. `agents/memory/scripts/.project`
+3. `agents/memory/.project`
 4. fail with a clear message
 
 ## Quick start (cold start)
@@ -146,10 +146,13 @@ memory.sh status                        # docker + neo4j-cli + graphiti mcp
 ```bash
 make -f agents/memory/scripts/Makefile help
 make -f agents/memory/scripts/Makefile set-project PROJECT=name
+make -f agents/memory/scripts/Makefile show-project
 make -f agents/memory/scripts/Makefile bootstrap        # up + status + seed + audit
 make -f agents/memory/scripts/Makefile seed
 make -f agents/memory/scripts/Makefile audit
 make -f agents/memory/scripts/Makefile query CYPHER="..."
+make -f agents/memory/scripts/Makefile session-start    # audit + recall open work
+make -f agents/memory/scripts/Makefile session-end      # end-of-session reminder flow
 make -f agents/memory/scripts/Makefile wipe             # destructive; backs up to /tmp
 make -f agents/memory/scripts/Makefile status
 make -f agents/memory/scripts/Makefile schema-labels
@@ -162,11 +165,14 @@ make -f agents/memory/scripts/Makefile clean-schema-cache
 |---|---|
 | `Makefile` | Project-agnostic entry points. Reads `.project`. |
 | `memory.sh` | Low-level dispatcher. |
-| `schema.sh` | Parses `memory/config/config.yaml`, caches label list in `runs/schema.cache`. Subcommands: `labels`, `describe <L>`, `validate <L>`, `all`. |
+| `schema.sh` | Parses `agents/memory/runtime/config/config.yaml`, caches label list in `runs/schema.cache`. Subcommands: `labels`, `describe <L>`, `validate <L>`, `all`. |
 | `add-node.sh` | Validates label + resolves project + runs MERGE for one typed node. |
 | `add-rel.sh` | Resolves project + validates src/dst exist + runs MATCH+MERGE. |
 | `audit.sh` | Resolves project + runs `invariants.cypher`, exits 0/1. |
 | `seed.sh` | Compiles `seed/<project>.yaml` into Cypher, runs atomically, audits after. |
+| `recall.sh` | Semantic recall: embeds the query, vector-searches `entity_name_embedding`, attaches chain-to-root + depth-1 neighbourhood. |
+| `embed.py` / `reembed.sh` / `extract_nodes.py` / `recall_postprocess.py` | Embedding pipeline: OpenAI `text-embedding-3-small` wrapper, one-shot node re-embed, node filter, recall output post-processing. |
+| `bootstrap/` | Pre-configured knowledge entries applied by `bootstrap-apply.sh` (agents module, context layers, loops…). |
 | `lib/project.sh` | Shared helper that resolves the project (group_id). |
 | `invariants.cypher` | The three schema invariants. `__GROUP_ID__` and `__SCHEMA_LABELS__` are substituted at runtime. |
 | `seed.template.cypher` | Reference shape of a generated seed (read-only doc). |
@@ -185,7 +191,7 @@ operate on the project resolved from `.project` (not a hardcoded group_id).
 2. **No orphan relation.** Every rel endpoint must exist. (`MATCH
    (a)-[r]->(b) WHERE a IS NULL OR b IS NULL ...`)
 3. **No label outside the schema.** Every label must be in
-   `memory/config/config.yaml`. (`UNWIND labels(n) ... NOT IN [...]`)
+   `agents/memory/runtime/config/config.yaml`. (`UNWIND labels(n) ... NOT IN [...]`)
 
 ## How to seed a project
 
@@ -204,14 +210,14 @@ operate on the project resolved from `.project` (not a hardcoded group_id).
 
 ## How to extend the schema
 
-The schema lives in one place: `memory/config/config.yaml` (lines 81-99).
+The schema lives in one place: `agents/memory/runtime/config/config.yaml`.
 
 1. Edit the file. Add a new `entity_types` entry under
    `graphiti.entity_types`. Each entry has a `name` and a `description`
    (the description guides the LLM extractor and is what `schema.sh
    describe` returns).
 2. Restart the Graphiti MCP container so it picks up the new config:
-   `cd memory && docker compose restart graphiti-mcp`.
+   `cd agents/memory/runtime && docker compose restart graphiti-mcp`.
 3. Run `memory.sh schema` to confirm the new label appears.
 
 Do not invent a label at write time. The wrapper will reject unknown

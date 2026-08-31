@@ -11,10 +11,16 @@ project root.
 | Subdir / file | Purpose |
 |---|---|
 | `loops/AGENTS.md` | Common rules for every specialised loop agent. Loaded automatically via `opencode.json` → `instructions`. |
+| `loops/supervisor.md` | Primary orchestrator: talks to the user, plans, delegates, integrates results. |
 | `loops/test-fixer.md` | Subagent: iterate a check command until it exits 0. |
 | `loops/code-reviewer.md` | Subagent: review a code change and return structured findings. Read-only. |
 | `loops/doc-researcher.md` | Subagent: query the project knowledge base first; web is a fallback. |
 | `loops/security-auditor.md` | Subagent: OWASP-style audit. Read-only. |
+| `loops/gawt-editor.md` | Subagent: file-editing specialist inside a shared gawt worktree (all edits via gawt MCP). |
+| `loops/improvement-agent.md` | Subagent: reviews research-harness cycles and auto-applies improvements. |
+| `loops/kb-update-daily.md` | Subagent: turns recent commits into a KB update plan (delegates the writes). |
+| `loops/memory-curator.md` | Subagent: the only loop that writes to the knowledge graph. |
+| `janus/README.md` | The `agents/janus/` deepagents multi-agent orchestrator (separate subsystem). |
 | `memory/README.md` | The `agents/memory/` installable module — see its README for layout, install, uninstall. |
 
 ## How the pieces relate

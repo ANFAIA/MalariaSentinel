@@ -1,189 +1,122 @@
-# mal-abm-fast
+# mal-abm-fast — C++ ABM Engine
 
-Fast C++ ABM engine for the **MalariaSentinel Centinela** (M-perf milestone).
+Fast C++20 agent-based model engine for the **MalariaSentinel Centinela**. It
+simulates mosquito population dynamics (aquatic stages, dispersal, host
+seeking, oviposition) and malaria transmission (EIP, human infection states,
+outbreaks) on the AOI grid, and is bit-compatible with the former M1.5 Python
+ABM (~1000× faster per rollout).
 
-Re-implements the M1.5 thin-slice ABM (currently in `mal-ghana-sim/src/mal_ghana_sim/abm/`)
-in C++ for the CESGA FT3 HPC cluster. Target: 100 rollouts in **<5 min wall**
-on a single FT3 `ilk` node (2× Intel Xeon Ice Lake 8352Y, 64 cores, 256 GB RAM).
-
-## Status
-
-**M-perf F1 — complete.** The C++ engine is a black-box equivalent of the Python
-reference (`mal_ghana_sim.abm`). All F1 acceptance criteria are met:
-
-| Criterion | Status | Commit |
-|---|---|---|
-| F1.a scaffold | ✅ | `016b902` |
-| F1.b full engine | ✅ | `744b594` (60/60 ctest) |
-| F1.c perf (BTPE + vectors + n-rollouts) | ✅ | `8ab7a58` |
-| F1.d output contract (COG + sidecar) | ✅ | verified by calibration scorers |
-| F1.e calibration scorers (replaces parity test) | ✅ | 10 scorers + LLM verdict in `tests/calibration/` |
-| F1.f determinism test | ✅ | included in F1.c review fixes |
-| F1.g FT3 benchmark | ⏳ | deferred to FT3 measurement |
+**Location**: this directory — `mal-core/src/mal_core/abm/`. The engine was
+consolidated here when `scripts/` was merged into `mal-core` (the old
+top-level `mal-abm-fast/` package no longer exists).
 
 ## Layout
 
 | Path | Purpose |
 |---|---|
-| `include/mal_abm_fast/*.hpp` | Public C++ headers (12 components: prng, dispersal, eip, climate, habitat_engine, mosquito_state, mosquito_submodel, coordinator, engine, output_contract, env_reader, aoi) |
-| `src/*.cpp` | Implementations (12 source files) |
-| `src/main.cpp` | CLI entry point (CLI11) — `run` subcommand |
-| `tests/test_*.cpp` | 11 GoogleTest test suites (60 tests total) |
-| `slurm/short.sh` | SLURM template for FT3 `ilk`, 6 h wall |
-| `slurm/long.sh` | SLURM template for FT3 `ilk`, 7 d wall |
-| `vcpkg.json` | vcpkg manifest (eigen3, gdal, cli11, nlohmann-json, googletest) |
-| `pyproject.toml` | uv workspace member |
-| `CMakeLists.txt` | Top-level CMake |
-| `docs/wire-spec.md` | Single source of truth for data contracts (424 lines) |
+| `include/mal_abm_fast/*.hpp` | Public C++ headers (params, wire, prng, dispersal, eip, climate, habitat_engine, mosquito/human state, host_seeking, coordinator, engine, output_contract, env_reader, aoi, species_params…) |
+| `src/*.cpp` | Implementations (engine loop, host landscape, aquatic cohorts, transmission, wind field, seeding, mobility schedule…) |
+| `src/main.cpp` | CLI entry point (CLI11) — `run` subcommand, 50+ flags |
+| `tests/test_*.cpp` | GoogleTest suites (climate, coordinator, dispersal, eip, engine, env_reader, gonotrophic, effective_hosts…) |
+| `cli/` | Python-side CLI helpers (`run.py`, `score.py`, `test.py`) |
+| `wrapper.py` | `CppAbmWrapper` — binary resolution + subprocess launch from `malariasim abm` |
+| `runner.py` | Manifest-driven run orchestration (`run_abm_from_manifest()`) |
+| `compile.py` + `build.sh` | Build entry points used by `malariasim abm --compile` |
+| `scripts/` | Input overlay / visualization utilities (hosts overlay, state/mobility/transmission visualization) |
+| `pool_hydrology.py` | Pool hydrology reference model |
+| `slurm/short.sh`, `slurm/long.sh` | SLURM templates for CESGA FT3 (6 h / 7 d walls) |
+| `cmake/` | Compiler warnings + FT3 module finders |
+| `docs/wire-spec.md` | **Single source of truth** for data contracts |
+| `bin/mal_abm_fast_<platform>` | Compiled binary (wrapper prefers this over `build/`) |
 
-## Build (via malariasim CLI)
+## Build
 
-From anywhere in the repo (or from an environment with `mal_core` installed):
-
-```bash
-malariasim abm --compile                      # Configure and build in current environment
-malariasim abm --compile --clean              # Clean build directory before building
-malariasim abm --compile --worktree <path>    # Compile inside an isolated gawt worktree
-```
-
-## Run
+From anywhere in the repo:
 
 ```bash
-# Standard simulation run
-malariasim abm --aoi ghana --days 30 --seed 1
-
-# Simulation run using binary from isolated gawt worktree
-malariasim abm --worktree .gitagent/worktree --aoi ghana --days 30 --seed 1
+malariasim abm --compile              # configure + build (build.sh / compile.py)
+malariasim abm --compile --clean      # wipe the build dir first
+malariasim abm --compile --worktree <path>   # compile inside an isolated gawt worktree
 ```
 
-## Build (macOS / local dev manual)
+> **Binary resolution pitfall**: `CppAbmWrapper` resolves
+> `bin/mal_abm_fast_<platform>` (e.g. `bin/mal_abm_fast_darwin`) **before**
+> `build/src/mal_abm_fast`. After any cmake build you MUST copy the fresh
+> binary, or runs silently use the stale one:
+>
+> ```bash
+> cp build/src/mal_abm_fast bin/mal_abm_fast_darwin
+> ```
+
+Manual build (macOS / local dev):
 
 ```bash
 brew install cmake ninja pkg-config gdal eigen cli11 nlohmann-json googletest
-cmake -S mal-abm-fast -B mal-abm-fast/build -G Ninja \
-      -DCMAKE_BUILD_TYPE=Release \
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
       -DCMAKE_PREFIX_PATH="$(brew --prefix gdal);$(brew --prefix eigen);$(brew --prefix nlohmann-json);$(brew --prefix googletest)"
-cmake --build mal-abm-fast/build -j
-ctest --test-dir mal-abm-fast/build --output-on-failure
+cmake --build build -j
+ctest --test-dir build --output-on-failure
 ```
 
-## Build (FT3 / CESGA)
-
-The `slurm/short.sh` template handles the FT3 build environment (Intel oneAPI
-2021.3 + impi 2021.3 + GDAL 3.7.0). Submit with:
-
-```bash
-sbatch mal-abm-fast/slurm/short.sh
-```
+FT3 / CESGA: `sbatch slurm/short.sh` (the template handles the Intel oneAPI + GDAL build environment).
 
 ## Run
 
-### Single rollout (F1.b)
+Normally you don't invoke the binary directly — the `malariasim abm` wrapper
+resolves the manifest at `data/<aoi>/manifest.json`, validates completeness,
+resolves paths, and launches the engine:
 
 ```bash
-./mal-abm-fast/build/mal_abm_fast run \
-    --aoi ghana --year 2024 --month 6 --seed 1 --days 30 \
-    --env    data/runs/ghana/ghana_regional_2024_06_env.tif \
-    --habitat data/runs/ghana/ghana_regional_2024_06_habitat_patches.gpkg \
-    --output data/runs/ghana/ghana_regional_2024_06_state.tif
+malariasim abm --aoi ghana --days 30 --seed 1
+malariasim abm --worktree .gitagent/worktree --aoi ghana --days 30 --seed 1
 ```
 
-Outputs `state.tif` (2-band COG: density + suitability) + `state.json` (sidecar).
-
-### Multiple rollouts (F1.c)
+Direct binary invocation (matching what the wrapper does):
 
 ```bash
-./mal-abm-fast/build/mal_abm_fast run --n-rollouts 100 \
+./bin/mal_abm_fast_darwin run \
     --aoi ghana --year 2024 --month 6 --seed 1 --days 30 \
-    --env    data/runs/ghana/ghana_regional_2024_06_env.tif \
-    --habitat data/runs/ghana/ghana_regional_2024_06_habitat_patches.gpkg \
+    --env    data/ghana/ghana_regional_2024_2025_env.nc \
+    --habitat data/ghana/ghana_habitat_patches.gpkg \
     --output /tmp/rollout/state.tif
 ```
 
-Outputs `state_seed0000.tif` … `state_seed0099.tif` + corresponding `.json` sidecars.
-Each rollout gets a fresh PRNG instance (per-rollout isolation for F2 OpenMP).
+### Key CLI flags (groups)
 
-### Daily snapshots (time-series generation)
+`./bin/mal_abm_fast run --help` documents all of them. Main groups:
 
-```bash
-./mal-abm-fast/build/mal_abm_fast run --snapshot-every 1 --n-rollouts 10 \
-    --aoi ghana --year 2024 --month 6 --seed 1 --days 30 \
-    --env    data/runs/ghana/ghana_regional_2024_06_env.tif \
-    --habitat data/runs/ghana/ghana_regional_2024_06_habitat_patches.gpkg \
-    --output /tmp/rollout/state.tif
-```
+- **Grid/inputs**: `--aoi` | `--bbox/--crs/--resolution-m/--scale`, `--env`, `--habitat`, `--hosts`, `--human-mobility-day/night`, `--livestock-mobility`, `--wind-field`
+- **Run shape**: `--year --month --days(1..731) --seed --n-rollouts --threads --snapshot-every --max-population`
+- **Mosquito dynamics**: `--disperse-prob/--disperse-sigma-m/--disperse-max-m`, `--birth-fecundity`, `--larva-bh-alpha`, `--seeding-mode`, `--init-frac`, detection-seeding flags (`--detection-points`, `--n-adults-per-detection`, …)
+- **Transmission**: `--beta-hv`, `--beta-vh`, `--human-incubation-days`, `--human-infectious-days`, `--immunity-duration-days`, `--initial-human-prevalence`, outbreak flags (`--human-outbreak-day/--foci/--cases/--min-density`, `--human-foci-coords`, …)
+- **Outputs**: `--emit-cohort-log`, `--emit-transmission-log`, `--transmission-snapshot-every`
 
-With `--snapshot-every 1`, a snapshot is taken every day (30 files per rollout). Files are named `state_day001.tif` … `state_day030.tif` alongside the final `state.tif`. This produces time-series data for U-Net training.
+For multi-year runs, pass all days in one invocation (`--year 2024 --month 1 --days 731`). Do not split by month: a new process re-seeds mosquitoes and loses aquatic cohort and engine state.
 
-### Output structure
+### Output artifacts
 
 | File | Description |
 |---|---|
-| `state.tif` | Final snapshot (backward compatible) |
-| `state.json` | Sidecar JSON for final snapshot |
-| `state_dayNNN.tif` | Intermediate snapshot at day N (when `--snapshot-every` > 0) |
-| `state_dayNNN.json` | Sidecar JSON for intermediate snapshot |
-
-### CLI flags
-
-| Flag | Default | Description |
-|---|---|---|
-| `--aoi` | — | AOI slug (e.g. `ghana`) |
-| `--bbox` | — | Custom bbox `W,S,E,N` (mutually exclusive with `--aoi`) |
-| `--env` | — | Path to 4-band env GeoTIFF |
-| `--habitat` | — | Path to habitat GeoPackage |
-| `--output` | — | Output path for state COG |
-| `--year` | 2024 | Start year |
-| `--month` | 6 | Start month (1–12) |
-| `--seed` | 1 | PRNG seed |
-| `--days` | 30 | One continuous simulation (1–731 days; 2024+2025 = 731) |
-| `--n-rollouts` | 1 | Number of rollouts (≥1) |
-| `--snapshot-every` | 0 | Intermediate snapshot frequency in days (0 = only final). Files named `<stem>_dayNNN.tif` |
-| `--emit-cohort-log` | — | Daily cohort statistics JSON for eggs, larvae, pupae, adults, births, deaths and maturation. |
-
-For multi-year runs, pass all days in one invocation. Do not split by month:
-a new process re-seeds mosquitoes and loses aquatic cohort and engine state.
-For complete 2024-2025 use `--year 2024 --month 1 --days 731` with an
-environment NetCDF containing all 731 days.
+| `state.tif` | Final state COG (density + suitability bands) |
+| `state.json` | Sidecar JSON for the final snapshot |
+| `state_dayNNN.tif` / `.json` | Intermediate snapshots (when `--snapshot-every` > 0) |
+| `transmission.tif` | Per-rollout transmission output (when enabled; name derived from the output path) |
+| `*_transmission_daily.json` | Daily transmission log (needed by the D25 cases scorer) |
+| cohort log JSON | Daily aquatic/adult cohort statistics (`--emit-cohort-log`) |
 
 ## Tests
 
-### C++ unit tests (GoogleTest)
-
 ```bash
-ctest --test-dir mal-abm-fast/build --output-on-failure
-# 60 tests: prng, dispersal, eip, climate, habitat_engine, mosquito_submodel,
-#           coordinator, engine, output_contract, state_cog, smoke
+# C++ unit tests (GoogleTest)
+ctest --test-dir build --output-on-failure
+
+# Calibration harness (pytest) — see tests/calibration/README.md
+cd tests/calibration && uv run pytest -m fast -v
 ```
-
-### Calibration scorers
-
-```bash
-cd mal-core/src/mal_core/abm/tests/calibration
-uv run pytest -m fast -v
-# 10 scorers: D1-D15 + D16-D18 (fast tier)
-```
-
-## Architecture
-
-The engine follows a 5-step daily loop (matching the Python reference):
-
-1. **Larva mortality** — inactive patches lose larvae
-2. **Larva growth** — EIP progress based on temperature (Mordecai)
-3. **Larva to adult** — emergence when EIP ≥ 110
-4. **Adult dispersal** — 20% of adults disperse (clipped Gaussian, σ=1km, max=2km)
-5. **Birth** — binomial(K=1000, p=0.005) per active patch
-
-Key design decisions:
-- **SoA population layout** — struct-of-arrays for cache-friendly access
-- **BTPE binomial** — Kachitvichyanukul & Schmeiser 1988 algorithm
-- **Dense vector lookups** — `std::vector` indexed by `patch_id` (replaces `unordered_map`)
-- **Per-rollout PRNG isolation** — fresh `Prng(seed+i)` per rollout in `--n-rollouts` mode
 
 ## See also
 
-- [docs/wire-spec.md](docs/wire-spec.md) — data contracts and module signatures
-- [docs/plans/in-process/perf-cpp-abm-plan.md](../../../../docs/plans/in-process/perf-cpp-abm-plan.md) — full M-perf design
-- [docs/plans/in-process/m-perf-checklist.md](../../../../docs/plans/in-process/m-perf-checklist.md) — F1–F5 issue checklist
-- `agents/skills/cesga/SKILL.md` — CESGA FT3 conventions
-- `mal-execution/scripts/cesga-run/` — reference SLURM scripts for the Python ABM
+- `docs/wire-spec.md` — data contracts, module map, per-day contract, determinism rules
+- `slurm/` — CESGA FT3 job templates
+- `mal-execution/scripts/cesga-run/` — CESGA automation
+- `mal-core/README.md` — pipeline stage order and the post-run scoring CLI

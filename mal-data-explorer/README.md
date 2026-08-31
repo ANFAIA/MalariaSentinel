@@ -18,6 +18,8 @@ Anopheles dataset visualization, mapping, and bias analysis scripts.
 | 10 | `10_two_focus_plot.py` | Visualization of REACT two-foci pattern |
 | 11 | `11_bias_analysis.py` | Quantitative bias analysis of GUF Anopheles dataset |
 | 12 | `12_bias_plot.py` | Bias analysis visualizations |
+| 13 | `13_m12_water_viz.py` | M12 water pipeline (JRC water + coastline mask → water_frac) and habitat patches |
+| 14 | `14_breeding_pools.py` | Breeding-pool (charcas) model replica — Python mirror of the M7.4.1 pool model in `coordinator.cpp` |
 
 ## Usage
 
@@ -27,4 +29,9 @@ uv run python 03_map_ghana.py
 uv run python 12_bias_plot.py
 ```
 
-Scripts read from `../data/` and write figures to `../data/maps/`.
+Scripts read from `../data/` and write figures to `../data/maps/` (or `runs/` for the newer diagnostics).
+
+> **14_breeding_pools.py** is the ground-truth replica of the ABM pool model
+> (`mal-core/src/mal_core/abm/src/coordinator.cpp`): terrain pools, urban
+> rain-gated pools, and urban-persistent patches joined daily. When changing
+> the C++ pool rules, update this script too and compare the maps.
