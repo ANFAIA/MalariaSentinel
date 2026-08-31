@@ -230,7 +230,12 @@ inline constexpr float  POOL_WATER_CAPACITY_SAT_MM  = 50.0f;
 // the baseline habitat is breeding-capable; rains amplify it, the dry
 // season does not erase it. Depth kept small: the baseline supports a
 // modest urban vector population, not a permanent-water habitat class.
-inline constexpr float  POOL_URBAN_BASELINE_MM      = 6.0f;
+// Expressed as a fraction of POOL_WATER_CAPACITY_SAT_MM so the urban
+// water-availability factor is pinned: K_patch = K_MAX * k_capacity_mult
+// * 0.12 at the baseline, rising with rain events up to 1.0.
+inline constexpr float  POOL_URBAN_BASELINE_FACTOR  = 0.12f;
+inline constexpr float  POOL_URBAN_BASELINE_MM      =
+    POOL_URBAN_BASELINE_FACTOR * POOL_WATER_CAPACITY_SAT_MM;  // 6.0 mm
 inline constexpr float  POOL_RAIN_WASH_MM           = 40.0f;   // heavy rain: washout event
 inline constexpr float  POOL_DESICCATION_GRACE_DAYS = 5.0f;    // grace before desiccation starts
 inline constexpr float  POOL_EVAP_REF_MM            = 5.0f;    // reference evap at 30°C (mm/day)

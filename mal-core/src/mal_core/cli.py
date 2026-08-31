@@ -232,6 +232,7 @@ def abm(
     n_adults_per_detection: int = typer.Option(50, "--n-adults-per-detection", help="Adult mosquitoes per seeded patch."),
     n_larvae_per_detection: int = typer.Option(30, "--n-larvae-per-detection", help="Larvae per seeded patch."),
     enable_transmission: bool = typer.Option(False, "--enable-transmission", help="Enable spatial SEIR-SEI malaria transmission model (M7.4)."),
+    transmission_snapshot_every: int = typer.Option(0, "--transmission-snapshot-every", help="Transmission snapshot interval in days (0=final only)."),
     human_seeding_mode: str = typer.Option("random-viable", "--human-seeding-mode", help="Human infection seeding mode: 'random-viable' | 'explicit' | 'uniform-legacy' | 'none'."),
     human_outbreak_day: int = typer.Option(0, "--human-outbreak-day", help="Day of simulation to trigger human outbreak (e.g. 60 for 2-month warm-up)."),
     human_outbreak_foci: int = typer.Option(3, "--human-outbreak-foci", help="Number of random foci for human outbreak."),
@@ -346,7 +347,8 @@ def abm(
             seed=seed,
             output_dir=output_dir,
             cohort_log=cohort_log,
-            enable_transmission=enable_transmission,
+        enable_transmission=enable_transmission,
+        transmission_snapshot_every=transmission_snapshot_every,
         )
 
     if debug:
