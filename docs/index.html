@@ -906,17 +906,72 @@
                   <p class="form-help" style="margin-left: 28px;" data-i18n="config.compile.help">
                     Construye el binario <code>mal_abm_fast</code> desde el código fuente antes de lanzar la simulación. Desmárcalo si el motor ya está compilado para saltar la fase de build.
                   </p>
+                  <div style="margin-left: 28px; margin-top: 10px; display: flex; flex-direction: column; gap: 8px;">
+                    <label class="form-checkbox-label">
+                      <input type="checkbox" id="paramClean" class="form-checkbox">
+                      <span data-i18n="config.clean.label">Recompilación limpia (--clean)</span>
+                    </label>
+                    <label class="form-checkbox-label">
+                      <input type="checkbox" id="paramDebug" class="form-checkbox">
+                      <span data-i18n="config.debug.label">GIF de depuración hospedadores-vectores (--debug)</span>
+                    </label>
+                  </div>
+                  <p class="form-help" style="margin-left: 28px;" data-i18n="config.debug.help">
+                    Superpone humanos (verde), ganado (marrón) y mosquitos (azul, I_V en rojo) tras la ejecución. Solo diagnóstico.
+                  </p>
                 </div>
 
-                <!-- Año de Inicio -->
-                <div class="form-group">
-                  <label class="form-label" for="paramYear" data-i18n="config.year.label">Año de Inicio (--year)</label>
-                  <select id="paramYear" class="form-select">
-                    <option value="2024" selected="">2024</option>
-                    <option value="2025">2025</option>
-                    <option value="2026">2026</option>
-                    <option value="2027">2027</option>
-                  </select>
+                <!-- Ejecución avanzada: timeout, worktree, data-root -->
+                <div class="form-group" style="background: var(--bg); padding: 14px; border-radius: var(--radius); border: 1px solid var(--border);">
+                  <span class="form-label" style="display: block; margin-bottom: 10px;" data-i18n="config.advexec.title">Ejecución Avanzada</span>
+                  <div class="grid-2" style="gap: 12px; margin-bottom: 12px;">
+                    <div class="form-group" style="margin-bottom: 0;">
+                      <label class="form-label" for="paramTimeout" data-i18n="config.timeout.label">Timeout (--timeout)</label>
+                      <input type="number" id="paramTimeout" class="form-input" placeholder="sin límite" min="1">
+                      <p class="form-help" data-i18n="config.timeout.help">Límite en segundos del subproceso del motor (vacío = sin límite).</p>
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0;">
+                      <label class="form-label" for="paramWorktree" data-i18n="config.worktree.label">Worktree (--worktree)</label>
+                      <input type="text" id="paramWorktree" class="form-input" placeholder=".gitagent/worktree">
+                      <p class="form-help" data-i18n="config.worktree.help">Ruta a un worktree gawt para compilar y ejecutar de forma aislada.</p>
+                    </div>
+                  </div>
+                  <div class="form-group" style="margin-bottom: 0;">
+                    <label class="form-label" for="paramDataRoot" data-i18n="config.dataroot.label">Raíz de Datos (--data-root)</label>
+                    <input type="text" id="paramDataRoot" class="form-input" placeholder="data">
+                    <p class="form-help" data-i18n="config.dataroot.help">Directorio que contiene el manifiesto del AOI (por defecto: <code>data/</code>).</p>
+                  </div>
+                </div>
+
+                <!-- Año y Mes de Inicio -->
+                <div class="grid-2" style="gap: 12px;">
+                  <div class="form-group" style="margin-bottom: 0;">
+                    <label class="form-label" for="paramYear" data-i18n="config.year.label">Año de Inicio (--year)</label>
+                    <select id="paramYear" class="form-select">
+                      <option value="2024" selected="">2024</option>
+                      <option value="2025">2025</option>
+                      <option value="2026">2026</option>
+                      <option value="2027">2027</option>
+                    </select>
+                  </div>
+                  <div class="form-group" style="margin-bottom: 0;">
+                    <label class="form-label" for="paramMonth" data-i18n="config.month.label">Mes de Inicio (--month)</label>
+                    <select id="paramMonth" class="form-select">
+                      <option value="1" selected="" data-i18n="config.month.1">Enero</option>
+                      <option value="2" data-i18n="config.month.2">Febrero</option>
+                      <option value="3" data-i18n="config.month.3">Marzo</option>
+                      <option value="4" data-i18n="config.month.4">Abril</option>
+                      <option value="5" data-i18n="config.month.5">Mayo</option>
+                      <option value="6" data-i18n="config.month.6">Junio</option>
+                      <option value="7" data-i18n="config.month.7">Julio</option>
+                      <option value="8" data-i18n="config.month.8">Agosto</option>
+                      <option value="9" data-i18n="config.month.9">Septiembre</option>
+                      <option value="10" data-i18n="config.month.10">Octubre</option>
+                      <option value="11" data-i18n="config.month.11">Noviembre</option>
+                      <option value="12" data-i18n="config.month.12">Diciembre</option>
+                    </select>
+                    <p class="form-help" data-i18n="config.month.help">Define la estación climática de partida.</p>
+                  </div>
                 </div>
 
                 <!-- Duración, Snapshots y Rollouts -->
@@ -968,10 +1023,46 @@
                 <div class="form-group">
                   <label class="form-label" for="paramSeedingMode" data-i18n="config.seeding.label">Siembra Inicial de Mosquitos (--seeding-mode)</label>
                   <select id="paramSeedingMode" class="form-select">
-                    <option value="uniform" selected="" data-i18n="config.seeding.uniform">uniform (homogénea en cuerpos de agua)</option>
+                    <option value="uniform" selected="" data-i18n="config.seeding.uniform">uniform (homogénea en parches viables)</option>
                     <option value="random-viable" data-i18n="config.seeding.rv">random-viable (en celdas con idoneidad ecológica &gt; 0)</option>
+                    <option value="host-weighted" data-i18n="config.seeding.hw">host-weighted (ponderada por hospedadores cercanos)</option>
                     <option value="explicit" data-i18n="config.seeding.explicit">explicit (en estaciones de muestreo fijas)</option>
                   </select>
+                  <p class="form-help" data-i18n="config.seeding.help">El equilibrio adulto depende de emergencia acuática ÷ mortalidad; la siembra solo cambia la velocidad de calentamiento.</p>
+                </div>
+
+                <div id="seedingOptions" style="display: flex; flex-direction: column; gap: 12px;">
+                  <div id="uniformSeedOptions">
+                    <label class="form-label" for="paramInitFrac" data-i18n="config.initfrac.label">Fracción Inicial de K (--init-frac)</label>
+                    <input type="number" id="paramInitFrac" class="form-input" value="0.30" min="0" max="1" step="0.05">
+                    <p class="form-help" data-i18n="config.initfrac.help">Solo uniform: fracción de la capacidad (K) sembrada por parche. Más alta = calentamiento más rápido; el equilibrio no cambia.</p>
+                  </div>
+
+                  <div id="hostWeightedOptions" style="display: none;">
+                    <label class="form-label" for="paramHostSeedingRadius" data-i18n="config.hradius.label">Radio de Atracción (--host-seeding-radius-km)</label>
+                    <input type="number" id="paramHostSeedingRadius" class="form-input" value="5.0" min="0.5" step="0.5">
+                    <p class="form-help" data-i18n="config.hradius.help">Solo host-weighted: radio (km) alrededor de cada parche para ponderar la abundancia de hospedadores cercanos.</p>
+                  </div>
+
+                  <div id="patchSeedOptions" style="display: none;">
+                    <label class="form-label" for="paramNDetections" data-i18n="config.ndet.label">Nº de Parches Sembrados (--n-detections)</label>
+                    <input type="number" id="paramNDetections" class="form-input" value="3" min="1" max="100">
+                    <p class="form-help" data-i18n="config.ndet.help">Parches seleccionados para la siembra inicial (modos random-viable y host-weighted).</p>
+                  </div>
+
+                  <div id="detectionSeedOptions" style="display: none;">
+                    <label class="form-label" data-i18n="config.detseed.title">Agentes por Parche Sembrado</label>
+                    <div class="grid-2" style="gap: 10px;">
+                      <div class="form-group" style="margin-bottom: 0;">
+                        <label class="form-label" for="paramAdultsPerDetection" data-i18n="config.adults.label">Adultos (--n-adults-per-detection)</label>
+                        <input type="number" id="paramAdultsPerDetection" class="form-input" value="50" min="1">
+                      </div>
+                      <div class="form-group" style="margin-bottom: 0;">
+                        <label class="form-label" for="paramLarvaePerDetection" data-i18n="config.larvae.label">Larvas (--n-larvae-per-detection)</label>
+                        <input type="number" id="paramLarvaePerDetection" class="form-input" value="30" min="0">
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
                 <!-- Control 1: Capa de Hospedadores y Atracción Animal/Humana (Desacoplado) -->
@@ -1006,21 +1097,111 @@
                       </select>
                     </div>
 
+                    <div id="uniformLegacyOptions" style="display: none;">
+                      <label class="form-label" for="paramInitialPrevalence" data-i18n="config.prev.label">Prevalencia Humana Inicial (--initial-human-prevalence)</label>
+                      <input type="number" id="paramInitialPrevalence" class="form-input" value="0.05" min="0" max="1" step="0.01">
+                      <p class="form-help" data-i18n="config.prev.help">Solo uniform-legacy: fracción de la población humana infectada al inicio.</p>
+                    </div>
+
+                    <div id="explicitFociOptions" style="display: none;">
+                      <label class="form-label" for="paramFociCoords" data-i18n="config.fcoords.label">Coordenadas de Focos (--human-foci-coords)</label>
+                      <input type="text" id="paramFociCoords" class="form-input" value="656,364:150;535,207:150">
+                      <p class="form-help" data-i18n="config.fcoords.help">Formato <code>fila,columna:casos;...</code> en celdas de la grilla ABM (Accra 656,364 · Kumasi 535,207 · Tamale 233,293).</p>
+                    </div>
+
                     <div class="grid-2" style="gap: 10px;">
                       <div>
                         <label class="form-label" for="paramOutbreakDay" data-i18n="config.obday.label">Día del Brote (--human-outbreak-day)</label>
                         <input type="number" id="paramOutbreakDay" class="form-input" value="180" min="0" max="700">
-                        <p class="form-help" data-i18n="config.obday.help">Día en que se inyectan los casos índice.</p>
+                        <p class="form-help" data-i18n="config.obday.help">Día en que se inyectan los casos índice (0 = al inicio).</p>
                       </div>
-                      <div>
+                      <div id="outbreakFociWrap">
                         <label class="form-label" for="paramOutbreakFoci" data-i18n="config.obfoci.label">Nº de Focos (--human-outbreak-foci)</label>
                         <input type="number" id="paramOutbreakFoci" class="form-input" value="5" min="1" max="20">
                       </div>
                     </div>
 
-                    <div>
+                    <div id="outbreakCasesWrap">
                       <label class="form-label" for="paramOutbreakCases" data-i18n="config.obcases.label">Casos Infectados por Foco (--human-outbreak-cases)</label>
-                      <input type="number" id="paramOutbreakCases" class="form-input" value="100" min="1" max="1000">
+                      <input type="number" id="paramOutbreakCases" class="form-input" value="100" min="1" step="1">
+                    </div>
+
+                    <div>
+                      <label class="form-label" for="paramTransSnapshot" data-i18n="config.transsnap.label">Intervalo de Salida de Transmisión (--transmission-snapshot-every)</label>
+                      <select id="paramTransSnapshot" class="form-select">
+                        <option value="0" selected="" data-i18n="config.snap.0">Solo final (0)</option>
+                        <option value="1" data-i18n="config.snap.1">Cada 1 día</option>
+                        <option value="7" data-i18n="config.snap.7">Cada 7 días (semanal)</option>
+                        <option value="14" data-i18n="config.snap.14">Cada 14 días (quincenal)</option>
+                        <option value="30" data-i18n="config.snap.30">Cada 30 días (mensual)</option>
+                      </select>
+                    </div>
+
+                    <div class="grid-2" style="gap: 10px;">
+                      <div>
+                        <label class="form-label" for="paramMinCellPop" data-i18n="config.mincellpop.label">Población Mínima por Celda (--human-min-cell-pop)</label>
+                        <input type="number" id="paramMinCellPop" class="form-input" value="50" min="0" step="10">
+                        <p class="form-help" data-i18n="config.mincellpop.help">Población mínima para que una celda sea candidata a foco.</p>
+                      </div>
+                      <div>
+                        <label class="form-label" for="paramClusterRadius" data-i18n="config.clusterradius.label">Radio de Clúster (km) (--human-cluster-radius-km)</label>
+                        <input type="number" id="paramClusterRadius" class="form-input" value="0" min="0" step="0.5">
+                        <p class="form-help" data-i18n="config.clusterradius.help">Modo brote concentrado: UN clúster espacial con los casos repartidos según población. 0 = focos independientes.</p>
+                      </div>
+                    </div>
+
+                    <div class="grid-2" style="gap: 10px;">
+                      <div>
+                        <label class="form-label" for="paramMinDensity" data-i18n="config.mindensity.label">Densidad Vectorial Mínima (--human-outbreak-min-density)</label>
+                        <input type="number" id="paramMinDensity" class="form-input" value="0" min="0" max="1" step="0.05">
+                        <p class="form-help" data-i18n="config.mindensity.help">Disparador adaptativo: el brote espera a que la mejor celda viable alcance esta densidad normalizada de mosquitos (agentes/K_MAX). 0 = día exacto. Umbrales altos (≥0.5) pueden no dispararse nunca.</p>
+                      </div>
+                      <div>
+                        <label class="form-label" for="paramClusterMaxCorePop" data-i18n="config.corepop.label">Tope Poblacional del Núcleo (--human-cluster-max-core-pop)</label>
+                        <input type="number" id="paramClusterMaxCorePop" class="form-input" value="0" min="0" step="100">
+                        <p class="form-help" data-i18n="config.corepop.help">En modo clúster: celdas más densas no pueden ser núcleo (los vectores se diluyen, R≪1). 0 = sin tope.</p>
+                      </div>
+                    </div>
+
+                    <div style="border-top: 1px solid var(--border); padding-top: 12px;">
+                      <span class="form-label" style="display: block; margin-bottom: 10px;" data-i18n="config.bio.title">Parámetros Biológicos de Transmisión</span>
+
+                      <div class="grid-2" style="gap: 10px; margin-bottom: 12px;">
+                        <div>
+                          <label class="form-label" for="paramBetaHv" data-i18n="config.betahv.label">Prob. Humano→Vector (--beta-hv)</label>
+                          <input type="number" id="paramBetaHv" class="form-input" value="0.40" min="0" max="1" step="0.05">
+                        </div>
+                        <div>
+                          <label class="form-label" for="paramBetaVh" data-i18n="config.betavh.label">Prob. Vector→Humano (--beta-vh)</label>
+                          <input type="number" id="paramBetaVh" class="form-input" value="0.50" min="0" max="1" step="0.05">
+                        </div>
+                      </div>
+
+                      <div class="grid-2" style="gap: 10px; margin-bottom: 12px;">
+                        <div>
+                          <label class="form-label" for="paramIncubation" data-i18n="config.incub.label">Incubación Humana (días) (--human-incubation-days)</label>
+                          <input type="number" id="paramIncubation" class="form-input" value="12" min="1">
+                        </div>
+                        <div>
+                          <label class="form-label" for="paramInfectious" data-i18n="config.infec.label">Duración Infecciosa (días) (--human-infectious-days)</label>
+                          <input type="number" id="paramInfectious" class="form-input" value="20" min="1">
+                        </div>
+                      </div>
+
+                      <div class="form-group" style="margin-bottom: 12px;">
+                        <label class="form-label" for="paramVecInfFrac" data-i18n="config.vecinf.label">Fracción Inicial de Vectores Infectados (--initial-vector-infected-frac)</label>
+                        <input type="number" id="paramVecInfFrac" class="form-input" value="0" min="0" max="1" step="0.05">
+                        <p class="form-help" data-i18n="config.vecinf.help">Parte del pool de hembras ya infectadas al inicio (útil para incursiones vectoriales).</p>
+                      </div>
+
+                      <label class="form-checkbox-label">
+                        <input type="checkbox" id="paramImmunity" class="form-checkbox">
+                        <span data-i18n="config.immunity.label">Inmunidad Humana Temporal (--enable-immunity)</span>
+                      </label>
+                      <div id="immunityOptions" style="display: none; margin-top: 8px;">
+                        <label class="form-label" for="paramImmunityDays" data-i18n="config.immdays.label">Duración de la Inmunidad (días) (--immunity-duration-days)</label>
+                        <input type="number" id="paramImmunityDays" class="form-input" value="180" min="1">
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1490,11 +1671,28 @@
 
       var paramDays = document.getElementById('paramDays');
       var paramYear = document.getElementById('paramYear');
+      var paramMonth = document.getElementById('paramMonth');
       var paramSnapshot = document.getElementById('paramSnapshot');
       var paramRollouts = document.getElementById('paramRollouts');
       var paramSeed = document.getElementById('paramSeed');
       var paramSeedingMode = document.getElementById('paramSeedingMode');
       var paramCompile = document.getElementById('paramCompile');
+      var paramClean = document.getElementById('paramClean');
+      var paramDebug = document.getElementById('paramDebug');
+      var paramTimeout = document.getElementById('paramTimeout');
+      var paramWorktree = document.getElementById('paramWorktree');
+      var paramDataRoot = document.getElementById('paramDataRoot');
+
+      // Seeding sub-options (mode-dependent visibility)
+      var uniformSeedOptions = document.getElementById('uniformSeedOptions');
+      var hostWeightedOptions = document.getElementById('hostWeightedOptions');
+      var patchSeedOptions = document.getElementById('patchSeedOptions');
+      var detectionSeedOptions = document.getElementById('detectionSeedOptions');
+      var paramInitFrac = document.getElementById('paramInitFrac');
+      var paramHostSeedingRadius = document.getElementById('paramHostSeedingRadius');
+      var paramNDetections = document.getElementById('paramNDetections');
+      var paramAdultsPerDetection = document.getElementById('paramAdultsPerDetection');
+      var paramLarvaePerDetection = document.getElementById('paramLarvaePerDetection');
 
       var paramEnableHosts = document.getElementById('paramEnableHosts');
       var paramEnableTransmission = document.getElementById('paramEnableTransmission');
@@ -1503,6 +1701,25 @@
       var paramOutbreakDay = document.getElementById('paramOutbreakDay');
       var paramOutbreakFoci = document.getElementById('paramOutbreakFoci');
       var paramOutbreakCases = document.getElementById('paramOutbreakCases');
+      var outbreakFociWrap = document.getElementById('outbreakFociWrap');
+      var outbreakCasesWrap = document.getElementById('outbreakCasesWrap');
+      var uniformLegacyOptions = document.getElementById('uniformLegacyOptions');
+      var explicitFociOptions = document.getElementById('explicitFociOptions');
+      var paramInitialPrevalence = document.getElementById('paramInitialPrevalence');
+      var paramFociCoords = document.getElementById('paramFociCoords');
+      var paramTransSnapshot = document.getElementById('paramTransSnapshot');
+      var paramMinCellPop = document.getElementById('paramMinCellPop');
+      var paramClusterRadius = document.getElementById('paramClusterRadius');
+      var paramMinDensity = document.getElementById('paramMinDensity');
+      var paramClusterMaxCorePop = document.getElementById('paramClusterMaxCorePop');
+      var paramBetaHv = document.getElementById('paramBetaHv');
+      var paramBetaVh = document.getElementById('paramBetaVh');
+      var paramIncubation = document.getElementById('paramIncubation');
+      var paramInfectious = document.getElementById('paramInfectious');
+      var paramVecInfFrac = document.getElementById('paramVecInfFrac');
+      var paramImmunity = document.getElementById('paramImmunity');
+      var immunityOptions = document.getElementById('immunityOptions');
+      var paramImmunityDays = document.getElementById('paramImmunityDays');
 
       var paramCohortLog = document.getElementById('paramCohortLog');
       var paramGif = document.getElementById('paramGif');
@@ -1565,7 +1782,7 @@
       var outTextGifTitle = document.getElementById('outTextGifTitle');
       var outCountGif = document.getElementById('outCountGif');
 
-      // Presets Dictionary
+      // Presets Dictionary (espejo exacto de los defaults del CLI: cli.py::abm)
       var presets = {
         'brote-anual': {
           aoi: 'ghana',
@@ -1573,17 +1790,42 @@
           snapshot: 7,
           rollouts: 1,
           seed: 1,
+          year: 2024,
+          month: 1,
+          compile: true,
+          clean: false,
+          debug: false,
+          timeout: '',
+          worktree: '',
+          dataRoot: '',
           seeding: 'uniform',
+          initFrac: 0.30,
+          hostRadius: 5.0,
+          nDetections: 3,
+          adultsPer: 50,
+          larvaePer: 30,
           hosts: true,
           transmission: true,
           humanSeeding: 'random-viable',
+          initialPrevalence: 0.05,
+          fociCoords: '656,364:150;535,207:150',
           outbreakDay: 180,
           outbreakFoci: 5,
           outbreakCases: 100,
+          transSnapshot: 0,
+          minCellPop: 50,
+          clusterRadius: 0,
+          minDensity: 0,
+          clusterMaxCorePop: 0,
+          betaHv: 0.40,
+          betaVh: 0.50,
+          incubation: 12,
+          infectious: 20,
+          vecInfFrac: 0,
+          immunity: false,
+          immunityDays: 180,
           cohortLog: true,
           gif: true,
-          year: 2024,
-          compile: true,
           slug: 'focal_outbreak'
         },
         'incursion-vectorial': {
@@ -1592,17 +1834,42 @@
           snapshot: 1,
           rollouts: 1,
           seed: 42,
+          year: 2024,
+          month: 5,
+          compile: true,
+          clean: false,
+          debug: false,
+          timeout: '',
+          worktree: '',
+          dataRoot: '',
           seeding: 'random-viable',
+          initFrac: 0.30,
+          hostRadius: 5.0,
+          nDetections: 10,
+          adultsPer: 50,
+          larvaePer: 30,
           hosts: true,
           transmission: true,
           humanSeeding: 'none',
+          initialPrevalence: 0.05,
+          fociCoords: '',
           outbreakDay: 0,
           outbreakFoci: 3,
           outbreakCases: 50,
+          transSnapshot: 0,
+          minCellPop: 50,
+          clusterRadius: 0,
+          minDensity: 0,
+          clusterMaxCorePop: 0,
+          betaHv: 0.40,
+          betaVh: 0.50,
+          incubation: 12,
+          infectious: 20,
+          vecInfFrac: 0.15,
+          immunity: false,
+          immunityDays: 180,
           cohortLog: true,
           gif: true,
-          year: 2024,
-          compile: true,
           slug: 'vector_incursion'
         },
         'focos-urbanos': {
@@ -1611,17 +1878,42 @@
           snapshot: 14,
           rollouts: 1,
           seed: 1,
+          year: 2024,
+          month: 1,
+          compile: true,
+          clean: false,
+          debug: false,
+          timeout: '',
+          worktree: '',
+          dataRoot: '',
           seeding: 'uniform',
+          initFrac: 0.30,
+          hostRadius: 5.0,
+          nDetections: 3,
+          adultsPer: 50,
+          larvaePer: 30,
           hosts: true,
           transmission: true,
           humanSeeding: 'explicit',
+          initialPrevalence: 0.05,
+          fociCoords: '656,364:150;535,207:150',
           outbreakDay: 60,
           outbreakFoci: 2,
           outbreakCases: 150,
+          transSnapshot: 0,
+          minCellPop: 50,
+          clusterRadius: 0,
+          minDensity: 0,
+          clusterMaxCorePop: 0,
+          betaHv: 0.40,
+          betaVh: 0.50,
+          incubation: 12,
+          infectious: 20,
+          vecInfFrac: 0,
+          immunity: false,
+          immunityDays: 180,
           cohortLog: true,
           gif: false,
-          year: 2024,
-          compile: true,
           slug: 'explicit_foci'
         },
         'calibracion-rapida': {
@@ -1630,17 +1922,42 @@
           snapshot: 1,
           rollouts: 1,
           seed: 100,
-          seeding: 'random-viable',
+          year: 2024,
+          month: 1,
+          compile: true,
+          clean: false,
+          debug: false,
+          timeout: '',
+          worktree: '',
+          dataRoot: '',
+          seeding: 'uniform',
+          initFrac: 0.30,
+          hostRadius: 5.0,
+          nDetections: 3,
+          adultsPer: 50,
+          larvaePer: 30,
           hosts: true,
           transmission: false,
           humanSeeding: 'none',
+          initialPrevalence: 0.05,
+          fociCoords: '',
           outbreakDay: 0,
           outbreakFoci: 3,
           outbreakCases: 50,
+          transSnapshot: 0,
+          minCellPop: 50,
+          clusterRadius: 0,
+          minDensity: 0,
+          clusterMaxCorePop: 0,
+          betaHv: 0.40,
+          betaVh: 0.50,
+          incubation: 12,
+          infectious: 20,
+          vecInfFrac: 0,
+          immunity: false,
+          immunityDays: 180,
           cohortLog: true,
           gif: false,
-          year: 2024,
-          compile: true,
           slug: 'fast_calib'
         },
         'dataset-unet': {
@@ -1649,17 +1966,42 @@
           snapshot: 30,
           rollouts: 10,
           seed: 1,
+          year: 2024,
+          month: 1,
+          compile: true,
+          clean: false,
+          debug: false,
+          timeout: '',
+          worktree: '',
+          dataRoot: '',
           seeding: 'uniform',
+          initFrac: 0.30,
+          hostRadius: 5.0,
+          nDetections: 3,
+          adultsPer: 50,
+          larvaePer: 30,
           hosts: true,
           transmission: true,
           humanSeeding: 'random-viable',
+          initialPrevalence: 0.05,
+          fociCoords: '656,364:150;535,207:150',
           outbreakDay: 60,
           outbreakFoci: 4,
           outbreakCases: 80,
+          transSnapshot: 0,
+          minCellPop: 50,
+          clusterRadius: 0,
+          minDensity: 0,
+          clusterMaxCorePop: 0,
+          betaHv: 0.40,
+          betaVh: 0.50,
+          incubation: 12,
+          infectious: 20,
+          vecInfFrac: 0,
+          immunity: false,
+          immunityDays: 180,
           cohortLog: true,
           gif: false,
-          year: 2024,
-          compile: true,
           slug: 'unet_rollouts'
         }
       };
@@ -1675,8 +2017,20 @@
         var snapshot = parseInt(paramSnapshot.value, 10);
         var rollouts = parseInt(paramRollouts.value, 10);
         var seed = parseInt(paramSeed.value, 10) || 1;
-        var seeding = paramSeedingMode.value;
+        var year = parseInt(paramYear.value, 10) || 2024;
+        var month = parseInt(paramMonth.value, 10) || 1;
         var hasCompile = paramCompile.checked;
+        var hasClean = paramClean.checked;
+        var hasDebug = paramDebug.checked;
+        var timeout = paramTimeout.value !== '' ? parseInt(paramTimeout.value, 10) : null;
+        var worktree = paramWorktree.value.trim();
+        var dataRoot = paramDataRoot.value.trim();
+        var seeding = paramSeedingMode.value;
+        var initFrac = parseFloat(paramInitFrac.value); if (isNaN(initFrac)) initFrac = 0.30;
+        var hostRadius = parseFloat(paramHostSeedingRadius.value) || 5.0;
+        var nDetections = parseInt(paramNDetections.value, 10) || 3;
+        var adultsPer = parseInt(paramAdultsPerDetection.value, 10) || 50;
+        var larvaePer = parseInt(paramLarvaePerDetection.value, 10); if (isNaN(larvaePer)) larvaePer = 30;
 
         var hasHosts = paramEnableHosts.checked;
         var hasTrans = paramEnableTransmission.checked;
@@ -1688,9 +2042,23 @@
         }
 
         var humanSeeding = paramHumanSeeding.value;
+        var initialPrevalence = parseFloat(paramInitialPrevalence.value);
+        var fociCoords = paramFociCoords.value.trim();
         var outbreakDay = parseInt(paramOutbreakDay.value, 10) || 0;
         var outbreakFoci = parseInt(paramOutbreakFoci.value, 10) || 3;
-        var outbreakCases = parseFloat(paramOutbreakCases.value) || 50;
+        var outbreakCases = parseInt(paramOutbreakCases.value, 10) || 50;
+        var transSnapshot = parseInt(paramTransSnapshot.value, 10) || 0;
+        var minCellPop = parseFloat(paramMinCellPop.value);
+        var clusterRadius = parseFloat(paramClusterRadius.value) || 0;
+        var minDensity = parseFloat(paramMinDensity.value) || 0;
+        var clusterMaxCorePop = parseFloat(paramClusterMaxCorePop.value) || 0;
+        var betaHv = parseFloat(paramBetaHv.value); if (isNaN(betaHv)) betaHv = 0.40;
+        var betaVh = parseFloat(paramBetaVh.value); if (isNaN(betaVh)) betaVh = 0.50;
+        var incubation = parseInt(paramIncubation.value, 10) || 12;
+        var infectious = parseInt(paramInfectious.value, 10) || 20;
+        var vecInfFrac = parseFloat(paramVecInfFrac.value) || 0;
+        var hasImmunity = paramImmunity.checked;
+        var immunityDays = parseInt(paramImmunityDays.value, 10) || 180;
 
         var hasCohortLog = paramCohortLog.checked;
         var hasGif = paramGif.checked;
@@ -1701,46 +2069,74 @@
           hasCohortLog = true;
         }
 
-        var year = parseInt(paramYear.value, 10) || 2024;
         var outputDir = 'runs/' + aoi + '/' + year + '/' + days + 'd_' + currentSlug;
         paramOutputDir.value = outputDir;
 
-        // Toggle transmission sub-options visibility
-        transmissionOptions.style.display = hasTrans ? 'flex' : 'none';
+        // ── Visibilidad de sub-opciones según modo seleccionado ──
+        // Siembra de mosquitos
+        uniformSeedOptions.style.display = seeding === 'uniform' ? 'block' : 'none';
+        hostWeightedOptions.style.display = seeding === 'host-weighted' ? 'block' : 'none';
+        patchSeedOptions.style.display = (seeding === 'random-viable' || seeding === 'host-weighted') ? 'block' : 'none';
+        detectionSeedOptions.style.display = seeding !== 'uniform' ? 'block' : 'none';
 
-        // 1. Build CLI Command string
+        // Transmisión
+        transmissionOptions.style.display = hasTrans ? 'flex' : 'none';
+        uniformLegacyOptions.style.display = (hasTrans && humanSeeding === 'uniform-legacy') ? 'block' : 'none';
+        explicitFociOptions.style.display = (hasTrans && humanSeeding === 'explicit') ? 'block' : 'none';
+        outbreakFociWrap.style.display = (hasTrans && humanSeeding === 'random-viable') ? 'block' : 'none';
+        outbreakCasesWrap.style.display = (hasTrans && humanSeeding === 'random-viable') ? 'block' : 'none';
+        immunityOptions.style.display = (hasTrans && hasImmunity) ? 'block' : 'none';
+
+        // 1. Build CLI Command string (solo se emiten flags ≠ default del CLI)
         var cmd = 'uv run malariasim abm';
         if (hasCompile) {
           cmd += ' \\\n  --compile';
+          if (hasClean) cmd += ' \\\n  --clean';
         }
-        cmd += ' \\\n  --aoi ' + aoi + ' \\\n  --days ' + days;
-        if (snapshot > 0) {
-          cmd += ' \\\n  --snapshot-every ' + snapshot;
-        } else {
-          cmd += ' \\\n  --snapshot-every 0';
-        }
+        if (worktree) cmd += ' \\\n  --worktree ' + worktree;
+        cmd += ' \\\n  --aoi ' + aoi + ' \\\n  --year ' + year;
+        if (month !== 1) cmd += ' \\\n  --month ' + month;
+        cmd += ' \\\n  --days ' + days + ' \\\n  --snapshot-every ' + snapshot;
 
-        if (rollouts > 1) {
-          cmd += ' \\\n  --n-rollouts ' + rollouts;
-        }
-        if (seed !== 1) {
-          cmd += ' \\\n  --seed ' + seed;
-        }
+        if (rollouts > 1) cmd += ' \\\n  --n-rollouts ' + rollouts;
+        if (seed !== 1) cmd += ' \\\n  --seed ' + seed;
+        if (timeout !== null && !isNaN(timeout)) cmd += ' \\\n  --timeout ' + timeout;
+        if (dataRoot && dataRoot !== 'data') cmd += ' \\\n  --data-root ' + dataRoot;
 
-        cmd += ' \\\n  --year ' + year + ' \\\n  --month 1';
         cmd += ' \\\n  --seeding-mode ' + seeding;
+        if (seeding === 'uniform' && initFrac !== 0.30) cmd += ' \\\n  --init-frac ' + initFrac;
+        if (seeding === 'host-weighted' && hostRadius !== 5) cmd += ' \\\n  --host-seeding-radius-km ' + hostRadius;
+        if ((seeding === 'random-viable' || seeding === 'host-weighted') && nDetections !== 3) cmd += ' \\\n  --n-detections ' + nDetections;
+        if (seeding !== 'uniform') {
+          if (adultsPer !== 50) cmd += ' \\\n  --n-adults-per-detection ' + adultsPer;
+          if (larvaePer !== 30) cmd += ' \\\n  --n-larvae-per-detection ' + larvaePer;
+        }
 
         if (hasTrans) {
           cmd += ' \\\n  --enable-transmission';
+          if (transSnapshot !== 0) cmd += ' \\\n  --transmission-snapshot-every ' + transSnapshot;
           cmd += ' \\\n  --human-seeding-mode ' + humanSeeding;
-          if (humanSeeding !== 'none' && humanSeeding !== 'uniform-legacy') {
+          if (humanSeeding === 'uniform-legacy' && initialPrevalence !== 0.05) cmd += ' \\\n  --initial-human-prevalence ' + initialPrevalence;
+          if (humanSeeding === 'explicit' && fociCoords) cmd += ' \\\n  --human-foci-coords "' + fociCoords + '"';
+          if (humanSeeding === 'random-viable' || humanSeeding === 'explicit') {
             if (outbreakDay > 0) cmd += ' \\\n  --human-outbreak-day ' + outbreakDay;
             if (humanSeeding === 'random-viable') {
               cmd += ' \\\n  --human-outbreak-foci ' + outbreakFoci;
               cmd += ' \\\n  --human-outbreak-cases ' + outbreakCases;
-            } else if (humanSeeding === 'explicit') {
-              cmd += ' \\\n  --human-foci-coords "120,45:100;85,130:50"';
             }
+          }
+          if (minCellPop !== 50) cmd += ' \\\n  --human-min-cell-pop ' + minCellPop;
+          if (clusterRadius > 0) cmd += ' \\\n  --human-cluster-radius-km ' + clusterRadius;
+          if (minDensity > 0) cmd += ' \\\n  --human-outbreak-min-density ' + minDensity;
+          if (clusterMaxCorePop > 0) cmd += ' \\\n  --human-cluster-max-core-pop ' + clusterMaxCorePop;
+          if (vecInfFrac > 0) cmd += ' \\\n  --initial-vector-infected-frac ' + vecInfFrac;
+          if (betaHv !== 0.40) cmd += ' \\\n  --beta-hv ' + betaHv;
+          if (betaVh !== 0.50) cmd += ' \\\n  --beta-vh ' + betaVh;
+          if (incubation !== 12) cmd += ' \\\n  --human-incubation-days ' + incubation;
+          if (infectious !== 20) cmd += ' \\\n  --human-infectious-days ' + infectious;
+          if (hasImmunity) {
+            cmd += ' \\\n  --enable-immunity';
+            if (immunityDays !== 180) cmd += ' \\\n  --immunity-duration-days ' + immunityDays;
           }
         }
 
@@ -1750,6 +2146,7 @@
 
         cmd += ' \\\n  --output-dir ' + outputDir;
         if (hasGif) cmd += ' \\\n  --gif';
+        if (hasDebug) cmd += ' \\\n  --debug';
 
         cliCommandOutput.textContent = cmd;
 
@@ -1758,13 +2155,17 @@
         if (snapshot > 0) {
           numSnapshotsPerRollout = Math.floor(days / snapshot) + 1;
         }
+        var numTransSnapshotsPerRollout = 0;
+        if (hasTrans) {
+          numTransSnapshotsPerRollout = transSnapshot > 0 ? Math.floor(days / transSnapshot) + 1 : 1;
+        }
         var totalStateRasters = numSnapshotsPerRollout * rollouts;
-        var totalTransRasters = hasTrans ? (numSnapshotsPerRollout * rollouts) : 0;
+        var totalTransRasters = numTransSnapshotsPerRollout * rollouts;
         var totalCohortLogs = hasCohortLog ? rollouts : 0;
         var totalGifs = hasGif ? (rollouts * (hasTrans ? 2 : 1)) : 0;
 
         summaryStateRasters.textContent = totalStateRasters + L(' archivos (' + rollouts + ' rollouts × ' + numSnapshotsPerRollout + ')', ' files (' + rollouts + ' rollouts × ' + numSnapshotsPerRollout + ')');
-        summaryTransRasters.textContent = hasTrans ? (totalTransRasters + L(' archivos (SEIR)', ' files (SEIR)')) : L('0 archivos (desactivado)', '0 files (disabled)');
+        summaryTransRasters.textContent = hasTrans ? (totalTransRasters + L(' archivos (' + rollouts + ' rollouts × ' + numTransSnapshotsPerRollout + ' · SEIR)', ' files (' + rollouts + ' rollouts × ' + numTransSnapshotsPerRollout + ' · SEIR)')) : L('0 archivos (desactivado)', '0 files (disabled)');
         summaryCohortLog.textContent = totalCohortLogs > 0 ? (totalCohortLogs + L(' archivo(s) JSON', ' JSON file(s)')) : L('Desactivado', 'Disabled');
         summaryGifs.textContent = totalGifs > 0 ? (totalGifs + L(' archivo(s) .gif', ' .gif file(s)')) : L('Desactivado', 'Disabled');
 
@@ -1938,8 +2339,21 @@
       paramSnapshot.addEventListener('change', updatePipeline);
       paramRollouts.addEventListener('change', updatePipeline);
       paramSeed.addEventListener('input', updatePipeline);
+      paramYear.addEventListener('change', updatePipeline);
+      paramMonth.addEventListener('change', updatePipeline);
       paramSeedingMode.addEventListener('change', updatePipeline);
       paramCompile.addEventListener('change', updatePipeline);
+      paramClean.addEventListener('change', updatePipeline);
+      paramDebug.addEventListener('change', updatePipeline);
+      paramTimeout.addEventListener('input', updatePipeline);
+      paramWorktree.addEventListener('input', updatePipeline);
+      paramDataRoot.addEventListener('input', updatePipeline);
+
+      paramInitFrac.addEventListener('input', updatePipeline);
+      paramHostSeedingRadius.addEventListener('input', updatePipeline);
+      paramNDetections.addEventListener('input', updatePipeline);
+      paramAdultsPerDetection.addEventListener('input', updatePipeline);
+      paramLarvaePerDetection.addEventListener('input', updatePipeline);
 
       paramEnableHosts.addEventListener('change', updatePipeline);
       paramEnableTransmission.addEventListener('change', updatePipeline);
@@ -1947,10 +2361,23 @@
       paramOutbreakDay.addEventListener('input', updatePipeline);
       paramOutbreakFoci.addEventListener('input', updatePipeline);
       paramOutbreakCases.addEventListener('input', updatePipeline);
+      paramInitialPrevalence.addEventListener('input', updatePipeline);
+      paramFociCoords.addEventListener('input', updatePipeline);
+      paramTransSnapshot.addEventListener('change', updatePipeline);
+      paramMinCellPop.addEventListener('input', updatePipeline);
+      paramClusterRadius.addEventListener('input', updatePipeline);
+      paramMinDensity.addEventListener('input', updatePipeline);
+      paramClusterMaxCorePop.addEventListener('input', updatePipeline);
+      paramBetaHv.addEventListener('input', updatePipeline);
+      paramBetaVh.addEventListener('input', updatePipeline);
+      paramIncubation.addEventListener('input', updatePipeline);
+      paramInfectious.addEventListener('input', updatePipeline);
+      paramVecInfFrac.addEventListener('input', updatePipeline);
+      paramImmunity.addEventListener('change', updatePipeline);
+      paramImmunityDays.addEventListener('input', updatePipeline);
 
       paramCohortLog.addEventListener('change', updatePipeline);
       paramGif.addEventListener('change', updatePipeline);
-      paramYear.addEventListener('change', updatePipeline);
 
       // Preset click handler
       presetChips.forEach(function(chip) {
@@ -1966,19 +2393,45 @@
             paramSnapshot.value = pData.snapshot;
             paramRollouts.value = pData.rollouts;
             paramSeed.value = pData.seed;
+            paramYear.value = pData.year;
+            paramMonth.value = String(pData.month);
             paramSeedingMode.value = pData.seeding;
             paramCompile.checked = pData.compile;
+            paramClean.checked = pData.clean;
+            paramDebug.checked = pData.debug;
+            paramTimeout.value = pData.timeout;
+            paramWorktree.value = pData.worktree;
+            paramDataRoot.value = pData.dataRoot;
+
+            paramInitFrac.value = pData.initFrac;
+            paramHostSeedingRadius.value = pData.hostRadius;
+            paramNDetections.value = pData.nDetections;
+            paramAdultsPerDetection.value = pData.adultsPer;
+            paramLarvaePerDetection.value = pData.larvaePer;
 
             paramEnableHosts.checked = pData.hosts;
             paramEnableTransmission.checked = pData.transmission;
             paramHumanSeeding.value = pData.humanSeeding;
+            paramInitialPrevalence.value = pData.initialPrevalence;
+            paramFociCoords.value = pData.fociCoords;
             paramOutbreakDay.value = pData.outbreakDay;
             paramOutbreakFoci.value = pData.outbreakFoci;
             paramOutbreakCases.value = pData.outbreakCases;
+            paramTransSnapshot.value = String(pData.transSnapshot);
+            paramMinCellPop.value = pData.minCellPop;
+            paramClusterRadius.value = pData.clusterRadius;
+            paramMinDensity.value = pData.minDensity;
+            paramClusterMaxCorePop.value = pData.clusterMaxCorePop;
+            paramBetaHv.value = pData.betaHv;
+            paramBetaVh.value = pData.betaVh;
+            paramIncubation.value = pData.incubation;
+            paramInfectious.value = pData.infectious;
+            paramVecInfFrac.value = pData.vecInfFrac;
+            paramImmunity.checked = pData.immunity;
+            paramImmunityDays.value = pData.immunityDays;
 
             paramCohortLog.checked = pData.cohortLog;
             paramGif.checked = pData.gif;
-            paramYear.value = pData.year;
             currentSlug = pData.slug;
 
             updatePipeline();
@@ -2095,19 +2548,46 @@
           'config.snap.label': 'Intervalo de Salida (--snapshot-every)', 'config.snap.1': 'Cada 1 día', 'config.snap.7': 'Cada 7 días (semanal)', 'config.snap.14': 'Cada 14 días (quincenal)', 'config.snap.30': 'Cada 30 días (mensual)', 'config.snap.0': 'Solo final (0)',
           'config.rollouts.label': 'Nº de Rollouts (--n-rollouts)', 'config.rollouts.1': '1 (Ejecución individual)', 'config.rollouts.5': '5 (Ensamble estocástico)', 'config.rollouts.10': '10 (Dataset para U-Net)', 'config.rollouts.20': '20 (Ensamble masivo)', 'config.rollouts.help': 'Simulaciones concurrentes con semillas independientes.',
           'config.seed.label': 'Semilla Base (--seed)', 'config.seed.help': 'Para reproducibilidad científica.',
-          'config.seeding.label': 'Siembra Inicial de Mosquitos (--seeding-mode)', 'config.seeding.uniform': 'uniform (homogénea en cuerpos de agua)', 'config.seeding.rv': 'random-viable (en celdas con idoneidad ecológica > 0)', 'config.seeding.explicit': 'explicit (en estaciones de muestreo fijas)',
+          'config.seeding.label': 'Siembra Inicial de Mosquitos (--seeding-mode)', 'config.seeding.uniform': 'uniform (homogénea en parches viables)', 'config.seeding.rv': 'random-viable (en celdas con idoneidad ecológica > 0)', 'config.seeding.hw': 'host-weighted (ponderada por hospedadores cercanos)', 'config.seeding.explicit': 'explicit (en estaciones de muestreo fijas)',
+          'config.seeding.help': 'El equilibrio adulto depende de emergencia acuática ÷ mortalidad; la siembra solo cambia la velocidad de calentamiento.',
+          'config.initfrac.label': 'Fracción Inicial de K (--init-frac)', 'config.initfrac.help': 'Solo uniform: fracción de la capacidad (K) sembrada por parche. Más alta = calentamiento más rápido; el equilibrio no cambia.',
+          'config.hradius.label': 'Radio de Atracción (--host-seeding-radius-km)', 'config.hradius.help': 'Solo host-weighted: radio (km) alrededor de cada parche para ponderar la abundancia de hospedadores cercanos.',
+          'config.ndet.label': 'Nº de Parches Sembrados (--n-detections)', 'config.ndet.help': 'Parches seleccionados para la siembra inicial (modos random-viable y host-weighted).',
+          'config.detseed.title': 'Agentes por Parche Sembrado',
+          'config.adults.label': 'Adultos (--n-adults-per-detection)', 'config.larvae.label': 'Larvas (--n-larvae-per-detection)',
           'config.compile.label': 'Compilar Motor C++ Antes de Ejecutar (--compile)', 'config.compile.help': 'Construye el binario <code>mal_abm_fast</code> desde el código fuente antes de lanzar la simulación. Desmárcalo si el motor ya está compilado para saltar la fase de build.',
+          'config.clean.label': 'Recompilación limpia (--clean)',
+          'config.debug.label': 'GIF de depuración hospedadores-vectores (--debug)', 'config.debug.help': 'Superpone humanos (verde), ganado (marrón) y mosquitos (azul, I_V en rojo) tras la ejecución. Solo diagnóstico.',
+          'config.advexec.title': 'Ejecución Avanzada',
+          'config.timeout.label': 'Timeout (--timeout)', 'config.timeout.help': 'Límite en segundos del subproceso del motor (vacío = sin límite).',
+          'config.worktree.label': 'Worktree (--worktree)', 'config.worktree.help': 'Ruta a un worktree gawt para compilar y ejecutar de forma aislada.',
+          'config.dataroot.label': 'Raíz de Datos (--data-root)', 'config.dataroot.help': 'Directorio que contiene el manifiesto del AOI (por defecto: <code>data/</code>).',
           'config.hosts.label': 'Capa de Hospedadores y Atracción Ganadera/Humana', 'config.hosts.help': 'Permite simular el movimiento y búsqueda de sangre de los mosquitos guiado por la densidad de ganado (vacas, cerdos, aves) y asentamientos humanos, incluso sin simular malaria.',
           'config.trans.label': 'Transmisión Epidemiológica de Malaria (--enable-transmission)', 'config.trans.help': 'Activa el ciclo bidireccional de infección entre mosquitos hembra (ingesta de gametocitos, incubación EIP) y población humana (incubación, recuperación e inmunidad).',
           'config.hseed.label': 'Modo de Siembra Humana (--human-seeding-mode)', 'config.hseed.rv': 'random-viable (focos en aldeas viables con mosquitos)', 'config.hseed.explicit': 'explicit (coordenadas de ciudades explícitas)', 'config.hseed.ul': 'uniform-legacy (5% de prevalencia en todo el territorio)', 'config.hseed.none': 'none (sin humanos infectados al inicio)',
-          'config.obday.label': 'Día del Brote (--human-outbreak-day)', 'config.obday.help': 'Día en que se inyectan los casos índice.',
+          'config.prev.label': 'Prevalencia Humana Inicial (--initial-human-prevalence)', 'config.prev.help': 'Solo uniform-legacy: fracción de la población humana infectada al inicio.',
+          'config.fcoords.label': 'Coordenadas de Focos (--human-foci-coords)', 'config.fcoords.help': 'Formato <code>fila,columna:casos;...</code> en celdas de la grilla ABM (Accra 656,364 · Kumasi 535,207 · Tamale 233,293).',
+          'config.obday.label': 'Día del Brote (--human-outbreak-day)', 'config.obday.help': 'Día en que se inyectan los casos índice (0 = al inicio).',
           'config.obfoci.label': 'Nº de Focos (--human-outbreak-foci)',
           'config.obcases.label': 'Casos Infectados por Foco (--human-outbreak-cases)',
+          'config.transsnap.label': 'Intervalo de Salida de Transmisión (--transmission-snapshot-every)',
+          'config.mincellpop.label': 'Población Mínima por Celda (--human-min-cell-pop)', 'config.mincellpop.help': 'Población mínima para que una celda sea candidata a foco.',
+          'config.clusterradius.label': 'Radio de Clúster (km) (--human-cluster-radius-km)', 'config.clusterradius.help': 'Modo brote concentrado: UN clúster espacial con los casos repartidos según población. 0 = focos independientes.',
+          'config.mindensity.label': 'Densidad Vectorial Mínima (--human-outbreak-min-density)', 'config.mindensity.help': 'Disparador adaptativo: el brote espera a que la mejor celda viable alcance esta densidad normalizada de mosquitos (agentes/K_MAX). 0 = día exacto. Umbrales altos (≥0.5) pueden no dispararse nunca.',
+          'config.corepop.label': 'Tope Poblacional del Núcleo (--human-cluster-max-core-pop)', 'config.corepop.help': 'En modo clúster: celdas más densas no pueden ser núcleo (los vectores se diluyen, R≪1). 0 = sin tope.',
+          'config.bio.title': 'Parámetros Biológicos de Transmisión',
+          'config.betahv.label': 'Prob. Humano→Vector (--beta-hv)', 'config.betavh.label': 'Prob. Vector→Humano (--beta-vh)',
+          'config.incub.label': 'Incubación Humana (días) (--human-incubation-days)', 'config.infec.label': 'Duración Infecciosa (días) (--human-infectious-days)',
+          'config.vecinf.label': 'Fracción Inicial de Vectores Infectados (--initial-vector-infected-frac)', 'config.vecinf.help': 'Parte del pool de hembras ya infectadas al inicio (útil para incursiones vectoriales).',
+          'config.immunity.label': 'Inmunidad Humana Temporal (--enable-immunity)', 'config.immunity.help': '',
+          'config.immdays.label': 'Duración de la Inmunidad (días) (--immunity-duration-days)',
           'config.cohort.label': 'Registrar Censo Diario de Cohortes (--cohort-log)', 'config.cohort.help': 'Registra la evolución diaria de huevos, larvas, pupas y adultos. <strong>Imprescindible para graficar pirámides demográficas y generar animaciones GIF.</strong>',
           'config.gif.label': 'Generar Animación GIF Post-Ejecución (--gif)', 'config.gif.help': 'Genera mapas animados de densidad de mosquitos y propagación de la infección.',
           'config.outdir.label': 'Directorio de Salida (--output-dir)',
           'config.outdir.help': 'Generado automáticamente a partir de AOI, año y duración.',
           'config.year.label': 'Año de Inicio (--year)',
+          'config.month.label': 'Mes de Inicio (--month)', 'config.month.help': 'Define la estación climática de partida.',
+          'config.month.1': 'Enero', 'config.month.2': 'Febrero', 'config.month.3': 'Marzo', 'config.month.4': 'Abril', 'config.month.5': 'Mayo', 'config.month.6': 'Junio', 'config.month.7': 'Julio', 'config.month.8': 'Agosto', 'config.month.9': 'Septiembre', 'config.month.10': 'Octubre', 'config.month.11': 'Noviembre', 'config.month.12': 'Diciembre',
           'config.prereq.title': 'Prerrequisitos de Datos & Guía de Configuración',
           'config.cli.title': 'Comando CLI Listo para Terminal', 'config.cli.copy': 'Copiar comando',
           'config.manifest.title': 'Manifiesto de Artefactos de Salida', 'config.manifest.pop': 'GeoTIFFs de Población:', 'config.manifest.mal': 'GeoTIFFs de Malaria:', 'config.manifest.logs': 'Logs Demográficos:', 'config.manifest.gifs': 'Animaciones GIF:',
@@ -2260,19 +2740,46 @@
           'config.snap.label': 'Output Interval (--snapshot-every)', 'config.snap.1': 'Every 1 day', 'config.snap.7': 'Every 7 days (weekly)', 'config.snap.14': 'Every 14 days (fortnightly)', 'config.snap.30': 'Every 30 days (monthly)', 'config.snap.0': 'Final only (0)',
           'config.rollouts.label': 'No. of Rollouts (--n-rollouts)', 'config.rollouts.1': '1 (Individual run)', 'config.rollouts.5': '5 (Stochastic ensemble)', 'config.rollouts.10': '10 (U-Net dataset)', 'config.rollouts.20': '20 (Massive ensemble)', 'config.rollouts.help': 'Concurrent simulations with independent seeds.',
           'config.seed.label': 'Base Seed (--seed)', 'config.seed.help': 'For scientific reproducibility.',
-          'config.seeding.label': 'Initial Mosquito Seeding (--seeding-mode)', 'config.seeding.uniform': 'uniform (homogeneous in water bodies)', 'config.seeding.rv': 'random-viable (in cells with ecological suitability > 0)', 'config.seeding.explicit': 'explicit (at fixed sampling stations)',
+          'config.seeding.label': 'Initial Mosquito Seeding (--seeding-mode)', 'config.seeding.uniform': 'uniform (homogeneous in viable patches)', 'config.seeding.rv': 'random-viable (in cells with ecological suitability > 0)', 'config.seeding.hw': 'host-weighted (weighted by nearby hosts)', 'config.seeding.explicit': 'explicit (at fixed sampling stations)',
+          'config.seeding.help': 'Adult equilibrium depends on aquatic emergence ÷ mortality; seeding only changes warm-up speed.',
+          'config.initfrac.label': 'Initial K Fraction (--init-frac)', 'config.initfrac.help': 'Uniform only: fraction of carrying capacity (K) seeded per patch. Higher = faster warm-up; equilibrium unchanged.',
+          'config.hradius.label': 'Attraction Radius (--host-seeding-radius-km)', 'config.hradius.help': 'Host-weighted only: radius (km) around each patch to weight nearby host abundance.',
+          'config.ndet.label': 'Seeded Patches (--n-detections)', 'config.ndet.help': 'Patches selected for initial seeding (random-viable and host-weighted modes).',
+          'config.detseed.title': 'Agents per Seeded Patch',
+          'config.adults.label': 'Adults (--n-adults-per-detection)', 'config.larvae.label': 'Larvae (--n-larvae-per-detection)',
           'config.compile.label': 'Compile C++ Engine Before Running (--compile)', 'config.compile.help': 'Builds the <code>mal_abm_fast</code> binary from source before launching the simulation. Uncheck it if the engine is already compiled to skip the build phase.',
+          'config.clean.label': 'Clean recompile (--clean)',
+          'config.debug.label': 'Host-vector debug GIF (--debug)', 'config.debug.help': 'Overlays humans (green), livestock (brown) and mosquitoes (blue, I_V in red) after the run. Diagnosis only.',
+          'config.advexec.title': 'Advanced Execution',
+          'config.timeout.label': 'Timeout (--timeout)', 'config.timeout.help': 'Engine subprocess limit in seconds (empty = no limit).',
+          'config.worktree.label': 'Worktree (--worktree)', 'config.worktree.help': 'Path to a gawt worktree for isolated compile and run.',
+          'config.dataroot.label': 'Data Root (--data-root)', 'config.dataroot.help': 'Directory containing the AOI manifest (default: <code>data/</code>).',
           'config.hosts.label': 'Host Layer & Livestock/Human Attraction', 'config.hosts.help': 'Enables mosquito movement and blood-seeking guided by livestock (cattle, pigs, poultry) and human settlement density, even without malaria simulation.',
           'config.trans.label': 'Malaria Epidemiological Transmission (--enable-transmission)', 'config.trans.help': 'Activates the bidirectional infection cycle between female mosquitoes (gametocyte ingestion, EIP incubation) and human population (incubation, recovery and immunity).',
           'config.hseed.label': 'Human Seeding Mode (--human-seeding-mode)', 'config.hseed.rv': 'random-viable (foci in viable villages with mosquitoes)', 'config.hseed.explicit': 'explicit (explicit city coordinates)', 'config.hseed.ul': 'uniform-legacy (5% prevalence across territory)', 'config.hseed.none': 'none (no infected humans at start)',
-          'config.obday.label': 'Outbreak Day (--human-outbreak-day)', 'config.obday.help': 'Day when index cases are injected.',
+          'config.prev.label': 'Initial Human Prevalence (--initial-human-prevalence)', 'config.prev.help': 'Uniform-legacy only: fraction of the human population infected at start.',
+          'config.fcoords.label': 'Foci Coordinates (--human-foci-coords)', 'config.fcoords.help': 'Format <code>row,col:cases;...</code> in ABM grid cells (Accra 656,364 · Kumasi 535,207 · Tamale 233,293).',
+          'config.obday.label': 'Outbreak Day (--human-outbreak-day)', 'config.obday.help': 'Day when index cases are injected (0 = at start).',
           'config.obfoci.label': 'No. of Foci (--human-outbreak-foci)',
           'config.obcases.label': 'Infected Cases per Focus (--human-outbreak-cases)',
+          'config.transsnap.label': 'Transmission Output Interval (--transmission-snapshot-every)',
+          'config.mincellpop.label': 'Minimum Cell Population (--human-min-cell-pop)', 'config.mincellpop.help': 'Minimum population for a cell to qualify as a candidate focus.',
+          'config.clusterradius.label': 'Cluster Radius (km) (--human-cluster-radius-km)', 'config.clusterradius.help': 'Concentrated-outbreak mode: ONE spatial cluster with cases split by population. 0 = independent foci.',
+          'config.mindensity.label': 'Minimum Vector Density (--human-outbreak-min-density)', 'config.mindensity.help': 'Adaptive trigger: the outbreak waits until the best viable cell reaches this normalised mosquito density (agents/K_MAX). 0 = exact day. High thresholds (≥0.5) may never trigger.',
+          'config.corepop.label': 'Cluster Core Population Cap (--human-cluster-max-core-pop)', 'config.corepop.help': 'Cluster mode: denser cells cannot be cores (vectors dilute, R≪1). 0 = no cap.',
+          'config.bio.title': 'Transmission Biological Parameters',
+          'config.betahv.label': 'Human→Vector Prob. (--beta-hv)', 'config.betavh.label': 'Vector→Human Prob. (--beta-vh)',
+          'config.incub.label': 'Human Incubation (days) (--human-incubation-days)', 'config.infec.label': 'Infectious Duration (days) (--human-infectious-days)',
+          'config.vecinf.label': 'Initial Infected Vector Fraction (--initial-vector-infected-frac)', 'config.vecinf.help': 'Share of the female pool already infected at start (useful for vector incursions).',
+          'config.immunity.label': 'Temporary Human Immunity (--enable-immunity)', 'config.immunity.help': '',
+          'config.immdays.label': 'Immunity Duration (days) (--immunity-duration-days)',
           'config.cohort.label': 'Log Daily Cohort Census (--cohort-log)', 'config.cohort.help': 'Records daily evolution of eggs, larvae, pupae and adults. <strong>Essential for plotting demographic pyramids and generating GIF animations.</strong>',
           'config.gif.label': 'Generate GIF Animation Post-Run (--gif)', 'config.gif.help': 'Generates animated maps of mosquito density and infection spread.',
           'config.outdir.label': 'Output Directory (--output-dir)',
           'config.outdir.help': 'Automatically generated from AOI, year and duration.',
           'config.year.label': 'Start Year (--year)',
+          'config.month.label': 'Start Month (--month)', 'config.month.help': 'Sets the starting climate season.',
+          'config.month.1': 'January', 'config.month.2': 'February', 'config.month.3': 'March', 'config.month.4': 'April', 'config.month.5': 'May', 'config.month.6': 'June', 'config.month.7': 'July', 'config.month.8': 'August', 'config.month.9': 'September', 'config.month.10': 'October', 'config.month.11': 'November', 'config.month.12': 'December',
           'config.prereq.title': 'Data Prerequisites & Configuration Guide',
           'config.cli.title': 'CLI Command Ready for Terminal', 'config.cli.copy': 'Copy command',
           'config.manifest.title': 'Output Artifact Manifest', 'config.manifest.pop': 'Population GeoTIFFs:', 'config.manifest.mal': 'Malaria GeoTIFFs:', 'config.manifest.logs': 'Demographic Logs:', 'config.manifest.gifs': 'GIF Animations:',
