@@ -49,14 +49,18 @@ enum class HostType : uint8_t {
 /// Gonotrophic cycle parameters. Defaults are calibrated for
 /// An. gambiae s.s. in West Africa (Ghana).
 struct GonotrophicParams {
-    float cycle_duration_days   = 2.65f;   // post-first-cycle egg maturation
+    float cycle_duration_days   = 2.0f;    // post-first-cycle egg maturation
+                                           // (An. gambiae s.l. 2-3d, Gillies
+                                           // & Wilkes 1961; warm-season end)
     float first_cycle_days      = 4.0f;    // first-cycle egg maturation
     float feeding_success_rate  = 0.825f;  // [0.75, 0.90]
     int32_t egg_batch_mean      = 120;     // binomial(240, 0.5)
     int32_t egg_batch_n         = 240;     // trials for the egg-batch draw
     int32_t egg_batch_min       = 30;
     int32_t egg_batch_max       = 170;
-    float resting_duration_days = 1.0f;    // post-feed rest
+    float resting_duration_days = 0.5f;    // post-feed rest (short pre-gravid
+                                           // rest; full cycle ≈ 2.5d between
+                                           // blood meals ≈ 0.40 bites/day)
 };
 
 /// Advance one female's gonotrophic state by one day.

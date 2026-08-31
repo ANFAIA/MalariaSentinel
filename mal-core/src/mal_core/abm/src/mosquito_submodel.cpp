@@ -48,6 +48,7 @@ namespace {
 
 inline void record_female_feed(
     size_t si, MosquitoSoA& soa, HostType host,
+    int32_t host_row, int32_t host_col,
     BiteLedger& bite_ledger,
     const HumanCompartmentGrid* human_grid,
     const TransmissionParams* transmission_params,
@@ -55,17 +56,22 @@ inline void record_female_feed(
 {
     const bool is_infectious =
         (soa.vector_state[si] == static_cast<uint8_t>(VectorTransmissionState::INFECTIOUS));
+    // Epidemiological credit goes to the HOST's cell: the bite landed on
+    // a host detected up to host_seeking_radius_m (1500m) away, so both
+    // the infectious-meal record (vector→human pressure) and the
+    // human→vector prevalence draw must use the host cell, not the
+    // mosquito's resting cell.
     if (is_infectious) {
-        bite_ledger.record_infectious_success(soa.row[si], soa.col[si], host);
+        bite_ledger.record_infectious_success(host_row, host_col, host);
     } else {
-        bite_ledger.record_success(soa.row[si], soa.col[si], host);
+        bite_ledger.record_success(host_row, host_col, host);
     }
 
     if (host == HostType::HUMAN &&
         soa.vector_state[si] == static_cast<uint8_t>(VectorTransmissionState::SUSCEPTIBLE) &&
         human_grid && transmission_params && transmission_params->enabled)
     {
-        const double prev = human_grid->prev_at(soa.row[si], soa.col[si]);
+        const double prev = human_grid->prev_at(host_row, host_col);
         if (prev > 0.0) {
             const double p_inf = static_cast<double>(transmission_params->beta_hv) * prev;
             if (rng.uniform_double() < p_inf) {
@@ -689,11 +695,14 @@ void MosquitoSubmodel::advance_day(const AOI& aoi,
                     // Use spatial host-seeking model with real host landscape.
                     auto attractions = host_seeking_->compute_attraction(
                         soa_.row[si], soa_.col[si], *host_landscape_, aoi);
-                    const HostType host = host_seeking_->select_host(attractions, rng_);
+                    const HostAttraction* picked =
+                        host_seeking_->select_host_entry(attractions, rng_);
+                    const HostType host = picked
+                        ? picked->primary_host : HostType::HUMAN;
                     bite_ledger_.record_attempt(
                         soa_.row[si], soa_.col[si], host);
                     // Check if any hosts are present (attraction field non-empty).
-                    if (!attractions.empty()) {
+                    if (picked != nullptr) {
                         g_state = GonotrophicState::BLOOD_FED;
                         g_timer = 0;
                         soa_.gonotrophic_state[si] = static_cast<uint8_t>(g_state);
@@ -701,7 +710,8 @@ void MosquitoSubmodel::advance_day(const AOI& aoi,
                         soa_.feeding_success[si] = 1.0f;
                         n_successful_feeds++;
                         record_female_feed(
-                            si, soa_, host, bite_ledger_,
+                            si, soa_, host, picked->row, picked->col,
+                            bite_ledger_,
                             human_grid_, transmission_params_, rng_);
                     }
                 } else {
@@ -715,7 +725,9 @@ void MosquitoSubmodel::advance_day(const AOI& aoi,
                     soa_.feeding_success[si] = 1.0f;
                     n_successful_feeds++;
                     record_female_feed(
-                        si, soa_, HostType::HUMAN, bite_ledger_,
+                        si, soa_, HostType::HUMAN,
+                        soa_.row[si], soa_.col[si],
+                        bite_ledger_,
                         human_grid_, transmission_params_, rng_);
                 }
             }
@@ -765,19 +777,22 @@ void MosquitoSubmodel::advance_day(const AOI& aoi,
 
                 const auto attractions = host_seeking_->compute_attraction(
                     soa_.row[si], soa_.col[si], eff, aoi);
-                const HostType host =
-                    host_seeking_->select_host(attractions, rng_);
+                const HostAttraction* picked =
+                    host_seeking_->select_host_entry(attractions, rng_);
+                const HostType host = picked
+                    ? picked->primary_host : HostType::HUMAN;
                 n_feeding_attempts++;
                 bite_ledger_.record_attempt(
                     soa_.row[si], soa_.col[si], host);
-                if (!attractions.empty()) {
+                if (picked != nullptr) {
                     soa_.gonotrophic_state[si] =
                         static_cast<uint8_t>(GonotrophicState::BLOOD_FED);
                     soa_.gonotrophic_timer[si] = 0;
                     soa_.feeding_success[si] = 1.0f;
                     n_successful_feeds++;
                     record_female_feed(
-                        si, soa_, host, bite_ledger_,
+                        si, soa_, host, picked->row, picked->col,
+                        bite_ledger_,
                         human_grid_, transmission_params_, rng_);
                     // BLOOD_FED: skip later phases for this female.
                 }

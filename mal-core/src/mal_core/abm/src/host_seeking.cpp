@@ -138,6 +138,8 @@ std::vector<HostAttraction> HostSeekingModel::compute_attraction(
             entry.distance_m   = dist_m;
             entry.attraction   = att;
             entry.primary_host = dominant_host(cell);
+            entry.row          = r;
+            entry.col          = c;
             result.push_back(entry);
         }
     }
@@ -168,8 +170,16 @@ HostType HostSeekingModel::select_host(
     const std::vector<HostAttraction>& attractions,
     Prng& rng) const
 {
+    const HostAttraction* entry = select_host_entry(attractions, rng);
+    return entry ? entry->primary_host : HostType::HUMAN;
+}
+
+const HostAttraction* HostSeekingModel::select_host_entry(
+    const std::vector<HostAttraction>& attractions,
+    Prng& rng) const
+{
     if (attractions.empty()) {
-        return HostType::HUMAN;  // fallback
+        return nullptr;  // fallback handled by caller
     }
 
     // Weighted roulette: cumulative sum of attraction scores.
@@ -178,7 +188,7 @@ HostType HostSeekingModel::select_host(
         total += a.attraction;
     }
     if (total <= 0.0f) {
-        return attractions[0].primary_host;
+        return &attractions[0];
     }
 
     const float draw = static_cast<float>(rng.uniform_double() * total);
@@ -186,12 +196,12 @@ HostType HostSeekingModel::select_host(
     for (const auto& a : attractions) {
         cumulative += a.attraction;
         if (cumulative >= draw) {
-            return a.primary_host;
+            return &a;
         }
     }
 
     // Fallback (floating-point edge case).
-    return attractions.back().primary_host;
+    return &attractions.back();
 }
 
 std::pair<float, float> HostSeekingModel::approach_vector(

@@ -54,6 +54,8 @@ struct HostAttraction {
     float distance_m   = 0.0f;   // Euclidean distance from mosquito to cell centre
     float attraction   = 0.0f;   // combined attraction score (all host types)
     HostType primary_host = HostType::HUMAN;  // dominant host type at this cell
+    int32_t row = -1;            // grid row of the host cell (epidemiology anchor)
+    int32_t col = -1;            // grid col of the host cell
 };
 
 /// Anthropophilic / zoophilic weights for An. gambiae s.s.
@@ -107,6 +109,14 @@ public:
     /// Stochastically select a host type from the attraction field.
     /// Returns the dominant host type if the field is empty.
     HostType select_host(
+        const std::vector<HostAttraction>& attractions,
+        Prng& rng) const;
+
+    /// Stochastically select one entry of the attraction field (same
+    /// roulette as select_host) and return it, so the caller knows
+    /// WHICH cell the bitten host lives in.  Returns nullptr when the
+    /// field is empty.
+    const HostAttraction* select_host_entry(
         const std::vector<HostAttraction>& attractions,
         Prng& rng) const;
 
