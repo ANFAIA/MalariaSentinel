@@ -557,7 +557,71 @@
     /* hide elements when language is set */
     [data-lang="es"] .en-only { display: none !important; }
     [data-lang="en"] .es-only { display: none !important; }
+
+    /* ─── consent banner ────────────────────────────────────────────── */
+    .consent-banner {
+      display: none;
+      position: fixed;
+      left: 16px; right: 16px; bottom: 16px;
+      z-index: 100;
+      max-width: 560px;
+      margin-inline: auto;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 20px;
+      box-shadow: 0 12px 32px color-mix(in oklch, var(--fg) 14%, transparent);
+    }
+    .consent-banner .consent-title {
+      display: flex; align-items: center; gap: 8px;
+      font-family: var(--font-mono);
+      font-size: 12px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.04em;
+      color: var(--accent);
+    }
+    .consent-banner p { font-size: 13px; color: var(--muted); margin: 10px 0 14px; line-height: 1.5; }
+    .consent-banner .consent-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+    .consent-banner .btn { padding: 8px 16px; font-size: 13px; }
   </style>
+
+  <!-- Google tag (gtag.js) · GA4 + Consent Mode v2 (carga diferida hasta aceptación) -->
+  <script>
+    window.GA_MEASUREMENT_ID = 'G-T1LS1EBJDL';
+    window.dataLayer = window.dataLayer || [];
+    function gtag() { window.dataLayer.push(arguments); }
+
+    gtag('consent', 'default', {
+      'ad_storage': 'denied',
+      'ad_user_data': 'denied',
+      'ad_personalization': 'denied',
+      'analytics_storage': 'denied',
+      'wait_for_update': 500
+    });
+
+    window.msConsentGranted = false;
+    window.msTrack = function (name, params) {
+      if (!window.msConsentGranted) return;
+      gtag('event', name, params || {});
+    };
+    window.msLoadGA = function () {
+      if (window.msGaLoaded) return;
+      window.msGaLoaded = true;
+      var s = document.createElement('script');
+      s.async = true;
+      s.src = 'https://www.googletagmanager.com/gtag/js?id=' + window.GA_MEASUREMENT_ID;
+      document.head.appendChild(s);
+      gtag('js', new Date());
+      gtag('config', window.GA_MEASUREMENT_ID);
+    };
+
+    (function () {
+      if (localStorage.getItem('ms-consent') === 'granted') {
+        window.msConsentGranted = true;
+        gtag('consent', 'update', { 'analytics_storage': 'granted' });
+        window.msLoadGA();
+      }
+    })();
+  </script>
 </head>
 <body>
 
@@ -579,7 +643,7 @@
           <button class="lang-btn active" data-lang-btn="es">ES</button>
           <button class="lang-btn" data-lang-btn="en">EN</button>
         </div>
-        <a href="https://github.com/ANFAIA/MalariaSentinel" target="_blank" rel="noopener" class="btn btn-secondary" style="padding: 6px 14px; font-size: 13px; display: inline-flex; align-items: center; gap: 6px;">
+        <a href="https://github.com/ANFAIA/MalariaSentinel" target="_blank" rel="noopener" class="btn btn-secondary" data-ga="nav_github" style="padding: 6px 14px; font-size: 13px; display: inline-flex; align-items: center; gap: 6px;">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path></svg>
           GitHub
         </a>
@@ -602,7 +666,7 @@
             <button class="lang-btn active" data-lang-btn="es">ES</button>
             <button class="lang-btn" data-lang-btn="en">EN</button>
           </div>
-          <a href="https://github.com/ANFAIA/MalariaSentinel" target="_blank" rel="noopener" class="btn btn-primary" style="flex: 1;">Ver en GitHub</a>
+          <a href="https://github.com/ANFAIA/MalariaSentinel" target="_blank" rel="noopener" class="btn btn-primary" data-ga="nav_github_mobile" style="flex: 1;">Ver en GitHub</a>
         </div>
       </div>
     </div>
@@ -620,8 +684,8 @@
             Plataforma colaborativa abierta en etapa inicial que integra simulaciones basadas en agentes (ABM), tensores climáticos satelitales y sustitutos neuronales de inferencia ultrarrápida para optimizar intervenciones de salud pública en territorio.
           </p>
           <div class="row" style="margin-top: 32px; flex-wrap: wrap;">
-            <a href="#configurador-abm" class="btn btn-primary" data-i18n="hero.cta_config">Probar Configurador Interactivo</a>
-            <a href="#arquitectura" class="btn btn-ghost btn-arrow" data-i18n="hero.cta_arch">Ver arquitectura técnica</a>
+            <a href="#configurador-abm" class="btn btn-primary" data-i18n="hero.cta_config" data-ga="cta_configurator">Probar Configurador Interactivo</a>
+            <a href="#arquitectura" class="btn btn-ghost btn-arrow" data-i18n="hero.cta_arch" data-ga="cta_architecture">Ver arquitectura técnica</a>
           </div>
           <div class="row" style="margin-top: 16px; gap: 16px; flex-wrap: wrap; font-size: 13px; color: var(--muted);">
             <span data-i18n="hero.institutions">Un proyecto realizado con el apoyo de <a href="https://www.anfaia.org/" target="_blank" rel="noopener" style="color: var(--accent); font-weight: 600;">ANFAIA</a> y <a href="https://www.cesga.es/" target="_blank" rel="noopener" style="color: var(--accent); font-weight: 600;">CESGA</a></span>
@@ -1610,8 +1674,8 @@
           Proyecto 100% abierto bajo licencia Apache 2.0. Código, planes de desarrollo y documentación técnica accesibles para toda la comunidad.
         </p>
         <div class="row" style="justify-content: center; gap: 12px; flex-wrap: wrap;">
-          <a href="https://github.com/ANFAIA/MalariaSentinel" class="btn btn-primary" data-i18n="cta.github">Ver repositorio en GitHub</a>
-          <a href="https://github.com/ANFAIA/MalariaSentinel/discussions" class="btn btn-secondary" data-i18n="cta.discuss">Unirse a la discusión</a>
+          <a href="https://github.com/ANFAIA/MalariaSentinel" class="btn btn-primary" data-i18n="cta.github" data-ga="footer_cta_github">Ver repositorio en GitHub</a>
+          <a href="https://github.com/ANFAIA/MalariaSentinel/discussions" class="btn btn-secondary" data-i18n="cta.discuss" data-ga="footer_cta_discussions">Unirse a la discusión</a>
         </div>
       </div>
     </section>
@@ -1647,6 +1711,21 @@
       </div>
     </div>
   </footer>
+
+  <!-- Consent Banner (GDPR · Google Analytics opt-in) -->
+  <div class="consent-banner" id="consentBanner" role="dialog" aria-live="polite" aria-label="Consentimiento de analíticas">
+    <span class="consent-title">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20Zm0-16v6m0 4h.01"></path></svg>
+      <span data-i18n="consent.title">Privacidad y analíticas</span>
+    </span>
+    <p data-i18n="consent.text">
+      Usamos Google Analytics para entender cómo se usa este sitio (páginas vistas, países, clics). Nada se envía a Google hasta que aceptas. Tu elección se guarda en este navegador.
+    </p>
+    <div class="consent-actions">
+      <button class="btn btn-primary" id="consentAccept" data-i18n="consent.accept">Aceptar</button>
+      <button class="btn btn-secondary" id="consentReject" data-i18n="consent.reject">Rechazar</button>
+    </div>
+  </div>
 
   <!-- Interactive JavaScript: Mobile Menu & Real-Time ABM Visualizer -->
   <script>
@@ -2415,6 +2494,7 @@
           chip.classList.add('active');
 
           var pKey = chip.getAttribute('data-preset');
+          window.msTrack('select_preset', { preset_id: pKey });
           var pData = presets[pKey];
           if (pData) {
             paramAoi.value = pData.aoi;
@@ -2473,6 +2553,7 @@
         copyCliBtn.addEventListener('click', function() {
           var textToCopy = cliCommandOutput.textContent;
           navigator.clipboard.writeText(textToCopy).then(function() {
+            window.msTrack('copy_command');
             copyCliBtn.classList.add('copied');
             copyBtnText.textContent = L('¡Copiado!', 'Copied!');
             setTimeout(function() {
@@ -2683,6 +2764,11 @@
           'footer.nav.status': 'Avances',
           'footer.nav.config': 'Configurador ABM',
           'footer.nav.unet': 'U-Net',
+          // Consent
+          'consent.title': 'Privacidad y analíticas',
+          'consent.text': 'Usamos Google Analytics para entender cómo se usa este sitio (páginas vistas, países, clics). Nada se envía a Google hasta que aceptas. Tu elección se guarda en este navegador.',
+          'consent.accept': 'Aceptar',
+          'consent.reject': 'Rechazar',
         },
         'en': {
           // Nav
@@ -2876,6 +2962,11 @@
           'footer.nav.status': 'Status',
           'footer.nav.config': 'ABM Configurator',
           'footer.nav.unet': 'U-Net',
+          // Consent
+          'consent.title': 'Privacy & analytics',
+          'consent.text': 'We use Google Analytics to understand how this site is used (page views, countries, clicks). Nothing is sent to Google until you accept. Your choice is stored in this browser.',
+          'consent.accept': 'Accept',
+          'consent.reject': 'Reject',
         }
       };
 
@@ -2933,12 +3024,42 @@
       // Wire up lang buttons
       document.querySelectorAll('[data-lang-btn]').forEach(function(btn) {
         btn.addEventListener('click', function() {
-          setLang(btn.getAttribute('data-lang-btn'));
+          var lang = btn.getAttribute('data-lang-btn');
+          setLang(lang);
+          window.msTrack('change_language', { language: lang });
         });
       });
 
       // Auto-detect on first visit
       setLang(getLang());
+    })();
+
+    // ─── Analytics: consent banner + custom event tracking ─────────────
+    (function() {
+      var banner = document.getElementById('consentBanner');
+      var acceptBtn = document.getElementById('consentAccept');
+      var rejectBtn = document.getElementById('consentReject');
+
+      function setConsent(granted) {
+        localStorage.setItem('ms-consent', granted ? 'granted' : 'denied');
+        window.msConsentGranted = granted;
+        gtag('consent', 'update', { 'analytics_storage': granted ? 'granted' : 'denied' });
+        if (granted) window.msLoadGA();
+        if (banner) banner.style.display = 'none';
+      }
+
+      if (acceptBtn) acceptBtn.addEventListener('click', function() { setConsent(true); });
+      if (rejectBtn) rejectBtn.addEventListener('click', function() { setConsent(false); });
+
+      if (banner && !localStorage.getItem('ms-consent')) {
+        banner.style.display = 'block';
+      }
+
+      // CTA clicks: any element with data-ga attribute
+      document.addEventListener('click', function(e) {
+        var el = e.target && e.target.closest ? e.target.closest('[data-ga]') : null;
+        if (el) window.msTrack('cta_click', { cta_id: el.getAttribute('data-ga') });
+      });
     })();
   </script>
 
