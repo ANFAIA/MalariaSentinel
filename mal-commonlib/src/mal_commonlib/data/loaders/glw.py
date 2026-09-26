@@ -10,12 +10,18 @@ for Ghana and clips to the AOI bounding box.
 Supported species: cattle, goats, sheep, pigs, chickens.
 
 Source: FAO GLW4 (https://data.apps.fao.org/catalog/dataset/)
-Format: Cloud-Optimized GeoTIFF (COG), one band (heads/km² or heads/pixel).
+Format: Cloud-Optimized GeoTIFF (COG), one band — DENSITY in heads/km² (NOT per-pixel counts).
 
 Notes:
-    * Returns livestock head count per cell (animals/pixel).
-    * Resolution is ~10 km (5 arc-minutes). When aggregated to a finer
-      ABM grid, the data must be conservatively (sum-preserving) resampled.
+    * Returns livestock DENSITY in heads/km², nearest-resampled onto the
+      AOI grid. For ~1 km² ABM cells the value doubles as heads/cell
+      (density × 1 km² ≈ heads per cell).
+    * Resolution is ~10 km (5 arc-minutes). Density is an intensive
+      quantity: resample to a finer grid with nearest/bilinear. NEVER
+      sum-resample density — that inflates values by the number of fine
+      cells per coarse pixel (~85× for 10 km → 1 km).
+    * Verified 2026-09-26 against the raw COG: Ghana-bbox sum 40,635 ×
+      85.5 km²/pixel = 3.47M heads = ingest manifest cattle total.
     * The loader caches downloads locally; re-runs skip the download.
 """
 from __future__ import annotations
@@ -170,6 +176,8 @@ def _read_clip(
 
     from rasterio.warp import reproject
 
+    # Density (heads/km²) is intensive: nearest is the correct resampling
+    # when upsampling to the finer AOI grid. Sum would inflate ~85×.
     reproject(
         source=arr_f,
         destination=out,
@@ -186,7 +194,7 @@ def _read_clip(
         name=f"glw4_{species}",
         attrs={
             "long_name": long_name,
-            "units": "animals/pixel",
+            "units": "heads/km²",
             "source": "FAO GLW4",
             "species": species,
             "nodata": -9999.0,
@@ -213,8 +221,8 @@ def load_glw_livestock(
 
     Returns:
         xr.DataArray with dims (y, x), dtype float32, CRS = aoi.crs.
-        Values are animal head count per cell (animals/pixel).
-        ``-9999.0`` for cells with no data.
+        Values are livestock DENSITY in heads/km² (for ~1 km² ABM cells
+        this equals heads per cell). ``-9999.0`` for cells with no data.
     """
     from mal_commonlib.aoi import AOI as AOIType
 

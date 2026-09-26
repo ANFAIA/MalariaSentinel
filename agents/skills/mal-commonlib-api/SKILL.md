@@ -361,7 +361,7 @@ cattle = loader.load(aoi, species="cattle", cache_dir=None)
 
 FAO Gridded Livestock of the World v4 (2020). Supported species: `cattle`, `goats`, `sheep`, `pigs`, `chickens`. Resolution ~10 km (5 arc-minutes).
 
-**Returns**: `xr.DataArray` (y, x), float32, animals/pixel, NoData = `-9999.0`
+**Returns**: `xr.DataArray` (y, x), float32, heads/km² (density; ≈ heads/cell for ~1 km² ABM cells), NoData = `-9999.0`
 
 ---
 
