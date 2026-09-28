@@ -3,12 +3,14 @@
 Supports v1 (flat files dict), v2 (datasets block), and v3.1 schemas.
 Reads auto-migrate v1 → v2 in memory; writes always produce v3.1.
 """
+
 from __future__ import annotations
 import json
 import logging
 from pathlib import Path
 
 log = logging.getLogger(__name__)
+
 
 def _find_repo_root() -> Path:
     """Walk up from this file to find the repo root (has opencode.json or .git)."""
@@ -18,6 +20,7 @@ def _find_repo_root() -> Path:
             return p
         p = p.parent
     return Path(__file__).resolve().parents[4]
+
 
 _REPO_ROOT = _find_repo_root()
 DATA_ROOT = _REPO_ROOT / "data"
@@ -37,6 +40,7 @@ def read_manifest(aoi: str, data_root: Path | None = None) -> dict:
 
 def _migrate_v1_to_v2(manifest: dict) -> dict:
     """Convert v1 flat files dict to v2 datasets block."""
+    # TODO Make unnecessary and remove
     files = manifest.get("files", {})
     datasets = {}
     for key, filename in files.items():
@@ -132,7 +136,9 @@ def list_files(aoi: str) -> dict[str, str]:
     return flat
 
 
-def validate_completeness(aoi: str, *, years: list[int] | None = None, data_root: Path | None = None) -> list[str]:
+def validate_completeness(
+    aoi: str, *, years: list[int] | None = None, data_root: Path | None = None
+) -> list[str]:
     """Return list of missing expected files. Empty = complete.
 
     For daily NC entries with a ``period`` field, checks that the
@@ -183,7 +189,9 @@ def validate_completeness(aoi: str, *, years: list[int] | None = None, data_root
     return sorted(set(missing))
 
 
-def get_dataset_files(aoi: str, dataset_name: str, year: int | str | None = None) -> list[Path]:
+def get_dataset_files(
+    aoi: str, dataset_name: str, year: int | str | None = None
+) -> list[Path]:
     """Get file paths for a dataset, optionally filtered by year."""
     manifest = read_manifest(aoi)
     ds = manifest.get("datasets", {}).get(dataset_name)

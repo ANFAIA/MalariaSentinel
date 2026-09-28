@@ -1,0 +1,174 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "MalariaSentinel — Malaria SDSS Architecture",
+    "locale": "en",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/ANFAIA/MalariaSentinel",
+      "provider": "github",
+      "revision": "8d57756791dd82fd76277a4f835e60cdd7ea3064"
+    }
+  },
+  "components": [
+    {
+      "id": "explorer",
+      "type": "frontend",
+      "label": "mal-data-explorer",
+      "sublabel": "viz · bias analysis",
+      "tag": "experiment",
+      "sources": [{ "path": "mal-data-explorer/pyproject.toml" }],
+      "pos": [230, 100],
+      "size": [130, 60]
+    },
+    {
+      "id": "cli",
+      "type": "backend",
+      "label": "malariasim CLI",
+      "sublabel": "mal_core.cli",
+      "tag": "core",
+      "sources": [{ "path": "mal-core/src/mal_core/cli.py" }],
+      "pos": [450, 100],
+      "size": [130, 60]
+    },
+    {
+      "id": "agents",
+      "type": "cloud",
+      "label": "agents/ — OpenCode",
+      "sublabel": "loops · memory module",
+      "sources": [{ "path": "AGENTS.md" }],
+      "pos": [880, 100],
+      "size": [130, 60]
+    },
+    {
+      "id": "kg",
+      "type": "database",
+      "label": "Neo4j knowledge graph",
+      "sublabel": "Graphiti MCP · 8 labels",
+      "sources": [{ "path": "agents/memory/scripts/Makefile" }],
+      "pos": [1130, 100],
+      "size": [150, 60]
+    },
+    {
+      "id": "earth",
+      "type": "external",
+      "label": "Earth data sources",
+      "sublabel": "ERA5 · DHIMS",
+      "pos": [40, 290],
+      "size": [130, 60]
+    },
+    {
+      "id": "data",
+      "type": "database",
+      "label": "data/ manifest",
+      "sublabel": "single source of truth",
+      "sources": [{ "path": "docs/specs/data/spec.md" }],
+      "pos": [230, 290],
+      "size": [130, 60]
+    },
+    {
+      "id": "core",
+      "type": "backend",
+      "label": "mal-core pipeline",
+      "sublabel": "ABM wrapper · scoring",
+      "tag": "core",
+      "sources": [{ "path": "mal-core/pyproject.toml" }],
+      "pos": [450, 290],
+      "size": [130, 60]
+    },
+    {
+      "id": "abm",
+      "type": "backend",
+      "label": "C++ ABM engine",
+      "sublabel": "mal_abm_fast binary",
+      "tag": "core",
+      "sources": [{ "path": "mal-core/src/mal_core/abm/wrapper.py" }],
+      "pos": [690, 290],
+      "size": [130, 60]
+    },
+    {
+      "id": "runs",
+      "type": "database",
+      "label": "runs/",
+      "sublabel": "snapshots · scorecard",
+      "pos": [930, 290],
+      "size": [130, 60]
+    },
+    {
+      "id": "commonlib",
+      "type": "backend",
+      "label": "mal-commonlib",
+      "sublabel": "config · paths · utils",
+      "tag": "core",
+      "sources": [{ "path": "mal-commonlib/pyproject.toml" }],
+      "pos": [450, 480],
+      "size": [130, 60]
+    },
+    {
+      "id": "execution",
+      "type": "backend",
+      "label": "mal-execution",
+      "sublabel": "batch · U-Net scripts",
+      "tag": "core",
+      "sources": [{ "path": "mal-execution/pyproject.toml" }],
+      "pos": [700, 480],
+      "size": [130, 60]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "Core tier — the Centinela",
+      "wraps": ["cli", "core", "abm", "commonlib", "execution"]
+    },
+    {
+      "kind": "region",
+      "label": "Project memory",
+      "wraps": ["agents", "kg"]
+    }
+  ],
+  "connections": [
+    { "id": "earth-data", "from": "earth", "to": "data", "label": "download", "labelDy": 54 },
+    { "id": "data-core", "from": "data", "to": "core", "label": "manifest" },
+    { "id": "core-abm", "from": "core", "to": "abm", "label": "exec" },
+    { "id": "abm-runs", "from": "abm", "to": "runs", "label": "day snapshots" },
+    { "id": "runs-core", "from": "runs", "to": "core", "label": "score", "fromSide": "top", "toSide": "top" },
+    { "id": "cli-core", "from": "cli", "to": "core", "label": "invokes", "labelDy": 24 },
+    { "id": "explorer-data", "from": "explorer", "to": "data", "label": "reads", "labelDy": 24 },
+    { "id": "agents-cli", "from": "agents", "to": "cli", "label": "supervisor" },
+    { "id": "agents-kg", "from": "agents", "to": "kg", "label": "typed writes" },
+    { "id": "core-commonlib", "from": "core", "to": "commonlib", "label": "imports", "labelDy": 24 },
+    { "id": "execution-core", "from": "execution", "to": "core", "label": "batch jobs" },
+    { "id": "execution-runs", "from": "execution", "to": "runs", "label": "remote runs" }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Centinela pipeline",
+      "items": [
+        "malariasim download → ingest → abm → score → train → predict",
+        "data/<aoi>/manifest.json is the single source of truth",
+        "score writes scorecard.json into the run dir"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Tiers",
+      "items": [
+        "Core: mal-commonlib · mal-core · mal-execution",
+        "Experiment: mal-data-explorer (viz · bias analysis)",
+        "Promotion is one-way: experiment → core, then delete the original"
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "Project memory",
+      "items": [
+        "Neo4j knowledge graph via Graphiti MCP",
+        "8-label schema · 3 invariants on every audit",
+        "Recall before write — supersede, never duplicate"
+      ]
+    }
+  ]
+}

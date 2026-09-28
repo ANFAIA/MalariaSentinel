@@ -4,6 +4,8 @@
 
 **Siguiente paso:** [guion hablado por slides](guion-presentacion-10-minutos.md).
 
+**Version publica de 5 minutos:** [guion para publico general, periodistas e inversores](guion-presentacion-5-minutos-publico-general.md).
+
 ## Tesis central
 
 La malaria no espera a que un sistema de salud confirme un brote. MalariaSentinel busca convertir datos ambientales y epidemiologicos en anticipacion espacial: ayudar a los programas de eliminacion a decidir **donde mirar, cuando actuar y como priorizar recursos limitados**.
