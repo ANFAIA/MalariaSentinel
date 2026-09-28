@@ -137,11 +137,16 @@ def _load_worldcover_pc(
     search = catalog.search(
         collections=[_PC_COLLECTION],
         bbox=list(bbox),
+        # Filter to the requested product year: the collection holds both
+        # v100 (2020) and v200 (2021); without this the vote accumulator
+        # mixes tiles from different years and the lower class code wins
+        # ties in the argmax.
+        datetime=f"{year}-01-01T00:00:00Z/{year}-12-31T23:59:59Z",
     )
     items = list(search.items())
     if not items:
         raise FileNotFoundError(
-            f"No ESA WorldCover tiles in Planetary Computer for bbox={bbox}"
+            f"No ESA WorldCover tiles in Planetary Computer for bbox={bbox} year={year}"
         )
     signed_items = [planetary_computer.sign(item) for item in items]
 
@@ -237,11 +242,13 @@ def load_worldcover_landcover(
     year: int = 2021,
     cache_dir: pathlib.Path | None = None,
 ) -> xr.DataArray:
-    """Load ESA WorldCover 2021 v200 land cover classification for the AOI.
+    """Load ESA WorldCover land cover classification for the AOI.
 
     Downloads the 10 m resolution land cover raster from Planetary Computer
-    and reprojects to the AOI grid using nearest-neighbour resampling
-    (categorical data). Returns the full 11-class classification.
+    for the requested product year (``datetime``-filtered STAC search so
+    tiles from the other supported year are never mixed) and reprojects to
+    the AOI grid using nearest-neighbour resampling (categorical data).
+    Returns the full 11-class classification.
 
     Args:
         aoi: the AOI.

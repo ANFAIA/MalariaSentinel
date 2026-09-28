@@ -20,7 +20,6 @@ from .worldpop import WorldPopLoader
 from .glw import GLWLoader
 from .ghsl import GHSLLoader
 from .wildlife import WildlifeLoader
-from .buildings import BuildingsLoader
 
 __all__ = [
     "load_coastline_land_mask",
@@ -40,5 +39,4 @@ __all__ = [
     "GLWLoader",
     "GHSLLoader",
     "WildlifeLoader",
-    "BuildingsLoader",
 ]

@@ -380,13 +380,12 @@ GHS-SMOD settlement classification from JRC. Classes: 20 (water), 30 (urban), 50
 
 ---
 
-### Buildings — `load_overture_buildings`
+### Buildings — `load_buildings_fraction`
 
 ```python
-from mal_commonlib.data.loaders.buildings import BuildingsLoader
+from mal_commonlib.data.loaders.buildings import load_buildings_fraction
 
-loader = BuildingsLoader()
-building_frac = loader.load(aoi, cache_dir=None)
+building_frac = load_buildings_fraction(aoi, cache_dir=None)
 ```
 
 Overture Maps building footprints rasterized to building-fraction layer (fraction of each ABM cell covered by buildings). Values in [0, 1].

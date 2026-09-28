@@ -29,7 +29,6 @@ from __future__ import annotations
 
 import os
 import pathlib
-import warnings
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -41,7 +40,7 @@ if TYPE_CHECKING:
     from mal_commonlib.aoi import AOI
 
 
-__all__ = ["load_buildings_fraction", "BuildingsLoader", "DOWNLOADER"]
+__all__ = ["load_buildings_fraction", "DOWNLOADER"]
 
 _OVERTURE_S3_BUCKET = "overturemaps-us-west-2"
 _OVERTURE_S3_REGION = "us-west-2"
@@ -213,23 +212,6 @@ def load_buildings_fraction(
     da.rio.write_transform(from_bounds(*aoi.bbox, *aoi.cells_per_side()[::-1]), inplace=True)
     da.rio.write_nodata(_NODATA, inplace=True)
     return da
-
-
-class BuildingsLoader:
-    """DEPRECATED: Use load_buildings_fraction() instead."""
-
-    def load(
-        self,
-        aoi: AOI,
-        *,
-        cache_dir: pathlib.Path | None = None,
-    ) -> xr.DataArray:
-        warnings.warn(
-            "BuildingsLoader is deprecated; use load_buildings_fraction()",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        return load_buildings_fraction(aoi, cache_dir=cache_dir)
 
 
 DOWNLOADER = {
