@@ -6,6 +6,7 @@ COG (TIF) path was removed - see docs/specs/ingest/spec.md.
 """
 from __future__ import annotations
 
+import logging
 import pathlib
 
 import geopandas as gpd
@@ -146,6 +147,13 @@ def build_env_tensor(
         type="time-series",
         variables=nc_result["variables"],
         format="nc",
+        license=("Copernicus-Cite+CC-BY-4.0+CHIRPS-Cite"),
+        attribution=(
+            "Derived from CHIRPS v2 (Funk et al. 2014), JRC GSW v1.4 "
+            "(© EU/JRC, CC BY 4.0), ERA5-Land (Contains modified Copernicus "
+            "Climate Change Service information [Year]) and MODIS MOD13A3 "
+            "(NASA LP DAAC)."
+        ),
         data_root=data_root,
     )
     dem_path = output_dir / f"{aoi.slug}_elevation.tif"
@@ -233,7 +241,19 @@ def build_env_tensor(
         )
         register_dataset(
             aoi.slug, "habitat", year, habitat_path.name,
-            type="time-series", format="gpkg", data_root=data_root,
+            type="time-series", format="gpkg",
+            license="ODbL-1.0+CC-BY-4.0",
+            attribution=(
+                "Derived from MERIT DEM (Yamazaki Lab, ODbL 1.0 branch "
+                "elected 2026-09-27) and JRC GSW (© EU/JRC, CC BY 4.0)."
+            ),
+            data_root=data_root,
         )
         nc_result["habitat_path"] = str(habitat_path)
+    try:
+        from mal_commonlib.data.licenses import warn_manifest_limits
+
+        warn_manifest_limits(aoi.slug, data_root)
+    except Exception as e:  # never break ingest over a warning
+        logging.getLogger(__name__).debug("license warning skipped: %s", e)
     return nc_result

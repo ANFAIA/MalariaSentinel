@@ -268,6 +268,10 @@ DOWNLOADER = {
     "name": "glw",
     "description": "FAO GLW4 global livestock density",
     "requires_auth": ["none"],
+    "license": "CC-BY-4.0",
+    "attribution": (
+        "GLW4-2020 © FAO (CC BY 4.0), data.apps.fao.org/catalog — "
+        "Gridded Livestock of the World v4, 5 arc-min D-DA maps."),
     "is_time_series": False,
     "outputs": {
         "cattle": lambda aoi, **kw: load_glw_livestock(aoi, species="cattle", **kw),

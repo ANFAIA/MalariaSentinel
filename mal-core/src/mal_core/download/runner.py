@@ -133,6 +133,8 @@ def run_download(
                             required_for_abm=required_for_abm,
                             format="nc",
                             period={"start": t0, "end": t1},
+                            license=spec.license,
+                            attribution=spec.attribution,
                             data_root=out_dir.parent,
                         )
                         log.info("    daily NC → %s (period %s to %s)", path.name, t0, t1)
@@ -162,6 +164,8 @@ def run_download(
                             required_for_abm=required_for_abm,
                             format="nc",
                             period={"start": t0, "end": t1},
+                            license=spec.license,
+                            attribution=spec.attribution,
                             data_root=out_dir.parent,
                         )
                         log.info("    monthly NC → %s (period %s to %s)", path.name, t0, t1)
@@ -193,6 +197,8 @@ def run_download(
                                     type="time-series",
                                     required_for_abm=required_for_abm,
                                     format="tif",
+                                    license=spec.license,
+                                    attribution=spec.attribution,
                                     data_root=out_dir.parent,
                                 )
                                 log.info("    %s aggregate (%s) → %s", yr, reduction, path.name)
@@ -209,6 +215,8 @@ def run_download(
                                 type="time-series",
                                 required_for_abm=required_for_abm,
                                 format="tif",
+                                license=spec.license,
+                                attribution=spec.attribution,
                                 data_root=out_dir.parent,
                             )
                             log.info("    %s → %s", yr, path.name)
@@ -228,6 +236,8 @@ def run_download(
                         path.name,
                         type="static",
                         required_for_abm=required_for_abm,
+                        license=spec.license,
+                        attribution=spec.attribution,
                         data_root=out_dir.parent,
                     )
                     log.info("    → %s", path.name)
@@ -236,5 +246,13 @@ def run_download(
         except Exception as e:
             log.error("Download failed for %s: %s", name, e)
             results[name] = {"status": "error", "error": str(e)}
+
+    # One aggregated usage-limit warning per run (docs/licenses.md)
+    try:
+        from mal_commonlib.data.licenses import warn_manifest_limits
+
+        warn_manifest_limits(aoi)
+    except Exception as e:  # never break a download over a warning
+        log.debug("license warning skipped: %s", e)
 
     return results

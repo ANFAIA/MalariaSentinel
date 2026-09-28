@@ -267,6 +267,11 @@ DOWNLOADER = {
         "Used by daily_nc.py to exclude open-ocean cells from JRC GSW permanent water."
     ),
     "requires_auth": ["none"],
+    "license": "LicenseRef-GSHHG-LGPL-3.0",
+    "attribution": (
+        "Wessel, P., & Smith, W. H. F. (1996), A global, self-consistent, "
+        "hierarchical, high-resolution shoreline database, JGR 101, "
+        "8741-8743. GSHHG distributed under LGPL v3+."),
     "is_time_series": False,
     "outputs": {
         "land_mask": load_coastline_land_mask,

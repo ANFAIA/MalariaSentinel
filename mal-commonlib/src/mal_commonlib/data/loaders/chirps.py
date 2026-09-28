@@ -468,6 +468,13 @@ DOWNLOADER = {
     "name": "chirps",
     "description": "CHIRPS rainfall: daily and monthly precipitation",
     "requires_auth": ["none"],
+    "license": "CHIRPS-Cite",
+    "attribution": (
+        "Funk, C.C., Peterson, P.J., Landsfeld, M.F., et al., 2014, "
+        "A quasi-global precipitation time series for drought monitoring: "
+        "U.S. Geological Survey Data Series 832, 4 p. Data: UCSB Climate "
+        "Hazards Center (CHIRPS-2.0)."
+    ),
     "is_time_series": True,
     "outputs": {
         "rainfall": load_chirps_rainfall,

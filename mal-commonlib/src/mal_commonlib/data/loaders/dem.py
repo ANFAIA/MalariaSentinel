@@ -533,6 +533,15 @@ DOWNLOADER = {
     "name": "dem",
     "description": "MERIT-DEM elevation: 100m resolution",
     "requires_auth": ["none"],
+    # MERIT is dual CC BY-NC 4.0 / ODbL 1.0. Election: ODbL (compatible with
+    # the Apache-2.0 code tier; decision recorded in docs/licenses.md).
+    "license": "ODbL-1.0",
+    "attribution": (
+        "MERIT DEM © Yamazaki Lab, University of Tokyo (ODbL 1.0 branch "
+        "elected). Yamazaki, D., et al., 2017, A high accuracy map of "
+        "global terrain elevations, GRL 44, 5844-5853. "
+        "NASADEM fallback: NASA/USGS (public domain)."
+    ),
     "is_time_series": False,
     "outputs": {
         "elevation": load_merit_dem,

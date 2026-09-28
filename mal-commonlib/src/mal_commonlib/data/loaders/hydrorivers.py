@@ -367,6 +367,10 @@ DOWNLOADER = {
     "name": "hydrorivers",
     "description": "Permanent river mask and proximity field (HydroRIVERS proxy via JRC GSW)",
     "requires_auth": ["none"],
+    "license": "CC-BY-4.0",
+    "attribution": (
+        "Derived from JRC Global Surface Water v1.4 © European Union/JRC "
+        "(CC BY 4.0). Pekel et al. 2016, Nature 540, 418-422."),
     "is_time_series": False,
     "outputs": {
         "permanent_rivers": load_hydrorivers_permanent_rivers,

@@ -358,6 +358,13 @@ DOWNLOADER = {
     "name": "jrc_gsw",
     "description": "JRC Global Surface Water: water occurrence and seasonality",
     "requires_auth": ["none"],
+    "license": "CC-BY-4.0",
+    "attribution": (
+        "JRC Global Surface Water v1.4 © European Union/JRC (CC BY 4.0, "
+        "Decision 2011/833/EU). Pekel, J.-F., et al., 2016, High-resolution "
+        "mapping of global surface water and its long-term changes, "
+        "Nature 540, 418-422."
+    ),
     "is_time_series": False,
     "outputs": {
         "water_occurrence": load_jrc_gsw_water_frac,

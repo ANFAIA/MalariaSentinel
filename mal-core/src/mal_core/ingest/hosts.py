@@ -5,6 +5,7 @@ Core logic preserved; CLI layer removed.
 """
 from __future__ import annotations
 
+import logging
 import pathlib
 import sys
 
@@ -214,10 +215,25 @@ def build_host_dataset(
                     "chickens", "urban_class", "building_fraction",
                     "wildlife_host_proxy"],
         format="nc",
+        license="CC-BY-4.0+ODbL-1.0+NASA-Cite",
+        attribution=(
+            "Derived from WorldPop (CC BY 4.0), FAO GLW4 (CC BY 4.0), "
+            "GHS-SMOD (© EU/JRC, CC BY 4.0), Overture buildings "
+            "(© OpenStreetMap contributors, Overture Maps Foundation, "
+            "ODbL 1.0) and ESA WorldCover (© ESA WorldCover project [2021] "
+            "/ Contains modified Copernicus Sentinel data (2021) processed "
+            "by ESA WorldCover consortium)."
+        ),
     )
     register_dataset(
         aoi.slug, "host_manifest", None,
         str(manifest_path.name),
     )
+    try:
+        from mal_commonlib.data.licenses import warn_manifest_limits
+
+        warn_manifest_limits(aoi.slug)
+    except Exception as e:  # never break ingest over a warning
+        logging.getLogger(__name__).debug("license warning skipped: %s", e)
 
     return results

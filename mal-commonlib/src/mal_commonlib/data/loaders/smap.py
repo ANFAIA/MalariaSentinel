@@ -420,6 +420,10 @@ DOWNLOADER = {
     "name": "smap",
     "description": "SMAP RSS L3 sea surface salinity: monthly ocean PSU",
     "requires_auth": ["earthdata"],
+    "license": "NASA-Cite",
+    "attribution": (
+        "SMAP RSS L3 SSS SMI Monthly V6.0, Remote Sensing Systems / "
+        "NASA PO.DAAC, https://doi.org/10.5067/SMP60-3SMCS"),
     "is_time_series": True,
     "outputs": {
         "salinity": load_smap_salinity,

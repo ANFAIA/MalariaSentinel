@@ -1,0 +1,37 @@
+MalariaSentinel
+Copyright 2026 ANFAIA and MalariaSentinel Contributors
+
+This project is licensed under the Apache License, Version 2.0 (see LICENSE).
+Interactive datasets are NOT included in this repository (data/ is
+gitignored); they are re-downloaded by `malariasim download` under their own
+upstream licenses. Attribution owed when publishing derived products:
+
+  - Copernicus Climate Change Service (ERA5 / ERA5-Land):
+    "Contains modified Copernicus Climate Change Service information [Year].
+    Neither the European Commission nor ECMWF is responsible for any use
+    that may be made of the Copernicus information or data it contains."
+  - UCSB Climate Hazards Center, CHIRPS: Funk, C.C., et al., 2014,
+    A quasi-global precipitation time series for drought monitoring,
+    U.S. Geological Survey Data Series 832, 4 p.
+  - NASA LP DAAC, MODIS MOD13A3 v061: DOI 10.5067/MODIS/MOD13A3.061
+  - R. Remote Sensing Systems / NASA PO.DAAC, SMAP RSS L3 SSS V6.0:
+    DOI 10.5067/SMP60-3SMCS
+  - WorldPop (population): WorldPop, www.worldpop.org (CC BY 4.0);
+    Lloyd et al. 2019. Not for uses that harm or discriminate.
+  - FAO, GLW4-2020 Gridded Livestock density (CC BY 4.0),
+    data.apps.fao.org
+  - European Commission, Joint Research Centre (CC BY 4.0 / EC reuse,
+    Decision 2011/833/EU): JRC Global Surface Water v1.4 (Pekel et al.,
+    2016, Nature 540, 418-422); GHS-SMOD R2023A
+  - ESA WorldCover project (CC BY 4.0):
+    "© ESA WorldCover project [2021] / Contains modified Copernicus
+    Sentinel data (2021) processed by ESA WorldCover consortium"
+  - Overture Maps Foundation buildings (ODbL 1.0):
+    © OpenStreetMap contributors, Overture Maps Foundation
+  - Yamazaki Lab, University of Tokyo, MERIT DEM (ODbL 1.0 branch elected):
+    Yamazaki, D., et al., 2017, GRL 44, 5844-5853
+  - NASA/USGS NASADEM fallback (public domain)
+  - Wessel, P., & Smith, W. H. F. (1996), JGR 101, 8741-8743 (GSHHG,
+    distributed under LGPL v3+)
+
+Full per-dataset table and the decision log: docs/licenses.md

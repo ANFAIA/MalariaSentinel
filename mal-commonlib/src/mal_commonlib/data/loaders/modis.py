@@ -436,6 +436,11 @@ DOWNLOADER = {
     "name": "modis",
     "description": "MODIS NDVI: vegetation index",
     "requires_auth": ["earthdata"],
+    "license": "NASA-Cite",
+    "attribution": (
+        "MODIS MOD13A3 v061, NASA LP DAAC, https://doi.org/"
+        "10.5067/MODIS/MOD13A3.061"
+    ),
     "is_time_series": True,
     "outputs": {
         "ndvi": load_modis_ndvi,

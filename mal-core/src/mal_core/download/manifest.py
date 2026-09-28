@@ -47,6 +47,8 @@ def update_dataset(
     variables: list[str] | None = None,
     format: str | None = None,
     period: dict[str, str] | None = None,
+    license: str | None = None,
+    attribution: str | None = None,
     data_root: Path | None = None,
 ) -> Path:
     """Update a specific dataset entry in the manifest.
@@ -61,6 +63,11 @@ def update_dataset(
         variables: list of variable names in the file.
         format: file format ("tif" | "nc" | "gpkg" | "csr").
         period: for multi-year NC, {"start": "YYYY-MM-DD", "end": "YYYY-MM-DD"}.
+        license: upstream license id(s) from
+            ``mal_commonlib.data.licenses.KNOWN_LICENSES`` ('+'-joined for
+            derived products). None leaves the existing value untouched.
+        attribution: literal credit line (docs/licenses.md). None leaves
+            the existing value untouched.
     """
     root = data_root or DATA_ROOT
     path = root / aoi / "manifest.json"
@@ -82,6 +89,10 @@ def update_dataset(
         ds["variables"] = variables
     if period:
         ds["period"] = period
+    if license:
+        ds["license"] = license
+    if attribution:
+        ds["attribution"] = attribution
 
     if year:
         ds.setdefault("files", {})[str(year)] = filename

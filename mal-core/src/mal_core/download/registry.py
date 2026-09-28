@@ -26,6 +26,8 @@ class DownloaderSpec:
     abm_default_outputs: list[str] | None = None
     required_for_abm: dict[str, bool] | None = None
     reductions: dict[str, str] | None = None
+    license: str | None = None
+    attribution: str | None = None
 
 def discover_downloaders() -> dict[str, DownloaderSpec]:
     registry: dict[str, DownloaderSpec] = {}
@@ -71,6 +73,8 @@ def discover_downloaders() -> dict[str, DownloaderSpec]:
                 abm_default_outputs=raw.get("abm_default_outputs", profile_defaults.get(raw["name"])),
                 required_for_abm=raw.get("required_for_abm", None),
                 reductions=raw.get("reductions", None),
+                license=raw.get("license", None),
+                attribution=raw.get("attribution", None),
             )
             registry[spec.name] = spec
             log.debug("Registered downloader: %s (%d outputs)", spec.name, len(spec.outputs))

@@ -147,6 +147,12 @@ def build_mobility_dataset(
             aoi_slug, manifest_key, None,
             csr_name,
             required_for_abm=True,
+            license="CC-BY-4.0+ODbL-1.0+NASA-Cite",
+            attribution=(
+                "Mobility graph derived from host_static.nc — inherits "
+                "WorldPop/GLW4/GHS-SMOD (CC BY 4.0), Overture buildings "
+                "(ODbL 1.0) and ESA WorldCover/Copernicus attributions."
+            ),
         )
     register_dataset(
         aoi_slug, "mobility_manifest", None,

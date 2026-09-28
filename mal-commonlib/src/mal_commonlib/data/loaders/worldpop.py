@@ -478,7 +478,10 @@ DOWNLOADER = {
     "name": "worldpop",
     "description": "WorldPop constrained population density",
     "requires_auth": ["none"],
-    "is_time_series": False,
+    "license": "CC-BY-4.0+WorldPop-harm",
+    "attribution": (
+        "WorldPop Global 2000-2020 Constrained population counts, "
+        "www.worldpop.org (CC BY 4.0). Lloyd et al. 2019 for GHA 2019."),
     "outputs": {
         "population": load_worldpop_population,
     },

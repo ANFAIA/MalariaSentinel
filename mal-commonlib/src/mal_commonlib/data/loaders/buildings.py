@@ -236,6 +236,10 @@ DOWNLOADER = {
     "name": "buildings",
     "description": "Overture Maps building footprint fraction",
     "requires_auth": ["none"],
+    "license": "ODbL-1.0",
+    "attribution": (
+        "© OpenStreetMap contributors, Overture Maps Foundation (ODbL 1.0; "
+        "derived from OSM + Microsoft Building Footprints)."),
     "is_time_series": False,
     "outputs": {
         "building_fraction": load_buildings_fraction,

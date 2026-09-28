@@ -283,6 +283,11 @@ DOWNLOADER = {
     "name": "ghsl",
     "description": "GHSL settlement classification (SMOD) for urban/rural classification",
     "requires_auth": ["none"],
+    "license": "CC-BY-4.0",
+    "attribution": (
+        "GHS-SMOD R2023A © European Union, Joint Research Centre (CC BY 4.0, "
+        "EC reuse Decision 2011/833/EU). Schiavina, M., Pesaresi, M., "
+        "Melchiorri, M. 2023."),
     "is_time_series": False,
     "outputs": {
         "urban_class": load_ghsl_urban_class,

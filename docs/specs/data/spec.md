@@ -204,6 +204,32 @@ now honours every kwarg (`type`, `required_for_abm`, `variables`,
 | `mobility_night` | CSR | static | `<aoi>_mobility_night.csr` | ingest | no |
 | `livestock_mobility` | CSR | static | `<aoi>_livestock_mobility.csr` | ingest | no |
 
+### §6.4 Upstream licensing (added 2026-09-27)
+
+Every manifest dataset entry carries two optional metadata fields (v3.1,
+non-breaking — written when the loader declares them):
+
+- `license` — id(s) from `mal_commonlib.data.licenses.KNOWN_LICENSES`
+  (`'+'`-joined compound ids for derived products).
+- `attribution` — the literal credit line owed in publications/maps.
+
+Provenance:
+
+- **Loaders** (`mal-commonlib/data/loaders/*.py`) declare `license` +
+  `attribution` in their `DOWNLOADER` dict; `malariasim download` stamps
+  both into the manifest entry via `update_dataset`.
+- **Derived products** (ingest `env`, `habitat`, `host_static`,
+  `mobility_*`) register compound ids summing their inputs.
+- **Warnings**: download runner and ingest builders call
+  `warn_manifest_limits(aoi)` — one aggregated UserWarning per process
+  listing which uses are limited (ODbL share-alike, Copernicus/WorldCover
+  literal attribution lines, BY-NC currency, citation obligations).
+- **Human-readable audit + decision log** (incl. MERIT DEM = ODbL branch
+  elected 2026-09-27; Overture kept): `docs/licenses.md`; consolidated
+  third-party attribution block: root `NOTICE`.
+- **Contract test**: `mal-commonlib/tests/test_licenses.py` enforces
+  that every `DOWNLOADER` carries a known id + literal attribution.
+
 **Deprecated**: `worldcover` — archived to `mal-commonlib/.../loaders/_legacy/worldcover.py`. Use `jrc_gsw` for `water_frac`.
 
 ## 7. Migration & deprecation

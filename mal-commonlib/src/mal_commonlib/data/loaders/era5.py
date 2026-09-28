@@ -602,6 +602,13 @@ DOWNLOADER = {
     "name": "era5",
     "description": "ERA5 reanalysis: temperature, wind, humidity",
     "requires_auth": ["cds"],
+    "license": "Copernicus-Cite",
+    "attribution": (
+        "Contains modified Copernicus Climate Change Service information "
+        "[Year]. Neither the European Commission nor ECMWF is responsible "
+        "for any use that may be made of the Copernicus information or data "
+        "it contains. DOI: 10.24381/cds.5d0b5cf0 / 10.24381/cds.f850e93a"
+    ),
     "is_time_series": True,
     "outputs": {
         "temp_suitability": load_era5_temp_suitability,

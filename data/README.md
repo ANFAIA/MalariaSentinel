@@ -54,6 +54,32 @@ data/
 | guf        | 3,917   | 50   | ipt.gbif.fr (pasteur_guyane_anopheles)               | CC BY-NC 4.0|
 | colombia_vl| 1,502   | 68   | ipt.biodiversidad.co/sib (ins_mosquiteros_malaria)   | CC BY-NC 4.0|
 
+### Pipeline datasets (ghana/ manifest)
+
+Every upstream source has been license-audited (2026-09-27); the full
+table + decision log is `docs/licenses.md` and the consolidated
+attribution list lives in the root `NOTICE`. Summary:
+
+| Manifest dataset | Upstream | License |
+|---|---|---|
+| era5_temp / era5_water_temp / wind | Copernicus CDS (ERA5) | CC BY 4.0 ("Contains modified Copernicus…") |
+| chirps_rainfall(_daily) | UCSB CHC | free, cite Funk et al. 2014 |
+| modis_ndvi | NASA LP DAAC | free, cite DOI |
+| smap_salinity | RSS / PO.DAAC | free, cite DOI |
+| jrc_water | EC JRC | CC BY 4.0 |
+| coastline_land_mask | GSHHG (Wessel & Smith) | LGPL v3 (data) |
+| worldpop (population.tif) | WorldPop | CC BY 4.0 (+ responsibility disclaimer) |
+| ghsl (urban_class.tif) | EC JRC GHSL | CC BY 4.0 |
+| glw (cattle/goats/sheep/pigs/chickens.tif) | FAO | CC BY 4.0 |
+| buildings (building fraction) | Overture Maps | **ODbL 1.0** (share-alike) |
+| dem (MERIT / NASADEM fallback) | Yamazaki Lab / NASA | ODbL 1.0 (elected) / public domain |
+| wildlife_host_proxy | derived | CC BY 4.0 + ODbL (via Overture) |
+| env / habitat / host_static / mobility_* | derived (ingest) | inherit compound — see docs/licenses.md §3 |
+
+Restricted-use note: `guf/` and `colombia_vl/` are **CC BY-NC 4.0** —
+isolate to `mal-data-explorer` (never import into core/training); any
+productized (commercial) use of derivatives built from them is forbidden.
+
 Associated paper (open access via HAL):
 - Moua et al. 2016, *Distribution of the Habitat Suitability of the Main
   Malaria Vector in French Guiana Using Maximum Entropy Modeling*, J Med

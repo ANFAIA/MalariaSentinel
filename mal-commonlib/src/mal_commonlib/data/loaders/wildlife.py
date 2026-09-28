@@ -392,6 +392,13 @@ DOWNLOADER = {
     "name": "wildlife",
     "description": "Wildlife host proxy suitability from WorldCover + JRC GSW + buildings",
     "requires_auth": ["none"],
+    "license": "CC-BY-4.0+ODbL-1.0",
+    "attribution": (
+        "Derived from ESA WorldCover (CC BY 4.0: © ESA WorldCover project "
+        "[2021] / Contains modified Copernicus Sentinel data (2021) "
+        "processed by ESA WorldCover consortium), JRC GSW (CC BY 4.0) and "
+        "Overture buildings (© OpenStreetMap contributors, Overture Maps "
+        "Foundation, ODbL 1.0)."),
     "is_time_series": False,
     "outputs": {
         "wildlife_host_proxy": load_wildlife_host_proxy,
