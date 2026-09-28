@@ -29,7 +29,6 @@ from __future__ import annotations
 import os
 import pathlib
 import shutil
-import warnings
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -89,7 +88,7 @@ _SPECIES_CONFIG: dict[str, dict] = {
 
 SUPPORTED_SPECIES = tuple(_SPECIES_CONFIG.keys())
 
-__all__ = ["load_glw_livestock", "GLWLoader", "DOWNLOADER", "SUPPORTED_SPECIES"]
+__all__ = ["load_glw_livestock", "DOWNLOADER", "SUPPORTED_SPECIES"]
 
 
 def _default_cache_dir() -> pathlib.Path:
@@ -244,24 +243,6 @@ def load_glw_livestock(
 
     da = _read_clip(aoi, tif_path, species, cfg["long_name"])
     return da
-
-
-class GLWLoader:
-    """DEPRECATED: Use load_glw_livestock() instead."""
-
-    def load(
-        self,
-        aoi: AOI | str,
-        species: str = "cattle",
-        *,
-        cache_dir: pathlib.Path | None = None,
-    ) -> xr.DataArray:
-        warnings.warn(
-            "GLWLoader is deprecated; use load_glw_livestock()",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        return load_glw_livestock(aoi, species=species, cache_dir=cache_dir)
 
 
 DOWNLOADER = {

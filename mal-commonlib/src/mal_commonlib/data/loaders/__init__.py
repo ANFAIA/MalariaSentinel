@@ -15,12 +15,6 @@ from .worldcover import (
     load_worldcover_mangrove,
 )
 
-# Deprecated class-style shims (kept for backward compatibility)
-from .worldpop import WorldPopLoader
-from .glw import GLWLoader
-from .ghsl import GHSLLoader
-from .wildlife import WildlifeLoader
-
 __all__ = [
     "load_coastline_land_mask",
     "load_jrc_gsw_water_frac",
@@ -35,8 +29,4 @@ __all__ = [
     "load_worldcover_permanent_water",
     "load_worldcover_wetland",
     "load_worldcover_mangrove",
-    "WorldPopLoader",
-    "GLWLoader",
-    "GHSLLoader",
-    "WildlifeLoader",
 ]

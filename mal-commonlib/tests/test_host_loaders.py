@@ -242,7 +242,7 @@ class TestWriteManifest:
 
 
 class TestWorldPopLoader:
-    """Test WorldPopLoader with a mocked GeoTIFF (no network)."""
+    """Test load_worldpop_population with a mocked GeoTIFF (no network)."""
 
     def _worldpop_aoi(self) -> AOI:
         """1° × 1° AOI in WGS-84, 1 km grid, with iso3=GHA for WorldPop tests."""
@@ -406,35 +406,8 @@ class TestWorldPopLoader:
         with pytest.raises(ValueError, match="2000-2020"):
             wp_mod.load_worldpop_population(aoi, year=1999)
 
-    def test_worldpop_loader_class_still_works(self, tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch):
-        """The deprecated WorldPopLoader class still loads via the new API."""
-        from mal_commonlib.data.loaders import worldpop as wp_mod
-
-        aoi = self._worldpop_aoi()
-        fake_tif = _make_fake_tif(
-            tmp_path / "gha_ppp_2019_constrained.tif",
-            _fake_worldpop_data(),
-            bbox=(-1.0, 6.0, 0.0, 7.0),
-        )
-
-        def _fake_download(url, dest, **kwargs):
-            import shutil
-            dest.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(str(fake_tif), str(dest))
-            return dest
-
-        monkeypatch.setattr(wp_mod, "_download_to", _fake_download)
-
-        loader = wp_mod.WorldPopLoader()
-        with pytest.warns(DeprecationWarning):
-            da = loader.load(aoi, year=2019, cache_dir=tmp_path / "cache")
-
-        mask = da.values != -9999
-        np.testing.assert_allclose(float(da.values[mask].sum()), 26_000.0, rtol=1e-2)
-
-
 class TestGLWLoader:
-    """Test GLWLoader with a mocked GeoTIFF (no network)."""
+    """Test load_glw_livestock with a mocked GeoTIFF (no network)."""
 
     def test_load_cattle(self, tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch):
         from mal_commonlib.data.loaders import glw as glw_mod
@@ -453,8 +426,7 @@ class TestGLWLoader:
 
         monkeypatch.setattr(glw_mod, "_download_to", _fake_download)
 
-        loader = glw_mod.GLWLoader()
-        da = loader.load(aoi, species="cattle", cache_dir=tmp_path / "cache")
+        da = glw_mod.load_glw_livestock(aoi, species="cattle", cache_dir=tmp_path / "cache")
 
         assert isinstance(da, xr.DataArray)
         assert da.dtype == np.float32
@@ -463,16 +435,15 @@ class TestGLWLoader:
         assert "cattle" in da.name
 
     def test_invalid_species_raises(self):
-        loader = __import__(
-            "mal_commonlib.data.loaders.glw", fromlist=["GLWLoader"]
-        ).GLWLoader()
+        from mal_commonlib.data.loaders import glw as glw_mod
+
         aoi = _small_aoi()
         with pytest.raises(ValueError, match="Unknown species"):
-            loader.load(aoi, species="elephants")
+            glw_mod.load_glw_livestock(aoi, species="elephants")
 
 
 class TestGHSLLoader:
-    """Test GHSLLoader with a mocked GeoTIFF (no network)."""
+    """Test load_ghsl_urban_class with a mocked GeoTIFF (no network)."""
 
     def test_load_smod(self, tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch):
         from mal_commonlib.data.loaders import ghsl as ghsl_mod
@@ -492,8 +463,7 @@ class TestGHSLLoader:
 
         monkeypatch.setattr(ghsl_mod, "_download_zip", _fake_download)
 
-        loader = ghsl_mod.GHSLLoader()
-        da = loader.load(aoi, cache_dir=tmp_path / "cache")
+        da = ghsl_mod.load_ghsl_urban_class(aoi, cache_dir=tmp_path / "cache")
 
         assert isinstance(da, xr.DataArray)
         assert da.dtype == np.int32

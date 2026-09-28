@@ -24,7 +24,7 @@ Foundation package for MalariaSentinel. No internal dependencies — everything 
 | **GLW loader** | `mal_commonlib.data.loaders.glw` | `load_glw_livestock` — FAO Global Livestock Distribution |
 | **GHSL loader** | `mal_commonlib.data.loaders.ghsl` | `load_ghsl_urban_rural` — Global Human Settlement Layer |
 | **Buildings loader** | `mal_commonlib.data.loaders.buildings` | `load_overture_buildings` — Overture Maps building footprints |
-| **Wildlife loader** | `mal_commonlib.data.loaders.wildlife` | `load_wildlife_proxy` — Wildlife/livestock proximity proxy |
+| **Wildlife loader** | `mal_commonlib.data.loaders.wildlife` | `load_wildlife_host_proxy` — Wildlife/livestock proximity proxy |
 | **TWI** | `mal_commonlib.terrain.twi` | `compute_twi` — Topographic Wetness Index from DEM |
 | **Mobility** | `mal_commonlib.data.mobility` | Gravity-model mobility OD matrices |
 | **Host utils** | `mal_commonlib.data.host_utils` | Host density aggregation utilities |
@@ -338,10 +338,9 @@ ESA WorldCover 10 m via Planetary Computer STAC. Default water classes: `(80, 90
 ### WorldPop — `load_worldpop_population`
 
 ```python
-from mal_commonlib.data.loaders.worldpop import WorldPopLoader
+from mal_commonlib.data.loaders.worldpop import load_worldpop_population
 
-loader = WorldPopLoader()
-pop = loader.load(aoi, year=2019, cache_dir=None)
+pop = load_worldpop_population(aoi, year=2019, cache_dir=None)
 ```
 
 WorldPop Ghana 2019 v2.0 constrained UN-adjusted population estimate (~100 m). Returns population count per cell (persons/pixel).
@@ -353,10 +352,9 @@ WorldPop Ghana 2019 v2.0 constrained UN-adjusted population estimate (~100 m). R
 ### GLW — `load_glw_livestock`
 
 ```python
-from mal_commonlib.data.loaders.glw import GLWLoader
+from mal_commonlib.data.loaders.glw import load_glw_livestock
 
-loader = GLWLoader()
-cattle = loader.load(aoi, species="cattle", cache_dir=None)
+cattle = load_glw_livestock(aoi, species="cattle", cache_dir=None)
 ```
 
 FAO Gridded Livestock of the World v4 (2020). Supported species: `cattle`, `goats`, `sheep`, `pigs`, `chickens`. Resolution ~10 km (5 arc-minutes).
@@ -365,13 +363,12 @@ FAO Gridded Livestock of the World v4 (2020). Supported species: `cattle`, `goat
 
 ---
 
-### GHSL — `load_ghsl_urban_rural`
+### GHSL — `load_ghsl_urban_class`
 
 ```python
-from mal_commonlib.data.loaders.ghsl import GHSLLoader
+from mal_commonlib.data.loaders.ghsl import load_ghsl_urban_class
 
-loader = GHSLLoader()
-settlement = loader.load(aoi, cache_dir=None)
+settlement = load_ghsl_urban_class(aoi, cache_dir=None)
 ```
 
 GHS-SMOD settlement classification from JRC. Classes: 20 (water), 30 (urban), 50 (rural). Resolution ~1 km.
@@ -394,16 +391,15 @@ Overture Maps building footprints rasterized to building-fraction layer (fractio
 
 ---
 
-### Wildlife — `load_wildlife_proxy`
+### Wildlife — `load_wildlife_host_proxy`
 
 ```python
-from mal_commonlib.data.loaders.wildlife import WildlifeLoader
+from mal_commonlib.data.loaders.wildlife import load_wildlife_host_proxy
 
-loader = WildlifeLoader()
-wildlife = loader.load(aoi, year=2021, cache_dir=None)
+wildlife = load_wildlife_host_proxy(aoi, year=2021, cache_dir=None)
 ```
 
-Wildlife host proxy derived from WorldCover habitat suitability (0.5), JRC GSW water proximity (0.3), and Overture Maps remoteness (0.2). Values in [0, 1].
+Wildlife host proxy derived from WorldCover habitat suitability (0.5), JRC GSW water presence (0.3), and Overture Maps remoteness (0.2). Values in [0, 1].
 
 **Returns**: `xr.DataArray` (y, x), float32, [0, 1], NoData = `-9999.0`
 

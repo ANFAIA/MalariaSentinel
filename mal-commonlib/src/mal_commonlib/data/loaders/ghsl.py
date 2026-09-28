@@ -39,9 +39,8 @@ import io
 import os
 import pathlib
 import shutil
-import warnings
-import zipfile
 from typing import TYPE_CHECKING
+import zipfile
 
 import numpy as np
 import rasterio
@@ -267,18 +266,6 @@ def load_ghsl_urban_class(
     return da
 
 
-class GHSLLoader:
-    """DEPRECATED: Use load_ghsl_urban_class() instead."""
-
-    def load(self, aoi, *, cache_dir=None):
-        warnings.warn(
-            "GHSLLoader is deprecated; use load_ghsl_urban_class()",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        return load_ghsl_urban_class(aoi, cache_dir=cache_dir)
-
-
 DOWNLOADER = {
     "name": "ghsl",
     "description": "GHSL settlement classification (SMOD) for urban/rural classification",
@@ -300,7 +287,6 @@ DOWNLOADER = {
 
 __all__ = [
     "load_ghsl_urban_class",
-    "GHSLLoader",
     "GHSL_URBAN",
     "GHSL_RURAL",
     "GHSL_RURAL_LOW",

@@ -34,7 +34,6 @@ from __future__ import annotations
 
 import logging
 import pathlib
-import warnings
 
 import numpy as np
 import rioxarray  # noqa: F401
@@ -246,24 +245,6 @@ def load_wildlife_host_proxy(
     return da
 
 
-class WildlifeLoader:
-    """DEPRECATED: Use load_wildlife_host_proxy() instead."""
-
-    def load(
-        self,
-        aoi: AOI,
-        *,
-        year: int = 2021,
-        cache_dir: pathlib.Path | None = None,
-    ) -> xr.DataArray:
-        warnings.warn(
-            "WildlifeLoader is deprecated; use load_wildlife_host_proxy()",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        return load_wildlife_host_proxy(aoi, year=year, cache_dir=cache_dir)
-
-
 DOWNLOADER = {
     "name": "wildlife",
     "description": "Wildlife host proxy suitability from WorldCover + JRC GSW + buildings",
@@ -284,4 +265,4 @@ DOWNLOADER = {
     },
 }
 
-__all__ = ["load_wildlife_host_proxy", "WildlifeLoader", "HABITAT_SUITABILITY", "DOWNLOADER"]
+__all__ = ["load_wildlife_host_proxy", "HABITAT_SUITABILITY", "DOWNLOADER"]

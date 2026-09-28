@@ -59,7 +59,6 @@ import hashlib
 import os
 import pathlib
 import shutil
-import warnings
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -98,7 +97,7 @@ _R2025A_YEAR_RANGE = (2015, 2030)
 # Default NoData sentinel for the loader's output grid (always -9999.0).
 _OUT_NODATA = -9999.0
 
-__all__ = ["load_worldpop_population", "WorldPopLoader", "DOWNLOADER"]
+__all__ = ["load_worldpop_population", "DOWNLOADER"]
 
 
 def _default_cache_dir() -> pathlib.Path:
@@ -451,27 +450,6 @@ def load_worldpop_population(
     url = _resolve_url(year, iso3, release=release)
     _download_to(url, tif_path)
     return _read_clip(aoi, tif_path, year)
-
-
-class WorldPopLoader:
-    """DEPRECATED: Use ``load_worldpop_population()`` instead."""
-
-    def load(
-        self,
-        aoi: "AOI",
-        year: int = 2019,
-        *,
-        release: str = "Global1",
-        cache_dir: pathlib.Path | None = None,
-    ) -> xr.DataArray:
-        warnings.warn(
-            "WorldPopLoader is deprecated; use load_worldpop_population() instead",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        return load_worldpop_population(
-            aoi, year=year, release=release, cache_dir=cache_dir,
-        )
 
 
 DOWNLOADER = {
