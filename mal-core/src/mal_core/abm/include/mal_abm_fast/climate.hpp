@@ -1,32 +1,29 @@
 // SPDX-License-Identifier: MIT
-// climate.hpp — env COG reader (4 bands: rain, temp, water, ndvi).
+// climate.hpp — daily env NetCDF reader (rain, water temp, water, ndvi).
 //
-// The env COG is a single GeoTIFF with 4 (or 5) bands described by the
-// following names (per `docs/abm-output-contract.md` and the Python
-// `mal_ghana_sim.abm.run._load_env_dict`):
+// The env input is a single CF-1.8 NetCDF4 file with (time, y, x)
+// variables (per docs/specs/data/spec.md §6.3 and the Python
+// `mal_core.ingest.daily_nc` builder):
 //
-//   band 1  rainfall           (mm/day, float32)
-//   band 2  temp_suitability    ([0, 1], Mordecai parabolic suitability)
-//   band 3  water_frac          ([0, 1], open water fraction)
-//   band 4  ndvi                ([0, 1], vegetation index)
+//   rainfall           (mm/day)
+//   water_temp_c       (°C — NO Mordecai inverse, already deg C)
+//   water_frac         ([0, 1], open water fraction)
+//   ndvi               ([0, 1], vegetation index)
 //
-//   optional band 5  twi        (Topographic Wetness Index, static;
-//                                used by the dynamic PLUVIAL_POOL rule)
-//                                If absent, the climate engine treats
-//                                TWI as 0 everywhere and the dynamic
-//                                rule is equivalent to
-//                                `water_frac > 0 AND rain > 15`.
+//   optional  salinity_ppt         (psu; absent = freshwater everywhere)
+//   optional  permanent_water_mask ([0, 1] static mask)
+//   optional  twi                  (Topographic Wetness Index, static;
+//                                   used by the dynamic PLUVIAL_POOL rule.
+//                                   If absent, the climate engine treats
+//                                   TWI as 0 everywhere and the dynamic
+//                                   rule is equivalent to
+//                                   `water_frac > 0 AND rain > 15`.)
 //
-// The Mordecai inverse is applied to the temp_suitability band on
-// load (the EIP code expects deg C, not [0, 1]):
-//
-//   T = 25 - 8 * sqrt(1 - s)            (lower branch; biologically
-//                                        relevant for An. gambiae)
-//
-// Reading the env COG goes through GDAL (`GDALDataset::GetRasterBand`).
-// A missing band is a hard error: the engine cannot fall back to a
-// zero grid for a real run. The IO subagent (F1.b) implements the
-// actual GDAL calls.
+// Reading goes through GDAL's netCDF driver (see env_reader.hpp). A
+// missing required variable is a hard error: the engine cannot fall
+// back to a zero grid for a real run.
+// (The legacy 4-band COG loader `load_from_env_tif` was removed — the
+// env input contract is NC-only; see docs/specs/abm/spec.md INV-6.)
 #pragma once
 
 #include <cstdint>
@@ -44,14 +41,8 @@ class ClimateEngine {
 public:
     ClimateEngine() = default;
 
-    // Read the env COG from `path` and populate the 4 grids + the
-    // optional 5th TWI grid. The Mordecai inverse is applied to the
-    // temp_suitability band on read. Throws std::runtime_error if a
-    // required band is missing.
-    void load_from_env_tif(const std::string& path, const AOI& aoi);
-
     // Grid shape (post-rotation, row-major). h() and w() are valid
-    // only after a successful load_from_env_tif().
+    // only after a successful load_from_env_nc().
     int32_t h() const { return h_; }
     int32_t w() const { return w_; }
 
@@ -69,15 +60,15 @@ public:
     float temp_at(int32_t row, int32_t col) const;
     float water_frac_at(int32_t row, int32_t col) const;
     // Salinity (psu). Out-of-bounds returns 0.0 (freshwater). When no
-    // salinity data was loaded (TIF path, or a pre-salinity NC), every
+    // salinity data was loaded (a pre-salinity NC), every
     // cell reads 0.0 — the salinity factor is inert, as before.
     float salinity_at(int32_t row, int32_t col) const;
     float permanent_water_at(int32_t row, int32_t col) const;
 
     // TWI grid (per-cell, static). Setter is for the habitat engine
-    // (it loads TWI from the gpkg) or the loader (it reads a
-    // 5th band). Default value is an empty vector (= TWI = 0
-    // everywhere).
+    // (it loads TWI from the gpkg) or the NC reader (it reads the
+    // optional `twi` variable). Default value is an empty vector
+    // (= TWI = 0 everywhere).
     std::vector<float> twi_grid() const { return twi_; }
     void set_twi_grid(std::vector<float> t) { twi_ = std::move(t); }
 
@@ -104,8 +95,7 @@ public:
     // After set_day(), the *_at() accessors return values for that day.
     void set_day(int32_t day);
 
-    // Number of time steps loaded by load_from_env_nc. Returns 1 if
-    // only a static (single-day) COG was loaded via load_from_env_tif.
+    // Number of time steps loaded by load_from_env_nc.
     int32_t n_days() const { return n_days_; }
 
     // Create a thread-safe clone for parallel rollouts. The multi-day
@@ -118,12 +108,12 @@ public:
 private:
     int32_t              h_ = 0, w_ = 0;
     std::vector<float>   rain_;
-    std::vector<float>   temp_;     // Mordecai-inverted deg C
+    std::vector<float>   temp_;     // deg C (water_temp_c from the NC)
     std::vector<float>   water_;
     std::vector<float>   ndvi_;
     std::vector<float>   salinity_; // psu; empty = freshwater everywhere
     std::vector<float>   permanent_water_;
-    std::vector<float>   twi_;      // optional 5th band; empty = zeros
+    std::vector<float>   twi_;      // optional static NC variable; empty = zeros
     std::vector<float>   k_capacity_mult_;  // optional static capacity
     std::vector<float>   catchment_ratio_;  // optional static catchment ratio
                                             // multiplier; empty = legacy

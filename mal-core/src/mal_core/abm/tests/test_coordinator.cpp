@@ -8,6 +8,7 @@
 // implementations).
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <chrono>
 #include <cstdint>
 #include <filesystem>
@@ -82,6 +83,63 @@ std::string read_file(const std::string& path) {
     return buf.str();
 }
 
+std::filesystem::path MakeTmpEnvNC() {
+    const char* base = std::getenv("TMPDIR");
+    std::filesystem::path dir =
+        (base && *base) ? std::filesystem::path(base)
+                        : std::filesystem::temp_directory_path();
+    return dir / "mal_abm_fast_test_coordinator.nc";
+}
+
+void WriteSyntheticEnvNC(const std::filesystem::path& path, int n_days,
+                         int h = 4, int w = 4,
+                         const std::vector<float>& sal_vals = {}) {
+    int ncid, dimids[3], vid[4], vidsal;
+    int dimid_time, dimid_y, dimid_x;
+
+    ASSERT_EQ(nc_create(path.string().c_str(),
+                        NC_CLOBBER | NC_NETCDF4, &ncid), NC_NOERR);
+    ASSERT_EQ(nc_def_dim(ncid, "time", NC_UNLIMITED, &dimid_time), NC_NOERR);
+    ASSERT_EQ(nc_def_dim(ncid, "y", h, &dimid_y), NC_NOERR);
+    ASSERT_EQ(nc_def_dim(ncid, "x", w, &dimid_x), NC_NOERR);
+    dimids[0] = dimid_time; dimids[1] = dimid_y; dimids[2] = dimid_x;
+
+    ASSERT_EQ(nc_def_var(ncid, "rainfall", NC_FLOAT, 3, dimids, &vid[0]), NC_NOERR);
+    ASSERT_EQ(nc_def_var(ncid, "water_temp_c", NC_FLOAT, 3, dimids, &vid[1]), NC_NOERR);
+    ASSERT_EQ(nc_def_var(ncid, "water_frac", NC_FLOAT, 3, dimids, &vid[2]), NC_NOERR);
+    ASSERT_EQ(nc_def_var(ncid, "ndvi", NC_FLOAT, 3, dimids, &vid[3]), NC_NOERR);
+    const bool with_salinity = !sal_vals.empty();
+    if (with_salinity) {
+        ASSERT_EQ(nc_def_var(ncid, "salinity_ppt", NC_FLOAT, 3, dimids, &vidsal), NC_NOERR);
+    }
+    ASSERT_EQ(nc_put_att_text(ncid, NC_GLOBAL, "Conventions", 6, "CF-1.8"), NC_NOERR);
+    ASSERT_EQ(nc_enddef(ncid), NC_NOERR);
+
+    // Day 0: rain=60 (>50 threshold), Day 1: rain=40 (<50)
+    const float rain_vals[] = {60.0f, 40.0f};
+    const float temp_vals[] = {25.0f, 20.0f};
+    std::vector<float> buf(h * w);
+    size_t start[3] = {0, 0, 0};
+    size_t count[3] = {1, static_cast<size_t>(h), static_cast<size_t>(w)};
+
+    for (int d = 0; d < n_days; ++d) {
+        start[0] = d;
+        std::fill(buf.begin(), buf.end(), rain_vals[d % 2]);
+        ASSERT_EQ(nc_put_vara_float(ncid, vid[0], start, count, buf.data()), NC_NOERR);
+        std::fill(buf.begin(), buf.end(), temp_vals[d % 2]);
+        ASSERT_EQ(nc_put_vara_float(ncid, vid[1], start, count, buf.data()), NC_NOERR);
+        std::fill(buf.begin(), buf.end(), 0.5f);
+        ASSERT_EQ(nc_put_vara_float(ncid, vid[2], start, count, buf.data()), NC_NOERR);
+        std::fill(buf.begin(), buf.end(), 0.4f);
+        ASSERT_EQ(nc_put_vara_float(ncid, vid[3], start, count, buf.data()), NC_NOERR);
+        if (with_salinity) {
+            std::fill(buf.begin(), buf.end(), sal_vals[d % sal_vals.size()]);
+            ASSERT_EQ(nc_put_vara_float(ncid, vidsal, start, count, buf.data()), NC_NOERR);
+        }
+    }
+    ASSERT_EQ(nc_close(ncid), NC_NOERR);
+}
+
 }  // namespace
 
 TEST(MalAbmFastCoordinator, Aoi4x4) {
@@ -100,37 +158,14 @@ TEST(MalAbmFastCoordinator, FullDayOrchestrator) {
     EXPECT_EQ(aoi.cells_per_side(), 5);
     EXPECT_EQ(cells_per_side_h(aoi), 5);
 
-    // Write a synthetic 4x4 env COG (rain=60, temp_suitability=1.0 [→25C],
-    // water_frac=0.5, ndvi=0.5) and load it.
-    const std::string env_path = temp_dir("coordinator_env") + "/env.tif";
-    {
-        std::filesystem::create_directories(std::filesystem::path(env_path).parent_path());
-        GDALDriver* drv = GetGDALDriverManager()->GetDriverByName("GTiff");
-        ASSERT_NE(drv, nullptr);
-        GDALDataset* ds = drv->Create(env_path.c_str(), 4, 4, 4, GDT_Float32, nullptr);
-        ASSERT_NE(ds, nullptr);
-        std::vector<float> band(16, 0.0f);
-        std::fill(band.begin(), band.end(), 0.5f);  // water_frac + ndvi
-        ds->GetRasterBand(1)->SetDescription("water_frac");
-        ds->GetRasterBand(1)->RasterIO(GF_Write, 0, 0, 4, 4, band.data(), 4, 4, GDT_Float32, 0, 0);
-        std::fill(band.begin(), band.end(), 60.0f);  // rainfall
-        ds->GetRasterBand(2)->SetDescription("rainfall");
-        ds->GetRasterBand(2)->RasterIO(GF_Write, 0, 0, 4, 4, band.data(), 4, 4, GDT_Float32, 0, 0);
-        std::fill(band.begin(), band.end(), 1.0f);  // temp_suitability (peak Mordecai → 25C)
-        ds->GetRasterBand(3)->SetDescription("temp_suitability");
-        ds->GetRasterBand(3)->RasterIO(GF_Write, 0, 0, 4, 4, band.data(), 4, 4, GDT_Float32, 0, 0);
-        std::fill(band.begin(), band.end(), 0.5f);  // ndvi
-        ds->GetRasterBand(4)->SetDescription("ndvi");
-        ds->GetRasterBand(4)->RasterIO(GF_Write, 0, 0, 4, 4, band.data(), 4, 4, GDT_Float32, 0, 0);
-        // Set the affine transform from the AOI bbox.
-        double affine[6] = {0.01, 0.0, 0.0, 0.0, -0.01, 0.04};
-        ds->SetGeoTransform(affine);
-        OGRSpatialReference srs; srs.SetFromUserInput("EPSG:4326");
-        ds->SetSpatialRef(&srs);
-        GDALClose(ds);
-    }
+    // Write a synthetic 4x4 daily env NC (day 0: rain=60, water_temp_c=25,
+    // water_frac=0.5, ndvi=0.4) and load it.
+    const auto nc_path = MakeTmpEnvNC();
+    if (std::filesystem::exists(nc_path)) std::filesystem::remove(nc_path);
+    WriteSyntheticEnvNC(nc_path, 1);
+    const std::string env_path = nc_path.string();
     auto climate = std::make_shared<ClimateEngine>();
-    climate->load_from_env_tif(env_path, aoi);
+    climate->load_from_env_nc(env_path, aoi);
 
     // Write a synthetic 1-row habitat gpkg at (row=2, col=2) and load it.
     const std::string hab_path = temp_dir("coordinator_hab") + "/hab.gpkg";
@@ -255,69 +290,6 @@ TEST(MalAbmFastCoordinator, WriteStateCogReturnsPathAndCreatesSidecar) {
 
     std::filesystem::remove_all(out_dir);
 }
-
-// -- Daily NetCDF coordinator test (daily-env-netcdf feature) -----------------
-
-namespace {
-
-std::filesystem::path MakeTmpEnvNC() {
-    const char* base = std::getenv("TMPDIR");
-    std::filesystem::path dir =
-        (base && *base) ? std::filesystem::path(base)
-                        : std::filesystem::temp_directory_path();
-    return dir / "mal_abm_fast_test_coordinator.nc";
-}
-
-void WriteSyntheticEnvNC(const std::filesystem::path& path, int n_days,
-                         int h = 4, int w = 4,
-                         const std::vector<float>& sal_vals = {}) {
-    int ncid, dimids[3], vid[4], vidsal;
-    int dimid_time, dimid_y, dimid_x;
-
-    ASSERT_EQ(nc_create(path.string().c_str(),
-                        NC_CLOBBER | NC_NETCDF4, &ncid), NC_NOERR);
-    ASSERT_EQ(nc_def_dim(ncid, "time", NC_UNLIMITED, &dimid_time), NC_NOERR);
-    ASSERT_EQ(nc_def_dim(ncid, "y", h, &dimid_y), NC_NOERR);
-    ASSERT_EQ(nc_def_dim(ncid, "x", w, &dimid_x), NC_NOERR);
-    dimids[0] = dimid_time; dimids[1] = dimid_y; dimids[2] = dimid_x;
-
-    ASSERT_EQ(nc_def_var(ncid, "rainfall", NC_FLOAT, 3, dimids, &vid[0]), NC_NOERR);
-    ASSERT_EQ(nc_def_var(ncid, "water_temp_c", NC_FLOAT, 3, dimids, &vid[1]), NC_NOERR);
-    ASSERT_EQ(nc_def_var(ncid, "water_frac", NC_FLOAT, 3, dimids, &vid[2]), NC_NOERR);
-    ASSERT_EQ(nc_def_var(ncid, "ndvi", NC_FLOAT, 3, dimids, &vid[3]), NC_NOERR);
-    const bool with_salinity = !sal_vals.empty();
-    if (with_salinity) {
-        ASSERT_EQ(nc_def_var(ncid, "salinity_ppt", NC_FLOAT, 3, dimids, &vidsal), NC_NOERR);
-    }
-    ASSERT_EQ(nc_put_att_text(ncid, NC_GLOBAL, "Conventions", 6, "CF-1.8"), NC_NOERR);
-    ASSERT_EQ(nc_enddef(ncid), NC_NOERR);
-
-    // Day 0: rain=60 (>50 threshold), Day 1: rain=40 (<50)
-    const float rain_vals[] = {60.0f, 40.0f};
-    const float temp_vals[] = {25.0f, 20.0f};
-    std::vector<float> buf(h * w);
-    size_t start[3] = {0, 0, 0};
-    size_t count[3] = {1, static_cast<size_t>(h), static_cast<size_t>(w)};
-
-    for (int d = 0; d < n_days; ++d) {
-        start[0] = d;
-        std::fill(buf.begin(), buf.end(), rain_vals[d % 2]);
-        ASSERT_EQ(nc_put_vara_float(ncid, vid[0], start, count, buf.data()), NC_NOERR);
-        std::fill(buf.begin(), buf.end(), temp_vals[d % 2]);
-        ASSERT_EQ(nc_put_vara_float(ncid, vid[1], start, count, buf.data()), NC_NOERR);
-        std::fill(buf.begin(), buf.end(), 0.5f);
-        ASSERT_EQ(nc_put_vara_float(ncid, vid[2], start, count, buf.data()), NC_NOERR);
-        std::fill(buf.begin(), buf.end(), 0.4f);
-        ASSERT_EQ(nc_put_vara_float(ncid, vid[3], start, count, buf.data()), NC_NOERR);
-        if (with_salinity) {
-            std::fill(buf.begin(), buf.end(), sal_vals[d % sal_vals.size()]);
-            ASSERT_EQ(nc_put_vara_float(ncid, vidsal, start, count, buf.data()), NC_NOERR);
-        }
-    }
-    ASSERT_EQ(nc_close(ncid), NC_NOERR);
-}
-
-}  // namespace
 
 TEST(CoordinatorModel, PatchActivationTogglesDaily) {
     using namespace mal_abm_fast;

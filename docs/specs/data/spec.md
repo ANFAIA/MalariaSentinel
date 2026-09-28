@@ -113,15 +113,11 @@ string in 12 places and any rename would silently break the pipeline.
 
 ### §5.3 Env tensor formats
 
-- **INV-10.** COG/TIF env file (ingest default `output_format="tif"`):
-  - Bands in order: `water_frac, rainfall, temp_suitability, ndvi`.
-  - `dtype = float32`, NoData `-9999.0`, tile size `128×128`, deflate.
-  - Sidecar carries `band_names`, `nodata`, `shape`, `contract_version: "1.0"`, `generator_version`, `crs`, `transform`.
-- **INV-11.** Daily NetCDF env file (ingest `output_format="nc"`):
+- **INV-11.** Daily NetCDF env file (the only env output of ingest; the legacy COG/TIF variant was removed on 2026-09-27):
   - CF-1.8 conventions, dims `(time, y, x)`, vars `rainfall, water_temp_c, water_frac, ndvi`.
-  - `time` axis covers the full month (e.g. 28–31 days).
-  - `contract_version: "2.0"` (note: differs from the COG file — see §7).
-- **INV-12.** NetCDF `_FillValue` and COG `nodata` are both `-9999.0`.
+  - `time` axis covers the full multi-year range from the CHIRPS daily input (e.g. 2024-2025).
+  - `contract_version: "2.0"`.
+- **INV-12.** NetCDF `_FillValue` is `-9999.0` (or xarray's NaN default for float32; the ABM treats NaN as no-data).
 
 ### §5.4 Loader contract
 
@@ -186,7 +182,6 @@ now honours every kwarg (`type`, `required_for_abm`, `variables`,
 | Type | Format | Frequency | Pattern | Registered loader | `required_for_abm` |
 |---|---|---|---|---|---|
 | `env` | NetCDF4 | daily | `<aoi>_regional_<start>_<end>_env.nc` | `daily_nc` (assembles chirps+jrc_gsw+era5+modis) | yes |
-| `env` (COG variant) | GeoTIFF | monthly | `<aoi>_<scale>_<year>_<month:02d>_env.tif` | ingest (`output_format="tif"`) | yes |
 | `chirps_rainfall` | GeoTIFF | monthly | `<aoi>_rainfall_<year>.tif` | `chirps` | no |
 | `chirps_rainfall_daily` | NetCDF4 | daily | `<aoi>_rainfall_daily_<start>_<end>_daily.nc` | `chirps` (`load_chirps_rainfall_daily`) | yes |
 | `era5_temp` | GeoTIFF | monthly | `<aoi>_temp_suitability_<year>.tif` | `era5` (`load_era5_temp_suitability`) | no |
@@ -248,17 +243,12 @@ for m in Path('data').glob('*/manifest.json'):
 # INV-8: no v1 manifests survive
 rg '"files"\s*:\s*\{[^}]*"ghana' data/ && echo "FAIL: v1 manifest found" || echo "OK"
 
-# INV-10..12: env tensors honour NoData and band order
+# INV-11/12: env tensors honour NoData
 uv run python -c "
-import xarray as xr, rasterio
+import xarray as xr
 for p in __import__('pathlib').Path('data/ghana').glob('*env*.nc'):
     ds = xr.open_dataset(p)
     assert float(ds['rainfall'].encoding.get('_FillValue', -9999.0)) == -9999.0
-for p in __import__('pathlib').Path('data/ghana').glob('*_env.tif'):
-    with rasterio.open(p) as src:
-        assert src.nodata == -9999.0
-        names = src.descriptions
-        assert names[0] == 'water_frac' and names[-1] == 'ndvi', f'bad band order: {names}'
 "
 
 # INV-13..15: loaders return xr objects in memory

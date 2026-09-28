@@ -748,7 +748,10 @@ OUTPUT
                     + " days but simulation requests " + std::to_string(days) + " days");
             }
         } else {
-            shared_climate->load_from_env_tif(env_path, aoi);
+            throw std::runtime_error(
+                "env must be a daily NetCDF (.nc); got '" + env_path
+                + "'. The legacy COG/TIF env path was removed — rebuild with "
+                "'malariasim ingest' (daily NC).");
         }
         std::cout << "abm_run: loaded climate data (" << shared_climate->n_days() 
                   << " days, " << shared_climate->h() << "x" << shared_climate->w() 

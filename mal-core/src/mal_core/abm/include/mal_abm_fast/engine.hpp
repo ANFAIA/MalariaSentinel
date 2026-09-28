@@ -40,8 +40,8 @@ public:
 
     // Build the engine for (AOI, env path, habitat gpkg path,
     // master Prng, start_date). Loads the env via
-    // `ClimateEngine::load_from_env_tif` (for .tif) or
-    // `ClimateEngine::load_from_env_nc` (for .nc), and the habitat via
+    // `ClimateEngine::load_from_env_nc` (the env must be a .nc daily
+    // NetCDF; the legacy .tif COG path was removed), and the habitat via
     // `HabitatEngine::load_from_gpkg`, then derives independent
     // sub-stream seeds for the `CoordinatorModel` and
     // `MosquitoSubmodel` from `rng` and constructs them.

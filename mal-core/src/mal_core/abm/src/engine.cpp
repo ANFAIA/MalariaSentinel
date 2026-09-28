@@ -62,7 +62,10 @@ Engine::Engine(AOI aoi,
                     + " days but simulation requests " + std::to_string(max_days) + " days");
             }
         } else {
-            climate->load_from_env_tif(env_path, aoi_);
+            throw std::runtime_error(
+                "Engine: env must be a daily NetCDF (.nc); got '" + env_path
+                + "'. The legacy COG/TIF env path was removed — rebuild with "
+                "'malariasim ingest' (daily NC).");
         }
     } catch (const std::exception& e) {
         throw std::runtime_error(

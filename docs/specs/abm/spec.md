@@ -105,8 +105,8 @@ pins is the load-bearing wall: every downstream spec (`training`,
 
 ### §5.2 Env tensor
 
-- **INV-6.** Env input has two formats. **Current**: CF-1.8 daily NetCDF (`.nc`), dims `(time, y, x)`, vars `rainfall` (mm/day), `water_temp_c` (°C), `water_frac` ∈ [0,1], `ndvi` ∈ [0,1], `_FillValue = -9999.0`. **Deprecated**: monthly COG GeoTIFF (`.tif`), shape `(C_env=4, H, W)`, bands `water_frac, rainfall, temp_suitability, ndvi`. The TIF format is deprecated because it cannot represent daily data, which is required for the PLUVIAL_POOL dynamic breeding-site rule (`rain_d > 15 mm/day`).
-- **INV-7.** Env file naming: NC `{aoi}_{product}_{year_start}_{year_end}_env.nc` (multi-year daily) or `{aoi}_{scale}_{year}_{month:02d}_env.nc` (single-month daily). TIF (deprecated): `{aoi_slug}_{scale}_{year}_{month:02d}_env.tif`. No seed (deterministic per month).
+- **INV-6.** Env input is a CF-1.8 daily NetCDF (`.nc`) — the only accepted format. Dims `(time, y, x)`, vars `rainfall` (mm/day), `water_temp_c` (°C), `water_frac` ∈ [0,1], `ndvi` ∈ [0,1], `_FillValue = -9999.0`. The legacy monthly COG GeoTIFF (`.tif`) reader (`read_env_tif`/`load_from_env_tif`) was removed on 2026-09-27: it could not represent daily data, which is required for the PLUVIAL_POOL dynamic breeding-site rule (`rain_d > 15 mm/day`). A non-`.nc` env path now raises a hard error.
+- **INV-7.** Env file naming: NC `{aoi}_{product}_{year_start}_{year_end}_env.nc` (multi-year daily) or `{aoi}_{scale}_{year}_{month:02d}_env.nc` (single-month daily). No seed (deterministic per month).
 
 ### §5.3 Sidecar JSON
 
@@ -117,7 +117,7 @@ pins is the load-bearing wall: every downstream spec (`training`,
 ### §5.4 CRS and band descriptions
 
 - **INV-11.** CRS ∈ `EPSG:4326` or UTM (`EPSG:326xx` / `EPSG:327xx`). The writer **must** auto-reproject; silent mis-CRS is forbidden.
-- **INV-12.** Band descriptions: state COG bands set via `rasterio.set_band_description` or GDAL: `["adult_occupancy", "host_seeking_pressure"]` (C++ `STATE_BAND_NAMES` in `wire.hpp:172`). **Legacy alias**: `["density", "suitability"]` used in older Python code and some docs — both names refer to the same two bands. Env TIF (deprecated): `[water_frac, rainfall, temp_suitability, ndvi]`. Env NC: variable names `rainfall, water_temp_c, water_frac, ndvi` (no band descriptions — NetCDF variables).
+- **INV-12.** Band descriptions: state COG bands set via `rasterio.set_band_description` or GDAL: `["adult_occupancy", "host_seeking_pressure"]` (C++ `STATE_BAND_NAMES` in `wire.hpp:172`). **Legacy alias**: `["density", "suitability"]` used in older Python code and some docs — both names refer to the same two bands. Env NC: variable names `rainfall, water_temp_c, water_frac, ndvi` (no band descriptions — NetCDF variables).
 
 ### §5.5 Tile rules
 
@@ -132,7 +132,7 @@ pins is the load-bearing wall: every downstream spec (`training`,
 ## 6. Data contracts
 
 - Output: GeoTIFF state COG + sidecar JSON per §5.1, §5.3, §5.4.
-- Input env: CF-1.8 daily NetCDF (current, per §5.2 INV-6) or monthly COG GeoTIFF (deprecated). Env format is chosen at ingest time (`output_format="nc"` or `"tif"`). The ABM C++ engine has two readers: `read_env_tif` (legacy) and `read_env_nc` (current). The PLUVIAL_POOL rule **requires** the NC path.
+- Input env: CF-1.8 daily NetCDF (per §5.2 INV-6; the only accepted format — the legacy COG reader was removed on 2026-09-27). The C++ engine has one reader: `read_env_nc`. The PLUVIAL_POOL rule requires this NC path.
 - Input mobility + host layers: produced by `ingest`. `run_abm_from_manifest` validates manifest completeness and resolves paths; the pipeline-level `pipeline/spec.md` §5 INV-3 is the authoritative validation point for the full pipeline.
 
 ## 7. Migration & deprecation
@@ -155,9 +155,8 @@ from pathlib import Path
 import re
 state = re.compile(r'^[a-z0-9-]+_[a-z0-9-]+_\d{4}_\d{2}_seed\d{4}(_r\d{4}_c\d{4})?\.tif$')
 env_nc = re.compile(r'^[a-z0-9-]+_[a-z0-9-]+_\d{4}_\d{2}_env\.nc$')
-env_tif = re.compile(r'^[a-z0-9-]+_[a-z0-9-]+_\d{4}_\d{2}_env\.tif$')  # deprecated
 # walk runs/ and verify each state .tif matches state pattern
-# walk data/ and verify each env file matches nc (current) or tif (deprecated)
+# walk data/ and verify each env file matches the NC pattern
 "
 
 # INV-6: NC env has daily rainfall (not monthly aggregate)

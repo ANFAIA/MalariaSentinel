@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
-// climate.cpp — ClimateEngine implementation (env COG -> 4 flat bands).
+// climate.cpp — ClimateEngine implementation (env NC -> flat bands).
 //
 // The ClimateEngine is a thin wrapper over the env_reader helper: it
-// delegates the actual file IO to `env_reader::read_env_tif` and
+// delegates the actual file IO to `env_reader::read_env_nc` and
 // stores the resulting flat bands in row-major float32 vectors.
-// The per-day rainfall lookup is constant across the simulation
-// (the env COG is monthly; daily CHIRPS interpolation is [M7+]).
+// (The legacy `load_from_env_tif` COG path was removed — the env
+// input contract is NC-only; see docs/specs/abm/spec.md INV-6.)
 //
 // `*_at(row, col)` accessors are bounds-checked; out-of-bounds returns
 // 0 (rain/water) or 25 deg C (temp — a safe default that keeps the
@@ -39,40 +39,6 @@ inline size_t Idx(int32_t row, int32_t col, int32_t w) noexcept {
 
 // -- public API ---------------------------------------------------------------
 
-void ClimateEngine::load_from_env_tif(const std::string& path,
-                                      const AOI& aoi) {
-    (void)aoi;  // The engine's h_/w_ are taken from the COG itself;
-                // the AOI is reserved for a future validation pass
-                // (e.g. assert the COG's transform matches the AOI
-                // bbox). The thin slice trusts the COG producer.
-
-    env_reader::EnvBands bands = env_reader::read_env_tif(path);
-
-    h_ = bands.h;
-    w_ = bands.w;
-    rain_  = std::move(bands.rainfall);
-    temp_  = std::move(bands.temp_suitability);  // already Mordecai-inverted
-    water_ = std::move(bands.water_frac);
-    ndvi_  = std::move(bands.ndvi);
-    if (!bands.twi.empty()) {
-        twi_ = std::move(bands.twi);
-    } else {
-        twi_.clear();
-    }
-
-    if (h_ <= 0 || w_ <= 0) {
-        throw std::runtime_error(
-            "ClimateEngine::load_from_env_tif: env COG has no rasters");
-    }
-    if (static_cast<int32_t>(rain_.size()) != h_ * w_
-        || static_cast<int32_t>(temp_.size()) != h_ * w_
-        || static_cast<int32_t>(water_.size()) != h_ * w_
-        || static_cast<int32_t>(ndvi_.size())  != h_ * w_) {
-        throw std::runtime_error(
-            "ClimateEngine::load_from_env_tif: band size mismatch");
-    }
-}
-
 float ClimateEngine::rain_at(int32_t row, int32_t col) const {
     if (h_ <= 0 || w_ <= 0) return 0.0f;
     if (row < 0 || row >= h_ || col < 0 || col >= w_) return 0.0f;
@@ -83,7 +49,7 @@ float ClimateEngine::temp_at(int32_t row, int32_t col) const {
     if (h_ <= 0 || w_ <= 0) return ADULT_TEMP_FALLBACK_C;
     if (row < 0 || row >= h_ || col < 0 || col >= w_) return ADULT_TEMP_FALLBACK_C;
     const float T = temp_[Idx(row, col, w_)];
-    // Out-of-coverage / land-mask pixels are NaN in the env COG.
+    // Out-of-coverage / land-mask pixels are NaN in the env NC.
     // The Lardeux mortality step falls back to ADULT_DAILY_MORT_BASE
     // (= 0.90, a 10% survival rate) when it sees a NaN, and the EIP
     // accumulator skips the daily GDD step (larvae never mature).
@@ -101,8 +67,8 @@ float ClimateEngine::water_frac_at(int32_t row, int32_t col) const {
 }
 
 float ClimateEngine::salinity_at(int32_t row, int32_t col) const {
-    // Empty salinity_ => no salinity data (TIF path or pre-salinity
-    // NC): every cell is freshwater (0.0 psu), the legacy behaviour.
+    // Empty salinity_ => no salinity data (pre-salinity NC): every
+    // cell is freshwater (0.0 psu), the legacy behaviour.
     if (salinity_.empty()) return 0.0f;
     if (h_ <= 0 || w_ <= 0) return 0.0f;
     if (row < 0 || row >= h_ || col < 0 || col >= w_) return 0.0f;
@@ -199,7 +165,7 @@ void ClimateEngine::load_from_env_nc(const std::string& path,
 }
 
 void ClimateEngine::set_day(int32_t day) {
-    if (n_days_ <= 1) return;  // static COG: no daily switching
+    if (n_days_ <= 1) return;  // single-day env: no daily switching
     if (day < 0) day = 0;
     if (day >= n_days_) day = n_days_ - 1;
     cur_day_ = day;
@@ -255,8 +221,9 @@ std::shared_ptr<ClimateEngine> ClimateEngine::clone_for_thread() const {
             if (salinity_nc_) clone->salinity_[i] = (*salinity_nc_)[i];
         }
     } else {
-        // COG-loaded engine: no multi-day NetCDF data, so rain_nc_ is
-        // nullptr. Copy the static bands directly — otherwise the
+        // Static-band engine (env loaded without multi-day NC data, e.g.
+        // a default-constructed engine): rain_nc_ is nullptr. Copy the
+        // static bands directly — otherwise the
         // clone's water_/rain_/temp_/ndvi_ vectors stay at their
         // zero/fallback defaults, and downstream code that reads them
         // (e.g. build_seed_instructions's viability filter) sees
@@ -271,7 +238,7 @@ std::shared_ptr<ClimateEngine> ClimateEngine::clone_for_thread() const {
 
     // Static grids are shared read-only with the clone (M7.4.1).
     // NOTE: twi_/k_capacity_mult_ may come from either the env NC
-    // (load_from_env_nc on the shared engine) or the COG path — copy
+    // (load_from_env_nc on the shared engine) or the habitat engine — copy
     // them unconditionally so both branches behave identically.
     clone->twi_ = twi_;
     clone->k_capacity_mult_ = k_capacity_mult_;

@@ -123,50 +123,28 @@ uv run python mal-execution/scripts/validate_unet.py <run_dir> <model_path> <out
 
 ## Environment building
 
-### `build_environment.py`
+### `malariasim ingest`
 
-Build the M1 env tensor (4-band COG) + habitat patches from remote data sources.
+Build the daily multi-year env NC + habitat patches from data already downloaded by `malariasim download`.
 
 ```bash
-uv run python mal-execution/scripts/build_environment.py \
-    --aoi ghana --year 2024 --month 06 --output-dir data/runs/ghana
+uv run malariasim ingest --aoi ghana --year 2024 --month 6 --data-dir data/ghana
 ```
 
 | Flag | Required | Default | Description |
 |---|---|---|---|
-| `--aoi` | No* | `ghana` | AOI slug from registry |
-| `--bbox` | No* | -- | Custom bbox `"W,S,E,N"` (overrides slug) |
-| `--year` | Yes | -- | Year |
-| `--month` | Yes | -- | Month (1-12) |
-| `--output-dir` | Yes | -- | Output directory |
-| `--scale` | No | `regional` | Aggregation scale |
-| `--crs` | No | `EPSG:4326` | CRS for custom bbox |
-| `--resolution-m` | No | `1000` | Ground resolution in metres |
-| `--format` | No | `tif` | Output format. `nc` is **deprecated since M13** -- see migration note below. |
-| `--skip-era5` | No | `False` | Skip ERA5 (channel becomes NoData) |
-| `--skip-modis` | No | `False` | Skip MODIS (channel becomes NoData) |
-| `--skip-jrc-gsw` | No | `False` | Skip JRC GSW (water_frac becomes NoData) |
+| `--aoi` | No | `ghana` | AOI slug from registry |
+| `--year` | No | `2024` | Year (manifest metadata) |
+| `--month` | No | `6` | Month (manifest metadata) |
+| `--data-dir` | No | `runs/ingest` | Directory containing the downloaded raw inputs |
+| `--output-dir` | No | `runs/ingest` | Where host/mobility artifacts are written |
+| `--what` | No | `all` | `env`, `hosts`, `mobility`, or `all` |
 
-\* Either `--aoi` or `--bbox` is required.
+**Output files** (in `--data-dir`):
+- `<aoi>_regional_<start>_<end>_env.nc` -- CF-1.8 daily multi-year NetCDF (rainfall, water_temp_c, water_frac, ndvi, optional salinity_ppt + permanent_water_mask)
+- `<aoi>_habitat_patches.gpkg` -- pluvial pool / permanent water points
 
-**Output files**:
-- `<aoi>_<scale>_<YYYY>_<MM>_env.tif` -- 4-band COG (water_frac, rainfall, temp_suitability, ndvi)
-- `<aoi>_<scale>_<YYYY>_<MM>_env.json` -- sidecar metadata
-- `<aoi>_<scale>_<YYYY>_<MM>_habitat_patches.gpkg` -- pluvial pool points
-
-**Auth policy**: CHIRPS, MERIT-DEM, JRC GSW work without credentials. ERA5 (CDS) and MODIS (EARTHDATA_TOKEN) are auto-skipped with a warning if credentials are missing.
-
-### M13 Migration: Daily NC Output
-
-**Deprecated**: `env.py --format nc` / `output_format='nc'` in `build_env_tensor()`.
-
-**New way**: Use the download runner to produce daily NC files:
-```bash
-malariasim download --datasets chirps --outputs rainfall_daily --years 2024,2025 --aoi ghana
-```
-This produces `data/ghana/ghana_chirps_rainfall_daily_2024_2025_daily.nc` consumable by the C++ ABM's `read_env_nc()`.
-
-The legacy `_write_env_nc()` function is removed. The download runner writes daily NC via `xarray.to_netcdf()` with period metadata in the manifest.
+**Contract**: ingest never downloads. Missing input files raise `FileNotFoundError` with a `malariasim download` hint. The legacy 4-band monthly COG (`.tif`) path and the `build_environment.py` script were removed on 2026-09-27 -- the env input contract is NC-only (see `docs/specs/ingest/spec.md` and `docs/specs/abm/spec.md` INV-6).
 
 ### `build_hosts.py`
 
@@ -334,11 +312,8 @@ hetzner-run cost --type ccx33 --hours 2
 ### Full pipeline: build -> train -> validate -> predict
 
 ```bash
-# 1. Build environment for multiple months
-for M in $(seq 1 12); do
-  uv run python mal-execution/scripts/build_environment.py \
-    --aoi ghana --year 2024 --month $M --output-dir data/runs/ghana
-done
+# 1. Build environment (daily env NC + habitat patches)
+uv run malariasim ingest --aoi ghana --year 2024 --month 6 --data-dir data/ghana
 
 # 2. Build host population + mobility
 uv run python mal-execution/scripts/build_hosts.py --output-dir hosts/

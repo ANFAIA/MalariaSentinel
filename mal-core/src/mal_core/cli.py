@@ -163,7 +163,6 @@ def ingest(
     month: int = typer.Option(6, "--month", help="Month"),
     output_dir: Path = typer.Option(Path("runs/ingest"), "--output-dir"),
     data_dir: Path | None = typer.Option(None, "--data-dir", help="Downloaded AOI directory"),
-    scale: str = typer.Option("regional", "--scale"),
     what: str = typer.Option("all", "--what", help="What to build: env, hosts, mobility, all"),
 ) -> None:
     """Build ABM-ready artifacts for an AOI.
@@ -172,7 +171,7 @@ def ingest(
     Use --what to build a specific component.
 
     Key parameters:
-      --what: env (4-band tensor + habitat), hosts (host_static.nc),
+      --what: env (daily env NC + habitat), hosts (host_static.nc),
               mobility (CSR OD matrices), or all (default)
     """
     from .ingest import build_env_tensor, build_host_dataset, build_mobility_dataset
@@ -182,7 +181,7 @@ def ingest(
     aoi_obj = _AOI.from_slug(aoi) if isinstance(aoi, str) else aoi
     if what in ("env", "all"):
         chosen_data_dir = data_dir or output_dir
-        result = build_env_tensor(aoi=aoi, year=year, month=month, output_dir=chosen_data_dir, scale=scale, data_root=chosen_data_dir.parent)
+        result = build_env_tensor(aoi=aoi, year=year, month=month, output_dir=chosen_data_dir, data_root=chosen_data_dir.parent)
         results["env"] = result
     if what in ("hosts", "all"):
         result = build_host_dataset(aoi=aoi_obj, output_dir=output_dir)
