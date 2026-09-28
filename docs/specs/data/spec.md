@@ -53,7 +53,7 @@ kg_refs:
 | Version | `v3.1` (manifest schema); `v2.0` (file naming); `v2.0` (env NetCDF) |
 | Status | `stable` (naming); `stable` (manifest v3.1 schema) |
 | Owner | David Flórez-Mazuera |
-| Last drift check | `2026-08-05` |
+| Last drift check | `2026-09-27` |
 
 ## 1. Objective
 
@@ -70,7 +70,7 @@ string in 12 places and any rename would silently break the pipeline.
 - File naming convention for `data/<aoi>/`.
 - Manifest schema (v3.1) at `data/<aoi>/manifest.json`.
 - Dataset type semantics (`time-series` vs `static`).
-- Manifest API (`read_manifest`, `update_dataset`, `validate_completeness`, `get_dataset_files`, `list_files`).
+- Manifest API (`read_manifest`, `update_dataset`, `validate_completeness`, `get_dataset_files`).
 - Env NetCDF format (CF-1.8 daily) and env COG/TIF format.
 - Loader contract (signatures, `DOWNLOADER` dict, return type).
 - ABM manifest validation flow.
@@ -86,12 +86,10 @@ string in 12 places and any rename would silently break the pipeline.
 
 | Symbol | Where | Notes |
 |---|---|---|
-| `read_manifest(aoi)` | `mal_core.download.manifest` | Returns the full manifest dict. Auto-migrates v1 → v2 in memory. Empty skeleton if file missing. |
+| `read_manifest(aoi)` | `mal_core.download.manifest` | Returns the full v3.1 manifest dict. Empty skeleton if file missing. |
 | `update_dataset(aoi, dataset_name, year, filename, *, type, required_for_abm, variables, format, period)` | `mal_core.download.manifest` | Updates one dataset entry, rebuilds `expected_files`, writes v3.1. All kwargs are written to disk. |
-| `update_manifest(aoi, key, filename)` | `mal_core.download.manifest` | Legacy compat wrapper — delegates to `update_dataset`. |
 | `validate_completeness(aoi, *, years=None)` | `mal_core.download.manifest` | Returns `list[str]` of missing filenames (empty = complete). When `years` is provided, period-based NC entries are checked for year coverage. |
 | `get_dataset_files(aoi, dataset_name, year=None)` | `mal_core.download.manifest` | Returns resolved `list[Path]` (empty if not found). |
-| `list_files(aoi)` | `mal_core.download.manifest` | Flat dict (v1 compat). |
 | `register_dataset(...)` | `mal_core.ingest._shared` | Thin wrapper around `update_dataset` used by ingest builders. |
 
 ## 5. Invariants
@@ -108,7 +106,7 @@ string in 12 places and any rename would silently break the pipeline.
 - **INV-5.** Top-level keys: `aoi` (required), `name` (optional), `grid` (optional), `datasets` (required), `expected_files` (required).
 - **INV-6.** Each dataset entry: `type` ∈ `{"time-series","static"}`, `format` ∈ `{nc,gpkg,csr,json,tif}`, `files` map (`year → filename` for time-series, `key → filename` for static), `required_for_abm` (bool, defaults to false), `variables` (list, optional), `period` (dict, optional — see §6.2).
 - **INV-7.** `expected_files` is the flat sorted union of all `files` values. `validate_completeness` checks each against `data/<aoi>/`.
-- **INV-8.** Reader auto-migrates v1 (flat `files` dict) to v2 in memory. **Writes always produce v3.1.** Migration script: `scripts/migrate_data_format.py`.
+- **INV-8.** Single schema on disk: v3.1 datasets block. **Writes always produce v3.1.** The legacy v1 (flat `files` dict) migration path was removed on 2026-09-27 — no v1 manifests exist on disk; a flat manifest now fails loudly on read.
 - **INV-9.** A dataset missing from the manifest is **not** available to consumers (the ABM raises `FileNotFoundError`).
 
 ### §5.3 Env tensor formats
@@ -210,8 +208,8 @@ now honours every kwarg (`type`, `required_for_abm`, `variables`,
 
 ## 7. Migration & deprecation
 
-- **Manifest v1 → v2**: auto on read, manual via `scripts/migrate_data_format.py` on disk. No further writes should produce v1.
-- **Manifest v2 → v3.1**: writes always produce v3.1 (all kwargs honoured, `period` field supported). Reads auto-migrate v1/v2 in memory.
+- **Manifest v1 removed (2026-09-27)**: the flat `files` dict schema and its reader migration (`_migrate_v1_to_v2`) are gone, including the duplicate copy in `prediction/aoi_resolver.py`. The `update_manifest` / `list_files` legacy helpers were deleted (zero callers). No migration script existed; no v1 manifests exist on disk.
+- **Manifest v2 → v3.1**: writes always produce v3.1 (all kwargs honoured, `period` field supported).
 - **Env COG `contract_version: "1.0"` vs NetCDF `contract_version: "2.0"`**: the COG path is the M1/M2 contract pinned in `abm/spec.md` §5.2; the NetCDF path is a richer daily CF-1.8 surface used by some consumers. Bumping either without bumping the other is a P1 bug — see drift check.
 - **Deprecated**: `worldcover` dataset — archived to `mal-commonlib/.../loaders/_legacy/worldcover.py`. Use `jrc_gsw` for `water_frac`.
 - Deprecation policy: 1 MINOR spec version carries the warning; removed in the next MAJOR.
@@ -240,7 +238,7 @@ for m in Path('data').glob('*/manifest.json'):
     assert 'datasets' in d and 'expected_files' in d, f'bad schema in {m}'
 "
 
-# INV-8: no v1 manifests survive
+# INV-8: v1 is gone — no flat manifests may exist
 rg '"files"\s*:\s*\{[^}]*"ghana' data/ && echo "FAIL: v1 manifest found" || echo "OK"
 
 # INV-11/12: env tensors honour NoData

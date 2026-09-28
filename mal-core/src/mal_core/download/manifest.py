@@ -1,7 +1,8 @@
 """Auto-managed AOI manifest — updates data/<aoi>/manifest.json after downloads.
 
-Supports v1 (flat files dict), v2 (datasets block), and v3.1 schemas.
-Reads auto-migrate v1 → v2 in memory; writes always produce v3.1.
+Single schema: the v3.1 datasets block (per docs/specs/data/spec.md §5.2).
+Writes always produce v3.1. (The legacy v1 flat-files migration was removed
+on 2026-09-27 — no v1 manifests exist on disk.)
 """
 
 from __future__ import annotations
@@ -27,40 +28,12 @@ DATA_ROOT = _REPO_ROOT / "data"
 
 
 def read_manifest(aoi: str, data_root: Path | None = None) -> dict:
-    """Read manifest. Handles both v1 (flat files) and v2 (datasets block)."""
+    """Read the v3.1 datasets-block manifest. Empty skeleton if file missing."""
     path = (data_root or DATA_ROOT) / aoi / "manifest.json"
     if not path.exists():
         return {"aoi": aoi, "datasets": {}, "expected_files": []}
     with open(path) as f:
-        manifest = json.load(f)
-    if "datasets" not in manifest and "files" in manifest:
-        manifest = _migrate_v1_to_v2(manifest)
-    return manifest
-
-
-def _migrate_v1_to_v2(manifest: dict) -> dict:
-    """Convert v1 flat files dict to v2 datasets block."""
-    # TODO Make unnecessary and remove
-    files = manifest.get("files", {})
-    datasets = {}
-    for key, filename in files.items():
-        if any(x in key for x in ["habitat", "host", "mobility"]):
-            dtype = "static"
-        else:
-            dtype = "time-series"
-        datasets[key] = {
-            "type": dtype,
-            "format": filename.rsplit(".", 1)[-1] if "." in filename else "unknown",
-            "files": {key: filename},
-        }
-    manifest["datasets"] = datasets
-    manifest["expected_files"] = list(files.values())
-    return manifest
-
-
-def update_manifest(aoi: str, key: str, filename: str) -> Path:
-    """Update a flat-key entry (legacy compat). Delegates to update_dataset."""
-    return update_dataset(aoi, key, None, filename)
+        return json.load(f)
 
 
 def update_dataset(
@@ -126,16 +99,6 @@ def update_dataset(
     return path
 
 
-def list_files(aoi: str) -> dict[str, str]:
-    """Return flat filename dict (v1 compat)."""
-    manifest = read_manifest(aoi)
-    datasets = manifest.get("datasets", {})
-    flat = {}
-    for ds in datasets.values():
-        flat.update(ds.get("files", {}))
-    return flat
-
-
 def validate_completeness(
     aoi: str, *, years: list[int] | None = None, data_root: Path | None = None
 ) -> list[str]:
@@ -181,7 +144,7 @@ def validate_completeness(
                 if not (data_dir / f).exists():
                     missing.append(f)
 
-    # Also check legacy expected_files list
+    # Also check the top-level expected_files union
     for f in manifest.get("expected_files", []):
         if f not in missing and not (data_dir / f).exists():
             missing.append(f)

@@ -4,7 +4,8 @@ Convention: each AOI has a directory under data/<aoi>/ with a manifest.json
 listing available files. This module resolves paths from the manifest so no
 code needs to hardcode "data/ghana/...".
 
-Supports manifest v2 (datasets block) and v1 (flat files dict).
+Reads the v3.1 datasets-block manifest (docs/specs/data/spec.md §5.2).
+(The legacy v1 flat-files migration was removed on 2026-09-27.)
 """
 from __future__ import annotations
 
@@ -26,7 +27,7 @@ _REPO_ROOT = _find_repo_root()
 
 @dataclass
 class AOIFiles:
-    """Resolved file paths for an AOI from manifest v2."""
+    """Resolved file paths for an AOI from its manifest."""
     aoi: str
     data_dir: Path
     datasets: dict[str, dict]  # dataset_name → {type, format, files, ...}
@@ -67,7 +68,7 @@ class AOIFiles:
 def resolve_aoi(aoi_slug: str, data_root: Path | None = None) -> AOIFiles:
     """Resolve data file paths for an AOI from its manifest.json.
 
-    Looks for data/<aoi>/manifest.json. Supports both v1 and v2 schemas.
+    Looks for data/<aoi>/manifest.json (v3.1 datasets-block schema).
 
     Args:
         aoi_slug: AOI identifier (e.g. "ghana", "morocco").
@@ -86,34 +87,12 @@ def resolve_aoi(aoi_slug: str, data_root: Path | None = None) -> AOIFiles:
     with open(manifest_path) as f:
         manifest = json.load(f)
 
-    # Migrate v1 → v2 in memory
-    if "datasets" not in manifest and "files" in manifest:
-        manifest = _migrate_v1_to_v2(manifest)
-
     datasets = manifest.get("datasets", {})
     return AOIFiles(
         aoi=aoi_slug,
         data_dir=aoi_dir,
         datasets=datasets,
     )
-
-
-def _migrate_v1_to_v2(manifest: dict) -> dict:
-    """Convert v1 flat files dict to v2 datasets block."""
-    files = manifest.get("files", {})
-    datasets = {}
-    for key, filename in files.items():
-        if any(x in key for x in ["habitat", "host", "mobility"]):
-            dtype = "static"
-        else:
-            dtype = "time-series"
-        datasets[key] = {
-            "type": dtype,
-            "format": filename.rsplit(".", 1)[-1] if "." in filename else "unknown",
-            "files": {key: filename},
-        }
-    manifest["datasets"] = datasets
-    return manifest
 
 
 def _fallback_resolve(aoi_slug: str, aoi_dir: Path) -> AOIFiles:
