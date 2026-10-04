@@ -180,7 +180,7 @@ now honours every kwarg (`type`, `required_for_abm`, `variables`,
 | Type | Format | Frequency | Pattern | Registered loader | `required_for_abm` |
 |---|---|---|---|---|---|
 | `env` | NetCDF4 | daily | `<aoi>_regional_<start>_<end>_env.nc` | `daily_nc` (assembles chirps+jrc_gsw+era5+modis) | yes |
-| `chirps_rainfall` | GeoTIFF | monthly | `<aoi>_rainfall_<year>.tif` | `chirps` | no |
+| `chirps_rainfall` | GeoTIFF | monthly | `<aoi>_rainfall_<year>.tif` | (deleted loader; disk artifacts only) | no |
 | `chirps_rainfall_daily` | NetCDF4 | daily | `<aoi>_rainfall_daily_<start>_<end>_daily.nc` | `chirps` (`load_chirps_rainfall_daily`) | yes |
 | `era5_temp` | GeoTIFF | monthly | `<aoi>_temp_suitability_<year>.tif` | `era5` (`load_era5_temp_suitability`) | no |
 | `era5_water_temp` | GeoTIFF | monthly | `<aoi>_water_temp_<year>.tif` | `era5` (`load_era5_water_temp`) | no |

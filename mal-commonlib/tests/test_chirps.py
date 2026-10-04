@@ -10,7 +10,6 @@ import rioxarray  # noqa: F401
 
 from mal_commonlib.aoi import AOI
 from mal_commonlib.data.loaders.chirps import (
-    load_chirps_rainfall,
     load_chirps_rainfall_daily,
     DOWNLOADER,
 )
@@ -110,8 +109,10 @@ class TestChirpsDailyDownloaderFormats:
     def test_formats_key_exists(self):
         assert "formats" in DOWNLOADER
 
-    def test_rainfall_is_monthly(self):
-        assert DOWNLOADER["formats"]["rainfall"] == "monthly"
+    def test_rainfall_monthly_output_removed(self):
+        """The historical load_chirps_rainfall monthly interface was deleted (2026-09-29)."""
+        assert "rainfall" not in DOWNLOADER["outputs"]
+        assert "rainfall" not in DOWNLOADER["manifest_keys"]
 
     def test_rainfall_daily_is_daily(self):
         assert DOWNLOADER["formats"]["rainfall_daily"] == "daily"

@@ -15,7 +15,7 @@ Foundation package for MalariaSentinel. No internal dependencies — everything 
 | **AOI** | `mal_commonlib.aoi` (also re-exported from `mal_commonlib`) | Region-agnostic Area of Interest schema |
 | **Data loaders** | `mal_commonlib.data.loaders` | `load_jrc_gsw_water_frac`, `load_worldcover_water_frac` (plus individual modules) |
 | **DEM loader** | `mal_commonlib.data.loaders.dem` | `load_merit_dem` — MERIT DEM 90 m with NASADEM fallback |
-| **CHIRPS loader** | `mal_commonlib.data.loaders.chirps` | `load_chirps_rainfall`, `load_chirps_rainfall_daily` — CHIRPS v2.0 precipitation |
+| **CHIRPS loader** | `mal_commonlib.data.loaders.chirps` | `load_chirps_rainfall_daily` — CHIRPS v2.0 precipitation |
 | **ERA5 loader** | `mal_commonlib.data.loaders.era5` | `load_era5_temp_suitability`, `load_era5_water_temp`, `sharpe_demichele_growth` |
 | **JRC GSW loader** | `mal_commonlib.data.loaders.jrc_gsw` | `load_jrc_gsw_water_frac` — JRC Global Surface Water 30 m |
 | **MODIS loader** | `mal_commonlib.data.loaders.modis` | `load_modis_ndvi` — MODIS MOD13A3 v061 monthly NDVI |
@@ -230,21 +230,18 @@ MERIT DEM 90 m (hydrologically conditioned, preferred for TWI). Falls back to NA
 
 ---
 
-### CHIRPS — `load_chirps_rainfall`, `load_chirps_rainfall_daily`
+### CHIRPS — `load_chirps_rainfall_daily`
 
 ```python
-from mal_commonlib.data.loaders.chirps import load_chirps_rainfall, load_chirps_rainfall_daily
-
-# Monthly total (mm)
-rain = load_chirps_rainfall(aoi, year=2020, month=6, cache_dir=None)
+from mal_commonlib.data.loaders.chirps import load_chirps_rainfall_daily
 
 # Daily (time, y, x) in mm/day
-rain_daily = load_chirps_rainfall_daily(aoi, year=2020, month=6, cache_dir=None)
+rain_daily = load_chirps_rainfall_daily(aoi, years=[2024], months=[6], cache_dir=None)
 ```
 
-CHIRPS v2.0 daily 0.05° (~5 km), aggregated to monthly total. Returns raw mm (NOT normalized). The `rainfall_cap_mm` attr holds the P95 cap for documentation.
+CHIRPS v2.0 daily 0.05° (~5 km), per-day values (canonical since M13 — the ABM's PLUVIAL_POOL rule needs daily rainfall). Returns raw mm/day (NOT normalized). The historical monthly-total `load_chirps_rainfall` was deleted on 2026-09-29.
 
-**Returns**: `xr.DataArray` (y, x), float32, mm/month, NoData = `-9999.0`
+**Returns**: `xr.DataArray` (time, y, x), float32, mm/day, NoData = `-9999.0`
 
 **Year range**: 1981+
 
@@ -457,20 +454,20 @@ Min-max normalization to [0, 1].
 ```python
 from mal_commonlib.aoi import AOI, Scale
 from mal_commonlib.data.loaders.jrc_gsw import load_jrc_gsw_water_frac
-from mal_commonlib.data.loaders.chirps import load_chirps_rainfall
+from mal_commonlib.data.loaders.chirps import load_chirps_rainfall_daily
 from mal_commonlib.data.loaders.era5 import load_era5_temp_suitability
 from mal_commonlib.data.loaders.modis import load_modis_ndvi
 
 aoi = AOI.from_bbox(-2.97, 4.69, 0.79, 9.79, "EPSG:4326", "ghana", 1000)
 
 water   = load_jrc_gsw_water_frac(aoi, year=2021)
-rain    = load_chirps_rainfall(aoi, year=2020, month=6)
+rain    = load_chirps_rainfall_daily(aoi, years=[2024], months=[6])
 temp    = load_era5_temp_suitability(aoi, year=2020, month=6)
 ndvi    = load_modis_ndvi(aoi, year=2020, month=6)
 
 # Stack into (4, H, W) env tensor
 import numpy as np
-env = np.stack([water.values, rain.values, temp.values, ndvi.values], axis=0)
+env = np.stack([water.values, rain.isel(time=0).values, temp.values, ndvi.values], axis=0)
 ```
 
 ### Compute TWI from loaded DEM

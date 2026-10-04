@@ -1,7 +1,7 @@
 """CHIRPS v2.0 daily precipitation loader (M1.3a, channel: rainfall).
 
 Public surface:
-    load_chirps_rainfall(aoi, *, years, months=None, cache_dir=None) -> xr.DataArray
+    load_chirps_rainfall_daily(aoi, *, years, months=None, cache_dir=None) -> xr.DataArray
 
 Source: UCSB Climate Hazards Center CHIRPS v2.0 (public, no auth).
 Format: daily gzipped GeoTIFFs at 0.05° (~5 km) resolution; one file per day.
@@ -13,16 +13,13 @@ Notes:
       but reading those requires ``netCDF4`` or ``h5netcdf``, neither of which
       is a project dependency. v1 therefore uses the daily GeoTIFFs, which
       are readable with the already-installed ``rasterio`` / ``rioxarray``.
-    * Returns raw mm (monthly total precipitation), NOT a P95-normalized
-      value. The ABM compares the env band against
+    * Returns raw mm per day. The ABM compares the env band against
       ``RAIN_THRESHOLD_MM = 15`` to activate habitat patches, so the band
-      must be in mm. The suitability overlay applies its own
-      min-max normalization at consumption time — a previous version of
-      this loader normalized the band in [0, 1] here, which both broke the
-      ABM's threshold check and was redundant with the overlay's
-      normalization. The helper ``_normalize_rainfall`` is retained (and
-      still used to compute the wet-season P95 cap for the sidecar /
-      ``rainfall_cap_mm`` attr) but is no longer applied to the band.
+      must be in mm. The suitability overlay applies its own min-max
+      normalization at consumption time. A previous version of the (now
+      deleted) monthly loader normalized the band in [0, 1], which broke
+      the ABM's threshold check; that normalization no longer exists
+      anywhere in the codebase.
     * This loader only emits a single channel (``rainfall``); the M1.3b CLI
       assembles it into the (C_env=4, H, W) env tensor.
 """
@@ -34,7 +31,7 @@ import os
 import pathlib
 import shutil
 from collections.abc import Sequence
-from typing import Callable, Iterable
+from typing import Callable
 
 import numpy as np
 import rasterio
@@ -203,27 +200,6 @@ def _read_chirps_tif_gz(path: pathlib.Path, aoi: AOI) -> xr.DataArray:
     return da
 
 
-def _monthly_total_from_rasters(
-    rasters: Iterable[xr.DataArray],
-    aoi: AOI,
-) -> xr.DataArray:
-    """Sum daily CHIRPS (mm/day) into a monthly total (mm), aligned on the
-    AOI's grid in EPSG:4326. NaN where any day is NaN.
-
-    The output is on the daily 0.05° grid clipped to the AOI bbox; per-cell
-    reprojection to the AOI's ``resolution_m`` grid happens in the next step.
-    """
-    rasters = list(rasters)
-    if not rasters:
-        raise ValueError("monthly total needs at least one daily raster")
-    summed = rasters[0].copy()
-    for da in rasters[1:]:
-        # Align on the first raster's grid (CHIRPS daily is co-aligned).
-        summed = summed + da
-    # CHIRPS daily units are mm/day; sum over the month is monthly total mm.
-    return summed.astype(np.float32)
-
-
 def _ref_grid_for_aoi(aoi: AOI) -> xr.DataArray:
     """Build a 1-pixel reference DataArray in ``aoi.crs`` covering the AOI bbox
     with the shape needed to reproject into. The actual values are unused; only
@@ -241,145 +217,16 @@ def _ref_grid_for_aoi(aoi: AOI) -> xr.DataArray:
 
 
 def _reproject_to_aoi_grid(
-    monthly_total: xr.DataArray,
+    rain_field: xr.DataArray,
     aoi: AOI,
 ) -> np.ndarray:
-    """Reproject the monthly total (EPSG:4326) to the AOI's target grid."""
+    """Reproject a rain field (EPSG:4326) to the AOI's target grid."""
     ref = _ref_grid_for_aoi(aoi)
-    rep = monthly_total.rio.reproject_match(ref, resampling=rasterio.enums.Resampling.bilinear)
+    rep = rain_field.rio.reproject_match(ref, resampling=rasterio.enums.Resampling.bilinear)
     return np.asarray(rep.values, dtype=np.float32)
 
 
-def _normalize_rainfall(rain_mm: np.ndarray) -> tuple[np.ndarray, float]:
-    """Min-max normalize a (H, W) array over the AOI's wet-season P95 (v1 proxy).
-
-    Returns ``(normalized, cap_mm)`` where ``normalized`` is in [0, 1] and
-    ``cap_mm`` is the P95 value used as the cap. Both NaN and ``-9999.0`` are
-    treated as NoData and re-emitted as ``-9999.0`` so the env writer can
-    hand the result to rasterio without surprises.
-
-    .. note::
-        Retained as a helper for tests and downstream normalization (e.g.
-        if a future loader wants a pre-normalized [0, 1] band). The public
-        ``load_chirps_rainfall`` does **not** apply this function: it
-        returns the raw mm field and exposes the cap via the
-        ``rainfall_cap_mm`` attribute on the returned DataArray for
-        documentation / sidecar use only.
-    """
-    nodata_mask = (~np.isfinite(rain_mm)) | (rain_mm == CHIRPS_NODATA)
-    finite = rain_mm[~nodata_mask]
-    if finite.size == 0:
-        out = np.full(rain_mm.shape, CHIRPS_NODATA, dtype=np.float32)
-        return out, 0.0
-    cap = float(np.nanpercentile(finite, 95))
-    out = np.full(rain_mm.shape, CHIRPS_NODATA, dtype=np.float32)
-    if not np.isfinite(cap) or cap < 1e-9:
-        # No rain anywhere in the AOI: all finite cells normalize to 0.0.
-        out[~nodata_mask] = 0.0
-        return out, 0.0
-    out[~nodata_mask] = np.clip(rain_mm[~nodata_mask] / cap, 0.0, 1.0).astype(np.float32)
-    return out, cap
-
-
 # -- public API -------------------------------------------------------------
-
-
-def load_chirps_rainfall(
-    aoi: AOI,
-    *,
-    years: Sequence[int],
-    months: Sequence[int] | None = None,
-    cache_dir: pathlib.Path | None = None,
-    _fetch_daily: Callable[[int, int, int], xr.DataArray] | None = None,
-) -> xr.DataArray:
-    """Load CHIRPS v2.0 monthly precipitation for the given AOI.
-
-    Aggregates daily 0.05° (~5 km) to monthly total mm for the AOI's bbox,
-    reprojected to the AOI's grid. Returns the **raw monthly total in mm**
-    (no P95 normalization).
-
-    When a single (year, month) pair is requested, returns a 2-D (y, x)
-    DataArray. When multiple months are requested, returns a 3-D
-    (time, y, x) DataArray with a ``time`` dimension.
-
-    Args:
-        aoi: the AOI (bbox, CRS, resolution_m, slug).
-        years: sequence of years to load.
-        months: sequence of 1-indexed months. None = all 12.
-        cache_dir: optional local cache for downloaded GeoTIFFs.
-
-    Returns:
-        xr.DataArray with dtype float32, CRS = aoi.crs.
-        Values in mm/month (raw monthly total).
-    """
-    if months is None:
-        months = list(range(1, 13))
-
-    cdir = cache_dir if cache_dir is not None else _default_cache_dir()
-
-    if _fetch_daily is None:
-        def _default_fetch(y: int, m: int, d: int) -> xr.DataArray:
-            url = _daily_url_for(y, m, d)
-            dest = _cache_path_aoi(cdir, aoi.slug, y, m, d)
-            return _download_and_clip_to_aoi(url, aoi, dest)
-
-        fetch = _default_fetch
-    else:
-        fetch = _fetch_daily
-
-    results: list[xr.DataArray] = []
-    time_coords: list[np.datetime64] = []
-
-    for year in sorted(years):
-        for month in sorted(months):
-            if not (1 <= month <= 12):
-                raise ValueError(f"month must be in 1..12; got {month}")
-            if year < 1981:
-                raise ValueError(f"CHIRPS starts in 1981; got year={year}")
-
-            daily_rasters = [fetch(year, month, d) for d in _days_in_month(year, month)]
-            monthly = _monthly_total_from_rasters(daily_rasters, aoi)
-            rain_mm = _reproject_to_aoi_grid(monthly, aoi)
-            _normalized, cap_mm = _normalize_rainfall(rain_mm)
-            nodata_mask = (~np.isfinite(rain_mm)) | (rain_mm == CHIRPS_NODATA)
-            rain_mm = np.where(nodata_mask, np.float32(CHIRPS_NODATA), rain_mm.astype(np.float32))
-
-            h, w = aoi.cells_per_side()
-            assert rain_mm.shape == (h, w), (
-                f"rain_mm shape {rain_mm.shape} != AOI grid {(h, w)}"
-            )
-            da = xr.DataArray(
-                rain_mm.astype(np.float32),
-                dims=("y", "x"),
-                attrs={
-                    "long_name": "CHIRPS v2.0 monthly total precipitation",
-                    "units": "mm/month",
-                    "source": "CHIRPS v2.0 daily 0.05°",
-                    "aoi_slug": aoi.slug,
-                    "year": year,
-                    "month": month,
-                    "nodata": CHIRPS_NODATA,
-                    "rainfall_cap_mm": float(cap_mm),
-                },
-            )
-            da.rio.write_crs(aoi.crs_obj, inplace=True)
-            results.append(da)
-            time_coords.append(np.datetime64(f"{year:04d}-{month:02d}-01"))
-
-    if len(results) == 1:
-        return results[0]
-
-    stacked = xr.concat(results, dim="time")
-    stacked = stacked.assign_coords(time=time_coords)
-    stacked.attrs.update({
-        "long_name": "CHIRPS v2.0 monthly total precipitation",
-        "units": "mm/month",
-        "source": "CHIRPS v2.0 daily 0.05°",
-        "aoi_slug": aoi.slug,
-        "nodata": CHIRPS_NODATA,
-    })
-    stacked.rio.write_crs(aoi.crs_obj, inplace=True)
-    return stacked
 
 
 def load_chirps_rainfall_daily(
@@ -392,9 +239,10 @@ def load_chirps_rainfall_daily(
 ) -> xr.DataArray:
     """Load CHIRPS v2.0 daily precipitation as a 3-D (time, y, x) array.
 
-    Unlike :func:`load_chirps_rainfall` which aggregates to a monthly
-    total, this function preserves the per-day values so they can be
-    written into a daily NetCDF env file. Each day's values are
+    This is the canonical CHIRPS interface: per-day values written into a
+    daily NetCDF env file. The historical monthly-total loader
+    (``load_chirps_rainfall``) has been deleted; daily rainfall is what the
+    ABM's PLUVIAL_POOL rule needs. Each day's values are
     reprojected to the AOI's grid independently.
 
     Args:
@@ -466,7 +314,7 @@ def load_chirps_rainfall_daily(
 
 DOWNLOADER = {
     "name": "chirps",
-    "description": "CHIRPS rainfall: daily and monthly precipitation",
+    "description": "CHIRPS rainfall: daily precipitation",
     "requires_auth": ["none"],
     "license": "CHIRPS-Cite",
     "attribution": (
@@ -477,18 +325,15 @@ DOWNLOADER = {
     ),
     "is_time_series": True,
     "outputs": {
-        "rainfall": load_chirps_rainfall,
         "rainfall_daily": load_chirps_rainfall_daily,
     },
     "formats": {
-        "rainfall": "monthly",
         "rainfall_daily": "daily",
     },
     "manifest_keys": {
-        "rainfall": "chirps_rainfall",
         "rainfall_daily": "chirps_rainfall_daily",
     },
 }
 
 
-__all__ = ["load_chirps_rainfall", "load_chirps_rainfall_daily", "CHIRPS_NODATA", "DOWNLOADER"]
+__all__ = ["load_chirps_rainfall_daily", "CHIRPS_NODATA", "DOWNLOADER"]

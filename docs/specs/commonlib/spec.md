@@ -155,7 +155,7 @@ Function-style loaders. Each module exports a public `load_*` function. The load
 | `ghsl` | `load_ghsl_urban_class` | GHS-SMOD settlement classification |
 | `wildlife` | `load_wildlife_host_proxy` | Wildlife host suitability proxy |
 | `buildings` | `load_buildings_fraction` | Overture Maps building footprint fraction |
-| `chirps` | `load_chirps_rainfall`, `load_chirps_rainfall_daily` | CHIRPS rainfall (monthly and daily) |
+| `chirps` | `load_chirps_rainfall_daily` | CHIRPS rainfall (daily; monthly interface deleted 2026-09-29) |
 | `dem` | `load_merit_dem` | MERIT DEM elevation |
 | `era5` | `load_era5_temp_suitability`, `load_era5_water_temp`, `load_era5_wind_6hourly` | ERA5-Land (temperature, water temp, wind) |
 | `modis` | `load_modis_ndvi` | MODIS NDVI (MOD13A3) |
