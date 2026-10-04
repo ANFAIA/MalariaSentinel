@@ -266,15 +266,6 @@ def compute_catchment_ratio(
         # (ingest path) — the values are what matter downstream.
         pass
     return out
-    out = xr.DataArray(cr, dims=("y", "x"),
-                       coords={"y": dem["y"], "x": dem["x"]})
-    try:
-        out.rio.write_crs(dem.rio.crs, inplace=True)
-    except Exception:
-        # Caller's DataArray may be a plain y/x grid without a CRS
-        # (ingest path) — the values are what matter downstream.
-        pass
-    return out
 
 
 def compute_twi(dem: xr.DataArray, *, cell_size_m: float | None = None) -> xr.DataArray:
