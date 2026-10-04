@@ -147,45 +147,47 @@ class TestManifestWrapper:
             mock_instance.run.return_value = {
                 "stdout": "", "stderr": "", "returncode": 0,
             }
-            # Mock the manifest functions
+            # Catalog resolution reads a REAL manifest.json from the tmp
+            # data dir (identity = manifest key; strict on declared files).
             with patch("mal_core.download.manifest.validate_completeness", return_value=[]):
-                with patch("mal_core.download.manifest.read_manifest") as mock_read:
-                    mock_read.return_value = {
-                        "datasets": {
-                            "env": {"files": {"2024": "env.tif"}},
-                            "habitat": {"files": {"2024": "hab.gpkg"}},
-                        }
-                    }
-                    with tempfile.TemporaryDirectory() as tmp:
-                        data_dir = Path(tmp) / "data" / "ghana"
-                        data_dir.mkdir(parents=True)
-                        (data_dir / "env.tif").touch()
-                        (data_dir / "hab.gpkg").touch()
-                        out_dir = Path(tmp) / "runs" / "ghana"
+                with tempfile.TemporaryDirectory() as tmp:
+                    data_dir = Path(tmp) / "data" / "ghana"
+                    data_dir.mkdir(parents=True)
+                    (data_dir / "env.tif").touch()
+                    (data_dir / "hab.gpkg").touch()
+                    (data_dir / "manifest.json").write_text(
+                        json.dumps({
+                            "datasets": {
+                                "env": {"files": {"2024": "env.tif"}},
+                                "habitat": {"files": {"habitat": "hab.gpkg"}},
+                            }
+                        })
+                    )
+                    out_dir = Path(tmp) / "runs" / "ghana"
 
-                        # Patch Path("data") to use tmp
-                        with patch("mal_core.abm.wrapper.Path") as MockPath:
-                            # Make Path("data") return the tmp data dir
-                            original_path = Path
+                    # Patch Path("data") to use tmp
+                    with patch("mal_core.abm.wrapper.Path") as MockPath:
+                        # Make Path("data") return the tmp data dir
+                        original_path = Path
 
-                            def path_factory(*args, **kwargs):
-                                if args and args[0] == "data":
-                                    return original_path(tmp) / "data"
-                                elif args and args[0] == "runs":
-                                    return original_path(tmp) / "runs"
-                                return original_path(*args, **kwargs)
+                        def path_factory(*args, **kwargs):
+                            if args and args[0] == "data":
+                                return original_path(tmp) / "data"
+                            elif args and args[0] == "runs":
+                                return original_path(tmp) / "runs"
+                            return original_path(*args, **kwargs)
 
-                            MockPath.side_effect = path_factory
-                            MockPath.__class__ = type(original_path)
+                        MockPath.side_effect = path_factory
+                        MockPath.__class__ = type(original_path)
 
-                            from mal_core.abm.wrapper import run_abm_from_manifest
-                            result = run_abm_from_manifest(
-                                aoi="ghana", year=2024, month=1,
-                                days=7, output_dir=out_dir,
-                            )
-                            # Check snapshot_every was in the call
-                            call_kwargs = mock_instance.run.call_args[1]
-                            assert call_kwargs.get("snapshot_every") == 1
+                        from mal_core.abm.wrapper import run_abm_from_manifest
+                        result = run_abm_from_manifest(
+                            aoi="ghana", year=2024, month=1,
+                            days=7, output_dir=out_dir,
+                        )
+                        # Check snapshot_every was in the call
+                        call_kwargs = mock_instance.run.call_args[1]
+                        assert call_kwargs.get("snapshot_every") == 1
 
     def test_run_abm_passes_worktree(self):
         """run_abm() should pass worktree to CppAbmWrapper."""

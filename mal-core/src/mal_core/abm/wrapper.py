@@ -103,7 +103,8 @@ def run_abm_from_manifest(
     Reads manifest, validates completeness, resolves paths,
     then calls the C++ binary via CppAbmWrapper.
     """
-    from mal_core.download.manifest import read_manifest, validate_completeness
+    from mal_core.download.catalog import INGEST_ARTIFACTS, resolve
+    from mal_core.download.manifest import validate_completeness
 
     data_root = Path(data_root) if data_root else None
     complete = validate_completeness(aoi, data_root=data_root)
@@ -113,52 +114,46 @@ def run_abm_from_manifest(
             f"Run: malariasim download --aoi {aoi} --all"
         )
 
-    manifest = read_manifest(aoi, data_root)
     data_dir = (data_root or Path("data")) / aoi
 
-    env_path = None
-    habitat_path = None
-    hosts_path = None
-    wind_path = None
-    mobility_day_path = None
-    mobility_night_path = None
-    livestock_mobility_path = None
-
-    for ds_name, ds in manifest.get("datasets", {}).items():
-        files = ds.get("files", {})
-        if ds_name == "env":
-            fname = files.get("env") or files.get(str(year)) or next(iter(files.values()), None)
-            if fname:
-                env_path = str(data_dir / fname)
-        elif ds_name == "habitat":
-            fname = next(iter(files.values()), None)
-            if fname:
-                habitat_path = str(data_dir / fname)
-        elif ds_name == "host_static":
-            fname = next(iter(files.values()), None)
-            if fname:
-                hosts_path = str(data_dir / fname)
-        elif ds_name == "wind":
-            fname = files.get("wind") or files.get(str(year)) or next(iter(files.values()), None)
-            if fname:
-                wind_path = str(data_dir / fname)
-        elif ds_name == "mobility_day":
-            fname = files.get("mobility_day")
-            if fname:
-                mobility_day_path = str(data_dir / fname)
-        elif ds_name == "mobility_night":
-            fname = files.get("mobility_night")
-            if fname:
-                mobility_night_path = str(data_dir / fname)
-        elif ds_name == "livestock_mobility":
-            fname = files.get("livestock_mobility")
-            if fname:
-                livestock_mobility_path = str(data_dir / fname)
+    env_path = resolve(
+        aoi, INGEST_ARTIFACTS["env"].key, year=year,
+        data_dir=data_dir, data_root=data_root,
+    )
+    habitat_path = resolve(
+        aoi, INGEST_ARTIFACTS["habitat"].key, data_dir=data_dir,
+        data_root=data_root,
+    )
+    hosts_path = resolve(
+        aoi, INGEST_ARTIFACTS["host_static"].key, data_dir=data_dir,
+        data_root=data_root,
+    )
+    wind_path = resolve(
+        aoi, "wind", year=year, data_dir=data_dir, data_root=data_root
+    )  # era5 manifest key ("wind" = wind_6hourly output)
+    mobility_day_path = resolve(
+        aoi, INGEST_ARTIFACTS["mobility_day"].key, data_dir=data_dir,
+        data_root=data_root,
+    )
+    mobility_night_path = resolve(
+        aoi, INGEST_ARTIFACTS["mobility_night"].key, data_dir=data_dir,
+        data_root=data_root,
+    )
+    livestock_mobility_path = resolve(
+        aoi, INGEST_ARTIFACTS["livestock_mobility"].key, data_dir=data_dir,
+        data_root=data_root,
+    )
 
     if not env_path:
-        raise FileNotFoundError(f"No env data found for AOI '{aoi}', year {year}")
+        raise FileNotFoundError(
+            f"No env data found for AOI '{aoi}', year {year} "
+            f"(manifest key '{INGEST_ARTIFACTS['env'].key}')"
+        )
     if not habitat_path:
-        raise FileNotFoundError(f"No habitat data found for AOI '{aoi}'")
+        raise FileNotFoundError(
+            f"No habitat data found for AOI '{aoi}' "
+            f"(manifest key '{INGEST_ARTIFACTS['habitat'].key}')"
+        )
 
     if output_dir is None:
         output_dir = Path("runs") / aoi

@@ -195,7 +195,7 @@ def _write_static_inputs(tmp_path):
     _write_tif(tmp_path / "ghana_ndvi_2024.tif", [[0.5, 0.5], [0.5, 0.5]])
 
 
-def test_daily_nc_salinity_monthly_broadcast(tmp_path):
+def test_daily_nc_salinity_monthly_broadcast(tmp_path, write_manifest):
     times = np.arange(np.datetime64("2024-06-01"), np.datetime64("2024-08-01"))
     _write_rainfall(tmp_path, times)
     _write_static_inputs(tmp_path)
@@ -224,6 +224,12 @@ def test_daily_nc_salinity_monthly_broadcast(tmp_path):
     sda.rio.write_transform(from_bounds(0, 0, 1, 1, 2, 2), inplace=True)
     sda.to_netcdf(tmp_path / "ghana_salinity_2024_2025_monthly.nc")
 
+    write_manifest(tmp_path, {
+        "chirps_rainfall_daily": "ghana_rainfall_daily_2024_2025_daily.nc",
+        "jrc_water": "ghana_water_occurrence.tif",
+        "era5_water_temp": {"2024": "ghana_water_temp_2024.tif"},
+        "modis_ndvi": {"2024": "ghana_ndvi_2024.tif"},        "smap_salinity": "ghana_salinity_2024_2025_monthly.nc",
+    })
     result = build_daily_env_nc("ghana", tmp_path)
     assert "salinity_ppt" in result["variables"]
 
@@ -251,11 +257,17 @@ def test_daily_nc_salinity_monthly_broadcast(tmp_path):
         ds.close()
 
 
-def test_daily_nc_no_salinity_backward_compat(tmp_path):
+def test_daily_nc_no_salinity_backward_compat(tmp_path, write_manifest):
     times = np.arange(np.datetime64("2024-06-01"), np.datetime64("2024-07-01"))
     _write_rainfall(tmp_path, times)
     _write_static_inputs(tmp_path)
 
+    write_manifest(tmp_path, {
+        "chirps_rainfall_daily": "ghana_rainfall_daily_2024_2025_daily.nc",
+        "jrc_water": "ghana_water_occurrence.tif",
+        "era5_water_temp": {"2024": "ghana_water_temp_2024.tif"},
+        "modis_ndvi": {"2024": "ghana_ndvi_2024.tif"},
+    })
     result = build_daily_env_nc("ghana", tmp_path)
     assert "salinity_ppt" not in result["variables"]
 

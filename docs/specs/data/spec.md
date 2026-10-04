@@ -204,6 +204,21 @@ now honours every kwarg (`type`, `required_for_abm`, `variables`,
 | `mobility_night` | CSR | static | `<aoi>_mobility_night.csr` | ingest | no |
 | `livestock_mobility` | CSR | static | `<aoi>_livestock_mobility.csr` | ingest | no |
 
+**§6.3.1 Consumption contract — the dataset catalog (2026-10-04).** The identity
+of a dataset is its **manifest key**. Downloaded datasets declare their keys in
+each loader's `DOWNLOADER.manifest_keys` (discovered via the plugin registry);
+derived ingest artifacts (`env`, `habitat`, `host_static`, `mobility_*`) declare
+theirs in `mal_core/download/catalog.py::INGEST_ARTIFACTS` — the only place those
+key strings exist. Consumers never hardcode filenames: they declare dependencies
+as `catalog.Slot(key, required, per_year)` and resolve via
+`catalog.resolve_inputs(...)`. `manifest.json` is the single source of truth
+(strict: a declared-but-missing file is an error; per-year entries missing the
+requested year are an error). Conventional-name fallbacks do NOT live in
+consumers — pre-manifest data dirs are migrated once with
+`catalog.register_existing(aoi)` (it derives the names from the loaders' own
+`formats` metadata). `malariasim datasets --aoi <slug>` prints the full
+catalog comparison (loaders ↔ manifest ↔ disk).
+
 ### §6.4 Upstream licensing (added 2026-09-27)
 
 Every manifest dataset entry carries two optional metadata fields (v3.1,

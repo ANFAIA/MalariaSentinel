@@ -27,7 +27,7 @@ def _write_tif(path, values):
         dst.write(values, 1)
 
 
-def test_m12_two_month_env_uses_permanent_masks(tmp_path):
+def test_m12_two_month_env_uses_permanent_masks(tmp_path, write_manifest):
     """Daily rainfall survives while M12 masks enrich static water.
 
     Cell layout (2x2): lake, JRC-low, river, WorldCover-water. JRC base is
@@ -54,6 +54,16 @@ def test_m12_two_month_env_uses_permanent_masks(tmp_path):
     _write_tif(tmp_path / "ghana_wc_permanent_water.tif", [[0.0, 0.0], [0.0, 1.0]])
     _write_tif(tmp_path / "ghana_wc_wetland.tif", [[0.0, 1.0], [0.0, 0.0]])
 
+    write_manifest(tmp_path, {
+        "chirps_rainfall_daily": "ghana_rainfall_daily_2024_2025_daily.nc",
+        "jrc_water": "ghana_water_occurrence.tif",
+        "era5_water_temp": {"2024": "ghana_water_temp_2024.tif"},
+        "modis_ndvi": {"2024": "ghana_ndvi_2024.tif"},
+        "hydrolakes_lakes": "ghana_permanent_lakes.tif",
+        "hydrorivers_rivers": "ghana_permanent_rivers.tif",
+        "worldcover_water": "ghana_wc_permanent_water.tif",
+        "worldcover_wetland": "ghana_wc_wetland.tif",
+    })
     result = build_daily_env_nc("ghana", tmp_path)
     ds = xr.open_dataset(result["env_path"])
     try:
@@ -72,7 +82,7 @@ def test_m12_two_month_env_uses_permanent_masks(tmp_path):
         ds.close()
 
 
-def test_jrc_only_path_emits_permanent_water_mask(tmp_path):
+def test_jrc_only_path_emits_permanent_water_mask(tmp_path, write_manifest):
     """When no M12 enrichment TIFs are present, daily_nc still derives
     permanent_water_mask from the JRC+coast result (M12-fix 2026-08-26).
 
@@ -93,6 +103,12 @@ def test_jrc_only_path_emits_permanent_water_mask(tmp_path):
     # No permanent_lakes / permanent_rivers / wc_permanent_water TIFs.
     # No coastline_land_mask.tif either (so JRC base is used as-is).
 
+    write_manifest(tmp_path, {
+        "chirps_rainfall_daily": "ghana_rainfall_daily_2024_2025_daily.nc",
+        "jrc_water": "ghana_water_occurrence.tif",
+        "era5_water_temp": {"2024": "ghana_water_temp_2024.tif"},
+        "modis_ndvi": {"2024": "ghana_ndvi_2024.tif"},
+    })
     result = build_daily_env_nc("ghana", tmp_path)
     ds = xr.open_dataset(result["env_path"])
     try:
@@ -110,7 +126,7 @@ def test_jrc_only_path_emits_permanent_water_mask(tmp_path):
         ds.close()
 
 
-def test_habitat_excludes_open_ocean_cells(tmp_path, monkeypatch):
+def test_habitat_excludes_open_ocean_cells(tmp_path, monkeypatch, write_manifest):
     """Open-ocean cells with JRC>0 must NOT become pluvial_pool patches
     even when the raw JRC TIF sees them as water (M12-fix 2026-08-26).
 
@@ -136,6 +152,13 @@ def test_habitat_excludes_open_ocean_cells(tmp_path, monkeypatch):
 
     monkeypatch.setenv("COASTLINE_BUFFER_M", "0")
 
+    write_manifest(tmp_path, {
+        "chirps_rainfall_daily": "ghana_rainfall_daily_2024_2025_daily.nc",
+        "jrc_water": "ghana_water_occurrence.tif",
+        "era5_water_temp": {"2024": "ghana_water_temp_2024.tif"},
+        "modis_ndvi": {"2024": "ghana_ndvi_2024.tif"},
+        "coastline_land_mask": "ghana_land_mask.tif",
+    })
     result = build_daily_env_nc("ghana", tmp_path)
     ds = xr.open_dataset(result["env_path"])
     try:
@@ -149,7 +172,7 @@ def test_habitat_excludes_open_ocean_cells(tmp_path, monkeypatch):
         ds.close()
 
 
-def test_jrc_permanent_water_mask_jrc_only_high(tmp_path):
+def test_jrc_permanent_water_mask_jrc_only_high(tmp_path, write_manifest):
     """JRC=1.0 cells produce permanent_water_mask=1 with no M12 enrichment
     and no coastline file (i.e. raw JRC binarised at the input resolution)."""
     times = np.arange(np.datetime64("2024-06-01"), np.datetime64("2024-06-03"))
@@ -163,6 +186,12 @@ def test_jrc_permanent_water_mask_jrc_only_high(tmp_path):
     _write_tif(tmp_path / "ghana_water_temp_2024.tif", [[25.0, 25.0], [25.0, 25.0]])
     _write_tif(tmp_path / "ghana_ndvi_2024.tif", [[0.5, 0.5], [0.5, 0.5]])
 
+    write_manifest(tmp_path, {
+        "chirps_rainfall_daily": "ghana_rainfall_daily_2024_2025_daily.nc",
+        "jrc_water": "ghana_water_occurrence.tif",
+        "era5_water_temp": {"2024": "ghana_water_temp_2024.tif"},
+        "modis_ndvi": {"2024": "ghana_ndvi_2024.tif"},
+    })
     result = build_daily_env_nc("ghana", tmp_path)
     ds = xr.open_dataset(result["env_path"])
     try:
@@ -172,7 +201,7 @@ def test_jrc_permanent_water_mask_jrc_only_high(tmp_path):
         ds.close()
 
 
-def test_coastline_zeros_ocean_cells_but_keeps_coastal(tmp_path, monkeypatch):
+def test_coastline_zeros_ocean_cells_but_keeps_coastal(tmp_path, monkeypatch, write_manifest):
     """Saltwater filter: cells inside the buffered land mask stay, outside go to 0.
 
     JRC base ``[[1.0, 1.0], [1.0, 1.0]]`` (everything wet). Land mask
@@ -199,6 +228,13 @@ def test_coastline_zeros_ocean_cells_but_keeps_coastal(tmp_path, monkeypatch):
 
     _write_tif(tmp_path / "ghana_land_mask.tif", [[1.0, 0.0], [1.0, 0.0]])
 
+    write_manifest(tmp_path, {
+        "chirps_rainfall_daily": "ghana_rainfall_daily_2024_2025_daily.nc",
+        "jrc_water": "ghana_water_occurrence.tif",
+        "era5_water_temp": {"2024": "ghana_water_temp_2024.tif"},
+        "modis_ndvi": {"2024": "ghana_ndvi_2024.tif"},
+        "coastline_land_mask": "ghana_land_mask.tif",
+    })
     result = build_daily_env_nc("ghana", tmp_path)
     ds = xr.open_dataset(result["env_path"])
     try:
@@ -211,7 +247,7 @@ def test_coastline_zeros_ocean_cells_but_keeps_coastal(tmp_path, monkeypatch):
         ds.close()
 
 
-def test_coastline_disabled_by_negative_env(tmp_path, monkeypatch):
+def test_coastline_disabled_by_negative_env(tmp_path, monkeypatch, write_manifest):
     """Setting COASTLINE_BUFFER_M to a negative value disables the filter entirely."""
     monkeypatch.setenv("COASTLINE_BUFFER_M", "-1")
 
@@ -227,6 +263,13 @@ def test_coastline_disabled_by_negative_env(tmp_path, monkeypatch):
     _write_tif(tmp_path / "ghana_ndvi_2024.tif", [[0.5, 0.5], [0.5, 0.5]])
     _write_tif(tmp_path / "ghana_land_mask.tif", [[1.0, 0.0], [1.0, 0.0]])
 
+    write_manifest(tmp_path, {
+        "chirps_rainfall_daily": "ghana_rainfall_daily_2024_2025_daily.nc",
+        "jrc_water": "ghana_water_occurrence.tif",
+        "era5_water_temp": {"2024": "ghana_water_temp_2024.tif"},
+        "modis_ndvi": {"2024": "ghana_ndvi_2024.tif"},
+        "coastline_land_mask": "ghana_land_mask.tif",
+    })
     result = build_daily_env_nc("ghana", tmp_path)
     ds = xr.open_dataset(result["env_path"])
     try:

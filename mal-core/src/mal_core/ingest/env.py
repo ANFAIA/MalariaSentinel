@@ -137,12 +137,13 @@ def build_env_tensor(
         aoi = AOI.from_slug(aoi)
 
     from .daily_nc import build_daily_env_nc
+    from ..download.catalog import INGEST_ARTIFACTS
     nc_result = build_daily_env_nc(
         aoi=aoi.slug,
         data_dir=output_dir,
     )
     register_dataset(
-        aoi.slug, "env", year,
+        aoi.slug, INGEST_ARTIFACTS["env"].key, year,
         pathlib.Path(nc_result["env_path"]).name,
         type="time-series",
         variables=nc_result["variables"],
@@ -156,10 +157,16 @@ def build_env_tensor(
         ),
         data_root=data_root,
     )
-    dem_path = output_dir / f"{aoi.slug}_elevation.tif"
-    water_path = output_dir / f"{aoi.slug}_water_occurrence.tif"
-    land_path = output_dir / f"{aoi.slug}_land_mask.tif"
-    if dem_path.exists() and water_path.exists():
+    # Manifest-first resolution for the static rasters the habitat builder
+    # re-reads — via the catalog, identity = manifest key (strict when a
+    # declared file is missing; absent entry = the corresponding habitat
+    # inputs degrade, as daily_nc documents).
+    from ..download.catalog import resolve
+
+    dem_path = resolve(aoi.slug, "dem", data_dir=output_dir)
+    water_path = resolve(aoi.slug, "jrc_water", data_dir=output_dir)
+    land_path = resolve(aoi.slug, "coastline_land_mask", data_dir=output_dir)
+    if dem_path is not None and water_path is not None:
         from .daily_nc import read_static_tif
 
         h, w = aoi.cells_per_side()
@@ -179,7 +186,7 @@ def build_env_tensor(
         # NC live on land by construction (daily_nc applied the coast
         # filter).
         open_ocean_da = None
-        if land_path.exists():
+        if land_path is not None:
             land_da = xr.DataArray(
                 read_static_tif(land_path, (h, w)), dims=("y", "x")
             )
@@ -240,7 +247,7 @@ def build_env_tensor(
             open_ocean_mask=open_ocean_da,
         )
         register_dataset(
-            aoi.slug, "habitat", year, habitat_path.name,
+            aoi.slug, INGEST_ARTIFACTS["habitat"].key, year, habitat_path.name,
             type="time-series", format="gpkg",
             license="ODbL-1.0+CC-BY-4.0",
             attribution=(

@@ -239,13 +239,38 @@ def main(argv: list[str] | None = None) -> None:
 
     aoi = args.aoi
     data_dir = args.data_dir or Path("data") / aoi
-    host_nc = args.host_nc or data_dir / f"{aoi}_host_static.nc"
+    # Manifest-first input resolution via the dataset catalog: the four
+    # artifacts resolve by their INGEST_ARTIFACTS keys; a declared file
+    # that is missing is a strict error, an absent entry is a clear error
+    # hinting at the ingest stage that produces it.
+    from mal_core.download.catalog import INGEST_ARTIFACTS, resolve
+
+    host_nc = args.host_nc or resolve(
+        aoi, INGEST_ARTIFACTS["host_static"].key, data_dir=data_dir
+    )
+    if host_nc is None:
+        raise FileNotFoundError(
+            f"host_static not found in manifest ({data_dir}) — "
+            f"run: malariasim ingest {aoi} --what hosts"
+        )
     out_dir = args.output_dir
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    day_csr = data_dir / f"{aoi}_mobility_day.csr"
-    night_csr = data_dir / f"{aoi}_mobility_night.csr"
-    live_csr = data_dir / f"{aoi}_livestock_mobility.csr"
+    day_csr = resolve(aoi, INGEST_ARTIFACTS["mobility_day"].key, data_dir=data_dir)
+    night_csr = resolve(aoi, INGEST_ARTIFACTS["mobility_night"].key, data_dir=data_dir)
+    live_csr = resolve(aoi, INGEST_ARTIFACTS["livestock_mobility"].key, data_dir=data_dir)
+    missing_csrs = [
+        name for name, p in (
+            ("mobility_day", day_csr), ("mobility_night", night_csr),
+            ("livestock_mobility", live_csr),
+        ) if p is None
+    ]
+    if missing_csrs:
+        raise FileNotFoundError(
+            f"mobility CSR artifacts missing in manifest ({data_dir}): "
+            f"{missing_csrs} — run: malariasim ingest {aoi} --what mobility"
+        )
+    assert day_csr is not None and night_csr is not None and live_csr is not None
     manifest = data_dir / "mobility_manifest.json"
 
     # Beta parameters: manifest is the single source when present.

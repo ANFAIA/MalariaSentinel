@@ -142,9 +142,10 @@ def build_mobility_dataset(
         f"{aoi_slug}_mobility_night.csr": "mobility_night",
         f"{aoi_slug}_livestock_mobility.csr": "livestock_mobility",
     }
+    from ..download.catalog import INGEST_ARTIFACTS
     for csr_name, manifest_key in manifest_keys.items():
         register_dataset(
-            aoi_slug, manifest_key, None,
+            aoi_slug, INGEST_ARTIFACTS[manifest_key].key, None,
             csr_name,
             required_for_abm=True,
             license="CC-BY-4.0+ODbL-1.0+NASA-Cite",
@@ -155,7 +156,7 @@ def build_mobility_dataset(
             ),
         )
     register_dataset(
-        aoi_slug, "mobility_manifest", None,
+        aoi_slug, INGEST_ARTIFACTS["mobility_manifest"].key, None,
         str(manifest_path.name),
     )
 

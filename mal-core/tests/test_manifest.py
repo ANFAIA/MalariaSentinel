@@ -109,3 +109,96 @@ class TestValidateCompleteness:
         # 2025 not covered
         period_errors = [m for m in missing if "period" in m and "2025" in m]
         assert len(period_errors) == 1
+
+
+class TestResolveDatasetFile:
+    """resolve_dataset_file — manifest-first, strict on declared-but-missing."""
+
+    def _with_files(self, tmp_path, files: dict[str, str], datasets: dict) -> pathlib.Path:
+        """Create files inside a data-dir and return the dir."""
+        for rel in files.values():
+            p = tmp_path / rel
+            p.parent.mkdir(parents=True, exist_ok=True)
+            p.write_text("dummy")
+        return tmp_path
+
+    def _mk_manifest(self, datasets: dict) -> dict:
+        return {"datasets": datasets}
+
+    def test_no_entry_returns_none(self, tmp_path):
+        from mal_core.download.manifest import resolve_dataset_file
+
+        assert resolve_dataset_file(
+            "aoi", "host_static", data_dir=tmp_path, manifest={}
+        ) is None
+
+    def test_single_file_resolved(self, tmp_path):
+        from mal_core.download.manifest import resolve_dataset_file
+
+        data_dir = self._with_files(tmp_path, {}, {
+            "host_static": {"files": {"host_static": "a_host_static.nc"}},
+        })
+        (tmp_path / "a_host_static.nc").write_text("x")
+        p = resolve_dataset_file(
+            "aoi", "host_static", data_dir=data_dir,
+            manifest=self._mk_manifest({
+                "host_static": {"files": {"host_static": "a_host_static.nc"}},
+            }),
+        )
+        assert p == tmp_path / "a_host_static.nc"
+
+    def test_declared_but_missing_is_strict(self, tmp_path):
+        from mal_core.download.manifest import resolve_dataset_file
+
+        with pytest.raises(FileNotFoundError):
+            resolve_dataset_file(
+                "aoi", "host_static", data_dir=tmp_path,
+                manifest=self._mk_manifest({
+                    "host_static": {"files": {"host_static": "ghost.nc"}},
+                }),
+            )
+
+    def test_strict_false_returns_missing_path(self, tmp_path):
+        from mal_core.download.manifest import resolve_dataset_file
+
+        p = resolve_dataset_file(
+            "aoi", "host_static", data_dir=tmp_path, strict=False,
+            manifest=self._mk_manifest({
+                "host_static": {"files": {"host_static": "ghost.nc"}},
+            }),
+        )
+        assert p == tmp_path / "ghost.nc"
+
+    def test_per_year_selection(self, tmp_path):
+        from mal_core.download.manifest import resolve_dataset_file
+
+        data_dir = self._with_files(tmp_path, {}, {})
+        (tmp_path / "w_2024.tif").write_text("x")
+        (tmp_path / "w_2025.tif").write_text("x")
+        manifest = self._mk_manifest({
+            "era5_water_temp": {"files": {"2024": "w_2024.tif", "2025": "w_2025.tif"}},
+        })
+        assert resolve_dataset_file("aoi", "era5_water_temp", year=2025, data_dir=data_dir, manifest=manifest) \
+            == tmp_path / "w_2025.tif"
+        assert resolve_dataset_file("aoi", "era5_water_temp", year=2024, data_dir=data_dir, manifest=manifest) \
+            == tmp_path / "w_2024.tif"
+
+    def test_per_year_missing_year_is_strict(self, tmp_path):
+        from mal_core.download.manifest import resolve_dataset_file
+
+        manifest = self._mk_manifest({
+            "era5_water_temp": {"files": {"2024": "w_2024.tif"}},
+        })
+        (tmp_path / "w_2024.tif").write_text("x")
+        with pytest.raises(FileNotFoundError, match="nothing for 2025"):
+            resolve_dataset_file("aoi", "era5_water_temp", year=2025, data_dir=tmp_path, manifest=manifest)
+
+    def test_year_on_non_year_entry_uses_named_file(self, tmp_path):
+        from mal_core.download.manifest import resolve_dataset_file
+
+        (tmp_path / "rain.nc").write_text("x")
+        manifest = self._mk_manifest({
+            "chirps_rainfall_daily": {"files": {"chirps_rainfall_daily": "rain.nc"}},
+        })
+        assert resolve_dataset_file("aoi", "chirps_rainfall_daily", year=2024, data_dir=tmp_path, manifest=manifest) \
+            == tmp_path / "rain.nc"

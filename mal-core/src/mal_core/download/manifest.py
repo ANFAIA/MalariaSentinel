@@ -36,6 +36,83 @@ def read_manifest(aoi: str, data_root: Path | None = None) -> dict:
         return json.load(f)
 
 
+def resolve_dataset_file(
+    aoi: str,
+    dataset_name: str,
+    *,
+    year: int | str | None = None,
+    data_dir: Path | None = None,
+    data_root: Path | None = None,
+    manifest: dict | None = None,
+    strict: bool = True,
+) -> Path | None:
+    """Resolve a dataset's file path from the manifest — the single source of truth.
+
+    Selection inside the entry's ``files`` dict:
+      1. ``files[str(year)]`` when ``year`` is given and present (per-year
+         datasets: era5_water_temp, modis_ndvi, env...);
+      2. ``files[dataset_name]`` (single-file datasets where the key repeats
+         the dataset name: chirps_rainfall_daily, host_static...);
+      3. first declared file, otherwise.
+
+    Resolution semantics:
+
+    * No manifest entry for ``dataset_name`` → ``None``. The caller should
+      fall back to conventional-filename discovery (legacy tmp dirs,
+      sandboxes, downloads not yet registered).
+    * Entry exists but the declared file is missing on disk →
+      ``FileNotFoundError`` (``strict=True``, default). A stale manifest is
+      an error, never a silent fallback. ``strict=False`` returns the
+      missing path instead (attempted writes / diagnostics).
+
+    Args:
+        aoi: AOI slug.
+        dataset_name: manifest datasets key (e.g. ``"host_static"``).
+        year: optional per-year file key.
+        data_dir: directory holding the actual files. Defaults to
+            ``(data_root or DATA_ROOT) / aoi``.
+        data_root: parent of the AOI dir (default ``DATA_ROOT``); only used
+            to locate the manifest and the default ``data_dir``.
+        manifest: optional pre-loaded manifest dict (avoids re-reading; also
+            lets tmp-dir tests resolve against a locally written manifest).
+    """
+    if manifest is None:
+        manifest = read_manifest(aoi, data_root)
+    entry = manifest.get("datasets", {}).get(dataset_name)
+    if entry is None:
+        return None
+    files: dict = entry.get("files", {})
+    fname: str | None = None
+    if year is not None:
+        if str(year) in files:
+            fname = files[str(year)]
+        elif any(str(k).isdigit() for k in files):
+            # Per-year keyed entry without the requested year: selecting
+            # another year's file silently would be a data-integrity bug.
+            raise FileNotFoundError(
+                f"Manifest entry '{dataset_name}' is per-year keyed "
+                f"{sorted(files)} but declares nothing for {year}. "
+                f"Download year {year} or fix the manifest."
+            )
+    if not fname:
+        fname = files.get(dataset_name) or (
+            next(iter(files.values()), None) if files else None
+        )
+    if not fname:
+        return None
+    if data_dir is None:
+        data_dir = (data_root or DATA_ROOT) / aoi
+    path = Path(data_dir) / fname
+    if strict and not path.exists():
+        raise FileNotFoundError(
+            f"Manifest entry '{dataset_name}' exists but declares a file that "
+            f"is missing on disk: {path}. Re-download it "
+            f"(malariasim download --aoi {aoi} ...), or fix "
+            f"{Path(data_dir) / 'manifest.json'}."
+        )
+    return path
+
+
 def update_dataset(
     aoi: str,
     dataset_name: str,

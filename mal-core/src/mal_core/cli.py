@@ -635,10 +635,16 @@ def _ensure_env_stack(aoi: str, years: list[int], skip: bool = False) -> Path:
     env NC path.
     """
     from pathlib import Path as P
+    from .download.manifest import resolve_dataset_file
 
     data_dir = P("data") / aoi
     y_min, y_max = min(years), max(years)
-    env_nc = data_dir / f"{aoi}_regional_{y_min}_{y_max}_env.nc"
+    # Manifest-first cache check: the env NC the manifest declares (any
+    # declared entry whose period covers the years) is the cached artifact;
+    # the constructed conventional name is only the pre-manifest fallback.
+    env_nc = resolve_dataset_file(aoi, "env", year=y_min, data_dir=data_dir)
+    if env_nc is None:
+        env_nc = data_dir / f"{aoi}_regional_{y_min}_{y_max}_env.nc"
     if env_nc.exists():
         return env_nc
     if skip:
@@ -685,12 +691,22 @@ def _ensure_env_stack(aoi: str, years: list[int], skip: bool = False) -> Path:
 
 
 def _ensure_abm_inputs(aoi: str, data_dir: Path) -> None:
-    """Ensure habitat patches, host grid and mobility matrices exist."""
+    """Ensure habitat patches, host grid and mobility matrices exist.
+
+    Presence checks go through the catalog (manifest = single source of
+    truth; identity keys from INGEST_ARTIFACTS). Production keeps writing
+    the conventional names — register_existing/migration covers dirs that
+    predate manifests.
+    """
     from mal_commonlib.aoi import AOI
+    from .download.catalog import INGEST_ARTIFACTS, resolve
     from .ingest import build_host_dataset, build_mobility_dataset
 
-    habitat = data_dir / f"{aoi}_habitat_patches.gpkg"
-    if not habitat.exists():
+    habitat = resolve(
+        aoi, INGEST_ARTIFACTS["habitat"].key, data_dir=data_dir
+    )
+    if habitat is None:
+        # Not registered yet: build the env stack (registers env+habitat).
         from .ingest import build_env_tensor
 
         typer.echo("Building habitat patches (env builder)...")
@@ -701,20 +717,37 @@ def _ensure_abm_inputs(aoi: str, data_dir: Path) -> None:
             output_dir=data_dir,
             data_root=data_dir.parent,
         )
-        built = data_dir / f"{aoi}_regional_2024_01_habitat_patches.gpkg"
-        if not habitat.exists():
-            if built.exists():
-                built.replace(habitat)
-            else:
-                raise FileNotFoundError("habitat patch gpkg build failed")
+        habitat = resolve(
+            aoi, INGEST_ARTIFACTS["habitat"].key, data_dir=data_dir
+        )
+        if habitat is None:
+            raise FileNotFoundError(
+                "habitat patch gpkg build failed "
+                f"(manifest key '{INGEST_ARTIFACTS['habitat'].key}')"
+            )
 
-    hosts = data_dir / f"{aoi}_host_static.nc"
-    if not hosts.exists():
+    hosts = resolve(
+        aoi, INGEST_ARTIFACTS["host_static"].key, data_dir=data_dir
+    )
+    if hosts is None:
         typer.echo("Building host grid (WorldPop + livestock)...")
         build_host_dataset(AOI.from_slug(aoi), output_dir=data_dir)
+        hosts = resolve(
+            aoi, INGEST_ARTIFACTS["host_static"].key, data_dir=data_dir
+        )
+        if hosts is None:
+            raise FileNotFoundError(
+                "host grid build failed "
+                f"(manifest key '{INGEST_ARTIFACTS['host_static'].key}')"
+            )
 
-    csr = list(data_dir.glob(f"{aoi}_mobility_*.csr"))
-    if len(csr) < 2:
+    day_csr = resolve(
+        aoi, INGEST_ARTIFACTS["mobility_day"].key, data_dir=data_dir
+    )
+    night_csr = resolve(
+        aoi, INGEST_ARTIFACTS["mobility_night"].key, data_dir=data_dir
+    )
+    if day_csr is None or night_csr is None:
         typer.echo("Building mobility matrices (this can take a while)...")
         build_mobility_dataset(
             hosts_path=hosts, output_dir=data_dir, aoi_slug=aoi
@@ -756,6 +789,37 @@ def train(
         env_path=env_path,
     )
     typer.echo(f"Training complete. Best val_dice: {best_dice:.4f}")
+
+
+@app.command("datasets")
+def datasets_cmd(
+    aoi: str = typer.Option("ghana", "--aoi", help="AOI slug"),
+    missing_only: bool = typer.Option(False, "--missing", help="Show only rows not fully registered+on disk"),
+) -> None:
+    """Dataset catalog: loaders + ingest artifacts vs manifest vs disk.
+
+    One row per known manifest key (download datasets derive from each
+    loader's manifest_keys; ingest artifacts from INGEST_ARTIFACTS).
+    'disk' shows whether the manifest-declared file actually exists.
+    """
+    from .download.catalog import catalog_status
+
+    rows = catalog_status(aoi)
+    typer.echo(
+        f"{'kind':9s} {'key':30s} {'source':44s} {'abm':4s} "
+        f"{'manifest':9s} {'disk':6s} file"
+    )
+    typer.echo("-" * 130)
+    for r in rows:
+        if missing_only and (r["in_manifest"] and r["on_disk"]):
+            continue
+        fname = Path(r["path"]).name if r["path"] else "-"
+        typer.echo(
+            f"{r['kind']:9s} {r['key']:30s} {r['source']:44s} "
+            f"{'yes' if r['required_for_abm'] else '-':4s} "
+            f"{'yes' if r['in_manifest'] else 'no':9s} "
+            f"{'yes' if r['on_disk'] else 'no':6s} {fname}"
+        )
 
 
 @app.command()

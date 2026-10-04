@@ -207,8 +207,9 @@ def build_host_dataset(
     results["manifest_path"] = str(manifest_path)
 
     # Register in manifest
+    from ..download.catalog import INGEST_ARTIFACTS
     register_dataset(
-        aoi.slug, "host_static", None,
+        aoi.slug, INGEST_ARTIFACTS["host_static"].key, None,
         str(nc_path.name),
         required_for_abm=True,
         variables=["human", "cattle", "goats", "sheep", "pigs",
@@ -226,7 +227,7 @@ def build_host_dataset(
         ),
     )
     register_dataset(
-        aoi.slug, "host_manifest", None,
+        aoi.slug, INGEST_ARTIFACTS["host_manifest"].key, None,
         str(manifest_path.name),
     )
     try:

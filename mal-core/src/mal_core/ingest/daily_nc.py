@@ -26,9 +26,9 @@ mal-core/src/mal_core/abm/include/mal_abm_fast/climate.hpp:80-86.
 """
 from __future__ import annotations
 
+import json
 import os
 import pathlib
-import re
 from typing import Tuple
 
 import numpy as np
@@ -44,6 +44,76 @@ WATER_FRAC_VIABILITY_THRESHOLD = 0.05
 # permanent surf). Set ``COASTLINE_BUFFER_M=0`` to disable buffering
 # (use the raw coastline line), or negative to disable the filter entirely.
 COASTLINE_BUFFER_M_DEFAULT = 5_000.0
+
+# --- consumer dependency table (the ONLY dataset knowledge in this file) ------
+#
+# Identity of every input is its manifest key; resolution happens entirely
+# through mal_core.download.catalog (manifest.json = single source of truth).
+# Legacy conventional-name fallbacks do NOT live here — dirs that predate
+# manifests are migrated once with catalog.register_existing().
+
+from ..download import catalog as _cat
+
+ENV_INPUT_SLOTS: dict[str, _cat.Slot] = {
+    # Required by the builder — absent from the manifest = hard error.
+    "rainfall": _cat.Slot("chirps_rainfall_daily"),
+    "water_frac": _cat.Slot("jrc_water"),
+    "water_temp": _cat.Slot("era5_water_temp", per_year=True),
+    "ndvi": _cat.Slot("modis_ndvi", per_year=True),
+    # Optional — absent entry emits a warning and the corresponding
+    # variable/behaviour is skipped (backward-compatible).
+    "dem": _cat.Slot("dem", required=False),
+    "land_mask": _cat.Slot("coastline_land_mask", required=False),
+    "host_static": _cat.Slot("host_static", required=False),
+    "salinity": _cat.Slot("smap_salinity", required=False),
+    # M12-optional enrichment layers (worldcover not in the registry yet;
+    # hydrorivers registered but inert — slots stay absent until downloads land).
+    "permanent_lakes": _cat.Slot("hydrolakes_lakes", required=False),
+    "permanent_rivers": _cat.Slot("hydrorivers_rivers", required=False),
+    "worldcover_permanent_water": _cat.Slot("worldcover_water", required=False),
+    "worldcover_wetland": _cat.Slot("worldcover_wetland", required=False),
+}
+
+_PER_YEAR_SLOTS = frozenset(n for n, s in ENV_INPUT_SLOTS.items() if s.per_year)
+
+
+def resolve_daily_env_inputs(
+    aoi: str,
+    data_dir: pathlib.Path,
+    *,
+    explicit: dict | None = None,
+) -> dict[str, dict]:
+    """Resolve (only) every input ``build_daily_env_nc`` consumes — no build.
+
+    The build-free counterpart used to verify manifest wiring: required
+    slots must resolve to an existing file or the call raises; optional
+    slots with no manifest entry are simply absent.
+
+    Args:
+        explicit: optional ``{slot: Path}`` overrides (same keys as the
+            ``build_daily_env_nc`` keyword args).
+    Returns ``{slot: {"path": Path, "source": "manifest|explicit",
+    "years": {year: Path} | None}}`` (the ``years`` field only for the
+    per-year slots when the manifest entry is year-keyed).
+    """
+    resolved = _cat.resolve_inputs(
+        aoi, ENV_INPUT_SLOTS, data_dir=pathlib.Path(data_dir),
+        explicit=explicit,
+    )
+    out: dict[str, dict] = {}
+    for slot_name, value in resolved.items():
+        if value is None:
+            continue
+        if slot_name in _PER_YEAR_SLOTS and isinstance(value, dict):
+            out[slot_name] = {
+                "path": next(iter(value.values())),
+                "years": value,
+                "source": "manifest",
+            }
+        else:
+            out[slot_name] = {"path": value, "source": "manifest"}
+    return out
+
 
 
 def read_static_tif(
@@ -88,18 +158,19 @@ def build_daily_env_nc(
         data_dir: directory containing the raw input files.
         output_dir: where to write the NC (default: data_dir).
         rainfall_file, water_frac_file, water_temp_file, ndvi_file:
-            override input paths (default: conventional filenames in data_dir).
-        salinity_file: optional SMAP monthly salinity NC. Defaults to a
-            conventional ``{aoi}_salinity_<start>_<end>_monthly.nc`` discovered
-            in data_dir. When absent, no ``salinity_ppt`` variable is emitted
+            explicit input overrides (same slot names as ENV_INPUT_SLOTS).
+            By default every input resolves from the manifest via
+            ``ENV_INPUT_SLOTS`` — required slots hard-error when missing.
+        salinity_file: explicit override for the optional SMAP monthly
+            salinity NC (manifest key ``smap_salinity``). When the manifest
+            has no entry, no ``salinity_ppt`` variable is emitted
             (backward compatible).
-        dem_file: optional static DEM GeoTIFF. When present, a static
-            ``twi`` variable (Topographic Wetness Index, plan §6.3) is
-            computed via ``mal_commonlib.terrain.twi.compute_twi`` and
-            embedded in the NC so the C++ pluvial-pool urban rule can gate
-            on real terrain data. Defaults to ``{aoi}_elevation.tif``
-            (the DEM downloader's manifest output). When absent, no
-            ``twi`` variable is emitted (backward compatible).
+        dem_file: explicit override for the optional static DEM GeoTIFF
+            (manifest key ``dem``). When present, static ``twi`` and
+            ``catchment_ratio`` variables (plan §6.3) are computed via
+            ``mal_commonlib.terrain.twi`` and embedded so the C++
+            pluvial-pool urban rule can gate on real terrain. When absent,
+            no ``twi`` variable is emitted (backward compatible).
 
     Returns:
         dict with 'env_path' (str), 'format' ('nc'), 'aoi_slug', 'n_days',
@@ -109,28 +180,37 @@ def build_daily_env_nc(
     output_dir = pathlib.Path(output_dir) if output_dir else data_dir
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    rain_file = rainfall_file or (
-        data_dir / f"{aoi}_rainfall_daily_2024_2025_daily.nc"
-        if (data_dir / f"{aoi}_rainfall_daily_2024_2025_daily.nc").exists()
-        else _find_chirps_daily(data_dir)
+    # Two-phase manifest-first resolution via the catalog (the consumer's
+    # ONLY dataset knowledge is ENV_INPUT_SLOTS):
+    #   Phase 1 — non-per-year slots (explicit args win, validated).
+    #   Phase 2 — per-year slots, once the rainfall NC has revealed the
+    #   years present in the time axis.
+    explicit = {
+        name: p for name, p in (
+            ("rainfall", rainfall_file),
+            ("water_frac", water_frac_file),
+            ("water_temp", water_temp_file),
+            ("ndvi", ndvi_file),
+            ("salinity", salinity_file),
+            ("dem", dem_file),
+        ) if p is not None
+    }
+    phase1_slots = {
+        n: s for n, s in ENV_INPUT_SLOTS.items() if not s.per_year
+    }
+    resolved = _cat.resolve_inputs(
+        aoi, phase1_slots, data_dir=data_dir, explicit=explicit
     )
-    water_frac_file = water_frac_file or (data_dir / f"{aoi}_water_occurrence.tif")
-    year_match = re.search(r"_(20\d{2})(?:_|\.)", rain_file.name)
-    data_year = year_match.group(1) if year_match else "2024"
-    water_temp_file = water_temp_file or (data_dir / f"{aoi}_water_temp_{data_year}.tif")
-    ndvi_file = ndvi_file or (data_dir / f"{aoi}_ndvi_{data_year}.tif")
-
-    for label, p in [
-        ("rainfall", rain_file),
-        ("water_frac", water_frac_file),
-        ("water_temp", water_temp_file),
-        ("ndvi", ndvi_file),
-    ]:
-        if not p.exists():
-            raise FileNotFoundError(
-                f"{label} input not found: {p}. "
-                f"Run: malariasim download --aoi {aoi} --datasets <required>"
-            )
+    rain_file = resolved["rainfall"]
+    water_frac_file = resolved["water_frac"]
+    coastline_file = resolved["land_mask"]
+    hosts_nc = resolved["host_static"]
+    m12_paths = {
+        "permanent_lakes": resolved["permanent_lakes"],
+        "permanent_rivers": resolved["permanent_rivers"],
+        "worldcover_permanent_water": resolved["worldcover_permanent_water"],
+        "worldcover_wetland": resolved["worldcover_wetland"],
+    }
 
     print(f"Reading rainfall: {rain_file}")
     rain_ds = xr.open_dataset(rain_file)
@@ -165,11 +245,10 @@ def build_daily_env_nc(
         rainfall[nodata_mask] = 0.0  # degenerate: everything filled
     rainfall[rainfall < 0] = 0.0
 
-    # Open ocean -> 0 rain (and the land mask is reused further down for
-    # the saltwater filter).
-    coastline_file = data_dir / f"{aoi}_land_mask.tif"
+    # Open ocean -> 0 rain, and the SAME land mask feeds the saltwater
+    # filter below. Resolved once via the catalog ("/coastline_land_mask").
     ocean_mask = None
-    if coastline_file.exists():
+    if coastline_file is not None:
         try:
             lm = read_static_tif(coastline_file, target_shape)
             lm = np.nan_to_num(lm, nan=0.0)
@@ -191,11 +270,10 @@ def build_daily_env_nc(
     # land mask so coastal lagoons stay (buffer) but open ocean is rejected.
     # Controlled by the COASTLINE_BUFFER_M env var; negative disables the
     # filter entirely (legacy behaviour, useful for arid landlocked AOIs).
-    coastline_file = data_dir / f"{aoi}_land_mask.tif"
     buffer_env = os.environ.get("COASTLINE_BUFFER_M")
     buffer_m = float(buffer_env) if buffer_env is not None else COASTLINE_BUFFER_M_DEFAULT
     coastline_applied = False
-    if coastline_file.exists() and buffer_m >= 0:
+    if coastline_file is not None and buffer_m >= 0:
         print(f"Reading coastline land mask: {coastline_file}")
         land_mask = read_static_tif(coastline_file, target_shape)
         land_mask = np.nan_to_num(land_mask, nan=0.0)
@@ -226,7 +304,7 @@ def build_daily_env_nc(
             f"(coastline cells kept: {int(land_mask.sum())} of {land_mask.size})"
         )
         coastline_applied = True
-    elif not coastline_file.exists():
+    elif coastline_file is None:
         print(
             "WARNING: no land_mask.tif found — saltwater filter "
             "skipped. JRC GSW may include open-ocean cells. "
@@ -234,9 +312,11 @@ def build_daily_env_nc(
         )
 
     # --- M12 enrichment: compose M12 water datasets into water_frac ---
-    # Optional layers from hydrolakes / worldcover loaders.  When present
-    # they improve the water_frac estimate; when absent the function falls
-    # back to JRC GSW only (backward-compatible).
+    # Optional layers from hydrolakes / worldcover loaders (resolved in the
+    # catalog phase 1; absent entry → None).  When present they improve the
+    # water_frac estimate; when absent the function falls back to JRC GSW
+    # only (backward-compatible).
+
     permanent_water_mask = None
     wetland_mask = None
     component_masks: dict[str, np.ndarray] = {}
@@ -255,28 +335,28 @@ def build_daily_env_nc(
         permanent_water_mask = np.maximum(permanent_water_mask, jrc_permanent_water)
     component_masks["jrc_permanent_water"] = jrc_permanent_water.copy()
 
-    lakes_file = data_dir / f"{aoi}_permanent_lakes.tif"
-    if lakes_file.exists():
+    lakes_file = m12_paths["permanent_lakes"]
+    if lakes_file is not None:
         print(f"Loading M12 permanent water mask: {lakes_file}")
         permanent_water_mask = read_static_tif(lakes_file, target_shape)
         permanent_water_mask = np.nan_to_num(permanent_water_mask, nan=0.0)
         permanent_water_mask = np.clip(permanent_water_mask, 0.0, 1.0)
         component_masks["permanent_lakes"] = permanent_water_mask.copy()
 
-    rivers_file = data_dir / f"{aoi}_permanent_rivers.tif"
-    if rivers_file.exists():
+    rivers_file = m12_paths["permanent_rivers"]
+    if rivers_file is not None:
         rivers = np.clip(np.nan_to_num(read_static_tif(rivers_file, target_shape), nan=0.0), 0.0, 1.0)
         component_masks["permanent_rivers"] = rivers.copy()
         permanent_water_mask = rivers if permanent_water_mask is None else np.maximum(permanent_water_mask, rivers)
 
-    worldcover_water_file = data_dir / f"{aoi}_wc_permanent_water.tif"
-    if worldcover_water_file.exists():
+    worldcover_water_file = m12_paths["worldcover_permanent_water"]
+    if worldcover_water_file is not None:
         wc_water = np.clip(np.nan_to_num(read_static_tif(worldcover_water_file, target_shape), nan=0.0), 0.0, 1.0)
         component_masks["worldcover_permanent_water"] = wc_water.copy()
         permanent_water_mask = wc_water if permanent_water_mask is None else np.maximum(permanent_water_mask, wc_water)
 
-    wetland_file = data_dir / f"{aoi}_wc_wetland.tif"
-    if wetland_file.exists():
+    wetland_file = m12_paths["worldcover_wetland"]
+    if wetland_file is not None:
         print(f"Loading M12 wetland mask: {wetland_file}")
         wetland_mask = read_static_tif(wetland_file, target_shape)
         wetland_mask = np.nan_to_num(wetland_mask, nan=0.0)
@@ -298,14 +378,36 @@ def build_daily_env_nc(
             f"Check {water_frac_file} contains real JRC GSW data."
         )
 
-    def _annual_raster_stack(prefix: str, fallback: pathlib.Path, fill: float) -> np.ndarray:
-        """Use matching annual rasters for each day, with explicit fallback."""
-        years = np.unique(times.astype("datetime64[Y]")).astype(int) + 1970
+    # Phase 2 — per-year slots: the rainfall NC now reveals the years on
+    # the time axis; water_temp/ndvi resolve strictly for exactlythose
+    # years (year-keyed manifest entries) or cover all years when the
+    # entry declares a single file.
+    years = np.unique(times.astype("datetime64[Y]")).astype(int) + 1970
+    phase2 = _cat.resolve_inputs(
+        aoi,
+        {n: ENV_INPUT_SLOTS[n] for n in ("water_temp", "ndvi")},
+        data_dir=data_dir,
+        years=[int(y) for y in years],
+        explicit={k: v for k, v in explicit.items() if k in ("water_temp", "ndvi")},
+    )
+
+    def _annual_raster_stack(value, fill: float) -> np.ndarray:
+        """Stack resolved annual rasters onto the (time, y, x) tensor.
+
+        ``value`` is either ``{year: Path}`` (year-keyed entry) or a single
+        ``Path`` (single-file entry / explicit arg — used for every year).
+        """
         annual: dict[int, np.ndarray] = {}
         for data_year in years:
-            candidate = data_dir / f"{aoi}_{prefix}_{data_year}.tif"
-            path = candidate if candidate.exists() else fallback
-            print(f"Reading {prefix}: {path}")
+            if isinstance(value, dict):
+                if int(data_year) not in value:
+                    raise FileNotFoundError(
+                        f"no resolved annual raster for year {data_year}"
+                    )
+                path = value[int(data_year)]
+            else:
+                path = value
+            print(f"Reading annual raster: {path}")
             annual[int(data_year)] = np.nan_to_num(
                 read_static_tif(path, target_shape), nan=fill,
             )
@@ -316,19 +418,19 @@ def build_daily_env_nc(
         return stacked
 
     # ERA5 water temperature and MODIS NDVI are annual static rasters.
-    water_temp_c = _annual_raster_stack("water_temp", water_temp_file, 25.0)
-    ndvi = np.clip(_annual_raster_stack("ndvi", ndvi_file, 0.5), 0.0, 1.0)
+    water_temp_c = _annual_raster_stack(phase2["water_temp"], 25.0)
+    ndvi = np.clip(_annual_raster_stack(phase2["ndvi"], 0.5), 0.0, 1.0)
 
     # SMAP monthly sea surface salinity -> salinity_ppt (M7.8), optional.
     # Reproject each month to the AOI grid, mask land/no-data cells to 0.0
     # (freshwater), and broadcast the monthly value to every day of that month.
-    # Absent file -> no salinity_ppt variable at all (backward compatible).
+    # Absent manifest entry -> no salinity_ppt variable (backward compatible).
     salinity_monthly = None
     salinity_ppt = None
-    salinity_path = salinity_file or _find_salinity_monthly(data_dir)
-    if salinity_path is not None and salinity_path.exists():
-        print(f"Reading salinity (monthly): {salinity_path}")
-        salinity_monthly = _read_salinity_monthly(salinity_path, y, x, _env_crs(rain_ds))
+    salinity_resolved = resolved["salinity"]
+    if salinity_resolved is not None:
+        print(f"Reading salinity (monthly): {salinity_resolved}")
+        salinity_monthly = _read_salinity_monthly(salinity_resolved, y, x, _env_crs(rain_ds))
     if salinity_monthly is not None:
         salinity_ppt = np.zeros((n_days, h, w), dtype=np.float32)
         for index, timestamp in enumerate(times):
@@ -340,19 +442,19 @@ def build_daily_env_nc(
 
     # --- M7.4.1: static TWI from DEM (plan §6.3 pluvial-pool rules) ------
     # Embedded as a single-plane ('y', 'x') variable so the C++ env reader
-    # can gate the urban dynamic-pool rule on real terrain. Discovery
-    # follows the DEM downloader manifest output ({aoi}_elevation.tif).
-    dem_file = dem_file or (data_dir / f"{aoi}_elevation.tif")
+    # can gate the urban dynamic-pool rule on real terrain. Manifest-first
+    # ("dem"); absent entry → no 'twi' variable (warning below).
+    dem_path = resolved["dem"]
     twi_static: np.ndarray | None = None
     catchment_static: np.ndarray | None = None
-    if dem_file.exists():
+    if dem_path is not None:
         from mal_commonlib.terrain.twi import (
             compute_catchment_ratio,
             compute_twi,
         )
 
-        print(f"Computing TWI from DEM: {dem_file}")
-        dem_arr = read_static_tif(dem_file, target_shape)
+        print(f"Computing TWI from DEM: {dem_path}")
+        dem_arr = read_static_tif(dem_path, target_shape)
         dem_arr = dem_arr.astype(np.float32)
         dem_arr[dem_arr <= NODATA_SENTINEL + 1] = np.nan
         dem_da = xr.DataArray(
@@ -384,9 +486,9 @@ def build_daily_env_nc(
         )
     else:
         print(
-            f"WARNING: no DEM found ({dem_file}) — no 'twi' variable in the "
-            "env NC; the urban pluvial-pool rule will fall back to "
-            "rain + building-cover gating (no terrain gate)."
+            "WARNING: no 'dem' manifest entry for this AOI — no 'twi' "
+            "variable in the env NC; the urban pluvial-pool rule will "
+            "fall back to rain + building-cover gating (no terrain gate)."
         )
 
     # --- M7.4.1: static per-cell larval→adult capacity multiplier ---------
@@ -425,11 +527,11 @@ def build_daily_env_nc(
 
     # Static urban structure (from the host dataset): building_fraction
     # and GHS-SMOD urban_class drive the urban pluvial-pool proxy and
-    # the building cover reduction of effective water area.
+    # the building cover reduction of effective water area. Manifest-first
+    # ("host_static"); absent entry → no urban modifiers (warning below).
     bldg_static = np.zeros((h, w), dtype=np.float32)
     urban_class_static = np.zeros((h, w), dtype=np.int32)
-    hosts_nc = data_dir / f"{aoi}_host_static.nc"
-    if hosts_nc.exists():
+    if hosts_nc is not None:
         hds = xr.open_dataset(hosts_nc)
         if "building_fraction" in hds:
             bldg_static = np.asarray(
@@ -657,15 +759,6 @@ def build_daily_env_nc(
     }
 
 
-def _find_salinity_monthly(data_dir: pathlib.Path) -> pathlib.Path | None:
-    """Locate the SMAP monthly salinity NC by conventional glob fallback."""
-    candidates = sorted(data_dir.glob(f"*salinity*monthly*.nc"))
-    if candidates:
-        return candidates[0]
-    candidates = sorted(data_dir.glob("*salinity*.nc"))
-    return candidates[0] if candidates else None
-
-
 def _env_crs(rain_ds: xr.Dataset) -> str:
     """CRS of the env grid, read from the rainfall NC (fallback EPSG:4326)."""
     try:
@@ -719,15 +812,3 @@ def _read_salinity_monthly(
             key = np.datetime64(str(times[i])[:10], "D")
             out[key] = arr
     return out
-
-
-def _find_chirps_daily(data_dir: pathlib.Path) -> pathlib.Path:
-    """Locate the CHIRPS daily NC by glob fallback."""
-    candidates = sorted(data_dir.glob("*rainfall_daily*.nc"))
-    if not candidates:
-        raise FileNotFoundError(
-            f"No CHIRPS daily rainfall NC found in {data_dir}. "
-            f"Run: malariasim download --aoi <slug> --datasets chirps "
-            f"--outputs rainfall_daily --years 2024,2025"
-        )
-    return candidates[0]
