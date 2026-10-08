@@ -7,7 +7,7 @@ from .glw import load_glw_livestock
 from .ghsl import load_ghsl_urban_class
 from .wildlife import load_wildlife_host_proxy
 from .buildings import load_buildings_fraction
-from .hydrorivers import load_hydrorivers_permanent_rivers, load_hydrorivers_river_proximity
+from ._legacy.hydrorivers import load_hydrorivers_permanent_rivers, load_hydrorivers_river_proximity
 from .worldcover import (
     load_worldcover_landcover,
     load_worldcover_permanent_water,

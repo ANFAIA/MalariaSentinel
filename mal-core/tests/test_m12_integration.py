@@ -285,9 +285,11 @@ def test_download_profiles_match_current_abm_contract():
     """Default profile excludes unused monthly, wind, river and landcover outputs."""
     registry = discover_downloaders()
     assert registry["chirps"].abm_default_outputs == ["rainfall_daily"]
-    assert registry["era5"].abm_default_outputs == ["water_temp"]
+    assert registry["era5"].abm_default_outputs == ["water_temp", "wind_6hourly"]
     assert registry["era5"].formats["wind_6hourly"] == "daily"
     assert "coastline" in registry
     assert registry["coastline"].abm_default_outputs == ["land_mask"]
-    assert registry["hydrorivers"].abm_default_outputs == []
+    # hydrorivers moved to _legacy 2026-10-08 (never downloaded for any AOI;
+    # optional permanent_rivers slot in daily_nc stays, manifest-key driven).
+    assert "hydrorivers" not in registry
     assert "hydrolakes" not in registry
