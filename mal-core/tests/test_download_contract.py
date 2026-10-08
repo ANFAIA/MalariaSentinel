@@ -9,11 +9,10 @@ from pathlib import Path
 
 import pytest
 
-# All loader module names that may have DOWNLOADER dicts
-LOADER_MODULES = [
-    "era5", "chirps", "dem", "jrc_gsw", "modis",
-    "worldpop", "glw", "ghsl", "wildlife", "buildings",
-]
+from mal_core.download.registry import _loader_module_names
+
+# Every loader module on disk is scanned (registry's single source of truth)
+LOADER_MODULES = _loader_module_names()
 
 VALID_AUTH = {"cds", "earthdata", "planetary_computer", "none"}
 

@@ -1,17 +1,31 @@
 """Download plugin registry — discovers DOWNLOADER dicts from mal_commonlib loaders."""
+
 import importlib
 import logging
+import pkgutil
 from dataclasses import dataclass
-from typing import Any, Callable
+from typing import Any
+from collections.abc import Callable
 
 log = logging.getLogger(__name__)
 
-LOADER_MODULES = [
-    "era5", "chirps", "dem", "jrc_gsw", "modis",
-    "worldpop", "glw", "ghsl", "wildlife", "buildings",
-    "coastline", "hydrorivers",
-    "smap",
-]
+def _loader_module_names() -> list[str]:
+    """Scan the loaders package: every module with a DOWNLOADER dict is a plugin.
+
+    Replaces the old hardcoded LOADER_MODULES list — a loader file dropped
+    in mal_commonlib/data/loaders/ is registered just by existing (the list
+    silently missed ``worldcover.py``). The per-module tolerance in
+    :func:`discover_downloaders` keeps utility modules (no DOWNLOADER) and
+    import failures from breaking the registry.
+    """
+    import mal_commonlib.data.loaders as loaders_pkg
+
+    return [
+        info.name
+        for info in pkgutil.iter_modules(loaders_pkg.__path__)
+        if not info.ispkg and info.name != "__init__"
+    ]
+
 
 @dataclass
 class DownloaderSpec:
@@ -29,9 +43,10 @@ class DownloaderSpec:
     license: str | None = None
     attribution: str | None = None
 
+
 def discover_downloaders() -> dict[str, DownloaderSpec]:
     registry: dict[str, DownloaderSpec] = {}
-    for mod_name in LOADER_MODULES:
+    for mod_name in _loader_module_names():
         try:
             mod = importlib.import_module(f"mal_commonlib.data.loaders.{mod_name}")
             raw = getattr(mod, "DOWNLOADER", None)
@@ -56,6 +71,7 @@ def discover_downloaders() -> dict[str, DownloaderSpec]:
                 # --- explicitly excluded (not ABM defaults) ---
                 "hydrorivers": [],
                 "smap": [],
+                "worldcover": [],
             }
             profile_formats = {
                 "era5": {"wind_6hourly": "daily", "water_temp": "monthly"},
@@ -70,21 +86,30 @@ def discover_downloaders() -> dict[str, DownloaderSpec]:
                 module_name=mod_name,
                 is_time_series=raw.get("is_time_series", False),
                 formats=raw.get("formats", profile_formats.get(raw["name"])),
-                abm_default_outputs=raw.get("abm_default_outputs", profile_defaults.get(raw["name"])),
+                abm_default_outputs=raw.get(
+                    "abm_default_outputs", profile_defaults.get(raw["name"])
+                ),
                 required_for_abm=raw.get("required_for_abm", None),
                 reductions=raw.get("reductions", None),
                 license=raw.get("license", None),
                 attribution=raw.get("attribution", None),
             )
             registry[spec.name] = spec
-            log.debug("Registered downloader: %s (%d outputs)", spec.name, len(spec.outputs))
+            log.debug(
+                "Registered downloader: %s (%d outputs)", spec.name, len(spec.outputs)
+            )
         except Exception as e:
             log.warning("Failed to load downloader from %s: %s", mod_name, e)
     return registry
 
+
 def list_downloaders() -> list[dict[str, Any]]:
     registry = discover_downloaders()
     return [
-        {"name": spec.name, "description": spec.description, "outputs": list(spec.outputs.keys())}
+        {
+            "name": spec.name,
+            "description": spec.description,
+            "outputs": list(spec.outputs.keys()),
+        }
         for spec in registry.values()
     ]

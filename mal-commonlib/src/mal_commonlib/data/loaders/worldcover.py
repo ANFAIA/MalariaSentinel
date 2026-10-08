@@ -464,6 +464,11 @@ DOWNLOADER = {
         "wc_wetland": "worldcover_wetland",
         "wc_mangrove": "worldcover_mangrove",
     },
+    "license": "CC-BY-4.0",
+    "attribution": (
+        "Contains modified Copernicus Sentinel data [2021] "
+        "© ESA WorldCover project (10m raster, 2021 v200)"
+    ),
 }
 
 

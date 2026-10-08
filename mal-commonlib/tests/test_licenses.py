@@ -14,12 +14,20 @@ import pytest
 
 from mal_commonlib.data.licenses import KNOWN_LICENSES, collect_limits
 
-# Same registry order as mal_core.download.registry.LOADER_MODULES
-LOADER_MODULES = [
-    "era5", "chirps", "dem", "jrc_gsw", "modis",
-    "worldpop", "glw", "ghsl", "wildlife", "buildings",
-    "coastline", "hydrorivers", "smap",
-]
+# Scan, not list: every loader module in the package is a plugin
+# (single source of truth — mirrors mal_core.download.registry discovery).
+def _loader_module_names() -> list[str]:
+    import pkgutil
+    import mal_commonlib.data.loaders as loaders_pkg
+
+    return [
+        info.name
+        for info in pkgutil.iter_modules(loaders_pkg.__path__)
+        if not info.ispkg and info.name != "__init__"
+    ]
+
+
+LOADER_MODULES = _loader_module_names()
 
 # Attribution substrings that are (legally) literal lines upstream requires.
 MANDATORY_ATTRIBUTION_FRAGMENTS = {

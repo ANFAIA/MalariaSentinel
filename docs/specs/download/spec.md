@@ -59,7 +59,7 @@ registry/auth/manifest plumbing, and the manifest would diverge.
 ## 2. In scope
 
 - `DOWNLOADER` dict convention (`name`, `description`, `requires_auth`, `outputs`, `manifest_keys`, `is_time_series`, `formats`).
-- The plugin registry (`LOADER_MODULES`, `discover_downloaders`, `DownloaderSpec`).
+- The plugin registry (_loader_module_names scan_, `discover_downloaders`, `DownloaderSpec`).
 - The runner (`run_download`) — orchestrator that discovers, filters, calls, saves, registers. Handles monthly (per-month TIF) and daily (multi-year NC) write paths.
 - The writer (`save_product` in `mal_core.download.writer`) — single save point for loaders. GeoTIFF for `DataArray`, NetCDF for `Dataset` or 3D `DataArray`.
 - The manifest helpers (`read_manifest`, `update_dataset`, `validate_completeness`, `get_dataset_files`) in `mal_core.download.manifest` — read/write `data/<aoi>/manifest.json` (v1→v3.1 auto-migration).
@@ -84,7 +84,7 @@ registry/auth/manifest plumbing, and the manifest would diverge.
 | `run_download(aoi, datasets=None, outputs=None, years=None, months=None, output_dir=None, cache_dir=None, **kwargs)` | `mal_core.download.runner` | Returns `dict[str, dict]` where keys are downloader names and values are `{"status": "ok"\|"skipped"\|"error", ...}`. `months` is `list[int] \| None`. |
 | `discover_downloaders()` | `mal_core.download.registry` | Returns `dict[name, DownloaderSpec]`. |
 | `list_downloaders()` | `mal_core.download.registry` | Returns `list[{name, description, outputs}]`. |
-| `LOADER_MODULES` | `mal_core.download.registry` | Hardcoded list of loader module names to import. Adding a name here is the only step required after creating the loader module. |
+| `_loader_module_names()` | `mal_core.download.registry` | `pkgutil.iter_modules` scan of the loaders package: every module exporting a `DOWNLOADER` dict is a loader — no list to maintain. |
 | `DownloaderSpec` | `mal_core.download.registry` | Dataclass with `name`, `description`, `requires_auth`, `outputs`, `manifest_keys`, `module_name`, `is_time_series`, `formats` (optional `dict[str, str]`). |
 | `DOWNLOADER` (per-module dict) | `mal_commonlib.data.loaders.<name>` | Loader module's self-description. See §5. |
 | `save_product(data, path, format=None, var_name=None)` | `mal_core.download.writer` | Persists `xr.DataArray` → GeoTIFF, `xr.Dataset` → NetCDF. 3D DataArrays require `format="nc"`. `var_name` sets the NetCDF variable name when saving a DataArray. Returns the written `Path`. |
@@ -113,7 +113,7 @@ registry/auth/manifest plumbing, and the manifest would diverge.
 
 ### §5.3 Runner behaviour
 
-- **INV-7.** Runner discovers `DOWNLOADER`s via `importlib` from `LOADER_MODULES` (no hardcoded registry; one source of truth in `registry.py`).
+- **INV-7.** Runner discovers `DOWNLOADER`s via `importlib` from the package scan (`_loader_module_names` — every module in the loaders package with a `DOWNLOADER` dict is a loader; one source of truth in `registry.py`).
 - **INV-8.** Runner filters by `--datasets` (match `name`) and `--outputs` (match output key inside the dict).
 - **INV-9.** Runner uses `spec.is_time_series` (from the DOWNLOADER dict) to branch: time-series loaders get `years` + `months`; static loaders get only `aoi` + `cache_dir`. For time-series loaders, the runner also reads `spec.formats[output_name]` to decide between **monthly** (default), **daily**, and **monthly_nc** write paths. Signature inspection is not used.
 - **INV-10.** Runner passes only kwargs the loader accepts (`accepted = set(sig.parameters)`); unknown kwargs are silently dropped (logged).
@@ -158,9 +158,9 @@ registry/auth/manifest plumbing, and the manifest would diverge.
 
 ## 7. Migration & deprecation
 
-- Adding a loader: create `mal-commonlib/.../loaders/<name>.py`, export `DOWNLOADER`, append `"<name>"` to `LOADER_MODULES` in `registry.py`. Non-breaking (MINOR).
+- Adding a loader: create `mal-commonlib/.../loaders/<name>.py` and export `DOWNLOADER` — discovery scans the package (`pkgutil.iter_modules`); appending to a list is no longer a step. Non-breaking (MINOR).
 - Renaming a manifest key: BREAKING (MAJOR). Requires updating the ABM wrapper, ingest builders, and any consumer that calls `get_dataset_files(aoi, "<old_key>")`.
-- Deprecating a loader: move to `_legacy/`, keep the module importable but drop from `LOADER_MODULES`. Document the replacement in §5.4.
+- Deprecating a loader: move to `_legacy/` subpackage (excluded from discovery scan) or stop exporting `DOWNLOADER`. Document the replacement in §5.4.
 - Deprecation policy: 1 MINOR spec version carries the warning; removed in the next MAJOR.
 - OPERA removal is intentional and breaking: new downloads must not request
   `opera_dswx_s1`; old manifests containing its key are historical only.
@@ -170,7 +170,7 @@ registry/auth/manifest plumbing, and the manifest would diverge.
 ```bash
 # INV-5/6: every registered module exports DOWNLOADER with the required keys
 uv run python -c "
-from mal_core.download.registry import discover_downloaders, LOADER_MODULES
+from mal_core.download.registry import discover_downloaders
 for name, spec in discover_downloaders().items():
     assert spec.name and spec.requires_auth is not None and spec.outputs and spec.manifest_keys, f'bad DOWNLOADER for {name}'
     if spec.formats:
@@ -182,13 +182,14 @@ for name, spec in discover_downloaders().items():
 rg "def\s+load_\w+\(" mal-commonlib/src/mal_commonlib/data/loaders/ -A 2 | rg -v "aoi(: AOI)?\s*," && echo "FAIL: loader missing aoi as first arg" || echo "OK"
 rg "output_path" mal-commonlib/src/mal_commonlib/data/loaders/ && echo "FAIL: loader accepts output_path" || echo "OK"
 
-# INV-7: registry discovery imports only from LOADER_MODULES
+# INV-7: discovery is a package scan — disk set == registry set
 uv run python -c "
 from mal_core.download.registry import discover_downloaders
 from mal_commonlib.data import loaders
 import os
 on_disk = {f[:-3] for f in os.listdir(os.path.dirname(loaders.__file__)) if f.endswith('.py') and not f.startswith('_')}
 on_disk -= {'__init__'}
+assert set(_loader_module_names()) == on_disk
 registered = set(discover_downloaders().keys())
 extra = on_disk - registered - {'_legacy'}
 assert not extra, f'unregistered loader modules: {extra}'
