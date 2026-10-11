@@ -18,15 +18,13 @@ top-level `mal-abm-fast/` package no longer exists).
 | `src/*.cpp` | Implementations (engine loop, host landscape, aquatic cohorts, transmission, wind field, seeding, mobility schedule…) |
 | `src/main.cpp` | CLI entry point (CLI11) — `run` subcommand, 50+ flags |
 | `tests/test_*.cpp` | GoogleTest suites (climate, coordinator, dispersal, eip, engine, env_reader, gonotrophic, effective_hosts…) |
-| `cli/` | Python-side CLI helpers (`run.py`, `score.py`, `test.py`) |
 | `wrapper.py` | `CppAbmWrapper` — binary resolution + subprocess launch from `malariasim abm` |
 | `runner.py` | Manifest-driven run orchestration (`run_abm_from_manifest()`) |
-| `compile.py` + `build.sh` | Build entry points used by `malariasim abm --compile` |
+| `compile.py` | Build entry point behind `malariasim abm --compile` (also the remote-VM build path, e.g. hetzner-run) |
 | `scripts/` | Input overlay / visualization utilities (hosts overlay, state/mobility/transmission visualization) |
-| `pool_hydrology.py` | Pool hydrology reference model |
-| `slurm/short.sh`, `slurm/long.sh` | SLURM templates for CESGA FT3 (6 h / 7 d walls) |
-| `cmake/` | Compiler warnings + FT3 module finders |
-| `docs/wire-spec.md` | **Single source of truth** for data contracts |
+| `pool_hydrology.py` | Pool hydrology reference model (Python parity of the C++ header) |
+| `cmake/` | Compiler-warning flags module |
+| `docs/specs/abm/spec.md` | Output contract spec (repo-wide, single source of truth) |
 | `bin/mal_abm_fast_<platform>` | Compiled binary (wrapper prefers this over `build/`) |
 
 ## Build
@@ -34,7 +32,7 @@ top-level `mal-abm-fast/` package no longer exists).
 From anywhere in the repo:
 
 ```bash
-malariasim abm --compile              # configure + build (build.sh / compile.py)
+malariasim abm --compile              # configure + build + copy binary to bin/
 malariasim abm --compile --clean      # wipe the build dir first
 malariasim abm --compile --worktree <path>   # compile inside an isolated gawt worktree
 ```
@@ -58,7 +56,7 @@ cmake --build build -j
 ctest --test-dir build --output-on-failure
 ```
 
-FT3 / CESGA: `sbatch slurm/short.sh` (the template handles the Intel oneAPI + GDAL build environment).
+FT3 / CESGA: use `mal-execution/scripts/cesga-run/` (`sbatch run_abm.sh`).
 
 ## Run
 
@@ -116,7 +114,6 @@ cd tests/calibration && uv run pytest -m fast -v
 
 ## See also
 
-- `docs/wire-spec.md` — data contracts, module map, per-day contract, determinism rules
-- `slurm/` — CESGA FT3 job templates
-- `mal-execution/scripts/cesga-run/` — CESGA automation
+- `docs/specs/abm/spec.md` — frozen output contract (shape, sidecar keys, naming, NoData, versioning)
+- `mal-execution/scripts/cesga-run/` — CESGA FT3 automation (the live SLURM pipeline)
 - `mal-core/README.md` — pipeline stage order and the post-run scoring CLI

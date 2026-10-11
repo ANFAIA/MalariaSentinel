@@ -41,32 +41,6 @@ class Tier(str, Enum):
     FULL = "full"
 
 
-def _parse_stage_flags(raw: str | None) -> dict[str, dict[str, str]]:
-    """Parse 'abm.days=60,training.epochs=100,flag=val' into nested dict.
-
-    Flags with a stage prefix (e.g. 'abm.days=60') are routed to that stage.
-    Flags without a prefix (e.g. 'seed=42') are placed under '_global' and
-    forwarded to all stages.
-    """
-    if not raw:
-        return {}
-    flags: dict[str, dict[str, str]] = {}
-    for token in raw.split(","):
-        token = token.strip()
-        if not token:
-            continue
-        if "=" not in token:
-            continue  # skip malformed tokens
-        if "." in token.split("=")[0]:
-            stage, rest = token.split(".", 1)
-            key, _, value = rest.partition("=")
-            flags.setdefault(stage.strip(), {})[key.strip()] = value.strip()
-        else:
-            key, _, value = token.partition("=")
-            flags.setdefault("_global", {})[key.strip()] = value.strip()
-    return flags
-
-
 @app.command()
 def predict(
     aoi: str | None = typer.Option(None, "--aoi", help="AOI slug (e.g. ghana)"),

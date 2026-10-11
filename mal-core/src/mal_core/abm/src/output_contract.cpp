@@ -6,11 +6,12 @@
 // (total adult mosquitoes in cell post-dispersal / K_MAX ∈ [0, 1]),
 // band 2 = host_seeking_pressure (female adults in host-seeking state
 // / K_MAX ∈ [0, 1]). The nodata sentinel is `NODATA_SENTINEL`
-// (-9999). The COG profile mirrors `docs/wire-spec.md` §2.
+// (-9999). The COG profile mirrors the output contract spec
+// (`docs/specs/abm/spec.md`).
 //
 // `write_state_sidecar` writes a JSON sidecar next to the .tif, with
 // the 14 keys the F1.e parity test pins. The keys are emitted in the
-// order listed in `docs/wire-spec.md` so the byte-equal test is
+// order listed in `docs/specs/abm/spec.md` so the byte-equal test is
 // stable across engines.
 #include "output_contract.hpp"
 
@@ -208,8 +209,9 @@ void write_state_cog(const std::string& path,
 void write_state_sidecar(const std::string& tif_path,
                          const StateCogMetadata& meta) {
     nlohmann::json j;
-    // The key order here matches docs/wire-spec.md §2 (the parity
-    // test relies on a stable ordering for the JSON object).
+    // The key order here matches the output contract spec
+    // (`docs/specs/abm/spec.md`; the parity test relies on a stable
+    // ordering for the JSON object).
     //
     // F1.c: `n_rollouts` and `rollout_index` are inserted between
     // `seed` and `generator_version` (after the F1.b keys, before

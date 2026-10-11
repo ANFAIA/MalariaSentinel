@@ -62,13 +62,13 @@ _build_sim_cmd() {
     verify_cmd="mal-core/src/mal_core/abm/build/src/mal_abm_fast run --aoi $aoi --env data/$aoi/${aoi}_regional_2024_2025_env.nc --habitat data/$aoi/${aoi}_habitat_patches.gpkg --year $year --month $month --days 1 --seed 1 --n-rollouts 1 --snapshot-every 1 --output /tmp/verify_d1.tif --hosts data/$aoi/${aoi}_host_static.nc --seeding-mode host-weighted 2>&1 | tee /work/verify_env_bands.log | grep -aq 'carries static catchment_ratio' && grep -aq 'carries static k_capacity_mult' /work/verify_env_bands.log && grep -aq 'carries static TWI' /work/verify_env_bands.log && echo '[verify-env-bands] OK' && "
   fi
 
-  local cmd="cd /work/code/$repo_name && uv sync $sync_args && bash mal-core/src/mal_core/abm/build.sh && "
+  local cmd="cd /work/code/$repo_name && uv sync $sync_args && uv run malariasim abm --compile && "
   if [[ -n "$verify_cmd" ]]; then
     cmd="$cmd$verify_cmd"
   fi
   if [[ -z "$data_ready" ]]; then
     sync_args="$sync_args --group download --group ingest"
-    cmd="cd /work/code/$repo_name && uv sync $sync_args && bash mal-core/src/mal_core/abm/build.sh && uv run malariasim download --aoi $aoi && uv run malariasim ingest --aoi $aoi --year $year --month $month --data-dir data/$aoi --output-dir data/$aoi && "
+    cmd="cd /work/code/$repo_name && uv sync $sync_args && uv run malariasim abm --compile && uv run malariasim download --aoi $aoi && uv run malariasim ingest --aoi $aoi --year $year --month $month --data-dir data/$aoi --output-dir data/$aoi && "
   fi
   cmd="$cmd uv run malariasim abm --aoi $aoi --year $year --month $month --days $days --seed $seed --n-rollouts $n_rollouts --snapshot-every $snapshot_every --timeout 2000000 --output-dir runs/abm/$run_name$gif_flag"
   printf '%s' "$cmd"

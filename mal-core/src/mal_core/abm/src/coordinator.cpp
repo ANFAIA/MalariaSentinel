@@ -115,7 +115,8 @@ void CoordinatorModel::activate_patches() {
     // (line 75-77 below) which constructs PatchState with
     // `activated = (climate.rain_at(row, col) > PLUVIAL_POOL_RAIN_THRESHOLD_MM)`
     // for every pre-existing patch cell. The HabitatPatch struct has no
-    // `activated` field in the M1.5 thin slice (per the wire-spec.md
+    // `activated` field in the M1.5 thin slice (per the contract
+    // history; see `docs/specs/abm/spec.md`).
     // design — activation is derived from today's climate, not stored
     // on the patch), so this function is a no-op for F1.b. The per-day
     // contract still calls it (so the engine.step() API matches the

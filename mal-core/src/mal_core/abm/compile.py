@@ -190,3 +190,22 @@ def compile_abm(
         return True, str(built_bin)
 
     return True, str(dest_bin)
+
+
+def _main() -> None:  # pragma: no cover — thin runner evaluated from a CLI toolchain
+    """Standalone build entry: ``uv run python mal_core/abm/compile.py``.
+
+    Prints success message or stderr/stdout, and exits non-zero on failure —
+    safe to chain with ``&&`` in SLURM/VM build steps.
+    """
+    ok, msg = compile_abm()
+    if ok:
+        print(f"Compilation successful: {msg}")
+        sys.exit(0)
+    else:
+        print(f"Compilation failed:\n{msg}", file=sys.stderr)
+        sys.exit(1)
+
+
+if __name__ == "__main__":  # pragma: no cover
+    _main()

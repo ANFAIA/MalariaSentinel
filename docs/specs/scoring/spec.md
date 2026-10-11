@@ -67,7 +67,6 @@ promoting.
 - The report renderer (`verdict_label`, `dimension_status`, `render_report`).
 - The scorecard runner (`score_run`, `save_scorecard`).
 - Tier markers (`fast`, `full`, `llm`).
-- Flag schema (`SCORING_FLAGS_SCHEMA`, `ScoringFlags`).
 - Pipeline position: stage 4 (after abm).
 
 ## 3. Out of scope
@@ -96,7 +95,6 @@ promoting.
 | `ScorerResult` | `mal_core.abm.tests.calibration.scorers.base` | Dataclass: `score`, `value`, `target`, `diagnostics`, `passed`. |
 | `ScoringReport` | `mal_core.abm.tests.calibration.scorers.base` | Dataclass: `experiment_name`, `params`, `n_days`, `n_seeds`, `scores`, `composite`, `llm_verdict`. |
 | `Scorer` (ABC) | `mal_core.abm.tests.calibration.scorers.base` | Abstract base: `name`, `weight`, `score(run_dir, experiment) -> ScorerResult`. |
-| `SCORING_FLAGS_SCHEMA`, `ScoringFlags` | `mal_core.scoring.flags` | Pydantic-style: `tier`, `experiment_name`. |
 
 ## 5. Invariants
 

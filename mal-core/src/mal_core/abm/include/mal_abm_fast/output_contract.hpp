@@ -70,9 +70,9 @@ void write_state_cog(const std::string& path,
                      const StateCogMetadata& meta);
 
 // Write the sidecar JSON (e.g. `<tif_path>.json` for a `.tif` path).
-// The keys in the JSON are the F1.e parity test's contract; the
-// implementation subagent must emit them in the order listed in
-// docs/wire-spec.md.
+// The keys in the JSON are the parity test's contract; the
+// implementation must emit them in the order listed in
+// docs/specs/abm/spec.md.
 void write_state_sidecar(const std::string& tif_path,
                          const StateCogMetadata& meta);
 

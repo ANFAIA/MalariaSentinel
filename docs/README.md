@@ -18,8 +18,8 @@ project website (served from this directory).
 ## Conventions
 
 - **New spec**: copy `specs/_template.md` into the matching domain folder; keep
-  specs current when the contract they describe changes (the ABM wire spec —
-  `mal-core/src/mal_core/abm/docs/wire-spec.md` — is the single source of
+  specs current when the contract they describe changes (the ABM output
+  contract spec — `docs/specs/abm/spec.md` — is the single source of
   truth for engine data contracts).
 - **Plans** move from `plans/in-process/` to `plans/completed/` when the
   acceptance criteria pass; never delete completed plans.

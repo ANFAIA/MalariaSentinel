@@ -71,7 +71,6 @@ SDSS multi-scale.
 - `get_latest_prediction(aoi_slug)`, `get_prediction_metadata(aoi_slug)`.
 - `load_env_stack(aoi)` and `load_abm_state(aoi, month)` (state and env loaders).
 - AOI data resolver (`resolve_aoi(aoi_slug)`, `AOIFiles`): maps AOI slugs to data file paths via `data/<aoi>/manifest.json`.
-- Flag schema (`PREDICTION_FLAGS_SCHEMA`, `PredictionFlags`).
 - Pipeline position: stage 6 (after training).
 
 ## 3. Out of scope

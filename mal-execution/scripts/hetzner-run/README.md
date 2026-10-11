@@ -139,7 +139,7 @@ the VM uses targeted profiles:
 | `uv sync --package mal-core --group train` | adds torch (U-Net training) |
 | `uv sync --package mal-core --group serve` | adds fastapi/uvicorn |
 
-The ABM is compiled on the VM (`build.sh` writes
+The ABM is compiled on the VM (`uv run malariasim abm --compile` writes
 `bin/mal_abm_fast_linux`). First boot installs the build toolchain via
 cloud-init and compiles GDAL deps (~5–10 min); later runs can start from a
 snapshot of that VM (see "Snapshot strategy").

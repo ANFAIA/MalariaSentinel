@@ -2,8 +2,8 @@
 // test_mosquito_submodel.cpp — GoogleTest pin for the F1.b
 // `MosquitoSubmodel` (SoA + 5 per-day ops + density queries).
 //
-// The three properties pinned here match the wire-spec's
-// `tests/test_smoke.cpp` style and the brief in the f1e-submodel
+// The three properties pinned here follow the same style as the
+// original smoke tests (`tests/test_smoke.cpp`) and the brief in the f1e-submodel
 // delegation:
 //
 //   1. Construction: round(100 * 1000 * 0.3) = 30000 agents.

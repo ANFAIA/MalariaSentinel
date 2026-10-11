@@ -3,7 +3,7 @@
 // accumulator and the `is_infective` threshold.
 //
 // The header `eip.hpp` is header-only with `inline` defs; this test
-// file pins the behaviour that the wire-spec.md §4 table promises:
+// file pins the behaviour that the contract spec (`docs/specs/abm/spec.md`) calls for:
 //
 //     * daily_gd       = max(0, T - EIP_BASE_C)
 //     * eip_progress'  = eip_progress + daily_gd     (NaN-safe)

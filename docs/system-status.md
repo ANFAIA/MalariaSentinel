@@ -851,8 +851,8 @@ cd mal-core/src/mal_core/abm/tests/calibration && uv run pytest -m fast -v
 
 ```bash
 brew install cmake ninja pkg-config gdal eigen cli11 nlohmann-json googletest
-# Via build.sh (recommended)
-bash mal-core/src/mal_core/abm/build.sh
+# Via the CLI (recommended; also copies the binary to bin/)
+malariasim abm --compile
 
 # Manual
 cmake -S mal-core/src/mal_core/abm -B mal-core/src/mal_core/abm/build -G Ninja \

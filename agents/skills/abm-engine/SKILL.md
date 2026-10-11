@@ -45,9 +45,8 @@ Each day the model runs a 5-step loop:
 | `src/*.cpp` | Implementations (12 source files) |
 | `src/main.cpp` | CLI entry point (CLI11) — `run` subcommand |
 | `tests/test_*.cpp` | 11 GoogleTest test suites (60 tests) |
-| `slurm/short.sh` | SLURM template for FT3 ILK, 6h wall |
-| `slurm/long.sh` | SLURM template for FT3 ILK, 7d wall |
-| `docs/wire-spec.md` | Data contracts and module signatures |
+| `mal-execution/scripts/cesga-run/` | SLURM scripts for FT3 (run_abm.sh, manage_jobs.sh) |
+| `docs/specs/abm/spec.md` | Data contracts (output contract spec, repo-wide) |
 
 ### Build (macOS / local dev)
 
@@ -322,15 +321,17 @@ rsync -avz --progress cesga:$STORE/MalariaSentinel/runs/m-perf/ ./runs/m-perf/
 
 ### Using SLURM templates
 
+The live FT3 pipeline is `mal-execution/scripts/cesga-run/`:
+
 ```bash
-# Short job (6h, 100 rollouts)
-sbatch mal-core/src/mal_core/abm/slurm/short.sh
+# Standard ABM job (medium partition, 24 months by default)
+sbatch mal-execution/scripts/cesga-run/run_abm.sh
 
 # Override parameters
-MONTH=6 YEAR=2024 N_ROLLOUTS=100 sbatch mal-core/src/mal_core/abm/slurm/short.sh
+sbatch --export=ABM_AOI=ghana,ABM_START_MONTH=7,ABM_SEED=5 run_abm.sh
 
-# Long job (7d, multi-month)
-NUM_MONTHS=24 N_ROLLOUTS=100 sbatch mal-core/src/mal_core/abm/slurm/long.sh
+# Job management
+bash mal-execution/scripts/cesga-run/manage_jobs.sh
 ```
 
 ### Run the ABM on CESGA (manifest-driven CLI)

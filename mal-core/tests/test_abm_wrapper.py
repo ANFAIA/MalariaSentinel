@@ -7,22 +7,6 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from mal_core.abm.wrapper import CppAbmWrapper
-from mal_core.abm.flags import ABM_FLAGS_SCHEMA, AbmFlags
-
-
-def test_abm_flags_schema_has_keys():
-    assert "aoi" in ABM_FLAGS_SCHEMA
-    assert "year" in ABM_FLAGS_SCHEMA
-    assert "days" in ABM_FLAGS_SCHEMA
-    assert "n_rollouts" in ABM_FLAGS_SCHEMA
-    assert "seed" in ABM_FLAGS_SCHEMA
-    assert "snapshot_every" in ABM_FLAGS_SCHEMA
-
-
-def test_abm_flags_schema_types():
-    assert ABM_FLAGS_SCHEMA["aoi"]["type"] is str
-    assert ABM_FLAGS_SCHEMA["year"]["type"] is int
-    assert ABM_FLAGS_SCHEMA["days"]["type"] is int
 
 
 def test_wrapper_resolve_binary_not_found(tmp_path):

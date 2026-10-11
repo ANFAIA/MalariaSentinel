@@ -88,10 +88,8 @@ pins is the load-bearing wall: every downstream spec (`training`,
 | `run_abm(...)` | `mal_core.abm.runner` | Runs the C++ binary for one `(aoi, year, month, seed)` and writes state rasters + sidecars. |
 | `CppAbmWrapper` | `mal_core.abm.wrapper` | Thin Python wrapper around the compiled C++ binary. Resolves binary path, introspects flags, runs `subprocess`. |
 | `run_abm_from_manifest(...)` | `mal_core.abm.wrapper` | Reads manifest, validates completeness, resolves data paths, calls `CppAbmWrapper`. |
-| `ABM_FLAGS_SCHEMA`, `AbmFlags` | `mal_core.abm.flags` | `TypedDict` schema for ABM CLI flags. New flags bump MINOR. |
 | Calibration scorers | `mal_core.abm.tests.calibration.scorers.D<id>_<name>` | Each scorer is a `D<id>_<name>.py` module exporting a class with `score(run_dir, experiment) -> ScorerResult`. Active scorers: D1-D10 + D16 (11 total). D11-D15 exist as files but are not registered in `ALL_SCORERS`. Adding a scorer is non-breaking. |
-| `run_calibration(...)` | `mal_core.scoring.runner` (called by pipeline) | Runs calibration pytest suite against a run directory. Cross-spec: ABM owns the rollout files consumed. |
-| CLI subcommands | `mal_core.abm.cli.{run,score,test}` | Typer CLI entry points: `run` (execute ABM), `score` (score a run dir), `test` (run calibration pytest). |
+| CLI subcommands | `mal_core.cli` | Typer CLI (`malariasim`): `abm` (compile/execute ABM), `score` (score a run dir), plus download/ingest/train/predict stages. |
 
 ## 5. Invariants — Output contract (frozen at v2.0)
 

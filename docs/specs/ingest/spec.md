@@ -77,7 +77,6 @@ shape per AOI.
 - `build_daily_env_nc(aoi, data_dir, output_dir=None, rainfall_file=None, water_frac_file=None, water_temp_file=None, ndvi_file=None) -> dict` — builds the daily multi-year NetCDF consumed by the C++ ABM. Reads pre-downloaded input files from `data_dir` by convention (`{aoi}_rainfall_daily_{years}_daily.nc`, `{aoi}_water_occurrence.tif`, `{aoi}_water_temp_{year}.tif`, `{aoi}_ndvi_{year}.tif`). Returns `{"env_path", "format", "aoi_slug", "n_days", "n_viable_cells", "grid", "variables"}`.
 - `build_host_dataset(aoi, *, output_dir, worldpop_year=2019, skip_buildings=False, skip_wildlife=False) -> dict` — writes host_static.nc + host_manifest.json.
 - `build_mobility_dataset(hosts_path, *, output_dir, aoi_slug, cell_size_km=1.0, beta_day=0.05, beta_night=0.5, beta_livestock=0.1, max_distance_km=50.0) -> dict` — writes 3 CSR files + mobility_manifest.json.
-- Flag schema (`INGEST_FLAGS_SCHEMA`, `IngestFlags`) covering env + hosts + mobility.
 - `register_dataset` (writes through to manifest).
 - Helpers in `daily_nc.py`: `read_static_tif(path, target_shape)` (reads single-band TIF with bilinear resampling), `_find_chirps_daily(data_dir)` (glob fallback for CHIRPS daily NC).
 - Constant `WATER_FRAC_VIABILITY_THRESHOLD = 0.05` in `daily_nc.py` — minimum water_frac for a cell to count as viable habitat.

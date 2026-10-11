@@ -90,7 +90,6 @@ zeros (`DummyModel`).
 | `get_dataloaders(run_dir, batch_size=16, num_workers=0, subsample=1.0, preload=False)` | `mal_core.training.dataset` | Returns `(train_loader, val_loader)`. |
 | `train_unet(run_dir, output_dir, *, epochs=50, batch_size=16, lr=1e-3, device=None, subsample=1.0, preload=False) -> float` | `mal_core.training.trainer` | Returns best `val_dice`. |
 | `UNetWrapper(ckpt_path)` | `mal_core.training.wrapper` | `ModelProtocol` for `prediction.spec.md`. `predict(state, env) -> (2, H, W)`. |
-| `TRAINING_FLAGS_SCHEMA` | `mal_core.training.flags` | TypedDict + schema dict for CLI flag defaults. |
 - Pipeline position: stage 5 (after scoring).
 
 **Supporting CLI scripts** (in `mal-execution/scripts/`, not part of core API):

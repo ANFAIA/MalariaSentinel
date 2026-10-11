@@ -188,7 +188,7 @@ assert_contains "--dry-run sim-run (no data) uv profile" "uv sync --package mal-
 assert_contains "--dry-run sim-run (no data) download" "malariasim download" "$LAST_ERR"
 assert_contains "--dry-run sim-run (no data) ingest" "malariasim ingest" "$LAST_ERR"
 assert_contains "--dry-run sim-run (no data) abm" "malariasim abm" "$LAST_ERR"
-assert_contains "--dry-run sim-run (no data) build" "build.sh" "$LAST_ERR"
+assert_contains "--dry-run sim-run (no data) build" "abm --compile" "$LAST_ERR"
 assert_contains "--dry-run sim-run (no data) data-not-ready" "NOT ready" "$LAST_ERR"
 
 # 5b. Data ready -> push data/<aoi>, no download/ingest, optional --gif.

@@ -35,7 +35,8 @@ packages:
   - ca-certificates
   - curl
   # Build toolchain for mal_abm_fast (cmake + ninja + deps).
-  # build.sh writes bin/mal_abm_fast_linux after a successful build.
+  # `uv run malariasim abm --compile` writes bin/mal_abm_fast_linux after a
+  # successful build.
   - cmake
   - ninja-build
   - g++

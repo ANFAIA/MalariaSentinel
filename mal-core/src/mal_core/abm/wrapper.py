@@ -44,9 +44,7 @@ class CppAbmWrapper:
         err_hint = "malariasim abm --compile"
         if worktree:
             err_hint += f" --worktree {worktree}"
-        raise FileNotFoundError(
-            f"ABM binary not found. Run: {err_hint} (or bash {pkg_dir / 'build.sh'})"
-        )
+        raise FileNotFoundError(f"ABM binary not found. Run: {err_hint}")
 
     def _introspect_flags(self) -> dict[str, dict[str, Any]]:
         try:

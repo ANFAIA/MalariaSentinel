@@ -37,5 +37,5 @@ scripts when you need batch/chained or cloud execution.
 ## Related
 
 - `mal-core/README.md` — pipeline stage order, scoring, modules
-- `mal-core/src/mal_core/abm/slurm/` — SLURM templates for the C++ engine
+- `mal-execution/scripts/cesga-run/` — its own SLURM pipeline (`run_abm.sh`, `manage_jobs.sh`)
 - `tools/` — local dev helpers (verify, format, tests)
