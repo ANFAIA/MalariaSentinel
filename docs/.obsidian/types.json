@@ -1,0 +1,33 @@
+{
+  "types": {
+    "aliases": "aliases",
+    "cssclasses": "multitext",
+    "tags": "tags",
+    "up": "multitext",
+    "down": "multitext",
+    "same": "multitext",
+    "next": "multitext",
+    "prev": "multitext",
+    "BC-tag-note-tag": "text",
+    "BC-tag-note-field": "text",
+    "BC-tag-note-exact": "checkbox",
+    "BC-tag-note-sibling-field": "text",
+    "BC-regex-note-regex": "text",
+    "BC-regex-note-flags": "text",
+    "BC-regex-note-field": "text",
+    "BC-folder-note-field": "text",
+    "BC-folder-note-recurse": "checkbox",
+    "BC-list-note-field": "text",
+    "BC-list-note-neighbour-field": "text",
+    "BC-list-note-exclude-index": "checkbox",
+    "BC-list-note-section": "text",
+    "BC-list-note-exclude": "multitext",
+    "BC-dendron-note-field": "text",
+    "BC-johnny-decimal-note-field": "text",
+    "BC-dataview-note-query": "text",
+    "BC-dataview-note-field": "text",
+    "BC-traverse-note-field": "text",
+    "BC-ignore-in-edges": "checkbox",
+    "BC-ignore-out-edges": "checkbox"
+  }
+}

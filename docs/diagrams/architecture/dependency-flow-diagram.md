@@ -52,11 +52,11 @@ flowchart LR
   end
   subgraph bin[Binario]
     b1[("bin/mal_abm_fast_darwin<br/>#04 stándar de binario")]
-    b2[(build/src/mal_abm_fast<br/>⚠️ stale si no hay cp)]
+    b2[(build/src/mal_abm_fast<br/>stale si no hay cp)]
   end
   subgraph config[Config runtime]
-    flags["argv 50+ flags<br/>( CliAbmWrapper schema)"]
-    cts[[[31-constantes]]<br/>wire.hpp paridad Python]
+    flags["argv 50+ flags<br/>(CliAbmWrapper schema)"]
+    cts["31-constantes · wire.hpp<br/>paridad Python"]
   end
 
   cmake --> comp --> b1
@@ -65,10 +65,10 @@ flowchart LR
   MF -->|catalog.resolve Slots| flags
   rw -->|ingest hosts| MF
   eco -->|daily_nc + aoi| MF
-  wind -.->|"Slot opcional"| flags
+  wind -.->|Slot opcional| flags
   hab -->|seeding + coordinator| flags
-  b1 --> engine_note[["21-engine"]]
-  flags --> main_note[["20-main-cli"]]
+  b1 --> engine_note[note 21-engine]
+  flags --> main_note[note 20-main-cli]
   cts --> main_note
 ```
 
@@ -85,6 +85,7 @@ flowchart LR
 | transmission | constantes + BiteLedger + human grid | [[27-transmission]] + [[31-constantes]] | se omite el bloque M7.4 si `is_enabled()==false` |
 | wind | era5 "wind" + mes de migración | WindField | dispersal 100% kernel gaussiano (opt-in) |
 | outputs | GDAL driver COG + JSON | [[21-engine]] snapshot | main lanza error al escribir |
+| flags | binario nomenclado + AOI + paths datasets | [[20-main-cli]] + [[40-wrapper]] | wrapper no arma argv → abort |
 
 ## Reglas de oro
 
