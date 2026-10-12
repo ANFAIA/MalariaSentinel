@@ -1,0 +1,12 @@
+{
+  "edgeFields": {
+    "up":        { "field": "up",        "groups": [] },
+    "down":      { "field": "down",      "groups": [] },
+    "related":   { "field": "related",   "groups": [] },
+    "calls":     { "field": "calls",     "groups": [] },
+    "called_by": { "field": "called_by", "groups": [] },
+    "owns":      { "field": "owns",      "groups": [] },
+    "reads":     { "field": "reads",     "groups": [] },
+    "writes":    { "field": "writes",    "groups": [] }
+  }
+}

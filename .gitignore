@@ -56,3 +56,9 @@ mal-abm-fast/build/
 .cortexkit/
 conversation_history/
 social-networks/MalariaSentinel ABM Video/work-*/
+
+# vault obsidian: excluir estado de workspace volátil
+docs/.obsidian/workspace.json
+docs/.obsidian/workspace-mobile.json
+docs/.obsidian/cache
+.DS_Store
