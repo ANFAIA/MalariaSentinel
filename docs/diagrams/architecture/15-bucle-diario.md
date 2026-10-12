@@ -33,6 +33,7 @@ show-attributes: true
 
 
 
+
 # 15 · Bucle diario — `Engine::step()` (el corazón)
 
 **Rol.** Un día completo de simulación en orden fijo, con `wind guard` intermedio y divergence checks al final. Todo lo demás cuelga de esta función.

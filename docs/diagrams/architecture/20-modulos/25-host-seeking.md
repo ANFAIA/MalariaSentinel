@@ -38,6 +38,7 @@ show-attributes: true
 
 
 
+
 # 25 · HostSeekingModel + MobilitySchedule + HostLandscape
 
 **Rol.** La pluma de olfato: decide *a qué celda va una hembra con hambre* y *a quién pica*, dada la densidad efectiva de humanos/ganado/vida silvestre y la preferencia de especie.

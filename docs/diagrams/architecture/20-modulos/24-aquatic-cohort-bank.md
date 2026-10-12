@@ -34,6 +34,7 @@ show-attributes: true
 
 
 
+
 # 24 · AquaticCohortBank — inundación→emergencia
 
 **Rol.** Todos los estadios acuáticos de un parche viven aquí como **cohortes** (agregados por parche×estado×edad), no individuos. Compresión de estado enorme: 1 cohorte = N mosquitos idénticos.

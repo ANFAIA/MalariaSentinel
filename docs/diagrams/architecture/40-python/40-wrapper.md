@@ -22,6 +22,7 @@ show-attributes: true
 
 
 
+
 # 40 · Capa Python — wrapper, runner, compile
 
 **Rol.** Python **nunca** simula: prepara argv, lanza el binario en subprocess y lee la salida. El único contrato son flags CLI y archivos.

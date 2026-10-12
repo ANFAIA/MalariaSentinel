@@ -21,6 +21,7 @@ show-attributes: true
 <!-- bc:auto:end -->
 
 
+
 # 10 · Sistema en capas
 
 **Rol.** El ABM es un pipeline de 4 capas: Python decide *qué* correr (data, slots, flags), C++ decide *cómo* simular (día a día), y la salida queda como COG GeoTIFF + JSON sidecar por rollout. Nada de Python entra al bucle numérico.

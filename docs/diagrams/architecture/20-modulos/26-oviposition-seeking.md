@@ -31,6 +31,7 @@ show-attributes: true
 
 
 
+
 # 26 · OvipositionSeekingModel — regreso al agua
 
 **Rol.** Después de la comida de sangre, la hembra necesita un parche **activo** para ovipositar. Este modelo dirige el vuelo hacia el criadero más atractivo dentro del radio; sin modelo (fallback), se usa la celda actual si está activa.

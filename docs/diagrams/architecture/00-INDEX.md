@@ -3,7 +3,7 @@ title: "ABM · Mapa de Arquitectura"
 tags: [abm, index, moc]
 tier: index
 cssclasses: [wide-page]
-down: ["[[10-sistema]]", "[[15-bucle-diario]]", "[[20-main-cli]]", "[[21-engine]]", "[[22-coordinator]]", "[[23-mosquito-submodel]]", "[[24-aquatic-cohort-bank]]", "[[25-host-seeking]]", "[[26-oviposition-seeking]]", "[[27-transmission]]", "[[28-wind-field]]", "[[30-tipos-datos]]", "[[31-constantes]]", "[[40-wrapper]]", "[[90-convenciones]]"]
+down: ["[[10-sistema]]", "[[15-bucle-diario]]", "[[dependency-flow-diagram]]", "[[20-main-cli]]", "[[21-engine]]", "[[22-coordinator]]", "[[23-mosquito-submodel]]", "[[24-aquatic-cohort-bank]]", "[[25-host-seeking]]", "[[26-oviposition-seeking]]", "[[27-transmission]]", "[[28-wind-field]]", "[[30-tipos-datos]]", "[[31-constantes]]", "[[40-wrapper]]", "[[90-convenciones]]"]
 ---
 
 # 00 · Índice — Motor ABM (`mal-core/src/mal_core/abm/`)
@@ -18,7 +18,7 @@ Nota-raíz del vault MalariaSentinel. Todo lo demás cuelga de aquí.
 
 ## Navegación
 
-1. **Vista macro:** [[10-sistema]] — capas Python → CLI → Engine → submodelos → COG/JSON.
+1. **Vista macro:** [[10-sistema]] — capas Python → CLI → Engine → submodelos → COG/JSON. Dependencias (binario/datos/flags): [[dependency-flow-diagram]].
 2. **Vista temporal:** [[15-bucle-diario]] — el pulso del sistema, `Engine::step()`.
 3. **Clase por clase:** notas [[20-main-cli]] [[21-engine]] [[22-coordinator]] [[23-mosquito-submodel]] [[24-aquatic-cohort-bank]] [[25-host-seeking]] [[26-oviposition-seeking]] [[27-transmission]] [[28-wind-field]].
 4. **Contrato de datos:** [[30-tipos-datos]] · [[31-constantes]].
@@ -92,7 +92,7 @@ flowchart TD
 
 ## Orden de lectura recomendado
 
-[[10-sistema]] · [[15-bucle-diario]] · [[20-main-cli]] · [[21-engine]] · [[22-coordinator]] · [[23-mosquito-submodel]] · [[24-aquatic-cohort-bank]] · [[25-host-seeking]] · [[26-oviposition-seeking]] · [[27-transmission]] · [[28-wind-field]] · [[30-tipos-datos]] · [[31-constantes]] · [[40-wrapper]] · [[90-convenciones]] · [[91-plugins-setup]]
+[[10-sistema]] · [[15-bucle-diario]] · [[dependency-flow-diagram]] · [[20-main-cli]] · [[21-engine]] · [[22-coordinator]] · [[23-mosquito-submodel]] · [[24-aquatic-cohort-bank]] · [[25-host-seeking]] · [[26-oviposition-seeking]] · [[27-transmission]] · [[28-wind-field]] · [[30-tipos-datos]] · [[31-constantes]] · [[40-wrapper]] · [[90-convenciones]] · [[91-plugins-setup]]
 
 ## up
 

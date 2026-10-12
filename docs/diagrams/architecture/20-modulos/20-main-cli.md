@@ -34,6 +34,7 @@ show-attributes: true
 
 
 
+
 # 20 · main.cpp — CLI + bucle de rollouts
 
 **Rol.** Punto de entrada del binario `mal_abm_fast`. Parsea 50+ flags con CLI11, resuelve el AOI, arma la config, y lanza el bucle paralelo de rollouts. No modela nada: solo *construya* y *dirija*.

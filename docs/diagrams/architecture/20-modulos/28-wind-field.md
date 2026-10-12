@@ -30,6 +30,7 @@ show-attributes: true
 
 
 
+
 # 28 · WindField — migración del viento
 
 **Rol.** Campo diario de viento (u,v por celda, opcional). En la ventana estacional activa, una fracción de adultos en dispersión se deja advectar por el viento en vez de moverse con kernel gaussiano.

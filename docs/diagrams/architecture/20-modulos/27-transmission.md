@@ -37,6 +37,7 @@ show-attributes: true
 
 
 
+
 # 27 · TransmissionModel — la cadena del patógeno
 
 **Rol.** Puente mosquito↔humano: consume el `BiteLedger` (qué picadas ocurrieron hoy y en cuál celda), avanza la EIP del vector infectado con GDD del clima, y hace seguir el compartimento humano (S→E→I→) por celda.

@@ -47,6 +47,7 @@ show-attributes: true
 
 
 
+
 # 23 · MosquitoSubmodel — el corazón biológico
 
 **Rol.** Dueño de los agentes mosquito: estado SoA (`MosquitoSoA`), banco acuático (`AquaticCohortBank`) y ledger de picaduras (`BiteLedger`). Cada dia ejecuta los estados de hembra (G4 gonotrófico) y de adultos (G3), la dispersión y mortalidad.

@@ -35,6 +35,7 @@ show-attributes: true
 
 
 
+
 # 22 · CoordinatorModel — parches, clima y agregación
 
 **Rol.** Traduce clima+terreno a **estado diario por parche** (`vector<PatchState>`) que todo el resto consume. También agrega densidad de adultos por celda y escribe los COGs de estado.

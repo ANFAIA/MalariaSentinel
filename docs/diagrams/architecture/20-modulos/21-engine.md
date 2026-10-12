@@ -35,6 +35,7 @@ show-attributes: true
 
 
 
+
 # 21 · Engine — la fachada
 
 **Rol.** Dueño de todos los submodelos (`unique_ptr`/raw pointers no-owning según el caso). Su único método de trabajo es `step()` ([[15-bucle-diario]]), y expone snapshots a disco. Es la única clase que *ve todo el tablero*.
