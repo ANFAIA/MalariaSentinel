@@ -1,4 +1,5 @@
-"""D20: Washout response scorer.
+"""D20: Washout response scorer (canonical; promoted from the calibration
+harness 2026-10).
 
 Verifies that heavy rain (>= 40mm) causes a measurable washout of
 aquatic cohorts:
@@ -6,60 +7,63 @@ aquatic cohorts:
     >= 30% within 24 hours.
   - A 30mm rain event (below washout threshold) causes no washout.
 
-Based on: the 40mm negative correlation documented in wire.hpp:148-150
-(washout of larvae by heavy rain).
+Based on: the 40mm negative correlation (washout of larvae by heavy
+rain) implemented in the C++ pool hydrology (wire.hpp washout model).
 """
 from __future__ import annotations
 
 from pathlib import Path
 from typing import Any
 
-from scorers.base import Scorer, ScorerResult
+from mal_core.abm.pool_hydrology import (
+    POOL_RAIN_WASH_MM,
+    POOL_WASH_FRACTION_MAX,
+    washout_fraction,
+)
+
+from .base import Scorer, ScorerResult
 
 
 class WashoutResponseScorer(Scorer):
-    """D18: Washout response to heavy rain scorer."""
+    """D20: washout response to heavy rain (weighted composite)."""
 
-    @property
-    def name(self) -> str:
-        return "D20_washout_response"
+    name = "D20_washout_response"
+    kind = "composite"
+    weight = 1.0
+    description = (
+        f"Heavy rain washes out larvae: 50mm -> >=0.15 (target 0.30); "
+        f"flat below {POOL_RAIN_WASH_MM}mm; cap {POOL_WASH_FRACTION_MAX} "
+        f"at 80mm"
+    )
+    min_score = 0.70
 
-    @property
-    def weight(self) -> float:
-        return 0.5
-
-    def score(self, run_dir: Path, experiment: dict[str, Any]) -> ScorerResult:
+    def score(self, run_dir: Path, ctx: dict[str, Any]) -> ScorerResult:
         """Score washout response using the washout_fraction function.
 
         Tests:
-          1. 50mm rain → washout fraction >= 0.30 (biological target)
-          2. 30mm rain → washout fraction == 0.0 (below threshold)
-          3. 80mm rain → washout fraction == 0.6 (at cap)
+          1. 50mm rain -> washout fraction >= 0.30 (biological target)
+          2. 30mm rain -> washout fraction == 0.0 (below threshold)
+          3. 80mm rain -> washout fraction == cap
+          4. 40mm rain -> at threshold, fraction ~0
         """
-        from mal_core.abm.pool_hydrology import (
-            washout_fraction,
-            POOL_RAIN_WASH_MM,
-            POOL_WASH_FRACTION_MAX,
-        )
-
         diagnostics: dict[str, Any] = {}
 
-        # Test 1: 50mm → should produce washout.
+        # Test 1: 50mm -> should produce washout.
         frac_50 = washout_fraction(50.0)
         diagnostics["frac_50mm"] = round(frac_50, 4)
         test1_ok = frac_50 >= 0.15  # at least 15% at 50mm (target: 30%)
 
-        # Test 2: 30mm → no washout (below threshold).
+        # Test 2: 30mm -> no washout (below threshold).
         frac_30 = washout_fraction(30.0)
         diagnostics["frac_30mm"] = round(frac_30, 4)
         test2_ok = frac_30 == 0.0
 
-        # Test 3: 80mm → at cap.
+        # Test 3: 80mm -> at cap.
         frac_80 = washout_fraction(80.0)
         diagnostics["frac_80mm"] = round(frac_80, 4)
         test3_ok = abs(frac_80 - POOL_WASH_FRACTION_MAX) < 0.001
 
-        # Test 4: 40mm → exactly at threshold (should be 0 or very small).
+        # Test 4: 40mm -> exactly at threshold (should be 0 or very small).
         frac_40 = washout_fraction(40.0)
         diagnostics["frac_40mm"] = round(frac_40, 4)
         test4_ok = frac_40 <= 0.01  # at threshold, fraction should be ~0
@@ -77,7 +81,10 @@ class WashoutResponseScorer(Scorer):
         return ScorerResult(
             score=round(score, 4),
             value=round(frac_50, 4),
-            target=f"washout at 50mm >= 0.15; no washout at 30mm; cap at 80mm = {POOL_WASH_FRACTION_MAX}",
+            target=(
+                f"washout at 50mm >= 0.15; no washout at 30mm; "
+                f"cap at 80mm = {POOL_WASH_FRACTION_MAX}"
+            ),
             diagnostics=diagnostics,
             passed=score >= 0.70,
         )

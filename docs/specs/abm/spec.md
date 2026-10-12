@@ -65,11 +65,8 @@ pins is the load-bearing wall: every downstream spec (`training`,
 ## 2. In scope
 
 - C++ ABM engine (`wire.hpp`, CMake build) and the Mesa-Geo adapter for the thin slice.
-- ABM runner (`runner.py`), flag schema (`flags.py`), and the Python wrapper around the binary (`wrapper.py`).
-- CLI subcommands (`cli/run.py`, `cli/score.py`, `cli/test.py`) for running, scoring, and testing ABM simulations.
+- ABM runner (`runner.py`), the Python wrapper around the binary (`wrapper.py`), and the compile entry (`compile.py`, `malariasim abm --compile`).
 - **Output contract** (§5–§7 below): state tensor, env tensor, file naming, sidecar, NoData, tile rules, `K_max`, `H/W`.
-- Calibration scorers and the calibration test framework (`abm/tests/calibration/`).
-- Calibration infrastructure: experiment registry (`experiments/`), scorecard diffing (`diff.py`), best-score tracking (`best.py`), report rendering (`report.py`).
 - Visualization script (`scripts/visualize_state.py`).
 - Pipeline position: stage 3 (after ingest). Reads manifest for env/habitat/hosts paths.
 
@@ -88,7 +85,6 @@ pins is the load-bearing wall: every downstream spec (`training`,
 | `run_abm(...)` | `mal_core.abm.runner` | Runs the C++ binary for one `(aoi, year, month, seed)` and writes state rasters + sidecars. |
 | `CppAbmWrapper` | `mal_core.abm.wrapper` | Thin Python wrapper around the compiled C++ binary. Resolves binary path, introspects flags, runs `subprocess`. |
 | `run_abm_from_manifest(...)` | `mal_core.abm.wrapper` | Reads manifest, validates completeness, resolves data paths, calls `CppAbmWrapper`. |
-| Calibration scorers | `mal_core.abm.tests.calibration.scorers.D<id>_<name>` | Each scorer is a `D<id>_<name>.py` module exporting a class with `score(run_dir, experiment) -> ScorerResult`. Active scorers: D1-D10 + D16 (11 total). D11-D15 exist as files but are not registered in `ALL_SCORERS`. Adding a scorer is non-breaking. |
 | CLI subcommands | `mal_core.cli` | Typer CLI (`malariasim`): `abm` (compile/execute ABM), `score` (score a run dir), plus download/ingest/train/predict stages. |
 
 ## 5. Invariants — Output contract (frozen at v2.0)
@@ -190,20 +186,15 @@ for p in Path('runs/').rglob('*.json'):
     assert cv.startswith('2.'), f'unexpected major: {p} has contract_version={cv}'
 "
 
-# Calibration scorers: verify 11 active scorers in ALL_SCORERS
+# Canon scoring registry: 13 composite dims + 6 gates
 uv run python -c "
-from mal_core.abm.tests.calibration.scorers.score import ALL_SCORERS
-print(f'Active scorers: {len(ALL_SCORERS)}')
-names = [s.name for s in ALL_SCORERS]
-print(names)
-assert len(ALL_SCORERS) == 11, f'Expected 11, got {len(ALL_SCORERS)}'
-"
-
-# Calibration composite: verify all 16 weights defined
-uv run python -c "
-from mal_core.abm.tests.calibration.scorers.composite import DEFAULT_WEIGHTS
-print(f'Weights defined: {len(DEFAULT_WEIGHTS)}')
-assert len(DEFAULT_WEIGHTS) == 16, f'Expected 16, got {len(DEFAULT_WEIGHTS)}'
+from mal_core.scoring.registry import build_registry, COMPOSITE_WEIGHTS
+r = build_registry()
+dims = sorted(n for n, s in r.items() if s.kind == 'composite')
+gates = sorted(n for n, s in r.items() if s.kind == 'gate')
+print(f'{len(dims)} dims, {len(gates)} gates')
+assert len(dims) == 13 and len(gates) == 6, (dims, gates)
+assert set(dims) == set(COMPOSITE_WEIGHTS)
 "
 ```
 
@@ -242,11 +233,11 @@ def read_state_by_name(path):
 Scoring a run directory:
 
 ```python
-from mal_core.abm.tests.calibration.scorers.score import score_run
+from mal_core.scoring import run_scoring
 from pathlib import Path
 
-scorecard = score_run(Path("runs/ghana/"), {"name": "default", "params": {}, "n_days": 90, "n_seeds": 1})
-print(f"Composite: {scorecard['composite']}")
+scorecard = run_scoring(Path("runs/ghana/"))
+print(f"Composite: {scorecard['composite']} ({scorecard['verdict']})")
 ```
 
 ## 10. References

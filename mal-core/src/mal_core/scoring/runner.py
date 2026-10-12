@@ -132,6 +132,15 @@ def run_scoring(
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
+    # LLM qualitative judge (draft spec v1.2): appends `verdict_llm` when
+    # the OpenRouter key is present and the call succeeds; silently absent
+    # otherwise (a deterministic fallback stays local to the LLM module).
+    from .llm_scorer import score_with_llm
+
+    llm_result = score_with_llm(scorecard)
+    if "fallback" not in llm_result:
+        scorecard["verdict_llm"] = llm_result
+
     out_path = run_dir / "scorecard.json"
     out_path.write_text(json.dumps(scorecard, indent=2, default=str))
     return scorecard

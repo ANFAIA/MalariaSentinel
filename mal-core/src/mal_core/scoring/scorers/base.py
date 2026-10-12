@@ -1,8 +1,8 @@
 """Base classes and run-artifact discovery for post-run ABM scorers.
 
-Promoted from mal_core/abm/tests/calibration/scorers/base.py (2026-08).
-The canonical scoring home is ``mal_core.scoring``; the calibration test
-suite keeps its own harness copies.
+Single scoring system since 2026-10 (the old pytest calibration harness
+and its duplicated scorers were deleted; its unit tests live in
+mal-core/tests/test_scoring_*.py).
 
 Scorers run *after* an ABM execution against its output directory
 (``malariasim score --run-dir <dir>``) and produce a scorecard saved

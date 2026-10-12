@@ -1,4 +1,9 @@
-"""Unit tests for D2 (mortality), D3 (EIP), D4 (stability) cohort scorers."""
+"""Unit tests for canon cohort scorers: D2 survival, D3 EIP, D4 stability.
+
+Adapted from the calibration harness tests (mal-core abm tests/calibration,
+2026-10): the canon scorers live in mal_core.scoring.scorers and report
+``status="skipped"`` (not score=0.0) when their cohort log is absent.
+"""
 from __future__ import annotations
 
 import json
@@ -6,9 +11,9 @@ from pathlib import Path
 
 import pytest
 
-from scorers.mortality import MortalityScorer
-from scorers.eip import EIPScorer
-from scorers.stability import StabilityScorer
+from mal_core.scoring.scorers.d2_survival import SurvivalScorer
+from mal_core.scoring.scorers.d3_eip import EIPScorer
+from mal_core.scoring.scorers.d4_stability import StabilityScorer
 
 
 def _write_cohort(path: Path, daily: list[dict]) -> None:
@@ -16,10 +21,10 @@ def _write_cohort(path: Path, daily: list[dict]) -> None:
 
 
 # ---------------------------------------------------------------------------
-# D2: Mortality scorer
+# D2: Survival scorer
 # ---------------------------------------------------------------------------
 
-class TestMortalityScorer:
+class TestSurvivalScorer:
     def test_perfect(self, tmp_path: Path) -> None:
         """p_d=0.915 -> mean life ~11.8d -> score close to 1.0."""
         daily = []
@@ -30,7 +35,7 @@ class TestMortalityScorer:
                           "n_alive": n_adults, "n_larvae": 0, "n_births": 0,
                           "n_maturation": 0, "eip_frac": 0.3})
         _write_cohort(tmp_path / "cohort.json", daily)
-        scorer = MortalityScorer()
+        scorer = SurvivalScorer()
         result = scorer.score(tmp_path, {})
         assert result.score >= 0.80, f"Expected >= 0.80, got {result.score}"
         assert result.passed is True
@@ -45,16 +50,17 @@ class TestMortalityScorer:
                           "n_alive": n_adults, "n_larvae": 0, "n_births": 0,
                           "n_maturation": 0, "eip_frac": 0.3})
         _write_cohort(tmp_path / "cohort.json", daily)
-        scorer = MortalityScorer()
+        scorer = SurvivalScorer()
         result = scorer.score(tmp_path, {})
         assert result.score < 0.30, f"Expected < 0.30, got {result.score}"
         assert result.passed is False
 
     def test_missing_file(self, tmp_path: Path) -> None:
-        """No cohort.json -> score=0.0."""
-        scorer = MortalityScorer()
+        """No cohort.json -> skipped status."""
+        scorer = SurvivalScorer()
         result = scorer.score(tmp_path, {})
         assert result.score == 0.0
+        assert result.status == "skipped"
         assert result.passed is False
 
 
@@ -100,6 +106,20 @@ class TestEIPScorer:
         result = scorer.score(tmp_path, {})
         assert result.score < 0.30, f"Expected < 0.30, got {result.score}"
 
+    def test_constant_eip_is_skipped(self, tmp_path: Path) -> None:
+        """Degenerate cohort (constant eip_frac, no transmission recorded)
+        is reported as skipped, not punished."""
+        daily = []
+        for d in range(90):
+            daily.append({"day": d, "n_adults": 200, "n_deaths": 10,
+                          "n_alive": 5000, "n_larvae": 3000, "n_births": 50,
+                          "n_maturation": 5, "eip_frac": 0.3})
+        _write_cohort(tmp_path / "cohort.json", daily)
+        scorer = EIPScorer()
+        result = scorer.score(tmp_path, {})
+        assert result.status == "skipped"
+        assert result.passed is False
+
 
 # ---------------------------------------------------------------------------
 # D4: Stability scorer
@@ -107,9 +127,8 @@ class TestEIPScorer:
 
 class TestStabilityScorer:
     def test_healthy(self, tmp_path: Path) -> None:
-        """collapse_ratio=0.5, explosion_ratio=2.0 -> score=1.0."""
+        """collapse_ratio=0.5, explosion_ratio=1.0 -> score=1.0."""
         daily = []
-        # day 0: 1000, day 30: 500, day 60: 600, day 90: 700
         pops = [1000] * 30 + [500] * 30 + [600] * 30
         for d in range(90):
             daily.append({"day": d, "n_alive": pops[d], "n_adults": 100,
@@ -124,8 +143,6 @@ class TestStabilityScorer:
     def test_collapse(self, tmp_path: Path) -> None:
         """collapse_ratio=0.05 with explosion -> score penalised."""
         daily = []
-        # day 0: 1000, day 30: 50 (5%), day 60: 50, day 90: 50
-        # Also spike to 8000 (8x) at day 45 to trigger explosion penalty
         pops = [1000] * 30 + [50] * 15 + [8000] + [50] * 44
         for d in range(90):
             daily.append({"day": d, "n_alive": pops[d], "n_adults": 100,
@@ -134,15 +151,12 @@ class TestStabilityScorer:
         _write_cohort(tmp_path / "cohort.json", daily)
         scorer = StabilityScorer()
         result = scorer.score(tmp_path, {})
-        # With collapse_ratio=0.05 and explosion_ratio=8.0,
-        # collapse_ok~0.78 and explosion_ok~0.697 -> avg~0.74
         assert result.score < 0.80, f"Expected < 0.80, got {result.score}"
         assert result.diagnostics["explosion_ratio"] > 5.0
 
     def test_explosion(self, tmp_path: Path) -> None:
         """explosion_ratio=10.0 -> score < 0.70."""
         daily = []
-        # day 0: 1000, day 30-90: stable but max is 10000 at some point
         for d in range(90):
             n_alive = 10000 if d == 45 else 1000
             daily.append({"day": d, "n_alive": n_alive, "n_adults": 100,
@@ -152,3 +166,10 @@ class TestStabilityScorer:
         scorer = StabilityScorer()
         result = scorer.score(tmp_path, {})
         assert result.score < 0.70, f"Expected < 0.70, got {result.score}"
+
+    def test_missing_file(self, tmp_path: Path) -> None:
+        """No cohort.json -> skipped status."""
+        scorer = StabilityScorer()
+        result = scorer.score(tmp_path, {})
+        assert result.status == "skipped"
+        assert result.passed is False

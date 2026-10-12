@@ -257,7 +257,7 @@ The Ghana simulation models mosquito population expansion from seed points (obse
 |---|---|
 | `ghana-pipeline` | Running the end-to-end Ghana simulation pipeline (Stages 1–6) |
 | `abm-engine` | Running, building, or deploying the agent-based model engines (Python or C++) |
-| `calibration-framework` | Validating biological parameterization of the ABM against empirical targets |
+| `abm-engine` | Validating biological parameterization of the ABM against empirical targets (post-run scoring: `malariasim score`)
 | `data-explorer` | Exploring, mapping, and bias-analysing input datasets |
 | `cesga` | Deploying simulation jobs to CESGA FinisTerrae III HPC |
 | `project-memory` | Querying or recording domain knowledge in the project knowledge graph |

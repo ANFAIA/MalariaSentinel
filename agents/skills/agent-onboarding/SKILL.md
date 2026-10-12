@@ -16,7 +16,7 @@ Single entry point for any agent starting from scratch on MalariaSentinel. Follo
 | Understand the domain | `sdss-reference` |
 | Run Ghana simulation | `ghana-pipeline` |
 | Run ABM simulations | `abm-engine` |
-| Validate ABM output | `calibration-framework` |
+| Validate ABM output | `abm-engine` (`malariasim score --run-dir <dir>`) |
 | Explore datasets | `data-explorer` |
 | Use the knowledge graph | `project-memory` |
 | Deploy to HPC | `cesga` |

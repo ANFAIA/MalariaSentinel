@@ -273,18 +273,15 @@ ctest --test-dir mal-core/src/mal_core/abm/build --output-on-failure
 #           coordinator, engine, output_contract, state_cog, smoke
 ```
 
-### Calibration scorers (PR gate)
+### Python unit tests (scoring prompt-gate)
 
 ```bash
-cd mal-core/src/mal_core/abm/tests/calibration && uv run pytest -m fast -v
-# 10 scorers: D1-D15 + D16-D18 (fast tier)
+uv run python -m pytest mal-core/tests -q
+# scoring unit tests: test_scoring_cohort / _state / _pools / _llm / _feedback
 ```
 
-### Python unit tests (calibration scorers)
-
-```bash
-cd mal-core/src/mal_core/abm/tests/calibration && uv run pytest tests/test_pool_hydrology.py -v
-```
+Post-run scoring (13 composite dims + 6 gates + optional LLM judge):
+`malariasim score --run-dir <dir>` → `scorecard.json` (canon: `mal_core/scoring/`).
 
 ---
 

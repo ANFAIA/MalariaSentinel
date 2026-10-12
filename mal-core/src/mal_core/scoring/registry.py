@@ -10,6 +10,8 @@ Anchors (all papers live in papers/):
 - D3  EIP: Mordecai 2013
 - D11 stage structure: Bayoh & Lindsay 2003; Ouedraogo 2024
 - D16 detection coverage: validate-detections launch-and-measure design
+- D19 pool persistence: Depinay 2004; Ward 2015 (promoted from the
+  calibration harness 2026-10)
 - D21 dispersal: Costantini 1996; Thomas 2013; Midega 2007 (see
   papers/anopheles-dynamics/dispersal-kernel-calibration.md)
 - D25 cases: DHIMS II via Seidu 2026 (Mendeley 10.17632/r3c3cr7x6g)
@@ -33,9 +35,11 @@ from .scorers import (
     MobilityGate,
     MoransScorer,
     PerformanceGate,
+    PoolPersistenceScorer,
     StabilityScorer,
     SurvivalScorer,
     UrbanProductivityGate,
+    WashoutResponseScorer,
 )
 from .scorers.base import Scorer
 
@@ -54,6 +58,8 @@ COMPOSITE_WEIGHTS: dict[str, float] = {
     "D8_coupling": 2.0,
     "D4_stability": 2.0,
     "D25_cases_ghana": 2.0,
+    "D19_pool_persistence": 1.0,
+    "D20_washout_response": 1.0,
     "D1_habitat_occupancy": 1.0,
     "D5_morans": 1.0,
     "D11_aquatic_structure": 1.0,
@@ -79,6 +85,8 @@ def build_registry() -> dict[str, ScorerSpec]:
         MoransScorer(),              # D5
         CouplingScorer(),            # D8
         AquaticStructureScorer(),    # D11
+        PoolPersistenceScorer(),     # D19 (promoted 2026-10)
+        WashoutResponseScorer(),     # D20 (promoted 2026-10)
         LongHorizonPersistenceScorer(),  # D15
         DetectionCoverageScorer(),   # D16
         DispersalKernelScorer(),     # D21

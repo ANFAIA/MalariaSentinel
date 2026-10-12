@@ -1,39 +1,27 @@
-"""Tests for M14 pool hydrology — Python parity with C++ (promoted from mal-ghana-sim).
+"""Tests for M14 pool hydrology + canon pool scorers D19/D20.
 
-Tests cover:
-  1. advance_pool — filling, drying, accumulation, capping
-  2. desiccation_rate — grace period, ramp
-  3. washout_fraction — threshold, linear, cap
+Hydrology model tests promoted from the calibration harness (2026-10);
+loaded via the plain ``mal_core.abm.pool_hydrology`` import now.
 """
 from __future__ import annotations
 
-import importlib.util
-import sys
-from pathlib import Path
+from mal_core.abm.pool_hydrology import (
+    DailyForcing,
+    POOL_DESICCATION_GRACE_DAYS,
+    POOL_DESICC_BASE_DAILY,
+    POOL_RAIN_WASH_MM,
+    POOL_WASH_FRACTION_MAX,
+    POOL_WATER_BREED_MM,
+    POOL_WATER_DRY_MM,
+    POOL_WATER_MAX_MM,
+    PoolState,
+    advance_pool,
+    desiccation_rate,
+    washout_fraction,
+)
 
-def _load_pool_module():
-    spec = importlib.util.spec_from_file_location(
-        "mal_core.abm.pool_hydrology",
-        Path(__file__).resolve().parents[3] / "pool_hydrology.py",
-    )
-    mod = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = mod
-    spec.loader.exec_module(mod)
-    return mod
-
-_pool = _load_pool_module()
-PoolState = _pool.PoolState
-DailyForcing = _pool.DailyForcing
-advance_pool = _pool.advance_pool
-desiccation_rate = _pool.desiccation_rate
-washout_fraction = _pool.washout_fraction
-POOL_WATER_BREED_MM = _pool.POOL_WATER_BREED_MM
-POOL_WATER_DRY_MM = _pool.POOL_WATER_DRY_MM
-POOL_WATER_MAX_MM = _pool.POOL_WATER_MAX_MM
-POOL_RAIN_WASH_MM = _pool.POOL_RAIN_WASH_MM
-POOL_WASH_FRACTION_MAX = _pool.POOL_WASH_FRACTION_MAX
-POOL_DESICCATION_GRACE_DAYS = _pool.POOL_DESICCATION_GRACE_DAYS
-POOL_DESICC_BASE_DAILY = _pool.POOL_DESICC_BASE_DAILY
+from mal_core.scoring.scorers.d19_pool_persistence import PoolPersistenceScorer
+from mal_core.scoring.scorers.d20_washout_response import WashoutResponseScorer
 
 
 # ---------------------------------------------------------------------------
@@ -110,12 +98,12 @@ class TestDesiccationRate:
 
     def test_grace_period(self):
         """Dry but within grace period → no desiccation."""
-        pool = PoolState(water_mm=0.5, days_dry=3)
+        pool = PoolState(water_mm=0.5, days_dry=POOL_DESICCATION_GRACE_DAYS - 1)
         assert desiccation_rate(pool) == 0.0
 
     def test_after_grace(self):
         """Past grace period → desiccation ramps up."""
-        pool = PoolState(water_mm=0.5, days_dry=8)
+        pool = PoolState(water_mm=0.5, days_dry=POOL_DESICCATION_GRACE_DAYS + 2)
         rate = desiccation_rate(pool)
         assert 0.0 < rate <= POOL_DESICC_BASE_DAILY
 
@@ -155,3 +143,37 @@ class TestWashoutFraction:
         """Above 2*threshold → capped at WASH_FRACTION_MAX."""
         frac = washout_fraction(100.0)
         assert abs(frac - POOL_WASH_FRACTION_MAX) < 0.001
+
+
+# ---------------------------------------------------------------------------
+# Canon scorers D19 / D20
+# ---------------------------------------------------------------------------
+
+
+class TestPoolPersistenceScorer:
+    def test_reference_scenario_passes(self, tmp_path) -> None:
+        scorer = PoolPersistenceScorer()
+        result = scorer.score(tmp_path, {})
+        assert result.passed is True
+        assert result.score >= 0.70
+        assert result.value >= 4.0  # active days
+        assert result.diagnostics["active_days"] >= 4
+
+    def test_name_and_kind(self, tmp_path) -> None:
+        scorer = PoolPersistenceScorer()
+        assert scorer.name == "D19_pool_persistence"
+        assert scorer.kind == "composite"
+
+
+class TestWashoutResponseScorer:
+    def test_reference_thresholds_pass(self, tmp_path) -> None:
+        scorer = WashoutResponseScorer()
+        result = scorer.score(tmp_path, {})
+        assert result.passed is True
+        assert result.score >= 0.70
+        assert result.diagnostics["frac_30mm"] == 0.0
+
+    def test_name_and_kind(self, tmp_path) -> None:
+        scorer = WashoutResponseScorer()
+        assert scorer.name == "D20_washout_response"
+        assert scorer.kind == "composite"

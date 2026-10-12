@@ -4,7 +4,7 @@ Pipeline order (each stage reads artefacts from the previous one):
     1. malariasim download --aoi {aoi} --datasets era5,chirps
     2. malariasim ingest --aoi {aoi} --year {year} --month {month}
     3. malariasim abm --aoi {aoi} --days 30
-    4. malariasim score --run-dir {dir} --tier fast
+    4. malariasim score --run-dir {dir}
     5. malariasim train --run-dir {dir} --epochs 50
     6. malariasim predict --aoi {aoi} --scale {regional|national|continental} --year {year}
 
@@ -16,7 +16,6 @@ Standalone commands (no ordering required):
 from __future__ import annotations
 
 from pathlib import Path
-from enum import Enum
 
 import typer
 
@@ -32,13 +31,6 @@ app = typer.Typer(
          "Each stage reads artefacts written by the previous one.",
     no_args_is_help=True,
 )
-
-
-class Tier(str, Enum):
-    """Legacy tier choice (calibration pytest harness)."""
-
-    FAST = "fast"
-    FULL = "full"
 
 
 @app.command()
@@ -379,7 +371,7 @@ def _render_animation(
 
 @app.command("score")
 def score_cmd(
-    run_dir: Path = typer.Option(..., "--run-dir", help="Directory with ABM outputs"),
+    run_dir: Path | None = typer.Option(None, "--run-dir", help="Directory with ABM outputs"),
     aoi: str | None = typer.Option(None, "--aoi", help="AOI slug (auto-detected from run metadata if omitted)"),
     only: str = typer.Option("", "--only", help="Comma-separated scorer names to run (e.g. d2,d15)"),
     skip: str = typer.Option("", "--skip", help="Comma-separated scorer names to exclude"),
@@ -414,6 +406,10 @@ def score_cmd(
                 f"manual={row['manual']}  {row['description']}"
             )
         return
+
+    if run_dir is None:
+        typer.echo("Error: --run-dir is required (or pass --list)", err=True)
+        raise typer.Exit(code=1)
 
     only_list = [s.strip() for s in only.split(",") if s.strip()] or None
     skip_list = [s.strip() for s in skip.split(",") if s.strip()] or None

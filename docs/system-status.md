@@ -1,6 +1,6 @@
 # MalariaSentinel — Estado del Proyecto y Arquitectura
 
-> Actualizado: 2026-08-25 · ABM C++ (M9 consolidated in mal-core): **M7.4.1** · Pipeline: **M9 complete** · DeepAgent: **M10 skeleton** · Tests: **83 Python (mal-core) + 261 C++ + 14 calibration scorers**
+> Actualizado: 2026-10-12 · ABM C++ (M9 consolidated in mal-core): **M7.4.1** · Pipeline: **M9 complete** · DeepAgent: **M10 skeleton** · Tests: 100+ Python (mal-core) + 261 C++ · Scoring: **canon post-run 13 dims + 6 gates + LLM judge**
 
 ---
 
@@ -185,8 +185,8 @@ graph TB
         UN["training/model.py<br/>UNet"]
     end
 
-    subgraph SCORING["Scoring"]
-        SCR["scoring/runner.py<br/>run_calibration()"]
+    subgraph SCORING["Scoring (canon, post-run)"]
+        SCR["scoring/runner.py<br/>run_scoring() → scorecard.json"]
         FB["scoring/feedback.py<br/>get_feedback()"]
     end
 
@@ -842,9 +842,8 @@ PRNG xoshiro256** canonico. Dos runs con mismo `(seed, i, days, AOI, env, habita
 ctest --test-dir mal-core/src/mal_core/abm/build --output-on-failure
 # 60 tests
 
-# Calibration scorers
-cd mal-core/src/mal_core/abm/tests/calibration && uv run pytest -m fast -v
-# 10 scorers + composite
+# Python unit tests (scoring, wrapper, catalog, manifest...)
+uv run python -m pytest mal-core/tests -q
 ```
 
 ### Build (macOS)

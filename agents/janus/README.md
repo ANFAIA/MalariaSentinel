@@ -152,7 +152,7 @@ agents/janus/
 
 ```bash
 uv run pytest agents/janus/src/agents_janus/tests/ -v   # all mocked, no LLM/gawt needed
-cd mal-core/src/mal_core/abm/tests/calibration && uv run pytest -m fast -v
+uv run python -m pytest mal-core/tests -q               # scoring unit tests included
 ```
 
 ## Dependencies

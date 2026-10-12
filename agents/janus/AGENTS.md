@@ -2,16 +2,15 @@
 
 ## Project conventions
 - ABM C++ code lives in `mal-core/src/mal_core/abm/` (headers: `params.h`, `wire.hpp`, `engine.hpp`)
-- Calibration scorers live in `mal-abm-fast/tests/calibration/scorers/`
-- Thresholds are in `mal-abm-fast/tests/calibration/thresholds.yaml`
-- Composite scorer is `mal-abm-fast/tests/calibration/scorers/composite.py`
-- Tests run with: `cd mal-abm-fast/tests/calibration && uv run pytest -m fast -v`
+- Post-run scoring (the ONLY scoring system) lives in `mal-core/src/mal_core/scoring/` — `malariasim score --run-dir <dir>` builds `scorecard.json` (13 composite dims D1-D5, D8, D11, D15, D16, D19, D20, D21, D25 + 6 gates G6/G7/G10/G12/G14/G24 + optional LLM verdict in `verdict_llm`)
+- Scorers: `mal_core/scoring/scorers/d<id>_*.py` + `gates.py`; registry + weights in `mal_core/scoring/registry.py` (COMPOSITE_WEIGHTS)
+- LLM judge: `mal_core/scoring/llm_scorer.py` + `prompts/llm_verdict.md` (OPENROUTER_KEY env / repo .env)
+- Python unit tests: `uv run python -m pytest mal-core/tests -q` (scoring tests: test_scoring_*.py)
 - Python modules are in `mal-core/src/mal_core/`
 - The monorepo uses `uv` for dependency management
 
 ## Known pitfalls
 - Don't weaken tests or skip scorers to force a pass
-- Always compare against the best historical composite score
 - Maximum 3 parallel workers at a time
 - Workers share a single gawt worktree (multi-session, one shared worktree)
 - Never edit files directly from the orchestrator — dispatch specialists
@@ -30,8 +29,13 @@
 - `resolve_conflict` forks the graph via get_state/update_state/invoke — the orchestrator must be created with a checkpointer (`agent.py::_checkpointer()`), or it fails with "No checkpointer set"
 
 ## Scorer naming convention
-Scorers follow the pattern `D<id>_<name>.py` where `<id>` is the next number (D1, D2, ... D10 currently).
-Each scorer must be registered in `thresholds.yaml` with `min_score`, `max_delta`, and `hard_floor`.
+Canonical post-run scorers follow the pattern `d<id>_<name>.py` (e.g.
+`d19_pool_persistence.py`), class registered in
+`mal-core/src/mal_core/scoring/registry.py` (`build_registry()` +
+`COMPOSITE_WEIGHTS`). Engineering invariants are gates in
+`scorers/gates.py` (`G<id>_<name>`), reported apart from the composite.
+IDs D1-D25 are stable claims on validation dimensions — check
+`docs/specs/scoring/spec.md` before reusing one.
 
 ## Dual-Mode Orchestrator (Centinela + Dispatcher)
 

@@ -51,7 +51,17 @@ time."""
 # Path to the bundled system-prompt markdown. Resolved at import time so
 # that subsequent calls do not hit the filesystem.
 _PROMPT_PATH = Path(__file__).resolve().parent / "prompts" / "llm_verdict.md"
-SYSTEM_PROMPT: str = _PROMPT_PATH.read_text(encoding="utf-8")
+
+
+def _get_system_prompt() -> str:
+    """Read the system prompt once and memoize it."""
+    global _SYSTEM_PROMPT
+    if _SYSTEM_PROMPT is None:
+        _SYSTEM_PROMPT = _PROMPT_PATH.read_text(encoding="utf-8")
+    return _SYSTEM_PROMPT
+
+
+_SYSTEM_PROMPT: str | None = None
 """The full system prompt (charter + reference ranges + output rules).
 Loaded from ``scorers/prompts/llm_verdict.md`` at import time."""
 
@@ -300,7 +310,7 @@ def score_with_llm(
             "temperature": 0,
             "timeout": timeout_s,
             "messages": [
-                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "system", "content": _get_system_prompt()},
                 {"role": "user", "content": f"Calibration report:\n```json\n{json.dumps(report, indent=2, default=str)}\n```\n\nReturn ONLY a JSON object matching this schema:\n{Verdict.model_json_schema()}"},
             ],
         }

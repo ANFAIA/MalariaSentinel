@@ -241,16 +241,14 @@ Janus improves the ABM by:
 | Component | Location | Purpose |
 |---|---|---|
 | ABM Engine | `mal-core/src/mal_core/abm/` | C++ simulation |
-| Calibration Scorers | `mal-core/src/mal_core/abm/tests/calibration/` | Validation metrics |
-| Thresholds | `mal-core/src/mal_core/abm/tests/calibration/thresholds.yaml` | Score boundaries |
-| Composite Score | `mal-core/src/mal_core/abm/tests/calibration/scorers/composite.py` | Aggregated metric |
+| Post-run scoring | `mal-core/src/mal_core/scoring/` | 13 dims + 6 gates + LLM judge (`malariasim score`) |
 
 ## Related Skills
 
 | Skill | Use when |
 |---|---|
 | `abm-engine` | Understanding the C++ ABM |
-| `calibration-framework` | Running calibration scorers |
+| `abm-engine` | Post-run scoring (`malariasim score`: 13 dims + 6 gates + LLM judge) |
 | `mal-core-api` | Accessing core APIs |
 | `project-memory` | Querying the knowledge graph |
 | `gitagent` | Understanding gawt worktree isolation |
@@ -293,11 +291,8 @@ If workers conflict on file edits:
 # Check current scores
 uv run janus status
 
-# Review threshold boundaries
-cat mal-core/src/mal_core/abm/tests/calibration/thresholds.yaml
-
-# Check composite scorer weights
-cat mal-core/src/mal_core/abm/tests/calibration/scorers/composite.py
+# Check scorer registry + weights
+grep -n "COMPOSITE_WEIGHTS" -A 18 mal-core/src/mal_core/scoring/registry.py
 ```
 
 ## Development

@@ -1,9 +1,10 @@
-"""D19: Pool persistence scorer.
+"""D19: Pool persistence scorer (canonical; promoted from the calibration
+harness 2026-10).
 
 Verifies that the pool hydrology model produces biologically plausible
 pool dynamics:
-  - A 30mm rain event at T=25°C produces a pool that stays active for
-    at least 4 days, then transitions to dry within 7 days at T=32°C.
+  - A 30mm rain event at T=25 C produces a pool that stays active for
+    at least 4 days, then transitions to dry within 7 days at T=32 C.
   - The water level follows a filling-then-drying trajectory consistent
     with the evaporation model.
 
@@ -15,54 +16,52 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from scorers.base import Scorer, ScorerResult
+from mal_core.abm.pool_hydrology import (
+    DailyForcing,
+    POOL_WATER_BREED_MM,
+    POOL_WATER_DRY_MM,
+    PoolState,
+    advance_pool,
+)
+
+from .base import Scorer, ScorerResult
 
 
 class PoolPersistenceScorer(Scorer):
-    """D17: Pool persistence and desiccation dynamics scorer."""
+    """D19: pool persistence and desiccation dynamics (weighted composite)."""
 
-    @property
-    def name(self) -> str:
-        return "D19_pool_persistence"
+    name = "D19_pool_persistence"
+    kind = "composite"
+    weight = 1.0
+    description = "Pool hydrology: 30mm fill -> >=4 active days; dries within 13 days"
+    min_score = 0.70
 
-    @property
-    def weight(self) -> float:
-        return 0.5
-
-    def score(self, run_dir: Path, experiment: dict[str, Any]) -> ScorerResult:
+    def score(self, run_dir: Path, ctx: dict[str, Any]) -> ScorerResult:
         """Score pool persistence using the Python hydrology model.
 
         Simulates a single-patch scenario:
-          Day 0-2: 30mm rain at 25°C (filling)
-          Day 3-10: 0mm rain at 32°C (drying)
+          Day 0-2: 30mm rain at 25 C (filling)
+          Day 3-12: 0mm rain at 32 C (drying)
 
         Verifies:
           - Pool is active (>= 5mm) for at least 4 days total
           - Pool becomes dry (< 1mm) within 10 days
           - Water level trajectory is monotonically decreasing during dry phase
         """
-        from mal_core.abm.pool_hydrology import (
-            PoolState,
-            DailyForcing,
-            advance_pool,
-            POOL_WATER_BREED_MM,
-            POOL_WATER_DRY_MM,
-        )
-
         # Simulate filling + drying.
         pool = PoolState()
         water_levels: list[float] = []
         active_days = 0
         dry_day = -1
 
-        # Filling phase: 30mm/day for 3 days at 25°C.
+        # Filling phase: 30mm/day for 3 days at 25 C.
         for _ in range(3):
             pool = advance_pool(pool, DailyForcing(rain_mm=30.0, temp_c=25.0))
             water_levels.append(pool.water_mm)
             if pool.water_mm >= POOL_WATER_BREED_MM:
                 active_days += 1
 
-        # Drying phase: 0mm/day for 10 days at 32°C.
+        # Drying phase: 0mm/day for 10 days at 32 C.
         for d in range(10):
             pool = advance_pool(pool, DailyForcing(rain_mm=0.0, temp_c=32.0))
             water_levels.append(pool.water_mm)

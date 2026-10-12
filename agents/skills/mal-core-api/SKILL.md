@@ -48,7 +48,7 @@ import mal_core
 | `interventions_to_params` | `scenario` | function | Scenario → model parameter dict |
 | `CppAbmWrapper` | `abm.wrapper` | class | Python wrapper for C++ ABM binary |
 | `run_abm` | `abm.runner` | function | Run ABM simulation via wrapper |
-| `run_calibration` | `scoring.runner` | function | Run calibration scorers |
+| `run_scoring` | `scoring.runner` | function | Post-run scoring: writes scorecard.json in the run dir |
 | `get_feedback` | `scoring.feedback` | function | Generate feedback from scorecard |
 | `build_environment` | `ingest.env_builder` | function | Build env tensor for AOI |
 | `fastapi_app` | `server` | `FastAPI` | REST API for the SDSS |
@@ -382,16 +382,19 @@ rollout = run_abm(
 
 ---
 
-### `scoring/runner.py` — Calibration runner
+### `scoring/runner.py` — Post-run scoring runner
 
 ```python
-from mal_core.scoring.runner import run_calibration
+from mal_core.scoring import run_scoring
 
-scorecard = run_calibration(
-    run_dir="runs/pipeline/",
-    scorers=None,  # all registered scorers
+scorecard = run_scoring(
+    "runs/pipeline/",
+    only=None,   # all registered scorers
+    enable=["D25_cases_ghana"],  # manual (AOI-dependent) scorers
 )
-# Returns dict with scorer_name → {score, delta, best}
+# Writes scorecard.json into the run dir; returns the same dict:
+# composite, verdict, scores{...}, composite_dimensions{...}, gates{...},
+# skipped{...}, verdict_llm (optional).
 ```
 
 ---

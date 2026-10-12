@@ -108,8 +108,8 @@ For multi-year runs, pass all days in one invocation (`--year 2024 --month 1 --d
 # C++ unit tests (GoogleTest)
 ctest --test-dir build --output-on-failure
 
-# Calibration harness (pytest) — see tests/calibration/README.md
-cd tests/calibration && uv run pytest -m fast -v
+# Python-side unit tests (wrapper, compile, scoring, pool hydrology)
+uv run python -m pytest mal-core/tests -q
 ```
 
 ## See also

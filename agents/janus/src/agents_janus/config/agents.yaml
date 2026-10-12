@@ -64,7 +64,7 @@ agents:
     kind: specialist
     description: ABM C++ engine + Mesa-Geo adapter + runner
     spec: docs/specs/abm/spec.md
-    skills: [abm-engine, calibration-framework]
+    skills: [abm-engine]
     gawt_role: abm
     servers: [gitagent, codebase_memory]
     tools:
@@ -78,13 +78,13 @@ agents:
       - execute
     edits_allow:
       - mal-core/src/mal_core/abm/**
-      - mal-core/src/mal_core/abm/tests/calibration/**
+      - mal-core/src/mal_core/abm/**
 
   scoring:
     kind: specialist
-    description: Calibration scorers + composite
+    description: Post-run scoring — 13 dims + 6 gates + LLM judge
     spec: docs/specs/scoring/spec.md
-    skills: [calibration-framework]
+    skills: [abm-engine]
     gawt_role: scoring
     servers: [gitagent, codebase_memory]
     tools:
