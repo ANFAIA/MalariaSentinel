@@ -11,14 +11,16 @@ up:: [[10-sistema]]
 <!-- bc:auto:start -->
 ```breadcrumbs
 type: mermaid
-fields: [calls, called_by]
-depth: 1
+depth: [0, 1]
+sort: field
+show-attributes: [field]
 mermaid-direction: LR
-show-attributes: true
+mermaid-arrow: true
 ```
 
 
 <!-- bc:auto:end -->
+
 
 
 

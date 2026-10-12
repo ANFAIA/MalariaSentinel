@@ -11,10 +11,11 @@ up:: [[23-mosquito-submodel]]
 <!-- bc:auto:start -->
 ```breadcrumbs
 type: mermaid
-fields: [calls, called_by]
-depth: 1
+depth: [0, 1]
+sort: field
+show-attributes: [field]
 mermaid-direction: LR
-show-attributes: true
+mermaid-arrow: true
 ```
 
 > [!info] Conexiones exactas del grafo
@@ -35,6 +36,7 @@ show-attributes: true
 | `phase_active` | daily gate per hour | host_seeking.hpp | activo en horas de vuelo |
 
 <!-- bc:auto:end -->
+
 
 
 

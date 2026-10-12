@@ -1,210 +1,30 @@
 {
-  "nodes": [
-    {
-      "id": "n01",
-      "x": -1320,
-      "y": -960,
-      "width": 340,
-      "height": 180,
-      "type": "text",
-      "text": "## Python layer\n**[[40-wrapper]]**\nCppAbmWrapper.run()\nrun_abm_from_manifest()\n→ subprocess + argv"
-    },
-    {
-      "id": "n02",
-      "x": -900,
-      "y": -960,
-      "width": 340,
-      "height": 180,
-      "type": "text",
-      "text": "## CLI C++\n**[[20-main-cli]]**\nCLI11 · resolve_aoi\nmain() · OpenMP\nn_rollouts × Engine"
-    },
-    {
-      "id": "n05",
-      "x": -480,
-      "y": -780,
-      "width": 340,
-      "height": 200,
-      "type": "text",
-      "text": "## Engine\n**[[21-engine]]**\nstep() per day\nowns Coordinator / Submodel / Transmission\nsnapshot() · snapshot_transmission()"
-    },
-    {
-      "id": "n06",
-      "x": -480,
-      "y": -460,
-      "width": 340,
-      "height": 200,
-      "type": "text",
-      "text": "## CoordinatorModel\n**[[22-coordinator]]**\nset_climate_day()\nactivate_patches() (M14 pools)\nto_dataframe() → patch_states_today()\naggregate_density() · write_state_cog()"
-    },
-    {
-      "id": "n04",
-      "x": -60,
-      "y": -560,
-      "width": 380,
-      "height": 280,
-      "type": "text",
-      "text": "## MosquitoSubmodel\n**[[23-mosquito-submodel]]**\nadvance_day(aoi, patch_states)\n1 cohort_bank_.advance_day\n2 collect_emergence → SoA\n3 gonotrophic loop (hembras)\n4 adult_dispersal (kernel+wind)\n5 adult_mortality (Lardeux)"
-    },
-    {
-      "id": "n07",
-      "x": 420,
-      "y": -860,
-      "width": 340,
-      "height": 190,
-      "type": "text",
-      "text": "## AquaticCohortBank\n**[[24-aquatic-cohort-bank]]**\nadvance_day() · collect_emergence()\nadd_eggs() · seed_stage()\ndesiccation · washout · K_eff density"
-    },
-    {
-      "id": "n08",
-      "x": 420,
-      "y": -580,
-      "width": 340,
-      "height": 190,
-      "type": "text",
-      "text": "## HostSeeking + Mobility\n**[[25-host-seeking]]**\ndetect_host_cell() 2 km\napproach_vector() 50 m\nselect_host_entry()\nMobilitySchedule OD CSR"
-    },
-    {
-      "id": "n09",
-      "x": 420,
-      "y": -300,
-      "width": 340,
-      "height": 170,
-      "type": "text",
-      "text": "## OvipositionSeeking\n**[[26-oviposition-seeking]]**\ndetect_breeding_cell()\nstep_toward()\ntimeout 7d → skip-oviposit"
-    },
-    {
-      "id": "n10",
-      "x": -60,
-      "y": -160,
-      "width": 380,
-      "height": 220,
-      "type": "text",
-      "text": "## TransmissionModel (M7.4)\n**[[27-transmission]]**\ncheck_and_trigger_outbreak()\nadvance_vector_eip() GDD\nadvance_human_transmission()\nrecord_daily_stats() · foci log"
-    },
-    {
-      "id": "n11",
-      "x": 420,
-      "y": -40,
-      "width": 300,
-      "height": 150,
-      "type": "text",
-      "text": "## WindField (M7.6)\n**[[28-wind-field]]**\nis_migration_season()\nadvect u,v por día"
-    },
-    {
-      "id": "n12",
-      "x": -900,
-      "y": -460,
-      "width": 300,
-      "height": 170,
-      "type": "text",
-      "text": "## Contrato\n**[[30-tipos-datos]]**\nwire.hpp: AOI · PatchState · grids\n**[[31-constantes]]**\nK_MAX · EIP 110 GDD · σ 450 m"
-    },
-    {
-      "id": "n13",
-      "x": -1320,
-      "y": -460,
-      "width": 300,
-      "height": 150,
-      "type": "text",
-      "text": "## Salidas\nstate.tif + state.json\ntransmission.tif\nsteps/day json · foci_log"
-    }
-  ],
-  "edges": [
-    {
-      "id": "e01",
-      "fromSide": "right",
-      "fromNode": "n01",
-      "toSide": "left",
-      "toNode": "n02",
-      "label": "subprocess.run(argv)"
-    },
-    {
-      "id": "e02",
-      "fromSide": "right",
-      "fromNode": "n02",
-      "toSide": "left",
-      "toNode": "n05",
-      "label": "Engine ctor × rollout · Prng(seed+i)"
-    },
-    {
-      "id": "e03",
-      "fromSide": "bottom",
-      "fromNode": "n05",
-      "toSide": "top",
-      "toNode": "n06",
-      "label": "step(): set_climate_day · activate_patches · to_dataframe"
-    },
-    {
-      "id": "e04",
-      "fromSide": "right",
-      "fromNode": "n06",
-      "toSide": "left",
-      "toNode": "n04",
-      "label": "sub_->advance_day(patch_states_today())"
-    },
-    {
-      "id": "e05",
-      "fromSide": "bottom",
-      "fromNode": "n05",
-      "toSide": "top",
-      "toNode": "n10",
-      "label": "advance_vector_eip · advance_human_transmission"
-    },
-    {
-      "id": "e06",
-      "fromSide": "right",
-      "fromNode": "n04",
-      "toSide": "left",
-      "toNode": "n07",
-      "label": "cohort_bank_.advance_day · collect_emergence · add_eggs"
-    },
-    {
-      "id": "e07",
-      "fromSide": "right",
-      "fromNode": "n04",
-      "toSide": "left",
-      "toNode": "n08",
-      "label": "detect_host_cell · approach_vector · select_host_entry"
-    },
-    {
-      "id": "e08",
-      "fromSide": "right",
-      "fromNode": "n04",
-      "toSide": "top",
-      "toNode": "n09",
-      "label": "detect_breeding_cell · step_toward"
-    },
-    {
-      "id": "e09",
-      "fromSide": "top",
-      "fromNode": "n11",
-      "toSide": "bottom",
-      "toNode": "n04",
-      "label": "is_migration_season · u,v advect"
-    },
-    {
-      "id": "e10",
-      "fromSide": "right",
-      "fromNode": "n12",
-      "toSide": "left",
-      "toNode": "n06",
-      "label": "AOI · PatchState · grids · K_MAX"
-    },
-    {
-      "id": "e11",
-      "fromSide": "left",
-      "fromNode": "n05",
-      "toSide": "right",
-      "toNode": "n13",
-      "label": "snapshot() · snapshot_transmission()"
-    },
-    {
-      "id": "e12",
-      "fromSide": "left",
-      "fromNode": "n04",
-      "toSide": "right",
-      "toNode": "n12",
-      "label": "lee tipos + constantes"
-    }
-  ]
+	"nodes":[
+		{"id":"n10","type":"text","text":"## TransmissionModel (M7.4)\n**[[27-transmission]]**\ncheck_and_trigger_outbreak()\nadvance_vector_eip() GDD\nadvance_human_transmission()\nrecord_daily_stats() · foci log","x":-40,"y":-740,"width":380,"height":220},
+		{"id":"n05","type":"text","text":"## Engine\n**[[21-engine]]**\nstep() per day\nowns Coordinator / Submodel / Transmission\nsnapshot() · snapshot_transmission()","x":0,"y":-1200,"width":340,"height":200},
+		{"id":"n02","type":"text","text":"## CLI C++\n**[[20-main-cli]]**\nCLI11 · resolve_aoi\nmain() · OpenMP\nn_rollouts × Engine","x":-890,"y":-1180,"width":340,"height":180},
+		{"id":"n01","type":"text","text":"## Python layer\n**[[40-wrapper]]**\nCppAbmWrapper.run()\nrun_abm_from_manifest()\n→ subprocess + argv","x":-1490,"y":-950,"width":340,"height":180},
+		{"id":"n13","type":"text","text":"## Salidas\nstate.tif + state.json\ntransmission.tif\nsteps/day json · foci_log","x":-850,"y":-950,"width":300,"height":150},
+		{"id":"n06","type":"text","text":"## CoordinatorModel\n**[[22-coordinator]]**\nset_climate_day()\nactivate_patches() (M14 pools)\nto_dataframe() → patch_states_today()\naggregate_density() · write_state_cog()","x":-890,"y":-520,"width":340,"height":200},
+		{"id":"n12","type":"text","text":"## Contrato\n**[[30-tipos-datos]]**\nwire.hpp: AOI · PatchState · grids\n**[[31-constantes]]**\nK_MAX · EIP 110 GDD · σ 450 m","x":-1450,"y":-160,"width":300,"height":170},
+		{"id":"n04","type":"text","text":"## MosquitoSubmodel\n**[[23-mosquito-submodel]]**\nadvance_day(aoi, patch_states)\n1 cohort_bank_.advance_day\n2 collect_emergence → SoA\n3 gonotrophic loop (hembras)\n4 adult_dispersal (kernel+wind)\n5 adult_mortality (Lardeux)","x":-40,"y":-320,"width":380,"height":280},
+		{"id":"n08","type":"text","text":"## HostSeeking + Mobility\n**[[25-host-seeking]]**\ndetect_host_cell() 2 km\napproach_vector() 50 m\nselect_host_entry()\nMobilitySchedule OD CSR","x":950,"y":-510,"width":340,"height":190},
+		{"id":"n07","type":"text","text":"## AquaticCohortBank\n**[[24-aquatic-cohort-bank]]**\nadvance_day() · collect_emergence()\nadd_eggs() · seed_stage()\ndesiccation · washout · K_eff density","x":950,"y":-835,"width":340,"height":190},
+		{"id":"n09","type":"text","text":"## OvipositionSeeking\n**[[26-oviposition-seeking]]**\ndetect_breeding_cell()\nstep_toward()\ntimeout 7d → skip-oviposit","x":950,"y":-180,"width":340,"height":170},
+		{"id":"n11","type":"text","text":"## WindField (M7.6)\n**[[28-wind-field]]**\nis_migration_season()\nadvect u,v por día","x":950,"y":120,"width":300,"height":150}
+	],
+	"edges":[
+		{"id":"e01","fromNode":"n01","fromSide":"right","toNode":"n02","toSide":"left","label":"subprocess.run(argv)"},
+		{"id":"e02","fromNode":"n02","fromSide":"right","toNode":"n05","toSide":"left","label":"Engine ctor × rollout · Prng(seed+i)"},
+		{"id":"e03","fromNode":"n05","fromSide":"bottom","toNode":"n06","toSide":"top","label":"step(): set_climate_day · activate_patches · to_dataframe"},
+		{"id":"e04","fromNode":"n06","fromSide":"right","toNode":"n04","toSide":"left","label":"sub_->advance_day(patch_states_today())"},
+		{"id":"e05","fromNode":"n05","fromSide":"bottom","toNode":"n10","toSide":"top","label":"advance_vector_eip · advance_human_transmission"},
+		{"id":"e06","fromNode":"n04","fromSide":"right","toNode":"n07","toSide":"left","label":"cohort_bank_.advance_day · collect_emergence · add_eggs"},
+		{"id":"e07","fromNode":"n04","fromSide":"right","toNode":"n08","toSide":"left","label":"detect_host_cell · approach_vector · select_host_entry"},
+		{"id":"e08","fromNode":"n04","fromSide":"right","toNode":"n09","toSide":"top","label":"detect_breeding_cell · step_toward"},
+		{"id":"e09","fromNode":"n11","fromSide":"top","toNode":"n04","toSide":"bottom","label":"is_migration_season · u,v advect"},
+		{"id":"e10","fromNode":"n12","fromSide":"right","toNode":"n06","toSide":"left","label":"AOI · PatchState · grids · K_MAX"},
+		{"id":"e11","fromNode":"n05","fromSide":"left","toNode":"n13","toSide":"right","label":"snapshot() · snapshot_transmission()"},
+		{"id":"e12","fromNode":"n04","fromSide":"left","toNode":"n12","toSide":"right","label":"lee tipos + constantes"}
+	]
 }

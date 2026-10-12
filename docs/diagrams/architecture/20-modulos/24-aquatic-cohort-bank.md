@@ -12,10 +12,11 @@ up:: [[23-mosquito-submodel]]
 <!-- bc:auto:start -->
 ```breadcrumbs
 type: mermaid
-fields: [calls, called_by, owns]
-depth: 1
+depth: [0, 1]
+sort: field
+show-attributes: [field]
 mermaid-direction: LR
-show-attributes: true
+mermaid-arrow: true
 ```
 
 > [!info] Conexiones exactas del grafo
@@ -31,6 +32,7 @@ show-attributes: true
 | `write_diagnostics` | `count_by_stage[_instar]` · `total_aquatic` | aquatic_cohort_bank.cpp | para Engine::snapshot |
 
 <!-- bc:auto:end -->
+
 
 
 

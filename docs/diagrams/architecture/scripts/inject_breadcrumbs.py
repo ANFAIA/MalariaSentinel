@@ -60,18 +60,27 @@ def extract_conexiones_rows(body: str):
 
 
 def build_bc_block(fm: dict) -> str:
-    """Codeblock breadcrumbs mermaid con todos los fields no-vacíos."""
-    fields = [f for f in EDGE_FIELDS if fm.get(f)]
-    if not fields:
+    """Codeblock breadcrumbs mermaid local (vecindario, aristas etiquetadas por field).
+
+    Sintaxis 4.22.x validada contra docs 2026-10:
+    - depth SIEMPRE lista: depth: [0, 1]
+    - show-attributes: lista de atributos de edge, p.ej. [field]
+    - fields se omite → usa TODOS los edge fields registrados (calls, owns, ...).
+      El validator del plugin solo acepta sus 5 fields genéricos en `fields:`,
+      por eso no lo tocamos.
+    - sort: field agrupa el árbol/lista por tipo de edge (= Matrix View).
+    """
+    has_edges = any(fm.get(f) for f in EDGE_TYPES)
+    if not has_edges:
         return ""
-    fl = ", ".join(fields)
     return (
         "```breadcrumbs\n"
         "type: mermaid\n"
-        f"fields: [{fl}]\n"
-        "depth: 1\n"
+        "depth: [0, 1]\n"
+        "sort: field\n"
+        "show-attributes: [field]\n"
         "mermaid-direction: LR\n"
-        "show-attributes: true\n"
+        "mermaid-arrow: true\n"
         "```\n"
     )
 

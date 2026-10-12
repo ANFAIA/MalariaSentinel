@@ -12,10 +12,11 @@ up:: [[00-INDEX]]
 <!-- bc:auto:start -->
 ```breadcrumbs
 type: mermaid
-fields: [calls, called_by, owns]
-depth: 1
+depth: [0, 1]
+sort: field
+show-attributes: [field]
 mermaid-direction: LR
-show-attributes: true
+mermaid-arrow: true
 ```
 
 > [!info] Conexiones exactas del grafo
@@ -32,6 +33,7 @@ show-attributes: true
 | `residential_*()` | `host_landscape_->cells_` | host_landscape | proyección a grilla para snapshot |
 
 <!-- bc:auto:end -->
+
 
 
 

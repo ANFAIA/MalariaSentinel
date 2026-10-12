@@ -12,10 +12,11 @@ up:: [[21-engine]]
 <!-- bc:auto:start -->
 ```breadcrumbs
 type: mermaid
-fields: [calls, called_by, owns]
-depth: 1
+depth: [0, 1]
+sort: field
+show-attributes: [field]
 mermaid-direction: LR
-show-attributes: true
+mermaid-arrow: true
 ```
 
 > [!info] Conexiones exactas del grafo
@@ -32,6 +33,7 @@ show-attributes: true
 | `write_state_cog` | `cells_per_side` | [[31-constantes]] (wire.hpp) | dimensiones h·w del COG |
 
 <!-- bc:auto:end -->
+
 
 
 

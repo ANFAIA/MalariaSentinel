@@ -13,10 +13,11 @@ up:: [[21-engine]]
 <!-- bc:auto:start -->
 ```breadcrumbs
 type: mermaid
-fields: [calls, called_by, owns]
-depth: 1
+depth: [0, 1]
+sort: field
+show-attributes: [field]
 mermaid-direction: LR
-show-attributes: true
+mermaid-arrow: true
 ```
 
 > [!info] Conexiones exactas del grafo
@@ -44,6 +45,7 @@ show-attributes: true
 | ctor | `seed_stage` | aquatic_cohort_bank.cpp | siembra de cohortes iniciales |
 
 <!-- bc:auto:end -->
+
 
 
 

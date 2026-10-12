@@ -12,10 +12,11 @@ up:: [[00-INDEX]]
 <!-- bc:auto:start -->
 ```breadcrumbs
 type: mermaid
-fields: [calls]
-depth: 1
+depth: [0, 1]
+sort: field
+show-attributes: [field]
 mermaid-direction: LR
-show-attributes: true
+mermaid-arrow: true
 ```
 
 > [!info] Conexiones exactas del grafo
@@ -30,6 +31,7 @@ show-attributes: true
 | step() | `set_climate_day`, activate | coordinator.cpp | [[15-bucle-diario]] |
 
 <!-- bc:auto:end -->
+
 
 # 12 · Flujo de dependencias — qué necesita qué para correr
 
