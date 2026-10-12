@@ -141,7 +141,9 @@ def _load_api_key() -> str | None:
     """
     env_key = os.environ.get("OPENROUTER_KEY")
     if env_key:
-        return env_key
+        # Shell exports and CI secret wrappers may carry surrounding
+        # quotes (this repo's own .env does) — strip before sending.
+        return env_key.strip().strip('"').strip("'") or None
 
     here = Path(__file__).resolve().parent
     while True:
