@@ -155,9 +155,11 @@ inline constexpr float  ADULT_MORT_FLOOR        = 0.60f;
 // fallback is a documented degenerate-engine guard (25 deg C literal)
 // for an all-NaN slice or an unloaded engine.
 
-// Larva desiccation mortality (Depinay 2004 §3.1).
-inline constexpr int    LARVA_DESICCATION_GRACE_DAYS = 5;
-inline constexpr float  LARVA_DESICCATION_DAILY_RATE = 0.10f;
+// Larva desiccation (Depinay 2004 §3.1) is wired by the pool_hydrology
+// constants below: POOL_DESICCATION_GRACE_DAYS + POOL_DESICC_BASE_DAILY
+// (m14-pool-hydrology). The legacy LARVA_DESICCATION_GRACE_DAYS /
+// LARVA_DESICCATION_DAILY_RATE twins (same values) were removed on
+// 2026-10-13 — no runtime consumer since M14's desiccation_rate().
 
 // PLUVIAL_POOL dynamic-patch rule (M2 combined, C2):
 //   cell (r, c) is a habitat patch today iff

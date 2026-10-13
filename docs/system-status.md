@@ -588,8 +588,8 @@ graph TB
 | `HUMAN_INCUBATION_DAYS` | **12** | — | Periodo incubacion intrinseco (E_H → I_H) |
 | `HUMAN_INFECTIOUS_DAYS` | **20** | — | Duracion infecciosidad (I_H → R_H) |
 | `IMMUNITY_DURATION_DAYS` | **180** | — | Duracion inmunidad temporal (R_H → S_H) |
-| `LARVA_DESICCATION_GRACE_DAYS` | 5 | — | Dias gracia desecacion |
-| `LARVA_DESICCATION_DAILY_RATE` | 0.10 | — | Tasa desecacion |
+| `POOL_DESICCATION_GRACE_DAYS` | 5 | — | Dias gracia desecacion (pool_hydrology.hpp desiccation_rate; wire.hpp pool section) |
+| `POOL_DESICC_BASE_DAILY` | 0.10 | — | Tasa desecacion post-gracia (ramp exponencial 0.3/dia past grace) |
 
 **Cambios clave M7 vs F1**: Dispersal mas conservador (5% prob, sigma=450m, cap=2km). Nacimiento reemplazado por Mordecai EFD termico (0.25 fecundity constante + curva cuadratica). Mortalidad adulta recalibrada (basal 0.93, sigma=15, caps). Pluvial pool rain threshold revertido a 15mm (era 50mm en F1). Contract v2.0: bandas renombradas.
 
