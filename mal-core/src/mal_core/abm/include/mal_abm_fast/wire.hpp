@@ -143,16 +143,17 @@ inline constexpr float  ADULT_SIGMA             = 15.0f;
 inline constexpr float  ADULT_MORT_CAP          = 0.93f;
 inline constexpr float  ADULT_MORT_FLOOR        = 0.60f;
 
-// Fallback temperature (deg C) when the env COG returns NaN at a
-// cell (e.g. out-of-coverage pixels near the AOI edges, or
-// land/water mask that rasterized to NaN). 25 deg C sits at the
-// Lardeux optimum: p_d = ADULT_DAILY_MORT_BASAL exactly (0.87 with
-// the 2026-10-13 value) — strong survival, well above the 0.60
-// floor, and far above the 0.90-mortality fallback of the previous
-// behaviour (which crashed the population). EIP accumulation also
-// resumes (T > EIP_BASE_C, so the daily GD is non-zero and larvae
-// mature).
-inline constexpr float  ADULT_TEMP_FALLBACK_C  = 25.0f;
+// Temperature NaN policy (2026-10-13): the legacy per-lookup constant
+// ADULT_TEMP_FALLBACK_C (25 deg C) was removed. Out-of-coverage /
+// sea-mask NaN pixels in the env NC water_temp_c channel are imputed
+// at load time by neighbor-mean wavefront fill (climate.cpp
+// impute_temp_nans) — each imputed cell inherits the same day's
+// spatial temperature field, so it tracks the seasonal cycle instead
+// of pinning 25 deg C year-round (the fixed fallback put out-of-place
+// values on coastal/edge cells in hot and cold seasons). temp_at()
+// clamps off-grid (row, col) to the border cell; the only remaining
+// fallback is a documented degenerate-engine guard (25 deg C literal)
+// for an all-NaN slice or an unloaded engine.
 
 // Larva desiccation mortality (Depinay 2004 §3.1).
 inline constexpr int    LARVA_DESICCATION_GRACE_DAYS = 5;

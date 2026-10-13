@@ -325,10 +325,10 @@ void TransmissionModel::advance_vector_eip(
 
         const int32_t r = soa.row[si];
         const int32_t c = soa.col[si];
-        float temp = climate.temp_at(r, c);
-        if (!std::isfinite(static_cast<double>(temp))) {
-            temp = ADULT_TEMP_FALLBACK_C;
-        }
+        // temp_at() guarantees a finite value: NaN pixels are imputed
+        // at ClimateEngine load time and off-grid lookups clamp to the
+        // border cell (see climate.cpp temp_at).
+        const float temp = climate.temp_at(r, c);
 
         const float new_eip = accumulate_eip(soa.parasite_eip_progress[si], temp);
         soa.parasite_eip_progress[si] = new_eip;

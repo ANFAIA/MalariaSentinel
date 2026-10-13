@@ -579,7 +579,7 @@ graph TB
 | `ADULT_SIGMA` | **15.0** | — | Ancho respuesta termica (Martens 1997) |
 | `ADULT_MORT_CAP` | 0.93 | — | Upper bound supervivencia (Midega 2007) |
 | `ADULT_MORT_FLOOR` | 0.60 | — | Floor mortalidad extremos |
-| `ADULT_TEMP_FALLBACK_C` | 25.0 | — | Temp fallback NaN pixels |
+| `temp NaN policy` | imputación vecinos | — | climate.cpp `impute_temp_nans` al cargar (wavefront media de vecinos, estacional); `temp_at` OOB = clamp a celda borde; sin constante (ADULT_TEMP_FALLBACK_C eliminado 2026-10-13) |
 | `CONTRACT_VERSION` | **"2.0"** | — | Band rename: adult_occupancy + host_seeking_pressure |
 | `GENERATOR_VERSION` | **"m7.1-m7.2-multiscale"** | — | — |
 | `CONTRACT_VERSION_TRANSMISSION` | **"2.0-transmission"** | — | Contract version para transmission COG |

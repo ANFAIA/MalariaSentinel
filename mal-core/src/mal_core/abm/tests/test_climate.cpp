@@ -15,6 +15,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
+#include <limits>
 #include <string>
 #include <vector>
 
@@ -37,7 +38,12 @@ fs::path MakeTmpEnvNC() {
 }
 
 // Write a synthetic multi-day NetCDF using the netCDF-C API.
-void WriteSyntheticEnvNC(const fs::path& path, int n_days, bool with_salinity = false) {
+// nan_mode: 0 = no NaNs (finite linear temp field 20..26 = 20+r+c);
+//           1 = day-1-only NaN block at (1..2, 1..2) — interior NaNs
+//               surrounded by finite gradient values;
+//           2 = day-1 fully NaN temperature slice (degenerate).
+void WriteSyntheticEnvNC(const fs::path& path, int n_days,
+                         bool with_salinity = false, int nan_mode = 0) {
     int ncid, dimids[3], vid[4], vidsal;
     int dimid_time, dimid_y, dimid_x;
 
@@ -55,6 +61,15 @@ void WriteSyntheticEnvNC(const fs::path& path, int n_days, bool with_salinity = 
     if (with_salinity) {
         ASSERT_EQ(nc_def_var(ncid, "salinity_ppt", NC_FLOAT, 3, dimids, &vidsal), NC_NOERR);
     }
+    // _FillValue = NaN on water_temp_c: netCDF converts NaN writes into
+    // the default fill (9.969e+36) unless a NaN _FillValue attribute is
+    // declared first — the NaN payload must survive the round-trip, as
+    // in the real env NCs (xarray writer).
+    if (nan_mode != 0) {
+        const float nanfill = std::numeric_limits<float>::quiet_NaN();
+        ASSERT_EQ(nc_put_att_float(ncid, vid[1], "_FillValue", NC_FLOAT, 1,
+                                   &nanfill), NC_NOERR);
+    }
     ASSERT_EQ(nc_put_att_text(ncid, NC_GLOBAL, "Conventions", 6, "CF-1.8"), NC_NOERR);
     ASSERT_EQ(nc_enddef(ncid), NC_NOERR);
 
@@ -69,7 +84,24 @@ void WriteSyntheticEnvNC(const fs::path& path, int n_days, bool with_salinity = 
         start[0] = d;
         std::fill(buf, buf + kH * kW, rain_vals[d % 3]);
         ASSERT_EQ(nc_put_vara_float(ncid, vid[0], start, count, buf), NC_NOERR);
-        std::fill(buf, buf + kH * kW, temp_vals[d % 3]);
+        if (nan_mode == 2 && d == 1) {
+            std::fill(buf, buf + kH * kW,
+                      std::numeric_limits<float>::quiet_NaN());
+        } else {
+            for (int i = 0; i < kH * kW; ++i) {
+                const int r = i / kW, c = i % kW;
+                // Day 1 NaN block (nan_mode 1): interior, fully
+                // surrounded by finite gradient values.
+                if (nan_mode == 1 && d == 1 && r >= 1 && r <= 2 &&
+                    c >= 1 && c <= 2) {
+                    buf[i] = std::numeric_limits<float>::quiet_NaN();
+                } else if (nan_mode == 0) {
+                    buf[i] = temp_vals[d % 3];
+                } else {
+                    buf[i] = 20.0f + static_cast<float>(r + c);
+                }
+            }
+        }
         ASSERT_EQ(nc_put_vara_float(ncid, vid[1], start, count, buf), NC_NOERR);
         std::fill(buf, buf + kH * kW, 0.5f);
         ASSERT_EQ(nc_put_vara_float(ncid, vid[2], start, count, buf), NC_NOERR);
@@ -262,6 +294,81 @@ TEST(ClimateEngine, CloneForThreadPropagatesSalinity) {
 
     clone->set_day(1);
     EXPECT_FLOAT_EQ(clone->salinity_at(0, 0), 25.0f);
+
+    fs::remove(path);
+}
+
+// -- Temperature NaN imputation (2026-10-13) ---------------------------------
+
+// Interior NaN pixels are imputed at load time from same-day finite
+// neighbors: temp_at() is finite everywhere, imputed values stay
+// within the finite field's range, and off-grid lookups clamp to the
+// border cell — no per-lookup fallback constant (ADULT_TEMP_FALLBACK_C
+// was removed).
+TEST(ClimateEngine, TempNanImputedFromNeighborsAtLoad) {
+    const fs::path path = MakeTmpEnvNC();
+    if (fs::exists(path)) fs::remove(path);
+    WriteSyntheticEnvNC(path, 3, /*with_salinity=*/false, /*nan_mode=*/1);
+    ASSERT_TRUE(fs::exists(path));
+
+    mal_abm_fast::ClimateEngine eng;
+    eng.load_from_env_nc(path.string(), MakeAoi());
+
+    // Finite temp field on all days, all cells (including imputed NaNs).
+    for (int d = 0; d < 3; ++d) {
+        eng.set_day(d);
+        for (int r = 0; r < kH; ++r) {
+            for (int c = 0; c < kW; ++c) {
+                const float T = eng.temp_at(r, c);
+                EXPECT_TRUE(std::isfinite(static_cast<double>(T)))
+                    << "day " << d << " cell (" << r << "," << c << ")";
+            }
+        }
+    }
+
+    // Day 1: non-NaN cells keep the exact gradient 20 + r + c.
+    eng.set_day(1);
+    EXPECT_FLOAT_EQ(eng.temp_at(0, 0), 20.0f);
+    EXPECT_FLOAT_EQ(eng.temp_at(kH - 1, kW - 1), 26.0f);
+
+    // Imputed interior cells (the day-1 NaN block) are finite and
+    // bounded by the same-day finite field extremes [20, 26]. (The
+    // wavefront mean fill is not exactly symmetric on a gradient field
+    // — no point-for-point equality expected.)
+    EXPECT_GE(eng.temp_at(1, 1), 20.0f);
+    EXPECT_LE(eng.temp_at(1, 1), 26.0f);
+    EXPECT_GE(eng.temp_at(2, 2), 20.0f);
+    EXPECT_LE(eng.temp_at(2, 2), 26.0f);
+
+    // Off-grid lookups clamp to the border cell (no fallback constant).
+    EXPECT_FLOAT_EQ(eng.temp_at(-1, 0), eng.temp_at(0, 0));
+    EXPECT_FLOAT_EQ(eng.temp_at(kH, 0), eng.temp_at(kH - 1, 0));
+    EXPECT_FLOAT_EQ(eng.temp_at(0, kW), eng.temp_at(0, kW - 1));
+    EXPECT_FLOAT_EQ(eng.temp_at(-5, -5), eng.temp_at(0, 0));
+
+    fs::remove(path);
+}
+
+// Degenerate slice (every cell NaN — no finite cell anywhere): the NaNs
+// cannot borrow neighbors, so temp_at serves the documented degenerate
+// guard (25 deg C literal) — the mortality and EIP submodels stay in
+// their calibrated regime.
+TEST(ClimateEngine, AllNanTempSliceServesDegenerateGuard) {
+    const fs::path path = MakeTmpEnvNC();
+    if (fs::exists(path)) fs::remove(path);
+    WriteSyntheticEnvNC(path, 3, /*with_salinity=*/false, /*nan_mode=*/2);
+    ASSERT_TRUE(fs::exists(path));
+
+    mal_abm_fast::ClimateEngine eng;
+    eng.load_from_env_nc(path.string(), MakeAoi());
+
+    eng.set_day(1);  // the fully-NaN slice
+    EXPECT_FLOAT_EQ(eng.temp_at(0, 0), 25.0f);
+    EXPECT_FLOAT_EQ(eng.temp_at(kH - 1, kW - 1), 25.0f);
+
+    // Clean days keep their gradient values.
+    eng.set_day(0);
+    EXPECT_FLOAT_EQ(eng.temp_at(0, 0), 20.0f);
 
     fs::remove(path);
 }
