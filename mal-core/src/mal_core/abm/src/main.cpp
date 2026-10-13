@@ -334,7 +334,6 @@ OUTPUT
     float disperse_sigma_m = mal_abm_fast::ADULT_DISPERSE_SIGMA_M;
     float disperse_max_m   = mal_abm_fast::ADULT_DISPERSE_MAX_M;
     float larva_bh_alpha   = mal_abm_fast::LARVA_BH_ALPHA;
-    float birth_fecundity  = mal_abm_fast::BIRTH_FECUNDITY;
 
     bool debug_population = false;
     std::string cohort_log_path;
@@ -518,12 +517,6 @@ OUTPUT
                     "Hard cap on kernel; rare long-distance colonisation.")
         ->default_val(mal_abm_fast::ADULT_DISPERSE_MAX_M)
         ->group("Population Dynamics");
-    run->add_option("--birth-fecundity", birth_fecundity,
-                    "Per-adult per-day fecundity (default 0.25). "
-                    "n_eggs = binomial(n_females, fecundity). "
-                    "Lower = slower population growth.")
-        ->default_val(mal_abm_fast::BIRTH_FECUNDITY)
-        ->group("Population Dynamics");
     run->add_option("--larva-bh-alpha", larva_bh_alpha,
                     "Beverton-Holt competition coefficient (default 0.05). "
                     "Controls density-dependent larval mortality: "
@@ -706,7 +699,6 @@ OUTPUT
     overrides.disperse_sigma_m = disperse_sigma_m;
     overrides.disperse_max_m   = disperse_max_m;
     overrides.larva_bh_alpha   = larva_bh_alpha;
-    overrides.birth_fecundity  = birth_fecundity;
 
     // -- AOI resolution ------------------------------------------------
     mal_abm_fast::AOI aoi;

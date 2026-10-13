@@ -570,12 +570,11 @@ graph TB
 | `ADULT_DISPERSE_PROB` | **0.05** | 0.20 | C++ 5% (calibrado M7, Costantini+Thomas) |
 | `ADULT_DISPERSE_SIGMA_M` | **450.0** | 1000.0 | C++ sigma=450m (Costantini 1996 midpoint) |
 | `ADULT_DISPERSE_MAX_M` | **2000.0** | 2000.0 | C++ cap 2km (Thomas 2013 95th pctl) |
-| `BIRTH_FECUNDITY` | **0.25** | 0.005 (xK) | C++: 25% adultos/2 (calibrado M7) |
-| `BIRTH_RATE` | **Mordecai EFD** | constante | C++: termica (T0=16, Tm=34, Topt=25) |
+| `EggBatch_p` | **0.5 × EFD(T)** | constante | C++: térmica (EFD Mordecai 2013, T0=16, Tm=34, Topt=25) vía birth_rate.hpp |
 | `PLUVIAL_POOL_RAIN_THRESHOLD_MM` | **15.0** | 15.0 | Iguales (50mm revertido, biologico) |
 | `LARVA_BH_S0` | 0.95 | — | Mortalidad Beverton-Holt |
 | `LARVA_BH_ALPHA` | 0.05 | — | Coeficiente competencia |
-| `ADULT_DAILY_MORT_BASAL` | **0.93** | — | Mortalidad basal (Saarman 2019, Midega 2007) |
+| `ADULT_DAILY_MORT_BASAL` | **0.87** | — | Mortalidad basal (Saarman 2019 midpoint; 0.93 anterior) |
 | `ADULT_OPT_C` | **25.0** | — | Temperatura optima (Mordecai 2013) |
 | `ADULT_SIGMA` | **15.0** | — | Ancho respuesta termica (Martens 1997) |
 | `ADULT_MORT_CAP` | 0.93 | — | Upper bound supervivencia (Midega 2007) |

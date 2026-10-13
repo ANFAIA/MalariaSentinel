@@ -246,6 +246,21 @@ Engine::Engine(AOI aoi,
         sub_->set_host_seeking_model(host_seeking_model_.get());
     }
 
+    // -- Directed oviposition-site seeking (Plan D) --------------------------
+    // Wire the water-vapour/VOC plume kernel so gravid females actively walk
+    // toward activated breeding patches instead of relying on the standing-cell
+    // fallback (which strands them above dry land with no timer). Uses the
+    // wire.hpp OVIPOSITION_* constants (scale 50 m, radius 500 m).
+    if (sub_ && habitat_) {
+        sub_->set_habitat_engine(habitat_.get());
+        oviposition_seeking_model_ =
+            std::make_unique<OvipositionSeekingModel>();
+        sub_->set_oviposition_seeking_model(
+            oviposition_seeking_model_.get());
+        std::cout << "Engine: wired OvipositionSeekingModel "
+                     "(directed oviposition walk)\n";
+    }
+
     // -- M7.8 species + effective host landscape -----------------------------
     sub_->set_species(species_params_);
     sub_->cohort_bank_mutable().set_species(species_params_);
@@ -468,6 +483,21 @@ Engine::Engine(AOI aoi,
     if (host_landscape_) {
         host_seeking_model_ = std::make_unique<HostSeekingModel>();
         sub_->set_host_seeking_model(host_seeking_model_.get());
+    }
+
+    // -- Directed oviposition-site seeking (Plan D) --------------------------
+    // Wire the water-vapour/VOC plume kernel so gravid females actively walk
+    // toward activated breeding patches instead of relying on the standing-cell
+    // fallback (which strands them above dry land with no timer). Uses the
+    // wire.hpp OVIPOSITION_* constants (scale 50 m, radius 500 m).
+    if (sub_ && habitat_) {
+        sub_->set_habitat_engine(habitat_.get());
+        oviposition_seeking_model_ =
+            std::make_unique<OvipositionSeekingModel>();
+        sub_->set_oviposition_seeking_model(
+            oviposition_seeking_model_.get());
+        std::cout << "Engine: wired OvipositionSeekingModel "
+                     "(directed oviposition walk)\n";
     }
 
     // -- M7.8 species + effective host landscape -----------------------------

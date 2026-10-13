@@ -22,6 +22,7 @@ mermaid-arrow: true
 > [!info] Conexiones exactas del grafo
 > **Nodo actual · nota: dependency flow diagram**
 > *Mantenida manualmente — fuente: cpp real + índice codebase (“no es suposición”).*
+> 
 | método llamador | llamada → destino | en archivo | detalle / firma |
 |---|---|---|---|
 | compilar | compile.py + cmake | mal-core/abm/compile.py | auto-cp a bin/ |

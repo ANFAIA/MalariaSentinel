@@ -10,8 +10,9 @@
 //   Tm = maximum temperature for reproduction (34°C)
 //   Topt = optimal temperature (25°C)
 //
-// This replaces the constant BIRTH_FECUNDITY with a temperature-dependent
-// value that varies across the AOI grid cells.
+// This temperature-dependent modifier is wired (2026-10-13) into the
+// OVIPOSITING egg-batch draw in mosquito_submodel.cpp, replacing the
+// legacy constant BIRTH_FECUNDITY (removed — dead code).
 #pragma once
 
 #include <cmath>

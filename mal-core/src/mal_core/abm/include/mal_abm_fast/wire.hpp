@@ -81,13 +81,18 @@ inline constexpr float  OVIPOSITION_SCALE_M          = 50.0f;
 inline constexpr float  OVIPOSITION_RADIUS_M         = 500.0f;
 inline constexpr int    OVIPOSITION_SEEKING_TIMEOUT_DAYS = 7;
 
-// Per-adult per-day fecundity: binomial(n_adults/2, BIRTH_FECUNDITY) new larvae.
-// Tuned so the population stays near the initial seeded count on the
-// 30k-patch, 30-day M1.5 perf budget. The M1.5 perf baseline; raising
-// this would only mask the structural 150-adult point-source collapse
-// (see docs/calibration-test-framework.md §6 and the p_7b70cbc1 proposal
-// summary for the resolution path discussion).
-inline constexpr float  BIRTH_FECUNDITY              = 0.25f;
+// Egg batch size is temperature-scaled at oviposition time via the EFD
+// thermal modifier (birth_rate.hpp, Mordecai 2013): the binomial draw of
+// GonotrophicParams::egg_batch_n trials uses p = 0.5 × birth_rate_modifier(T),
+// with T the same per-patch temp_d that drives Lardeux adult survival.
+// The legacy per-adult-per-day constant BIRTH_FECUNDITY (0.25) was removed
+// on 2026-10-13 as dead code: the constant per-day birth path it
+// parameterised no longer exists (eggs enter exclusively through the
+// gonotrophic cycle), its RuntimeOverrides field had zero consumers, and
+// the --birth-fecundity CLI flag did nothing. The M1.5 tuning note
+// ("raise only masks the structural point-source collapse") is superseded
+// by the aquatic-bottleneck diagnosis: 0.87 mortality (Saarman 2019) +
+// wired OvipositionSeekingModel + thermal egg batches.
 
 // Larva density-dependent mortality (Beverton-Holt, docs/abm-status.md:79).
 inline constexpr float  LARVA_BH_S0    = 0.95f;   // baseline daily survival
@@ -100,32 +105,34 @@ struct RuntimeOverrides {
     float disperse_sigma_m = ADULT_DISPERSE_SIGMA_M;
     float disperse_max_m   = ADULT_DISPERSE_MAX_M;
     float larva_bh_alpha   = LARVA_BH_ALPHA;
-    float birth_fecundity  = BIRTH_FECUNDITY;
 };
 
 // Adult daily mortality — Lardeux thermo-dependent with basal cap.
 //   p_d = ADULT_DAILY_MORT_BASAL * exp(-((T - ADULT_OPT_C)^2) / (2 * ADULT_SIGMA^2))
 //   clipped to [ADULT_MORT_FLOOR, ADULT_MORT_CAP]
-// ADULT_DAILY_MORT_BASAL (default 0.95) is the maximum daily survival at
-// the optimal temperature. It accounts for non-thermal mortality sources
-// (senescence, predation, accidents) that the Lardeux Gaussian does not
-// model. At Ghana June median T=27.5°C: p_d=0.892, mean life 9.3 days,
-// matching Saarman 2019 (0.87) and Midega 2007 (0.83-0.95). Previous
-// value 0.90 was at the low end of the field MRR range and produced an
-// immediate 5-day collapse of the 150-adult point-source; 0.95 delays
-// collapse to ~day 30-45 but does not prevent it (the F=0.10 reproduction
-// rate cannot sustain 150 adults at p_d=0.892 — see proposal p_7b70cbc1
-// and docs/calibration-test-framework.md §6 for the resolution path).
-//   - Costantini 1996: 0.80-0.88 (Burkina Faso savanna)
-//   - Saarman 2019:    0.87 (West Africa, self-marking)
+// ADULT_DAILY_MORT_BASAL (0.87 since 2026-10-13, Saarman 2019 midpoint) is
+// the maximum daily survival at the optimal temperature. It accounts for
+// non-thermal mortality sources (senescence, predation, accidents) that
+// the Lardeux Gaussian does not model. At T=25°C: p_d=0.87, mean life
+// ~7.1 days. At Ghana July medians (27-29°C): p_d=0.84-0.86.
+// History: 0.95/0.93 probes produced a structural point-source collapse
+// blamed on mortality that is actually the aquatic bottleneck (see 2026
+// A/B in runs/abm_mort_v3); Costantini 1996 MRR gives 0.80-0.88.
+//   - Saarman 2019:    0.87 (West Africa, self-marking)  <- current value
 //   - North 2018:      0.875 (model param)
+//   - Costantini 1996: 0.80-0.88 (Burkina Faso savanna)
 //   - Midega 2007:     0.83-0.95 (Kenya coast)
 // ADULT_OPT_C = 25°C: matches Mordecai 2013 + Lunde 2013 (Bayoh-Mordecai).
-// ADULT_SIGMA = 7: broader curve, matches Martens 1997 (West Africa MRR
-// at 30-35°C remains survivable).
-// ADULT_MORT_CAP = 0.95: empirical upper bound from Midega 2007.
-// ADULT_MORT_FLOOR = 0.60: emergency floor for extreme temps.
-inline constexpr float  ADULT_DAILY_MORT_BASAL  = 0.93f;
+// ADULT_SIGMA = 15: broader curve, matches Martens 1997 (West Africa MRR
+// at 30-35°C remains survivable). With sigma=7, survival at 32°C was only
+// 57.7% (mean life 2.5 days) — too low for field observations. Sigma=15
+// gives p_d=0.78 at 32°C (mean life ~4 days), matching the "survivable"
+// range from Martens 1997 and Costantini 1996.
+// ADULT_MORT_CAP = 0.93: empirical upper bound (Midega 2007). Dormant with
+// BASAL=0.87 — the Gaussian never exceeds 0.87 at improving temps; the
+// cap would only bind again if BASAL rises above 0.93.
+// ADULT_MORT_FLOOR = 0.60: emergency floor for extreme temps (max 40%/day).
+inline constexpr float  ADULT_DAILY_MORT_BASAL  = 0.87f;  // Saarman 2019 shared-midpoint (was 0.93; prior probes 0.90, 0.95)
 inline constexpr float  ADULT_OPT_C             = 25.0f;
 // ADULT_SIGMA = 15: broader curve, matches Martens 1997 (West Africa MRR
 // at 30-35°C remains survivable). With sigma=7, survival at 32°C was only
@@ -135,17 +142,16 @@ inline constexpr float  ADULT_OPT_C             = 25.0f;
 inline constexpr float  ADULT_SIGMA             = 15.0f;
 inline constexpr float  ADULT_MORT_CAP          = 0.93f;
 inline constexpr float  ADULT_MORT_FLOOR        = 0.60f;
-// Backward-compat alias for existing code that reads ADULT_DAILY_MORT_BASE.
-inline constexpr float  ADULT_DAILY_MORT_BASE   = ADULT_DAILY_MORT_BASAL;
 
 // Fallback temperature (deg C) when the env COG returns NaN at a
 // cell (e.g. out-of-coverage pixels near the AOI edges, or
-// land/water mask that rasterized to NaN). 25 deg C gives a Lardeux
-// p_d = exp(-((25-26)^2) / (2*49)) ≈ 0.9898 — a strong survival
-// value well above the 0.60 mortality floor, and well above the
-// 0.90 fallback that the previous behaviour produced (which crashed
-// the population). EIP accumulation also resumes (T > EIP_BASE_C
-// so the daily GD is non-zero and larvae mature).
+// land/water mask that rasterized to NaN). 25 deg C sits at the
+// Lardeux optimum: p_d = ADULT_DAILY_MORT_BASAL exactly (0.87 with
+// the 2026-10-13 value) — strong survival, well above the 0.60
+// floor, and far above the 0.90-mortality fallback of the previous
+// behaviour (which crashed the population). EIP accumulation also
+// resumes (T > EIP_BASE_C, so the daily GD is non-zero and larvae
+// mature).
 inline constexpr float  ADULT_TEMP_FALLBACK_C  = 25.0f;
 
 // Larva desiccation mortality (Depinay 2004 §3.1).

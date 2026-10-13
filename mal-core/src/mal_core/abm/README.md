@@ -85,7 +85,7 @@ Direct binary invocation (matching what the wrapper does):
 
 - **Grid/inputs**: `--aoi` | `--bbox/--crs/--resolution-m/--scale`, `--env`, `--habitat`, `--hosts`, `--human-mobility-day/night`, `--livestock-mobility`, `--wind-field`
 - **Run shape**: `--year --month --days(1..731) --seed --n-rollouts --threads --snapshot-every --max-population`
-- **Mosquito dynamics**: `--disperse-prob/--disperse-sigma-m/--disperse-max-m`, `--birth-fecundity`, `--larva-bh-alpha`, `--seeding-mode`, `--init-frac`, detection-seeding flags (`--detection-points`, `--n-adults-per-detection`, …)
+- **Mosquito dynamics**: `--disperse-prob/--disperse-sigma-m/--disperse-max-m`, `--larva-bh-alpha`, `--seeding-mode`, `--init-frac`, detection-seeding flags (`--detection-points`, `--n-adults-per-detection`, …)
 - **Transmission**: `--beta-hv`, `--beta-vh`, `--human-incubation-days`, `--human-infectious-days`, `--immunity-duration-days`, `--initial-human-prevalence`, outbreak flags (`--human-outbreak-day/--foci/--cases/--min-density`, `--human-foci-coords`, …)
 - **Outputs**: `--emit-cohort-log`, `--emit-transmission-log`, `--transmission-snapshot-every`
 

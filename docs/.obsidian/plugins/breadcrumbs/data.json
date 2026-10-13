@@ -283,7 +283,7 @@
           "prevs"
         ],
         "lock_view": false,
-        "lock_path": ""
+        "lock_path": "diagrams/architecture/00-INDEX.md"
       },
       "tree": {
         "collapse": false,

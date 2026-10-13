@@ -34,6 +34,7 @@
 #include "mal_abm_fast/dispersal.hpp"
 #include "mal_abm_fast/seeding.hpp"
 #include "mal_abm_fast/aquatic_cohort_bank.hpp"
+#include "mal_abm_fast/birth_rate.hpp"
 #include "mal_abm_fast/gonotrophic_cycle.hpp"
 #include "mal_abm_fast/bite_ledger.hpp"
 #include "mal_abm_fast/multirate_scheduler.hpp"
@@ -665,8 +666,20 @@ void MosquitoSubmodel::advance_day(const AOI& aoi,
             update_patch_id(i, soa_.row[si], soa_.col[si], patch_states, aoi);
             // Egg batch size is a stochastic binomial draw (per female,
             // per oviposition), clamped to the species' feasible range.
+            // EFD thermal modifier (Mordecai 2013, birth_rate.hpp): the
+            // per-trial probability is scaled by birth_rate_modifier(T)
+            // in [0,1] — the same per-patch water temperature (temp_d)
+            // that drives Lardeux survival. Cold (16°C) and hot (34°C)
+            // extremes zero the batch; at 25°C the draw is unchanged.
+            // NaN temp (patch absent from today's states) → no modifier.
+            double p_batch = 0.5;
+            const float t_ovip = seeding_temp_d(patch_states,
+                                                soa_.row[si], soa_.col[si]);
+            if (!std::isnan(static_cast<double>(t_ovip))) {
+                p_batch *= birth_rate_modifier(static_cast<double>(t_ovip));
+            }
             int32_t eggs = rng_.binomial(
-                gonotrophic_params_.egg_batch_n, 0.5);
+                gonotrophic_params_.egg_batch_n, p_batch);
             if (eggs < gonotrophic_params_.egg_batch_min)
                 eggs = gonotrophic_params_.egg_batch_min;
             if (eggs > gonotrophic_params_.egg_batch_max)

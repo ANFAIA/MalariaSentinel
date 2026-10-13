@@ -21,6 +21,7 @@
 #include "habitat_engine.hpp"
 #include "host_landscape.hpp"
 #include "host_seeking.hpp"
+#include "oviposition_seeking.hpp"
 #include "mobility_schedule.hpp"
 #include "mosquito_submodel.hpp"
 #include "prng.hpp"
@@ -191,6 +192,7 @@ private:
     std::unique_ptr<HostLandscape>          host_landscape_;
     std::unique_ptr<MobilitySchedule>       mobility_schedule_;
     std::unique_ptr<HostSeekingModel>       host_seeking_model_;
+    std::unique_ptr<OvipositionSeekingModel> oviposition_seeking_model_;
 
     // Optional wind field (M7.6 — loaded when --wind-field is provided).
     std::unique_ptr<WindField>              wind_field_;

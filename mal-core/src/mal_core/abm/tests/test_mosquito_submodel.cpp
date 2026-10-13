@@ -156,8 +156,8 @@ TEST(MalAbmFastMosquitoSubmodel, BevertonHoltKillsLarvaeAtHighDensity) {
     // Seed 100 patches × 1000 K × 1.0 = 100000 larvae so the first
     // 4 active patches each hold N=1000 larvae — well into the BH
     // high-density regime (p = 0.95 * K / (K + alpha * N) ≈ 0.905
-    // for alpha=0.05). With per-adult birth (BIRTH_FECUNDITY=0.10), the
-    // old 0.3 init frac (300 larv/patch) let new births mask BH
+    // for alpha=0.05). With per-day births (the legacy fecundity knob,
+    // removed 2026-10-13), the old 0.3 init frac (300 larv/patch) let new births mask BH
     // deaths, so we raise the initial population to keep BH
     // deaths dominant over births.
     mal_abm_fast::MosquitoSubmodel sub(100, 1000, 1.0f, 42);
@@ -205,7 +205,7 @@ TEST(MalAbmFastMosquitoSubmodel, AdultMortalityReducesPopulation) {
 }
 
 TEST(MalAbmFastMosquitoSubmodel, AdultMortalityUsesFallbackWhenNoTemp) {
-    // All patches inactive — adult mortality uses ADULT_DAILY_MORT_BASE = 0.90.
+    // All patches inactive — adult mortality uses ADULT_DAILY_MORT_BASAL = 0.87.
     mal_abm_fast::MosquitoSubmodel sub(100, 1000, 0.3f, 42);
     const auto aoi = make_test_aoi();
     auto ps = make_test_patch_states();

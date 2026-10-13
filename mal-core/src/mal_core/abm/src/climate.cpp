@@ -50,10 +50,10 @@ float ClimateEngine::temp_at(int32_t row, int32_t col) const {
     if (row < 0 || row >= h_ || col < 0 || col >= w_) return ADULT_TEMP_FALLBACK_C;
     const float T = temp_[Idx(row, col, w_)];
     // Out-of-coverage / land-mask pixels are NaN in the env NC.
-    // The Lardeux mortality step falls back to ADULT_DAILY_MORT_BASE
-    // (= 0.90, a 10% survival rate) when it sees a NaN, and the EIP
+    // The Lardeux mortality step falls back to ADULT_TEMP_FALLBACK_C
+    // (25 deg C = the calibrated optimum) when it sees a NaN, and the EIP
     // accumulator skips the daily GDD step (larvae never mature).
-    // Substituting a real temperature (25 deg C) keeps both
+    // Substituting a real temperature keeps both
     // submodels in their calibrated regime and avoids the
     // population crash.
     if (!std::isfinite(static_cast<double>(T))) return ADULT_TEMP_FALLBACK_C;
