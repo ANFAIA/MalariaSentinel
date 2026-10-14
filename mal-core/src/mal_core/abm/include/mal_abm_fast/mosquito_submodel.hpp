@@ -213,7 +213,7 @@ private:
     MosquitoSoA  soa_;
     AquaticCohortBank cohort_bank_;
     Prng         rng_;
-    int32_t      k_per_patch_ = K_PER_PATCH_DEFAULT;
+    int32_t      k_per_patch_ = K_MAX;
     RuntimeOverrides overrides_;
 
     DailyStats last_day_stats_{};

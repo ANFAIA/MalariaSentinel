@@ -207,7 +207,7 @@ TEST(MalAbmFastCoordinator, FullDayOrchestrator) {
     // G3: 10% adults (30) + 90% eggs (270) in cohort bank.
     MosquitoSubmodel sub(
         /*n_patches=*/1,
-        /*k_per_patch=*/K_PER_PATCH_DEFAULT,
+        /*k_per_patch=*/K_MAX,
         /*init_frac=*/INIT_FRAC,
         /*seed=*/uint64_t{42});
     ASSERT_EQ(sub.total_agents(), 30);
@@ -343,7 +343,7 @@ TEST(CoordinatorModel, PatchActivationTogglesDaily) {
 
     MosquitoSubmodel sub(
         /*n_patches=*/1,
-        /*k_per_patch=*/K_PER_PATCH_DEFAULT,
+        /*k_per_patch=*/K_MAX,
         /*init_frac=*/INIT_FRAC,
         /*seed=*/uint64_t{42});
 

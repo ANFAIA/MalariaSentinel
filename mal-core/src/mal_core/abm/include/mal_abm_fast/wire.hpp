@@ -30,10 +30,13 @@ namespace mal_abm_fast {
 // Constants — match mal_ghana_sim.abm defaults exactly (M1.5 thin slice).
 // ---------------------------------------------------------------------------
 
-// Per-patch carrying capacity.
+// Per-patch larval carrying capacity (Beverton-Holt scale) and the
+// seed-size denominator for UNIFORM seeding: initial agent count per
+// patch = round(K_MAX * init_frac) (10% adults / 90% aquatic). The
+// legacy constant K_PER_PATCH_DEFAULT (a numerically-identical twin
+// used only for seeding) was removed on 2026-10-13 — one capacity
+// constant, INIT_FRAC floats on top of it.
 inline constexpr int    K_MAX                       = 1000;
-// Default initialisation: round(n_patches * k_per_patch * init_frac) larvae.
-inline constexpr int    K_PER_PATCH_DEFAULT        = 1000;
 // 30% of K is seeded as larvae on construction.
 inline constexpr float  INIT_FRAC                   = 0.30f;
 

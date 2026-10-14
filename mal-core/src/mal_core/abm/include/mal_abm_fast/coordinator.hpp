@@ -198,7 +198,7 @@ public:
     // pre-existing habitat patch PLUS the dynamic urban-persistent
     // baseline patches (urban_class == 30 && building_fraction >=
     // URBAN_B_MIN). Per-patch counts match the legacy round-robin
-    // path (init_frac * k_per_patch agents, 10% adults / 90% eggs).
+    // path (seed count = K_MAX * init_frac agents, 10% adults / 90% eggs).
     // Rain-day-only dynamic patches are intentionally NOT seeded:
     // they are naturally colonised during the wet season. Without
     // this, urban-baseline patches start empty and can never be

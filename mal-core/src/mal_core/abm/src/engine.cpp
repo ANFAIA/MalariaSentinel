@@ -171,14 +171,14 @@ Engine::Engine(AOI aoi,
         std::vector<SeedInstruction> uniform_instructions;
         if (coord_ != nullptr) {
             uniform_instructions = coord_->build_uniform_seed_instructions(
-                seeding_config.init_frac, K_PER_PATCH_DEFAULT);
+                seeding_config.init_frac, K_MAX);
         }
         if (!uniform_instructions.empty()) {
             seeding_patch_.patch_id = uniform_instructions.front().patch_id;
             seeding_patch_.row      = uniform_instructions.front().row;
             seeding_patch_.col      = uniform_instructions.front().col;
             sub_ = std::make_unique<MosquitoSubmodel>(
-                n_patches, K_PER_PATCH_DEFAULT, uniform_instructions,
+                n_patches, K_MAX, uniform_instructions,
                 sub_seed, overrides_);
             std::cout << "Engine: UNIFORM seeding over "
                       << uniform_instructions.size()
@@ -186,7 +186,7 @@ Engine::Engine(AOI aoi,
                       << "persistent baseline)\n";
         } else {
             sub_ = std::make_unique<MosquitoSubmodel>(
-                n_patches, K_PER_PATCH_DEFAULT, seeding_config.init_frac,
+                n_patches, K_MAX, seeding_config.init_frac,
                 sub_seed, overrides_);
         }
     } else {
@@ -202,7 +202,7 @@ Engine::Engine(AOI aoi,
             seeding_patch_.col      = instructions.front().col;
         }
         sub_ = std::make_unique<MosquitoSubmodel>(
-            n_patches, K_PER_PATCH_DEFAULT, instructions, sub_seed, overrides_);
+            n_patches, K_MAX, instructions, sub_seed, overrides_);
     }
 
     // -- Optional host-seeking components -----------------------------------
@@ -414,14 +414,14 @@ Engine::Engine(AOI aoi,
         std::vector<SeedInstruction> uniform_instructions;
         if (coord_ != nullptr) {
             uniform_instructions = coord_->build_uniform_seed_instructions(
-                seeding_config.init_frac, K_PER_PATCH_DEFAULT);
+                seeding_config.init_frac, K_MAX);
         }
         if (!uniform_instructions.empty()) {
             seeding_patch_.patch_id = uniform_instructions.front().patch_id;
             seeding_patch_.row      = uniform_instructions.front().row;
             seeding_patch_.col      = uniform_instructions.front().col;
             sub_ = std::make_unique<MosquitoSubmodel>(
-                n_patches, K_PER_PATCH_DEFAULT, uniform_instructions,
+                n_patches, K_MAX, uniform_instructions,
                 sub_seed, overrides_);
             std::cout << "Engine: UNIFORM seeding over "
                       << uniform_instructions.size()
@@ -429,7 +429,7 @@ Engine::Engine(AOI aoi,
                       << "persistent baseline)\n";
         } else {
             sub_ = std::make_unique<MosquitoSubmodel>(
-                n_patches, K_PER_PATCH_DEFAULT, seeding_config.init_frac,
+                n_patches, K_MAX, seeding_config.init_frac,
                 sub_seed, overrides_);
         }
     } else {
@@ -441,7 +441,7 @@ Engine::Engine(AOI aoi,
             seeding_patch_.col      = instructions.front().col;
         }
         sub_ = std::make_unique<MosquitoSubmodel>(
-            n_patches, K_PER_PATCH_DEFAULT, instructions, sub_seed, overrides_);
+            n_patches, K_MAX, instructions, sub_seed, overrides_);
     }
 
     // -- Optional host-seeking components -----------------------------------
