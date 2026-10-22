@@ -124,6 +124,8 @@ _MISSING_CASES = [
     ("oviposition", "scale_m"),
     ("aquatic_stages", "egg_daily_mort"),
     ("rng", "aquatic_seed_washout"),
+    ("wildlife", "class_suitability"),
+    ("wildlife", "weights", "habitat"),
 ]
 
 
@@ -573,3 +575,63 @@ def test_night_window_must_not_be_empty(tmp_path):
 
     message = _message(_tmp_yaml(tmp_path, mutate))
     assert "night_start_hour" in message
+
+
+# -- task-08: wildlife class table and component weights --------------------
+
+def test_wildlife_class_set_is_exact(tmp_path):
+    def mutate(data):
+        data["wildlife"]["class_suitability"].pop("snow_and_ice")
+
+    message = _message(_tmp_yaml(tmp_path, mutate))
+    assert "wildlife.class_suitability" in message
+    assert "snow_and_ice" in message
+
+
+def test_wildlife_extra_class_rejected(tmp_path):
+    def mutate(data):
+        data["wildlife"]["class_suitability"]["forest"] = 0.1
+
+    message = _message(_tmp_yaml(tmp_path, mutate))
+    assert "wildlife.class_suitability" in message
+    assert "forest" in message
+
+
+@pytest.mark.parametrize("value", [-0.1, 1.1])
+@pytest.mark.parametrize("cls", ["water", "trees"])
+def test_wildlife_suitability_must_be_a_fraction(tmp_path, cls, value):
+    def mutate(data):
+        data["wildlife"]["class_suitability"][cls] = value
+
+    message = _message(_tmp_yaml(tmp_path, mutate))
+    assert f"wildlife.class_suitability.{cls}" in message
+    assert "[0, 1]" in message
+
+
+def test_wildlife_weights_must_sum_to_one(tmp_path):
+    def mutate(data):
+        data["wildlife"]["weights"]["habitat"] = 0.6
+
+    message = _message(_tmp_yaml(tmp_path, mutate))
+    assert "wildlife.weights sum" in message
+    assert "1.0" in message
+
+
+def test_wildlife_weight_must_be_a_fraction(tmp_path):
+    def mutate(data):
+        data["wildlife"]["weights"]["water"] = 1.5
+        data["wildlife"]["weights"]["remoteness"] = -0.1
+
+    message = _message(_tmp_yaml(tmp_path, mutate))
+    assert "wildlife.weights.water" in message
+    assert "wildlife.weights.remoteness" in message
+    assert "[0, 1]" in message
+
+
+def test_wildlife_unknown_weight_key_rejected(tmp_path):
+    def mutate(data):
+        data["wildlife"]["weights"]["built"] = 0.0
+
+    message = _message(_tmp_yaml(tmp_path, mutate))
+    assert "wildlife.weights.built" in message
+    assert "unrecognized keys" in message

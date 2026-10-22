@@ -34,6 +34,9 @@ loader tests):
   positive scales; ``gonotrophic`` egg batch ``0 < min <= mean <= max <= n``;
   movement kernels positive, ``oviposition.min_attraction`` in ``[0, 1]``
   and ``dispersal.night_*_hour`` in ``[0, 24)`` with a non-empty window.
+* ``wildlife.class_suitability`` keys are exactly the nine Dynamic World
+  classes with values in ``[0, 1]``; ``Σ wildlife.weights == 1`` (±1e-9)
+  with every component weight in ``[0, 1]``.
 
 Growing the schema (R2): add the field to the matching ``BaseModel``
 below.  Unknown keys fail loudly, so a YAML edit without a matching model
@@ -80,6 +83,13 @@ HOST_PREF_KEYS: tuple[str, ...] = (
 NAMED_SPECIES: tuple[str, ...] = (
     "coluzzii", "gambiae_ss", "funestus", "arabiensis", "melas",
     "stephensi")
+
+# Dynamic World class names consumed by the wildlife loader (task-08). The
+# code→name identity lives in ``dynamic_world.DW_LABEL_NAMES``; this tuple is
+# the anti-drift contract between the YAML table and that loader identity.
+WILDLIFE_CLASSES: tuple[str, ...] = (
+    "water", "trees", "grass", "flooded_vegetation", "crops",
+    "shrub_and_scrub", "built", "bare", "snow_and_ice")
 
 ACTIVITY_PHASES = 4
 _CONTRACT_RE = re.compile(r"^\d+\.\d+$")
@@ -200,6 +210,17 @@ class Ingest(_StrictModel):
     nc_compression_level: int
 
 
+class WildlifeWeights(_StrictModel):
+    habitat: float
+    water: float
+    remoteness: float
+
+
+class Wildlife(_StrictModel):
+    class_suitability: dict[str, float]
+    weights: WildlifeWeights
+
+
 class Adults(_StrictModel):
     daily_mort_basal: float
     opt_c: float
@@ -312,6 +333,7 @@ class ModelConfig(_StrictModel):
     capacity: Capacity
     geodesy: Geodesy
     ingest: Ingest
+    wildlife: Wildlife
     adults: Adults
     eip: Eip
     transmission: Transmission
@@ -444,6 +466,39 @@ class ModelConfig(_StrictModel):
             errors.append(
                 "ingest.nodata_sentinel_int must be negative, got "
                 f"{self.ingest.nodata_sentinel_int!r}")
+
+        wildlife = self.wildlife
+        expected_classes = set(WILDLIFE_CLASSES)
+        got_classes = set(wildlife.class_suitability)
+        if got_classes != expected_classes:
+            missing = sorted(expected_classes - got_classes)
+            unknown = sorted(got_classes - expected_classes)
+            detail = []
+            if missing:
+                detail.append(f"missing {missing}")
+            if unknown:
+                detail.append(f"unknown {unknown}")
+            errors.append(
+                "wildlife.class_suitability keys != Dynamic World classes "
+                f"({'; '.join(detail)})")
+        for name, value in wildlife.class_suitability.items():
+            if not (0.0 <= value <= 1.0):
+                errors.append(
+                    f"wildlife.class_suitability.{name} must be in [0, 1], "
+                    f"got {value!r}")
+        weight_total = (wildlife.weights.habitat + wildlife.weights.water
+                        + wildlife.weights.remoteness)
+        if not math.isclose(weight_total, 1.0, rel_tol=0.0, abs_tol=_TOL):
+            errors.append(
+                f"wildlife.weights sum {weight_total!r} != 1.0 (±1e-9)")
+        for name, value in (
+                ("habitat", wildlife.weights.habitat),
+                ("water", wildlife.weights.water),
+                ("remoteness", wildlife.weights.remoteness)):
+            if not (0.0 <= value <= 1.0):
+                errors.append(
+                    f"wildlife.weights.{name} must be in [0, 1], got "
+                    f"{value!r}")
 
         # [0, 1] fractions/probabilities (task-07 sections).
         for name, value in (
@@ -738,6 +793,7 @@ __all__ = [
     "NAMED_SPECIES",
     "SCHEMA",
     "SchemaError",
+    "WILDLIFE_CLASSES",
     "ensure_valid",
     "freeze",
     "resolve_path",

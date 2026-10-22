@@ -100,6 +100,9 @@ def dump_raw(path: str | os.PathLike[str] | None = None) -> dict[str, Any]:
             out[f"species.{name}.pref"] = [
                 float(row["pref"][h]) for h in
                 ("human", "cattle", "goat", "sheep", "wildlife")]
+    # Engine-consumed sections. ``wildlife`` is deliberately absent: it is a
+    # py-only input-loader section with no C++ consumer or config_dump entry
+    # (task-08), so emitting it would break the py⇄C++ key parity contract.
     for sec in ("ingest", "adults", "eip", "transmission", "dispersal",
                 "host_seeking", "oviposition", "aquatic_stages", "thermal",
                 "gonotrophic", "rng"):

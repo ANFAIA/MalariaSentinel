@@ -12,10 +12,11 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
-
+import yaml as _yaml
 from mal_commonlib.aoi import AOI
 from mal_commonlib.data.loaders import dynamic_world as dw
 from mal_commonlib.data.loaders import wildlife as wl
+from mal_commonlib.model_constants import model_constant
 
 
 def test_suitability_table_covers_all_dw_codes() -> None:
@@ -92,8 +93,8 @@ def test_composite_no_longer_degenerates(monkeypatch: pytest.MonkeyPatch) -> Non
     fake_water = np.full((H, W), wl._NODATA_OUT_SCALAR, dtype=np.float32)
     fake_bld = np.zeros((H, W), dtype=np.float32)
 
-    import mal_commonlib.data.loaders.jrc_gsw as jrc_mod
     import mal_commonlib.data.loaders.buildings as bld_mod
+    import mal_commonlib.data.loaders.jrc_gsw as jrc_mod
 
     monkeypatch.setattr(
         jrc_mod, "load_jrc_gsw_habitat_features",
@@ -127,3 +128,74 @@ def _fake_ds(planes: dict[str, np.ndarray]):
         {name: dw.xr.DataArray(arr, dims=("y", "x"))
          for name, arr in planes.items()}
     )
+
+
+# -- task-08: config-driven table/weights -----------------------------------
+
+
+def test_yaml_class_names_are_the_loader_identity() -> None:
+    """The nine YAML keys must be exactly the DW label names (anti-drift)."""
+    yaml_names = tuple(model_constant("wildlife", "class_suitability"))
+    assert set(yaml_names) == set(dw.DW_LABEL_NAMES.values())
+    assert len(yaml_names) == len(dw.DW_LABEL_NAMES) == 9
+    # Every contract feature class must resolve through the habitat table.
+    covered = {code for codes in dw.FEATURE_CLASSES.values() for code in codes}
+    assert covered <= set(wl.HABITAT_SUITABILITY)
+
+
+def test_product_changes_when_yaml_changes(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Mutating the YAML table/weights must change the product (not a snapshot)."""
+    H = W = 2
+    labels = dw.xr.DataArray(
+        np.full((H, W), dw.DW_TREES, dtype=np.int32),
+        dims=("y", "x"),
+        coords={"y": np.arange(H, dtype=float), "x": np.arange(W, dtype=float)},
+        name="label",
+    )
+    monkeypatch.setattr(wl, "load_dw_label_mode", lambda aoi, **_: labels)
+
+    fake_water = np.full((H, W), wl._NODATA_OUT_SCALAR, dtype=np.float32)
+    fake_bld = np.zeros((H, W), dtype=np.float32)
+
+    import mal_commonlib.data.loaders.buildings as bld_mod
+    import mal_commonlib.data.loaders.jrc_gsw as jrc_mod
+    from mal_commonlib.model_constants import DEFAULT_PATH, ENV_VAR
+
+    monkeypatch.setattr(
+        jrc_mod, "load_jrc_gsw_habitat_features",
+        lambda aoi, **_: _fake_ds({"jrc_persistent": fake_water}),
+    )
+    monkeypatch.setattr(
+        bld_mod, "load_buildings_fraction",
+        lambda aoi, cache_dir=None: _fake_da(fake_bld),
+    )
+
+    aoi = AOI.from_slug("ghana")
+    before = float(wl.load_wildlife_host_proxy(aoi, year=2024).values[0, 0])
+    # Default config: 0.5*0.9 + 0.3*0.5 (water NoData → neutral) + 0.2*1.0.
+    assert before == pytest.approx(0.5 * 0.9 + 0.3 * 0.5 + 0.2 * 1.0)
+
+    data = _yaml.safe_load(DEFAULT_PATH.read_text(encoding="utf-8"))
+    data["wildlife"]["class_suitability"]["trees"] = 0.4
+    data["wildlife"]["weights"] = {
+        "habitat": 0.2, "water": 0.5, "remoteness": 0.3}
+    config = tmp_path / "model_constants.yaml"
+    config.write_text(
+        _yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
+    monkeypatch.setenv(ENV_VAR, str(config))
+
+    after = float(wl.load_wildlife_host_proxy(aoi, year=2024).values[0, 0])
+    assert after == pytest.approx(0.2 * 0.4 + 0.5 * 0.5 + 0.3 * 1.0)
+    assert after != pytest.approx(before)
+
+
+def test_default_product_uses_yaml_values() -> None:
+    """The import-time snapshot is the YAML table, not a code literal copy."""
+    yaml_scores = model_constant("wildlife", "class_suitability")
+    expected = {
+        code: float(yaml_scores[name])
+        for code, name in dw.DW_LABEL_NAMES.items()
+    }
+    assert wl.HABITAT_SUITABILITY == expected

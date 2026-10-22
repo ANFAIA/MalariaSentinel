@@ -151,6 +151,28 @@ ingest:          # lado py (escritor NC) + valores de paridad cruzada C++⇄py
   grid_degrees_step_max: 1      # [°] paso máximo implícito al reconstruir rejillas en grados
   nc_compression_level: 4       # [nivel] compresión zlib del NC (config de fichero, no modelo)
 
+wildlife:         # proxy de hospedadores silvestres (loader py-only; el motor NO lo consume)
+  # Idoneidad de hábitat por clase Dynamic World V1 (códigos 0-8). La clave es el
+  # NOMBRE de la clase en dynamic_world.DW_LABEL_NAMES; el mapeo código→nombre es
+  # identidad de la fuente, no calibrable. Tabla re-clavada el 2026-10-20 al pasar
+  # de WorldCover a Dynamic World conservando el anclaje de la era WC.
+  class_suitability:   # [fracción] idoneidad de hábitat por clase DW, en [0,1]
+    water: 0.0                 # [fracción] DW 0; WC 80 agua permanente
+    trees: 0.9                 # [fracción] DW 1; WC 10 cobertura arbórea
+    grass: 0.6                 # [fracción] DW 2; WC 30 pastizal
+    flooded_vegetation: 0.45   # [fracción] DW 3; WC 90 (0.4) + WC 95 manglar (0.5) → punto medio
+    crops: 0.3                 # [fracción] DW 4; WC 40 cultivo
+    shrub_and_scrub: 0.7       # [fracción] DW 5; WC 20 matorral
+    built: 0.05                # [fracción] DW 6; WC 50 superficie construida
+    bare: 0.2                  # [fracción] DW 7; WC 60 suelo desnudo/ralo
+    snow_and_ice: 0.1          # [fracción] DW 8; WC 100 musgo/líquen (fuera del rango de Ghana)
+  # Pesos de la combinación lineal habitat/water/remoteness. Engineering priors
+  # sin fuente documentada (política Task 4: prior explícito antes que cita dudosa).
+  weights:                    # [fracción] pesos de los 3 componentes (Σ=1.00)
+    habitat: 0.5              # [fracción] peso de class_suitability
+    water: 0.3                # [fracción] peso de la presencia de agua JRC
+    remoteness: 0.2           # [fracción] peso de 1 − fracción construida
+
 adults:          # OJO: las claves `mort_*` son SUPERVIVENCIA diaria (p_d), no mortalidad
   daily_mort_basal: 0.87      # [prob/día] supervivencia basal diaria (nombre histórico `mort`;
                               # Lardeux; vida media resultante)

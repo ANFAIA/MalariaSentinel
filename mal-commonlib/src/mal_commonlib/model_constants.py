@@ -5,15 +5,15 @@ parameters (R1).  Schema and invariant validation live in **mal-core**
 (``mal_core.config_validation``, R2), which is the ONLY validator.
 
 This module exists because ``mal-commonlib`` sits BELOW ``mal-core`` in the
-dependency graph: a couple of loaders need a shared sentinel (NoData) and
-cannot import the validator without inverting that dependency.  It never
-validates and never invents defaults — it resolves the same path (explicit >
-``MAL_MODEL_CONSTANTS`` > repo default), reads one dotted key and fails
-loudly when the key is missing.
+dependency graph: loaders need shared values (NoData sentinels and
+loader-owned parameter sections) and cannot import the validator without
+inverting that dependency.  It never validates and never invents defaults —
+it resolves the same path (explicit > ``MAL_MODEL_CONSTANTS`` > repo
+default), reads one dotted key and fails loudly when the key is missing.
 
-Use it only for cross-cutting scalars (NoData sentinels).  Model parameters
-belong in mal-core consumers, where the validated ``mal_core.habitat.config``
-tree is available.
+Use it only for parameters consumed by mal-commonlib loaders (NoData
+sentinels and loader-owned sections such as ``wildlife``).  Parameters that
+only mal-core consumes belong there, where the validated tree is available.
 """
 from __future__ import annotations
 

@@ -7,9 +7,10 @@ Public surface
 Estimates spatial suitability for non-human, non-livestock blood hosts
 (antelopes, rodents, other wild mammals) as a ``[0, 1]`` score derived
 from three existing data layers: a weighted combination of habitat
-suitability, water presence and remoteness. The weights are the module
-constants ``_W_HABITAT`` / ``_W_WATER`` / ``_W_REMOTE``; they are pending
-migration to ``model_constants.yaml`` (task-07 backlog).
+suitability, water presence and remoteness. The per-class suitability
+table and the component weights are model parameters read from
+``model_constants.yaml`` (section ``wildlife``) through the read-only
+accessor; schema/invariant validation stays in ``mal_core`` (R2).
 
 Sources:
     * **Google Dynamic World V1 10 m** — modal-label codes mapped to habitat
@@ -38,48 +39,42 @@ import xarray as xr
 from rasterio.transform import from_bounds
 
 from mal_commonlib.aoi import AOI
-from mal_commonlib.data.loaders.dynamic_world import load_dw_label_mode
+from mal_commonlib.data.loaders.dynamic_world import (
+    DW_LABEL_NAMES,
+    load_dw_label_mode,
+)
 from mal_commonlib.model_constants import model_constant
 
 log = logging.getLogger(__name__)
 
-# -- Dynamic World label → habitat suitability mapping --------------------
-#
-# WC heritage of each anchor (the table was re-keyed 2026-10-20 when the
-# source swapped WorldCover → Dynamic World; values conserve the WC-era
-# anchoring so wildlife calibration keeps meaning):
-#   DW 1 trees            <- WC 10  tree cover      0.9
-#   DW 5 shrub_and_scrub  <- WC 20  shrub cover     0.7
-#   DW 2 grass            <- WC 30  grassland       0.6
-#   DW 4 crops            <- WC 40  cropland        0.3
-#   DW 6 built            <- WC 50  built-up        0.05
-#   DW 7 bare             <- WC 60  bare / sparse   0.2
-#   DW 0 water            <- WC 80  perm. water     0.0
-#   DW 3 flooded_vegetation <- WC 90 (0.4) + WC 95 mangroves (0.5) → midpoint
-#   DW 8 snow_and_ice     <- WC 100 moss/lichen     0.1 (out of range for Ghana)
 
-HABITAT_SUITABILITY: dict[int, float] = {
-    0: 0.0,    # water
-    1: 0.9,    # trees
-    2: 0.6,    # grass
-    3: 0.45,   # flooded_vegetation (wetland+mangrove midpoint)
-    4: 0.3,    # crops
-    5: 0.7,    # shrub_and_scrub
-    6: 0.05,   # built
-    7: 0.2,    # bare
-    8: 0.1,    # snow_and_ice (not expected in Ghana)
-}
+def _class_suitability() -> dict[int, float]:
+    """Map DW label code → habitat suitability, read from the YAML.
+
+    The code→name mapping is ``dynamic_world.DW_LABEL_NAMES``: source
+    identity, not a calibrated parameter. Values live in
+    ``wildlife.class_suitability``.
+    """
+    scores = model_constant("wildlife", "class_suitability")
+    return {code: float(scores[name]) for code, name in DW_LABEL_NAMES.items()}
+
+
+def _component_weights() -> dict[str, float]:
+    """Component weights of the linear combination, read from the YAML."""
+    weights = model_constant("wildlife", "weights")
+    return {name: float(value) for name, value in weights.items()}
+
+
+# Import-time snapshot of the class table for external readers (tests,
+# notebooks). The product path re-reads ``wildlife.class_suitability`` on
+# every call so a config change is observable without re-importing.
+HABITAT_SUITABILITY: dict[int, float] = _class_suitability()
 
 # In-range codes not listed above (defensive) map to 0.0; out-of-range or
 # NoData pixels keep NoData in the output rather than a fake 0.
 _UNKNOWN_CLASS_SCORE = 0.0
 _DW_MIN_LABEL = 0
 _DW_MAX_LABEL = 8
-
-# Weight vector for the three components
-_W_HABITAT = 0.5
-_W_WATER = 0.3
-_W_REMOTE = 0.2
 
 _NODATA_OUT_SCALAR = float(model_constant("ingest", "nodata_sentinel"))
 
@@ -90,6 +85,8 @@ _NODATA_OUT_SCALAR = float(model_constant("ingest", "nodata_sentinel"))
 def _load_dw_habitat_pc(
     aoi: AOI,
     year: int,
+    *,
+    suitability: dict[int, float] | None = None,
 ) -> np.ndarray:
     """Derive habitat suitability from the shared Dynamic World classification.
 
@@ -98,7 +95,7 @@ def _load_dw_habitat_pc(
     per-year STAC ``datetime`` filter. Because nearest resampling assigns
     each destination cell the same source pixel regardless of whether the
     class→score mapping runs before or after reprojection, mapping the
-    reprojected (int32) classification through ``HABITAT_SUITABILITY``
+    reprojected (int32) classification through the YAML class table
     reproduces the original per-tixel mapping exactly.
 
     Returns (H, W) float32 habitat suitability in [0, 1], or the NoData sentinel for
@@ -108,8 +105,9 @@ def _load_dw_habitat_pc(
     lc_vals = lc.values
 
     # Build a lookup array indexed by label code for fast vectorised mapping.
+    table = _class_suitability() if suitability is None else suitability
     class_lut = np.full(_DW_MAX_LABEL + 1, _UNKNOWN_CLASS_SCORE, dtype=np.float32)
-    for cls, score in HABITAT_SUITABILITY.items():
+    for cls, score in table.items():
         class_lut[cls] = score
 
     # NoData pixels stay NoData in the output: an unobserved cell is
@@ -190,12 +188,17 @@ def load_wildlife_host_proxy(
     if isinstance(aoi, str):
         aoi = AOI.from_slug(aoi)
 
+    # Model parameters are read before any I/O: a missing/invalid key must be
+    # a loud error, never a silently neutral component.
+    suitability = _class_suitability()
+    weights = _component_weights()
+
     H, W = aoi.cells_per_side()
     H, W = int(H), int(W)
 
     # --- 1. Habitat suitability from Dynamic World --------------------
     try:
-        habitat = _load_dw_habitat_pc(aoi, year)
+        habitat = _load_dw_habitat_pc(aoi, year, suitability=suitability)
         log.info("wildlife: Dynamic World habitat loaded successfully")
     except Exception as exc:
         log.warning("wildlife: Dynamic World failed (%s), using neutral 0.5", exc)
@@ -232,7 +235,9 @@ def load_wildlife_host_proxy(
     remote = _remoteness(bld_frac)
 
     # --- 4. Compute composite ----------------------------------------
-    proxy = _W_HABITAT * habitat + _W_WATER * water + _W_REMOTE * remote
+    proxy = (weights["habitat"] * habitat
+             + weights["water"] * water
+             + weights["remoteness"] * remote)
     proxy = np.clip(proxy, 0.0, 1.0).astype(np.float32)
 
     # Propagate nodata: cells where WorldCover had no data
@@ -252,8 +257,8 @@ def load_wildlife_host_proxy(
             ),
             "formula": (
                 "weighted combination of habitat_suitability, "
-                "water_presence and remoteness (weights: module "
-                "constants _W_*, pending model_constants.yaml migration)"
+                "water_presence and remoteness (weights from "
+                "model_constants.yaml wildlife.weights)"
             ),
             "nodata": _NODATA_OUT_SCALAR,
         },
