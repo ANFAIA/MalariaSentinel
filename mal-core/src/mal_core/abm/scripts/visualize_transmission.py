@@ -23,13 +23,17 @@ import rasterio
 from scipy.ndimage import maximum_filter
 from PIL import Image
 
+from mal_commonlib.model_constants import model_constant
+
+_NODATA = float(model_constant("ingest", "nodata_sentinel"))
+
 
 def load_transmission_tif(path: Path) -> tuple[dict[str, np.ndarray], float]:
     """Load transmission snapshot GeoTIFF bands and nodata."""
     band_names = ["prevalence", "incidence", "pressure", "focus"]
     result: dict[str, np.ndarray] = {}
     with rasterio.open(path) as src:
-        nodata = src.nodata if src.nodata is not None else -9999.0
+        nodata = src.nodata if src.nodata is not None else _NODATA
         for b_idx, b_name in enumerate(band_names, start=1):
             if b_idx <= src.count:
                 arr = np.asarray(src.read(b_idx), dtype=np.float32)

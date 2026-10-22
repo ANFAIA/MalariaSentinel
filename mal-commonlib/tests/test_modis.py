@@ -258,14 +258,11 @@ def test_sinusoidal_to_lonlat_returns_degrees_not_radians() -> None:
 )
 def test_modis_ghana_smoke() -> None:
     """Real Earthdata download for Ghana, 2022-07. 2024-07 is currently
-    empty upstream (NASA MOD13A3 v061 lag). Skips cleanly if the download
-    fails (network/permissions).
+    empty upstream (NASA MOD13A3 v061 lag). Opt-in via ``-m integration``;
+    once enabled, a failed download is a failure, not a skip.
     """
     aoi = AOI.from_bbox(GHANA_W, GHANA_S, GHANA_E, GHANA_N, "EPSG:4326", "ghana", 1000)
-    try:
-        out = load_modis_ndvi(aoi, years=[2022], months=[7])
-    except Exception as e:
-        pytest.skip(f"MOD13A3 download failed: {e}")
+    out = load_modis_ndvi(aoi, years=[2022], months=[7])
     assert out.dtype == np.float32
     valid = out.values[out.values != NODATA_OUT]
     assert valid.size > 0

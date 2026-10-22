@@ -26,6 +26,10 @@ import numpy as np
 import xarray as xr
 from PIL import Image
 
+from mal_commonlib.model_constants import model_constant
+
+_NODATA = float(model_constant("ingest", "nodata_sentinel"))
+
 
 HOST_VARS = [
     ("human", "Human density", "YlOrRd"),
@@ -55,7 +59,7 @@ def plot_host_panel(ds: xr.Dataset, output: Path) -> None:
             continue
 
         arr = ds[var].values.astype(np.float64)
-        arr = np.where(arr == -9999, np.nan, arr)
+        arr = np.where(arr == _NODATA, np.nan, arr)
 
         if var == "urban_class":
             # categorical
@@ -138,7 +142,7 @@ def plot_habitat_statics(env_nc: Path, output: Path) -> None:
             ax.set_axis_off()
             continue
         arr = ds[var].values.astype(np.float64)
-        arr = np.where(arr == -9999, np.nan, arr)
+        arr = np.where(arr == _NODATA, np.nan, arr)
         im = ax.imshow(arr, cmap=cmap, origin="upper",
                        norm=mcolors.Normalize(vmin=0, vmax=max(1e-6, np.nanmax(arr))))
         ax.set_title(title, fontsize=12)

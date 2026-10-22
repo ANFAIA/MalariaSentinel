@@ -688,7 +688,10 @@ def validate_model_config(
         raise SchemaError(_format_errors(exc, resolved)) from exc
 
     object.__setattr__(cfg, "_source_path", resolved)
-    logger.info("model_constants: %s", resolved)
+    # DEBUG, not INFO: the CLI already echoes the resolved path once for the
+    # user (task-06 decision 6). INFO here duplicated that line whenever the
+    # embedding app configured logging at INFO.
+    logger.debug("model_constants: %s", resolved)
     return cfg
 
 

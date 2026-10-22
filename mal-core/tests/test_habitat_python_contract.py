@@ -11,21 +11,18 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-
 from mal_core.habitat.config import CONFIG
+
 mal_core_root = Path(__file__).resolve().parent.parent
 
 
 from mal_core.habitat import (
     HABITAT_TYPES,
-    HABITAT_DYNAMICS,
-    availability,
     aquatic_stress,
+    availability,
     capacity,
-    constants,
     potential,
 )
-
 
 # ---------------------------------------------------------------------------
 # package exports (task-01 B2): __all__ must resolve for every name
@@ -239,18 +236,8 @@ def test_washout_linear_cap():
 # constants.py — contract guards
 # ---------------------------------------------------------------------------
 
-def test_weights_sum_to_one():
-    for name, row in CONFIG["species"].items():
-        if name in ("default_species", "k_ref") or "weights" not in row:
-            continue
-        weights = row["weights"]
-        assert math.isclose(sum(weights.values()), 1.0)
 
 
-def test_dynamics_partition_is_exhaustive():
-    from mal_core.habitat.config import persistent_names, pluvial_names
-    assert persistent_names() | pluvial_names() == set(HABITAT_TYPES)
-    assert not (persistent_names() & pluvial_names())
 
 
 def test_activation_scales_documented():

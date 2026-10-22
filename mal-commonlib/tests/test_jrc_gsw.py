@@ -340,14 +340,15 @@ def test_jrc_gsw_raises_when_even_2020_fallback_has_no_items(
     reason="MAL_JRC_GSW_NETWORK not set; integration test skipped",
 )
 def test_jrc_gsw_download(tmp_path: pathlib.Path) -> None:
-    """Real JRC GSW download for a small AOI via Planetary Computer."""
+    """Real JRC GSW download for a small AOI via Planetary Computer.
+
+    Opt-in via ``-m integration``; once enabled, a failed download is a
+    failure, not a skip.
+    """
     aoi = AOI.from_bbox(-1.0, 5.0, 0.0, 6.0, "EPSG:4326", "test-jrc", 1000)
-    try:
-        ds = load_jrc_gsw_habitat_features(
-            aoi, year=2021, cache_dir=tmp_path / "cache"
-        )
-    except Exception as e:
-        pytest.skip(f"JRC GSW download failed: {e}")
+    ds = load_jrc_gsw_habitat_features(
+        aoi, year=2021, cache_dir=tmp_path / "cache"
+    )
     valid = ds["jrc_persistent"].values[ds["jrc_persistent"].values != NODATA_OUT]
     assert valid.size > 0
     assert valid.min() >= 0.0 and valid.max() <= 1.0

@@ -66,6 +66,35 @@ std::string sidecar_path_for(const std::string& tif_path) {
 
 }  // namespace
 
+std::string state_sidecar_path(const std::string& tif_path) {
+    return sidecar_path_for(tif_path);
+}
+
+namespace {
+
+// Mirrors engine.cpp / main.cpp: a lowercase `.tif` is replaced, otherwise
+// the suffix is appended to the full path.
+std::string append_diagnostic_suffix(const std::string& path,
+                                     const std::string& suffix) {
+    const std::string tif_ext = ".tif";
+    if (path.size() > tif_ext.size() &&
+        path.compare(path.size() - tif_ext.size(), tif_ext.size(),
+                     tif_ext) == 0) {
+        return path.substr(0, path.size() - tif_ext.size()) + suffix;
+    }
+    return path + suffix;
+}
+
+}  // namespace
+
+std::vector<std::string> state_reserved_sidecars(const std::string& tif_path) {
+    return {
+        state_sidecar_path(tif_path),
+        append_diagnostic_suffix(tif_path, "_aquatic.json"),
+        append_diagnostic_suffix(tif_path, "_foci.json"),
+    };
+}
+
 void write_state_cog(const std::string& path,
                      const DensityGrid& density,
                      const SuitabilityGrid& suit,

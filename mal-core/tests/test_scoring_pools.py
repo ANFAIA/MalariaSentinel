@@ -23,10 +23,8 @@ RAIN_WASH_FRACTION_MAX = float(_AQ["wash_fraction_max"])
 RAIN_WASH_MM = float(_AQ["wash_threshold_mm"])
 from mal_core.habitat import HABITAT_TYPES
 from mal_core.habitat.availability import update_pluvial_state
-
 from mal_core.scoring.scorers.d19_pool_persistence import PoolPersistenceScorer
 from mal_core.scoring.scorers.d20_washout_response import WashoutResponseScorer
-
 
 # ---------------------------------------------------------------------------
 # pluvial recursion tests (availability)
@@ -67,7 +65,6 @@ class TestPluvialAvailability:
 
     def test_memory_time_scale(self) -> None:
         """The z decay after DRY_MEMORY_DAYS lands near e^{-1}."""
-        import math
 
         import numpy as np
 
@@ -133,13 +130,6 @@ class TestWashoutFraction:
 # ---------------------------------------------------------------------------
 
 
-def test_built_fraction_is_a_persistent_habitat() -> None:
-    """The urban persistent premise is wired through the habitat-type list:
-    a built column keeps a persistent (non-pluvial) supply entry."""
-    from mal_core.habitat.config import persistent_names as _f
-
-
-    assert "urban_persistent" in _f()
 
 
 # ---------------------------------------------------------------------------
@@ -156,7 +146,6 @@ class TestPoolPersistenceScorer:
         assert result.value >= 4.0  # active days
         assert result.diagnostics["active_days"] >= 4
         # persistent floor strictly inside (0, 1]
-        from mal_core.habitat import HABITAT_TYPES
         from mal_core.habitat.capacity import species_accuracy
         h_map = {
             g: float(v)

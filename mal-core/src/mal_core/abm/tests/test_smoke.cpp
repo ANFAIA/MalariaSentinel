@@ -36,13 +36,3 @@ TEST(MalAbmFastSmoke, PrngStub) {
     rng3.seed_from(43);
     EXPECT_NE(rng3.next(), a1);
 }
-
-TEST(MalAbmFastSmoke, EipAccumulate) {
-    // Below base temperature → no GDD accumulation.
-    EXPECT_DOUBLE_EQ(mal_abm_fast::accumulate_eip(0.0, 10.0), 0.0);
-    // Above base → positive GDD.
-    EXPECT_DOUBLE_EQ(mal_abm_fast::accumulate_eip(0.0, 26.0), 10.0);
-    // NaN-safe.
-    const double nan = std::nan("");
-    EXPECT_DOUBLE_EQ(mal_abm_fast::accumulate_eip(50.0, nan), 50.0);
-}

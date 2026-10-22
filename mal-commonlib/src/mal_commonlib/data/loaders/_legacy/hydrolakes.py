@@ -55,6 +55,8 @@ import xarray as xr
 from rasterio.transform import from_bounds
 from rasterio.warp import Resampling
 
+from mal_commonlib.model_constants import model_constant
+
 if TYPE_CHECKING:
     from mal_commonlib.aoi import AOI
 
@@ -73,7 +75,7 @@ DEFAULT_LAKE_THRESHOLD_PCT: int = 95
 _MIN_YEAR: int = 1984
 _MAX_YEAR: int = 2021
 
-_NODATA_OUT_SCALAR = -9999.0
+_NODATA_OUT_SCALAR = float(model_constant("ingest", "nodata_sentinel"))
 
 
 def _ensure_cache_dir(cache_dir: pathlib.Path | None) -> pathlib.Path:

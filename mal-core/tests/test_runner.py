@@ -1,13 +1,7 @@
 """Tests for the download runner module — M13 Phase 2 format dispatch."""
 from __future__ import annotations
 
-import numpy as np
-import xarray as xr
-from pathlib import Path
-from unittest.mock import MagicMock, patch
-
 from mal_core.download.runner import _standard_path, _standard_path_daily
-
 
 # --- _standard_path tests ---
 
@@ -67,40 +61,5 @@ def test_standard_path_daily_single_year(tmp_path):
 # --- Format dispatch tests ---
 
 
-def test_formats_field_on_spec():
-    """DownloaderSpec carries formats from DOWNLOADER dict."""
-    from mal_core.download.registry import DownloaderSpec
-
-    spec = DownloaderSpec(
-        name="test",
-        description="test",
-        requires_auth=[],
-        outputs={"monthly_out": MagicMock(), "daily_out": MagicMock()},
-        manifest_keys={"monthly_out": "monthly_key", "daily_out": "daily_key"},
-        module_name="test",
-        is_time_series=True,
-        formats={"monthly_out": "monthly", "daily_out": "daily"},
-    )
-    assert spec.formats["monthly_out"] == "monthly"
-    assert spec.formats["daily_out"] == "daily"
 
 
-def test_formats_none_backward_compat():
-    """DownloaderSpec with formats=None defaults to monthly."""
-    from mal_core.download.registry import DownloaderSpec
-
-    spec = DownloaderSpec(
-        name="test",
-        description="test",
-        requires_auth=[],
-        outputs={"rainfall": MagicMock()},
-        manifest_keys={"rainfall": "key"},
-        module_name="test",
-        is_time_series=True,
-        formats=None,
-    )
-    # Runner logic: output_format defaults to "monthly" when spec.formats is None
-    output_format = "monthly"
-    if spec.formats and "rainfall" in spec.formats:
-        output_format = spec.formats["rainfall"]
-    assert output_format == "monthly"

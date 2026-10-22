@@ -13,8 +13,6 @@ import pathlib
 import pydantic
 import pytest
 import yaml as _yaml
-from typer.testing import CliRunner
-
 from mal_core import config_validation as cv
 from mal_core.config_validation import (
     DEFAULT_PATH,
@@ -24,6 +22,7 @@ from mal_core.config_validation import (
     ensure_valid,
     validate_model_config,
 )
+from typer.testing import CliRunner
 
 _DEFAULT_TEXT = DEFAULT_PATH.read_text(encoding="utf-8")
 
@@ -61,7 +60,7 @@ def test_canonical_yaml_validates_and_is_typed():
 
 def test_logs_resolved_path(tmp_path, caplog):
     path = _tmp_yaml(tmp_path, lambda data: None)
-    with caplog.at_level(logging.INFO, logger="mal_core.config_validation"):
+    with caplog.at_level(logging.DEBUG, logger="mal_core.config_validation"):
         validate_model_config(path)
     assert f"model_constants: {path}" in caplog.text
 
@@ -459,14 +458,20 @@ def test_cli_help_does_not_validate(tmp_path, monkeypatch):
     assert "Score a completed ABM run" in result.output
 
 
-def test_cli_announces_constants_path(tmp_path, monkeypatch):
+def test_cli_announces_constants_path(tmp_path, monkeypatch, caplog):
     from mal_core.cli import app
 
     good = _tmp_yaml(tmp_path, lambda data: None)
     monkeypatch.setenv(cv.ENV_VAR, str(good))
-    result = runner.invoke(app, ["datasets", "--missing"])
+    # Even with library logging at INFO, the user sees exactly one line:
+    # the CLI echo. The library announcement is DEBUG-only (decision 6).
+    with caplog.at_level(logging.INFO):
+        result = runner.invoke(app, ["datasets", "--missing"])
     assert result.exit_code == 0
-    assert f"model_constants: {good}" in _cli_text(result)
+    # result.output is the mixed stream the user sees; _cli_text also
+    # appends result.stderr, which would count the same line twice.
+    assert f"model_constants: {good}" in result.output
+    assert result.output.count(f"model_constants: {good}") == 1
 
 
 # -- no duplicated validation logic -----------------------------------------

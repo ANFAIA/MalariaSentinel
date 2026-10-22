@@ -3,6 +3,7 @@
 // response tests (M7.8). Implemented by ag-spp.
 #include <gtest/gtest.h>
 
+#include "mal_abm_fast/config.hpp"
 #include "mal_abm_fast/species.hpp"
 #include "mal_abm_fast/species_params.hpp"
 
@@ -35,14 +36,17 @@ TEST(Species, ActivityWeightsSumToOneForAllSpecies) {
     }
 }
 
-TEST(Species, ColuzziiDefaultsAreAnthropophilic) {
+TEST(Species, ColuzziiDefaultsComeFromYaml) {
     const auto sp = species_params_for(MosquitoSpeciesId::ANOPHELES_COLUZZII);
+    const auto cfg = parse_config_file(resolve_config_path());
+    const auto& row = cfg.species.rows.at("coluzzii");
     EXPECT_GT(sp.pref_human, 0.9f);
-    // model_constants.yaml species.coluzzii row (plan constants-yaml:
-    // the engine's 300/1500 wins the 100/300 wire shadow).
-    EXPECT_EQ(sp.host_seeking_scale_m, 300.0f);
-    EXPECT_EQ(sp.host_seeking_radius_m, 1500.0f);
-    EXPECT_EQ(sp.gonotrophic_days, 2.0f);
+    EXPECT_FLOAT_EQ(sp.host_seeking_scale_m,
+                    static_cast<float>(row.host_seeking_scale_m));
+    EXPECT_FLOAT_EQ(sp.host_seeking_radius_m,
+                    static_cast<float>(row.host_seeking_radius_m));
+    EXPECT_FLOAT_EQ(sp.gonotrophic_days,
+                    static_cast<float>(cfg.gonotrophic.cycle_duration_days));
 }
 
 TEST(Salinity, MaxAtFreshwaterOptimum) {

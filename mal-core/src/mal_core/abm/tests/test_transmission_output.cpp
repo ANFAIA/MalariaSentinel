@@ -9,6 +9,7 @@
 #include <gdal_priv.h>
 #include <nlohmann/json.hpp>
 
+#include "mal_abm_fast/output_contract.hpp"
 #include "mal_abm_fast/transmission_output.hpp"
 
 namespace mal_abm_fast {
@@ -114,6 +115,36 @@ TEST(TransmissionOutput, WritesDailyTransmissionLog) {
     EXPECT_EQ(j["daily"][2]["day"], 3);
 
     std::filesystem::remove(log_path);
+}
+
+// The CLI compares this path with --emit-transmission-log to reject a
+// collision (task-06 decision 5); keep the sidecar naming rule pinned.
+TEST(TransmissionOutput, StateSidecarReplacesTifExtension) {
+    EXPECT_EQ(state_sidecar_path("/tmp/run/state.tif"),
+              "/tmp/run/state.json");
+    EXPECT_EQ(state_sidecar_path("/tmp/run/STATE.TIF"),
+              "/tmp/run/STATE.json");
+    EXPECT_EQ(state_sidecar_path("/tmp/run/state"),
+              "/tmp/run/state.json");
+    EXPECT_EQ(state_sidecar_path("/tmp/run/state.json"),
+              "/tmp/run/state.json.json");
+}
+
+// The guard must cover every JSON file the engine writes for a rollout,
+// not just the metadata sidecar: `_aquatic.json` (always, when a submodel
+// exists) and `_foci.json` (when an outbreak triggers).
+TEST(TransmissionOutput, ReservedSidecarsIncludeDiagnostics) {
+    const auto reserved = state_reserved_sidecars("/tmp/run/state.tif");
+    ASSERT_EQ(reserved.size(), 3u);
+    EXPECT_EQ(reserved[0], "/tmp/run/state.json");
+    EXPECT_EQ(reserved[1], "/tmp/run/state_aquatic.json");
+    EXPECT_EQ(reserved[2], "/tmp/run/state_foci.json");
+
+    // Non-.tif paths keep the engine's append rule.
+    const auto appended = state_reserved_sidecars("/tmp/run/state");
+    EXPECT_EQ(appended[0], "/tmp/run/state.json");
+    EXPECT_EQ(appended[1], "/tmp/run/state_aquatic.json");
+    EXPECT_EQ(appended[2], "/tmp/run/state_foci.json");
 }
 
 }  // namespace

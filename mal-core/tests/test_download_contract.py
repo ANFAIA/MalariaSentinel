@@ -1,17 +1,13 @@
-"""Contract tests for download plugin system.
+"""Contract tests for the download plugin system.
 
-Validates that every DOWNLOADER dict in mal_commonlib.data.loaders
-follows the spec defined in docs/download-api-spec.md.
+Validates that every DOWNLOADER dict in mal_commonlib.data.loaders follows
+the spec in docs/specs/download/spec.md. The modules are discovered (not
+listed) so a new loader is covered automatically.
 """
 import importlib
-import inspect
-from pathlib import Path
-
-import pytest
 
 from mal_core.download.registry import _loader_module_names
 
-# Every loader module on disk is scanned (registry's single source of truth)
 LOADER_MODULES = _loader_module_names()
 
 VALID_AUTH = {"cds", "earthdata", "planetary_computer", "earthengine", "none"}
@@ -31,114 +27,64 @@ def _discover_downloaders():
     return downloaders
 
 
-class TestDownloaderDictStructure:
-    """Each DOWNLOADER dict has required keys with correct types."""
-
-    def test_has_required_keys(self):
-        for mod_name, dl in _discover_downloaders().items():
-            for key in ("name", "description", "requires_auth", "outputs", "manifest_keys"):
-                assert key in dl, f"{mod_name}: missing required key '{key}'"
-
-    def test_name_is_string(self):
-        for mod_name, dl in _discover_downloaders().items():
-            assert isinstance(dl["name"], str), f"{mod_name}: name must be str"
-
-    def test_name_is_lowercase_no_spaces(self):
-        for mod_name, dl in _discover_downloaders().items():
-            name = dl["name"]
-            assert name == name.lower(), f"{mod_name}: name must be lowercase, got '{name}'"
-            assert " " not in name, f"{mod_name}: name must have no spaces, got '{name}'"
-
-    def test_description_is_string(self):
-        for mod_name, dl in _discover_downloaders().items():
-            assert isinstance(dl["description"], str), f"{mod_name}: description must be str"
-
-    def test_requires_auth_is_list(self):
-        for mod_name, dl in _discover_downloaders().items():
-            assert isinstance(dl["requires_auth"], list), f"{mod_name}: requires_auth must be list"
-
-    def test_requires_auth_values_valid(self):
-        for mod_name, dl in _discover_downloaders().items():
-            for auth in dl["requires_auth"]:
-                assert auth in VALID_AUTH, f"{mod_name}: invalid auth '{auth}', must be in {VALID_AUTH}"
-
-    def test_outputs_is_dict(self):
-        for mod_name, dl in _discover_downloaders().items():
-            assert isinstance(dl["outputs"], dict), f"{mod_name}: outputs must be dict"
-
-    def test_manifest_keys_is_dict(self):
-        for mod_name, dl in _discover_downloaders().items():
-            assert isinstance(dl["manifest_keys"], dict), f"{mod_name}: manifest_keys must be dict"
+def test_downloader_dict_structure():
+    downloaders = _discover_downloaders()
+    assert downloaders, "no DOWNLOADER dicts discovered"
+    for mod_name, dl in downloaders.items():
+        for key in ("name", "description", "requires_auth", "outputs",
+                    "manifest_keys"):
+            assert key in dl, f"{mod_name}: missing required key '{key}'"
+        assert isinstance(dl["name"], str), f"{mod_name}: name must be str"
+        assert dl["name"] == dl["name"].lower(), (
+            f"{mod_name}: name must be lowercase, got '{dl['name']}'")
+        assert " " not in dl["name"], (
+            f"{mod_name}: name must have no spaces, got '{dl['name']}'")
+        assert isinstance(dl["description"], str) and dl["description"], (
+            f"{mod_name}: description must be a non-empty string")
+        assert isinstance(dl["requires_auth"], list), (
+            f"{mod_name}: requires_auth must be list")
+        for auth in dl["requires_auth"]:
+            assert auth in VALID_AUTH, (
+                f"{mod_name}: invalid auth '{auth}', must be in {VALID_AUTH}")
+        assert isinstance(dl["outputs"], dict), f"{mod_name}: outputs must be dict"
+        assert isinstance(dl["manifest_keys"], dict), (
+            f"{mod_name}: manifest_keys must be dict")
 
 
-class TestDownloaderOutputs:
-    """Each output callable is importable and has a manifest key."""
-
-    def test_all_outputs_are_callable(self):
-        for mod_name, dl in _discover_downloaders().items():
-            for name, func in dl["outputs"].items():
-                assert callable(func), f"{mod_name}.{name}: output must be callable"
-
-    def test_all_outputs_have_manifest_key(self):
-        for mod_name, dl in _discover_downloaders().items():
-            for name in dl["outputs"]:
-                assert name in dl["manifest_keys"], (
-                    f"{mod_name}: output '{name}' has no manifest_keys entry"
-                )
-
-    def test_manifest_keys_are_nonempty_strings(self):
-        for mod_name, dl in _discover_downloaders().items():
-            for name, key in dl["manifest_keys"].items():
-                assert isinstance(key, str) and len(key) > 0, (
-                    f"{mod_name}.manifest_keys['{name}']: must be non-empty string"
-                )
+def test_all_outputs_are_callable_with_manifest_key():
+    for mod_name, dl in _discover_downloaders().items():
+        for name, func in dl["outputs"].items():
+            assert callable(func), f"{mod_name}.{name}: output must be callable"
+            assert name in dl["manifest_keys"], (
+                f"{mod_name}: output '{name}' has no manifest_keys entry")
+        for name, key in dl["manifest_keys"].items():
+            assert isinstance(key, str) and key, (
+                f"{mod_name}.manifest_keys['{name}']: must be non-empty string")
 
 
-class TestDownloaderUniqueness:
-    """No duplicate names or manifest keys across downloaders."""
-
-    def test_unique_names(self):
-        names = []
-        for mod_name, dl in _discover_downloaders().items():
-            names.append(dl["name"])
-        assert len(names) == len(set(names)), f"Duplicate downloader names: {names}"
-
-    def test_unique_manifest_keys(self):
-        all_keys = []
-        for mod_name, dl in _discover_downloaders().items():
-            for key in dl["manifest_keys"].values():
-                all_keys.append(key)
-        # manifest keys can overlap (same key in different downloaders is OK
-        # if they write to different AOIs), but within a downloader they must be unique
-        for mod_name, dl in _discover_downloaders().items():
-            keys = list(dl["manifest_keys"].values())
-            assert len(keys) == len(set(keys)), (
-                f"{mod_name}: duplicate manifest keys within downloader: {keys}"
-            )
+def test_unique_names():
+    names = [dl["name"] for dl in _discover_downloaders().values()]
+    assert len(names) == len(set(names)), f"Duplicate downloader names: {names}"
 
 
-class TestDownloaderDiscovery:
-    """The registry discovers downloaders correctly."""
+def test_manifest_keys_unique_within_downloader():
+    # Keys may repeat across downloaders (different AOIs/datasets); within
+    # one downloader a duplicate key would make the catalog ambiguous.
+    for mod_name, dl in _discover_downloaders().items():
+        keys = list(dl["manifest_keys"].values())
+        assert len(keys) == len(set(keys)), (
+            f"{mod_name}: duplicate manifest keys within downloader: {keys}")
 
-    def test_discover_at_least_one(self):
-        downloaders = _discover_downloaders()
-        assert len(downloaders) >= 1, "No downloaders discovered"
 
-    def test_era5_registered(self):
-        downloaders = _discover_downloaders()
-        assert "era5" in downloaders, "era5 downloader not registered"
-
-    def test_six_loaders_registered(self):
-        # Contract v3.0 (+Dynamic World swap 2026-10-17): the dem loader is
-        # retired (plan 01) and worldcover is replaced by dynamic_world (GEE).
-        downloaders = _discover_downloaders()
-        expected = {
-            "era5", "chirps", "jrc_gsw", "modis", "worldpop",
-            "dynamic_world", "glw", "ghsl", "wildlife", "buildings",
-            "coastline", "smap",
-        }
-        found = set(downloaders.keys())
-        missing = expected - found
-        assert not missing, f"Missing downloaders: {missing}. Found: {found}"
-        assert "dem" not in found, "dem loader must be retired"
-        assert "worldcover" not in found, "worldcover must be replaced by dynamic_world"
+def test_registered_set_matches_contract_v3():
+    # Contract v3.0 (+Dynamic World swap): dem is retired, worldcover is
+    # replaced by dynamic_world (see docs/specs/download/spec.md).
+    found = set(_discover_downloaders())
+    expected = {
+        "era5", "chirps", "jrc_gsw", "modis", "worldpop",
+        "dynamic_world", "glw", "ghsl", "wildlife", "buildings",
+        "coastline", "smap",
+    }
+    assert expected <= found, f"Missing downloaders: {expected - found}"
+    assert "dem" not in found, "dem loader must be retired"
+    assert "worldcover" not in found, "worldcover must be replaced by dynamic_world"

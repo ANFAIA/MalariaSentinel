@@ -57,6 +57,7 @@ from rasterio.transform import from_bounds
 from rasterio.warp import Resampling
 
 from mal_commonlib.aoi import AOI
+from mal_commonlib.model_constants import model_constant
 
 # Default set of "water / wetland" WorldCover class codes. The full legend is:
 #   10  Tree cover
@@ -89,7 +90,7 @@ _VERSION_FOR_YEAR: dict[int, str] = {2020: "v100", 2021: "v200"}
 _PC_STAC_URL = "https://planetarycomputer.microsoft.com/api/stac/v1"
 _PC_COLLECTION = "esa-worldcover"
 
-_NODATA_OUT_SCALAR = -9999.0
+_NODATA_OUT_SCALAR = float(model_constant("ingest", "nodata_sentinel"))
 
 
 def _ensure_cache_dir(cache_dir: pathlib.Path | None) -> pathlib.Path:

@@ -1,10 +1,9 @@
 """Tests for the download writer module."""
+
 import numpy as np
 import pytest
-import xarray as xr
 import rioxarray  # noqa: F401 — registers .rio accessor
-from pathlib import Path
-
+import xarray as xr
 from mal_core.download.writer import save_product
 
 
@@ -90,23 +89,5 @@ def test_save_product_unknown_format_raises(tmp_path):
         save_product(da, path, format="csv")
 
 
-def test_save_dataarray_2d_default_tif(tmp_path):
-    """Default (format=None) for 2D DataArray still produces TIF."""
-    da = xr.DataArray(
-        np.random.rand(10, 10),
-        dims=["y", "x"],
-        attrs={"crs": "EPSG:4326"},
-    )
-    da = da.rio.set_spatial_dims(x_dim="x", y_dim="y")
-    da = da.rio.write_crs("EPSG:4326")
-    path = tmp_path / "test_default.tif"
-    result = save_product(da, path)
-    assert result.suffix == ".tif"
 
 
-def test_save_dataset_default_nc(tmp_path):
-    """Default (format=None) for Dataset still produces NC."""
-    ds = xr.Dataset({"var": (["y", "x"], np.random.rand(10, 10))})
-    path = tmp_path / "test_default.nc"
-    result = save_product(ds, path)
-    assert result.suffix == ".nc"

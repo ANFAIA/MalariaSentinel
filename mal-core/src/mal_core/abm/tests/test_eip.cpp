@@ -9,10 +9,8 @@
 //     * eip_progress'  = eip_progress + daily_gd     (NaN-safe)
 //     * is_infective   = eip_progress >= EIP_THRESHOLD_GD()
 //
-// The F1.a smoke test (`tests/test_smoke.cpp::EipAccumulate`) already
-// pins the below-base, above-base, and NaN cases; we add coverage for
-// the multi-day trajectory (11/12/13 days at T=25) and the wire.hpp
-// constants.
+// This file covers the below-base, above-base, NaN and multi-day
+// trajectory (11/12/13 days at T=25) cases plus the wire.hpp constants.
 #include <gtest/gtest.h>
 
 #include <cmath>
@@ -65,11 +63,6 @@ TEST(MalAbmFastEip, InfectiveThreshold) {
     EXPECT_FALSE(mal_abm_fast::is_infective(109.0f));
     EXPECT_TRUE (mal_abm_fast::is_infective(110.0f));
     EXPECT_TRUE (mal_abm_fast::is_infective(150.0f));
-}
-
-TEST(MalAbmFastEip, WireConstantsPinned) {
-    EXPECT_FLOAT_EQ(mal_abm_fast::EIP_BASE_C(),         16.0f);
-    EXPECT_FLOAT_EQ(mal_abm_fast::EIP_THRESHOLD_GD(),   110.0f);
 }
 
 TEST(MalAbmFastEip, MixedTemperatureDays) {

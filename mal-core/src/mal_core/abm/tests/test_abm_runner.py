@@ -13,7 +13,6 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-
 # ── Flag plumbing ─────────────────────────────────────────────────
 
 class TestFlagPlumbing:
@@ -140,7 +139,6 @@ class TestManifestWrapper:
 
     def test_snapshot_every_default_in_flags(self):
         """Default snapshot_every=1 should be in the flags dict."""
-        from mal_core.abm.wrapper import CppAbmWrapper
 
         with patch("mal_core.abm.wrapper.CppAbmWrapper") as MockWrapper:
             mock_instance = MockWrapper.return_value

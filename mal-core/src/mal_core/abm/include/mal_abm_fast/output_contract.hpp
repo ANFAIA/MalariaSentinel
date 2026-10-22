@@ -17,6 +17,7 @@
 #include <array>
 #include <cstdint>
 #include <string>
+#include <vector>
 
 #include "wire.hpp"
 
@@ -75,5 +76,16 @@ void write_state_cog(const std::string& path,
 // docs/specs/abm/spec.md.
 void write_state_sidecar(const std::string& tif_path,
                          const StateCogMetadata& meta);
+
+// Path of the sidecar written next to a state COG: `.tif` -> `.json`
+// (case-insensitive), otherwise `<path>.json`. Exposed so the CLI can
+// refuse an `--emit-transmission-log` path that would be overwritten by
+// the state sidecar (task-06 decision 5).
+std::string state_sidecar_path(const std::string& tif_path);
+
+// Every JSON file the engine reserves next to a state COG: the metadata
+// sidecar plus the `_aquatic.json` and `_foci.json` diagnostics. The CLI
+// rejects a transmission log that would overwrite any of them.
+std::vector<std::string> state_reserved_sidecars(const std::string& tif_path);
 
 }  // namespace mal_abm_fast

@@ -5,16 +5,15 @@ import json
 import pathlib
 
 import pytest
-
 from mal_core.download.catalog import (
     INGEST_ARTIFACTS,
     Slot,
     catalog_status,
+    downloadable_datasets,
     load_local_manifest,
     register_existing,
     resolve,
     resolve_inputs,
-    downloadable_datasets,
 )
 
 
@@ -179,6 +178,30 @@ class TestRegisterExisting:
         summary2 = register_existing("ghana", data_dir=d)
         assert all("already registered" in s for s in summary2["skipped"])
 
+    def test_manifest_carries_exactly_the_six_required_artifacts(self, tmp_path):
+        """The manifest must carry every ``required_for_abm`` artifact.
+
+        Source of truth is ``INGEST_ARTIFACTS``: the table decides which keys
+        the ABM wrapper later resolves. The explicit six-key set below is the
+        current contract; adding a required artifact must update this list on
+        purpose. A missing manifest entry here would make the C++ run fail at
+        ``resolve_inputs`` time, so this is a startup contract, not a stat.
+        """
+        d = self._mk_dir(tmp_path)
+        register_existing("ghana", data_dir=d)
+        manifest = load_local_manifest(d)
+
+        expected = {key for key, art in INGEST_ARTIFACTS.items()
+                    if art.required_for_abm}
+        assert expected == {
+            "env", "habitat", "host_static", "mobility_day",
+            "mobility_night", "livestock_mobility",
+        }
+        actual = {key for key, entry in manifest.items()
+                  if entry.get("required_for_abm")}
+        assert actual == expected
+        assert all(manifest[key]["files"] for key in expected)
+
     def test_missing_files_reported(self, tmp_path):
         d = tmp_path / "ghana"
         d.mkdir()
@@ -201,11 +224,3 @@ class TestIngestArtifactsTable:
         assert INGEST_ARTIFACTS["mobility_day"].required_for_abm
         assert not INGEST_ARTIFACTS["host_manifest"].required_for_abm
 
-    def test_keys_match_ghana_manifest(self):
-        """The real ghana manifest must carry every ABM-required artifact."""
-        manifest = json.loads(
-            (pathlib.Path("data") / "ghana" / "manifest.json").read_text()
-        )
-        for key, art in INGEST_ARTIFACTS.items():
-            if art.required_for_abm:
-                assert key in manifest["datasets"], key

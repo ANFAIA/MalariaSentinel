@@ -49,6 +49,25 @@ terrain = [
     "laspy[lazrs]>=2.5.0",
 ]
 
+[tool.pytest.ini_options]
+# One canonical entry point: `uv run pytest` from the repo root. Without
+# this, pytest discovers two files named test_runner.py and aborts with an
+# import-file-mismatch error. The calibration harness under
+# mal-core/src/mal_core/abm/tests/calibration/ is retired (no tests).
+testpaths = [
+    "mal-core/tests",
+    "mal-commonlib/tests",
+    "mal-core/src/mal_core/abm/tests",
+]
+# Network tests are opt-in: `uv run pytest -m integration`. A network
+# failure inside an integration test is a failure, never a skip.
+addopts = "-m 'not integration and not full' --strict-markers"
+markers = [
+    "fast: cheap unit test (default)",
+    "full: opt-in full run (network/LLM), not part of the default suite",
+    "integration: hits a real network endpoint; run with -m integration",
+]
+
 [tool.uv]
 package = false
 environments = [

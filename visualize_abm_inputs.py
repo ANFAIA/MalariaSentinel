@@ -25,6 +25,10 @@ import xarray as xr
 from matplotlib.gridspec import GridSpec
 from PIL import Image
 
+from mal_commonlib.model_constants import model_constant
+
+_NODATA = float(model_constant("ingest", "nodata_sentinel"))
+
 OUT = Path("runs/abm/abm_inputs")
 OUT.mkdir(parents=True, exist_ok=True)
 DATA = Path("data/ghana")
@@ -53,7 +57,7 @@ def plot_host_density():
 
     for ax, (var, title, cmap) in zip(axes.flat, vars_to_plot):
         data = ds[var].values
-        data = np.where(data == -9999.0, np.nan, data)
+        data = np.where(data == _NODATA, np.nan, data)
         if var == "urban_class":
             im = ax.pcolormesh(x, y, data, cmap=cmap, vmin=0, vmax=1)
         elif var == "building_fraction":
@@ -93,7 +97,7 @@ def plot_env_snapshot():
 
     for ax, (var, title, cmap) in zip(axes_flat, env_vars):
         data = day0[var].values
-        data = np.where(data == -9999.0, np.nan, data)
+        data = np.where(data == _NODATA, np.nan, data)
         masked = np.ma.masked_invalid(data)
         im = ax.pcolormesh(x, y, masked, cmap=cmap)
         ax.set_title(title, fontsize=11)
@@ -119,7 +123,7 @@ def make_timeseries_gif(var_name: str, label: str, cmap: str, filename: str, ste
     frames = []
     for t_idx in range(0, n_days, step):
         data = ds[var_name].isel(time=t_idx).values
-        data = np.where(data == -9999.0, np.nan, data)
+        data = np.where(data == _NODATA, np.nan, data)
         masked = np.ma.masked_invalid(data)
         t_str = str(times[t_idx])[:10]
 

@@ -156,6 +156,20 @@ done
 check_absent "$T07_ABM/include/mal_abm_fast/wire.hpp" \
     'resolution_m[[:space:]]*=[[:space:]]*[0-9]+[[:space:]]*;|-9999' \
     'wire resolution/nodata literals'
+# Visualisation scripts and the archived loaders are outside the Python
+# package tree but still read the same NoData sentinel: no literals there
+# either (task-06 decision 2).
+_VIZ_FILES="visualize_abm_inputs.py"
+for _f in "$T07_ABM"/scripts/*.py \
+          mal-commonlib/src/mal_commonlib/data/loaders/_legacy/*.py; do
+    [ -f "$_f" ] || continue
+    _LEGACY_HITS=$(grep -nE -- '-9999' "$_f" 2>/dev/null \
+        | grep -vE '^[0-9]+:[[:space:]]*#' || true)
+    [ -n "$_LEGACY_HITS" ] && { echo "HIT [NoData literal in $_f]:"; echo "$_LEGACY_HITS" | head -4; fail=1; }
+done
+_VIZ_HITS=$(grep -nE -- '-9999' $_VIZ_FILES 2>/dev/null \
+    | grep -vE '^[^:]+:[0-9]+:[[:space:]]*#' || true)
+[ -n "$_VIZ_HITS" ] && { echo "HIT [NoData literal in visualize_abm_inputs.py]:"; echo "$_VIZ_HITS" | head -4; fail=1; }
 check_absent "$T07_ABM/include/mal_abm_fast/host_seeking.hpp" \
     '(range_m|step_size_m)[[:space:]]*=[[:space:]]*[0-9]' \
     'host-seeking header default args'

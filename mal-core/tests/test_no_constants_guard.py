@@ -27,7 +27,9 @@ def _fake_root(tmp_path: Path) -> Path:
     for sub in (
         "mal-commonlib/src/mal_commonlib/data/loaders",
         "mal-core/src/mal_core/abm/src",
+        "mal-core/src/mal_core/abm/scripts",
         "mal-core/src/mal_core/abm/include/mal_abm_fast",
+        "mal-commonlib/src/mal_commonlib/data/loaders/_legacy",
         "mal-core/src/mal_core/scoring",
         "mal-core/src/mal_core/ingest",
         "mal-core/src/mal_core/habitat",
@@ -77,3 +79,22 @@ def test_same_line_resolution_literal_is_caught(tmp_path):
     res = _run_guard(root)
     assert res.returncode == 1
     assert "resolution" in res.stdout
+
+
+def test_nodata_literal_in_scripts_and_legacy_is_caught(tmp_path):
+    """Visualisation scripts and archived loaders also read the sentinel."""
+    root = _fake_root(tmp_path)
+    script = (root / "mal-core/src/mal_core/abm/scripts"
+              / "visualize_transmission.py")
+    script.write_text("nodata = -9999.0\n", encoding="utf-8")
+    res = _run_guard(root)
+    assert res.returncode == 1
+    assert "visualize_transmission.py" in res.stdout
+
+    script.write_text("nodata = NODATA_SENTINEL()\n", encoding="utf-8")
+    legacy = (root / "mal-commonlib/src/mal_commonlib/data/loaders/_legacy"
+              / "worldcover.py")
+    legacy.write_text("_NODATA_OUT_SCALAR = -9999.0\n", encoding="utf-8")
+    res = _run_guard(root)
+    assert res.returncode == 1
+    assert "worldcover.py" in res.stdout

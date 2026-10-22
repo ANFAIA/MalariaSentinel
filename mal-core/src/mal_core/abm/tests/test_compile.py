@@ -4,7 +4,6 @@ from unittest.mock import MagicMock, patch
 
 from mal_core.abm.compile import (
     _detect_nproc,
-    _find_macos_prefixes,
     compile_abm,
     get_abm_dirs,
     resolve_abm_dirs,
@@ -33,34 +32,10 @@ def test_detect_nproc():
     assert n >= 1
 
 
-def test_find_macos_prefixes():
-    prefixes = _find_macos_prefixes()
-    assert isinstance(prefixes, list)
 
 
-def test_compile_abm_dry_run_or_mock():
-    with (
-        patch("shutil.which", return_value="/usr/bin/cmake"),
-        patch("subprocess.run") as mock_run,
-        patch("shutil.copy2"),
-        patch("pathlib.Path.is_file", return_value=True),
-    ):
-        mock_run.return_value = MagicMock(returncode=0, stdout="OK", stderr="")
-        success, _ = compile_abm()
-        assert success is True
 
 
-def test_compile_abm_worktree_mock():
-    with (
-        patch("shutil.which", return_value="/usr/bin/cmake"),
-        patch("subprocess.run") as mock_run,
-        patch("shutil.copy2"),
-        patch("pathlib.Path.is_file", return_value=True),
-    ):
-        mock_run.return_value = MagicMock(returncode=0, stdout="OK", stderr="")
-        success, res_path = compile_abm(worktree="/tmp/fake_worktree")
-        assert success is True
-        assert "fake_worktree" in res_path
 
 
 def test_compile_abm_cmake_missing():

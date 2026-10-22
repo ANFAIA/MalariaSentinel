@@ -102,12 +102,6 @@ TEST(ThermalResponses, PupaDevelopmentRateBelowThreshold) {
     EXPECT_EQ(mal_abm_fast::pupa_development_rate(8.0f), 0.0f);
 }
 
-TEST(ThermalResponses, GonotrophicDevelopmentRateAt25C) {
-    const float rate = mal_abm_fast::gonotrophic_development_rate(25.0f);
-    EXPECT_GT(rate, 0.0f);
-    EXPECT_LE(rate, 1.0f);
-}
-
 // ---------------------------------------------------------------------------
 // AquaticCohortBank lifecycle tests
 // ---------------------------------------------------------------------------

@@ -48,6 +48,7 @@
 #include <omp.h>
 
 #include "engine.hpp"
+#include "output_contract.hpp"
 #include "prng.hpp"
 #include "seeding.hpp"
 #include "wire.hpp"
@@ -140,6 +141,22 @@ std::string rollout_output_path(const std::string& output_path,
     const std::string ext  = p.has_extension() ? p.extension().string() : ".tif";
     std::ostringstream name;
     name << stem << "_seed" << std::setw(4) << std::setfill('0')
+         << rollout_index << ext;
+    return (parent / name.str()).string();
+}
+
+std::string rollout_transmission_log_path(const std::string& requested,
+                                          int rollout_index,
+                                          int n_rollouts) {
+    if (requested.empty()) return {};
+    if (n_rollouts == 1 && rollout_index == 0) return requested;
+    const std::filesystem::path tp(requested);
+    const std::filesystem::path parent = tp.has_parent_path()
+        ? tp.parent_path() : std::filesystem::path{};
+    const std::string ext = tp.has_extension()
+        ? tp.extension().string() : ".json";
+    std::ostringstream name;
+    name << "transmission_seed" << std::setw(4) << std::setfill('0')
          << rollout_index << ext;
     return (parent / name.str()).string();
 }
@@ -834,6 +851,32 @@ OUTPUT
     transmission_params.human_outbreak_min_density = human_outbreak_min_density;
     transmission_params.human_cluster_max_core_pop = human_cluster_max_core_pop;    transmission_params.focus_threshold = transmission_focus_threshold;
 
+    // Reject an --emit-transmission-log path that the state sidecar would
+    // overwrite (task-06 decision 5). Single-threaded, before the rollout
+    // loop: a collision is a bad invocation, not a rollout failure.
+    if (!transmission_log_path.empty()) {
+        for (int i = 0; i < n_rollouts; ++i) {
+            const std::string tx_path =
+                rollout_transmission_log_path(transmission_log_path, i, n_rollouts);
+            const std::filesystem::path tx_abs =
+                std::filesystem::absolute(tx_path).lexically_normal();
+            for (const std::string& sidecar :
+                 mal_abm_fast::state_reserved_sidecars(
+                     rollout_output_path(output_path, i, n_rollouts))) {
+                const std::filesystem::path sidecar_abs =
+                    std::filesystem::absolute(sidecar).lexically_normal();
+                if (tx_abs == sidecar_abs) {
+                    std::cerr
+                        << "abm_run: --emit-transmission-log collides with "
+                           "a reserved state sidecar ("
+                        << tx_abs.string()
+                        << "); choose a different log path or output stem\n";
+                    return EXIT_FAILURE;
+                }
+            }
+        }
+    }
+
     // -- Rollouts loop (F1.c) -------------------------------------------
     // Each rollout gets a fresh `Prng` instance seeded at
     // `seed_rollout = seed + i`. A new `Engine` is built per rollout
@@ -1034,21 +1077,8 @@ OUTPUT
 
         // -- Write transmission log JSON (M7.4) ----------------------
         if (!transmission_log_path.empty() && engine.transmission()) {
-            std::string rollout_trans_log;
-            if (n_rollouts == 1) {
-                rollout_trans_log = transmission_log_path;
-            } else {
-                const std::filesystem::path tp(transmission_log_path);
-                const std::filesystem::path tparent = tp.has_parent_path()
-                    ? tp.parent_path() : std::filesystem::path{};
-                const std::string tstem = tp.stem().string();
-                const std::string text  = tp.has_extension()
-                    ? tp.extension().string() : ".json";
-                std::ostringstream tname;
-                tname << "transmission_seed"
-                      << std::setw(4) << std::setfill('0') << i << text;
-                rollout_trans_log = (tparent / tname.str()).string();
-            }
+            const std::string rollout_trans_log =
+                rollout_transmission_log_path(transmission_log_path, i, n_rollouts);
             mal_abm_fast::write_transmission_log(
                 rollout_trans_log, engine.transmission()->history(), days);
             std::cout << "abm_run: rollout " << i << "/" << n_rollouts

@@ -22,6 +22,7 @@
 #include <vector>
 
 #include "aoi.hpp"
+#include "config.hpp"
 #include "host_landscape.hpp"
 #include "host_seeking.hpp"
 #include "mobility_schedule.hpp"
@@ -127,15 +128,18 @@ TEST(HostLandscape, AtReturnsPopulatedCellInBounds) {
 // HostPreference defaults
 // ---------------------------------------------------------------------------
 
-TEST(HostPreference, AnthropophilicDefaults) {
+TEST(HostPreference, DefaultsComeFromYaml) {
+    // task-06: compare with the validated YAML, never a copied literal.
+    const auto cfg = mal_abm_fast::parse_config_file(
+        mal_abm_fast::resolve_config_path());
+    const auto& pref_cfg = cfg.species.rows.at(cfg.species.default_species).pref;
     mal_abm_fast::HostPreference pref;
-    EXPECT_FLOAT_EQ(pref.human, 0.99f);
-    EXPECT_FLOAT_EQ(pref.cattle, 0.005f);
-    EXPECT_FLOAT_EQ(pref.goat, 0.003f);
-    EXPECT_FLOAT_EQ(pref.sheep, 0.001f);
-    EXPECT_FLOAT_EQ(pref.wildlife, 0.001f);
+    EXPECT_FLOAT_EQ(pref.human,    static_cast<float>(pref_cfg[0]));
+    EXPECT_FLOAT_EQ(pref.cattle,   static_cast<float>(pref_cfg[1]));
+    EXPECT_FLOAT_EQ(pref.goat,     static_cast<float>(pref_cfg[2]));
+    EXPECT_FLOAT_EQ(pref.sheep,    static_cast<float>(pref_cfg[3]));
+    EXPECT_FLOAT_EQ(pref.wildlife, static_cast<float>(pref_cfg[4]));
 
-    // Sum should be ~1.0.
     const float total = pref.human + pref.cattle + pref.goat +
                         pref.sheep + pref.wildlife;
     EXPECT_NEAR(total, 1.0f, 0.001f);

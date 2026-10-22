@@ -67,23 +67,4 @@ inline float pupa_development_rate(float temp_c) {
     return static_cast<float>(std::max(0.0, std::min(rate, 1.0)));
 }
 
-// ---------------------------------------------------------------------------
-// Gonotrophic development rate — placeholder for M7.2 (test-only today; no
-// production caller). The GONO_* constants are compiled fixtures that mirror
-// the thermal thresholds; they are NOT read from model_constants.yaml.
-// Migration to gonotrophic.* is a task-07 backlog item, not a comment fix.
-// ---------------------------------------------------------------------------
-inline constexpr double GONO_TL   = 16.0;
-inline constexpr double GONO_TH   = 38.0;
-inline constexpr double GONO_TOPT = 25.0;
-
-inline float gonotrophic_development_rate(float temp_c) {
-    const double T = static_cast<double>(temp_c);
-    if (T <= GONO_TL || T >= GONO_TH) return 0.0f;
-    // Normalised quadratic: peaks at 1.0 at Topt
-    const double rate = (T - GONO_TL) * (GONO_TH - T) /
-                        ((GONO_TOPT - GONO_TL) * (GONO_TH - GONO_TOPT));
-    return static_cast<float>(std::max(0.0, std::min(rate * 0.25, 1.0)));
-}
-
 }  // namespace mal_abm_fast
