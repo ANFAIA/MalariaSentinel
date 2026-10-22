@@ -4,10 +4,13 @@
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
+#include <sstream>
 
 #include "mal_abm_fast/config.hpp"
 #include "mal_abm_fast/birth_rate.hpp"
 #include "mal_abm_fast/gonotrophic_cycle.hpp"
+#include "mal_abm_fast/host_seeking.hpp"
+#include "mal_abm_fast/species_params.hpp"
 #include "mal_abm_fast/thermal_responses.hpp"
 #include "mal_abm_fast/transmission.hpp"
 #include "mal_abm_fast/multirate_scheduler.hpp"
@@ -111,6 +114,45 @@ TEST(ConfigParser, AnchorRejected) {
                  mal_abm_fast::ConfigError);
 }
 
+TEST(ConfigParser, MultilineLiteralRejectedWithLine) {
+    // task-01 B5: block literals (`|`, `>`) are outside the YAML subset;
+    // the parser must fail loudly and name the offending line.
+    const std::string path = write_temp(
+        "multiline.yaml",
+        "version: 1\n"
+        "pluvial:\n"
+        "  rain_scale_mm:\n"
+        "    | 2.5\n");
+    try {
+        mal_abm_fast::parse_config_file(path);
+        FAIL() << "expected ConfigError";
+    } catch (const mal_abm_fast::ConfigError& e) {
+        const std::string msg = e.what();
+        EXPECT_NE(msg.find("line 4"), std::string::npos) << msg;
+        EXPECT_NE(msg.find("block"), std::string::npos) << msg;
+    }
+}
+
+TEST(ConfigParser, UnknownNestedKeyToleratedBySyntaxParser) {
+    // task-01 B5: unknown-key policy belongs to the single pydantic
+    // validator (R2, test_unknown_key_rejected_everywhere). The C++
+    // subset parser only checks syntax + the keys it reads, so an extra
+    // key inside a nested section must not break the engine config.
+    std::ifstream in(canonical_yaml());
+    ASSERT_TRUE(in.good());
+    std::stringstream buf;
+    buf << in.rdbuf();
+    std::string text = buf.str();
+    const std::string anchor = "pluvial:\n";
+    const size_t pos = text.find(anchor);
+    ASSERT_NE(pos, std::string::npos);
+    text.insert(pos + anchor.size(), "  unknown_nested_key: 1.5\n");
+    const std::string path = write_temp("unknown_nested.yaml", text);
+    mal_abm_fast::ModelConfig cfg;
+    EXPECT_NO_THROW(cfg = mal_abm_fast::parse_config_file(path));
+    EXPECT_FLOAT_EQ(cfg.pluvial.rain_scale_mm, 2.5f);
+}
+
 TEST(ConfigParser, MissingKeysListedTogether) {
     const std::string path = write_temp(
         "miss.yaml",
@@ -164,6 +206,43 @@ TEST(ConfigBoundDefaults, TransmissionParamsComeFromYaml) {
                      cfg.transmission.initial_human_prevalence);
     EXPECT_DOUBLE_EQ(p.initial_vector_infected_frac,
                      cfg.transmission.initial_vector_infected_frac);
+}
+
+TEST(ConfigBoundDefaults, HostPreferenceComesFromYaml) {
+    // Compare against the same singleton the struct reads (an env override
+    // must not make this test compare different files).
+    const auto& cfg = mal_abm_fast::load_config();
+    const auto& row = cfg.species.rows.at(cfg.species.default_species);
+    const mal_abm_fast::HostPreference pref;
+    EXPECT_FLOAT_EQ(pref.human, float(row.pref[0]));
+    EXPECT_FLOAT_EQ(pref.cattle, float(row.pref[1]));
+    EXPECT_FLOAT_EQ(pref.goat, float(row.pref[2]));
+    EXPECT_FLOAT_EQ(pref.sheep, float(row.pref[3]));
+    EXPECT_FLOAT_EQ(pref.wildlife, float(row.pref[4]));
+}
+
+TEST(ConfigBoundDefaults, SpeciesParamsComeFromYaml) {
+    const auto& cfg = mal_abm_fast::load_config();
+    const auto& row = cfg.species.rows.at(cfg.species.default_species);
+    const mal_abm_fast::SpeciesParams sp;
+    for (size_t i = 0; i < mal_abm_fast::PHASE_WEIGHT_COUNT; ++i) {
+        EXPECT_FLOAT_EQ(sp.activity_weights[i],
+                        float(row.activity_weights[i]));
+    }
+    EXPECT_FLOAT_EQ(sp.pref_human, float(row.pref[0]));
+    EXPECT_FLOAT_EQ(sp.pref_cattle, float(row.pref[1]));
+    EXPECT_FLOAT_EQ(sp.pref_goat, float(row.pref[2]));
+    EXPECT_FLOAT_EQ(sp.pref_sheep, float(row.pref[3]));
+    EXPECT_FLOAT_EQ(sp.pref_wildlife, float(row.pref[4]));
+    EXPECT_FLOAT_EQ(sp.host_seeking_scale_m,
+                    float(row.host_seeking_scale_m));
+    EXPECT_FLOAT_EQ(sp.host_seeking_radius_m,
+                    float(row.host_seeking_radius_m));
+    EXPECT_FLOAT_EQ(sp.salinity_opt_ppt, float(row.salinity_opt_ppt));
+    EXPECT_FLOAT_EQ(sp.salinity_hi_tol_ppt, float(row.salinity_hi_tol_ppt));
+    EXPECT_FLOAT_EQ(sp.salinity_slope, float(row.salinity_slope));
+    EXPECT_FLOAT_EQ(sp.gonotrophic_days,
+                    float(cfg.gonotrophic.cycle_duration_days));
 }
 
 TEST(ConfigBoundDefaults, ThermalCurvesUseYamlParameters) {

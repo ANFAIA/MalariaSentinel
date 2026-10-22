@@ -53,13 +53,14 @@ import rioxarray  # noqa: F401  (registers the .rio accessor)
 import xarray as xr
 
 from mal_commonlib.aoi import AOI
+from mal_commonlib.model_constants import model_constant
 
 log = logging.getLogger(__name__)
 
 _DATASET_ID = "SMAP_RSS_L3_SSS_SMI_MONTHLY_V6"
-_FILL = -9999.0
+_FILL = float(model_constant("ingest", "nodata_sentinel"))
 _SCALE = 1e-3
-_NODATA_OUT = -9999.0
+_NODATA_OUT = float(model_constant("ingest", "nodata_sentinel"))
 _LAND_FRACTION_THRESHOLD = 0.5
 _GRID_STEP = 0.25
 

@@ -68,6 +68,8 @@ import xarray as xr
 from rasterio.transform import from_bounds
 from rasterio.warp import Resampling
 
+from mal_commonlib.model_constants import model_constant
+
 if TYPE_CHECKING:
     from mal_commonlib.aoi import AOI
 
@@ -94,8 +96,8 @@ _R2025A_URL_TEMPLATE = (
 _GLOBAL1_YEAR_RANGE = (2000, 2020)
 _R2025A_YEAR_RANGE = (2015, 2030)
 
-# Default NoData sentinel for the loader's output grid (always -9999.0).
-_OUT_NODATA = -9999.0
+# NoData sentinel for the loader's output grid (ingest.nodata_sentinel).
+_OUT_NODATA = float(model_constant("ingest", "nodata_sentinel"))
 
 __all__ = ["load_worldpop_population", "DOWNLOADER"]
 
@@ -278,7 +280,7 @@ def _read_clip(
         arr = src.read(1, window=win)
         src_transform_window = src.window_transform(win)
         nodata = src.nodata
-        # The source file may use a different sentinel (-99999, etc.). Re-map
+        # The source file may use a different sentinel (e.g. -99999). Re-map
         # to our output sentinel so downstream masks are consistent.
         if nodata is None:
             sentinel = output_nodata

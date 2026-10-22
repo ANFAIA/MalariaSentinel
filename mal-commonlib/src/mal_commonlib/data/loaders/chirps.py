@@ -39,9 +39,10 @@ import rioxarray  # noqa: F401 — registers the .rio accessor
 import xarray as xr
 
 from mal_commonlib.aoi import AOI
+from mal_commonlib.model_constants import model_constant
 
 
-CHIRPS_NODATA: float = -9999.0
+CHIRPS_NODATA: float = float(model_constant("ingest", "nodata_sentinel"))
 CHIRPS_DAILY_TIF_GZ_TEMPLATE = (
     "https://data.chc.ucsb.edu/products/CHIRPS-2.0/global_daily/tifs/p05/{year}/"
     "chirps-v2.0.{year:04d}.{month:02d}.{day:02d}.tif.gz"

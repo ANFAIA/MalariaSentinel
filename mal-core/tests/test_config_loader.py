@@ -148,16 +148,18 @@ def test_canonical_loads_and_derives():
     assert CONFIG["species"]["k_ref"] == 50.0
 
 
-def test_weight_sums_and_row_widths():
+@pytest.mark.parametrize("name", [
+    "coluzzii", "gambiae_ss", "funestus", "arabiensis",
+    "melas", "stephensi", "neutral",
+])
+def test_weight_sums_and_row_widths(name):
     types_list = habitat_names()
     species = CONFIG["species"]
-    for name in ("coluzzii", "gambiae_ss", "funestus", "arabiensis",
-                 "neutral"):
-        row = species[name]
-        weights = row["weights"]
-        assert set(weights) == set(types_list)
-        total = sum(weights.values())
-        assert math.isclose(total, 1.0, rel_tol=0.0, abs_tol=1e-9), name
+    row = species[name]
+    weights = row["weights"]
+    assert set(weights) == set(types_list)
+    total = sum(weights.values())
+    assert math.isclose(total, 1.0, rel_tol=0.0, abs_tol=1e-9), name
 
 
 def test_geodesy_relation():

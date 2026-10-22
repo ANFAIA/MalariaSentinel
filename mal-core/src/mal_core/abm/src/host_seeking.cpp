@@ -260,7 +260,9 @@ std::optional<std::pair<int32_t, int32_t>> HostSeekingModel::detect_host_cell(
     const int32_t c_min = std::max(0, mosquito_col - search_cells);
     const int32_t c_max = std::min(grid_w - 1, mosquito_col + search_cells);
 
-    float best_attr = 0.5f;  // minimum threshold
+    // Algorithmic acceptance floor in attraction units (not a calibrated
+    // parameter; the scientific kernel is cell_attraction).
+    float best_attr = 0.5f;
     int32_t best_row = -1;
     int32_t best_col = -1;
 

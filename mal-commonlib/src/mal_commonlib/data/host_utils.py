@@ -24,6 +24,11 @@ from typing import Any
 import numpy as np
 import xarray as xr
 
+from mal_commonlib.model_constants import model_constant
+
+_NODATA = float(model_constant("ingest", "nodata_sentinel"))
+_NODATA_INT = int(model_constant("ingest", "nodata_sentinel_int"))
+
 
 def aggregate_to_grid(
     source: np.ndarray,
@@ -33,7 +38,7 @@ def aggregate_to_grid(
     target_crs: Any,
     target_shape: tuple[int, int],
     method: str = "sum",
-    nodata: float = -9999.0,
+    nodata: float = _NODATA,
 ) -> np.ndarray:
     """Aggregate a source raster to a target grid.
 
@@ -85,7 +90,7 @@ def build_host_static_nc(
     output_path: pathlib.Path,
     grid_spec: dict,
     *,
-    nodata: float = -9999.0,
+    nodata: float = _NODATA,
     pigs: np.ndarray | None = None,
     chickens: np.ndarray | None = None,
     building_fraction: np.ndarray | None = None,
@@ -161,7 +166,7 @@ def build_host_static_nc(
                 attrs={
                     "long_name": "GHS-SMOD settlement class",
                     "units": "class code (30=urban, 50=rural)",
-                    "nodata": -9999,
+                    "nodata": _NODATA_INT,
                 },
             ),
         },
@@ -250,7 +255,7 @@ def write_manifest(
     H, W = human.shape
 
     def _stats(arr: np.ndarray, name: str) -> dict:
-        valid = arr[arr != -9999.0]
+        valid = arr[arr != _NODATA]
         return {
             "variable": name,
             "shape": list(arr.shape),
@@ -258,7 +263,7 @@ def write_manifest(
             "max": float(valid.max()) if valid.size > 0 else 0.0,
             "mean": float(valid.mean()) if valid.size > 0 else 0.0,
             "total": float(valid.sum()) if valid.size > 0 else 0.0,
-            "nodata_count": int((arr == -9999.0).sum()),
+            "nodata_count": int((arr == _NODATA).sum()),
         }
 
     manifest = {

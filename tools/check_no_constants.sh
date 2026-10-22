@@ -104,6 +104,73 @@ check_absent "$T07_ABM/src/host_landscape.cpp" \
     'residential fraction literal'
 check_absent "$T07_ABM/src/engine.cpp" \
     'set_current_hour\([0-9]' 'engine flight hour literal'
+# task-02: single-source collisions must not regress (C1/C3/C4/C5/C7/C8/C9).
+check_absent "$T07_ABM/src/main.cpp" \
+    '(beta_hv|beta_vh|human_incubation_days|human_infectious_days|immunity_duration_days|initial_human_prevalence|initial_vector_infected_frac|transmission_focus_threshold)[[:space:]]*=[[:space:]]*[0-9]' \
+    'CLI model-value defaults (same line)'
+check_absent "$T07_ABM/src/main.cpp" \
+    'resolution_m[[:space:]]*=[[:space:]]*[0-9]+[[:space:]]*;' \
+    'CLI AOI resolution literal'
+# Multiline assignment: "name =" at EOL followed by a numeric literal.
+# grep is line-based, so awk covers the split form the reviewer proved.
+_hits=$(awk '
+  /(beta_hv|beta_vh|human_incubation_days|human_infectious_days|immunity_duration_days|initial_human_prevalence|initial_vector_infected_frac|transmission_focus_threshold|resolution_m)[[:space:]]*=[[:space:]]*$/ {pend=NR}
+  pend && NR>pend && NR<=pend+2 && /^[[:space:]]*-?[0-9]/ {print FILENAME":"pend"-"NR": multiline literal"; pend=0}
+' "$T07_ABM/src/main.cpp" 2>/dev/null || true)
+[ -n "$_hits" ] && { echo "HIT [CLI model-value defaults (multiline)]:"; echo "$_hits" | head -4; fail=1; }
+# Numeric ->default_val(...) inside a transmission value option block.
+# The option name may sit on the line after `add_option(` (reviewer-proved
+# P2 gap): remember the opening line and look ahead two lines.
+_hits=$(awk '
+  /->[[:space:]]*add_option\(/ {
+    if ($0 ~ /--(beta-hv|beta-vh|human-incubation-days|human-infectious-days|immunity-duration-days|initial-human-prevalence|initial-vector-infected-frac|transmission-focus-threshold)/) {flag=1}
+    else {flag=0; pend=NR}
+    next
+  }
+  pend && NR<=pend+2 && /--(beta-hv|beta-vh|human-incubation-days|human-infectious-days|immunity-duration-days|initial-human-prevalence|initial-vector-infected-frac|transmission-focus-threshold)/ {flag=1; pend=0}
+  flag && /default_val\([[:space:]]*-?[0-9]/ {print FILENAME":"NR": "$0}
+' "$T07_ABM/src/main.cpp" 2>/dev/null || true)
+[ -n "$_hits" ] && { echo "HIT [CLI numeric default_val on transmission option]:"; echo "$_hits" | head -4; fail=1; }
+# Python CLI must not pin transmission model values either (C1 entrypoint).
+check_absent "mal-core/src/mal_core/cli.py" \
+    '(beta_hv|beta_vh|human_incubation_days|human_infectious_days|immunity_duration_days|initial_human_prevalence|initial_vector_infected_frac)[[:space:]]*:[[:space:]]*(float|int)[[:space:]]*=[[:space:]]*typer\.Option\([[:space:]]*[0-9]' \
+    'Python CLI transmission defaults'
+# Python scoring twin of capacity.persistent_availability (C8).
+check_absent "mal-core/src/mal_core/habitat/capacity.py" \
+    'else[[:space:]]*1\.0([^0-9]|$)' \
+    'persistent availability literal'
+# ingest.valid_count_epsilon must stay consumed.
+check_absent "mal-commonlib/src/mal_commonlib/data/loaders/dynamic_world.py" \
+    'valid_count,[[:space:]]*1e-9' \
+    'valid_count epsilon literal'
+# NoData sentinels in the low-level loaders come from ingest.nodata_sentinel.
+for _f in host_utils.py loaders/era5.py loaders/chirps.py loaders/modis.py \
+          loaders/ghsl.py loaders/glw.py loaders/jrc_gsw.py loaders/coastline.py \
+          loaders/smap.py loaders/worldpop.py loaders/wildlife.py \
+          loaders/buildings.py; do
+    _hits=$(grep -nE '=[[:space:]]*-9999|\(-9999|==[[:space:]]*-9999|nodata"[[:space:]]*:[[:space:]]*-9999|np\.full\([^)]*-9999' \
+        "mal-commonlib/src/mal_commonlib/data/$_f" 2>/dev/null \
+        | grep -vE '^[0-9]+:[[:space:]]*#' || true)
+    [ -n "$_hits" ] && { echo "HIT [NoData literal in $_f]:"; echo "$_hits" | head -4; fail=1; }
+done
+check_absent "$T07_ABM/include/mal_abm_fast/wire.hpp" \
+    'resolution_m[[:space:]]*=[[:space:]]*[0-9]+[[:space:]]*;|-9999' \
+    'wire resolution/nodata literals'
+check_absent "$T07_ABM/include/mal_abm_fast/host_seeking.hpp" \
+    '(range_m|step_size_m)[[:space:]]*=[[:space:]]*[0-9]' \
+    'host-seeking header default args'
+check_absent "$T07_ABM/include/mal_abm_fast/oviposition_seeking.hpp" \
+    '(range_m|step_size_m|radius_m)[[:space:]]*=[[:space:]]*[0-9]' \
+    'oviposition header default args'
+check_absent "$T07_ABM/src/aquatic_cohort_bank.cpp" \
+    'from_instar[[:space:]]*<[[:space:]]*4' \
+    'last_larval_instar literal'
+check_absent "$T07_ABM/include/mal_abm_fast/habitat_availability.hpp" \
+    'persistent_zone\[g\][[:space:]]*\?[[:space:]]*1\.0f' \
+    'persistent availability literal'
+check_absent "$T07_ABM/src/mosquito_submodel.cpp" \
+    'p_batch[[:space:]]*=[[:space:]]*0\.5' \
+    'egg-batch probability literal'
 hits=$(grep -nE -- '-9999' \
     mal-commonlib/src/mal_commonlib/data/loaders/dynamic_world.py \
     mal-core/src/mal_core/prediction/predictor.py 2>/dev/null || true)

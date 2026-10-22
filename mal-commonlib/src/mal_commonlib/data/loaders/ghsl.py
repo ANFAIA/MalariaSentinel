@@ -49,6 +49,11 @@ import xarray as xr
 from rasterio.transform import from_bounds
 from rasterio.warp import Resampling
 
+from mal_commonlib.model_constants import model_constant
+
+_NODATA = float(model_constant("ingest", "nodata_sentinel"))
+_NODATA_INT = int(model_constant("ingest", "nodata_sentinel_int"))
+
 if TYPE_CHECKING:
     from mal_commonlib.aoi import AOI
 
@@ -182,14 +187,14 @@ def _read_clip(aoi: AOI, tif_path: pathlib.Path) -> xr.DataArray:
         win_transform = src.window_transform(win)
         nodata = src.nodata
 
-    sentinel = nodata if nodata is not None else -9999.0
+    sentinel = nodata if nodata is not None else _NODATA
     arr_i = np.asarray(arr, dtype=np.int32)
     if nodata is not None:
-        arr_i = np.where(arr == nodata, -9999, arr_i)
+        arr_i = np.where(arr == nodata, _NODATA_INT, arr_i)
 
     h, w_cells = aoi.cells_per_side()
     dst_transform = from_bounds(*aoi.bbox, w_cells, h)
-    out_f = np.full((h, w_cells), -9999.0, dtype=np.float32)
+    out_f = np.full((h, w_cells), _NODATA, dtype=np.float32)
 
     rio_reproject(
         source=arr_i.astype(np.float32),
@@ -210,14 +215,14 @@ def _read_clip(aoi: AOI, tif_path: pathlib.Path) -> xr.DataArray:
             "long_name": "GHS-SMOD settlement classification",
             "units": "class code (30=urban, 50=rural, 20=water)",
             "source": "GHS-SMOD E2030 R2023A (JRC FTP)",
-            "nodata": -9999,
+            "nodata": _NODATA_INT,
             "urban_class": GHSL_URBAN,
             "rural_class": GHSL_RURAL,
         },
     )
     da.rio.write_crs(aoi.crs_obj, inplace=True)
     da.rio.write_transform(dst_transform, inplace=True)
-    da.rio.write_nodata(-9999, inplace=True)
+    da.rio.write_nodata(_NODATA_INT, inplace=True)
     return da
 
 

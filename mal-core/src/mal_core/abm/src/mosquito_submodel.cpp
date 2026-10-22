@@ -704,7 +704,9 @@ void MosquitoSubmodel::advance_day(const AOI& aoi,
             // that drives Lardeux survival. Cold (16°C) and hot (34°C)
             // extremes zero the batch; at 25°C the draw is unchanged.
             // NaN temp (patch absent from today's states) → no modifier.
-            double p_batch = 0.5;
+            double p_batch =
+                static_cast<double>(gonotrophic_params_.egg_batch_mean) /
+                static_cast<double>(gonotrophic_params_.egg_batch_n);
             const float t_ovip = seeding_temp_d(patch_states,
                                                 soa_.row[si], soa_.col[si]);
             if (!std::isnan(static_cast<double>(t_ovip))) {

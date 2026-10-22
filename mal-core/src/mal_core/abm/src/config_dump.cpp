@@ -177,7 +177,6 @@ int main(int argc, char** argv) {
         out["host_seeking.approach_step_m"] =
             cfg.host_seeking.approach_step_m;
         out["oviposition.scale_m"] = cfg.oviposition.scale_m;
-        out["oviposition.radius_m"] = cfg.oviposition.radius_m;
         out["oviposition.detect_range_m"] = cfg.oviposition.detect_range_m;
         out["oviposition.step_m"] = cfg.oviposition.step_m;
         out["oviposition.min_attraction"] = cfg.oviposition.min_attraction;

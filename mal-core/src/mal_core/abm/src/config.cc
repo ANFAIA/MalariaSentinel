@@ -808,8 +808,6 @@ ModelConfig parse_config_file(const std::string& path) {
     const YNode* ov = L.section(&root, "oviposition");
     cfg.oviposition.scale_m = L.num(L.key(ov, "oviposition", "scale_m"),
                                     "oviposition.scale_m");
-    cfg.oviposition.radius_m = L.num(L.key(ov, "oviposition", "radius_m"),
-                                     "oviposition.radius_m");
     cfg.oviposition.detect_range_m = L.num(
         L.key(ov, "oviposition", "detect_range_m"),
         "oviposition.detect_range_m");

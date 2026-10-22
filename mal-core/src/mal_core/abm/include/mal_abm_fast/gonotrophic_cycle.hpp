@@ -55,7 +55,7 @@ struct GonotrophicParams {
     float cycle_duration_days;    // post-first-cycle egg maturation
     float first_cycle_days;       // first-cycle egg maturation
     float feeding_success_rate;   // PROBING -> BLOOD_FED
-    int32_t egg_batch_mean;       // binomial(n, 0.5) mean
+    int32_t egg_batch_mean;       // binomial(n, p) mean, p = mean/n
     int32_t egg_batch_n;          // trials for the egg-batch draw
     int32_t egg_batch_min;
     int32_t egg_batch_max;

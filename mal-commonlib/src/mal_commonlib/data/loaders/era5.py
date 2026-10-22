@@ -45,9 +45,10 @@ import rioxarray  # noqa: F401 — registers the .rio accessor
 import xarray as xr
 
 from mal_commonlib.aoi import AOI
+from mal_commonlib.model_constants import model_constant
 
 
-ERA5_NODATA: float = -9999.0
+ERA5_NODATA: float = float(model_constant("ingest", "nodata_sentinel"))
 ERA5_DATASET: str = "derived-era5-land-daily-statistics"
 ERA5_VARIABLE: str = "2m_temperature"
 ERA5_DAILY_STATISTIC: str = "daily_mean"  # daily mean; daily °C contract

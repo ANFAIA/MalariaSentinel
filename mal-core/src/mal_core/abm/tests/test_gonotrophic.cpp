@@ -21,6 +21,7 @@
 
 #include "aoi.hpp"
 #include "wire.hpp"
+#include "config.hpp"
 #include "gonotrophic_cycle.hpp"
 #include "bite_ledger.hpp"
 #include "multirate_scheduler.hpp"
@@ -108,15 +109,23 @@ TEST(GonotrophicState, EnumValues) {
 // ---------------------------------------------------------------------------
 
 TEST(GonotrophicParams, DefaultValues) {
+    // task-01 B8: the default constructor reads gonotrophic: from
+    // model_constants.yaml — assert the binding, never a copied literal.
+    const auto cfg = mal_abm_fast::parse_config_file(
+        mal_abm_fast::resolve_config_path());
     mal_abm_fast::GonotrophicParams p;
-    EXPECT_FLOAT_EQ(p.cycle_duration_days, 2.65f);
-    EXPECT_FLOAT_EQ(p.first_cycle_days, 4.0f);
-    EXPECT_FLOAT_EQ(p.feeding_success_rate, 0.825f);
-    EXPECT_EQ(p.egg_batch_mean, 120);
-    EXPECT_EQ(p.egg_batch_n, 240);
-    EXPECT_EQ(p.egg_batch_min, 30);
-    EXPECT_EQ(p.egg_batch_max, 170);
-    EXPECT_FLOAT_EQ(p.resting_duration_days, 1.0f);
+    EXPECT_FLOAT_EQ(p.cycle_duration_days,
+                    static_cast<float>(cfg.gonotrophic.cycle_duration_days));
+    EXPECT_FLOAT_EQ(p.first_cycle_days,
+                    static_cast<float>(cfg.gonotrophic.first_cycle_days));
+    EXPECT_FLOAT_EQ(p.feeding_success_rate,
+                    static_cast<float>(cfg.gonotrophic.feeding_success_rate));
+    EXPECT_EQ(p.egg_batch_mean, cfg.gonotrophic.egg_batch_mean);
+    EXPECT_EQ(p.egg_batch_n, cfg.gonotrophic.egg_batch_n);
+    EXPECT_EQ(p.egg_batch_min, cfg.gonotrophic.egg_batch_min);
+    EXPECT_EQ(p.egg_batch_max, cfg.gonotrophic.egg_batch_max);
+    EXPECT_FLOAT_EQ(p.resting_duration_days,
+                    static_cast<float>(cfg.gonotrophic.resting_duration_days));
 }
 
 // ---------------------------------------------------------------------------
@@ -169,34 +178,40 @@ TEST(GonotrophicCycle, RestingToEggMaturing) {
     EXPECT_FALSE(wants);
 }
 
-TEST(GonotrophicCycle, FirstCycleEggMaturationTakesFourDays) {
+TEST(GonotrophicCycle, FirstCycleEggMaturationTakesFirstCycleDaysRoundedUp) {
     auto state = mal_abm_fast::GonotrophicState::EGG_MATURING;
     int32_t timer = 0;
     int32_t cycles = 0;  // first cycle
     mal_abm_fast::GonotrophicParams params;
-    // First cycle uses first_cycle_days (4.0) rounded up to 4 days.
-    for (int d = 0; d < 3; ++d) {
+    // First cycle uses first_cycle_days from the YAML, rounded up.
+    const int expected_days = static_cast<int>(
+        std::ceil(static_cast<double>(params.first_cycle_days)));
+    ASSERT_GE(expected_days, 1);
+    for (int d = 0; d < expected_days - 1; ++d) {
         mal_abm_fast::advance_gonotrophic_one_day(state, timer, cycles, params);
         EXPECT_EQ(state, mal_abm_fast::GonotrophicState::EGG_MATURING);
         EXPECT_EQ(cycles, 0);
     }
-    // Day 4: timer reaches 4, should transition to GRAVID.
+    // Last day: timer reaches expected_days → GRAVID.
     mal_abm_fast::advance_gonotrophic_one_day(state, timer, cycles, params);
     EXPECT_EQ(state, mal_abm_fast::GonotrophicState::GRAVID);
     EXPECT_EQ(cycles, 1);
 }
 
-TEST(GonotrophicCycle, SubsequentCycleEggMaturationTakesThreeDays) {
+TEST(GonotrophicCycle, SubsequentCycleEggMaturationTakesCycleDurationRoundedUp) {
     auto state = mal_abm_fast::GonotrophicState::EGG_MATURING;
     int32_t timer = 0;
     int32_t cycles = 1;  // a later cycle
     mal_abm_fast::GonotrophicParams params;
-    // Subsequent cycles use cycle_duration_days (2.65) rounded up to 3 days.
-    for (int d = 0; d < 2; ++d) {
+    // Subsequent cycles use cycle_duration_days from the YAML, rounded up.
+    const int expected_days = static_cast<int>(
+        std::ceil(static_cast<double>(params.cycle_duration_days)));
+    ASSERT_GE(expected_days, 1);
+    for (int d = 0; d < expected_days - 1; ++d) {
         mal_abm_fast::advance_gonotrophic_one_day(state, timer, cycles, params);
         EXPECT_EQ(state, mal_abm_fast::GonotrophicState::EGG_MATURING);
     }
-    // Day 3: timer reaches 3, should transition to GRAVID.
+    // Last day: timer reaches expected_days → GRAVID.
     mal_abm_fast::advance_gonotrophic_one_day(state, timer, cycles, params);
     EXPECT_EQ(state, mal_abm_fast::GonotrophicState::GRAVID);
     EXPECT_EQ(cycles, 2);

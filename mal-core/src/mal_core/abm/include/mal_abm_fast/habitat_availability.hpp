@@ -153,8 +153,9 @@ inline std::array<float, kNumZoneId> default_species_weights() {
 // -- the day formula ----------------------------------------------------------
 
 /// Static sum_k w[g] * H[*, g] * A[*, k] accuracy: persistent habitats ride
-/// at availability 1 in the MVP (A = 1 whenever their potential > 0);
-/// pluvial habitats use the rain-driven z. No path takes S above 1.
+/// at capacity.persistent_availability (A = that constant whenever their
+/// potential > 0); pluvial habitats use the rain-driven z. No path takes
+/// S above 1.
 inline float species_accuracy(const std::array<float, kNumZoneId>& h,
                               const std::array<float, kNumZoneId>& w,
                               float z_pluvial) {
@@ -165,7 +166,10 @@ inline float species_accuracy(const std::array<float, kNumZoneId>& h,
     for (size_t g = 0; g < kNumZoneId; ++g) {
         if (w[g] <= 0.0f || h[g] <= 0.0f) continue;
         const float availability =
-            persistent_zone[g] ? 1.0f : std::clamp(z_pluvial, 0.0f, 1.0f);
+            persistent_zone[g]
+                ? static_cast<float>(
+                      load_config().capacity.persistent_availability)
+                : std::clamp(z_pluvial, 0.0f, 1.0f);
         s += w[g] * h[g] * availability;
     }
     return std::clamp(s, 0.0f, 1.0f);

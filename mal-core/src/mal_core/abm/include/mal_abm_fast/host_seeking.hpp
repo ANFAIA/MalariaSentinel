@@ -59,13 +59,24 @@ struct HostAttraction {
 };
 
 /// Anthropophilic / zoophilic weights for An. gambiae s.s.
-/// Defaults: Takken et al. 1998, continuous choice experiments.
+/// Values come from species.<default_species>.pref in
+/// model_constants.yaml; set_species_params() rebuilds them per species.
 struct HostPreference {
-    float human    = 0.99f;
-    float cattle   = 0.005f;
-    float goat     = 0.003f;
-    float sheep    = 0.001f;
-    float wildlife = 0.001f;
+    float human    = static_cast<float>(
+        load_config().species.rows.at(
+            load_config().species.default_species).pref[0]);
+    float cattle   = static_cast<float>(
+        load_config().species.rows.at(
+            load_config().species.default_species).pref[1]);
+    float goat     = static_cast<float>(
+        load_config().species.rows.at(
+            load_config().species.default_species).pref[2]);
+    float sheep    = static_cast<float>(
+        load_config().species.rows.at(
+            load_config().species.default_species).pref[3]);
+    float wildlife = static_cast<float>(
+        load_config().species.rows.at(
+            load_config().species.default_species).pref[4]);
 };
 
 /// Spatial host-seeking model.
@@ -86,8 +97,11 @@ public:
     ///
     /// `search_radius_m` defaults to a -1.0f sentinel: when species
     /// params are set (set_species_params) the species
-    /// `host_seeking_radius_m` is used; otherwise 300m
-    /// (species.host_seeking_radius_m).  Any positive value overrides both.
+    /// `host_seeking_radius_m` is used; otherwise the default species
+    /// row's `host_seeking_radius_m` from model_constants.yaml.  Any
+    /// positive value overrides both.  This attraction-field radius is a
+    /// different concept from host_seeking.detect_range_m (the engine
+    /// detection window passed to detect_host_cell).
     std::vector<HostAttraction> compute_attraction(
         int32_t mosquito_row, int32_t mosquito_col,
         const HostLandscape& landscape,
@@ -126,7 +140,7 @@ public:
         int32_t mosquito_row, int32_t mosquito_col,
         int32_t target_row, int32_t target_col,
         const AOI& aoi,
-        float step_size_m = 50.0f) const;
+        float step_size_m) const;
 
     /// Mutable access to host preference weights.
     HostPreference& preference() { return pref_; }
@@ -140,21 +154,21 @@ public:
         int32_t mosquito_row, int32_t mosquito_col,
         const HostLandscape& landscape,
         const AOI& aoi,
-        double range_m = 2000.0) const;
+        double range_m) const;
 
     /// One directed movement step toward the strongest detected host
     /// cell (Fase 3: "movimiento dirigido del mosquito", no external
-    /// Plan D dependency).  Reuses detect_host_cell (range 2000m) and
-    /// approach_vector (step_size_m, default 50m): if a host cell is
-    /// detected, returns the new (row, col) after one step (rounded to
-    /// the nearest cell, clamped to the grid); else nullopt.  Pure
+    /// Plan D dependency).  Reuses detect_host_cell (range configured by
+    /// host_seeking.detect_range_m) and approach_vector: if a host cell
+    /// is detected, returns the new (row, col) after one step (rounded
+    /// to the nearest cell, clamped to the grid); else nullopt.  Pure
     /// function — the integration calls it once per phase for
     /// HOST_SEEKING mosquitoes within detection range.
     std::optional<std::pair<int32_t, int32_t>> step_toward_host(
         int32_t row, int32_t col,
         const HostLandscape& eff_landscape,
         const AOI& aoi,
-        float step_size_m = 50.0f) const;
+        float step_size_m) const;
 
 private:
     HostPreference pref_;

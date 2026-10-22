@@ -191,7 +191,6 @@ struct HostSeekingCfg {
 
 struct OvipositionCfg {
     double scale_m = 0.0;
-    double radius_m = 0.0;
     double detect_range_m = 0.0;
     double step_m = 0.0;
     double min_attraction = 0.0;

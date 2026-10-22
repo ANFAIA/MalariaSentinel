@@ -69,7 +69,8 @@ def species_accuracy(
         weight = float(w.get(g, 0.0))
         if weight <= 0.0:
             continue
-        avail = z_pluvial if g in _PLUVIAL_TYPES else 1.0
+        avail = (z_pluvial if g in _PLUVIAL_TYPES
+                 else float(CONFIG["capacity"]["persistent_availability"]))
         c = np.asarray(val, dtype=np.float64)
         acc += weight * c * avail
     return np.clip(acc, 0.0, 1.0)

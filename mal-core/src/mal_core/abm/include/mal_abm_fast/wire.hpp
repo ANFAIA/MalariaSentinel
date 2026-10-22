@@ -41,7 +41,6 @@ inline double WIND_SURVIVAL() { return static_cast<double>(load_config().dispers
 inline double WIND_FLIGHT_SPEED_MS() { return static_cast<double>(load_config().dispersal.wind_self_speed_ms); }
 inline int HOST_SEEKING_STARVATION_DAYS() { return static_cast<int>(load_config().host_seeking.starvation_days); }
 inline double OVIPOSITION_SCALE_M() { return static_cast<double>(load_config().oviposition.scale_m); }
-inline double OVIPOSITION_RADIUS_M() { return static_cast<double>(load_config().oviposition.radius_m); }
 inline double OVIPOSITION_SEEKING_TIMEOUT_DAYS() { return static_cast<double>(load_config().oviposition.timeout_days); }
 inline double LARVA_BH_S0() { return static_cast<double>(load_config().aquatic_stages.larva_bh_s0); }
 inline double LARVA_BH_ALPHA() { return static_cast<double>(load_config().aquatic_stages.larva_bh_alpha); }
@@ -93,12 +92,13 @@ inline std::string CONTRACT_VERSION() { return load_config().contracts.cogs_stat
 // when habitats within 300m of houses are eliminated).
 
 // Oviposition-seeking plume parameters (Plan D).
-// Water-vapour + VOC plume: kScale=50m (Okal 2013), radius=500m
-// (Okal 2013, Lindh 2015: 9+m semi-field scaled up).
+// Water-vapour + VOC plume: kScale from oviposition.scale_m (Okal 2013);
+// the detection window comes from oviposition.detect_range_m at the caller.
 
 // Egg batch size is temperature-scaled at oviposition time via the EFD
 // thermal modifier (birth_rate.hpp, Mordecai 2013): the binomial draw of
-// GonotrophicParams::egg_batch_n trials uses p = 0.5 × birth_rate_modifier(T),
+// GonotrophicParams::egg_batch_n trials uses
+// p = (egg_batch_mean / egg_batch_n) × birth_rate_modifier(T),
 // with T the same per-patch temp_d that drives Lardeux adult survival.
 // The legacy per-adult-per-day constant BIRTH_FECUNDITY (0.25) was removed
 // on 2026-10-13 as dead code: the constant per-day birth path it

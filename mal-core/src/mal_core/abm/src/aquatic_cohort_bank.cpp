@@ -391,7 +391,8 @@ void AquaticCohortBank::promote_stages(
         if (p.from_stage == AquaticStage::EGG) {
             next_stage = AquaticStage::LARVA;
             next_instar = 1;
-        } else if (p.from_instar < 4) {
+        } else if (p.from_instar < static_cast<uint8_t>(
+                       load_config().aquatic_stages.last_larval_instar)) {
             next_stage = AquaticStage::LARVA;
             next_instar = static_cast<uint8_t>(p.from_instar + 1);
         } else {

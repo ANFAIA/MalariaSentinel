@@ -109,6 +109,7 @@ MIN_YEAR: int = 2015  # DW record starts 2015-06-27
 # (read-only accessor; validation lives in mal-core, R2).
 NODATA_OUT = float(model_constant("ingest", "nodata_sentinel"))
 NODATA_OUT_INT = int(model_constant("ingest", "nodata_sentinel_int"))
+VALID_COUNT_EPSILON = float(model_constant("ingest", "valid_count_epsilon"))
 
 ATTRIBUTION = (
     "Dynamic World V1 (Brown et al. 2022, doi:10.1038/s41597-022-01307-4) "
@@ -322,7 +323,7 @@ def _year_fraction_planes(
             acc = acc + class_sums[class_code]
         frac = np.where(
             valid_count > 0,
-            acc / np.maximum(valid_count, 1e-9),
+            acc / np.maximum(valid_count, VALID_COUNT_EPSILON),
             NODATA_OUT,
         ).astype(np.float32)
         frac = np.clip(np.where(frac == NODATA_OUT, frac, frac.clip(0.0, 1.0)),

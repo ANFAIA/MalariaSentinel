@@ -10,15 +10,17 @@
 //   A_j = twi_value_j × water_frac_j × exp(-dist_j / scale)
 //
 // where:
-//   scale = 50m (water-vapour plume decay, Okal 2013)
+//   scale = oviposition.scale_m (water-vapour plume decay, Okal 2013)
 //   twi_value = static Topographic Wetness Index from HabitatPatch
 //   water_frac = dynamic open-water fraction from PatchState
+//
+// The search radius is not stored here: every caller passes the engine
+// detection window (oviposition.detect_range_m) explicitly.
 //
 // Biological basis:
 //   - Water vapour: ≥5m detection (Okal 2013 semi-field)
 //   - Cedrol/VOCs: 9+m attraction (Lindh 2015 semi-field)
 //   - Visual cues: polarised light from water surfaces
-//   - 500m search radius: scaled from semi-field to landscape
 #pragma once
 
 #include <cstdint>
@@ -48,37 +50,42 @@ struct BreedingAttraction {
 ///
 /// Typical usage (called from the nightly oviposition loop):
 /// ```cpp
-/// OvipositionSeekingModel model(50.0, 500.0);
-/// auto target = model.detect_breeding_cell(row, col, hab, patch_states, aoi, 2000.0);
+/// OvipositionSeekingModel model;   // scale from model_constants.yaml
+/// auto target = model.detect_breeding_cell(
+///     row, col, hab, patch_states, aoi,
+///     load_config().oviposition.detect_range_m);
 /// if (target) {
-///     auto [dr, dc] = model.step_toward(row, col, target->first, target->second, aoi);
+///     auto [dr, dc] = model.step_toward(
+///         row, col, target->first, target->second, aoi,
+///         load_config().oviposition.step_m);
 /// }
 /// ```
 class OvipositionSeekingModel {
 public:
     explicit OvipositionSeekingModel(
-        double scale_m = OVIPOSITION_SCALE_M(),
-        double radius_m = OVIPOSITION_RADIUS_M());
+        double scale_m = OVIPOSITION_SCALE_M());
 
     /// Compute attraction field for patches within `search_radius_m`
     /// of the mosquito at (row, col). Uses HabitatPatch TWI and
-    /// PatchState water_frac for each activated patch.
+    /// PatchState water_frac for each activated patch. The radius is
+    /// mandatory: it comes from oviposition.detect_range_m at the call
+    /// site (no compiled fallback).
     std::vector<BreedingAttraction> compute_attraction(
         int32_t row, int32_t col,
         const HabitatEngine& hab,
         const std::vector<PatchState>& patch_states,
         const AOI& aoi,
-        float search_radius_m = -1.0f) const;
+        float search_radius_m) const;
 
     /// Detect the best breeding site within `range_m`.
     /// Returns the (row, col) of the patch with highest attraction
-    /// where attraction > 0.3, or nullopt if no site found.
+    /// where attraction > oviposition.min_attraction, or nullopt.
     std::optional<std::pair<int32_t, int32_t>> detect_breeding_cell(
         int32_t row, int32_t col,
         const HabitatEngine& hab,
         const std::vector<PatchState>& patch_states,
         const AOI& aoi,
-        double range_m = 2000.0) const;
+        double range_m) const;
 
     /// Compute one step toward a target breeding site.
     /// Returns (new_row, new_col) in grid units, clamped to step_size_m.
@@ -86,11 +93,10 @@ public:
         int32_t from_row, int32_t from_col,
         int32_t target_row, int32_t target_col,
         const AOI& aoi,
-        float step_size_m = 50.0f) const;
+        float step_size_m) const;
 
 private:
     double scale_m_;
-    double radius_m_;
 };
 
 }  // namespace mal_abm_fast

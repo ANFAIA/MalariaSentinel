@@ -25,6 +25,21 @@ def test_wrapper_resolve_binary_not_found(tmp_path):
         mod.__file__ = original_file
 
 
+def test_wrapper_omits_none_flags():
+    """None means "not specified": never forward a flag, let the C++ read YAML."""
+    wrapper = CppAbmWrapper.__new__(CppAbmWrapper)
+    wrapper.binary = Path("/fake/binary")
+    wrapper._flags_schema = {"aoi": {"type": str}, "beta_vh": {"type": float}}
+
+    with patch("mal_core.abm.wrapper.subprocess.run") as mock_run:
+        mock_run.return_value = MagicMock(stdout="", stderr="", returncode=0)
+        wrapper.run(aoi="ghana", beta_hv=None, beta_vh=0.5)
+
+    cmd = mock_run.call_args[0][0]
+    assert "--beta-hv" not in cmd
+    assert cmd[cmd.index("--beta-vh") + 1] == "0.5"
+
+
 def test_wrapper_run_builds_command():
     """Test that run() builds the correct CLI command."""
     mock_binary = Path("/fake/binary")

@@ -50,14 +50,15 @@ from rasterio.transform import from_bounds
 from rasterio.warp import Resampling
 
 from mal_commonlib.aoi import AOI
+from mal_commonlib.model_constants import model_constant
 
 # MOD13A3 fill value: -3000 in the raw int16 SDS. The original code assumed 0
 # (which was a bug — 0 is a valid NDVI value). Fill cells are caught by the
 # downstream ``arr < -0.2`` check in ``_rescale_ndvi`` because -3000 × 0.0001
 # = -0.3 < -0.2. We still keep the explicit constant for documentation.
 _FILL_RAW = -3000
-_NODATA_OUT = np.float32(-9999.0)
-_NODATA_OUT_SCALAR = -9999.0
+_NODATA_OUT = np.float32(model_constant("ingest", "nodata_sentinel"))
+_NODATA_OUT_SCALAR = float(model_constant("ingest", "nodata_sentinel"))
 
 # MODIS sinusoidal sphere radius (m). Used to convert the file's
 # UpperLeftPointMtrs / LowerRightMtrs (in metres on the sinusoidal grid) to

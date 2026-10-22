@@ -8,12 +8,15 @@
 //
 // Formula (EPSG:4326, M1.5 thin slice):
 //   centroid_lat_rad  = ((north + south) / 2) * pi / 180
-//   width_m           = (east - west) * 111194.9 * cos(centroid_lat_rad)
+//   width_m           = (east - west) * kMetresPerDegLat() * cos(centroid_lat_rad)
 //   cells_per_side    = round(width_m / resolution_m)         (W)
 //
 // Height is computed the same way without the cos factor:
-//   height_m          = (north - south) * 111194.9
+//   height_m          = (north - south) * kMetresPerDegLat()
 //   H                 = round(height_m / resolution_m)
+//
+// kMetresPerDegLat() comes from geodesy.metres_per_deg_lat in
+// model_constants.yaml (pi * earth_radius_m / 180, validated there).
 //
 // Both directions are clamped to a minimum of 1 cell so the resulting
 // grid is always at least 1x1.

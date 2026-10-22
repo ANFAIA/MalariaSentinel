@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: MIT
 // oviposition_seeking.cpp — Spatial oviposition-site-seeking kernel implementation.
 //
-// The attraction kernel uses an exponential distance decay with
-// water-vapour scale (50m) and multiplies by the candidate patch's
+// The attraction kernel uses an exponential distance decay with the
+// water-vapour scale from model_constants.yaml (oviposition.scale_m)
+// and multiplies by the candidate patch's
 // static habitat potential (contract v3.0: TWI and water_frac retired;
 // plan §6). Attraction = potential × decay.
 
@@ -20,8 +21,8 @@
 
 namespace mal_abm_fast {
 
-OvipositionSeekingModel::OvipositionSeekingModel(double scale_m, double radius_m)
-    : scale_m_(scale_m), radius_m_(radius_m) {}
+OvipositionSeekingModel::OvipositionSeekingModel(double scale_m)
+    : scale_m_(scale_m) {}
 
 std::vector<BreedingAttraction> OvipositionSeekingModel::compute_attraction(
     int32_t row, int32_t col,
@@ -31,10 +32,6 @@ std::vector<BreedingAttraction> OvipositionSeekingModel::compute_attraction(
     float search_radius_m) const
 {
     std::vector<BreedingAttraction> result;
-
-    if (search_radius_m < 0.0f) {
-        search_radius_m = static_cast<float>(radius_m_);
-    }
 
     const float cell_size_m = static_cast<float>(aoi.resolution_m);
 

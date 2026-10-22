@@ -1,46 +1,54 @@
 ---
-title: Constantes físicas · wire.hpp
-tags: [abm, cpp, constantes, paridad]
+title: Constantes físicas · model_constants.yaml
+tags: [abm, cpp, constantes, paridad, yaml]
 tier: contract
-file: "mal-core/src/mal_core/abm/include/mal_abm_fast/wire.hpp"
+file: "mal-core/config/model_constants.yaml"
 ---
 up:: [[00-INDEX]]
 
-# 31 · Constantes — paridad Python ↔ C++
+# 31 · Constantes — fuente única YAML
 
-**Rol.** Valores `inline constexpr` con cita de paper en comentario. **Regla de oro**: deben matchear los defaults Python exactos (los tests lo verifican).
+**Rol.** `mal-core/config/model_constants.yaml` es la ÚNICA fuente de parámetros
+de modelo (py ⇄ C++), con la unidad y la cita de paper en el comentario de cada
+clave. El código no declara valores de modelo: los loaders (`load_config()` en
+C++, `mal_core.habitat.config.CONFIG` en py) los leen del YAML.
 
-## Catalogo
+## Fuente y validación
 
-| Constante | Valor | Fuente | Usada en |
-|---|---|---|---|
-| `K_MAX` | max larvas por celda-cap | coherencia con coordinator aggregate + divergence cap | [[22-coordinator]] [[23-mosquito-submodel]] |
-| `EIP_THRESHOLD_GD` | 110 growing-degree-days (base 16°C) | EIP modelo GDD | [[27-transmission]] · ctor detection seeding (adultos listos día 1) |
-| dispersal σ | 450 m | Costantini 1996 | [[23-mosquito-submodel]] adult_dispersal · [[25-host-seeking]] scale_m_ |
-| mortalidad Lardeux | basal 0.93/day σ=15 | Lardeux 2008 | adult_mortality · thermal_responses (lardeux_p_d) |
-| fecundidad | 0.25 ratio | Akuoko 2024 | [[24-aquatic-cohort-bank]] add_eggs |
-| `HOST_SEEKING_STARVATION_DAYS` | 7 | Plan D thirst | submodelo (mata hambre) |
-| `OVIPOSITION_SEEKING_TIMEOUT_DAYS` | 7 | Plan D skip | [[26-oviposition-seeking]] |
-| `POOL_WATER_BREED_MM` | umbral W activo | M14 pool_hydrology | [[22-coordinator]] activate_patches |
-| `POOL_WATER_DRY_MM` | umbral seco → desiccation | M14 | cohort bank |
-| `POOL_RAIN_WASH_MM` | washout flush | M14 | cohort bank washout |
-| `URBAN_B_MIN` / `URBAN_R_MIN_MM` / TWI_MIN / DENSITY_CAP | reglas urbanas de charcos | M14 | coordinator setters urban_* |
-| `TWI_THRESHOLD` | 8 | regex humedales DEM | [[22-coordinator]] |
-| `POOL_CATCHMENT_*` | runoff factor | Bomblies 2008 HYDREMATS | pool DailyForcing |
-| `gonotrophic_days` | 2.0f (resting 0.5d) | paridad M7.4.1 (⚠️ 5 ctest legacy fallan por esto — expected) | gonotrophic_cycle |
+| Pieza | Ruta | Rol |
+|---|---|---|
+| Valores | `mal-core/config/model_constants.yaml` | fuente única; una sección por dominio |
+| Historial | `mal-core/config/model_constants-CHANGELOG.md` | altas/cambios de claves y su motivo |
+| Validador (py) | `mal-core/src/mal_core/config_validation.py` | pydantic v2, `extra="forbid"`, sin defaults; invariantes e impresión de claves faltantes |
+| Acceso C++ | `mal-core/src/mal_core/abm/include/mal_abm_fast/wire.hpp` | accesores `inline` que leen `load_config()` (p.ej. `EIP_THRESHOLD_GD()`, `kMetresPerDegLat()`); no son constantes compiladas |
+| Acceso py | `mal-core/src/mal_core/habitat/config.py` | singleton `CONFIG` validado |
+| Guard mecánico | `tools/check_no_constants.sh` | falla si un valor migrado reaparece como literal |
 
-## Regla de oro paridad
+## Secciones del YAML (sin duplicar valores aquí)
 
-```mermaid
-flowchart LR
-  PY["YAML/py defaults"] <-->|"debe matchear EXACTO"| CPP["wire.hpp inline constexpr"]
-  CPP --> U1["M23 submodel"]
-  CPP --> U2["M22 coordinator"]
-  CPP --> U3["M27 transmission"]
-  PY --> T["test de paridad (pytest)"]
-  CPP --> T2["ctest de constantes"]
-```
+- `version` / `contracts` — versionado del fichero y contratos `env_nc` / `cogs_state`.
+- `habitat_types` — tipos de hábitat y su dinámica (persistent/pluvial).
+- `habitat` / `pluvial` / `aquatic_stress` / `urban` — umbrales y respuestas temporales.
+- `species` — filas por especie: pesos por hábitat, `activity_weights`, `pref`,
+  salinidad y kernels de host-seeking. `k_ref` es única para el motor.
+- `capacity` — disponibilidad persistente y escala Beverton-Holt.
+- `ingest` — sentinelas NoData y resolución de ingest (espejo py⇄C++).
+- `geodesy` — `earth_radius_m` y `metres_per_deg_lat` (el validador comprueba
+  la relación exacta π·R/180).
+- `eip` / `transmission` — modelo SEIR-SEI Ross-Macdonald.
+- `thermal` — curvas térmicas (EFD, desarrollo de huevo/larva/pupa).
+- `gonotrophic` — ciclo gonotrófico (`GonotrophicParams` lee esta sección).
+- `dispersal` / `host_seeking` / `oviposition` — kernels de movimiento y ventanas.
 
-Nuca hardcodear en un cpp el valor de una de estas constantes: hay que **leer de wire.hpp**; si necesitas un valor nuevo, agrégalo a wire.hpp con cita del paper y espejo en YAML Python.
+## Reglas
+
+- **R1** — ningún default de modelo en código; si un valor vive en un `.cpp`/`.py`,
+  se mueve al YAML con clave nombrada por concepto y unidad en comentario.
+- **R2** — el validador pydantic es el único validador; toda alta/renombre/borrado
+  de clave extiende el modelo y sus tests.
+- **R4/R5** — cambiar un valor científico exige paper en `papers/`; las tareas de
+  migración no cambian valores.
+- La paridad py⇄C++ se verifica en los tests (`test_config_loader.py` incluye el
+  dump C++ `config_dump`), y el golden del motor congela el comportamiento.
 
 up:: [[00-INDEX]] · related:: [[30-tipos-datos]] · [[23-mosquito-submodel]]

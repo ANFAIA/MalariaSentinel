@@ -36,6 +36,8 @@ import rioxarray  # noqa: F401
 import xarray as xr
 from rasterio.transform import from_bounds
 
+from mal_commonlib.model_constants import model_constant
+
 if TYPE_CHECKING:
     from mal_commonlib.aoi import AOI
 
@@ -44,7 +46,7 @@ __all__ = ["load_buildings_fraction", "DOWNLOADER"]
 
 _OVERTURE_S3_BUCKET = "overturemaps-us-west-2"
 _OVERTURE_S3_REGION = "us-west-2"
-_NODATA = -9999.0
+_NODATA = float(model_constant("ingest", "nodata_sentinel"))
 
 
 def _default_cache_dir() -> pathlib.Path:

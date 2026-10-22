@@ -38,6 +38,10 @@ import xarray as xr
 from rasterio.transform import from_bounds
 from rasterio.warp import Resampling
 
+from mal_commonlib.model_constants import model_constant
+
+_NODATA = float(model_constant("ingest", "nodata_sentinel"))
+
 if TYPE_CHECKING:
     from mal_commonlib.aoi import AOI
 
@@ -163,15 +167,15 @@ def _read_clip(
         win_transform = src.window_transform(win)
         nodata = src.nodata
 
-    sentinel = nodata if nodata is not None else -9999.0
+    sentinel = nodata if nodata is not None else _NODATA
     arr_f = np.asarray(arr, dtype=np.float32)
-    arr_f = np.where(arr_f == sentinel, np.float32(-9999.0), arr_f)
+    arr_f = np.where(arr_f == sentinel, np.float32(_NODATA), arr_f)
     arr_f = np.clip(arr_f, 0.0, None)  # negative values are invalid
 
     h, w_cells = aoi.cells_per_side()
     dst_transform = from_bounds(*aoi.bbox, w_cells, h)
     out = np.zeros((h, w_cells), dtype=np.float32)
-    out[:] = -9999.0
+    out[:] = _NODATA
 
     from rasterio.warp import reproject
 
@@ -196,12 +200,12 @@ def _read_clip(
             "units": "heads/km²",
             "source": "FAO GLW4",
             "species": species,
-            "nodata": -9999.0,
+            "nodata": _NODATA,
         },
     )
     da.rio.write_crs(aoi.crs_obj, inplace=True)
     da.rio.write_transform(dst_transform, inplace=True)
-    da.rio.write_nodata(-9999.0, inplace=True)
+    da.rio.write_nodata(_NODATA, inplace=True)
     return da
 
 

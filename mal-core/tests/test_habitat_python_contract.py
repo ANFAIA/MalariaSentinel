@@ -28,6 +28,20 @@ from mal_core.habitat import (
 
 
 # ---------------------------------------------------------------------------
+# package exports (task-01 B2): __all__ must resolve for every name
+# ---------------------------------------------------------------------------
+
+def test_star_import_exports_resolve():
+    import mal_core.habitat as hab
+
+    namespace: dict[str, object] = {}
+    exec("from mal_core.habitat import *", namespace)  # noqa: S102
+    for name in hab.__all__:
+        assert name in namespace, f"{name} declared in __all__ but not exported"
+        assert getattr(hab, name) is namespace[name]
+
+
+# ---------------------------------------------------------------------------
 # potential.py — explicit static mapping (plan 02 §6.2-§6.4)
 # ---------------------------------------------------------------------------
 
@@ -155,6 +169,16 @@ def test_warmup_causal_heavy_pre_rain_raises_day0():
 
 def _h_all_at(v):
     return {g: v for g in HABITAT_TYPES}
+
+
+def test_persistent_availability_comes_from_config(monkeypatch):
+    """C8 Python twin: persistent A is read from capacity.persistent_availability."""
+    monkeypatch.setattr(capacity, "CONFIG",
+                        {"capacity": {"persistent_availability": 0.5}})
+    h = {"surface_persistent": np.ones(1), "open_pluvial": np.zeros(1)}
+    s = capacity.species_accuracy(
+        h, np.zeros(1), weights={"surface_persistent": 1.0})
+    assert math.isclose(float(s[0]), 0.5)
 
 
 def test_species_accuracy_sum1_weights():

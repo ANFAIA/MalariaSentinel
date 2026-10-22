@@ -277,7 +277,6 @@ class HostSeeking(_StrictModel):
 
 class Oviposition(_StrictModel):
     scale_m: float
-    radius_m: float
     detect_range_m: float
     step_m: float
     min_attraction: float

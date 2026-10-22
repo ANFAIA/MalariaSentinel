@@ -42,6 +42,7 @@ from rasterio.transform import from_bounds
 
 from mal_commonlib.aoi import AOI
 from mal_commonlib.data.loaders.dynamic_world import load_dw_label_mode
+from mal_commonlib.model_constants import model_constant
 
 log = logging.getLogger(__name__)
 
@@ -73,7 +74,7 @@ HABITAT_SUITABILITY: dict[int, float] = {
 }
 
 # In-range codes not listed above (defensive) map to 0.0; out-of-range or
-# NoData (-9999) pixels keep NoData in the output rather than a fake 0.
+# NoData pixels keep NoData in the output rather than a fake 0.
 _UNKNOWN_CLASS_SCORE = 0.0
 _DW_MIN_LABEL = 0
 _DW_MAX_LABEL = 8
@@ -83,7 +84,7 @@ _W_HABITAT = 0.5
 _W_WATER = 0.3
 _W_REMOTE = 0.2
 
-_NODATA_OUT_SCALAR = -9999.0
+_NODATA_OUT_SCALAR = float(model_constant("ingest", "nodata_sentinel"))
 
 
 # -- Habitat suitability from shared WorldCover loader --------------------
@@ -114,9 +115,9 @@ def _load_dw_habitat_pc(
     for cls, score in HABITAT_SUITABILITY.items():
         class_lut[cls] = score
 
-    # NoData pixels (-9999) stay NoData in the output: an unobserved cell is
-    # not a zero-suitability cell — downstream treats -9999 as neutral.
-    nodata = lc_vals == -9999
+    # NoData pixels stay NoData in the output: an unobserved cell is
+    # not a zero-suitability cell — downstream treats NoData as neutral.
+    nodata = lc_vals == _NODATA_OUT_SCALAR
     valid = (lc_vals >= _DW_MIN_LABEL) & (lc_vals <= _DW_MAX_LABEL)
     habitat = np.full_like(lc_vals, _NODATA_OUT_SCALAR, dtype=np.float32)
     inrange = valid & ~nodata
@@ -143,7 +144,7 @@ def _water_presence(water_frac: np.ndarray) -> np.ndarray:
     plane the habitat contract carries). The retired per-year
     ``load_jrc_gsw_water_frac`` is gone.
 
-    NoData cells (-9999.0) are filled with 0.5 (neutral).
+    NoData cells (configured sentinel) are filled with 0.5 (neutral).
     """
     nodata = water_frac == _NODATA_OUT_SCALAR
     score = np.clip(water_frac * 3.0, 0.0, 1.0)

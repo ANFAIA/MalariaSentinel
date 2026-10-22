@@ -413,6 +413,41 @@ def test_cli_rejects_broken_yaml_before_running(tmp_path, monkeypatch):
     assert str(broken) in text
 
 
+def test_abm_cli_defers_transmission_defaults_to_yaml(monkeypatch):
+    """C1: no transmission model value may be pinned by the Python CLI.
+
+    With no flag, the wrapper receives ``None`` and omits the argv entry,
+    so the C++ engine reads model_constants.yaml itself.
+    """
+    import mal_core.abm as abm_pkg
+
+    captured: dict = {}
+
+    def fake(**kwargs):
+        captured.update(kwargs)
+        return {"returncode": 0, "stdout": "", "stderr": ""}
+
+    monkeypatch.setattr(abm_pkg, "run_abm_from_manifest", fake)
+    from mal_core.cli import app
+
+    result = runner.invoke(app, ["abm", "--aoi", "ghana"])
+    assert result.exit_code == 0, _cli_text(result)
+    for key in (
+        "initial_human_prevalence",
+        "initial_vector_infected_frac",
+        "beta_hv",
+        "beta_vh",
+        "human_incubation_days",
+        "human_infectious_days",
+        "immunity_duration_days",
+    ):
+        assert captured[key] is None, f"{key} must defer to the YAML"
+
+    result = runner.invoke(app, ["abm", "--aoi", "ghana", "--beta-hv", "0.42"])
+    assert result.exit_code == 0, _cli_text(result)
+    assert captured["beta_hv"] == pytest.approx(0.42)
+
+
 def test_cli_help_does_not_validate(tmp_path, monkeypatch):
     from mal_core.cli import app
 

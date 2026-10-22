@@ -76,7 +76,9 @@ mal_abm_fast::AOI resolve_aoi(const std::string& aoi_slug,
         }
         aoi.slug = aoi_slug.empty() ? "custom" : aoi_slug;
     } else if (aoi_slug == "ghana") {
-        aoi = mal_abm_fast::AOI{-3.5, 4.5, 1.5, 11.5, "EPSG:4326", "ghana", 1000, "regional"};
+        // resolution_m/scale keep their YAML-bound member defaults here;
+        // the caller overwrites both right after this block.
+        aoi = mal_abm_fast::AOI{-3.5, 4.5, 1.5, 11.5, "EPSG:4326", "ghana"};
     } else if (!aoi_slug.empty()) {
         throw CLI::ValidationError(
             "unknown --aoi slug '" + aoi_slug +
@@ -365,7 +367,8 @@ OUTPUT
     float  human_outbreak_min_density   = 0.0f;
     double human_cluster_max_core_pop   = 0.0;
     std::string human_foci_coords       = "";
-    float  transmission_focus_threshold = 0.01f;
+    float  transmission_focus_threshold =
+        mal_abm_fast::TransmissionParams{}.focus_threshold;
     int    transmission_snapshot_every  = 0;
     std::string transmission_log_path;
 
@@ -670,8 +673,8 @@ OUTPUT
                     "(default from model_constants.yaml).")
         ->group("Transmission (SEIR-SEI)");
     run->add_option("--transmission-focus-threshold", transmission_focus_threshold,
-                    "Prevalence threshold for active transmission focus band (default 0.01).")
-        ->default_val(0.01f)
+                    "Prevalence threshold for active transmission focus band "
+                    "(default from TransmissionParams).")
         ->group("Transmission (SEIR-SEI)");
     run->add_option("--transmission-snapshot-every", transmission_snapshot_every,
                     "Intermediate transmission snapshot interval in days (0 = matches --snapshot-every).")

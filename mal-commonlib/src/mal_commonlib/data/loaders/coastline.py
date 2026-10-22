@@ -75,6 +75,8 @@ from rasterio.transform import from_bounds
 from scipy import ndimage
 from shapely.geometry import box
 
+from mal_commonlib.model_constants import model_constant
+
 if TYPE_CHECKING:
     from mal_commonlib.aoi import AOI
 
@@ -91,7 +93,7 @@ _DEFAULT_RESOLUTION = "c"
 _DEFAULT_BUFFER_M = 5_000.0
 _LEVEL_LAND = 1
 
-_NODATA_OUT_SCALAR = -9999.0
+_NODATA_OUT_SCALAR = float(model_constant("ingest", "nodata_sentinel"))
 
 
 def _ensure_cache_dir(cache_dir: pathlib.Path | None) -> pathlib.Path:

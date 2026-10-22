@@ -81,7 +81,9 @@ struct TransmissionParams {
     // outbreak archetype. 0 = no cap.
     double      human_cluster_max_core_pop = 0.0;
 
-    // Threshold for active transmission focus band
+    // Output-only threshold for the active-transmission focus band
+    // (diagnostic classification, not a model-rate parameter). Single
+    // source: the CLI initialises its override from this field.
     float focus_threshold = 0.01f;
 
     TransmissionParams();

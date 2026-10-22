@@ -194,7 +194,7 @@ thermal:          # curvas térmicas acuáticas + EFD (Mordecai 2013, Couper 202
   pupa_development_tmax_c: 40.0    # [°C] Brière-1 umbral superior
   pupa_development_scale: 0.00066  # [escala] a de rate=a·T·(T−TL)·√(TH−T)
 
-gonotrophic:      # ciclo gonotrófico (gonotrophic_cycle.hpp); B8 pendiente en task-01
+gonotrophic:      # ciclo gonotrófico (gonotrophic_cycle.hpp); fuente única del ciclo
   cycle_duration_days: 2.0     # [días] maduración tras el primer ciclo (redondeo ceil)
   first_cycle_days: 4.0        # [días] maduración del primer ciclo (ceil)
   feeding_success_rate: 0.825  # [fracción] PROBING→BLOOD_FED
@@ -228,15 +228,16 @@ host_seeking:   # la capa viva (la que engine ejecuta vía species_params); el p
   indoor_fraction_urban: 0.72     # 72% endofílico urbano (An. gambiae)
   indoor_fraction_rural: 0.30
   # rango de detección del kernel del MOTOR (el caller lo pasa explícito y
-  # gana sobre species.<fila>.host_seeking_radius_m=1500, que sigue vigente
-  # como default de compute_attraction cuando el caller pasa -1)
+  # gana sobre species.<fila>.host_seeking_radius_m=1500). Ese 1500 es un
+  # concepto DISTINTO: radio del campo de atracción de compute_attraction
+  # cuando el caller pasa el sentinel -1 (p.ej. feeding phase-aware).
   detect_range_m: 2000.0          # [m] detect_host_cell desde HOST_APPROACH
   approach_step_m: 50.0           # [m] paso de approach_vector
 
 oviposition:
   scale_m: 50.0       # [m] decaimiento del penacho (Okal 2013)
-  radius_m: 500.0     # [m] radio default de compute_attraction (Okal/Lindh)
-  detect_range_m: 2000.0  # [m] detect_breeding_cell: el caller explícito gana
+  detect_range_m: 2000.0  # [m] ÚNICO radio del kernel: detect_breeding_cell y
+                          # compute_attraction lo reciben del caller (engine)
   step_m: 50.0            # [m] paso de step_toward
   min_attraction: 0.3     # [adimensional] atracción mínima para aceptar un criadero
   timeout_days: 7

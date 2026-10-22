@@ -6,9 +6,10 @@
 // EVENING, NIGHT, DAWN], pref per HostType BY NAME, salinity opt/hi_tol/
 // slope per species). NO in-code species phase remains; the struct
 // defaults are NOT a source (see species_params.hpp).
-// gonotrophic_days stays OUT of the YAML (verdict plan v2 §0-3: the
-// SpeciesParams field has NO runtime consumer; the real cycle uses
-// GonotrophicParams::cycle_duration_days).
+// gonotrophic_days is a legacy API mirror of
+// gonotrophic.cycle_duration_days (B8 closed in task-01): the field has
+// NO runtime consumer; the real cycle uses GonotrophicParams, whose
+// constructor reads the YAML.
 #include <cmath>
 #include <stdexcept>
 #include <string>
@@ -64,9 +65,9 @@ SpeciesParams species_params_for(MosquitoSpeciesId id) {
     sp.salinity_opt_ppt    = static_cast<float>(row.salinity_opt_ppt);
     sp.salinity_hi_tol_ppt = static_cast<float>(row.salinity_hi_tol_ppt);
     sp.salinity_slope      = static_cast<float>(row.salinity_slope);
-    // gonotrophic_days: dead knob (no runtime consumer). The live cycle
-    // reads gonotrophic.* from the YAML via GonotrophicParams' constructor;
-    // this SpeciesParams field stays unwired (B8, task-01).
+    // gonotrophic_days: legacy mirror, no runtime consumer. The live
+    // cycle reads gonotrophic.* from the YAML via GonotrophicParams'
+    // constructor; tests assert this mirror tracks the same key (B8).
     return sp;
 }
 
