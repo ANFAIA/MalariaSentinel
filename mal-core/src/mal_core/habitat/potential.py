@@ -17,9 +17,9 @@ Mapping (per cell i; features are column numpy arrays of the env NC statics):
 
     H_surface_persistent = P
     H_wetland_persistent = V
-    H_urban_persistent   = BETA_URBAN * U
+    H_urban_persistent   = urban.beta_urban * U
     H_wetland_pluvial    = V
-    H_open_pluvial       = O
+    H_open_pluvial       = O + urban.rain_pools_built_damage * U   (aligned with the engine)
     H_crop_pluvial       = C
 
 Binding rules (plan §6.4 + project rule #167):
@@ -39,7 +39,12 @@ from typing import Mapping
 
 import numpy as np
 
-from .constants import BETA_URBAN, FEATURE_COLUMNS, HABITAT_TYPES
+from .config import CONFIG, habitat_names
+
+HABITAT_TYPES = habitat_names()
+_BETA_URBAN = float(CONFIG["urban"]["beta_urban"])
+_RAIN_POOLS_BUILT_DAMAGE = float(
+    CONFIG["urban"]["rain_pools_built_damage"])
 
 
 def static_potential(
@@ -65,9 +70,9 @@ def static_potential(
     out: dict[str, np.ndarray | float] = {
         "surface_persistent": p,
         "wetland_persistent": v,
-        "urban_persistent": _clip(BETA_URBAN * u),
+        "urban_persistent": _clip(_BETA_URBAN * u),
         "wetland_pluvial": v,
-        "open_pluvial": o,
+        "open_pluvial": _clip(o + _RAIN_POOLS_BUILT_DAMAGE * u),
         "crop_pluvial": c,
     }
     assert set(out) == set(HABITAT_TYPES)
@@ -103,4 +108,4 @@ def _clip(x):
     return _np.clip(arr, 0.0, 1.0)
 
 
-__all__ = ["static_potential", "total_potential", "FEATURE_COLUMNS"]
+__all__ = ["static_potential", "total_potential"]

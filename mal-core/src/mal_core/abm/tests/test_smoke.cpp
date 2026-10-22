@@ -9,8 +9,8 @@
 
 TEST(MalAbmFastSmoke, VersionConstant) {
     // Compile-time assertion that the EIP constants are pinned at the M1.5 values.
-    EXPECT_DOUBLE_EQ(mal_abm_fast::EIP_BASE_C, 16.0);
-    EXPECT_DOUBLE_EQ(mal_abm_fast::EIP_THRESHOLD_GD, 110.0);
+    EXPECT_DOUBLE_EQ(mal_abm_fast::EIP_BASE_C(), 16.0);
+    EXPECT_DOUBLE_EQ(mal_abm_fast::EIP_THRESHOLD_GD(), 110.0);
 }
 
 TEST(MalAbmFastSmoke, PrngStub) {

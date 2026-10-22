@@ -42,7 +42,10 @@ float HostSeekingModel::cell_attraction(
 
     // Indoor modifier: endophilic species get a boost indoors.
     // An. gambiae: 72% endophilic → indoor modifier = 1 + indoor_frac × 0.72
-    const float indoor_mod = 1.0f + cell.indoor_fraction * 0.72f;
+    const float indoor_mod =
+        1.0f + cell.indoor_fraction *
+            static_cast<float>(
+                load_config().host_seeking.indoor_attraction_add);
 
     // Urban modifier: concentrated CO₂ in settlements.
     const float urban_mod = 1.0f + 0.2f * cell.urbanicity;
@@ -101,10 +104,14 @@ std::vector<HostAttraction> HostSeekingModel::compute_attraction(
 
     // Resolve the effective search radius: positive caller value wins;
     // otherwise the species radius (when species params are set) or the
-    // 300m default (HOST_SEEKING_RADIUS_M).
+    // default species row from model_constants.yaml.
+    const auto& species_cfg = mal_abm_fast::load_config().species;
+    const float config_radius_m = static_cast<float>(
+        species_cfg.rows.at(species_cfg.default_species)
+            .host_seeking_radius_m);
     const float radius = (search_radius_m <= 0.0f)
         ? (has_species_params_ ? species_.host_seeking_radius_m
-                               : HOST_SEEKING_RADIUS_M)
+                               : config_radius_m)
         : search_radius_m;
 
     // Cell size in metres.

@@ -94,7 +94,7 @@ TEST(GridSpec, FromAOI) {
     EXPECT_EQ(gs.height, 200);
     EXPECT_DOUBLE_EQ(gs.west(),  -1.746);
     EXPECT_DOUBLE_EQ(gs.north(), 7.786);
-    EXPECT_DOUBLE_EQ(gs.resolution_x, 1000.0 / mal_abm_fast::kMetresPerDegLat);
+    EXPECT_DOUBLE_EQ(gs.resolution_x, 1000.0 / mal_abm_fast::kMetresPerDegLat());
     EXPECT_DOUBLE_EQ(gs.nodata, -9999.0);
 }
 

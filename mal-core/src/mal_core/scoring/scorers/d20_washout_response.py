@@ -15,12 +15,13 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from mal_core.habitat.config import CONFIG
 from mal_core.habitat.aquatic_stress import washout_fraction
-from mal_core.habitat.constants import (
-    AQUATIC_RAIN_WASH_MM,
-    AQUATIC_WASHOUT_FRACTION_MAX,
-)
+
 from .base import Scorer, ScorerResult
+
+_WASH_MM = float(CONFIG["aquatic_stress"]["wash_threshold_mm"])
+_WASH_MAX = float(CONFIG["aquatic_stress"]["wash_fraction_max"])
 
 
 class WashoutResponseScorer(Scorer):
@@ -31,8 +32,8 @@ class WashoutResponseScorer(Scorer):
     weight = 1.0
     description = (
         f"Heavy rain washes out cohorts: 50mm -> >=0.15 (cap "
-        f"{AQUATIC_WASHOUT_FRACTION_MAX} at 80mm); flat below "
-        f"{AQUATIC_RAIN_WASH_MM}mm"
+        f"{_WASH_MAX} at 80mm); flat below "
+        f"{_WASH_MM}mm"
     )
     min_score = 0.70
 
@@ -53,7 +54,7 @@ class WashoutResponseScorer(Scorer):
         # 3. 80 mm -> cap.
         frac_80 = washout_fraction(80.0)
         diagnostics["frac_80mm"] = round(frac_80, 4)
-        test3_ok = abs(frac_80 - AQUATIC_WASHOUT_FRACTION_MAX) < 0.001
+        test3_ok = abs(frac_80 - _WASH_MAX) < 0.001
 
         # 4. 40 mm -> exactly at threshold (~0).
         frac_40 = washout_fraction(40.0)
@@ -75,7 +76,7 @@ class WashoutResponseScorer(Scorer):
             value=round(frac_50, 4),
             target=(
                 f"washout at 50mm >= 0.15; none at 30mm; cap at 80mm = "
-                f"{AQUATIC_WASHOUT_FRACTION_MAX}"
+                f"{_WASH_MAX}"
             ),
             diagnostics=diagnostics,
             passed=score >= 0.70,

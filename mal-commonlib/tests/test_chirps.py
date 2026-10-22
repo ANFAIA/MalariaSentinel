@@ -119,3 +119,56 @@ class TestChirpsDailyDownloaderFormats:
 
     def test_formats_matches_outputs(self):
         assert set(DOWNLOADER["formats"].keys()) == set(DOWNLOADER["outputs"].keys())
+
+
+class TestCoastalWindowRegression:
+    """Regression of the 2026-10 coastal-window bug (state-report AGENTE 1
+    GAP #1): a tight (8x11 px, 0.05 deg) windowed CHIRPS clip — like
+    accra-coastal-test — used to reproject to 100% NaN because the source
+    DataArray had NO explicit transform/nodata attached and nearest
+    inference from 1-D coords failed. The read path must attach the
+    window transform + nodata explicitly, and the reprojected field must
+    keep the valid land pixels (all-nodata-not-all-9)."""
+
+    def test_coastal_window_keeps_valid_cells(self, tmp_path):
+        import rasterio
+        from rasterio.transform import from_bounds
+
+        from mal_commonlib.data.loaders.chirps import (
+            _read_chirps_tif_gz,
+            _reproject_to_aoi_grid,
+            CHIRPS_NODATA,
+        )
+
+        # Synthetic daily GeoTIFF covering the accra-coastal-test window:
+        # 0.05-deg pixel, 8 rows x 11 cols, ocean nodata + land values.
+        h, w = 8, 11
+        west, south, east, north = 0.05, 5.35, 0.60, 5.75
+        arr = np.full((h, w), CHIRPS_NODATA, dtype=np.float32)
+        arr[:4, :] = 12.5  # land band (northern rows): NOT all-nodata
+        transform = from_bounds(west, south, east, north, w, h)
+        path = tmp_path / "chirps_day.tif"
+        profile = {
+            "driver": "GTiff", "height": h, "width": w, "count": 1,
+            "dtype": "float32", "nodata": CHIRPS_NODATA,
+            "crs": "EPSG:4326", "transform": transform,
+        }
+        with rasterio.open(path, "w", **profile) as dst:
+            dst.write(arr, 1)
+
+        aoi = AOI.from_bbox(west, south, east, north, "EPSG:4326",
+                            "accra-coastal-test", 1000)
+        da = _read_chirps_tif_gz(path, aoi)
+
+        # The fix guards: explicit transform + nodata on the DataArray.
+        assert da.shape == (h, w)
+        assert da.rio.nodata is not None
+        assert da.rio.crs is not None
+        assert float(da.rio.transform().a) == pytest.approx(0.05)
+
+        out = _reproject_to_aoi_grid(da, aoi)
+        assert out.shape == aoi.cells_per_side()
+        # Not all -9999/NaN: the land pixels survive the reproject.
+        valid = out[np.isfinite(out)]
+        assert valid.size > 0, "all-nodata window regression"
+        assert not np.allclose(valid, 0.0)

@@ -22,48 +22,48 @@ Submodules
 * ``constants``      — the single value contract (thresholds, scales, names).
 
 These modules are pure python (numpy). The C++ engine re-implements the
-same constants verbatim; the parity is enforced by unit tests unit-by-unit
+same physics; the parity of shared responses is enforced by unit tests
 in ``mal-core/tests/test_habitat_*.py`` against the Python reference.
+Constants migrate to ``mal-core/config/model_constants.yaml`` (plan
+constants-yaml); engine values win on conflict (see constants.py docstring).
 """
 from __future__ import annotations
-
-from .constants import (  # noqa: F401 — re-export the value contract
-    ACTIVATION_MIN,
-    BETA_URBAN,
-    DEFAULT_SPECIES,
-    DESICCATION_GRACE_DAYS,
-    DESICC_BASE_DAILY,
-    DRY_MEMORY_DAYS,
-    HABITAT_CANDIDATE_MIN,
-    HABITAT_DYNAMICS,
-    HABITAT_TYPES,
-    K_REF_DAILY_PER_KM2,
-    PLUVIAL_TYPES,
-    PERSISTENT_TYPES,
-    RAIN_SCALE_MM,
-    RAIN_WASH_FRACTION_MAX,
-    RAIN_WASH_MM,
-    SPECIES_HABITAT_WEIGHTS,
-)
 
 from . import (  # noqa: F401 — package-level access
     aquatic_stress,
     availability,
     capacity,
-    constants,
+    config,
     potential,
 )
+
+# constants.py is a tombstone: it raises for every name. The canonical
+# path is mal_core.habitat.config (CONFIG) — see habitat/__init__.py.
+
+from .config import (  # noqa: F401
+    CONFIG,
+    habitat_names,
+    dynamics_map,
+    persistent_names,
+    pluvial_names,
+)
+
+HABITAT_TYPES = habitat_names()
+HABITAT_DYNAMICS = dynamics_map()
 
 __all__ = [
     "aquatic_stress",
     "availability",
     "capacity",
+    "config",
     "constants",
     "potential",
+    "CONFIG",
     "HABITAT_TYPES",
     "HABITAT_DYNAMICS",
-    "ACTIVATION_MIN",
     "BETA_URBAN",
-    "RAIN_SCALE_MM",
-    "DRY_MEMORY_DAYS",
+    "DEFAULT_SPECIES",
+    "SPECIES_HABITAT_WEIGHTS",
+    "PLUVIAL_TYPES",
+    "PERSISTENT_TYPES",
 ]

@@ -72,20 +72,21 @@ def _write_habitat_patches_gpkg(
     xs = transform.c + (cols + 0.5) * transform.a
     ys = transform.f + (rows + 0.5) * transform.e
 
-    from mal_core.habitat.constants import HABITAT_DYNAMICS
+    from mal_core.habitat.config import dynamics_map as _dynamics_map
+    _dynamics = _dynamics_map()
 
     # Column per habitat type + total + labelled columns.
     #   hab_type: the dominant habitat type (argmax of the six H values)
     #   dynamics: that type's temporal class (persistent | pluvial)
     dominant_types = [
-        max(HABITAT_DYNAMICS,
+        max(_dynamics,
             key=lambda g: float(h_static[g][r, c]))
         for r, c in zip(rows, cols)
     ]
     data: dict[str, object] = {
         "hab_type": np.array(dominant_types),
         "dynamics": np.array(
-            [HABITAT_DYNAMICS[g] for g in dominant_types]
+            [_dynamics[g] for g in dominant_types]
         ),
         "habitat_potential": h_total[rows, cols],
         "row": rows.astype(np.int32),

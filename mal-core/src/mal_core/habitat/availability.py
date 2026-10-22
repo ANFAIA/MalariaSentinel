@@ -8,8 +8,8 @@ Two responses only (plan 02 §5.2-§5.4):
 * ``pluvial``      — state z[i,t] in [0, 1] with exponential drying memory
   and saturating rain recharge:
 
-      z_dry = z_prev * exp(-delta_days / DRY_MEMORY_DAYS)
-      z     = z_dry + (1 - z_dry) * (1 - exp(-rain_mm / RAIN_SCALE_MM))
+      z_dry = z_prev * exp(-delta_days / pluvial.dry_memory_days)
+      z     = z_dry + (1 - z_dry) * (1 - exp(-rain_mm / pluvial.rain_scale_mm))
 
   Applied once per (cell, calendar day) in the daily ABM loop — never per
   patch and never per species. Causal warm-up (plan §6.5 rule of daily
@@ -27,21 +27,27 @@ import math
 
 import numpy as np
 
-from .constants import DRY_MEMORY_DAYS, RAIN_SCALE_MM
+from .config import CONFIG
+
+_PLUVIAL_RAIN_SCALE_MM = float(CONFIG["pluvial"]["rain_scale_mm"])
+_PLUVIAL_DRY_MEMORY_DAYS = float(CONFIG["pluvial"]["dry_memory_days"])
+_DELTA_DAYS = float(CONFIG["pluvial"]["delta_days"])
 
 
 def update_pluvial_state(
     z_prev: np.ndarray | float,
     rain_mm: np.ndarray | float,
-    *, delta_days: float = 1.0,
+    *, delta_days: float | None = None,
 ) -> np.ndarray | float:
     """One pluvial-response step (pure; state z in [0, 1])."""
     import numpy as np
 
+    if delta_days is None:
+        delta_days = _DELTA_DAYS
     z_arr = np.atleast_1d(np.asarray(z_prev, dtype=np.float64))
     rain = np.atleast_1d(np.asarray(rain_mm, dtype=np.float64))
-    z_dry = z_arr * math.exp(-float(delta_days) / DRY_MEMORY_DAYS)
-    recharge = np.exp(-rain / RAIN_SCALE_MM)
+    z_dry = z_arr * math.exp(-float(delta_days) / _PLUVIAL_DRY_MEMORY_DAYS)
+    recharge = np.exp(-rain / _PLUVIAL_RAIN_SCALE_MM)
     z = z_dry + (1.0 - z_dry) * (1.0 - recharge)
     z = np.clip(z, 0.0, 1.0)
     if np.isscalar(z_prev) and np.isscalar(rain_mm):
@@ -50,7 +56,7 @@ def update_pluvial_state(
 
 
 def warm_up_pluvial(
-    rain_series: np.ndarray, *, cold_start: float = 0.0
+    rain_series: np.ndarray, *, cold_start: float | None = None
 ) -> np.ndarray:
     """Integrate the pluvial response over a (n_steps,) rain series.
 
@@ -60,10 +66,12 @@ def warm_up_pluvial(
     before day 0 must raise day-0 availability, and a dry warm-up must
     leave it at the cold start.
     """
+    if cold_start is None:
+        cold_start = float(CONFIG["pluvial"]["cold_start_z"])
     z: np.ndarray | float = cold_start
     rain_series = np.asarray(rain_series, dtype=np.float64)
     for r in rain_series:
-        z = update_pluvial_state(z, float(r), delta_days=1.0)
+        z = update_pluvial_state(z, float(r), delta_days=_DELTA_DAYS)
     return _as_array(z)
 
 

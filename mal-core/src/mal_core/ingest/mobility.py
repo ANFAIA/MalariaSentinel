@@ -19,6 +19,7 @@ from mal_commonlib.data.mobility import (
 )
 
 from ._shared import register_dataset
+from .daily_nc import NODATA_SENTINEL
 
 
 def _load_host_data(hosts_path: pathlib.Path) -> dict[str, np.ndarray]:
@@ -74,7 +75,7 @@ def build_mobility_dataset(
 
     # Human attractiveness = human population (nodata -> 0)
     human = host_data.get("human", np.zeros(shape, dtype=np.float32))
-    human = np.where(human == -9999.0, 0.0, human)
+    human = np.where(human == NODATA_SENTINEL, 0.0, human)
     human_total = float(human.sum())
 
     # Livestock attractiveness = sum of livestock species
@@ -83,7 +84,7 @@ def build_mobility_dataset(
     for var in livestock_vars:
         if var in host_data:
             arr = host_data[var]
-            livestock += np.where(arr == -9999.0, 0.0, arr)
+            livestock += np.where(arr == NODATA_SENTINEL, 0.0, arr)
     livestock_total = float(livestock.sum())
 
     # Build + write each OD matrix, freeing memory between matrices

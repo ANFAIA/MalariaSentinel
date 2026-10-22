@@ -40,7 +40,8 @@ mal_abm_fast::AOI MakeAoi() {
 fs::path MakeTmpGpkg() {
     const char* base = std::getenv("TMPDIR");
     fs::path dir = (base && *base) ? fs::path(base) : fs::temp_directory_path();
-    return dir / "mal_abm_fast_test_habitat_engine.gpkg";
+    return dir / ("mal_abm_fast_test_habitat_engine_" +
+       std::to_string(static_cast<long>(::getpid())) + ".gpkg");
 }
 
 // Write a 4-row gpkg of candidate Point features. One patch per row

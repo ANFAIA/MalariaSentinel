@@ -12,6 +12,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+from mal_core.habitat.config import CONFIG
 mal_core_root = Path(__file__).resolve().parent.parent
 
 
@@ -45,22 +46,23 @@ def test_urban_persistent_contribution_not_zero():
     h = potential.static_potential({"jrc_persistent": 0.0, "lc_wetland": 0.0,
                                    "lc_built": 0.40, "lc_open_plus_water": 0.0,
                                    "lc_crop": 0.0})
-    expected = constants.BETA_URBAN * 0.40
+    expected = float(CONFIG["urban"]["beta_urban"]) * 0.40
     assert math.isclose(float(h["urban_persistent"]), expected)
     assert h["urban_persistent"] > 0.0
 
 
 def test_beta_urban_matches_the_cpp_engine_mirror():
-    """Single beta surface: the Python constant and the C++ header must
-    quote the same value (the one contract the plans demanded)."""
+    """Single beta surface: the loader normalization scope"""
+    # Single surface of truth: the YAML value and the C++ load accessor
+    # are the constant (test_upper_v1_min in habitat config.py).
+    expected = 0.75
+    assert float(CONFIG["urban"]["beta_urban"]) == expected
+    # The C++ header no longer compiles any constant (plan pasos 6-7):
+    # check the shadow is gone from the header.
     hpp = (mal_core_root / "src" / "mal_core" / "abm" / "include" /
            "mal_abm_fast" / "habitat_availability.hpp").read_text()
-    expected = 0.75
-    assert constants.BETA_URBAN == expected
-    import re
-    m = re.search(r"URBAN_PERSISTENT_BETA\s*=\s*([0-9.]+)f", hpp)
-    assert m, "URBAN_PERSISTENT_BETA not found in habitat_availability.hpp"
-    assert float(m.group(1)) == expected
+    assert "URBAN_PERSISTENT_BETA =" not in hpp
+    assert "load_config().urban.beta_urban" in hpp
 
 
 def test_wetland_feature_caps_both_persistent_and_pluvial():
@@ -98,7 +100,18 @@ def test_all_six_types_present_and_clipped():
                                    "lc_crop": 0.2})
     assert set(h) == set(HABITAT_TYPES)
     assert float(h["surface_persistent"]) == 1.0
-    assert float(h["open_pluvial"]) == 0.5
+    # open_pluvial = lc_open (0.5) + rain_pools_built_damage (0.3) * lc_built
+    # (3.0 clipped to 1.0 by the feature contract) = 0.8.
+    assert float(h["open_pluvial"]) == 0.8
+
+
+def test_open_pluvial_receives_built_damage_term():
+    """Aligned with the engine (plan constants-yaml paso 2)."""
+    h = potential.static_potential({"jrc_persistent": 0.0, "lc_wetland": 0.0,
+                                   "lc_built": 0.40, "lc_open_plus_water": 0.5,
+                                   "lc_crop": 0.0})
+    built_damage = float(CONFIG["urban"]["rain_pools_built_damage"])
+    assert math.isclose(float(h["open_pluvial"]), 0.5 + built_damage * 0.40)
 
 
 # ---------------------------------------------------------------------------
@@ -108,19 +121,21 @@ def test_all_six_types_present_and_clipped():
 def test_no_rain_decay_matches_exponential_memory():
     z0 = np.array([1.0, 0.4])
     z1 = availability.update_pluvial_state(z0, 0.0)
-    assert np.allclose(z1, z0 * math.exp(-1.0 / constants.DRY_MEMORY_DAYS))
+    assert np.allclose(z1, z0 * math.exp(
+        -1.0 / float(CONFIG["pluvial"]["dry_memory_days"])))
 
 
 def test_heavy_rain_repractives_toward_full():
     z = availability.update_pluvial_state(0.0, 100.0)
-    expected = 1.0 - math.exp(-100.0 / constants.RAIN_SCALE_MM)
+    expected = 1.0 - math.exp(
+        -100.0 / float(CONFIG["pluvial"]["rain_scale_mm"]))
     assert math.isclose(float(z), expected)
 
 
 def test_reference_example_20mm_from_cold_start():
-    # 20 mm rain given RAIN_SCALE_MM=20: recharge = 1 - e^-1 ≈ 0.632.
+    # Canonical rain_scale_mm=2.5 (engine value): recharge = 1 - e^-8.
     z = availability.update_pluvial_state(0.0, 20.0)
-    assert math.isclose(float(z), 1.0 - math.exp(-1.0), rel_tol=1e-9)
+    assert math.isclose(float(z), 1.0 - math.exp(-20.0 / 2.5), rel_tol=1e-9)
 
 
 def test_cold_start_is_zero():
@@ -146,9 +161,9 @@ def test_species_accuracy_sum1_weights():
     h = _h_all_at(1.0)
     z = np.array([0.5])
     s = capacity.species_accuracy(h, z)
-    # persistent half: 0.40+0.20+0.15 = 0.75 fully credited; pluvial half
-    # 0.25 credited at z=0.5 -> total 0.875
-    assert math.isclose(s[0], 0.75 + 0.25 * 0.5)
+    # canonical coluzzii row (C++ remapped): persistent half 0.40+0.10+0.20
+    # = 0.70 fully credited; pluvial half 0.00+0.25+0.05 = 0.30 at z=0.5.
+    assert math.isclose(s[0], 0.70 + 0.30 * 0.5)
 
 
 def test_urban_cell_keeps_persistent_capacity_in_drought():
@@ -165,11 +180,11 @@ def test_k_habitat_scales_with_area_and_S():
     k = capacity.k_habitat(s, lat, 1000.0)
     area_row = capacity.cell_area_km2(7.0, 1000.0)
     assert math.isclose(float(k[0][0]),
-                        constants.K_REF_DAILY_PER_KM2["coluzzii"] * area_row)
+                        capacity.K_REF_DIAG_PER_KM2 * area_row)
 
 
 def test_k_ref_value_documents_literature_anchor():
-    k_ref = constants.K_REF_DAILY_PER_KM2["coluzzii"]
+    k_ref = capacity.K_REF_DIAG_PER_KM2
     assert math.isclose(k_ref, 0.143 * 9.3 * 1.0e6)
 
 
@@ -178,17 +193,22 @@ def test_k_ref_value_documents_literature_anchor():
 # ---------------------------------------------------------------------------
 
 def test_desiccation_grace_then_ramp_to_baseline():
-    assert aquatic_stress.desiccation_rate(constants.DESICCATION_GRACE_DAYS) == 0.0
-    rate = aquatic_stress.desiccation_rate(constants.DESICCATION_GRACE_DAYS + 20)
-    assert 0.0 < rate <= constants.DESICC_BASE_DAILY
-    assert math.isclose(rate, constants.DESICC_BASE_DAILY, rel_tol=0.05)
+    _aq = CONFIG["aquatic_stress"]
+    grace = int(_aq["desicc_grace_days"])
+    assert aquatic_stress.desiccation_rate(grace) == 0.0
+    rate = aquatic_stress.desiccation_rate(grace + 20)
+    base = float(_aq["desicc_base_daily"])
+    assert 0.0 < rate <= base
+    assert math.isclose(rate, base, rel_tol=0.05)
 
 
 def test_washout_linear_cap():
+    _aq = CONFIG["aquatic_stress"]
     assert aquatic_stress.washout_fraction(10.0) == 0.0
-    assert 0.0 < aquatic_stress.washout_fraction(60.0) < constants.RAIN_WASH_FRACTION_MAX
+    waxf = float(_aq["wash_fraction_max"])
+    assert 0.0 < aquatic_stress.washout_fraction(60.0) < waxf
     assert math.isclose(aquatic_stress.washout_fraction(80.0),
-                        constants.RAIN_WASH_FRACTION_MAX)
+                        waxf)
 
 
 # ---------------------------------------------------------------------------
@@ -196,16 +216,21 @@ def test_washout_linear_cap():
 # ---------------------------------------------------------------------------
 
 def test_weights_sum_to_one():
-    for weights in constants.SPECIES_HABITAT_WEIGHTS.values():
+    for name, row in CONFIG["species"].items():
+        if name in ("default_species", "k_ref") or "weights" not in row:
+            continue
+        weights = row["weights"]
         assert math.isclose(sum(weights.values()), 1.0)
 
 
 def test_dynamics_partition_is_exhaustive():
-    assert constants.PERSISTENT_TYPES | constants.PLUVIAL_TYPES == set(HABITAT_TYPES)
-    assert not (constants.PERSISTENT_TYPES & constants.PLUVIAL_TYPES)
+    from mal_core.habitat.config import persistent_names, pluvial_names
+    assert persistent_names() | pluvial_names() == set(HABITAT_TYPES)
+    assert not (persistent_names() & pluvial_names())
 
 
 def test_activation_scales_documented():
-    assert 0.0 < constants.ACTIVATION_MIN < 1.0
-    assert constants.RAIN_SCALE_MM > 0.0
-    assert constants.DRY_MEMORY_DAYS > 0.0
+    from mal_core.habitat.config import CONFIG
+    assert 0.0 < CONFIG["habitat"]["activation_min_engine"] < 1.0
+    assert CONFIG["pluvial"]["rain_scale_mm"] > 0.0
+    assert CONFIG["pluvial"]["dry_memory_days"] > 0.0

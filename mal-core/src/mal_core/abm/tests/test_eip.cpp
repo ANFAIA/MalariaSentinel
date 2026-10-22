@@ -5,9 +5,9 @@
 // The header `eip.hpp` is header-only with `inline` defs; this test
 // file pins the behaviour that the contract spec (`docs/specs/abm/spec.md`) calls for:
 //
-//     * daily_gd       = max(0, T - EIP_BASE_C)
+//     * daily_gd       = max(0, T - EIP_BASE_C())
 //     * eip_progress'  = eip_progress + daily_gd     (NaN-safe)
-//     * is_infective   = eip_progress >= EIP_THRESHOLD_GD
+//     * is_infective   = eip_progress >= EIP_THRESHOLD_GD()
 //
 // The F1.a smoke test (`tests/test_smoke.cpp::EipAccumulate`) already
 // pins the below-base, above-base, and NaN cases; we add coverage for
@@ -68,8 +68,8 @@ TEST(MalAbmFastEip, InfectiveThreshold) {
 }
 
 TEST(MalAbmFastEip, WireConstantsPinned) {
-    EXPECT_FLOAT_EQ(mal_abm_fast::EIP_BASE_C,         16.0f);
-    EXPECT_FLOAT_EQ(mal_abm_fast::EIP_THRESHOLD_GD,   110.0f);
+    EXPECT_FLOAT_EQ(mal_abm_fast::EIP_BASE_C(),         16.0f);
+    EXPECT_FLOAT_EQ(mal_abm_fast::EIP_THRESHOLD_GD(),   110.0f);
 }
 
 TEST(MalAbmFastEip, MixedTemperatureDays) {

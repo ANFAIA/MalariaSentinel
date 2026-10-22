@@ -20,15 +20,20 @@ import math
 from pathlib import Path
 from typing import Any
 
-from mal_core.habitat import DRY_MEMORY_DAYS, RAIN_SCALE_MM, HABITAT_TYPES
+from mal_core.habitat.config import CONFIG
 from mal_core.habitat.capacity import species_accuracy
 
 from .base import Scorer, ScorerResult
 
+_PLUVIAL_RAIN_SCALE_MM = float(CONFIG["pluvial"]["rain_scale_mm"])
+_PLUVIAL_DRY_MEMORY_DAYS = float(CONFIG["pluvial"]["dry_memory_days"])
+
 # Static potential of a mixed peri-urban cell: the same feature bundle
 # the habitat ingest materialises for a populated coastal fringe.
 _MIXED_CELL_H = (0.20, 0.075, 0.30, 0.40, 0.10, 0.0)
-_MIXED_CELL_W = (0.25, 0.15, 0.15, 0.40, 0.05, 0.0)
+# coluzzii weights regenerated from the canonical C++ row (plan paso 4;
+# order = habitat_types.types).
+_MIXED_CELL_W = (0.40, 0.10, 0.20, 0.00, 0.25, 0.05)
 
 
 class PoolPersistenceScorer(Scorer):
@@ -52,7 +57,7 @@ class PoolPersistenceScorer(Scorer):
 
         Checks:
           1. z >= 0.05 for at least 4 days
-          2. z < 0.05 inside 3 * DRY_MEMORY_DAYS (memory scale)
+          2. z < 0.05 inside 3 * pluvial.dry_memory_days (memory scale)
           3. monotone decay through the no-rain phase
           4. persistent floor: species accuracy at z = 0 stays positive
              (human dry-season supply) and short of the z = 1 value
@@ -61,8 +66,8 @@ class PoolPersistenceScorer(Scorer):
             """One scalar pluvial step — the contract recursion, written
             in-place here because the scorer exercises a single cell (the
             array form lives in habitat.availability with identical math)."""
-            z_dry = z * math.exp(-days / DRY_MEMORY_DAYS)
-            fill = 1.0 - math.exp(-max(0.0, rain) / RAIN_SCALE_MM)
+            z_dry = z * math.exp(-days / _PLUVIAL_DRY_MEMORY_DAYS)
+            fill = 1.0 - math.exp(-max(0.0, rain) / _PLUVIAL_RAIN_SCALE_MM)
             return min(1.0, max(0.0, z_dry + (1.0 - z_dry) * fill))
 
         z = 0.0
@@ -88,14 +93,14 @@ class PoolPersistenceScorer(Scorer):
             "active_days": active_days,
             "dry_day": dry_day,
             "z_series": [round(v, 3) for v in z_series],
-            "rain_scale_mm": RAIN_SCALE_MM,
-            "dry_memory_days": DRY_MEMORY_DAYS,
+            "rain_scale_mm": _PLUVIAL_RAIN_SCALE_MM,
+            "dry_memory_days": _PLUVIAL_DRY_MEMORY_DAYS,
         }
 
         # 1. Persistence: a single 30 mm pulse is enough for >= 4 days.
         persistence_ok = active_days >= 4
         # 2. Drying: z falls under the floor within the memory scale.
-        dries_out = dry_day >= 0 and dry_day <= int(3 * DRY_MEMORY_DAYS)
+        dries_out = dry_day >= 0 and dry_day <= int(3 * _PLUVIAL_DRY_MEMORY_DAYS)
         # 3. Monotone decay after the last recharge.
         decay_levels = z_series[3:]
         monotone = all(
@@ -106,11 +111,11 @@ class PoolPersistenceScorer(Scorer):
         # built/wetland/JRC columns keep a positive supply).
         h_map = {
             g: float(v)
-            for g, v in zip(HABITAT_TYPES, _MIXED_CELL_H)
+            for g, v in zip(CONFIG["habitat_types"]["types"], _MIXED_CELL_H)
         }
         w_map = {
             g: float(v)
-            for g, v in zip(HABITAT_TYPES, _MIXED_CELL_W)
+            for g, v in zip(CONFIG["habitat_types"]["types"], _MIXED_CELL_W)
         }
         floor = float(species_accuracy(h_map, 0.0, w_map))
         ceiling = float(species_accuracy(h_map, 1.0, w_map))

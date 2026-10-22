@@ -87,7 +87,7 @@ public:
     /// `search_radius_m` defaults to a -1.0f sentinel: when species
     /// params are set (set_species_params) the species
     /// `host_seeking_radius_m` is used; otherwise 300m
-    /// (HOST_SEEKING_RADIUS_M).  Any positive value overrides both.
+    /// (species.host_seeking_radius_m).  Any positive value overrides both.
     std::vector<HostAttraction> compute_attraction(
         int32_t mosquito_row, int32_t mosquito_col,
         const HostLandscape& landscape,
@@ -160,7 +160,10 @@ private:
     HostPreference pref_;
     SpeciesParams species_;
     bool has_species_params_ = false;
-    float scale_m_ = HOST_SEEKING_SCALE_M;
+    float scale_m_ = static_cast<float>(
+        load_config()
+            .species.rows.at(load_config().species.default_species)
+            .host_seeking_scale_m);
 
     /// Compute per-host-type attraction for one cell.
     float cell_attraction(

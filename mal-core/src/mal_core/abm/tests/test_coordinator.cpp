@@ -83,11 +83,18 @@ std::string read_file(const std::string& path) {
 }
 
 std::filesystem::path MakeTmpEnvNC() {
+    // Review-a3 item 10 (flaky fix): gtest_discover_tests runs each TEST
+    // as its own ctest PROCESS, and WriteSyntheticEnvNC ASSERTs a fixed
+    // filename below — two CoordinatorModel tests in parallel both open
+    // the same path and one loses (nc_create EEXIST / half-written). The
+    // filename is now unique per process (pid) so isolated test runs
+    // don't share the file.
     const char* base = std::getenv("TMPDIR");
     std::filesystem::path dir =
         (base && *base) ? std::filesystem::path(base)
                         : std::filesystem::temp_directory_path();
-    return dir / "mal_abm_fast_test_coordinator.nc";
+    return dir / ("mal_abm_fast_test_coordinator_" +
+                  std::to_string(static_cast<long>(::getpid())) + ".nc");
 }
 
 // Contract v3.0 env NC: rainfall + air_temp_c daily, the five static

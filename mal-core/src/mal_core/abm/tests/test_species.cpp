@@ -38,8 +38,10 @@ TEST(Species, ActivityWeightsSumToOneForAllSpecies) {
 TEST(Species, ColuzziiDefaultsAreAnthropophilic) {
     const auto sp = species_params_for(MosquitoSpeciesId::ANOPHELES_COLUZZII);
     EXPECT_GT(sp.pref_human, 0.9f);
-    EXPECT_EQ(sp.host_seeking_scale_m, 100.0f);
-    EXPECT_EQ(sp.host_seeking_radius_m, 300.0f);
+    // model_constants.yaml species.coluzzii row (plan constants-yaml:
+    // the engine's 300/1500 wins the 100/300 wire shadow).
+    EXPECT_EQ(sp.host_seeking_scale_m, 300.0f);
+    EXPECT_EQ(sp.host_seeking_radius_m, 1500.0f);
     EXPECT_EQ(sp.gonotrophic_days, 2.0f);
 }
 

@@ -146,11 +146,14 @@ float ClimateEngine::temp_at(int32_t row, int32_t col) const {
 }
 
 float ClimateEngine::salinity_at(int32_t row, int32_t col) const {
-    // Empty salinity_ => no salinity data (pre-salinity NC): every
-    // cell is freshwater (0.0 psu), the legacy behaviour.
-    if (salinity_.empty()) return 0.0f;
-    if (h_ <= 0 || w_ <= 0) return 0.0f;
-    if (row < 0 || row >= h_ || col < 0 || col >= w_) return 0.0f;
+    // Empty salinity_ => no salinity data (pre-salinity NC): every cell
+    // uses the configured freshwater anchor (aquatic_stages.
+    // salinity_missing_psu; review-a3 P1-3).
+    const float missing = static_cast<float>(
+        load_config().aquatic_stages.salinity_missing_psu);
+    if (salinity_.empty()) return missing;
+    if (h_ <= 0 || w_ <= 0) return missing;
+    if (row < 0 || row >= h_ || col < 0 || col >= w_) return missing;
     return salinity_[Idx(row, col, w_)];
 }
 

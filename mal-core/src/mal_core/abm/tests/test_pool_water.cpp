@@ -25,9 +25,9 @@ TEST(PoolWater, KeffSanity) {
     // Plan §5.4 (v1): K_ref * cell_area_km2 * S with K_REF_GHANA = 50.0.
     const double S_full = 1.0, a_ghana_1km = 0.921;
     const double K = k_habitat(S_full, a_ghana_1km);
-    EXPECT_NEAR(K, K_REF_GHANA * 0.921, 1.0);
+    EXPECT_NEAR(K, load_config().species.k_ref * 0.921, 1.0);
     EXPECT_DOUBLE_EQ(k_habitat(0.0, a_ghana_1km), 0.0);
-    EXPECT_FLOAT_EQ(K_REF_GHANA, 50.0f);
+    EXPECT_FLOAT_EQ(load_config().species.k_ref, 50.0);
 }
 
 TEST(PoolWater, UrbanPersistentSupply) {
@@ -37,13 +37,13 @@ TEST(PoolWater, UrbanPersistentSupply) {
     const auto h = habitat_potential(f);
     EXPECT_GT(h[static_cast<size_t>(ZoneId::URBAN_PERSISTENT)], 0.0f);
     EXPECT_FLOAT_EQ(h[static_cast<size_t>(ZoneId::URBAN_PERSISTENT)],
-                    URBAN_PERSISTENT_BETA * f.lc_built);
+                    static_cast<float>(load_config().urban.beta_urban) * f.lc_built);
 }
 
 TEST(PoolWater, PluvialRecursionBehavior) {
     float z = 0.0f;
     // A single large pulse raises z substantially; a dry day lowers it.
-    z = update_z_step(z, RAIN_SCALE_MM, 1.0f);
+    z = update_z_step(z, static_cast<float>(load_config().pluvial.rain_scale_mm), 1.0f);
     EXPECT_GT(z, 0.6f);
     z = update_z_step(z, 0.0f, 1.0f);
     EXPECT_LT(z, 0.95f);
@@ -84,5 +84,5 @@ TEST(PoolWater, PotentialFormula) {
     EXPECT_FLOAT_EQ(
         h[static_cast<size_t>(ZoneId::OPEN_PLUVIAL)],
         std::min(1.0f, f.lc_open_plus_water +
-                           RAIN_POOLS_BUIT_DAMAGE * f.lc_built));
+                           static_cast<float>(load_config().urban.rain_pools_built_damage) * f.lc_built));
 }

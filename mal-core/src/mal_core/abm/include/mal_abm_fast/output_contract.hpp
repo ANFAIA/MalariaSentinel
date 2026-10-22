@@ -3,7 +3,7 @@
 //
 // The state COG is a 2-band GeoTIFF (band 1 = adult_occupancy, band 2 =
 // host_seeking_pressure), tiled, deflate-compressed, 128x128 blocks, with
-// `nodata = NODATA_SENTINEL` (-9999). The sidecar JSON is a small
+// `nodata = NODATA_SENTINEL()` (-9999). The sidecar JSON is a small
 // metadata file written next to the .tif (e.g.
 // `ghana_regional_2024_06_seed0001.json` for the COG
 // `ghana_regional_2024_06_seed0001.tif`).
@@ -45,11 +45,11 @@ struct StateCogMetadata {
     int32_t                     rollout_index  = 0;  // F1.c (0-indexed)
     std::string                 generator_version = GENERATOR_VERSION;
     std::string                 abm_params_hash   = "sha256:pending";
-    std::string                 contract_version  = CONTRACT_VERSION;
+    std::string                 contract_version  = CONTRACT_VERSION();
     std::array<std::string, 2>  band_names         = {
         STATE_BAND_NAMES[0], STATE_BAND_NAMES[1]
     };
-    float                       nodata = NODATA_SENTINEL;
+    float                       nodata = NODATA_SENTINEL();
     int32_t                     h = 0;
     int32_t                     w = 0;
 };
@@ -59,7 +59,7 @@ struct StateCogMetadata {
 //   * tiled = true
 //   * compress = deflate
 //   * blockxsize = blockysize = 128
-//   * nodata = NODATA_SENTINEL
+//   * nodata = NODATA_SENTINEL()
 //   * band descriptions = band_names[0], band_names[1]
 //
 // Returns the .tif path on success. Throws std::runtime_error on

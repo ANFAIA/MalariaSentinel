@@ -12,6 +12,8 @@
 // Emergence is collected AFTER advance_day() via collect_emergence().
 #include "mal_abm_fast/aquatic_cohort_bank.hpp"
 
+#include "mal_abm_fast/config.hpp"
+
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
@@ -29,16 +31,15 @@
 
 namespace mal_abm_fast {
 
-// ---------------------------------------------------------------------------
-// Egg & pupa mortality constants (daily rates)
-// ---------------------------------------------------------------------------
-// Egg: ~8% daily mortality (Giglioli 1965, Depinay 2004)
-//   At 25°C egg duration ~1.1 days → survival ~0.92
-inline constexpr float EGG_DAILY_MORT     = 0.08f;
-// Pupa: ~5% daily mortality (pupae are robust, Depinay 2004)
-inline constexpr float PUPA_DAILY_MORT    = 0.05f;
-// Desiccation rate for eggs and early instars at inactive patches
-inline constexpr float AQUATIC_DESICCATION_DAILY_RATE = 0.10f;
+// Review-a3 P1-1: egg/pupa daily mortality live in model_constants.yaml
+// (aquatic_stages.egg_daily_mort / pupa_daily_mort); accessors below read
+// the load_config() singleton — no compiled defaults.
+inline float EGG_DAILY_MORT() {
+    return static_cast<float>(load_config().aquatic_stages.egg_daily_mort);
+}
+inline float PUPA_DAILY_MORT() {
+    return static_cast<float>(load_config().aquatic_stages.pupa_daily_mort);
+}
 
 // Instar duration fraction: each instar is ~25% of total larval duration.
 // When a larva's development reaches 1.0 within an instar, it
@@ -165,7 +166,9 @@ void AquaticCohortBank::desiccation(
         bool vulnerable = false;
         if (c.stage == AquaticStage::EGG) {
             vulnerable = true;
-        } else if (c.stage == AquaticStage::LARVA && c.larval_instar <= 2) {
+        } else if (c.stage == AquaticStage::LARVA &&
+                   c.larval_instar <=
+                       load_config().aquatic_stress.vulnerable_instar_max) {
             vulnerable = true;
         }
         if (!vulnerable) continue;
@@ -196,7 +199,7 @@ void AquaticCohortBank::washout(
         rain_by_patch[ps.patch_id] = ps.rain_d;
     }
 
-    std::mt19937_64 rng(789);  // deterministic for reproducibility
+    std::mt19937_64 rng(load_config().rng.aquatic_seed_washout);
     for (auto& c : cohorts_) {
         if (c.count <= 0) continue;
         auto it = rain_by_patch.find(c.patch_id);
@@ -219,14 +222,14 @@ void AquaticCohortBank::stage_mortality(
     // Use a simple deterministic kill fraction per stage.
     // For eggs and pupa: kill a fraction of the cohort each day.
     // Larva mortality is handled separately by larva_mortality_density.
-    std::mt19937_64 rng(42);  // deterministic for reproducibility
+    std::mt19937_64 rng(load_config().rng.aquatic_seed_stage_mortality);
     for (auto& c : cohorts_) {
         if (c.count <= 0) continue;
         float mort_rate = 0.0f;
         if (c.stage == AquaticStage::EGG) {
-            mort_rate = EGG_DAILY_MORT;
+            mort_rate = EGG_DAILY_MORT();
         } else if (c.stage == AquaticStage::PUPA) {
-            mort_rate = PUPA_DAILY_MORT;
+            mort_rate = PUPA_DAILY_MORT();
         } else {
             continue;  // larvae handled elsewhere
         }
@@ -278,7 +281,8 @@ void AquaticCohortBank::larva_mortality_density(
         }
     }
 
-    // Patch salinity lookup (missing patch => 0.0 freshwater => s_hat = 1.0)
+    // Patch salinity lookup (missing patch => aquatic_stages.
+    // salinity_missing_psu => s_hat = 1.0 for the default 0.0 anchor)
     std::unordered_map<int64_t, float> salinity_by_patch;
     // Patch daily capacity lookup (plan §5.4: absolute K per cell).
     std::unordered_map<int64_t, float> capacity_by_patch;
@@ -289,7 +293,7 @@ void AquaticCohortBank::larva_mortality_density(
         known_patches.insert(ps.patch_id);
     }
 
-    std::mt19937_64 rng(123);  // deterministic
+    std::mt19937_64 rng(load_config().rng.aquatic_seed_larva_mortality);
     for (auto& c : cohorts_) {
         if (c.count <= 0 || c.stage != AquaticStage::LARVA) continue;
         const int64_t N = larva_per_patch[c.patch_id];
@@ -316,13 +320,16 @@ void AquaticCohortBank::larva_mortality_density(
             // Explicit zero capacity: no water, no larval survival.
             p = 0.0;
         } else {
-            p = static_cast<double>(LARVA_BH_S0) * K_patch /
+            p = static_cast<double>(LARVA_BH_S0()) * K_patch /
                 (K_patch + static_cast<double>(overrides.larva_bh_alpha) *
                                static_cast<double>(N));
         }
         // Independent salinity suitability multiplier (Fase 6).
         auto it = salinity_by_patch.find(c.patch_id);
-        const float psu = (it == salinity_by_patch.end()) ? 0.0f : it->second;
+        const float psu = (it == salinity_by_patch.end())
+            ? static_cast<float>(load_config()
+                                     .aquatic_stages.salinity_missing_psu)
+            : it->second;
         const float s_hat = salinity_suitability(species_, psu);
         if (s_hat < 1.0f) p *= static_cast<double>(s_hat);
         // Binomial survival

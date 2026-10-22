@@ -8,11 +8,11 @@
 //
 // Formula (EPSG:4326, M1.5 thin slice):
 //   centroid_lat_rad  = ((north + south) / 2) * pi / 180
-//   width_m           = (east - west) * 111320 * cos(centroid_lat_rad)
+//   width_m           = (east - west) * 111194.9 * cos(centroid_lat_rad)
 //   cells_per_side    = round(width_m / resolution_m)         (W)
 //
 // Height is computed the same way without the cos factor:
-//   height_m          = (north - south) * 111320
+//   height_m          = (north - south) * 111194.9
 //   H                 = round(height_m / resolution_m)
 //
 // Both directions are clamped to a minimum of 1 cell so the resulting
@@ -29,10 +29,10 @@ namespace mal_abm_fast {
 // AOI::cells_per_side() (which is the W dimension) but without the
 // cos(lat) factor. Not a method on AOI per the wire.hpp spec, but exposed
 // here as a free function for the coordinator / output writer to derive H.
-// Uses the kMetresPerDegLat constant from wire.hpp. Uses std::ceil to
+// Uses the kMetresPerDegLat() constant from wire.hpp. Uses std::ceil to
 // match the Python AOI.cells_per_side (mal_commonlib.aoi).
 inline int32_t cells_per_side_h(const AOI& aoi) noexcept {
-    const double height_m = (aoi.north - aoi.south) * kMetresPerDegLat;
+    const double height_m = (aoi.north - aoi.south) * kMetresPerDegLat();
     const double cells_d  = height_m / static_cast<double>(aoi.resolution_m);
     int32_t cells = static_cast<int32_t>(std::ceil(cells_d));
     if (cells < 1) cells = 1;

@@ -14,12 +14,13 @@ from mal_core.habitat.aquatic_stress import (
     desiccation_rate,
     washout_fraction,
 )
-from mal_core.habitat.constants import (
-    DESICC_BASE_DAILY,
-    DESICCATION_GRACE_DAYS,
-    RAIN_WASH_FRACTION_MAX,
-    RAIN_WASH_MM,
-)
+from mal_core.habitat.config import CONFIG
+
+_AQ = CONFIG["aquatic_stress"]
+DESICC_BASE_DAILY = float(_AQ["desicc_base_daily"])
+DESICCATION_GRACE_DAYS = int(_AQ["desicc_grace_days"])
+RAIN_WASH_FRACTION_MAX = float(_AQ["wash_fraction_max"])
+RAIN_WASH_MM = float(_AQ["wash_threshold_mm"])
 from mal_core.habitat import HABITAT_TYPES
 from mal_core.habitat.availability import update_pluvial_state
 
@@ -135,9 +136,10 @@ class TestWashoutFraction:
 def test_built_fraction_is_a_persistent_habitat() -> None:
     """The urban persistent premise is wired through the habitat-type list:
     a built column keeps a persistent (non-pluvial) supply entry."""
-    from mal_core.habitat.constants import PERSISTENT_TYPES
+    from mal_core.habitat.config import persistent_names as _f
 
-    assert "urban_persistent" in PERSISTENT_TYPES
+
+    assert "urban_persistent" in _f()
 
 
 # ---------------------------------------------------------------------------

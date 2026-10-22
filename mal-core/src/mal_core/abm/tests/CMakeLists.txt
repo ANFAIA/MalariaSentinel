@@ -1,4 +1,23 @@
-# tests/CMakeLists.txt — GoogleTest + ctest
+# tests/CMakeLists.txt — GoogleTest + ctest ...
+# Plan constants-yaml test 6: YAML-subset parser tests.
+add_executable(test_config test_config.cpp)
+target_link_libraries(test_config
+    PRIVATE mal_abm_fast_core GTest::gtest GTest::gtest_main mal_abm_fast::warnings
+)
+gtest_discover_tests(test_config DISCOVERY_TIMEOUT 30)
+
+# Plan test 7: golden engine run (constants-yaml migration) — the state
+# COG must stay bit-identical to the pre-migration engine (fixtures in
+# golden/, produced at commit 85d5537).
+add_executable(test_config_engine_golden test_config_engine_golden.cpp)
+target_compile_definitions(test_config_engine_golden PRIVATE
+    MAL_ABM_FAST_ENGINE_BIN="$<TARGET_FILE:mal_abm_fast>"
+)
+target_link_libraries(test_config_engine_golden
+    PRIVATE mal_abm_fast_core GTest::gtest GTest::gtest_main mal_abm_fast::warnings
+)
+gtest_discover_tests(test_config_engine_golden DISCOVERY_TIMEOUT 30)
+
 # All test executables for mal-abm-fast (F1.b scaffold + implementations).
 
 include(GoogleTest)

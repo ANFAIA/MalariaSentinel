@@ -80,8 +80,8 @@ struct TransmissionParams {
     float focus_threshold = 0.01f;
 
     // EIP parameters (Plasmodium falciparum extrinsic incubation period)
-    float eip_base_temp     = EIP_BASE_C;       // 16.0 deg C
-    float eip_threshold_gd  = EIP_THRESHOLD_GD; // 110.0 GDD
+    float eip_base_temp     = EIP_BASE_C();       // 16.0 deg C
+    float eip_threshold_gd  = EIP_THRESHOLD_GD(); // 110.0 GDD
 };
 
 /// Daily aggregated statistics for transmission.

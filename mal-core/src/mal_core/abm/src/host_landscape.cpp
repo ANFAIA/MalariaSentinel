@@ -110,7 +110,10 @@ std::vector<float> ReadInt32BandAsFloat(GDALRasterBandH band) {
 float urban_class_to_indoor_fraction(float urban_class) {
     // GHSL SMOD: 30 = urban centre, 50 = rural.
     // Treat any value <= 40 as urban, >= 40 as rural.
-    return (urban_class <= 40.0f) ? 0.72f : 0.30f;
+    const auto& hs = load_config().host_seeking;
+    return (urban_class <= 40.0f)
+        ? static_cast<float>(hs.indoor_fraction_urban)
+        : static_cast<float>(hs.indoor_fraction_rural);
 }
 
 float urban_class_to_urbanicity(float urban_class) {

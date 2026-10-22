@@ -20,6 +20,7 @@ add_library(mal_abm_fast_core STATIC
     mobility_schedule.cpp
     wind_field.cpp
     species_params.cpp
+    config.cc
     effective_host_landscape.cpp
     human_state.cpp
     transmission.cpp
@@ -46,4 +47,11 @@ endif()
 add_executable(mal_abm_fast main.cpp)
 target_link_libraries(mal_abm_fast
     PRIVATE mal_abm_fast_core mal_abm_fast::warnings CLI11::CLI11
+)
+
+# Plan constants-yaml test 4: config parity tool (JSON dump of the parsed
+# model constants for the py⇄C++ parity test).
+add_executable(config_dump config_dump.cpp)
+target_link_libraries(config_dump
+    PRIVATE mal_abm_fast_core mal_abm_fast::warnings nlohmann_json::nlohmann_json
 )

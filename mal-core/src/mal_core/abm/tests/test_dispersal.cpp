@@ -21,12 +21,14 @@
 #include <vector>
 
 #include "dispersal.hpp"
+#include "mal_abm_fast/config.hpp"
 #include "prng.hpp"
 #include "wire.hpp"
 
 namespace {
 
-constexpr double kMetresPerDeg = 111320.0;
+const double kMetresPerDeg =
+    mal_abm_fast::load_config().geodesy.metres_per_deg_lat;  // review-a3 P1-5
 
 }  // namespace
 
@@ -152,11 +154,11 @@ TEST(MalAbmFastDispersal, UsesWireConstants) {
     for (int i = 0; i < N; ++i) {
         mal_abm_fast::DispOffset o = mal_abm_fast::offset_m(
             p, 0.0, 0.0,
-            static_cast<double>(mal_abm_fast::ADULT_DISPERSE_SIGMA_M),
-            static_cast<double>(mal_abm_fast::ADULT_DISPERSE_MAX_M));
+            static_cast<double>(mal_abm_fast::ADULT_DISPERSE_SIGMA_M()),
+            static_cast<double>(mal_abm_fast::ADULT_DISPERSE_MAX_M()));
         const double dx_m = std::abs(o.dlon) * kMetresPerDeg;
         const double dy_m = std::abs(o.dlat) * kMetresPerDeg;
-        EXPECT_LE(dx_m, mal_abm_fast::ADULT_DISPERSE_MAX_M + 1e-6);
-        EXPECT_LE(dy_m, mal_abm_fast::ADULT_DISPERSE_MAX_M + 1e-6);
+        EXPECT_LE(dx_m, mal_abm_fast::ADULT_DISPERSE_MAX_M() + 1e-6);
+        EXPECT_LE(dy_m, mal_abm_fast::ADULT_DISPERSE_MAX_M() + 1e-6);
     }
 }

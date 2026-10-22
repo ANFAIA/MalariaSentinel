@@ -278,7 +278,7 @@ TEST(MalAbmFastEngine, EndToEndSnapshotWritesStateCogAndSidecar) {
     nlohmann::json j;
     f >> j;
     EXPECT_EQ(j.value("contract_version", ""),
-              mal_abm_fast::CONTRACT_VERSION);
+              mal_abm_fast::CONTRACT_VERSION());
     EXPECT_EQ(j.value("aoi_slug", ""), "test");
     EXPECT_EQ(j.value("scale", ""), "regional");
     EXPECT_EQ(j.value("year", 0), 2024);
@@ -403,7 +403,7 @@ TEST(MalAbmFastEngine, NRolloutsWritesPerRolloutOutputsAndSidecars) {
         EXPECT_EQ(j.value("seed", 0),
                   static_cast<int32_t>(seed_rollout));
         EXPECT_EQ(j.value("contract_version", ""),
-                  mal_abm_fast::CONTRACT_VERSION);
+                  mal_abm_fast::CONTRACT_VERSION());
     }
 
     // -- Determinism check: rollout[i] bytes differ from rollout[j] --

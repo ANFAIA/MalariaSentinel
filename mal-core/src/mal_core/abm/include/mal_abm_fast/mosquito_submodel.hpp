@@ -92,7 +92,7 @@ public:
     // Detection-based constructor (the only one since contract 4.0):
     // seed a mix of adults and larvae at specific patches via the
     // supplied SeedInstruction list. Adults start with
-    // `development_progress = EIP_THRESHOLD_GD` so they are ready to
+    // `development_progress = EIP_THRESHOLD_GD()` so they are ready to
     // disperse on day 1; larvae start with `development_progress = 0`
     // and must accumulate growing-degree-days before promotion.
     // Requested counts seed verbatim — no per-patch adult cap.

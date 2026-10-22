@@ -101,7 +101,7 @@ public:
     // species-neutral daily accuracy S[i, t] and capacity K[i, t], and
     // track per-cell dry-day streaks. Call AFTER climate_->set_day().
     // `gamma_t` (default 0 for MVP): temperature scaling of the pluvial
-    // drying memory — tau_eff = DRY_MEMORY_DAYS * (1 - gamma_T *
+    // drying memory — tau_eff = pluvial.dry_memory_days * (1 - gamma_T *
     // clamp((T_opt - temp)/T_ref)) when gamma_T > 0.
     void update_habitat_day(float gamma_t = 0.0f);
 
@@ -121,7 +121,7 @@ public:
 
     // Build the per-patch PatchState vector over candidate cells:
     // the union of the gpkg patches and every grid cell whose static
-    // potential clears kHabitatCandidateMin (contract: candidate-floor
+    // potential clears habitat.candidate_min_engine (contract: candidate-floor
     // based, no TWI/water/urban gates). Stables pid per cell for site
     // fidelity.
     std::vector<PatchState> to_dataframe();
@@ -183,7 +183,10 @@ private:
     int64_t                              next_patch_id_ = 0;
     std::vector<PatchState>                   cached_states_;
     // Species salinity high-tolerance (psu); default = coluzzii 30.0.
-    float                                     salinity_hi_tol_ppt_ = 30.0f;
+    float salinity_hi_tol_ppt_ = static_cast<float>(
+        load_config()
+            .species.rows.at(load_config().species.default_species)
+            .salinity_hi_tol_ppt);
     const HostLandscape*                      host_landscape_ = nullptr;
     //_PROXY habitat v1 state:
     int32_t                                   H_ = 0;

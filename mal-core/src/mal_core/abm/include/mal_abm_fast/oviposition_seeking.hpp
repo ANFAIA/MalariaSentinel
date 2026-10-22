@@ -57,8 +57,8 @@ struct BreedingAttraction {
 class OvipositionSeekingModel {
 public:
     explicit OvipositionSeekingModel(
-        double scale_m = OVIPOSITION_SCALE_M,
-        double radius_m = OVIPOSITION_RADIUS_M);
+        double scale_m = OVIPOSITION_SCALE_M(),
+        double radius_m = OVIPOSITION_RADIUS_M());
 
     /// Compute attraction field for patches within `search_radius_m`
     /// of the mosquito at (row, col). Uses HabitatPatch TWI and

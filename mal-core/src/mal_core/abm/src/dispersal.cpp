@@ -9,8 +9,8 @@
 //     dy = N(0, sigma_m)
 //     dist = sqrt(dx^2 + dy^2)
 //     if dist > max_m:  dx *= max_m / dist;  dy *= max_m / dist   (clip)
-//     dlon = dx / (111320 * cos(lat_rad))
-//     dlat = dy / 111320
+//     dlon = dx / (geodesy.metres_per_deg_lat * cos(lat_rad))
+//     dlat = dy / geodesy.metres_per_deg_lat
 //
 // The longitude divisor is shrunk by `cos(lat)` so the *ground* distance
 // is correct at the patch's latitude. We guard against
@@ -21,11 +21,12 @@
 
 #include <cmath>
 
+#include "mal_abm_fast/config.hpp"
+
 namespace mal_abm_fast {
 
 namespace {
 
-constexpr double kMetresPerDeg = 111320.0;
 constexpr double kCosLatFloor  = 1e-6;  // avoid div-by-near-zero at the poles.
 
 }  // namespace
@@ -57,9 +58,10 @@ DispOffset offset_m(Prng& prng, double lon, double lat,
     const double cos_lat  = std::cos(lat_rad);
     const double safe_cos = (cos_lat > kCosLatFloor) ? cos_lat : kCosLatFloor;
 
+    const double m_per_deg = load_config().geodesy.metres_per_deg_lat;
     DispOffset out;
-    out.dlon = clip_dx / (kMetresPerDeg * safe_cos);
-    out.dlat = clip_dy / kMetresPerDeg;
+    out.dlon = clip_dx / (m_per_deg * safe_cos);
+    out.dlat = clip_dy / m_per_deg;
     return out;
 }
 

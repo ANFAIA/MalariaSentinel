@@ -31,7 +31,7 @@ struct GridSpec {
     int32_t                 height = 0;
     double                  resolution_x = 0.0; // cell size in CRS units (degrees or metres)
     double                  resolution_y = 0.0;
-    double                  nodata = NODATA_SENTINEL;
+    double                  nodata = NODATA_SENTINEL();
 
     // Derive bounds from transform + width/height.
     double west()  const noexcept { return transform[2]; }
@@ -80,7 +80,7 @@ struct GridSpec {
         gs.height = h;
 
         // Resolution in CRS units (degrees for EPSG:4326).
-        gs.resolution_x = static_cast<double>(aoi.resolution_m) / kMetresPerDegLat;
+        gs.resolution_x = static_cast<double>(aoi.resolution_m) / kMetresPerDegLat();
         gs.resolution_y = -gs.resolution_x;  // negative in GDAL convention
 
         // GDAL affine: [pixel_width, 0, origin_x, 0, -pixel_height, origin_y]
@@ -91,7 +91,7 @@ struct GridSpec {
         gs.transform[4] = -gs.resolution_x;  // north-up image, rows go south
         gs.transform[5] =  aoi.north;
 
-        gs.nodata = NODATA_SENTINEL;
+        gs.nodata = NODATA_SENTINEL();
         return gs;
     }
 };

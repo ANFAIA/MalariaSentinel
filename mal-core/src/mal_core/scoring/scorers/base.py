@@ -18,7 +18,8 @@ from typing import Any
 
 import numpy as np
 
-NODATA = -9999.0
+from mal_core.habitat.config import CONFIG  # noqa: E402
+NODATA = float(CONFIG["ingest"]["nodata_sentinel"])
 
 
 @dataclass

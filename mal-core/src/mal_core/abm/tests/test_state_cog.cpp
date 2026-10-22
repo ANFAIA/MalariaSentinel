@@ -8,7 +8,7 @@
 //   * 2 bands, float32
 //   * band 1 description == "density"
 //   * band 2 description == "suitability"
-//   * nodata == NODATA_SENTINEL on both bands
+//   * nodata == NODATA_SENTINEL() on both bands
 //   * the data round-trips exactly
 //   * the sidecar JSON parses and contract_version == "1.1"
 //
@@ -101,10 +101,10 @@ mal_abm_fast::StateCogMetadata make_meta() {
     m.seed              = 1;
     m.generator_version = mal_abm_fast::GENERATOR_VERSION;
     m.abm_params_hash   = "sha256:pending";
-    m.contract_version  = mal_abm_fast::CONTRACT_VERSION;
+    m.contract_version  = mal_abm_fast::CONTRACT_VERSION();
     m.band_names        = {mal_abm_fast::STATE_BAND_NAMES[0],
                            mal_abm_fast::STATE_BAND_NAMES[1]};
-    m.nodata            = mal_abm_fast::NODATA_SENTINEL;
+    m.nodata            = mal_abm_fast::NODATA_SENTINEL();
     m.h                 = 4;
     m.w                 = 4;
     return m;
@@ -167,9 +167,9 @@ TEST(MalAbmFastStateCog, WritesTwoBandCogWithDescriptionsAndNodata) {
     EXPECT_STREQ(b2->GetDescription(),
                  mal_abm_fast::STATE_BAND_NAMES[1]);  // "suitability"
     EXPECT_DOUBLE_EQ(b1->GetNoDataValue(),
-                     static_cast<double>(mal_abm_fast::NODATA_SENTINEL));
+                     static_cast<double>(mal_abm_fast::NODATA_SENTINEL()));
     EXPECT_DOUBLE_EQ(b2->GetNoDataValue(),
-                     static_cast<double>(mal_abm_fast::NODATA_SENTINEL));
+                     static_cast<double>(mal_abm_fast::NODATA_SENTINEL()));
 
     // Read the data back and compare element-wise.
     std::vector<float> d_back(16, 0.0f);
@@ -223,7 +223,7 @@ TEST(MalAbmFastStateCog, WritesSidecarJsonWithContractVersion) {
     ASSERT_TRUE(j.is_object()) << "sidecar is not a JSON object";
 
     EXPECT_EQ(j.value("contract_version", ""),
-              mal_abm_fast::CONTRACT_VERSION);
+              mal_abm_fast::CONTRACT_VERSION());
     EXPECT_EQ(j.value("generator_version", ""),
               std::string(mal_abm_fast::GENERATOR_VERSION));
     EXPECT_EQ(j.value("aoi_slug", ""), "ghana");
@@ -237,7 +237,7 @@ TEST(MalAbmFastStateCog, WritesSidecarJsonWithContractVersion) {
     EXPECT_EQ(j.value("n_rollouts", -1), 1);
     EXPECT_EQ(j.value("rollout_index", -1), 0);
     EXPECT_DOUBLE_EQ(j.value("nodata", 0.0),
-                     static_cast<double>(mal_abm_fast::NODATA_SENTINEL));
+                     static_cast<double>(mal_abm_fast::NODATA_SENTINEL()));
     // Contract 4.0: `k_max` removed from the sidecar.
     EXPECT_FALSE(j.contains("k_max"));
     EXPECT_EQ(j.value("crs", ""), "EPSG:4326");
@@ -288,7 +288,7 @@ TEST(MalAbmFastStateCog, SidecarCarriesNRolloutsAndRolloutIndex) {
     EXPECT_EQ(j.value("rollout_index", -1), 3);
     EXPECT_EQ(j.value("seed", 0), 104);
     EXPECT_EQ(j.value("contract_version", ""),
-              mal_abm_fast::CONTRACT_VERSION);
+              mal_abm_fast::CONTRACT_VERSION());
 }
 
 // F1.c determinism test: two engine runs with different Prng seeds
@@ -463,7 +463,7 @@ TEST(MalAbmFastStateCog, TwoRolloutsDifferentSeedsProduceDifferentCogs) {
         EXPECT_EQ(j.value("n_rollouts", -1), 1);
         EXPECT_EQ(j.value("rollout_index", -1), 0);
         EXPECT_EQ(j.value("contract_version", ""),
-                  mal_abm_fast::CONTRACT_VERSION);
+                  mal_abm_fast::CONTRACT_VERSION());
     };
     check_sidecar(tif_a_path, 42);
     check_sidecar(tif_b_path, 43);

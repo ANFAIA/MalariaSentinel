@@ -34,7 +34,8 @@ constexpr int kW = 4;
 fs::path MakeTmpEnvNC() {
     const char* base = std::getenv("TMPDIR");
     fs::path dir = (base && *base) ? fs::path(base) : fs::temp_directory_path();
-    return dir / "mal_abm_fast_test_climate.nc";
+    return dir / ("mal_abm_fast_test_climate_" +
+                  std::to_string(static_cast<long>(::getpid())) + ".nc");
 }
 
 // Write a synthetic multi-day NetCDF using the netCDF-C API.

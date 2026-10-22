@@ -213,7 +213,7 @@ void HabitatEngine::load_from_gpkg(const std::string& path,
         potential = std::clamp(potential, 0.0f, 1.0f);
         // Candidate floor (engineering constant; plan §8). Dropped
         // patches are the negative case of the ingest census.
-        if (potential < kHabitatCandidateMin) {
+        if (potential < habitat_candidate_min_engine()) {
             ++candidate_dropped;
             continue;
         }
@@ -236,7 +236,7 @@ void HabitatEngine::load_from_gpkg(const std::string& path,
     std::cerr << "habitat_engine: loaded " << patches_.size() << " of "
               << candidate_seen << " candidate patches (dropped "
               << candidate_dropped << " below the "
-              << kHabitatCandidateMin << " candidate floor)\n";
+              << habitat_candidate_min_engine() << " candidate floor)\n";
 }
 
 const HabitatPatch& HabitatEngine::patch_by_id(int64_t pid) const {

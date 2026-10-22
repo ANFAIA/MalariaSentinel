@@ -57,7 +57,7 @@ TEST(TransmissionOutput, WritesFourBandCogAndSidecar) {
         GDALRasterBand* band = ds->GetRasterBand(b);
         ASSERT_NE(band, nullptr);
         EXPECT_STREQ(band->GetDescription(), TRANSMISSION_BAND_NAMES[b - 1]);
-        EXPECT_FLOAT_EQ(static_cast<float>(band->GetNoDataValue()), NODATA_SENTINEL);
+        EXPECT_FLOAT_EQ(static_cast<float>(band->GetNoDataValue()), NODATA_SENTINEL());
     }
     GDALClose(ds);
 

@@ -10,8 +10,8 @@
 //   dy = N(0, sigma_m)
 //   dist = sqrt(dx^2 + dy^2)
 //   if dist > max_m: scale (dx, dy) by max_m / dist   (clip to circle)
-//   dlon = dx / (111320 * cos(lat_rad))
-//   dlat = dy / 111320
+//   dlon = dx / (geodesy.metres_per_deg_lat * cos(lat_rad))
+//   dlat = dy / geodesy.metres_per_deg_lat
 //
 // The math subagent (F1.c) implements the kernel. The `dispersal` and
 // `mosquito_submodel` modules share the same `Prng` stream so the

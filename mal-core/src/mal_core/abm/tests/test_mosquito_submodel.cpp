@@ -207,7 +207,7 @@ TEST(MalAbmFastMosquitoSubmodel, AdultMortalityReducesPopulation) {
 }
 
 TEST(MalAbmFastMosquitoSubmodel, AdultMortalityUsesFallbackWhenNoTemp) {
-    // All patches inactive — adult mortality uses ADULT_DAILY_MORT_BASAL = 0.87.
+    // All patches inactive — adult mortality uses ADULT_DAILY_MORT_BASAL() = 0.87.
     mal_abm_fast::MosquitoSubmodel sub(100, 30, 270, 42);
     const auto aoi = make_test_aoi();
     auto ps = make_test_patch_states();

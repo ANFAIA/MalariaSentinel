@@ -332,10 +332,10 @@ OUTPUT
     std::string wind_field_path;
 
     // Runtime overrides for dispersal and larval parameters.
-    float disperse_prob    = mal_abm_fast::ADULT_DISPERSE_PROB;
-    float disperse_sigma_m = mal_abm_fast::ADULT_DISPERSE_SIGMA_M;
-    float disperse_max_m   = mal_abm_fast::ADULT_DISPERSE_MAX_M;
-    float larva_bh_alpha   = mal_abm_fast::LARVA_BH_ALPHA;
+    float disperse_prob    = mal_abm_fast::ADULT_DISPERSE_PROB();
+    float disperse_sigma_m = mal_abm_fast::ADULT_DISPERSE_SIGMA_M();
+    float disperse_max_m   = mal_abm_fast::ADULT_DISPERSE_MAX_M();
+    float larva_bh_alpha   = mal_abm_fast::LARVA_BH_ALPHA();
 
     bool debug_population = false;
     std::string cohort_log_path;
@@ -526,24 +526,24 @@ OUTPUT
     run->add_option("--disperse-prob", disperse_prob,
                     "Adult dispersal probability per day (default 0.05). "
                     "Fraction of adults that attempt to move each day.")
-        ->default_val(mal_abm_fast::ADULT_DISPERSE_PROB)
+        ->default_val(mal_abm_fast::ADULT_DISPERSE_PROB())
         ->group("Population Dynamics");
     run->add_option("--disperse-sigma-m", disperse_sigma_m,
                     "Dispersal kernel sigma in metres (default 450). "
                     "Gaussian width; controls neighbourhood movement.")
-        ->default_val(mal_abm_fast::ADULT_DISPERSE_SIGMA_M)
+        ->default_val(mal_abm_fast::ADULT_DISPERSE_SIGMA_M())
         ->group("Population Dynamics");
     run->add_option("--disperse-max-m", disperse_max_m,
                     "Max dispersal distance in metres (default 2000). "
                     "Hard cap on kernel; rare long-distance colonisation.")
-        ->default_val(mal_abm_fast::ADULT_DISPERSE_MAX_M)
+        ->default_val(mal_abm_fast::ADULT_DISPERSE_MAX_M())
         ->group("Population Dynamics");
     run->add_option("--larva-bh-alpha", larva_bh_alpha,
                     "Beverton-Holt competition coefficient (default 0.05). "
                     "Controls density-dependent larval mortality: "
                     "survival = S0 / (1 + alpha * N_larvae / K). "
                     "Higher = stronger competition at high density.")
-        ->default_val(mal_abm_fast::LARVA_BH_ALPHA)
+        ->default_val(mal_abm_fast::LARVA_BH_ALPHA())
         ->group("Population Dynamics");
 
     // ─── Output & Debug ──────────────────────────────────────────────────

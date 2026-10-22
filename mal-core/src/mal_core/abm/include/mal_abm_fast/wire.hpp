@@ -22,10 +22,39 @@
 #include <array>
 #include <cmath>
 #include <cstdint>
+
+#include "mal_abm_fast/config.hpp"
 #include <string>
 #include <vector>
 
 namespace mal_abm_fast {
+// Values live in mal-core/config/model_constants.yaml; accessors read the
+// load_config() singleton (plan constants-yaml §4 — no compiled defaults).
+inline double EIP_BASE_C() { return static_cast<double>(load_config().eip.base_c); }
+inline double EIP_THRESHOLD_GD() { return static_cast<double>(load_config().eip.threshold_gd); }
+inline double ADULT_DISPERSE_PROB() { return static_cast<double>(load_config().dispersal.adult_prob_day); }
+inline double ADULT_DISPERSE_SIGMA_M() { return static_cast<double>(load_config().dispersal.adult_sigma_m); }
+inline double ADULT_DISPERSE_MAX_M() { return static_cast<double>(load_config().dispersal.adult_max_m); }
+inline double WIND_MIGRATION_PROB() { return static_cast<double>(load_config().dispersal.wind_migration_prob); }
+inline double WIND_FLIGHT_HOURS() { return static_cast<double>(load_config().dispersal.wind_flight_hours); }
+inline double WIND_SURVIVAL() { return static_cast<double>(load_config().dispersal.wind_survival); }
+inline double WIND_FLIGHT_SPEED_MS() { return static_cast<double>(load_config().dispersal.wind_self_speed_ms); }
+inline int HOST_SEEKING_STARVATION_DAYS() { return static_cast<int>(load_config().host_seeking.starvation_days); }
+inline double OVIPOSITION_SCALE_M() { return static_cast<double>(load_config().oviposition.scale_m); }
+inline double OVIPOSITION_RADIUS_M() { return static_cast<double>(load_config().oviposition.radius_m); }
+inline double OVIPOSITION_SEEKING_TIMEOUT_DAYS() { return static_cast<double>(load_config().oviposition.timeout_days); }
+inline double LARVA_BH_S0() { return static_cast<double>(load_config().aquatic_stages.larva_bh_s0); }
+inline double LARVA_BH_ALPHA() { return static_cast<double>(load_config().aquatic_stages.larva_bh_alpha); }
+inline double ADULT_DAILY_MORT_BASAL() { return static_cast<double>(load_config().adults.daily_mort_basal); }
+inline double ADULT_OPT_C() { return static_cast<double>(load_config().adults.opt_c); }
+inline double ADULT_SIGMA() { return static_cast<double>(load_config().adults.sigma_c); }
+inline double ADULT_MORT_CAP() { return static_cast<double>(load_config().adults.mort_cap); }
+inline double ADULT_MORT_FLOOR() { return static_cast<double>(load_config().adults.mort_floor); }
+inline double NODATA_SENTINEL() { return static_cast<double>(load_config().ingest.nodata_sentinel); }
+inline double kEarthRadiusM() { return static_cast<double>(load_config().geodesy.earth_radius_m); }
+inline double kMetresPerDegLat() { return static_cast<double>(load_config().geodesy.metres_per_deg_lat); }
+inline std::string CONTRACT_VERSION() { return load_config().contracts.cogs_state; }
+
 
 // ---------------------------------------------------------------------------
 // Constants — match mal_ghana_sim.abm defaults exactly (M1.5 thin slice).
@@ -42,18 +71,13 @@ namespace mal_abm_fast {
 //   daily_gd       = max(0, T - EIP_BASE_C)
 //   infective when eip_progress >= EIP_THRESHOLD_GD
 // Tuned for An. gambiae s.s. in the M1.5 thin slice.
-inline constexpr float  EIP_BASE_C                  = 16.0f;
-inline constexpr float  EIP_THRESHOLD_GD            = 110.0f;
 
 // Adult dispersal kernel: isotropic Gaussian in metres, clipped at 2000 m.
-// 10% of adults move per day (An. gambiae rural dispersal).
+// 5% of adults move per day (An. gambiae rural dispersal).
 // Sigma=450m: midpoint of Costantini et al. 1996 (350-650 m/day, Burkina
 //   Faso MRR) and Thomas et al. 2013 (median 386m, The Gambia).
 // Cap=2000m: Thomas et al. 2013 95th percentile (1.7-2.8 km); captures
 //   rare long-distance colonization events.
-inline constexpr float  ADULT_DISPERSE_PROB         = 0.05f;
-inline constexpr float  ADULT_DISPERSE_SIGMA_M      = 450.0f;
-inline constexpr float  ADULT_DISPERSE_MAX_M        = 2000.0f;
 
 // Windborne long-range migration (M7.6 Phase 1).
 // Huestis et al. 2019 (Nature Communications): Sahel aerial sampling
@@ -62,25 +86,15 @@ inline constexpr float  ADULT_DISPERSE_MAX_M        = 2000.0f;
 // Faiman et al. 2020: survival at altitude 70-90%.
 // North & Godfray 2018: d_M = 0.01-0.05/day, without wind 0% colonization,
 //   with wind 100% colonization of Sahel.
-inline constexpr float  WIND_MIGRATION_PROB    = 0.05f;  // per GRAVID female/day
-inline constexpr float  WIND_FLIGHT_HOURS      = 4.0f;   // hours of wind advection
-inline constexpr float  WIND_SURVIVAL          = 0.85f;  // flight survival
-inline constexpr float  WIND_FLIGHT_SPEED_MS   = 1.0f;   // self-propelled speed
 
 // Host-seeking plume parameters (Plan D).
 // CO₂ + body-odour plume: kScale=100m (Giraldo 2023, Spitzen 2013,
 // Okumu 2013). search_radius=300m (Yang 2009: 94% malaria reduction
 // when habitats within 300m of houses are eliminated).
-inline constexpr float  HOST_SEEKING_SCALE_M         = 100.0f;
-inline constexpr float  HOST_SEEKING_RADIUS_M        = 300.0f;
-inline constexpr int    HOST_SEEKING_STARVATION_DAYS  = 7;
 
 // Oviposition-seeking plume parameters (Plan D).
 // Water-vapour + VOC plume: kScale=50m (Okal 2013), radius=500m
 // (Okal 2013, Lindh 2015: 9+m semi-field scaled up).
-inline constexpr float  OVIPOSITION_SCALE_M          = 50.0f;
-inline constexpr float  OVIPOSITION_RADIUS_M         = 500.0f;
-inline constexpr int    OVIPOSITION_SEEKING_TIMEOUT_DAYS = 7;
 
 // Egg batch size is temperature-scaled at oviposition time via the EFD
 // thermal modifier (birth_rate.hpp, Mordecai 2013): the binomial draw of
@@ -96,16 +110,14 @@ inline constexpr int    OVIPOSITION_SEEKING_TIMEOUT_DAYS = 7;
 // wired OvipositionSeekingModel + thermal egg batches.
 
 // Larva density-dependent mortality (Beverton-Holt, docs/abm-status.md:79).
-inline constexpr float  LARVA_BH_S0    = 0.95f;   // baseline daily survival
-inline constexpr float  LARVA_BH_ALPHA = 0.05f;   // competition coefficient
 
 // Runtime-configurable overrides for dispersal and larval parameters.
 // Used by CLI to override wire.hpp defaults for invasion simulations.
 struct RuntimeOverrides {
-    float disperse_prob    = ADULT_DISPERSE_PROB;
-    float disperse_sigma_m = ADULT_DISPERSE_SIGMA_M;
-    float disperse_max_m   = ADULT_DISPERSE_MAX_M;
-    float larva_bh_alpha   = LARVA_BH_ALPHA;
+    float disperse_prob    = static_cast<float>(load_config().dispersal.adult_prob_day);
+    float disperse_sigma_m = static_cast<float>(load_config().dispersal.adult_sigma_m);
+    float disperse_max_m   = static_cast<float>(load_config().dispersal.adult_max_m);
+    float larva_bh_alpha   = static_cast<float>(load_config().aquatic_stages.larva_bh_alpha);
 };
 
 // Adult daily mortality — Lardeux thermo-dependent with basal cap.
@@ -133,16 +145,11 @@ struct RuntimeOverrides {
 // BASAL=0.87 — the Gaussian never exceeds 0.87 at improving temps; the
 // cap would only bind again if BASAL rises above 0.93.
 // ADULT_MORT_FLOOR = 0.60: emergency floor for extreme temps (max 40%/day).
-inline constexpr float  ADULT_DAILY_MORT_BASAL  = 0.87f;  // Saarman 2019 shared-midpoint (was 0.93; prior probes 0.90, 0.95)
-inline constexpr float  ADULT_OPT_C             = 25.0f;
 // ADULT_SIGMA = 15: broader curve, matches Martens 1997 (West Africa MRR
 // at 30-35°C remains survivable). With sigma=7, survival at 32°C was only
 // 57.7% (mean life 2.5 days) — too low for field observations. Sigma=15
 // gives p_d=0.852 at 32°C (mean life 6.8 days), matching the "survivable"
 // range from Martens 1997 and Costantini 1996.
-inline constexpr float  ADULT_SIGMA             = 15.0f;
-inline constexpr float  ADULT_MORT_CAP          = 0.93f;
-inline constexpr float  ADULT_MORT_FLOOR        = 0.60f;
 
 // Temperature NaN policy (2026-10-13): the legacy per-lookup constant
 // ADULT_TEMP_FALLBACK_C (25 deg C) was removed. Out-of-coverage /
@@ -158,7 +165,7 @@ inline constexpr float  ADULT_MORT_FLOOR        = 0.60f;
 
 // Larva desiccation (Depinay 2004 §3.1) is wired by the pool_hydrology
 // constants below: POOL_DESICCATION_GRACE_DAYS + POOL_DESICC_BASE_DAILY
-// (m14-pool-hydrology). The legacy LARVA_DESICCATION_GRACE_DAYS /
+// (m14-pool-hydrology). The legacy LARVA_DESICCATION grace/ rate duo /
 // LARVA_DESICCATION_DAILY_RATE twins (same values) were removed on
 // 2026-10-13 — no runtime consumer since M14's desiccation_rate().
 
@@ -178,13 +185,11 @@ inline constexpr float  ADULT_MORT_FLOOR        = 0.60f;
 // deleted (plan docs/plans/in-process/redesign/01-retirada-*.md §6-§8).
 // Habitat availability is now proxy_habitat_v1: static H[i,g] from six
 // habitat types, two shared temporal responses with
-//   RAIN_SCALE_MM, DRY_MEMORY_DAYS, ACTIVATION_MIN (habitat_availability.hpp)
 // and preserved biological stress bits with
 //   RAIN_WASH_MM, DESICCATION_GRACE_DAYS, DESICC_BASE_DAILY
 // (aquatic_stress.hpp).
 
 // No-data sentinel for the 2-band state COG.
-inline constexpr float  NODATA_SENTINEL             = -9999.0f;
 
 // State COG band identifiers. Contract 4.0: both bands are RAW
 // per-cell adult counts (individuals), NOT normalized by any
@@ -208,7 +213,6 @@ inline constexpr const char* STATE_BAND_NAMES[2]     = {"adult_patch_count", "ad
 // COG bands are raw per-cell adult counts, the sidecar no longer
 // carries `k_max`, and the band names changed. Consumers must
 // version-gate on the sidecar string.
-inline constexpr const char* CONTRACT_VERSION        = "4.0";
 inline constexpr const char* GENERATOR_VERSION       = "proxy_habitat_v1";
 
 // ---------------------------------------------------------------------------
@@ -223,7 +227,7 @@ inline constexpr const char* GENERATOR_VERSION       = "proxy_habitat_v1";
 //
 // `cells_per_side()` returns the number of cells along the east-west axis
 // (the WIDTH of the AOI in cells). The height can be derived
-// symmetrically: H = round((north - south) * 111320 / resolution_m).
+// symmetrically: H = round((north - south) * geodesy met/deg / resolution_m).
 // The full inline implementation lives in aoi.hpp; the declaration is
 // here so wire.hpp remains self-contained for the data types.
 struct AOI {
@@ -316,13 +320,11 @@ struct SuitabilityGrid {
 // regional AOI both formulas give 551/779; for AOIs near a cell
 // boundary the rounding mode diverges (e.g. width_m = 999.5 m at
 // resolution_m = 1000: Python gives 1, lround gives 1, floor gives 0).
-inline constexpr double kEarthRadiusM = 6371008.8;  // WGS84 mean
-inline constexpr double kMetresPerDegLat = (3.14159265358979323846 * kEarthRadiusM) / 180.0;
 inline constexpr double kPi              = 3.14159265358979323846;
 
 inline int32_t AOI::cells_per_side() const noexcept {
     const double centroid_lat_rad = ((north + south) * 0.5) * (kPi / 180.0);
-    const double width_m = (east - west) * kMetresPerDegLat * std::cos(centroid_lat_rad);
+    const double width_m = (east - west) * load_config().geodesy.metres_per_deg_lat * std::cos(centroid_lat_rad);
     const double cells_d = width_m / static_cast<double>(resolution_m);
     int32_t cells = static_cast<int32_t>(std::ceil(cells_d));
     if (cells < 1) cells = 1;

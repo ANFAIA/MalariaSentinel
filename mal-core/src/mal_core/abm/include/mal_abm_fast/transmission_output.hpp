@@ -44,7 +44,7 @@ struct TransmissionCogMetadata {
         TRANSMISSION_BAND_NAMES[2],
         TRANSMISSION_BAND_NAMES[3]
     };
-    float                 nodata = NODATA_SENTINEL;
+    float                 nodata = NODATA_SENTINEL();
     int32_t               h = 0;
     int32_t               w = 0;
 

@@ -5,6 +5,12 @@ Core logic preserved; CLI layer removed.
 """
 from __future__ import annotations
 
+from mal_core.habitat.config import CONFIG
+
+
+def _ingest_nodata() -> float:
+    return float(CONFIG["ingest"]["nodata_sentinel"])
+
 import logging
 import pathlib
 import sys
@@ -74,7 +80,8 @@ def build_host_dataset(
         (h, w),
         method="sum",
     )
-    human_total = float(human[human != -9999.0].sum()) if (human == -9999.0).any() else float(human.sum())
+    _NODATA = _ingest_nodata()
+    human_total = float(human[human != _NODATA].sum()) if (human == _NODATA).any() else float(human.sum())
     results["human_total"] = human_total
 
     # 2. Livestock (GLW4, ~10km) — sum-preserving aggregation
@@ -94,7 +101,7 @@ def build_host_dataset(
         livestock_totals[species] = livestock_arr
 
     livestock_total = sum(
-        float(arr[arr != -9999.0].sum()) for arr in livestock_totals.values()
+        float(arr[arr != _NODATA].sum()) for arr in livestock_totals.values()
     )
     results["livestock_total"] = livestock_total
 

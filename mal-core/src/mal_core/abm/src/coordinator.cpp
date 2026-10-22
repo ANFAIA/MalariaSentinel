@@ -75,13 +75,15 @@ void CoordinatorModel::warm_up_pluvial(int32_t n_warmup_bands) {
     if (!climate_) return;
     const int32_t base = climate_->base_day();
     const int32_t cold_start = std::max(0, base - n_warmup_bands);
-    float z_cold = 0.0f;
+    float z_cold = static_cast<float>(load_config().pluvial.cold_start_z);
     for (int32_t band = cold_start; band < base; ++band) {
         const std::vector<float> rain = climate_->rain_band(band);
         const size_t n = static_cast<size_t>(H_) * static_cast<size_t>(W_);
         if (z_.size() != n || rain.size() != n) return;
         for (size_t i = 0; i < n; ++i) {
-            z_[i] = update_z_step(z_[i], std::max(0.0f, rain[i]), 1.0f);
+            z_[i] = update_z_step(
+                z_[i], std::max(0.0f, rain[i]),
+                static_cast<float>(load_config().pluvial.delta_days));
         }
     }
     (void)z_cold;
@@ -117,7 +119,9 @@ void CoordinatorModel::update_habitat_day(float gamma_t) {
     // 1. Pluvial state advance (rain-driven only in the MVP).
     for (size_t i = 0; i < n; ++i) {
         const float rain = climate_->rain_daily()[i];
-        z_[i] = update_z_step(z_[i], std::max(0.0f, rain), 1.0f);
+        z_[i] = update_z_step(
+                z_[i], std::max(0.0f, rain),
+                static_cast<float>(load_config().pluvial.delta_days));
     }
 
     // 2. Accuracy S and per-cell dry streaks.
@@ -135,7 +139,7 @@ void CoordinatorModel::update_habitat_day(float gamma_t) {
             const std::array<float, 6> h =
                 habitat_potential(feats_[idx]);
             const float S = species_accuracy(h, weights_sq, z_[idx]);
-            if (S >= kActivationMin) {
+            if (S >= habitat_activation_min()) {
                 dry_days_[idx] = 0;
                 ++n_live;
             } else {
@@ -145,7 +149,7 @@ void CoordinatorModel::update_habitat_day(float gamma_t) {
         }
     }
     std::cout << "coordinator: band " << climate_->base_day()
-              << " live cells (S >= " << kActivationMin << "): " << n_live
+              << " live cells (S >= " << habitat_activation_min() << "): " << n_live
               << " / " << (n) << "\n";
 }
 
@@ -165,7 +169,7 @@ std::vector<PatchState> CoordinatorModel::to_dataframe() {
     for (size_t i = 0; i < hw; ++i) {
         const float total = habitat_total_potential(
             habitat_potential(feats_[i]));
-        if (total < kHabitatCandidateMin) continue;
+        if (total < habitat_candidate_min_engine()) continue;
         candidates.insert({static_cast<int32_t>(i / W),
                            static_cast<int32_t>(i % W)});
     }
@@ -210,7 +214,7 @@ std::vector<PatchState> CoordinatorModel::to_dataframe() {
 
         const auto h = habitat_potential(feats_[idx]);
         ps.habitat_avail = species_accuracy(h, default_species_weights(), z_[idx]);
-        ps.activated = ps.habitat_avail >= kActivationMin;
+        ps.activated = ps.habitat_avail >= habitat_activation_min();
         ps.habitat_dry_days = dry_days_[idx];
         ps.k_habitat = K_cell_[idx];
 
@@ -247,7 +251,7 @@ std::vector<SeedInstruction> CoordinatorModel::build_seed_instructions(
     viable_rowcol.reserve(patches.size());
     for (size_t i = 0; i < patches.size(); ++i) {
         const auto& p = patches[i];
-        if (!(p.potential >= kHabitatCandidateMin)) continue;
+        if (!(p.potential >= habitat_candidate_min_engine())) continue;
         viable_ids.push_back(static_cast<int32_t>(i));
         viable_lonlat.push_back({p.lon, p.lat});
         viable_rowcol.push_back({p.row, p.col});
@@ -268,9 +272,12 @@ std::vector<SeedInstruction> CoordinatorModel::build_seed_instructions(
         for (int32_t r = 0; r < gh; ++r) {
             for (int32_t c = 0; c < gw; ++c) {
                 const HostCell cell = host_landscape_->at(r, c);
-                const float indoor_mod =
-                    1.0f + cell.indoor_fraction * 0.72f;
-                const float urban_mod = 1.0f + 0.2f * cell.urbanicity;
+                const auto& hs = load_config().host_seeking;
+                const float indoor_mod = 1.0f + cell.indoor_fraction *
+                    static_cast<float>(hs.indoor_attraction_add);
+                const float urban_mod =
+                    1.0f + static_cast<float>(hs.urbanicity_add) *
+                               cell.urbanicity;
                 const float mod = indoor_mod * urban_mod;
                 float att = 0.0f;
                 att += cell.humans_present    * prefs.human;

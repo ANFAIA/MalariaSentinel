@@ -112,8 +112,13 @@ std::vector<SeedInstruction> build_seed_instructions_host_weighted(
     // Mirrors HostSeekingModel::cell_attraction's distance kernel
     // (exp(-dist/scale)) but sums host density rather than a single
     // target cell: patches surrounded by preferred hosts weigh most.
-    const double scale_m = (config.host_seeking_scale_m > 0.0f)
-        ? static_cast<double>(config.host_seeking_scale_m) : 100.0;
+    const double scale_m = static_cast<double>(config.host_seeking_scale_m);
+    if (!(scale_m > 0.0)) {
+        throw std::invalid_argument(
+            "build_seed_instructions: host_seeking_scale_m not injected by "
+            "the engine (no default: model_constants.yaml species.<name>."
+            "host_seeking_scale_m is the single source; review-a3 P1-4)");
+    }
     const double radius_km = std::max(0.05, config.host_weight_radius_km);
     const int32_t search_cells = static_cast<int32_t>(
         std::ceil(radius_km * 1000.0 / static_cast<double>(cell_size_m)));

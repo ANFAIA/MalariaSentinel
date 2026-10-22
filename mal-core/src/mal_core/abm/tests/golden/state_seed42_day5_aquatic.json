@@ -1,0 +1,25 @@
+{
+  "day": 5,
+  "total_aquatic": 58,
+  "by_stage": {
+    "egg": 15,
+    "larva": 40,
+    "pupa": 3
+  },
+  "by_instar": {
+    "L1": 10,
+    "L2": 7,
+    "L3": 14,
+    "L4": 9
+  },
+  "top_patches": [
+    {"patch_id": 921, "count": 21},
+    {"patch_id": 77, "count": 20},
+    {"patch_id": 1350, "count": 17}
+  ],
+  "mean_development": {
+    "egg": 0.0000,
+    "larva": 0.3395,
+    "pupa": 0.5800
+  }
+}

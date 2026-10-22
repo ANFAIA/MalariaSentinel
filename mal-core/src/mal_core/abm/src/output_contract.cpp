@@ -6,7 +6,7 @@
 // (total adult mosquitoes in the cell, associated via their patch,
 // post-dispersal), band 2 = adult_cell_count (all adults counted at
 // their current position). Contract 4.0: raw per-cell counts, no
-// capacity normalization. The nodata sentinel is `NODATA_SENTINEL`
+// capacity normalization. The nodata sentinel is `NODATA_SENTINEL()`
 // (-9999). The COG profile mirrors the output contract spec
 // (`docs/specs/abm/spec.md`).
 //
@@ -171,7 +171,7 @@ void write_state_cog(const std::string& path,
                 "write_state_cog: cannot get band 1");
         }
         band->SetDescription(STATE_BAND_NAMES[STATE_BAND_DENSITY - 1]);
-        band->SetNoDataValue(static_cast<double>(NODATA_SENTINEL));
+        band->SetNoDataValue(static_cast<double>(NODATA_SENTINEL()));
         CPLErr err = band->RasterIO(
             GF_Write, 0, 0, w, h,
             const_cast<float*>(density.data.data()), w, h,
@@ -192,7 +192,7 @@ void write_state_cog(const std::string& path,
                 "write_state_cog: cannot get band 2");
         }
         band->SetDescription(STATE_BAND_NAMES[STATE_BAND_SUITABILITY - 1]);
-        band->SetNoDataValue(static_cast<double>(NODATA_SENTINEL));
+        band->SetNoDataValue(static_cast<double>(NODATA_SENTINEL()));
         CPLErr err = band->RasterIO(
             GF_Write, 0, 0, w, h,
             const_cast<float*>(suit.data.data()), w, h,

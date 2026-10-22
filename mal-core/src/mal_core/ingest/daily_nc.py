@@ -40,19 +40,27 @@ import numpy as np
 import rasterio
 import xarray as xr
 
-NODATA_SENTINEL = -9999.0
+from ..habitat.config import CONFIG as _MODEL_CONSTANTS
+
+_INGEST = _MODEL_CONSTANTS["ingest"]
+
+_ENV_NC = str(_MODEL_CONSTANTS["contracts"]["env_nc"])
+
+NODATA_SENTINEL = float(_INGEST["nodata_sentinel"])
 
 # Saltwater filter (M12-fix 2026-08-26; preserved): cells outside the buffered
 # GSHHG land mask are dropped from the static JRC feature. Default 5 km
 # buffer keeps coastal lagoons and estuaries while rejecting open ocean (where
 # JRC GSW sees permanent surf). Set ``COASTLINE_BUFFER_M=0`` to disable
 # buffering, negative to disable the filter entirely.
-COASTLINE_BUFFER_M_DEFAULT = 5_000.0
+COASTLINE_BUFFER_M_DEFAULT = float(_INGEST["coastline_buffer_m"])
 
 # Candidate-cell floor: cells whose total potential (sum of the six H
 # features, computed by mal_core.habitat.potential) is below this are
-# outside the ABM patch union. Kept in sync with habitat.HABITAT_CANDIDATE_MIN.
-HABITAT_CANDIDATE_MIN = 1.0e-6
+# outside the ABM patch union. Values live in model_constants.yaml
+# (ingest.candidate_min_ingest); the engine's patch floor is a separate
+# key (habitat.candidate_min_engine) with a different role.
+HABITAT_CANDIDATE_MIN = float(_INGEST["candidate_min_ingest"])
 
 # --- consumer dependency table (the ONLY dataset knowledge in this file) ------
 #
@@ -188,7 +196,7 @@ def build_daily_env_nc(
     nodata_mask = rainfall_raw == NODATA_SENTINEL
     nodata_count = int(nodata_mask.sum())
     fill_frac = nodata_mask.mean(axis=0)
-    valid_cells = fill_frac < 0.5
+    valid_cells = fill_frac < float(_INGEST["fill_frac_valid_max"])
     if valid_cells.any() and not valid_cells.all():
         from scipy.ndimage import distance_transform_edt
         _, (donor_i, donor_j) = distance_transform_edt(
@@ -206,7 +214,7 @@ def build_daily_env_nc(
         try:
             lm = read_static_tif(coastline_file, target_shape)
             lm = np.nan_to_num(lm, nan=0.0)
-            ocean_mask = lm <= 0.5
+            ocean_mask = lm <= float(_INGEST["ocean_mask_threshold"])
             for d in range(n_days):
                 rainfall[d][ocean_mask] = 0.0
         except Exception as e:
@@ -283,16 +291,18 @@ def build_daily_env_nc(
         print(f"Reading coastline land mask: {coastline_file}")
         land_mask = read_static_tif(coastline_file, target_shape)
         land_mask = np.nan_to_num(land_mask, nan=0.0)
-        land_mask = (land_mask > 0.5).astype(np.float32)
+        land_mask = (land_mask > float(_INGEST["land_mask_threshold"])).astype(np.float32)
         if buffer_m > 0:
             from scipy import ndimage
-            cell_size_hint = 1000.0
+            cell_size_hint = float(_INGEST["cell_size_hint_m"])
             try:
                 cell_size_hint = float(
-                    rain_ds.attrs.get("resolution_m", 1000.0))
+                    rain_ds.attrs.get("resolution_m",
+                                      float(_INGEST["cell_size_hint_m"])))
             except Exception:
                 pass
-            radius_cells = max(1, int(np.ceil(buffer_m / cell_size_hint)))
+            radius_cells = max(int(_INGEST["min_dilation_radius_cells"]),
+                               int(np.ceil(buffer_m / cell_size_hint)))
             structure = np.ones((2 * radius_cells + 1, 2 * radius_cells + 1), dtype=bool)
             land_mask = ndimage.binary_dilation(
                 land_mask > 0.5, structure=structure
@@ -376,7 +386,7 @@ def build_daily_env_nc(
             "title": f"MalariaSentinel daily env tensor — {aoi}",
             "aoi_slug": aoi,
             "scale": "regional",
-            "contract_version": "3.0",
+            "contract_version": _ENV_NC,
             "generator_version": "proxy-habitat-v1-0.1.0",
             "n_candidate_cells": int(n_candidates),
         },
@@ -389,7 +399,8 @@ def build_daily_env_nc(
         )
 
     encoding = {
-        v: {"dtype": "float32", "zlib": True, "complevel": 4}
+        v: {"dtype": "float32", "zlib": True,
+            "complevel": int(_INGEST["nc_compression_level"])}
         for v in ds.data_vars
     }
 
@@ -400,7 +411,8 @@ def build_daily_env_nc(
     # drivers expose the 2-D static variables as SUBDATASETS.
     y_m = float(np.median(np.abs(np.diff(y)))) if len(y) > 1 else 0.0
     x_m = float(np.median(np.abs(np.diff(x)))) if len(x) > 1 else 0.0
-    if y_m > 0 and x_m > 0 and y_m < 1 and x_m < 1:  # degree grids
+    step_max = int(_INGEST["grid_degrees_step_max"])
+    if y_m > 0 and x_m > 0 and y_m < step_max and x_m < step_max:  # degree grids
         lat_2d, lon_2d = np.meshgrid(y, x, indexing="ij")
         ds = ds.assign_coords(
             lat=(("y", "x"), lat_2d.astype(np.float64)),
@@ -438,7 +450,7 @@ def build_daily_env_nc(
         f"{jrc['jrc_persistent'].max():.3f}]\n"
         f"  candidate habitat cells (> "
         f"{HABITAT_CANDIDATE_MIN}): {n_candidates} of {h * w}"
-        f"\n  contract_version: 3.0"
+        f"\n  contract_version: {_ENV_NC}"
     )
 
     return {
@@ -449,7 +461,7 @@ def build_daily_env_nc(
         "n_candidate_cells": n_candidates,
         "grid": f"{h}x{w}",
         "variables": variables,
-        "contract_version": "3.0",
+        "contract_version": _ENV_NC,
     }
 
 

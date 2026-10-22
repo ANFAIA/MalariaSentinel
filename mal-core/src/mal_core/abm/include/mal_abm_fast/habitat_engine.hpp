@@ -7,7 +7,7 @@
 //   * optional `dynamics`     (int; 0 = persistent, 1 = pluvial)
 //   * optional `row`, `col`   (int32; pre-computed cell index)
 //   * the Point geometry      (lon, lat)
-// Features below the kHabitatCandidateMin potential floor are dropped.
+// Features below the habitat.candidate_min_engine floor are dropped.
 #pragma once
 
 #include <cstdint>

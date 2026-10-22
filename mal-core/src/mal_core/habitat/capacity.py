@@ -22,16 +22,18 @@ from typing import Mapping
 
 import numpy as np
 
-from .constants import (
-    DEFAULT_SPECIES,
-    K_REF_DAILY_PER_KM2,
-    PLUVIAL_TYPES,
-    SPECIES_HABITAT_WEIGHTS,
-)
+from .config import CONFIG
+# Emergency-adult scaling constant for the py DIAGNOSTIC capacity path
+# (renamed from the retired K_REF_DAILY_PER_KM2 .py constant; it is NOT a
+# model_constants.yaml key — the engine's k_ref = 50.0 is a different
+# concept; plan constants-yaml §9.1: dies here without conversion).
+K_REF_DIAG_PER_KM2: float = 0.143 * 9.3 * 1.0e6  # [ind·km⁻²·d⁻¹ diagnostic]
 from .potential import total_potential
 
-EARTH_RADIUS_M = 6_371_008.8
-METRES_PER_DEG_LAT = (np.pi * EARTH_RADIUS_M) / 180.0
+_DEFAULT_SPECIES = str(CONFIG["species"]["default_species"])
+_PLUVIAL_TYPES = frozenset(
+    g for g, k in CONFIG["habitat_types"]["dynamics"].items()
+    if k == "pluvial")
 
 
 def cell_area_km2(lat_deg: np.ndarray | float, resolution_m: float) -> np.ndarray | float:
@@ -60,13 +62,14 @@ def species_accuracy(
     Returns:
         per-cell S in [0, 1].
     """
-    w = weights if weights is not None else SPECIES_HABITAT_WEIGHTS[DEFAULT_SPECIES]
+    w = weights if weights is not None else dict(
+        CONFIG["species"][_DEFAULT_SPECIES]["weights"])
     acc = np.zeros_like(z_pluvial, dtype=np.float64)
     for g, val in h.items():
         weight = float(w.get(g, 0.0))
         if weight <= 0.0:
             continue
-        avail = z_pluvial if g in PLUVIAL_TYPES else 1.0
+        avail = z_pluvial if g in _PLUVIAL_TYPES else 1.0
         c = np.asarray(val, dtype=np.float64)
         acc += weight * c * avail
     return np.clip(acc, 0.0, 1.0)
@@ -79,7 +82,7 @@ def k_habitat(
     K_ref: float | None = None,
 ) -> np.ndarray:
     """Beverton-Holt per-cell capacity K[i,s,t] in larval-equivalents."""
-    k_ref = K_ref if K_ref is not None else K_REF_DAILY_PER_KM2[DEFAULT_SPECIES]
+    k_ref = K_ref if K_ref is not None else K_REF_DIAG_PER_KM2
     area = np.asarray(cell_area_km2(lat, resolution_m), dtype=np.float64)
     if area.shape != s.shape:
         # Broadcast per-row scalars down a 2-D S: rows all share the same

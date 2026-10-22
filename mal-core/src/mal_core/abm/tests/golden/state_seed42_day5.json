@@ -1,0 +1,31 @@
+{
+  "abm_params_hash": "sha256:pending",
+  "aoi_slug": "custom",
+  "band_names": [
+    "adult_patch_count",
+    "adult_cell_count"
+  ],
+  "contract_version": "4.0",
+  "crs": "EPSG:4326",
+  "generator_version": "proxy_habitat_v1",
+  "month": 1,
+  "n_rollouts": 1,
+  "nodata": -9999.0,
+  "rollout_index": 0,
+  "scale": "regional",
+  "seed": 42,
+  "shape": [
+    2,
+    45,
+    61
+  ],
+  "transform": [
+    0.00901639344262295,
+    0.0,
+    0.05,
+    0.0,
+    -0.008888888888888898,
+    5.75
+  ],
+  "year": 2024
+}

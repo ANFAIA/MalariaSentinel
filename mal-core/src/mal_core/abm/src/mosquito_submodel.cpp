@@ -241,7 +241,7 @@ MosquitoSubmodel::MosquitoSubmodel(int32_t n_patches,
 //
 // For each `SeedInstruction`:
 //   * `n_adults` agents are added with `stage = 1` (adult) and
-//     `development_progress = EIP_THRESHOLD_GD` so the first
+//     `development_progress = EIP_THRESHOLD_GD()` so the first
 //     `larva_to_adult` pass does NOT re-promote them — they are
 //     already adult, ready to disperse on day 1.
 //   * `n_larvae` agents are added with `stage = 0` (larva) and
@@ -415,16 +415,16 @@ inline float seeding_temp_d(const std::vector<PatchState>& ps,
 // value the mortality step uses.
 inline float lardeux_p_d(float T) {
     if (!std::isfinite(static_cast<double>(T))) {
-        return static_cast<float>(ADULT_DAILY_MORT_BASAL);
+        return static_cast<float>(ADULT_DAILY_MORT_BASAL());
     }
-    const double opt_c   = static_cast<double>(ADULT_OPT_C);
-    const double sigma   = static_cast<double>(ADULT_SIGMA);
-    const double basal   = static_cast<double>(ADULT_DAILY_MORT_BASAL);
+    const double opt_c   = static_cast<double>(ADULT_OPT_C());
+    const double sigma   = static_cast<double>(ADULT_SIGMA());
+    const double basal   = static_cast<double>(ADULT_DAILY_MORT_BASAL());
     const double two_ss  = 2.0 * sigma * sigma;
     const double Td      = static_cast<double>(T);
     double p = basal * std::exp(-((Td - opt_c) * (Td - opt_c)) / two_ss);
-    if (p < static_cast<double>(ADULT_MORT_FLOOR)) p = static_cast<double>(ADULT_MORT_FLOOR);
-    if (p > static_cast<double>(ADULT_MORT_CAP))   p = static_cast<double>(ADULT_MORT_CAP);
+    if (p < static_cast<double>(ADULT_MORT_FLOOR())) p = static_cast<double>(ADULT_MORT_FLOOR());
+    if (p > static_cast<double>(ADULT_MORT_CAP()))   p = static_cast<double>(ADULT_MORT_CAP());
     return static_cast<float>(p);
 }
 
@@ -549,7 +549,7 @@ void MosquitoSubmodel::advance_day(const AOI& aoi,
         // Starvation timer for HOST_SEEKING (Plan D).
         if (g_state == GonotrophicState::HOST_SEEKING) {
             soa_.gonotrophic_timer[si] += 1;
-            if (soa_.gonotrophic_timer[si] >= HOST_SEEKING_STARVATION_DAYS) {
+            if (soa_.gonotrophic_timer[si] >= HOST_SEEKING_STARVATION_DAYS()) {
                 swap_with_last(soa_, i, soa_.n_alive);
                 --soa_.n_alive;
                 --i;  // reprocess the element swapped into position i
@@ -599,7 +599,7 @@ void MosquitoSubmodel::advance_day(const AOI& aoi,
                     }
                 }
                 // OVIPOSITION_SEEKING timeout: skip-oviposit, return to HOST_SEEKING.
-                if (g_timer >= OVIPOSITION_SEEKING_TIMEOUT_DAYS &&
+                if (g_timer >= OVIPOSITION_SEEKING_TIMEOUT_DAYS() &&
                     g_state == GonotrophicState::OVIPOSITION_SEEKING) {
                     g_state = GonotrophicState::HOST_SEEKING;
                     g_timer = 0;
@@ -909,7 +909,7 @@ void MosquitoSubmodel::adult_dispersal(const AOI& aoi) {
             if (gs == GonotrophicState::GRAVID ||
                 gs == GonotrophicState::OVIPOSITION_SEEKING) {
                 if (rng_.uniform_double() <
-                    static_cast<double>(WIND_MIGRATION_PROB)) {
+                    static_cast<double>(WIND_MIGRATION_PROB())) {
                     const WindVector w = wind_field_->wind_at(
                         static_cast<double>(soa_.lon[si]),
                         static_cast<double>(soa_.lat[si]),
@@ -919,18 +919,18 @@ void MosquitoSubmodel::adult_dispersal(const AOI& aoi) {
                     const double ws =
                         std::sqrt(static_cast<double>(w.u * w.u + w.v * w.v));
                     const double flight_s =
-                        static_cast<double>(WIND_FLIGHT_HOURS) * 3600.0;
+                        static_cast<double>(WIND_FLIGHT_HOURS()) * 3600.0;
                     double dx_m = 0.0, dy_m = 0.0;
                     if (ws > 0.1) {
                         const double total_speed =
-                            ws + static_cast<double>(WIND_FLIGHT_SPEED_MS);
+                            ws + static_cast<double>(WIND_FLIGHT_SPEED_MS());
                         const double dist_m = total_speed * flight_s;
                         dx_m = (static_cast<double>(w.u) / ws) * dist_m;
                         dy_m = (static_cast<double>(w.v) / ws) * dist_m;
                     }
 
                     if (rng_.uniform_double() <
-                        static_cast<double>(WIND_SURVIVAL)) {
+                        static_cast<double>(WIND_SURVIVAL())) {
                         const double lat_rad =
                             static_cast<double>(soa_.lat[si]) *
                             (kPi / 180.0);
@@ -938,8 +938,8 @@ void MosquitoSubmodel::adult_dispersal(const AOI& aoi) {
                         const double ccos =
                             (safe_cos > 1e-6) ? safe_cos : 1e-6;
                         const double dlon =
-                            dx_m / (kMetresPerDegLat * ccos);
-                        const double dlat = dy_m / kMetresPerDegLat;
+                            dx_m / (kMetresPerDegLat() * ccos);
+                        const double dlat = dy_m / kMetresPerDegLat();
 
                         soa_.lon[si] = static_cast<float>(
                             static_cast<double>(soa_.lon[si]) + dlon);
@@ -1017,10 +1017,10 @@ void MosquitoSubmodel::adult_mortality(
         temp_grid[idx] = ps.temp_d;
     }
 
-    const double opt_c       = static_cast<double>(ADULT_OPT_C);
-    const double sigma       = static_cast<double>(ADULT_SIGMA);
+    const double opt_c       = static_cast<double>(ADULT_OPT_C());
+    const double sigma       = static_cast<double>(ADULT_SIGMA());
     const double two_sigma_sq = 2.0 * sigma * sigma;
-    const double basal       = static_cast<double>(ADULT_DAILY_MORT_BASAL);
+    const double basal       = static_cast<double>(ADULT_DAILY_MORT_BASAL());
 
     int64_t i = soa_.n_alive - 1;
     while (i >= 0) {
@@ -1035,10 +1035,10 @@ void MosquitoSubmodel::adult_mortality(
                 const double T = static_cast<double>(temp_grid[idx]);
                 p_d = basal * std::exp(-((T - opt_c) * (T - opt_c)) / two_sigma_sq);
             } else {
-                p_d = static_cast<double>(ADULT_DAILY_MORT_BASAL);
+                p_d = static_cast<double>(ADULT_DAILY_MORT_BASAL());
             }
-            if (p_d < ADULT_MORT_FLOOR) p_d = ADULT_MORT_FLOOR;
-            if (p_d > ADULT_MORT_CAP)   p_d = ADULT_MORT_CAP;
+            if (p_d < ADULT_MORT_FLOOR()) p_d = ADULT_MORT_FLOOR();
+            if (p_d > ADULT_MORT_CAP())   p_d = ADULT_MORT_CAP();
             if (rng_.uniform_double() >= p_d) {
                 swap_with_last(soa_, i, soa_.n_alive);
                 --soa_.n_alive;

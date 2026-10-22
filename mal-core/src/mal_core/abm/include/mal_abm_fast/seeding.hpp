@@ -24,7 +24,7 @@
 //
 // Each emitted `SeedInstruction` carries a (patch_id, row, col,
 // lon, lat, n_adults, n_larvae) tuple. The adult count is placed
-// with `eip_progress = EIP_THRESHOLD_GD` so the new agents are
+// with `eip_progress = EIP_THRESHOLD_GD()` so the new agents are
 // ready to disperse on day 1. Larvae start at `eip_progress = 0`
 // and must accumulate growing-degree-days before promotion.
 #pragma once
@@ -103,8 +103,12 @@ struct SeedingConfig {
 
     // For HOST_WEIGHTED:
     double host_weight_radius_km = 5.0;  // search radius around each patch
-    float  host_seeking_scale_m  = 100.0f;  // Gaussian decay scale (metres);
-                                            // mirror SpeciesParams::host_seeking_scale_m
+    // Review-a3 P1-4: the seeding-local 100.0f mirror is GONE. This is an
+    // engine-injected slot: engine.cpp always overwrites it with
+    // SpeciesParams::host_seeking_scale_m (model_constants.yaml
+    // species.<name>.host_seeking_scale_m) before the coordinator builds
+    // instructions. No compiled default is allowed here.
+    float host_seeking_scale_m = -1.0f;
     HostPrefWeights host_prefs;          // species host preferences
 };
 

@@ -7,6 +7,10 @@ artifacts are absent — missing data is not a data-integrity failure.
 """
 from __future__ import annotations
 
+from mal_core.habitat.config import CONFIG
+
+_INGEST_NODATA = float(CONFIG["ingest"]["nodata_sentinel"])
+
 import hashlib
 import json
 import re
@@ -170,7 +174,7 @@ class HostInputGate(Scorer):
             return ScorerResult.skipped("missing dependency: xarray", target="~ 27M")
         ds = xr.open_dataset(str(hosts))
         human = ds["human"].values
-        valid = human[human != -9999.0]
+        valid = human[human != _INGEST_NODATA]
         total = float(valid.sum()) if valid.size else 0.0
         ds.close()
         if ref_total <= 0 or total <= 0:

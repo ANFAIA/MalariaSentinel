@@ -1,0 +1,207 @@
+# model_constants.yaml — ÚNICA fuente de parámetros del modelo (py ⇄ C++).
+# Formato: subconjunto YAML plano parseable por mal_abm_fast/config.hpp (sin yaml-cpp).
+# Toda clave es OBLIGATORIA; loaders fallan listando faltantes. Unidades entre [ ].
+# 'frozen' = contrato; cambiar requiere version-bump + PR de contratos.
+
+version: 2                                # int; bump obligatorio en cambio frozen
+
+contracts:              # DOS contratos distintos, claves SEPARADAS (ver plan §9.3)
+  env_nc: "3.0"         # frozen — contrato del env NC, entrada habitat (daily_nc.py)
+  cogs_state: "4.0"     # frozen — contrato del state COG + sidecar (wire.hpp)
+
+habitat_types:          # frozen — orden = API de índice py; C++ carga por NOMBRE
+  types: [surface_persistent, wetland_persistent, urban_persistent,
+          wetland_pluvial, open_pluvial, crop_pluvial]      # 6 tipos
+  dynamics:             # k(g): persistent → A=1; pluvial → A=z
+    surface_persistent:  persistent
+    wetland_persistent:  persistent
+    urban_persistent:    persistent
+    wetland_pluvial:     pluvial
+    open_pluvial:        pluvial
+    crop_pluvial:        pluvial
+
+habitat:
+  activation_min_engine: 0.01  # [índice] umbral S ≥ 0.01 ⇒ celda parche viva
+                               # (coordinator.cpp:138,148,213; reset hab_dry_days).
+                               # [conflict: py=0.10 (constante muerta en runtime) /
+                               #  cpp=0.01 → 0.01] — el 0.10 muere, plan §5
+  candidate_min_engine: 0.01   # [índice] piso de parche del MOTOR (union coordinator +
+                               # filtro gpkg). [conflict: py=1.0e-6 / cpp=0.01 → 0.01].
+                               # El 1e-6 vive separado como ingest.candidate_min_ingest
+                               # (rol distinto: census del ingest vs parche ABM)
+
+pluvial:
+  rain_scale_mm: 2.5       # [mm] [conflict: py=20.0 / cpp=2.5 → 2.5] — valor del motor;
+                           # los scorers d19/d20 se alinean (paso 4 de §8)
+  dry_memory_days: 5.0     # [días] τ_ref (único espejo 1:1 que hoy era correcto)
+  delta_days: 1.0          # [días] paso temporal normal
+  cold_start_z: 0.0        # z inicial de arranque/warm-up
+
+aquatic_stress:
+  desicc_grace_days: 5.0        # [días]
+  desicc_base_daily: 0.10       # [1/día] techo del ramp (muere el 3er gemelo muerto)
+  desicc_ramp_decay: 0.3        # [1/día] exponente (hoy literal mágico −0.3 en 2 lados)
+  wash_threshold_mm: 40.0       # [mm] UNA clave para los 3 nombres de hoy
+  wash_fraction_max: 0.60
+  vulnerable_instar_max: 2      # EGG + L1 + L2 desecan
+
+urban:
+  beta_urban: 0.75              # H_urban = 0.75 · lc_built
+  rain_pools_built_damage: 0.3  # h[open_pluvial] += 0.3·lc_built — SIN espejo py hoy;
+                                # potential.py se alinea añadiendo el término (P0 §6)
+species:
+  default_species: coluzzii
+  # K único del motor: UNA clave, no por especie — el engine tiene un solo
+  # k_ref; K_ref per-species es extensión futura (version-bump).
+  k_ref: 50.0   # [ind·km⁻²·d⁻¹] [conflict: py=1.33e6 (OTRA unidad; NO entra) /
+                #               cpp=50.0 → 50.0] — veredicto y conversión en §9.1
+  # Pesos por especie, por NOMBRE de habitat_types. Mapping fila C++ ZoneId
+  # {jrc, urban, wetland, open, crop, forest} → nombres YAML:
+  #   jrc→surface_persistent, urban→urban_persistent, wetland→wetland_persistent,
+  #   open→open_pluvial, crop→crop_pluvial, forest→(0; columna muerta, no entra).
+  # wetland_pluvial = 0.00: las filas C++ no definen columna wetland separada; el peso
+  # wetland C++ (en C++ < kNumPersistent ⇒ A=1) se asigna a la columna persistente
+  # py, preservando la semántica de disponibilidad del motor.
+  # v2 filas: activity_weights [DAY, EVENING, NIGHT, DAWN] Σ=1 (TimePhase order,
+  # species_params.hpp); pref {human,cattle,goat,sheep,wildlife} = HostType Σ=1;
+  # salinity: s = (1−frac)·exp(−slope·(psu−opt)), hard cap 0 en psu ≥ hi_tol.
+  coluzzii:
+    weights: {surface_persistent: 0.40, wetland_persistent: 0.10, urban_persistent: 0.20,
+              wetland_pluvial: 0.00, open_pluvial: 0.25, crop_pluvial: 0.05}   # Σ=1.00
+    activity_weights: [0.02, 0.10, 0.80, 0.08]          # Σ=1.00
+    pref: {human: 0.99, cattle: 0.005, goat: 0.003, sheep: 0.001, wildlife: 0.001}  # Σ=1.00
+    salinity_opt_ppt: 0.0                               # [psu]
+    salinity_hi_tol_ppt: 30.0                           # [psu]
+    salinity_slope: 0.08                                # [psu⁻¹]
+    host_seeking_scale_m: 300.0   # [m] [conflict: wire=100.0 / species_params=300 → 300]
+    host_seeking_radius_m: 1500.0 # [m] [conflict: wire=300.0 / species_params=1500 → 1500]
+  gambiae_ss:
+    weights: {surface_persistent: 0.05, wetland_persistent: 0.05, urban_persistent: 0.15,
+              wetland_pluvial: 0.00, open_pluvial: 0.65, crop_pluvial: 0.10}   # Σ=1.00
+    activity_weights: [0.02, 0.10, 0.80, 0.08]
+    pref: {human: 0.99, cattle: 0.005, goat: 0.003, sheep: 0.001, wildlife: 0.001}
+    salinity_opt_ppt: 0.0
+    salinity_hi_tol_ppt: 20.0
+    salinity_slope: 0.12     # STEEPER que coluzzii
+    host_seeking_scale_m: 300.0
+    host_seeking_radius_m: 1500.0
+  funestus:
+    weights: {surface_persistent: 0.45, wetland_persistent: 0.30, urban_persistent: 0.10,
+              wetland_pluvial: 0.00, open_pluvial: 0.10, crop_pluvial: 0.05}   # Σ=1.00
+    activity_weights: [0.02, 0.10, 0.80, 0.08]
+    pref: {human: 0.99, cattle: 0.005, goat: 0.003, sheep: 0.001, wildlife: 0.001}
+    salinity_opt_ppt: 0.0
+    salinity_hi_tol_ppt: 15.0
+    salinity_slope: 0.15
+    host_seeking_scale_m: 300.0
+    host_seeking_radius_m: 1500.0
+  arabiensis:
+    weights: {surface_persistent: 0.10, wetland_persistent: 0.10, urban_persistent: 0.15,
+              wetland_pluvial: 0.00, open_pluvial: 0.55, crop_pluvial: 0.10}   # Σ=1.00
+    activity_weights: [0.02, 0.10, 0.80, 0.08]
+    pref: {human: 0.50, cattle: 0.20, goat: 0.15, sheep: 0.10, wildlife: 0.05}
+    salinity_opt_ppt: 0.0
+    salinity_hi_tol_ppt: 15.0
+    salinity_slope: 0.15
+    host_seeking_scale_m: 120.0   # arabiensis sí difiere
+    host_seeking_radius_m: 1500.0
+  melas:            # dormant — mangrove/brackish; sin población activa; PR de
+                    # calibración NO los toca sin ticket de activación coastal
+    weights: {surface_persistent: 0.25, wetland_persistent: 0.15, urban_persistent: 0.15,
+              wetland_pluvial: 0.00, open_pluvial: 0.40, crop_pluvial: 0.05}   # = neutral
+    activity_weights: [0.02, 0.10, 0.80, 0.08]
+    pref: {human: 0.99, cattle: 0.005, goat: 0.003, sheep: 0.001, wildlife: 0.001}
+    salinity_opt_ppt: 0.0
+    salinity_hi_tol_ppt: 38.0   # sobre marine PSD
+    salinity_slope: 0.02        # la más suave
+    host_seeking_scale_m: 300.0
+    host_seeking_radius_m: 1500.0
+  stephensi:        # dormant — urban invader M8+
+    weights: {surface_persistent: 0.25, wetland_persistent: 0.15, urban_persistent: 0.15,
+              wetland_pluvial: 0.00, open_pluvial: 0.40, crop_pluvial: 0.05}   # = neutral
+    activity_weights: [0.02, 0.10, 0.80, 0.08]
+    pref: {human: 0.70, cattle: 0.15, goat: 0.05, sheep: 0.05, wildlife: 0.05}
+    salinity_opt_ppt: 0.0
+    salinity_hi_tol_ppt: 20.0
+    salinity_slope: 0.15
+    host_seeking_scale_m: 300.0
+    host_seeking_radius_m: 1500.0
+  neutral:      # fila species-neutral del motor (coordinator.cpp:115,212)
+    weights: {surface_persistent: 0.25, wetland_persistent: 0.15, urban_persistent: 0.15,
+              wetland_pluvial: 0.00, open_pluvial: 0.40, crop_pluvial: 0.05}   # Σ=1.00
+
+capacity:
+  persistent_availability: 1.0    # A(persistent)=1 MVP (UNA clave; muere la dup
+                                  # species_weighted_constant)
+
+geodesy:
+  earth_radius_m: 6371008.8       # [m] WGS84 mean (el lado vivo es el C++, wire.hpp:319)
+  metres_per_deg_lat: 111195.08023353292  # [m/°] = π·R/180 EXACTO (loader valida la
+                                  # relación ±1e-9); NO el 111320 ni el 111194.9
+                                  # redondeado de los docstring mentirosos
+
+ingest:          # lado py (escritor NC) + valores de paridad cruzada C++⇄py
+  nodata_sentinel: -9999.0      # frozen — sentinel float compartido (COGs C++ escritos ⇄
+                                # relectura py atol=1.0); 4 defs → 1 clave
+  nodata_sentinel_int: -9999    # frozen — mirror int label-mode (dynamic_world.py:467,474)
+  coastline_buffer_m: 5000.0    # [m]
+  cell_size_hint_m: 1000.0      # [m] resolución default (muere la dup wire.hpp:236)
+  candidate_min_ingest: 1.0e-6  # [índice] piso census del ingest — rol DISTINTO de
+                                # candidate_min_engine (NO espejo; por diseño: marcas
+                                # casi-todo en NC y el motor filtra a 0.01)
+  min_dilation_radius_cells: 1
+  fill_frac_valid_max: 0.5      # celda válida si <50% nodata
+  ocean_mask_threshold: 0.5
+  land_mask_threshold: 0.5
+  valid_count_epsilon: 1.0e-9
+  grid_degrees_step_max: 1
+  nc_compression_level: 4       # config de fichero (no modelo), unificada aquí
+
+adults:
+  daily_mort_basal: 0.87      # [1/día] Lardeux (0.87 → vida media ≈7.7 d)
+  opt_c: 25.0                 # [°C] centro gaussiana supervivencia
+  sigma_c: 15.0               # [°C] ancho térmico
+  mort_cap: 0.93              # supervivencia diaria máx
+  mort_floor: 0.60            # supervivencia diaria mín
+
+eip:
+  base_c: 16.0                # [°C] piso térmico GDD
+  threshold_gd: 110.0         # [grados-día] cota de infectividad
+
+dispersal:
+  adult_prob_day: 0.05        # [1/día] (docstring wire «10%» MIENTE — corregido paso 0)
+  adult_sigma_m: 450.0        # [m] Costantini 1996 midpoint
+  adult_max_m: 2000.0         # [m]
+  wind_migration_prob: 0.05
+  wind_flight_hours: 4.0      # [h] Huestis 2019 mid
+  wind_survival: 0.85         # Faiman 2020 mid
+  wind_self_speed_ms: 1.0     # [m/s]
+  flight_hour: 20             # set_current_hour (motor)
+
+host_seeking:   # la capa viva (la que engine ejecuta vía species_params); el per-species
+                # scale/radius vive en species.<name>
+  starvation_days: 7
+  indoor_attraction_add: 0.72     # +(0.72·indoor_fraction) — sin anclaje documentado hoy
+  urbanicity_add: 0.2             # +(0.2·urbanicity)
+  # host_landscape urban_class→fraction mapping (review-a3 INFRA-7: antes
+  # literales 0.72/0.30 réplicas en C++)
+  indoor_fraction_urban: 0.72     # 72% endofílico urbano (An. gambiae)
+  indoor_fraction_rural: 0.30
+
+oviposition:
+  scale_m: 50.0       # [m]
+  radius_m: 500.0     # [m]
+  timeout_days: 7
+
+aquatic_stages:
+  egg_daily_mort: 0.08        # [1/día] Giglioli/Depinay
+  pupa_daily_mort: 0.05       # [1/día]
+  larva_bh_s0: 0.95           # Beverton-Holt supervivencia basal
+  larva_bh_alpha: 0.05        # coef competencia α
+  last_larval_instar: 4
+  salinity_missing_psu: 0.0   # [psu] sin datos ⇒ agua dulce (UNA clave para 6 sitios)
+
+rng:          # seeds de PRODUCCIÓN del motor (reproducibilidad; test fixtures NO van aquí)
+  aquatic_seed_washout: 789
+  aquatic_seed_stage_mortality: 42
+  aquatic_seed_larva_mortality: 123
