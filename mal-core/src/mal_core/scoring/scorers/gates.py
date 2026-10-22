@@ -29,18 +29,22 @@ from .base import (
 
 
 class DataValidGate(Scorer):
-    """G6 (ex-D6): every state band value finite and within [0, 1]."""
+    """G6 (ex-D6): every state band value finite and non-negative.
+
+    Contract 4.0: state bands are raw per-cell adult counts — values
+    above 1 are expected, so the old [0, 1] envelope no longer applies.
+    """
 
     name = "G6_data_valid"
     kind = "gate"
     weight = 0.0
-    description = "All state bands in [0,1] (COG/NaN write integrity)"
+    description = "All state bands finite and >= 0 (COG/NaN write integrity)"
     aoi_generalizable = True
 
     def score(self, run_dir: Path, ctx: dict[str, Any]) -> ScorerResult:
         tifs = find_state_files(run_dir)
         if not tifs:
-            return ScorerResult.skipped("no state files", target="100% in [0,1]")
+            return ScorerResult.skipped("no state files", target="finite & >= 0")
         if len(tifs) > 48:  # uniform sample — full sweep belongs to pytest
             step = len(tifs) / 48.0
             tifs = [tifs[int(i * step)] for i in range(48)]
@@ -54,7 +58,7 @@ class DataValidGate(Scorer):
                     finite = np.isfinite(band) & (band != NODATA)
                     if ds.nodata is not None:
                         finite &= band != ds.nodata
-                    ok = finite & (band >= 0.0) & (band <= 1.0)
+                    ok = finite & (band >= 0.0)
                     if int(ok.sum()) != band.size:
                         bad_files.append(tif.name)
                     total_valid += int(ok.sum())
@@ -63,7 +67,7 @@ class DataValidGate(Scorer):
         return ScorerResult(
             score=frac,
             value=frac,
-            target="100% in [0,1]",
+            target="finite & >= 0",
             diagnostics={"files_with_bad_values": bad_files[:10]},
             passed=frac == 1.0,
         )

@@ -191,7 +191,8 @@ def abm(
         help="Path to gawt worktree (e.g. .gitagent/worktree) for isolated compile and run.",
     ),
     seeding_mode: str = typer.Option("random-viable", "--seeding-mode", help="Initial mosquito seeding mode: 'uniform' | 'random-viable' | 'explicit' | 'host-weighted'."),
-    init_frac: float = typer.Option(0.30, "--init-frac", help="UNIFORM mode: fraction of K seeded per patch (0.0-1.0). Higher = faster vector warm-up, same equilibrium."),
+    seed_adults_per_patch: int = typer.Option(30, "--seed-adults-per-patch", help="UNIFORM mode: adult mosquitoes seeded per candidate patch (explicit count; 30/270 reproduces the retired 0.30×K_MAX=1000 mix)."),
+    seed_immatures_per_patch: int = typer.Option(270, "--seed-immatures-per-patch", help="UNIFORM mode: immatures (eggs+larvae+pupae) seeded per candidate patch."),
     host_seeding_radius_km: float = typer.Option(5.0, "--host-seeding-radius-km", help="HOST_WEIGHTED mode: radius (km) around each patch to weight nearby host abundance."),
     n_detections: int = typer.Option(3, "--n-detections", help="Number of patches to seed. RANDOM_VIABLE / HOST_WEIGHTED modes."),
     n_adults_per_detection: int = typer.Option(50, "--n-adults-per-detection", help="Adult mosquitoes per seeded patch."),
@@ -207,7 +208,7 @@ def abm(
     human_min_cell_pop: float = typer.Option(50.0, "--human-min-cell-pop", help="Minimum cell population to qualify as candidate focus."),
     human_foci_coords: str = typer.Option("", "--human-foci-coords", help="Explicit foci coordinates 'r1,c1:N1;r2,c2:N2'."),
     human_cluster_radius_km: float = typer.Option(0.0, "--human-cluster-radius-km", help="Concentrated-outbreak mode: ONE spatial cluster (core = max-pop viable cell or explicit coord), cases split ~ cell population within this radius. 0 = independent foci."),
-    human_outbreak_min_density: float = typer.Option(0.0, "--human-outbreak-min-density", help="Adaptive trigger: outbreak waits until best viable cell reaches this normalized mosquito density (agents/K_MAX; 0.1 ~ 100 females). 0 = exact day."),
+    human_outbreak_min_density: float = typer.Option(0.0, "--human-outbreak-min-density", help="Adaptive trigger: outbreak waits until best viable cell reaches this many adult mosquitoes (individuals/cell; the retired normalized 0.5 ≈ 500 adults). 0 = exact day."),
     human_cluster_max_core_pop: float = typer.Option(0.0, "--human-cluster-max-core-pop", help="Cluster core population cap: denser cells are not cores (vectors dilute, R<<1). 0 = no cap."),
     initial_human_prevalence: float = typer.Option(0.05, "--initial-human-prevalence", help="Initial infectious fraction of human population (used in uniform-legacy mode)."),
     initial_vector_infected_frac: float = typer.Option(0.0, "--initial-vector-infected-frac", help="Initial infectious fraction of female mosquitoes."),
@@ -282,7 +283,8 @@ def abm(
         data_root=data_root,
         worktree=worktree,
         seeding_mode=seeding_mode,
-        init_frac=init_frac,
+        seed_adults_per_patch=seed_adults_per_patch,
+        seed_immatures_per_patch=seed_immatures_per_patch,
         host_seeding_radius_km=host_seeding_radius_km,
         n_detections=n_detections,
         n_adults_per_detection=n_adults_per_detection,
@@ -524,7 +526,8 @@ def validate_cases(
     n_years: int = typer.Option(2, "--n-years", help="Number of years to simulate (last year = contrast)"),
     seed: int = typer.Option(1, "--seed", help="PRNG seed"),
     warmup_months: int = typer.Option(12, "--warmup-months", help="Initial months discarded before the comparison"),
-    init_frac: float = typer.Option(0.30, "--init-frac", help="UNIFORM seeding: fraction of K seeded per patch"),
+    seed_adults_per_patch: int = typer.Option(30, "--seed-adults-per-patch", help="UNIFORM seeding: adults per candidate patch (explicit count)"),
+    seed_immatures_per_patch: int = typer.Option(270, "--seed-immatures-per-patch", help="UNIFORM seeding: immatures per candidate patch"),
     vector_infected_frac: float = typer.Option(1.0, "--vector-infected-frac", help="Initial infected fraction of the vector pool"),
     snapshot_every: int = typer.Option(30, "--snapshot-every", help="Snapshot interval in days"),
     output_dir: Path = typer.Option(Path("runs/validate-cases"), "--output-dir", help="Output root"),
@@ -573,7 +576,8 @@ def validate_cases(
         data_root=None,
         worktree=None,
         seeding_mode="uniform",
-        init_frac=init_frac,
+        seed_adults_per_patch=seed_adults_per_patch,
+        seed_immatures_per_patch=seed_immatures_per_patch,
         enable_transmission=True,
         human_seeding_mode="none",
         initial_vector_infected_frac=vector_infected_frac,
@@ -624,21 +628,23 @@ def _ensure_env_stack(aoi: str, years: list[int], skip: bool = False) -> Path:
     from .ingest.daily_nc import build_daily_env_nc
 
     typer.echo(f"Auto-download: raw datasets for {y_min}-{y_max}...")
-    # Only what build_daily_env_nc + the engine actually consume:
-    # rainfall (chirps daily), water_temp + wind (era5), ndvi (modis),
-    # water_frac (jrc), twi/k_capacity (dem), land_mask (coastline),
-    # hosts/mobility inputs (worldpop, glw, ghsl, buildings, wildlife).
+    # Only what build_daily_env_nc + the engine actually consume under
+    # contract v3.0: rainfall (chirps daily), air temperature (era5),
+    # water/wetland/built/crop/open fractions (jrc + dynamic world),
+    # land_mask (coastline), hosts/mobility inputs
+    # (worldpop, glw, wildlife — ghsl/buildings retained as independent
+    # host-density consumers).
     run_download(
         aoi=aoi,
-        datasets=["chirps", "era5", "modis"],
-        outputs=["rainfall_daily", "water_temp", "wind_6hourly", "ndvi"],
+        datasets=["chirps", "era5"],
+        outputs=["rainfall_daily", "air_temp_daily", "wind_6hourly"],
         years=years,
         months=None,
         output_dir=data_dir,
     )
     for dataset, outputs in (
-        ("jrc_gsw", ["water_occurrence"]),
-        ("dem", ["elevation"]),
+        ("jrc_gsw", ["habitat_features"]),
+        ("dynamic_world", ["class_fractions"]),
         ("worldpop", ["population"]),
         ("glw", ["cattle", "goats", "sheep", "pigs", "chickens"]),
         ("ghsl", ["urban_class"]),
@@ -646,7 +652,7 @@ def _ensure_env_stack(aoi: str, years: list[int], skip: bool = False) -> Path:
         ("wildlife", ["wildlife_host_proxy"]),
         ("coastline", ["land_mask"]),
     ):
-        run_download(aoi=aoi, datasets=[dataset], outputs=outputs, years=None, months=None, output_dir=data_dir)
+        run_download(aoi=aoi, datasets=[dataset], outputs=outputs, years=years, months=None, output_dir=data_dir)
 
     typer.echo("Building daily env NC...")
     info = build_daily_env_nc(aoi=aoi, data_dir=data_dir)

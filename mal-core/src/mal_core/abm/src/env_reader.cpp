@@ -11,7 +11,8 @@
 #include <array>
 #include <cmath>
 #include <cstddef>
-#include <cstring>
+#include <cstdint>
+#include <iostream>
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
@@ -199,9 +200,33 @@ DailyEnvBands read_env_nc(const std::string& path, int32_t max_days) {
     };
 
     out.rainfall     = read_variable("rainfall");
-    out.water_temp_c = read_variable("water_temp_c");
-    out.water_frac   = read_variable("water_frac");
-    out.ndvi         = read_variable("ndvi");
+    out.air_temp_c   = read_variable("air_temp_c");
+
+    // Static habitat features — contract v3.0. Each optional: a missing
+    // plane logs and stays empty (the coordinator clamps missing
+    // features to 0 and the habitat potential degenerates accordingly).
+    const size_t expected_static =
+        static_cast<size_t>(out.h) * static_cast<size_t>(out.w);
+    auto read_static = [&](const char* name, std::vector<float>& dst) {
+        try {
+            std::vector<float> v = read_variable(name, /*static_plane=*/true);
+            if (v.size() == expected_static) {
+                for (float& x : v) {
+                    if (!std::isfinite(x) || x < 0.0f) x = 0.0f;
+                    else if (x > 1.0f) x = 1.0f;
+                }
+                dst = std::move(v);
+            }
+        } catch (const std::exception&) {
+            std::cerr << "env_reader: WARNING static var '" << name
+                      << "' unavailable in env NC; treating as 0.\n";
+        }
+    };
+    read_static("jrc_persistent",      out.jrc_persistent);
+    read_static("lc_built",            out.lc_built);
+    read_static("lc_wetland",          out.lc_wetland);
+    read_static("lc_open_plus_water",  out.lc_open_plus_water);
+    read_static("lc_crop",             out.lc_crop);
 
     // Optional salinity (psu). The env NC predates salinity; a file
     // without `salinity_ppt` must load identically (salinity_ empty,
@@ -223,69 +248,9 @@ DailyEnvBands read_env_nc(const std::string& path, int32_t max_days) {
         out.salinity_ppt = std::move(v);
     }
 
-    if (subdatasets.count("permanent_water_mask") != 0) {
-        out.permanent_water_mask = read_variable("permanent_water_mask");
-        for (float& x : out.permanent_water_mask) {
-            if (!std::isfinite(x) || x < 0.0f) x = 0.0f;
-            else if (x > 1.0f) x = 1.0f;
-        }
-    }
-
-    // Optional static TWI (plan §6.3 pluvial-pool rules; M7.4.1).
-    // Static variable: single band (no time dimension). A file without
-    // 'twi' must load identically (twi stays empty; the coordinator
-    // treats missing TWI as 0 and the urban rule falls back to
-    // rain + building-cover gating).
-    if (subdatasets.count("twi") != 0) {
-        std::vector<float> v = read_variable("twi", /*static_plane=*/true);
-        const size_t expected =
-            static_cast<size_t>(out.h) * static_cast<size_t>(out.w);
-        if (v.size() == expected) {
-            for (float& x : v) {
-                if (!std::isfinite(x) || x < 0.0f) x = 0.0f;
-            }
-            out.twi = std::move(v);
-        }
-        // Size mismatch (e.g. stale variable) → leave empty, warn-free:
-        // the simulation proceeds with the documented fallback.
-    }
-
-    // Optional static per-cell capacity multiplier (M7.4.1): feeds the
-    // Beverton-Holt larval cap K_patch = K_MAX × mult through the
-    // coordinator's K_eff view. Absent → legacy urban-only K_eff.
-    if (subdatasets.count("k_capacity_mult") != 0) {
-        std::vector<float> v =
-            read_variable("k_capacity_mult", /*static_plane=*/true);
-        const size_t expected =
-            static_cast<size_t>(out.h) * static_cast<size_t>(out.w);
-        if (v.size() == expected) {
-            for (float& x : v) {
-                if (!std::isfinite(x) || x < 0.0f) x = 0.0f;
-            }
-            out.k_capacity_mult = std::move(v);
-        }
-    }
-
-    // Optional static catchment-to-cell area ratio (M7.4.1): physical
-    // input of the pool catchment-runoff model. Absent → the
-    // coordinator falls back to the land-cover constant factors.
-    if (subdatasets.count("catchment_ratio") != 0) {
-        std::vector<float> v =
-            read_variable("catchment_ratio", /*static_plane=*/true);
-        const size_t expected =
-            static_cast<size_t>(out.h) * static_cast<size_t>(out.w);
-        if (v.size() == expected) {
-            for (float& x : v) {
-                if (!std::isfinite(x) || x < 0.0f) x = 0.0f;
-            }
-            out.catchment_ratio = std::move(v);
-        }
-    }
-
-    // Static-band netCDF-C fallback (M7.4.1): older GDAL netCDF drivers
-    // do not expose plain 2-D (y, x) variables as SUBDATASETS, which
-    // silently zeroed twi / k_capacity_mult / catchment_ratio on such
-    // systems. Read them straight from the file by variable name.
+    // Static-band netCDF-C fallback (preserved): older GDAL netCDF
+    // drivers do not expose plain 2-D (y, x) variables as SUBDATASETS;
+    // fetch statics straight from the file by variable name.
     auto read_static_netcdf = [&](const char* varname,
                                   std::vector<float>& dst) {
         if (!dst.empty()) return;  // GDAL path already delivered it
@@ -302,19 +267,24 @@ DailyEnvBands read_env_nc(const std::string& path, int32_t max_days) {
             nc_inq_dimlen(ncid, dimids[1], &dims[1]) == NC_NOERR &&
             dims[0] == static_cast<size_t>(out.h) &&
             dims[1] == static_cast<size_t>(out.w)) {
-            std::vector<float> v(dims[0] * dims[1], 0.0f);
+            std::vector<float>& v = dst;
+            v.assign(dims[0] * dims[1], 0.0f);
             if (nc_get_var_float(ncid, varid, v.data()) == NC_NOERR) {
                 for (float& x : v) {
                     if (!std::isfinite(x) || x < 0.0f) x = 0.0f;
+                    else if (x > 1.0f) x = 1.0f;
                 }
-                dst = std::move(v);
+            } else {
+                v.clear();
             }
         }
         nc_close(ncid);
     };
-    read_static_netcdf("twi", out.twi);
-    read_static_netcdf("k_capacity_mult", out.k_capacity_mult);
-    read_static_netcdf("catchment_ratio", out.catchment_ratio);
+    read_static_netcdf("jrc_persistent",      out.jrc_persistent);
+    read_static_netcdf("lc_built",            out.lc_built);
+    read_static_netcdf("lc_wetland",          out.lc_wetland);
+    read_static_netcdf("lc_open_plus_water",  out.lc_open_plus_water);
+    read_static_netcdf("lc_crop",             out.lc_crop);
 
     if (out.h <= 0 || out.w <= 0) {
         throw std::runtime_error(

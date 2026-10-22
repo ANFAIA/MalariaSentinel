@@ -1,17 +1,13 @@
 // SPDX-License-Identifier: MIT
-// env_reader.hpp — NetCDF4 daily env reader (time-series).
+// env_reader.hpp — NetCDF4 daily env reader (contract v3.0).
 //
-// This is the thin helper namespace the IO subagent (F1.b) implements
-// against GDAL. The ClimateEngine delegates the actual file IO to
-// `read_env_nc` and just stores the resulting flat bands.
-//
-// The NetCDF struct holds time-series data from a CF-1.8 NetCDF4 file.
-// GDAL's netCDF driver flattens dims: for (time=T, y=H, x=W) it exposes
-// T raster bands per variable, each band being one time slice. Variables
-// are: `rainfall`, `water_temp_c` (°C, NO Mordecai inverse), `water_frac`,
-// `ndvi`, and optionally `twi` (no time dim — 1 band).
-// (The legacy 4-band COG reader `read_env_tif` was removed — the env
-// input contract is NC-only; see docs/specs/abm/spec.md INV-6.)
+// Daily bands: rainfall (mm/day), air_temp_c (2 m daily mean).
+// Static planes: the six-habitat feature contract — jrc_persistent,
+// lc_built, lc_wetland, lc_open_plus_water, lc_crop — plus the optional
+// salinity_ppt daily variable.
+// (The retired v2 variables water_frac / ndvi / twi /
+// k_capacity_mult / catchment_ratio / permanent_water_mask are NOT read;
+// contract docs/plans/in-process/redesign/01-*-*.md §6.)
 #pragma once
 
 #include <array>
@@ -22,26 +18,17 @@
 namespace mal_abm_fast {
 namespace env_reader {
 
-// ---------------------------------------------------------------------------
-// Daily NetCDF reader (daily-env-netcdf feature)
-// ---------------------------------------------------------------------------
-
 // Multi-day bands: each vector is n_days * h * w (row-major per-day slices).
 struct DailyEnvBands {
-    std::vector<float>  rainfall;       // mm/day
-    std::vector<float>  water_temp_c;   // deg C, NO Mordecai inverse
-    std::vector<float>  water_frac;     // [0, 1]
-    std::vector<float>  ndvi;           // [0, 1]
-    std::vector<float>  salinity_ppt;   // psu; empty if the NC has no
-                                        // salinity_ppt variable (= freshwater)
-    std::vector<float>  permanent_water_mask; // optional 0..1 mask
-    std::vector<float>  twi;            // optional static TWI grid (h*w);
-                                        // empty if the NC has no twi variable
-                                        // (pluvial-pool urban rule falls back)
-    std::vector<float>  k_capacity_mult; // optional static per-cell capacity
-    std::vector<float>  catchment_ratio; // optional static catchment-to-cell area ratio
-                                        // multiplier (h*w); K_patch =
-                                        // K_MAX × mult. Empty = legacy.
+    std::vector<float> rainfall;     // mm/day
+    std::vector<float> air_temp_c;   // deg C (2 m daily mean)
+    // Static habitat features (h*w, single plane):
+    std::vector<float> jrc_persistent;     // JRC fraction of >=80%-occurrence watert
+    std::vector<float> lc_built;           // ESA WorldCover built-up fraction
+    std::vector<float> lc_wetland;         // wetland+mangrove fraction
+    std::vector<float> lc_open_plus_water; // open/low-veg + bare + water fraction
+    std::vector<float> lc_crop;            // cropland fraction
+    std::vector<float> salinity_ppt;  // psu; empty if the NC has no salinity_ppt
     int32_t             n_days = 0;
     int32_t             h      = 0;
     int32_t             w      = 0;
@@ -49,16 +36,12 @@ struct DailyEnvBands {
     std::string         crs;
 };
 
-// Open `path` (a NetCDF file with CF-1.8 daily env variables) with GDAL
-// and read required variables (`rainfall`, `water_temp_c`, `water_frac`,
-// `ndvi`) across time steps. If `max_days > 0`, only the first `max_days`
-// time steps are loaded (useful for large multi-year files). The time
-// dimension is UNLIMITED. Each variable is written as a multi-band raster
-// by GDAL where bands map to time steps. No Mordecai inverse is applied —
-// `water_temp_c` is already in deg C. Optionally reads a `salinity_ppt`
-// variable (psu); if absent, `salinity_ppt` stays empty (= freshwater,
-// the legacy behaviour). Throws std::runtime_error on any IO error or if
-// a required variable is missing.
+// Open `path` with GDAL, read `rainfall` + `air_temp_c` across the
+// whole time axis (or the first `max_days` bands when > 0), and the
+// five static habitat planes. A missing static variable is a warning;
+// missing `air_temp_c` is a hard contract error. `salinity_ppt` stays
+// empty when the NC predates it (freshwater everywhere). Throws
+// std::runtime_error on any IO or shape error.
 DailyEnvBands read_env_nc(const std::string& path, int32_t max_days = 0);
 
 }  // namespace env_reader

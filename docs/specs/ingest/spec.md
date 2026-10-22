@@ -73,13 +73,13 @@ shape per AOI.
 
 ## 2. In scope
 
-- `build_env_tensor(aoi, year, month, output_dir, *, twi_threshold=8.0, data_root=None) -> dict` — writes the daily env NC + habitat patches. Delegates to `build_daily_env_nc` in `daily_nc.py`. (The legacy `output_format="tif"` COG path, `scale`, `name`, and `skip_*` params were removed on 2026-09-27.)
-- `build_daily_env_nc(aoi, data_dir, output_dir=None, rainfall_file=None, water_frac_file=None, water_temp_file=None, ndvi_file=None) -> dict` — builds the daily multi-year NetCDF consumed by the C++ ABM. Reads pre-downloaded input files from `data_dir` by convention (`{aoi}_rainfall_daily_{years}_daily.nc`, `{aoi}_water_occurrence.tif`, `{aoi}_water_temp_{year}.tif`, `{aoi}_ndvi_{year}.tif`). Returns `{"env_path", "format", "aoi_slug", "n_days", "n_viable_cells", "grid", "variables"}`.
+- `build_env_tensor(aoi, year, month, output_dir, *, data_root=None) -> dict` — writes the daily env NC + the static habitat gpkg. Delegates to `build_daily_env_nc` in `daily_nc.py`. (The legacy `output_format="tif"` COG path, `scale`, `name`, `skip_*`, and the DEM-based `twi_threshold` were removed; contract v3.0 2026-10-17.)
+- `build_daily_env_nc(aoi, data_dir, output_dir=None, rainfall_file=None, air_temp_file=None, jrc_features_file=None, wc_fractions_file=None, salinity_file=None) -> dict` — builds the daily multi-year NetCDF consumed by the C++ ABM (contract v3.0). Reads pre-downloaded input files from `data_dir` via the dataset catalog (`chirps_rainfall_daily`, `era5_air_temp_daily`, `jrc_habitat_features`, `dw_class_fractions`). Returns `{"env_path", "format", "aoi_slug", "n_days", "n_candidate_cells", "grid", "variables"}`.
 - `build_host_dataset(aoi, *, output_dir, worldpop_year=2019, skip_buildings=False, skip_wildlife=False) -> dict` — writes host_static.nc + host_manifest.json.
 - `build_mobility_dataset(hosts_path, *, output_dir, aoi_slug, cell_size_km=1.0, beta_day=0.05, beta_night=0.5, beta_livestock=0.1, max_distance_km=50.0) -> dict` — writes 3 CSR files + mobility_manifest.json.
 - `register_dataset` (writes through to manifest).
 - Helpers in `daily_nc.py`: `read_static_tif(path, target_shape)` (reads single-band TIF with bilinear resampling), `_find_chirps_daily(data_dir)` (glob fallback for CHIRPS daily NC).
-- Constant `WATER_FRAC_VIABILITY_THRESHOLD = 0.05` in `daily_nc.py` — minimum water_frac for a cell to count as viable habitat.
+- Constant `HABITAT_CANDIDATE_MIN = 1e-6` (imported from `mal_core.habitat.constants`) — the summed static habitat potential floor for a cell to enter the ABM patch union. Zero candidate cells raises `RuntimeError`.
 - Pipeline position: stage 2 (after download). Three builders: build_env_tensor, build_host_dataset, build_mobility_dataset.
 
 ## 3. Out of scope
@@ -102,13 +102,12 @@ def build_env_tensor(
     month: int,
     output_dir: Path,
     *,
-    twi_threshold: float = 8.0,
     data_root: Path | None = None,
 ) -> dict:
     """Build the daily env NC + habitat patches. Delegates to
     build_daily_env_nc in daily_nc.py.
     Returns {"env_path", "habitat_path", "aoi_slug", "n_days",
-    "n_viable_cells", "grid", "year", "month", "format", "variables"}.
+    "n_candidate_cells", "grid", "year", "month", "format", "variables"}.
     """
 ```
 
@@ -120,19 +119,18 @@ def build_daily_env_nc(
     data_dir: Path,
     output_dir: Path | None = None,
     rainfall_file: Path | None = None,
-    water_frac_file: Path | None = None,
-    water_temp_file: Path | None = None,
-    ndvi_file: Path | None = None,
+    air_temp_file: Path | None = None,
+    jrc_features_file: Path | None = None,
+    wc_fractions_file: Path | None = None,
+    salinity_file: Path | None = None,
 ) -> dict:
     """Build the daily multi-year NetCDF consumed by the C++ ABM.
 
-    Reads pre-downloaded input files from data_dir by convention:
-      - {aoi}_rainfall_daily_{years}_daily.nc  (or glob fallback)
-      - {aoi}_water_occurrence.tif
-      - {aoi}_water_temp_{year}.tif
-      - {aoi}_ndvi_{year}.tif
+    Resolves pre-downloaded inputs from the manifest catalog (required slots,
+    strict): chirps_rainfall_daily, era5_air_temp_daily,
+    jrc_habitat_features, dw_class_fractions (optionally smap_salinity).
 
-    Returns {"env_path", "format", "aoi_slug", "n_days", "n_viable_cells", "grid", "variables"}.
+    Returns {"env_path", "format", "aoi_slug", "n_days", "n_candidate_cells", "grid", "variables"}.
     """
 ```
 
@@ -172,16 +170,16 @@ def build_mobility_dataset(
 
 ### §5.1 Habitat patches (GeoPackage)
 
-- **INV-6.** Habitat patches: `(TWI > twi_threshold) ∧ (water_frac > 0) ∧ isfinite(TWI)` → GeoPackage with columns `twi_value, water_frac_value, row, col, aoi_slug, geometry`. CRS = AOI CRS. When the buffered coastline land mask is present, open-ocean cells are excluded (M12-fix); `hab_type`/`is_permanent`/`source_layer` columns distinguish permanent water from pluvial pools.
+- **INV-6 (v3.0).** Habitat patches = the candidate-cell union: `total_potential(H[i,g]) > HABITAT_CANDIDATE_MIN` → GeoPackage Point features with columns `hab_type, habitat_potential, dynamics, row, col, aoi_slug, geometry` (+ one numeric column per habitat type `hab_<name>`). CRS = AOI CRS; `hab_type` is the winning habitat type per cell (argmax of H) and `dynamics` its temporal class (`persistent` | `pluvial`). When the buffered coastline land mask is present, open-ocean cells are excluded (M12 saltwater filter preserved on the static JRC plane). There is NO terrain criterion: no TWI, no DEM, no depression mask (plan 01).
 
 ### §5.2 Env tensor (NetCDF) — daily multi-year
 
-- **INV-7.** CF-1.8 conventions, dims `(time, y, x)`, vars `rainfall, water_temp_c, water_frac, ndvi` with `dtype = float32`, `zlib=True, complevel=4`. `_FillValue` is not explicitly set (xarray default NaN for float32).
+- **INV-7.** CF-1.8 conventions, dims `(time, y, x)`, daily vars `rainfall, air_temp_c` plus STATIC 2-D vars `jrc_persistent, lc_built, lc_wetland, lc_open_plus_water, lc_crop` (`dtype = float32`, `zlib=True, complevel=4`; statics carried once on the (y, x) grid, not broadcast per day). `_FillValue` is not explicitly set (xarray default NaN for float32).
 - **INV-8.** `time` axis covers the full multi-year range from the CHIRPS daily rainfall input (e.g. 2024-2025 = 731 days). Not per-month — the ABM reads multi-year slices.
-- **INV-9.** `contract_version: "2.0"`, `generator_version: "m2-daily-0.4.0"`. **Differs from COG INV-4** — see §7.
+- **INV-9.** `contract_version: "3.0"`, `generator_version: "proxy-habitat-v1-0.1.0"`. **Differs from COG INV-4** — see §7.
 - **INV-10.** File naming: `{aoi}_regional_{start}_{end}_env.nc` (e.g. `ghana_regional_2024_2025_env.nc`). Scale is hardcoded to `"regional"` in the NC builder; start/end years are inferred from the CHIRPS input.
-- **INV-20.** `WATER_FRAC_VIABILITY_THRESHOLD = 0.05` — minimum water_frac for a cell to count as viable habitat. Zero viable cells raises `RuntimeError`.
-- **INV-21.** Static layers (water_frac, water_temp_c, ndvi) are broadcast to every day. Only rainfall varies per day.
+- **INV-20.** `HABITAT_CANDIDATE_MIN` — a cell enters the patch union when its summed potential accuracy H_total > 1e-6. Zero candidate cells raises `RuntimeError` (fail loud).
+- **INV-21 (v3.0).** Static habitat planes are 2-D (y, x), never broadcast to the time axis. Daily channels: rainfall (CHIRPS) and air_temp_c (ERA5-Land daily mean, °C) — the annual raster is NOT read; the era5_air_temp_daily NC must cover every rainfall day or the build raises. Rain nor temperature ever enter the static planes (no double-counting).
 
 ### §5.3 Host dataset
 
@@ -231,7 +229,7 @@ for p in Path('data/ghana').glob('*_env.nc'):
     assert ds.attrs.get('Conventions') == 'CF-1.8', f'{p}: missing CF-1.8'
     assert 'time' in ds.dims, f'{p}: no time dim'
     assert ds.dims['time'] >= 365, f'{p}: time axis too short for multi-year'
-    for v in ('rainfall','water_temp_c','water_frac','ndvi'):
+    for v in ('rainfall','air_temp_c','jrc_persistent','lc_built','lc_wetland','lc_open_plus_water','lc_crop'):
         assert v in ds.data_vars, f'{p}: missing var {v}'
     assert ds.attrs.get('contract_version') == '2.0', f'{p}: contract_version={ds.attrs.get(\"contract_version\")}'
     assert ds.attrs.get('generator_version') == 'm2-daily-0.4.0', f'{p}: generator_version={ds.attrs.get(\"generator_version\")}'

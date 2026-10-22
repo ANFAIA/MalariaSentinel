@@ -28,10 +28,10 @@ from .state_loader import load_abm_state
 
 BAND_NAMES_MAP = {
     1: ["predicted_risk"],
-    2: ["predicted_adult_density", "predicted_biting_pressure"],
+    2: ["predicted_adult_patch_count", "predicted_adult_cell_count"],
     6: [
-        "predicted_adult_density",
-        "predicted_biting_pressure",
+        "predicted_adult_patch_count",
+        "predicted_adult_cell_count",
         "predicted_human_prevalence",
         "predicted_human_incidence",
         "predicted_infectious_pressure",

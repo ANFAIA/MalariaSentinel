@@ -6,13 +6,17 @@
 // `hab_type == 'permanent_water'`; the subtype is captured in the
 // `is_permanent` flag. Columns read per feature:
 //
-//   * `hab_type`    (string) — accepted: 'pluvial_pool' or 'permanent_water'
-//   * `is_permanent` (int32) — optional, defaults to 0; 1 if hab_type is 'permanent_water'
-//   * `K`           (int32)  — carrying capacity, default = K_MAX
-//   * `twi_value`   (float)  — static TWI value, default = 0
+//   * `hab_type`    (string) — habitat type label (v3.0: dominant
+//                habitat type, e.g. 'wetland_pluvial'); legacy values
+//                'pluvial_pool'/'permanent_water' still parse as strings
 //   * `row`         (int32)  — pre-computed cell row (F1.3b build_env)
 //   * `col`         (int32)  — pre-computed cell col (F1.3b build_env)
 //   * geometry      (Point)  — EPSG:4326 lon/lat
+//
+// Legacy columns `is_permanent`, `K` and `twi_value` are NOT read:
+// per-cell capacity K is recomputed every day by the coordinator
+// (k_habitat; contract 3.0/4.0), and TWI was retired with the pool
+// model.
 //
 // The (row, col) columns are read when present and valid; we do not
 // derive them in the thin slice (rasterio::rowcol equivalent would
@@ -158,25 +162,24 @@ void HabitatEngine::load_from_gpkg(const std::string& path,
             + path);
     }
 
-    // Resolve field indices. `hab_type` is required (we filter on it);
-    // the rest are optional with sensible defaults.
+    // Resolve field indices. All fields are optional with sensible
+    // defaults; the loader is contract-tolerant.
     const int hab_type_idx = FieldIndex(fdefn, "hab_type");
-    const int k_idx        = FieldIndex(fdefn, "K");
-    const int twi_idx      = FieldIndex(fdefn, "twi_value");
+    const int potential_idx = FieldIndex(fdefn, "habitat_potential");
+    const int dynamics_idx = FieldIndex(fdefn, "dynamics");
     const int row_idx      = FieldIndex(fdefn, "row");
     const int col_idx      = FieldIndex(fdefn, "col");
-    const int permanent_idx = FieldIndex(fdefn, "is_permanent");
     if (hab_type_idx < 0) {
-        // No hab_type column: every feature is treated as pluvial_pool
-        // (M1 only honours that subtype anyway, and the Python loader
-        // defaults hab_type to PLUVIAL_POOL if the column is absent).
+        // No hab_type column: every feature is treated as a candidate
+        // habitat patch (the ingest gpkg defaults hab_type to its
+        // dominant type when the column is absent).
     }
 
     patches_.clear();
     id_to_idx_.clear();
 
-    int64_t pluvial_pool_seen = 0;
-    int64_t twi_dropped       = 0;
+    int64_t candidate_seen = 0;
+    int64_t candidate_dropped = 0;
 
     OGR_L_ResetReading(layer);
     for (OGRFeatureH raw_feat = OGR_L_GetNextFeature(layer);
@@ -184,13 +187,10 @@ void HabitatEngine::load_from_gpkg(const std::string& path,
          raw_feat = OGR_L_GetNextFeature(layer)) {
         FeatureDestroyer feat(raw_feat);
 
-        // Accept temporary and permanent aquatic habitat. Legacy files
-        // without hab_type remain implicitly pluvial pools.
-        if (hab_type_idx >= 0) {
-            const std::string ht = GetStringField(feat.f, hab_type_idx);
-            if (ht != "pluvial_pool" && ht != "permanent_water") continue;
-        }
-        ++pluvial_pool_seen;
+        // Accept any feature: the contract no longer filters by
+        // hab_type (patch viability is potential-based).
+        (void)hab_type_idx;
+        ++candidate_seen;
 
         // (lon, lat) from the Point geometry.
         double lon = 0.0, lat = 0.0;
@@ -200,52 +200,43 @@ void HabitatEngine::load_from_gpkg(const std::string& path,
         }
 
         // (row, col) from explicit columns. Fall back to (0, 0) if
-        // missing — the gpkg emitted by F1.3b build_env always has
+        // missing — the gpkg emitted by ingest/env.py always has
         // them, so this is a defensive default only.
         const int32_t row = GetIntField(feat.f, row_idx, 0);
         const int32_t col = GetIntField(feat.f, col_idx, 0);
 
-        // K capped at K_MAX.
-        int32_t K = GetIntField(feat.f, k_idx, K_MAX);
-        if (K < 0)        K = 0;
-        if (K > K_MAX)    K = K_MAX;
-
-        const float twi_value = static_cast<float>(
-            GetDoubleField(feat.f, twi_idx, 0.0));
-
-        // Build-time filter: TWI is a STATIC terrain signal
-        // (Topographic Wetness Index, derived from the SRTM DEM). It
-        // does not change daily. Patches with TWI <= HABITAT_MIN_TWI
-        // are not viable Anopheles habitat (Kleinschmidt 2000) and
-        // are dropped here, once, at habitat-engine build time. Daily
-        // activation is governed separately by water_frac + rain
-        // (see coordinator.cpp:to_dataframe()).
-        if (twi_value <= HABITAT_MIN_TWI) {
-            ++twi_dropped;
+        // Static potential amplitude H_total in [0, 1]. Defaults to
+        // the full cell (a hand-written gpkg without a potential
+        // column is a valid habitat source at 1.0).
+        float potential = static_cast<float>(
+            GetDoubleField(feat.f, potential_idx, 1.0));
+        potential = std::clamp(potential, 0.0f, 1.0f);
+        // Candidate floor (engineering constant; plan §8). Dropped
+        // patches are the negative case of the ingest census.
+        if (potential < kHabitatCandidateMin) {
+            ++candidate_dropped;
             continue;
         }
+        const int dynamics = GetIntField(feat.f, dynamics_idx, 0);
 
         HabitatPatch patch;
         patch.patch_id        = static_cast<int64_t>(patches_.size());
         patch.row             = row;
         patch.col             = col;
-        patch.K               = K;
-        patch.twi_value       = twi_value;
+        patch.potential       = potential;
         patch.lon             = lon;
         patch.lat             = lat;
-        patch.hab_pluvial_pool = true;
-        patch.is_permanent = GetIntField(feat.f, permanent_idx, 0) != 0;
+        patch.dynamics       = dynamics;
 
         const int64_t new_idx = static_cast<int64_t>(patches_.size());
         id_to_idx_.emplace(patch.patch_id, new_idx);
         patches_.push_back(std::move(patch));
     }
 
-    std::cerr << "habitat_engine: dropped " << twi_dropped
-              << "/" << pluvial_pool_seen
-              << " patches below TWI threshold "
-              << HABITAT_MIN_TWI
-              << " (loaded " << patches_.size() << ")\n";
+    std::cerr << "habitat_engine: loaded " << patches_.size() << " of "
+              << candidate_seen << " candidate patches (dropped "
+              << candidate_dropped << " below the "
+              << kHabitatCandidateMin << " candidate floor)\n";
 }
 
 const HabitatPatch& HabitatEngine::patch_by_id(int64_t pid) const {
@@ -255,11 +246,6 @@ const HabitatPatch& HabitatEngine::patch_by_id(int64_t pid) const {
             "HabitatEngine::patch_by_id: unknown patch_id");
     }
     return patches_[static_cast<size_t>(it->second)];
-}
-
-std::vector<float> HabitatEngine::get_twi_grid(const AOI& aoi) const {
-    if (twi_provider_) return twi_provider_(aoi);
-    return {};
 }
 
 }  // namespace mal_abm_fast

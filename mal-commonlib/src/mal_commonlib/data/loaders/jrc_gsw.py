@@ -1,58 +1,39 @@
-"""JRC Global Surface Water (GSW) 30 m water mask loader (M2 fix — channel 0, ``water_frac``).
+"""JRC Global Surface Water (GSW) 30 m static habitat loader (contract v3.0).
 
 Public surface
 --------------
-``load_jrc_gsw_water_frac(aoi, *, year=2021, cache_dir=None) -> xr.DataArray``
+``load_jrc_gsw_habitat_features(aoi, *, year=2021, cache_dir=None) -> xr.Dataset``
 
-The ``month`` parameter is accepted for signature uniformity with the other
-M1.3a loaders (``build_env`` calls every loader as ``loader(aoi, year,
-month)``) but is ignored: JRC GSW has an annual product (``occurrence``)
-and a 12-band monthly product (``monthly_recurrence``). For the M2
-validation we use a single tile per year (the annual ``occurrence``
-band) and binarise at ``threshold_pct=80``, the standard "permanent
-water" cut-off in the JRC GSW literature (Pekel et al., 2016).
+A single retained channel: ``jrc_persistent``, the per-cell FRACTION of
+water pixels with occurrence >= 80 % (coastline masking excluded). The
+retired threshold-80 binary mask and the ``water_frac`` channel are gone
+(plan docs/plans/in-process/redesign/01-retirada-hidrologia-dem-escorrentia.md
+§6): the fraction IS the feature the redesign consumes, a continuous [0, 1]
+per-cell value, not a binarised raster.
 
 Why this loader exists
 ----------------------
-The M2 real-data validation observed ``water_frac ≈ 7%`` of cells on
-the Ghana AOI (30 186 / 429 229) using the ESA WorldCover 10 m product
-(``esa-worldcover`` STAC collection). All 20 larval sites in
-``data/ghana_idit/occurrence.txt`` sit in cells with
-``water_frac = 0.0``. Because ``build_env`` requires
-``TWI > 8 AND water_frac > 0`` to detect a habitat patch, no patches
-were materialised at the sites and the ABM never activated them; the
-M2 report ended with ``n_sites = 0``, ``AUC = nan``.
-
-The 10 m WorldCover annual product misses small water bodies (pools,
-streams, irrigation channels) that are too narrow or too seasonal to
-be classified as "permanent water" at 10 m. JRC GSW at 30 m has a
-dedicated "water occurrence" band (the fraction of monthly observations
-where the pixel was detected as water) that catches these features
-without changing the per-AOI grid math — we still reproject a binary
-"is-water-this-cell" mask from 30 m onto the 1 km AOI grid.
-
-This loader is the M2 fix for the water layer. It replaces
-``load_worldcover_water_frac`` in ``build_env``'s ``water_frac`` channel
-without changing the contract (same shape, dtype, CRS, and
-``[0, 1] / -9999`` value domain).
+Small water bodies (pools, streams, irrigation channels) are missed by
+the 10 m WorldCover classification. JRC GSW at 30 m has a dedicated
+"water occurrence" band (the fraction of monthly observations where the
+pixel was detected as water) that catches these features; the per-cell
+mean of the binary "occurrence >= 80" mask directly IS the
+persistent-water fraction used as static potential habitat.
 
 Distribution
 ------------
-The M2 fix uses the **Microsoft Planetary Computer** STAC catalog as
-the primary source. The catalog exposes the JRC GSW ``occurrence``,
-``change``, ``transition`` and ``monthly_recurrence`` assets under the
-``jrc-gsw`` collection. We stream-reproject each tile's AOI bbox
-window directly into the AOI grid via two ``rasterio.warp.reproject``
-calls (binary water mask + valid-pixel mask) per tile — no full-tile
-read, no merged mosaic. Memory is bounded by the AOI grid (~0.4 MB
-for Ghana) plus a single tile window.
+The loader uses the **Microsoft Planetary Computer** STAC catalog
+(``jrc-gsw`` collection) and streams each tile's AOI-bbox window directly
+into the AOI grid via ``rasterio.warp.reproject`` — no full-tile read,
+no merged mosaic.
 
-Output contract (per ``docs/abm-output-contract.md`` §2, channel 0):
+Output contract (plan 02 §5, static plane):
     * dims (y, x), dtype ``float32``
     * CRS = ``aoi.crs``
-    * values in ``{0.0, 1.0}`` (binary after threshold; not a fraction)
+    * values in ``[0, 1]`` (fraction of >= 80 %-permanent pixels)
     * NoData: ``-9999.0``
 """
+
 from __future__ import annotations
 
 import pathlib
@@ -271,15 +252,23 @@ def _load_jrc_gsw_pc(
 # -- public API -------------------------------------------------------------
 
 
-def load_jrc_gsw_water_frac(
+def load_jrc_gsw_habitat_features(
     aoi: AOI,
     *,
     year: int = 2021,
     cache_dir: pathlib.Path | None = None,
-) -> xr.DataArray:
-    """Load JRC Global Surface Water (GSW) 30 m ``occurrence`` for the AOI,
-    produce a ``water_frac`` raster in [0, 1] by computing the fraction
-    of each AOI cell that is "permanent water" (``occurrence >= threshold_pct``).
+) -> xr.Dataset:
+    """Load the contract v3.0 static habitat features derived from the JRC
+    Global Surface Water (GSW) 30 m ``occurrence`` band.
+
+    Single channel retained from the retired binary water/seasonal split
+    (plan docs/plans/in-process/redesign/01-retirada-hidrologia-dem-escorrentia.md
+    §6): the per-cell FRACTION of water pixels with occurrence >= 80 %,
+    coastline-masking excluded, as the only static surface-water signal the
+    redesign consumes (``jrc_persistent`` feature column). The old
+    threshold-80 binary mask (a whole-country binary raster with ~5 525
+    cells, useless for a relative habitat index) is NOT produced anymore;
+    the fraction IS the feature.
 
     The loader goes through the Microsoft Planetary Computer STAC catalog
     (``jrc-gsw`` collection) and reads only the AOI bbox window from
@@ -294,11 +283,10 @@ def load_jrc_gsw_water_frac(
             signed URLs stream directly).
 
     Returns:
-        xr.DataArray with dims (y, x), dtype ``float32``, CRS = ``aoi.crs``.
-        Values in [0, 1]. ``-9999.0`` for NoData.
+        ``xr.Dataset`` with one variable ``jrc_persistent`` of dims
+        (y, x), dtype float32, CRS = ``aoi.crs``, in [0, 1];
+        ``-9999.0`` for NoData.
     """
-    threshold_pct = DEFAULT_THRESHOLD_PCT
-
     if not (_MIN_YEAR <= int(year) <= _MAX_YEAR):
         raise ValueError(
             f"JRC GSW year must be in [{_MIN_YEAR}, {_MAX_YEAR}]; got {year}"
@@ -308,55 +296,54 @@ def load_jrc_gsw_water_frac(
     if not all(np.isfinite(b) for b in bbox):
         raise ValueError(f"AOI bbox has non-finite values: {bbox}")
 
-    arr, profile = _load_jrc_gsw_pc(aoi, int(year), int(threshold_pct))
-
-    da = xr.DataArray(
-        arr,
-        dims=("y", "x"),
-        name="water_frac",
-        attrs={
-            "long_name": "JRC GSW permanent water fraction",
-            "source": f"JRC Global Surface Water {year} (Planetary Computer STAC)",
-            "units": "fraction [0, 1]",
-            "threshold_pct": int(threshold_pct),
-            "asset": _PC_ASSET,
-        },
+    # The feature needs NO 80 % binarisation: the per-cell mean of the
+    # binary "occurrence >= threshold" mask directly IS the fraction of
+    # the cell covered by >=80 %-permanent water pixels. The retired code
+    # multiplied the resulting fraction into a separate 0.8 binary step —
+    # dropped; the mean at threshold_pct = PERMANENT_THRESHOLD_PCT.
+    arr, profile = _load_jrc_gsw_pc(
+        aoi, int(year), int(PERMANENT_THRESHOLD_PCT)
     )
-    da.rio.write_crs(profile["crs"], inplace=True)
-    da.rio.write_transform(profile["transform"], inplace=True)
 
-    if str(profile.get("crs")) == str(aoi.crs_obj):
-        rep = da.astype(np.float32)
-    else:
-        ref = _make_reference_grid(aoi)
-        rep = da.rio.reproject_match(ref, resampling=Resampling.average)
-        rep = rep.astype(np.float32)
-    rep = rep.rio.write_nodata(_NODATA_OUT_SCALAR)
-    values = rep.values
-    values = np.where(values == _NODATA_OUT_SCALAR, values, np.clip(values, 0.0, 1.0))
-    values = values.astype(np.float32)
+    values = arr.astype(np.float32)
+    values = np.where(values == _NODATA_OUT_SCALAR, values,
+                      np.clip(values, 0.0, 1.0))
+
     out = xr.DataArray(
         values,
         dims=("y", "x"),
-        name="water_frac",
+        name="jrc_persistent",
         attrs={
-            "long_name": "JRC GSW permanent water fraction (reprojected)",
+            "long_name": "JRC GSW fraction of >=80%-occurrence water pixels",
             "source": f"JRC Global Surface Water {year} (Planetary Computer STAC)",
-            "units": "fraction [0, 1]",
-            "threshold_pct": int(threshold_pct),
+            "units": "fraction of cell area [0, 1]",
+            "threshold_pct": int(PERMANENT_THRESHOLD_PCT),
             "asset": _PC_ASSET,
             "nodata": _NODATA_OUT_SCALAR,
         },
     )
-    out.rio.write_crs(aoi.crs, inplace=True)
-    out.rio.write_transform(from_bounds(*aoi.bbox, *aoi.cells_per_side()), inplace=True)
-    out.rio.write_nodata(_NODATA_OUT_SCALAR, inplace=True)
-    return out
+    out.rio.write_crs(profile["crs"], inplace=True)
+    if str(profile["crs"]) != str(aoi.crs_obj):
+        ref = _make_reference_grid(aoi)
+        out = out.rio.reproject_match(ref, resampling=Resampling.average)
+        out = out.astype(np.float32)
+    ds = out.to_dataset(name="jrc_persistent")
+    ds.rio.write_crs(aoi.crs, inplace=True)
+    ds.rio.write_transform(from_bounds(*aoi.bbox, *aoi.cells_per_side()), inplace=True)
+    ds["jrc_persistent"].rio.write_nodata(_NODATA_OUT_SCALAR, inplace=True)
+    ds.attrs = {
+        "contract": "habitat-v3.0-statics",
+        "source": f"JRC Global Surface Water {year} (Planetary Computer STAC)",
+        "asset": _PC_ASSET,
+        "year_used": int(profile["jrc_gsw_year"]),
+        "nodata": _NODATA_OUT_SCALAR,
+    }
+    return ds
 
 
 DOWNLOADER = {
     "name": "jrc_gsw",
-    "description": "JRC Global Surface Water: water occurrence and seasonality",
+    "description": "JRC Global Surface Water: per-cell permanent-water feature for the habitat contract",
     "requires_auth": ["none"],
     "license": "CC-BY-4.0",
     "attribution": (
@@ -367,18 +354,20 @@ DOWNLOADER = {
     ),
     "is_time_series": False,
     "outputs": {
-        "water_occurrence": load_jrc_gsw_water_frac,
+        "habitat_features": load_jrc_gsw_habitat_features,
     },
     "manifest_keys": {
-        "water_occurrence": "jrc_water",
+        "habitat_features": "jrc_habitat_features",
     },
 }
 
 
 __all__ = [
-    "load_jrc_gsw_water_frac",
+    "load_jrc_gsw_habitat_features",
+    "PERMANENT_THRESHOLD_PCT",
     "DEFAULT_THRESHOLD_PCT",
     "NODATA_OUT",
     "DOWNLOADER",
 ]
 NODATA_OUT = _NODATA_OUT_SCALAR
+PERMANENT_THRESHOLD_PCT: int = 80

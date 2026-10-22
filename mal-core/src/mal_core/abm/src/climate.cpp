@@ -1,16 +1,13 @@
 // SPDX-License-Identifier: MIT
-// climate.cpp — ClimateEngine implementation (env NC -> flat bands).
+// climate.cpp — ClimateEngine implementation (contract v3.0 env NC).
 //
 // The ClimateEngine is a thin wrapper over the env_reader helper: it
 // delegates the actual file IO to `env_reader::read_env_nc` and
 // stores the resulting flat bands in row-major float32 vectors.
-// (The legacy `load_from_env_tif` COG path was removed — the env
-// input contract is NC-only; see docs/specs/abm/spec.md INV-6.)
 //
 // `*_at(row, col)` accessors are bounds-checked; out-of-bounds returns
-// 0 (rain/water) or the border cell's temperature for temp (clamped
-// edge lookup — NaN pixels were imputed at load time, see
-// impute_temp_nans below, so no per-lookup fallback constant exists).
+// 0 (rain) or the border cell's temperature for temp (clamped edge
+// lookup — NaN pixels were imputed at load time, see impute_temp_nans).
 #include "climate.hpp"
 
 #include <cmath>
@@ -42,13 +39,9 @@ inline size_t Idx(int32_t row, int32_t col, int32_t w) noexcept {
 // Each NaN cell is filled once with the mean of its currently-finite
 // 8-neighborhood; filling a cell enqueues its still-NaN neighbors, so
 // the fill propagates one cell layer per wave until the whole NaN
-// region is covered. This is the O(N_nan) equivalent of repeated
-// onion-peel passes and needs no linear-algebra solver: the env
-// temperature field is smooth at ~1 km resolution, and the mean-based
-// fill tracks the same day's spatial field — the imputed values
-// follow the seasonal cycle instead of pinning a fixed fallback.
-// (The old per-cell constant — ADULT_TEMP_FALLBACK_C, 25 deg C — was
-// removed on 2026-10-13 in favour of this imputation.)
+// region is covered. (The elderly per-cell constant fallback was
+// removed on 2026-10-13; preserve imputation — the imputed values
+// follow the seasonal cycle instead of pinning a fixed fallback.)
 //
 // NaN components with no finite cell anywhere in the slice (an
 // entirely out-of-coverage slice) get the slice's finite mean; if
@@ -148,23 +141,8 @@ float ClimateEngine::temp_at(int32_t row, int32_t col) const {
     if (col < 0) col = 0;
     if (col >= w_) col = w_ - 1;
     const float T = temp_[Idx(row, col, w_)];
-    // Out-of-coverage / sea-mask pixels were NaN in the env NC and are
-    // imputed from same-day neighbors at load time (impute_temp_nans in
-    // load_from_env_nc), so they track the seasonal field instead of a
-    // fixed fallback. The previous ADULT_TEMP_FALLBACK_C constant
-    // (25 deg C per NaN/bounds miss) was removed on 2026-10-13.
-    // A NaN surviving here means a degenerate all-NaN slice (no finite
-    // cell anywhere in the env) or an unloaded engine: 25 deg C is the
-    // Lardeux optimum (p_d = ADULT_DAILY_MORT_BASAL exactly) and keeps
-    // both the mortality and EIP submodels in their calibrated regime.
     if (!std::isfinite(static_cast<double>(T))) return 25.0f;
     return T;
-}
-
-float ClimateEngine::water_frac_at(int32_t row, int32_t col) const {
-    if (h_ <= 0 || w_ <= 0) return 0.0f;
-    if (row < 0 || row >= h_ || col < 0 || col >= w_) return 0.0f;
-    return water_[Idx(row, col, w_)];
 }
 
 float ClimateEngine::salinity_at(int32_t row, int32_t col) const {
@@ -176,8 +154,6 @@ float ClimateEngine::salinity_at(int32_t row, int32_t col) const {
     return salinity_[Idx(row, col, w_)];
 }
 
-// -- Daily NetCDF support ----------------------------------------------------
-
 void ClimateEngine::load_from_env_nc(const std::string& path,
                                      const AOI& aoi,
                                      int32_t max_days) {
@@ -186,15 +162,11 @@ void ClimateEngine::load_from_env_nc(const std::string& path,
 
     // Impute NaN temperature pixels once, at load time, across every
     // day slice (out-of-coverage / sea-mask pixels are NaN in the NC).
-    // O(n) wavefront fill per slice, ~1-2 ms for a Ghana-size grid:
-    // after this the temperature channel is finite everywhere and
-    // temp_at() needs no per-lookup fallback. Seasonally correct: each
-    // imputed cell borrows the mean of its same-day neighbors.
-    if (!bands.water_temp_c.empty()) {
+    if (!bands.air_temp_c.empty()) {
         const size_t tslice = static_cast<size_t>(bands.h) *
                               static_cast<size_t>(bands.w);
         for (int32_t d = 0; d < bands.n_days; ++d) {
-            impute_temp_nans(bands.water_temp_c.data() +
+            impute_temp_nans(bands.air_temp_c.data() +
                              static_cast<size_t>(d) * tslice,
                              bands.h, bands.w);
         }
@@ -203,100 +175,85 @@ void ClimateEngine::load_from_env_nc(const std::string& path,
     h_      = bands.h;
     w_      = bands.w;
     n_days_ = bands.n_days;
+    base_day_ = 0;
     cur_day_ = 0;
 
     // Wrap multi-day buffers in shared_ptr for thread-safe sharing
-    rain_nc_       = std::make_shared<std::vector<float>>(std::move(bands.rainfall));
-    water_temp_nc_ = std::make_shared<std::vector<float>>(std::move(bands.water_temp_c));
-    water_frac_nc_ = std::make_shared<std::vector<float>>(std::move(bands.water_frac));
-    ndvi_nc_       = std::make_shared<std::vector<float>>(std::move(bands.ndvi));
+    rain_nc_      = std::make_shared<std::vector<float>>(std::move(bands.rainfall));
+    air_temp_nc_  = std::make_shared<std::vector<float>>(std::move(bands.air_temp_c));
     if (!bands.salinity_ppt.empty()) {
         salinity_nc_ = std::make_shared<std::vector<float>>(
             std::move(bands.salinity_ppt));
     } else {
         salinity_nc_.reset();
     }
-    if (!bands.permanent_water_mask.empty()) {
-        permanent_water_nc_ = std::make_shared<std::vector<float>>(
-            std::move(bands.permanent_water_mask));
-    } else {
-        permanent_water_nc_.reset();
+
+    // Static habitat features — bound exactly when they match the grid.
+    auto move_static = [&](std::vector<float>& src, std::vector<float>& dst,
+                           const char* name) {
+        if (src.size() == static_cast<size_t>(h_) * static_cast<size_t>(w_)) {
+            dst = std::move(src);
+        } else {
+            dst.clear();
+            std::cout << "ClimateEngine: static band '" << name
+                      << "' missing or mis-shaped; treated as 0.\n";
+        }
+    };
+    move_static(bands.jrc_persistent,     jrc_persistent_,     "jrc_persistent");
+    move_static(bands.lc_built,           lc_built_,           "lc_built");
+    move_static(bands.lc_wetland,         lc_wetland_,         "lc_wetland");
+    move_static(bands.lc_open_plus_water, lc_open_plus_water_, "lc_open_plus_water");
+    move_static(bands.lc_crop,            lc_crop_,            "lc_crop");
+    if (!jrc_persistent_.empty()) {
+        std::cout << "ClimateEngine: env NC carries the five static habitat "
+                  << "planes (" << h_ << "x" << w_ << ")\n";
     }
 
-    // Optional static TWI grid (plan §6.3 pluvial-pool rules). Static:
-    // single h*w plane, no time dimension.
-    if (bands.twi.size() == static_cast<size_t>(bands.h) *
-        static_cast<size_t>(bands.w)) {
-        twi_ = std::move(bands.twi);
-        std::cout << "ClimateEngine: env NC carries static TWI grid ("
-                  << h_ << "x" << w_ << ")\n";
-    } else {
-        twi_.clear();
-    }
-
-    // Optional static per-cell capacity multiplier (M7.4.1): consumed by
-    // CoordinatorModel::build_K_eff_grid to set the Beverton-Holt larval
-    // cap K_patch = K_MAX × mult per cell (literature-anchored formula
-    // computed at ingest time).
-    if (bands.k_capacity_mult.size() == static_cast<size_t>(bands.h) *
-        static_cast<size_t>(bands.w)) {
-        k_capacity_mult_ = std::move(bands.k_capacity_mult);
-        std::cout << "ClimateEngine: env NC carries static k_capacity_mult "
-                  << "grid (" << h_ << "x" << w_ << ")\n";
-    } else {
-        k_capacity_mult_.clear();
-    }
-
-    // Optional static catchment-to-cell area ratio (M7.4.1): consumed by
-    // CoordinatorModel's pool hydrology (catchment-runoff model).
-    if (bands.catchment_ratio.size() == static_cast<size_t>(bands.h) *
-        static_cast<size_t>(bands.w)) {
-        catchment_ratio_ = std::move(bands.catchment_ratio);
-        std::cout << "ClimateEngine: env NC carries static catchment_ratio "
-                  << "grid (" << h_ << "x" << w_ << ")\n";
-    } else {
-        catchment_ratio_.clear();
-    }
-
-    // Populate single-day accessors for day 0 (backwards compat).
-    rain_.assign(h_ * w_, 0.0f);
-    temp_.assign(h_ * w_, 25.0f);
-    water_.assign(h_ * w_, 0.0f);
-    ndvi_.assign(h_ * w_, 0.0f);
-    permanent_water_.assign(h_ * w_, 0.0f);
-    if (salinity_nc_) {
-        salinity_.assign(h_ * w_, 0.0f);
-    } else {
-        salinity_.clear();  // accessor returns 0.0 for every cell
-    }
-
+    // Populate single-day accessors for absolute band 0.
     const size_t slice = static_cast<size_t>(h_) * static_cast<size_t>(w_);
+    rain_.assign(slice, 0.0f);
+    temp_.assign(slice, 25.0f);
+    salinity_.assign(salinity_nc_ ? slice : 0, 0.0f);
     for (size_t i = 0; i < slice; ++i) {
-        rain_[i]  = (*rain_nc_)[i];
-        temp_[i]  = (*water_temp_nc_)[i];
-        water_[i] = (*water_frac_nc_)[i];
-        ndvi_[i]  = (*ndvi_nc_)[i];
-        if (permanent_water_nc_) permanent_water_[i] = (*permanent_water_nc_)[i];
+        rain_[i] = (*rain_nc_)[i];
+        temp_[i] = (*air_temp_nc_)[i];
         if (salinity_nc_) salinity_[i] = (*salinity_nc_)[i];
     }
 }
 
+void ClimateEngine::set_base_day(int32_t band_index) {
+    if (band_index < 0) band_index = 0;
+    if (band_index > n_days_ - 1) band_index = n_days_ - 1;
+    base_day_ = band_index;
+}
+
 void ClimateEngine::set_day(int32_t day) {
     if (n_days_ <= 1) return;  // single-day env: no daily switching
-    if (day < 0) day = 0;
-    if (day >= n_days_) day = n_days_ - 1;
-    cur_day_ = day;
+    // `day` is relative to base_day_: negative values read warm-up
+    // bands, values >= 0 read simulation bands.
+    int32_t band = base_day_ + day;
+    if (band < 0) band = 0;
+    if (band >= n_days_) band = n_days_ - 1;
+    cur_day_ = band;
 
     const size_t slice = static_cast<size_t>(h_) * static_cast<size_t>(w_);
     const size_t offset = static_cast<size_t>(cur_day_) * slice;
     for (size_t i = 0; i < slice; ++i) {
-        rain_[i]  = (*rain_nc_)[offset + i];
-        temp_[i]  = (*water_temp_nc_)[offset + i];
-        water_[i] = (*water_frac_nc_)[offset + i];
-        ndvi_[i]  = (*ndvi_nc_)[offset + i];
-        if (permanent_water_nc_) permanent_water_[i] = (*permanent_water_nc_)[offset + i];
+        rain_[i] = (*rain_nc_)[offset + i];
+        temp_[i] = (*air_temp_nc_)[offset + i];
         if (salinity_nc_) salinity_[i] = (*salinity_nc_)[offset + i];
     }
+}
+
+std::vector<float> ClimateEngine::rain_band(int32_t band_index) const {
+    const size_t slice = static_cast<size_t>(h_) * static_cast<size_t>(w_);
+    std::vector<float> out(slice, 0.0f);
+    if (!rain_nc_ || slice == 0) return out;
+    if (band_index < 0) band_index = 0;
+    if (band_index >= n_days_) band_index = n_days_ - 1;
+    const size_t offset = static_cast<size_t>(band_index) * slice;
+    for (size_t i = 0; i < slice; ++i) out[i] = (*rain_nc_)[offset + i];
+    return out;
 }
 
 std::shared_ptr<ClimateEngine> ClimateEngine::clone_for_thread() const {
@@ -304,69 +261,31 @@ std::shared_ptr<ClimateEngine> ClimateEngine::clone_for_thread() const {
     clone->h_ = h_;
     clone->w_ = w_;
     clone->n_days_ = n_days_;
+    clone->base_day_ = base_day_;
     clone->cur_day_ = 0;
-    
+
     // Share the multi-day data (read-only, thread-safe)
     clone->rain_nc_ = rain_nc_;
-    clone->water_temp_nc_ = water_temp_nc_;
-    clone->water_frac_nc_ = water_frac_nc_;
-    clone->ndvi_nc_ = ndvi_nc_;
+    clone->air_temp_nc_ = air_temp_nc_;
     clone->salinity_nc_ = salinity_nc_;
-    clone->permanent_water_nc_ = permanent_water_nc_;
-    
+
     // Independent single-day arrays (thread-local)
-    clone->rain_.assign(h_ * w_, 0.0f);
-    clone->temp_.assign(h_ * w_, 25.0f);
-    clone->water_.assign(h_ * w_, 0.0f);
-    clone->ndvi_.assign(h_ * w_, 0.0f);
-    clone->permanent_water_.assign(h_ * w_, 0.0f);
+    const size_t slice = static_cast<size_t>(h_) * static_cast<size_t>(w_);
+    clone->rain_.assign(slice, 0.0f);
+    clone->temp_.assign(slice, 25.0f);
     if (salinity_nc_) {
-        clone->salinity_.assign(h_ * w_, 0.0f);
+        clone->salinity_.assign(slice, 0.0f);
     } else {
         clone->salinity_.clear();
     }
-    
-    // Initialize day 0
-    if (n_days_ > 0 && rain_nc_) {
-        const size_t slice = static_cast<size_t>(h_) * static_cast<size_t>(w_);
-        for (size_t i = 0; i < slice; ++i) {
-            clone->rain_[i]  = (*rain_nc_)[i];
-            clone->temp_[i]  = (*water_temp_nc_)[i];
-            clone->water_[i] = (*water_frac_nc_)[i];
-            clone->ndvi_[i]  = (*ndvi_nc_)[i];
-            if (permanent_water_nc_) clone->permanent_water_[i] = (*permanent_water_nc_)[i];
-            if (salinity_nc_) clone->salinity_[i] = (*salinity_nc_)[i];
-        }
-    } else {
-        // Static-band engine (env loaded without multi-day NC data, e.g.
-        // a default-constructed engine): rain_nc_ is nullptr. Copy the
-        // static bands directly — otherwise the
-        // clone's water_/rain_/temp_/ndvi_ vectors stay at their
-        // zero/fallback defaults, and downstream code that reads them
-        // (e.g. build_seed_instructions's viability filter) sees
-        // water_frac=0 at every patch and produces 0 viable seeds.
-        clone->rain_  = rain_;
-        clone->temp_  = temp_;
-        clone->water_ = water_;
-        clone->ndvi_  = ndvi_;
-        clone->salinity_ = salinity_;
-        clone->permanent_water_ = permanent_water_;
-    }
 
-    // Static grids are shared read-only with the clone (M7.4.1).
-    // NOTE: twi_/k_capacity_mult_ may come from either the env NC
-    // (load_from_env_nc on the shared engine) or the habitat engine — copy
-    // them unconditionally so both branches behave identically.
-    clone->twi_ = twi_;
-    clone->k_capacity_mult_ = k_capacity_mult_;
-    clone->catchment_ratio_ = catchment_ratio_;
-
+    // static features are read-only; share by copy (bounded memory: 5 planes)
+    clone->jrc_persistent_ = jrc_persistent_;
+    clone->lc_built_ = lc_built_;
+    clone->lc_wetland_ = lc_wetland_;
+    clone->lc_open_plus_water_ = lc_open_plus_water_;
+    clone->lc_crop_ = lc_crop_;
     return clone;
-}
-
-float ClimateEngine::permanent_water_at(int32_t row, int32_t col) const {
-    if (row < 0 || col < 0 || row >= h_ || col >= w_ || permanent_water_.empty()) return 0.0f;
-    return permanent_water_[static_cast<size_t>(row) * static_cast<size_t>(w_) + static_cast<size_t>(col)];
 }
 
 }  // namespace mal_abm_fast

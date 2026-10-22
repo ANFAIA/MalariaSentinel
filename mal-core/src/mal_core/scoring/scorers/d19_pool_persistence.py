@@ -1,106 +1,140 @@
-"""D19: Pool persistence scorer (canonical; promoted from the calibration
-harness 2026-10).
+"""D19: Habitat persistence scorer (canonical; contract v3.0, 2026-10-17).
 
-Verifies that the pool hydrology model produces biologically plausible
-pool dynamics:
-  - A 30mm rain event at T=25 C produces a pool that stays active for
-    at least 4 days, then transitions to dry within 7 days at T=32 C.
-  - The water level follows a filling-then-drying trajectory consistent
-    with the evaporation model.
+Verifies that the proxy-habitat model produces biologically plausible
+persistence behaviour:
+  - A 30 mm rain event keeps the pluvial availability z above the
+    activation floor for at least 4 days, then z decays to near-zero
+    within the drying-memory scale at +7 days.
+  - Persistence-weighted species accuracy keeps a positive dry-season
+    floor from the persistent habitat types (JRC / urban / wetland):
+    built surface and wetlands ride at availability 1 (plan 02 §5,
+    k(g) = 0 for the persistent columns).
 
-Based on: Depinay 2004 (pool persistence in West Africa), Ward 2015
-(West African pan evaporation rates).
+Anchors: Bøgh 2004 (67% of available habitats colonised, Mbita);
+Ndenga 2011 (86% of surveyed habitats human-made, western Kenya) —
+persistence is a supply property, not a rainfall spell.
 """
 from __future__ import annotations
 
+import math
 from pathlib import Path
 from typing import Any
 
-from mal_core.abm.pool_hydrology import (
-    DailyForcing,
-    POOL_WATER_BREED_MM,
-    POOL_WATER_DRY_MM,
-    PoolState,
-    advance_pool,
-)
+from mal_core.habitat import DRY_MEMORY_DAYS, RAIN_SCALE_MM, HABITAT_TYPES
+from mal_core.habitat.capacity import species_accuracy
 
 from .base import Scorer, ScorerResult
 
+# Static potential of a mixed peri-urban cell: the same feature bundle
+# the habitat ingest materialises for a populated coastal fringe.
+_MIXED_CELL_H = (0.20, 0.075, 0.30, 0.40, 0.10, 0.0)
+_MIXED_CELL_W = (0.25, 0.15, 0.15, 0.40, 0.05, 0.0)
+
 
 class PoolPersistenceScorer(Scorer):
-    """D19: pool persistence and desiccation dynamics (weighted composite)."""
+    """D19: pluvial persistence and drying-memory dynamics (composite)."""
 
     name = "D19_pool_persistence"
     kind = "composite"
     weight = 1.0
-    description = "Pool hydrology: 30mm fill -> >=4 active days; dries within 13 days"
+    description = (
+        "Proxy habitat: 30mm pulse keeps z active >=4 days; z decays "
+        "thereafter; persistent-floor accuracy stays > 0 in drought"
+    )
     min_score = 0.70
 
     def score(self, run_dir: Path, ctx: dict[str, Any]) -> ScorerResult:
-        """Score pool persistence using the Python hydrology model.
+        """Score habitat persistence with the shared pluvial recursion.
 
-        Simulates a single-patch scenario:
-          Day 0-2: 30mm rain at 25 C (filling)
-          Day 3-12: 0mm rain at 32 C (drying)
+        Scenario:
+          Day 0-2: 30 mm events (recharge; the activation pulse)
+          Day 3-12: 0 mm (drying memory)
 
-        Verifies:
-          - Pool is active (>= 5mm) for at least 4 days total
-          - Pool becomes dry (< 1mm) within 10 days
-          - Water level trajectory is monotonically decreasing during dry phase
+        Checks:
+          1. z >= 0.05 for at least 4 days
+          2. z < 0.05 inside 3 * DRY_MEMORY_DAYS (memory scale)
+          3. monotone decay through the no-rain phase
+          4. persistent floor: species accuracy at z = 0 stays positive
+             (human dry-season supply) and short of the z = 1 value
         """
-        # Simulate filling + drying.
-        pool = PoolState()
-        water_levels: list[float] = []
+        def step(z: float, rain: float, days: float = 1.0) -> float:
+            """One scalar pluvial step — the contract recursion, written
+            in-place here because the scorer exercises a single cell (the
+            array form lives in habitat.availability with identical math)."""
+            z_dry = z * math.exp(-days / DRY_MEMORY_DAYS)
+            fill = 1.0 - math.exp(-max(0.0, rain) / RAIN_SCALE_MM)
+            return min(1.0, max(0.0, z_dry + (1.0 - z_dry) * fill))
+
+        z = 0.0
+        z_series: list[float] = []
         active_days = 0
         dry_day = -1
 
-        # Filling phase: 30mm/day for 3 days at 25 C.
         for _ in range(3):
-            pool = advance_pool(pool, DailyForcing(rain_mm=30.0, temp_c=25.0))
-            water_levels.append(pool.water_mm)
-            if pool.water_mm >= POOL_WATER_BREED_MM:
+            z = step(z, 30.0)
+            z_series.append(z)
+            if z >= 0.05:
                 active_days += 1
 
-        # Drying phase: 0mm/day for 10 days at 32 C.
         for d in range(10):
-            pool = advance_pool(pool, DailyForcing(rain_mm=0.0, temp_c=32.0))
-            water_levels.append(pool.water_mm)
-            if pool.water_mm >= POOL_WATER_BREED_MM:
+            z = step(z, 0.0)
+            z_series.append(z)
+            if z >= 0.05:
                 active_days += 1
-            if pool.water_mm < POOL_WATER_DRY_MM and dry_day < 0:
-                dry_day = d + 3  # offset by filling days
+            if z < 0.05 and dry_day < 0:
+                dry_day = d + 3
 
-        # Scoring.
         diagnostics: dict[str, Any] = {
             "active_days": active_days,
             "dry_day": dry_day,
-            "water_levels": [round(w, 2) for w in water_levels],
+            "z_series": [round(v, 3) for v in z_series],
+            "rain_scale_mm": RAIN_SCALE_MM,
+            "dry_memory_days": DRY_MEMORY_DAYS,
         }
 
-        # Active for at least 4 days (filling + residual moisture).
+        # 1. Persistence: a single 30 mm pulse is enough for >= 4 days.
         persistence_ok = active_days >= 4
-        # Dries out within 13 days total.
-        dries_out = dry_day >= 0
-
-        # Check monotonically decreasing during dry phase (indices 3..12).
-        dry_levels = water_levels[3:]
+        # 2. Drying: z falls under the floor within the memory scale.
+        dries_out = dry_day >= 0 and dry_day <= int(3 * DRY_MEMORY_DAYS)
+        # 3. Monotone decay after the last recharge.
+        decay_levels = z_series[3:]
         monotone = all(
-            dry_levels[i + 1] <= dry_levels[i] + 0.01  # tolerance for float
-            for i in range(len(dry_levels) - 1)
+            decay_levels[i + 1] <= decay_levels[i] + 1e-6
+            for i in range(len(decay_levels) - 1)
+        )
+        # 4. Persistent floor (the user-fixed urban premise: at z = 0 the
+        # built/wetland/JRC columns keep a positive supply).
+        h_map = {
+            g: float(v)
+            for g, v in zip(HABITAT_TYPES, _MIXED_CELL_H)
+        }
+        w_map = {
+            g: float(v)
+            for g, v in zip(HABITAT_TYPES, _MIXED_CELL_W)
+        }
+        floor = float(species_accuracy(h_map, 0.0, w_map))
+        ceiling = float(species_accuracy(h_map, 1.0, w_map))
+        floor_ok = (
+            math.isfinite(floor) and 0.0 < floor < ceiling <= 1.0
         )
 
         score = 0.0
         if persistence_ok:
-            score += 0.4
-        if dries_out:
             score += 0.3
+        if dries_out:
+            score += 0.2
         if monotone:
+            score += 0.2
+        if floor_ok:
             score += 0.3
 
         return ScorerResult(
             score=round(score, 4),
             value=float(active_days),
-            target="active >= 4 days; dries within 13 days; monotone drying",
+            target=(
+                "active >= 4 days; dries inside 3*DRY_MEMORY; monotone "
+                "decay; persistent floor in (0, ceiling]"
+            ),
             diagnostics=diagnostics,
             passed=score >= 0.70,
         )

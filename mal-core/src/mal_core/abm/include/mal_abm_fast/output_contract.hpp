@@ -24,7 +24,8 @@ namespace mal_abm_fast {
 
 // The metadata blob written into the sidecar JSON. Every field is
 // required; the writer must emit them in this exact order (the
-// `k_max` and `band_names` are pinned by the parity test).
+// `band_names` are pinned by the parity test). The retired `k_max`
+// key removed with contract 4.0 (bands are raw adult counts).
 //
 // F1.c `n_rollouts` and `rollout_index` (default 1 / 0): added in
 // the F1.c `--n-rollouts` change. The single-rollout case
@@ -51,7 +52,6 @@ struct StateCogMetadata {
     float                       nodata = NODATA_SENTINEL;
     int32_t                     h = 0;
     int32_t                     w = 0;
-    int32_t                     k_max = K_MAX;
 };
 
 // Write the 2-band state COG. The implementation subagent uses GDAL

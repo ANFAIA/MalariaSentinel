@@ -3,8 +3,9 @@
 //
 // Three modes:
 //
-//   * UNIFORM: emit zero instructions. The submodel uses init_frac
-//              for every patch (backward compatible legacy path).
+//   * UNIFORM: emit zero instructions. The submodel seeds the
+//              SeedingConfig explicit per-patch counts in every
+//              candidate patch (via build_uniform_seed_instructions).
 //   * RANDOM_VIABLE: pick N random patch_ids from `viable_patch_ids`,
 //              where each chosen patch receives
 //              `n_adults_per_detection` adults (ready to disperse)
@@ -200,8 +201,9 @@ std::vector<SeedInstruction> build_seed_instructions_for_patches(
 
     switch (config.mode) {
         case SeedingMode::UNIFORM:
-            // Legacy path: the submodel seeds `init_frac` of K in
-            // every patch. No instructions are needed.
+            // UNIFORM instructions are built by
+            // CoordinatorModel::build_uniform_seed_instructions (the
+            // day-0 patch union). No instructions here.
             return out;
 
         case SeedingMode::RANDOM_VIABLE: {

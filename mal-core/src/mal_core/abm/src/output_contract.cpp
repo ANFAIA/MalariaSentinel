@@ -2,10 +2,11 @@
 // output_contract.cpp — 2-band state COG writer + sidecar JSON writer.
 //
 // `write_state_cog` produces a tiled, deflate-compressed, 128x128
-// block GeoTIFF with two float32 bands: band 1 = adult_occupancy
-// (total adult mosquitoes in cell post-dispersal / K_MAX ∈ [0, 1]),
-// band 2 = host_seeking_pressure (female adults in host-seeking state
-// / K_MAX ∈ [0, 1]). The nodata sentinel is `NODATA_SENTINEL`
+// block GeoTIFF with two float32 bands: band 1 = adult_patch_count
+// (total adult mosquitoes in the cell, associated via their patch,
+// post-dispersal), band 2 = adult_cell_count (all adults counted at
+// their current position). Contract 4.0: raw per-cell counts, no
+// capacity normalization. The nodata sentinel is `NODATA_SENTINEL`
 // (-9999). The COG profile mirrors the output contract spec
 // (`docs/specs/abm/spec.md`).
 //
@@ -240,7 +241,7 @@ void write_state_sidecar(const std::string& tif_path,
     j["shape"].push_back(2);
     j["shape"].push_back(meta.h);
     j["shape"].push_back(meta.w);
-    j["k_max"]             = meta.k_max;
+    // Contract 4.0: the `k_max` key removed — bands carry raw counts.
 
     const std::string sidecar_path = sidecar_path_for(tif_path);
     std::ofstream f(sidecar_path, std::ios::out | std::ios::trunc);

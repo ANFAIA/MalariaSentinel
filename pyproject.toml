@@ -37,11 +37,16 @@ dependencies = [
     "gawt>=0.6.3",
     "pyogrio>=0.13.0",
     "fiona>=1.10.1",
+    "marimo>=0.25.1",
+    "earthengine-api>=1.7.48",
 ]
 
 [dependency-groups]
 dev = [
     "gawt>=0.6.3",
+]
+terrain = [
+    "laspy[lazrs]>=2.5.0",
 ]
 
 [tool.uv]

@@ -50,7 +50,7 @@ def resolve_dataset_file(
 
     Selection inside the entry's ``files`` dict:
       1. ``files[str(year)]`` when ``year`` is given and present (per-year
-         datasets: era5_water_temp, modis_ndvi, env...);
+         datasets: era5_wind, mobility, seasonals...);
       2. ``files[dataset_name]`` (single-file datasets where the key repeats
          the dataset name: chirps_rainfall_daily, host_static...);
       3. first declared file, otherwise.

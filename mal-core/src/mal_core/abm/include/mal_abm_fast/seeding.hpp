@@ -9,7 +9,8 @@
 // list of per-patch seeding instructions" facility with three modes:
 //
 //   * `UNIFORM`        — legacy path. No instructions are emitted;
-//                        the submodel uses `init_frac` for every
+//                        the submodel seeds the SeedingConfig explicit
+//                        per-patch counts (`build_uniform_seed_instructions`).
 //                        patch (backward compatible).
 //   * `RANDOM_VIABLE`  — pick N random patch_ids from the
 //                        "viable" set (water_frac > 0.05 AND
@@ -37,7 +38,7 @@
 namespace mal_abm_fast {
 
 enum class SeedingMode {
-    UNIFORM,        // backward compat: init_frac of K in all patches
+    UNIFORM,        // explicit per-patch adult/immature counts (SeedingConfig)
     RANDOM_VIABLE,  // N random points from viable patches
     EXPLICIT,       // user-provided lat/lon
     HOST_WEIGHTED   // N viable patches sampled ∝ nearby host abundance
@@ -85,8 +86,11 @@ struct SeedingConfig {
     // For EXPLICIT:
     std::vector<DetectionPoint> detections;
 
-    // For UNIFORM (legacy):
-    float init_frac = 0.30f;
+    // For UNIFORM: explicit per-patch initial counts (contract 4.0 —
+    // the retired init_frac × K_MAX product is replaced by direct
+    // counts; 30/270 reproduces the historical 0.30 × 1000 mix).
+    int32_t n_adults_per_patch    = 30;
+    int32_t n_immatures_per_patch = 270;
 
     // Per-detection defaults (apply to RANDOM_VIABLE; EXPLICIT can
     // override per-point via DetectionPoint).
@@ -105,7 +109,9 @@ struct SeedingConfig {
 };
 
 // Per-patch seeding instruction. Built by the coordinator and
-// consumed by the submodel constructor.
+// consumed by the submodel constructor. No adult cap: the requested
+// counts are seeded verbatim (the M17.4 urban_capacity_factor and the
+// K_MAX cap retired with plan 03-retirada-k-max).
 struct SeedInstruction {
     int32_t patch_id = 0;
     int32_t row      = 0;
@@ -114,12 +120,9 @@ struct SeedInstruction {
     double  lat      = 0.0;
     int32_t n_adults = 0;
     int32_t n_larvae = 0;
-    // Urban capacity factor (plan §6.4, M17.4 PR-A): in
-    // [URBAN_CAPACITY_FLOOR, URBAN_CAPACITY_CEIL] for urban-sourced
-    // patches, 1.0 for terrain patches. Mirrors PatchState::urban_capacity_factor.
-    // Carried here so the submodel's seed loop can cap adult counts
-    // by K_MAX * factor (per-patch) rather than the global K_MAX.
-    float   urban_capacity_factor = 1.0f;
+    // NOTE: `n_larvae` is distributed across eggs + L1..L4 + pupae by
+    // the submodel (age-structured seeding), so the field is really
+    // "immatures"; the historical name is kept for continuity.
 };
 
 // Build a list of SeedInstructions from a SeedingConfig + habitat info.
@@ -131,8 +134,8 @@ struct SeedInstruction {
 //   `patch_rowcol`     — per-patch [row, col] (parallel to viable_patch_ids).
 //   `rng`              — used for random selection in RANDOM_VIABLE mode.
 //
-// Returns an empty vector for UNIFORM mode (the submodel uses
-// init_frac for every patch — the legacy path).
+// Returns an empty vector for UNIFORM mode (the submodel uses the
+// SeedingConfig per-patch counts for every candidate patch).
 //
 // NOTE: the function is named `build_seed_instructions_for_patches`
 // to avoid clashing with `CoordinatorModel::build_seed_instructions`,

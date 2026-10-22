@@ -41,7 +41,7 @@ mal_abm_fast::AOI make_test_aoi() {
 
 // 100 patches at the 10x10 cells (row = i/10, col = i%10); the first
 // 4 are active (the top-left 2x2 block), the rest are inactive. Env
-// values are pinned to rain=20 mm, temp=25 C, water_frac=0.5.
+// values are pinned to rain=20 mm, temp=25 C (contract v3.0: no water_frac).
 std::vector<mal_abm_fast::PatchState> make_test_patch_states() {
     std::vector<mal_abm_fast::PatchState> ps(100);
     for (int64_t i = 0; i < 100; ++i) {
@@ -52,22 +52,24 @@ std::vector<mal_abm_fast::PatchState> make_test_patch_states() {
         ps[si].activated  = (i < 4);
         ps[si].rain_d     = 20.0f;
         ps[si].temp_d     = 25.0f;
-        ps[si].water_frac = 0.5f;
-    }
+        // Contract 4.0: explicit test capacity (numerically the retired
+        // K_MAX fallback). Without it K=0 means zero larval survival.
+        ps[si].k_habitat  = 1000.0f;
+            }
     return ps;
 }
 
 }  // namespace
 
 TEST(MalAbmFastMosquitoSubmodel, ConstructionSeedsRoundRobin) {
-    mal_abm_fast::MosquitoSubmodel sub(100, 1000, 0.3f, 42);
+    mal_abm_fast::MosquitoSubmodel sub(100, 30, 270, 42);
     // G3: 10% of 30000 = 3000 adults in SoA; 90% = 27000 eggs in cohort bank.
     EXPECT_EQ(sub.total_agents(), 3000);
     EXPECT_EQ(sub.cohort_bank().count_by_stage(mal_abm_fast::AquaticStage::EGG), 27000);
 }
 
 TEST(MalAbmFastMosquitoSubmodel, ThirtyDayRollout) {
-    mal_abm_fast::MosquitoSubmodel sub(100, 1000, 0.3f, 42);
+    mal_abm_fast::MosquitoSubmodel sub(100, 30, 270, 42);
     const auto aoi = make_test_aoi();
     const auto ps  = make_test_patch_states();
     for (int day = 0; day < 30; ++day) {
@@ -81,7 +83,7 @@ TEST(MalAbmFastMosquitoSubmodel, ThirtyDayRollout) {
 }
 
 TEST(MalAbmFastMosquitoSubmodel, AdultDispersalUpdatesRowCol) {
-    mal_abm_fast::MosquitoSubmodel sub(100, 1000, 0.3f, 42);
+    mal_abm_fast::MosquitoSubmodel sub(100, 30, 270, 42);
     const auto aoi = make_test_aoi();
     const auto ps  = make_test_patch_states();
     sub.advance_day(aoi, ps);
@@ -111,7 +113,7 @@ TEST(MalAbmFastMosquitoSubmodel, AdultDispersalUpdatesRowCol) {
 }
 
 TEST(MalAbmFastMosquitoSubmodel, DispersalDoesNotEscapeAOI) {
-    mal_abm_fast::MosquitoSubmodel sub(100, 1000, 0.3f, 42);
+    mal_abm_fast::MosquitoSubmodel sub(100, 30, 270, 42);
     const auto aoi = make_test_aoi();
     const auto ps  = make_test_patch_states();
     for (int day = 0; day < 30; ++day) {
@@ -133,8 +135,8 @@ TEST(MalAbmFastMosquitoSubmodel, DispersalDoesNotEscapeAOI) {
 }
 
 TEST(MalAbmFastMosquitoSubmodel, Determinism) {
-    mal_abm_fast::MosquitoSubmodel a(100, 1000, 0.3f, 42);
-    mal_abm_fast::MosquitoSubmodel b(100, 1000, 0.3f, 42);
+    mal_abm_fast::MosquitoSubmodel a(100, 30, 270, 42);
+    mal_abm_fast::MosquitoSubmodel b(100, 30, 270, 42);
     const auto aoi = make_test_aoi();
     const auto ps  = make_test_patch_states();
     for (int day = 0; day < 30; ++day) {
@@ -160,7 +162,7 @@ TEST(MalAbmFastMosquitoSubmodel, BevertonHoltKillsLarvaeAtHighDensity) {
     // removed 2026-10-13), the old 0.3 init frac (300 larv/patch) let new births mask BH
     // deaths, so we raise the initial population to keep BH
     // deaths dominant over births.
-    mal_abm_fast::MosquitoSubmodel sub(100, 1000, 1.0f, 42);
+    mal_abm_fast::MosquitoSubmodel sub(100, 30, 970, 42);
     const auto aoi = make_test_aoi();
     auto ps = make_test_patch_states();
     const int64_t before = sub.total_agents();
@@ -171,7 +173,7 @@ TEST(MalAbmFastMosquitoSubmodel, BevertonHoltKillsLarvaeAtHighDensity) {
 
 TEST(MalAbmFastMosquitoSubmodel, BevertonHoltSurvivalAtLowDensity) {
     // Very few larvae: BH survival ≈ S0 ≈ 0.95, almost all survive.
-    mal_abm_fast::MosquitoSubmodel sub(10, 1, 1.0f, 42);
+    mal_abm_fast::MosquitoSubmodel sub(10, 1, 9, 42);
     // 10 patches × 1 × 1.0 = 10 larvae total.
     const auto aoi = make_test_aoi();
     auto ps = make_test_patch_states();
@@ -189,7 +191,7 @@ TEST(MalAbmFastMosquitoSubmodel, AdultMortalityReducesPopulation) {
     // Seed 100 patches, run 30 days to get adults, then deactivate all
     // patches so no new births occur. Adult mortality (Lardeux fallback
     // at 0.90 when patch is inactive) should reduce the population.
-    mal_abm_fast::MosquitoSubmodel sub(100, 1000, 0.3f, 42);
+    mal_abm_fast::MosquitoSubmodel sub(100, 30, 270, 42);
     const auto aoi = make_test_aoi();
     const auto ps  = make_test_patch_states();
     for (int day = 0; day < 30; ++day) {
@@ -206,7 +208,7 @@ TEST(MalAbmFastMosquitoSubmodel, AdultMortalityReducesPopulation) {
 
 TEST(MalAbmFastMosquitoSubmodel, AdultMortalityUsesFallbackWhenNoTemp) {
     // All patches inactive — adult mortality uses ADULT_DAILY_MORT_BASAL = 0.87.
-    mal_abm_fast::MosquitoSubmodel sub(100, 1000, 0.3f, 42);
+    mal_abm_fast::MosquitoSubmodel sub(100, 30, 270, 42);
     const auto aoi = make_test_aoi();
     auto ps = make_test_patch_states();
     // First day: all active to seed adults.
@@ -224,7 +226,7 @@ TEST(MalAbmFastMosquitoSubmodel, AdultMortalityUsesFallbackWhenNoTemp) {
 
 TEST(MalAbmFastMosquitoSubmodel, AdvanceDayCallOrder) {
     // Verify that the 7 ops execute without crash and produce a valid state.
-    mal_abm_fast::MosquitoSubmodel sub(100, 1000, 0.3f, 42);
+    mal_abm_fast::MosquitoSubmodel sub(100, 30, 270, 42);
     const auto aoi = make_test_aoi();
     const auto ps  = make_test_patch_states();
     // Run 7 days (one per op cycle) — should not crash.
@@ -239,7 +241,7 @@ TEST(MalAbmFastMosquitoSubmodel, AdvanceDayCallOrder) {
 TEST(MalAbmFastMosquitoSubmodel, DesiccationKillsAfterGracePeriod) {
     // G3: desiccation now affects eggs and early instars in the cohort
     // bank. Seed many eggs and deactivate the patch — eggs should die.
-    mal_abm_fast::MosquitoSubmodel sub(1, 1000, 1.0f, 42);
+    mal_abm_fast::MosquitoSubmodel sub(1, 30, 970, 42);
     const auto aoi = make_test_aoi();
     auto ps = make_test_patch_states();
     for (auto& p : ps) p.activated = false;
@@ -247,11 +249,13 @@ TEST(MalAbmFastMosquitoSubmodel, DesiccationKillsAfterGracePeriod) {
     sub.advance_day(aoi, ps);  // eggs develop, some die from desiccation
     const int64_t eggs_after_active = sub.cohort_bank().count_by_stage(
         mal_abm_fast::AquaticStage::EGG);
+    // Deactivate and emulate the coordinator dry-day streak past grace.
     ps[0].activated = false;
+    ps[0].habitat_dry_days = 8;
     for (int d = 0; d < 5; ++d) {
         sub.advance_day(aoi, ps);
     }
-    // Past grace: desiccation starts killing eggs.
+    // Past grace: desiccation kills eggs and early instars.
     const int64_t eggs_after_inactive = sub.cohort_bank().count_by_stage(
         mal_abm_fast::AquaticStage::EGG);
     EXPECT_LT(eggs_after_inactive, eggs_after_active);
@@ -260,7 +264,7 @@ TEST(MalAbmFastMosquitoSubmodel, DesiccationKillsAfterGracePeriod) {
 TEST(MalAbmFastMosquitoSubmodel, DesiccationResetsOnReactivation) {
     // G3: test that reactivating a patch prevents further desiccation.
     // Seed many eggs so some survive the desiccation cycles.
-    mal_abm_fast::MosquitoSubmodel sub(1, 1000, 1.0f, 42);
+    mal_abm_fast::MosquitoSubmodel sub(1, 30, 970, 42);
     const auto aoi = make_test_aoi();
     auto ps = make_test_patch_states();
     for (auto& p : ps) p.activated = false;
@@ -269,21 +273,30 @@ TEST(MalAbmFastMosquitoSubmodel, DesiccationResetsOnReactivation) {
     // Run 2 days active to develop some eggs to L1
     sub.advance_day(aoi, ps);
     sub.advance_day(aoi, ps);
-    // Deactivate, then reactivate quickly to reset desiccation counter
+    sub.advance_day(aoi, ps);
+    // Deactivate (emulated streak), then reactivate quickly: the
+    // coordinator zeroes the streak on reactivation.
     ps[0].activated = false;
+    ps[0].habitat_dry_days = 3;
     sub.advance_day(aoi, ps);
     ps[0].activated = true;
+    ps[0].habitat_dry_days = 0;
     sub.advance_day(aoi, ps);
 
     // Deactivate and let desiccation kill some
+    // Deactivate and emulate the coordinator dry-day streak (contract
+    // v3.0: the streak counts consecutive habitat-dry days; the
+    // desiccation stressor stays inside its grace window at 5 days).
     ps[0].activated = false;
+    ps[0].habitat_dry_days = 5;
     for (int d = 0; d < 5; ++d) {
         sub.advance_day(aoi, ps);
     }
     const int64_t aquatic_after = sub.cohort_bank().total_aquatic();
-    // Some aquatic stages should remain after 5 days (within grace period)
+    // Some aquatic stages should remain just after the grace period.
     EXPECT_GT(aquatic_after, 0);
-    // Continue desiccation past grace period
+    // Continue desiccation past grace period (streak keeps growing).
+    ps[0].habitat_dry_days = 15;
     for (int d = 0; d < 5; ++d) {
         sub.advance_day(aoi, ps);
     }
@@ -293,7 +306,7 @@ TEST(MalAbmFastMosquitoSubmodel, DesiccationResetsOnReactivation) {
 
 TEST(MalAbmFastMosquitoSubmodel, InactivePatchCountZeroSkipsKill) {
     // With 0 eggs at an inactive patch, desiccation is a no-op.
-    mal_abm_fast::MosquitoSubmodel sub(1, 1000, 0.3f, 42);
+    mal_abm_fast::MosquitoSubmodel sub(1, 30, 270, 42);
     const auto aoi = make_test_aoi();
     auto ps = make_test_patch_states();
     for (auto& p : ps) p.activated = false;
@@ -311,7 +324,7 @@ TEST(MalAbmFastMosquitoSubmodel, InactivePatchCountZeroSkipsKill) {
 TEST(MalAbmFastMosquitoSubmodel, LarvaToAdultInactivePatchUsesLonLat) {
     // G3: adults emerge from the cohort bank with lon/lat snapped to
     // cell centre. All adults should have lon/lat within the AOI bbox.
-    mal_abm_fast::MosquitoSubmodel sub(100, 1000, 0.3f, 42);
+    mal_abm_fast::MosquitoSubmodel sub(100, 30, 270, 42);
     const auto aoi = make_test_aoi();
     auto ps = make_test_patch_states();
     // Run 30 days to promote some eggs to adults.
@@ -341,8 +354,8 @@ TEST(MalAbmFastMosquitoSubmodel, LarvaToAdultInactivePatchUsesLonLat) {
 
 TEST(MalAbmFastMosquitoSubmodel, DeterminismAfterDesiccation) {
     // Two identical runs with desiccation produce the same results.
-    mal_abm_fast::MosquitoSubmodel a(100, 1000, 0.3f, 42);
-    mal_abm_fast::MosquitoSubmodel b(100, 1000, 0.3f, 42);
+    mal_abm_fast::MosquitoSubmodel a(100, 30, 270, 42);
+    mal_abm_fast::MosquitoSubmodel b(100, 30, 270, 42);
     const auto aoi = make_test_aoi();
     auto ps = make_test_patch_states();
     for (int d = 0; d < 30; ++d) {

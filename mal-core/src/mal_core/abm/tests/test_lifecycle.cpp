@@ -50,7 +50,9 @@ std::vector<mal_abm_fast::PatchState> make_patch_states(
         ps[static_cast<size_t>(i)].activated  = all_active;
         ps[static_cast<size_t>(i)].rain_d     = 20.0f;
         ps[static_cast<size_t>(i)].temp_d     = temp_c;
-        ps[static_cast<size_t>(i)].water_frac = 0.5f;
+        // Contract 4.0: explicit test capacity (numerically the retired
+        // K_MAX fallback). Without it K=0 means zero larval survival.
+        ps[static_cast<size_t>(i)].k_habitat  = 1000.0f;
     }
     return ps;
 }
@@ -191,11 +193,12 @@ TEST(AquaticCohortBank, DesiccationKillsEggsAtInactivePatches) {
     mal_abm_fast::AquaticCohortBank bank;
     bank.add_eggs(0, 1000);
     auto ps = make_patch_states(25.0f);
-    ps[0].activated = false;  // patch 0 inactive
+    ps[0].activated = false;        // patch 0 inactive
+    ps[0].habitat_dry_days = 10;    // past the grace window
     mal_abm_fast::RuntimeOverrides overrides;
 
     bank.advance_day(ps, overrides);
-    // Some eggs should have died from desiccation
+    // Eggs should have died from desiccation
     const int64_t remaining = bank.count_by_stage(mal_abm_fast::AquaticStage::EGG);
     EXPECT_LT(remaining, 1000);
 }
@@ -226,8 +229,8 @@ TEST(AquaticCohortBank, LarvaDensityDependentMortality) {
 // MosquitoSubmodel integration tests
 // ---------------------------------------------------------------------------
 
-TEST(MosquitoSubmodelG3, LegacyConstructorSeedsAdultsAndEggs) {
-    mal_abm_fast::MosquitoSubmodel sub(100, 1000, 0.3f, 42);
+TEST(MosquitoSubmodelG3, UniformCountsConstructorSeedsAdultsAndEggs) {
+    mal_abm_fast::MosquitoSubmodel sub(100, 30, 270, 42);
     // 10% of 30000 = 3000 adults
     EXPECT_EQ(sub.total_agents(), 3000);
     // 90% = 27000 eggs in cohort bank
@@ -235,7 +238,7 @@ TEST(MosquitoSubmodelG3, LegacyConstructorSeedsAdultsAndEggs) {
 }
 
 TEST(MosquitoSubmodelG3, ThirtyDayRolloutWithLifecycle) {
-    mal_abm_fast::MosquitoSubmodel sub(100, 1000, 0.3f, 42);
+    mal_abm_fast::MosquitoSubmodel sub(100, 30, 270, 42);
     const auto aoi = make_test_aoi();
     const auto ps  = make_patch_states(25.0f);
 
@@ -257,7 +260,7 @@ TEST(MosquitoSubmodelG3, EmergenceIncreasesAdultCount) {
     // Seed a submodel with lots of eggs. After enough days, eggs should
     // emerge as adults, increasing the adult count beyond the initial
     // seeded adults. Use a 30-day window where adult mortality is moderate.
-    mal_abm_fast::MosquitoSubmodel sub(100, 1000, 0.3f, 42);
+    mal_abm_fast::MosquitoSubmodel sub(100, 30, 270, 42);
     const auto aoi = make_test_aoi();
     const auto ps  = make_patch_states(25.0f);
 
@@ -274,14 +277,14 @@ TEST(MosquitoSubmodelG3, EmergenceIncreasesAdultCount) {
 }
 
 TEST(MosquitoSubmodelG3, DensityByPatchStillWorks) {
-    mal_abm_fast::MosquitoSubmodel sub(100, 1000, 0.3f, 42);
+    mal_abm_fast::MosquitoSubmodel sub(100, 30, 270, 42);
     const auto density = sub.density_by_patch();
     // Should have density entries for all 100 patches
     EXPECT_EQ(density.size(), 100u);
 }
 
 TEST(MosquitoSubmodelG3, AdultDensityByCellStillWorks) {
-    mal_abm_fast::MosquitoSubmodel sub(100, 1000, 0.3f, 42);
+    mal_abm_fast::MosquitoSubmodel sub(100, 30, 270, 42);
     const auto aoi = make_test_aoi();
     const auto ps  = make_patch_states(25.0f);
     sub.advance_day(aoi, ps);
@@ -290,8 +293,8 @@ TEST(MosquitoSubmodelG3, AdultDensityByCellStillWorks) {
 }
 
 TEST(MosquitoSubmodelG3, DeterminismWithLifecycle) {
-    mal_abm_fast::MosquitoSubmodel a(100, 1000, 0.3f, 42);
-    mal_abm_fast::MosquitoSubmodel b(100, 1000, 0.3f, 42);
+    mal_abm_fast::MosquitoSubmodel a(100, 30, 270, 42);
+    mal_abm_fast::MosquitoSubmodel b(100, 30, 270, 42);
     const auto aoi = make_test_aoi();
     const auto ps  = make_patch_states(25.0f);
     for (int day = 0; day < 30; ++day) {
@@ -304,7 +307,7 @@ TEST(MosquitoSubmodelG3, DeterminismWithLifecycle) {
 }
 
 TEST(MosquitoSubmodelG3, CohortBankAccessible) {
-    mal_abm_fast::MosquitoSubmodel sub(10, 1000, 0.3f, 42);
+    mal_abm_fast::MosquitoSubmodel sub(10, 30, 270, 42);
     const auto& bank = sub.cohort_bank();
     EXPECT_GT(bank.total_aquatic(), 0);
     EXPECT_GT(bank.count_by_stage(mal_abm_fast::AquaticStage::EGG), 0);

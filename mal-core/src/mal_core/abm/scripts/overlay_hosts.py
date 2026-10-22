@@ -50,8 +50,8 @@ def _static_layers(aoi: str) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     water = None
     if env_nc.exists():
         env = xr.open_dataset(env_nc)
-        for key in ("permanent_water_mask", "m12_jrc_permanent_water",
-                    "water_frac"):
+        for key in ("jrc_persistent", "permanent_water_mask",
+                    "m12_jrc_permanent_water"):
             if key in env:
                 v = np.asarray(env[key].squeeze(), dtype=float)
                 if v.ndim == 3:  # time series → fraction of wet days

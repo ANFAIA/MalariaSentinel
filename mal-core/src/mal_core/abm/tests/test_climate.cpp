@@ -55,9 +55,7 @@ void WriteSyntheticEnvNC(const fs::path& path, int n_days,
     dimids[0] = dimid_time; dimids[1] = dimid_y; dimids[2] = dimid_x;
 
     ASSERT_EQ(nc_def_var(ncid, "rainfall", NC_FLOAT, 3, dimids, &vid[0]), NC_NOERR);
-    ASSERT_EQ(nc_def_var(ncid, "water_temp_c", NC_FLOAT, 3, dimids, &vid[1]), NC_NOERR);
-    ASSERT_EQ(nc_def_var(ncid, "water_frac", NC_FLOAT, 3, dimids, &vid[2]), NC_NOERR);
-    ASSERT_EQ(nc_def_var(ncid, "ndvi", NC_FLOAT, 3, dimids, &vid[3]), NC_NOERR);
+    ASSERT_EQ(nc_def_var(ncid, "air_temp_c", NC_FLOAT, 3, dimids, &vid[1]), NC_NOERR);
     if (with_salinity) {
         ASSERT_EQ(nc_def_var(ncid, "salinity_ppt", NC_FLOAT, 3, dimids, &vidsal), NC_NOERR);
     }
@@ -72,6 +70,23 @@ void WriteSyntheticEnvNC(const fs::path& path, int n_days,
     }
     ASSERT_EQ(nc_put_att_text(ncid, NC_GLOBAL, "Conventions", 6, "CF-1.8"), NC_NOERR);
     ASSERT_EQ(nc_enddef(ncid), NC_NOERR);
+
+    // Static habitat planes (contract v3.0; 0.0 built so the open-pluvial
+    // plane carries flash-pool potential alone).
+    auto def_static = [&](const char* name, float value) {
+        int dids[2] = {dimid_y, dimid_x};
+        int varid = -1;
+        ASSERT_EQ(nc_def_var(ncid, name, NC_FLOAT, 2, dids, &varid), NC_NOERR);
+        ASSERT_EQ(nc_enddef(ncid), NC_NOERR);
+        std::vector<float> plane(static_cast<size_t>(kH) * kW, value);
+        ASSERT_EQ(nc_put_var_float(ncid, varid, plane.data()), NC_NOERR);
+        ASSERT_EQ(nc_redef(ncid), NC_NOERR);
+    };
+    def_static("jrc_persistent",      0.2f);
+    def_static("lc_built",            0.0f);
+    def_static("lc_wetland",          0.2f);
+    def_static("lc_open_plus_water",  0.3f);
+    def_static("lc_crop",             0.0f);
 
     const float rain_vals[] = {60.0f, 40.0f, 55.0f};
     const float temp_vals[] = {25.0f, 20.0f, 30.0f};
@@ -103,10 +118,6 @@ void WriteSyntheticEnvNC(const fs::path& path, int n_days,
             }
         }
         ASSERT_EQ(nc_put_vara_float(ncid, vid[1], start, count, buf), NC_NOERR);
-        std::fill(buf, buf + kH * kW, 0.5f);
-        ASSERT_EQ(nc_put_vara_float(ncid, vid[2], start, count, buf), NC_NOERR);
-        std::fill(buf, buf + kH * kW, 0.4f);
-        ASSERT_EQ(nc_put_vara_float(ncid, vid[3], start, count, buf), NC_NOERR);
         if (with_salinity) {
             std::fill(buf, buf + kH * kW, sal_vals[d % 3]);
             ASSERT_EQ(nc_put_vara_float(ncid, vidsal, start, count, buf), NC_NOERR);
@@ -124,16 +135,6 @@ mal_abm_fast::AOI MakeAoi() {
 }
 
 }  // namespace
-
-TEST(ClimateEngine, SetTwiGridOverridesDefault) {
-    mal_abm_fast::ClimateEngine eng;
-    EXPECT_TRUE(eng.twi_grid().empty());
-    std::vector<float> t(16, 9.5f);
-    eng.set_twi_grid(std::move(t));
-    EXPECT_EQ(eng.twi_grid().size(), 16u);
-    EXPECT_FLOAT_EQ(eng.twi_grid()[0], 9.5f);
-    EXPECT_FLOAT_EQ(eng.twi_grid()[15], 9.5f);
-}
 
 // -- Daily NetCDF tests (daily-env-netcdf feature) ---------------------------
 
@@ -165,12 +166,20 @@ TEST(ClimateEngine, LoadFromEnvNcPopulatesDailyBands) {
     EXPECT_FLOAT_EQ(eng.rain_at(0, 0), 55.0f);
     EXPECT_FLOAT_EQ(eng.temp_at(0, 0), 30.0f);
 
-    // water_frac constant across all days
-    for (int d = 0; d < 3; ++d) {
-        eng.set_day(d);
-        EXPECT_FLOAT_EQ(eng.water_frac_at(0, 0), 0.5f);
-    }
+    fs::remove(path);
+}
 
+TEST(ClimateEngine, StaticBandsReachAccessor) {
+    const fs::path path = MakeTmpEnvNC();
+    if (fs::exists(path)) fs::remove(path);
+    WriteSyntheticEnvNC(path, 3);
+    ASSERT_TRUE(fs::exists(path));
+
+    mal_abm_fast::ClimateEngine eng;
+    eng.load_from_env_nc(path.string(), MakeAoi());
+    EXPECT_EQ(eng.jrc_persistent().size(), 16u);
+    const auto f = eng.habitat_features_at(0, 0);
+    EXPECT_GT(f.lc_open_plus_water, 0.0f);
     fs::remove(path);
 }
 
@@ -184,11 +193,6 @@ TEST(ClimateEngine, DailyRainfallReadCorrectly) {
     eng.load_from_env_nc(path.string(), MakeAoi());
 
     // Verify the climate engine correctly reads the synthetic rain values.
-    // Note: activation logic is no longer gated by a rain threshold here —
-    // pre-existing habitat patches are always activated (see
-    // CoordinatorModel.PreExistingPatchAlwaysActivated in test_coordinator.cpp).
-    // The PLUVIAL_POOL_RAIN_THRESHOLD_MM constant is only consulted by the
-    // dynamic PLUVIAL_POOL rule, which is exercised elsewhere.
 
     // Day 0: rain=60 at (0,0)
     eng.set_day(0);

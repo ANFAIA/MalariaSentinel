@@ -5,7 +5,7 @@
 // Properties pinned here:
 //
 //   1. UNIFORM mode: build_seed_instructions returns empty
-//      (the submodel uses init_frac for every patch — legacy path).
+//      (the submodel seeds the SeedingConfig explicit per-patch counts).
 //   2. RANDOM_VIABLE mode: picks N random patch_ids from the
 //      viable list (without replacement, deterministic given seed).
 //   3. EXPLICIT mode: a point within radius snaps to the nearest
@@ -31,7 +31,7 @@ namespace {
 
 // Build a 100-patch synthetic habitat (10x10 grid) with lon/lat
 // spread evenly across (0, 0) - (10, 10). All patches pass the
-// viability filter (water_frac=1.0, twi=10 > 8).
+// viability filter (static potential >= the candidate floor).
 struct FakeHabitat {
     std::vector<int32_t> ids;
     std::vector<std::array<double, 2>> lonlat;
@@ -290,7 +290,6 @@ TEST(MalAbmFastSeeding, SubmodelDetConstructorSeedsAdultsAndLarvae) {
     instructions.push_back(inst);
 
     mal_abm_fast::MosquitoSubmodel sub(/*n_patches*/ 100,
-                                       /*k_per_patch*/ 1000,
                                        instructions, /*seed*/ 42);
     // Adults in SoA = 10.
     EXPECT_EQ(sub.total_agents(), 10);
@@ -338,7 +337,7 @@ TEST(MalAbmFastSeeding, SubmodelDetConstructorMultipleDetections) {
         inst.n_larvae = 2;
         instructions.push_back(inst);
     }
-    mal_abm_fast::MosquitoSubmodel sub(100, 1000, instructions, 42);
+    mal_abm_fast::MosquitoSubmodel sub(100, instructions, 42);
     EXPECT_EQ(sub.total_agents(), 12);  // 3 * 4 adults only
     // 3 * 2 = 6 larvae distributed across stages.
     // Per detection: 1 pupa + 1 L4 + 0 L3 + 0 L2 + 0 L1 + 0 egg = 2.
@@ -349,15 +348,16 @@ TEST(MalAbmFastSeeding, SubmodelDetConstructorMultipleDetections) {
 
 TEST(MalAbmFastSeeding, SubmodelDetConstructorEmptyIsEmpty) {
     // Empty instructions -> zero agents.
-    mal_abm_fast::MosquitoSubmodel sub(100, 1000,
+    mal_abm_fast::MosquitoSubmodel sub(100,
                                        /*instructions*/ {}, /*seed*/ 42);
     EXPECT_EQ(sub.total_agents(), 0);
 }
 
-TEST(MalAbmFastSeeding, SubmodelLegacyConstructorStillWorks) {
-    // Backward compat: the original 4-arg constructor must still
-    // produce seeding. G3: 10% adults + 90% eggs in cohort bank.
-    mal_abm_fast::MosquitoSubmodel sub(100, 1000, 0.3f, 42);
+TEST(MalAbmFastSeeding, SubmodelUniformCountsConstructorStillWorks) {
+    // The explicit-count round-robin constructor (replacement of the
+    // retired k_per_patch × init_frac path). G3: 10% adults + 90%
+    // eggs in cohort bank.
+    mal_abm_fast::MosquitoSubmodel sub(100, 30, 270, 42);
     EXPECT_EQ(sub.total_agents(), 3000);  // 10% of 30000
     EXPECT_EQ(sub.cohort_bank().count_by_stage(mal_abm_fast::AquaticStage::EGG), 27000);
 }
@@ -378,7 +378,7 @@ TEST(MalAbmFastSeeding, EndToEndRandomViableBuildsSeededSubmodel) {
         cfg, h.ids, h.lonlat, h.rowcol, rng);
     ASSERT_EQ(instructions.size(), 4u);
 
-    mal_abm_fast::MosquitoSubmodel sub(100, 1000, instructions, 7);
+    mal_abm_fast::MosquitoSubmodel sub(100, instructions, 7);
     // 4 * 25 = 100 adults in SoA.
     EXPECT_EQ(sub.total_agents(), 100);
     // 4 * 15 = 60 larvae distributed across stages.

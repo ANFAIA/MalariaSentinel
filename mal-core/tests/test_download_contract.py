@@ -14,7 +14,7 @@ from mal_core.download.registry import _loader_module_names
 # Every loader module on disk is scanned (registry's single source of truth)
 LOADER_MODULES = _loader_module_names()
 
-VALID_AUTH = {"cds", "earthdata", "planetary_computer", "none"}
+VALID_AUTH = {"cds", "earthdata", "planetary_computer", "earthengine", "none"}
 
 
 def _discover_downloaders():
@@ -129,8 +129,16 @@ class TestDownloaderDiscovery:
         assert "era5" in downloaders, "era5 downloader not registered"
 
     def test_six_loaders_registered(self):
+        # Contract v3.0 (+Dynamic World swap 2026-10-17): the dem loader is
+        # retired (plan 01) and worldcover is replaced by dynamic_world (GEE).
         downloaders = _discover_downloaders()
-        expected = {"era5", "chirps", "dem", "jrc_gsw", "modis", "worldpop"}
+        expected = {
+            "era5", "chirps", "jrc_gsw", "modis", "worldpop",
+            "dynamic_world", "glw", "ghsl", "wildlife", "buildings",
+            "coastline", "smap",
+        }
         found = set(downloaders.keys())
         missing = expected - found
         assert not missing, f"Missing downloaders: {missing}. Found: {found}"
+        assert "dem" not in found, "dem loader must be retired"
+        assert "worldcover" not in found, "worldcover must be replaced by dynamic_world"

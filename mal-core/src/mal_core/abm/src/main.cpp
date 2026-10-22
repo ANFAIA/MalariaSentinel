@@ -252,8 +252,8 @@ OpenMP parallelism for multi-rollout execution.
 
 ARCHITECTURE
   Engine
-    ├── ClimateEngine      — daily temperature, rainfall, water_frac grids
-    ├── HabitatEngine      — static habitat patches (gpkg) with K, TWI
+    ├── ClimateEngine      — daily temperature + rainfall, habitat statics
+    ├── HabitatEngine      — candidate habitat patches (gpkg) with potential
     ├── HostLandscape       — human/livestock density grids (optional)
     ├── MobilitySchedule   — OD matrices for human/livestock movement
     ├── CoordinatorModel   — patch activation, state aggregation
@@ -265,9 +265,9 @@ ARCHITECTURE
 
 DAILY SIMULATION LOOP (Engine::step)
   1. coord_->set_climate_day(day)      — select today's climate slice
-  2. coord_->activate_patches()        — enable patches by rain/temp thresholds
-  3. coord_->to_dataframe()            — build PatchState vector (pre-existing
-                                        + dynamic pluvial pool cells)
+  2. coord_->update_habitat_day()      — pluvial z advance; per-cell S and K
+  3. coord_->to_dataframe()            — build PatchState vector (candidate
+                                        cell union from potential floor)
   4. sub_->advance_day()               — the 5-step mosquito lifecycle:
        a. AquaticCohortBank::advance_day()
           — thermal development (Briere-1 / Quadratic per stage)
@@ -284,9 +284,9 @@ DAILY SIMULATION LOOP (Engine::step)
   6. advance date by 1 day
 
 OUTPUT
-  State COG (.tif): 2 bands
-    Band 1 — adult_occupancy (post-dispersal density / K_MAX)
-    Band 2 — host_seeking_pressure (female biting pressure / K_MAX)
+  State COG (.tif): 2 bands (contract 4.0 — raw adult counts per cell)
+    Band 1 — adult_patch_count (adults associated via their patch, post-dispersal)
+    Band 2 — adult_cell_count (adults at their current position)
   Sidecar JSON: metadata, rollout info, contract version
 )mal");
     app.set_version_flag("--version", "0.1.0");
@@ -303,6 +303,7 @@ OUTPUT
     int         month       = 6;
     int         seed        = 1;
     int         days        = 30;
+    int         warmup_bands = 0;
     int         n_rollouts  = 1;
     int         snapshot_every = 0;
     int64_t     max_population = 0;
@@ -317,7 +318,8 @@ OUTPUT
     int         n_adults_per_detection = 50;
     int         n_larvae_per_detection = 30;
     std::string detection_points_str;
-    float       init_frac = 0.30f;               // UNIFORM mode
+    int32_t     seed_adults_per_patch = 30;      // UNIFORM mode
+    int32_t     seed_immatures_per_patch = 270;  // UNIFORM mode
     double      host_seeding_radius_km = 5.0;    // HOST_WEIGHTED mode
 
     // Host data (optional; if not provided, no host-seeking).
@@ -395,6 +397,14 @@ OUTPUT
         ->default_val(30)
         ->check(CLI::Range(1, 731))
         ->group("Spatial & Temporal");
+    run->add_option("--warmup-bands", warmup_bands,
+                    "Warm-up: integrate the pluvial state causally over "
+                    "this many env-NC bands before the simulation start "
+                    "(band index --warmup-bands becomes the start day). "
+                    "Default 0 = cold start (legacy band-0 semantics).")
+        ->default_val(0)
+        ->check(CLI::Range(0, 731))
+        ->group("Spatial & Temporal");
     run->add_option("--n-rollouts", n_rollouts,
                     "Parallel rollouts (1+). Each gets fresh PRNG seeded "
                     "at seed+i; outputs: <stem>_seed{NNNN}.tif.")
@@ -409,13 +419,14 @@ OUTPUT
 
     // ─── Input Data ──────────────────────────────────────────────────────
     run->add_option("--env", env_path,
-                    "Climate raster: GeoTIFF (.tif) or NetCDF (.nc). "
-                    "4-band: temperature, rainfall, water_frac, ndvi/twi.")
+                    "Daily env NC: rainfall + air_temp_c; static habitat planes "
+                    "(jrc_persistent, lc_built, lc_wetland, lc_open_plus_water, "
+                    "lc_crop) per contract v3.0.")
         ->required()
         ->group("Input Data");
     run->add_option("--habitat", habitat_path,
-                    "Habitat patches GeoPackage (.gpkg). Each feature: "
-                    "row, col, K (carrying capacity), TWI.")
+                    "Candidate habitat GeoPackage (.gpkg). Each feature: "
+                    "row, col, habitat_potential, dynamics.")
         ->required()
         ->check(CLI::ExistingFile)
         ->group("Input Data");
@@ -449,7 +460,9 @@ OUTPUT
                     "Population initialisation mode:\n"
                     "  random-viable (default) — N random viable patches, "
                     "each seeded with adults + larvae\n"
-                    "  uniform — init_frac of K in every patch\n"
+                    "  uniform — fixed adult/immature counts in every "
+                    "candidate patch (via --seed-adults-per-patch / "
+                    "--seed-immatures-per-patch)\n"
                     "  explicit — user lat/lon points snapped to nearest "
                     "habitat patch\n"
                     "  host-weighted — N viable patches sampled in "
@@ -457,13 +470,21 @@ OUTPUT
                     "species' host preferences (requires --hosts)")
         ->default_val("random-viable")
         ->group("Seeding");
-    run->add_option("--init-frac", init_frac,
-                    "UNIFORM mode: fraction of K seeded in every patch "
-                    "(legacy constant was 0.30). Higher values shorten the "
-                    "vector population warm-up but do not change the "
-                    "carrying-capacity equilibrium.")
-        ->default_val(0.30f)
-        ->check(CLI::Bound(0.0f, 1.0f))
+    run->add_option("--seed-adults-per-patch", seed_adults_per_patch,
+                    "UNIFORM mode: adult females+males seeded in every "
+                    "candidate patch (explicit count, independent of "
+                    "any capacity). Default 30 reproduces the retired "
+                    "0.30 × K_MAX=1000 mix (10% adults).")
+        ->default_val(30)
+        ->check(CLI::NonNegativeNumber)
+        ->group("Seeding");
+    run->add_option("--seed-immatures-per-patch", seed_immatures_per_patch,
+                    "UNIFORM mode: immatures (eggs+larvae+pupae, "
+                    "age-structured) seeded in every candidate patch. "
+                    "Default 270 reproduces the retired 0.30 × "
+                    "K_MAX=1000 mix (90% immatures).")
+        ->default_val(270)
+        ->check(CLI::NonNegativeNumber)
         ->group("Seeding");
     run->add_option("--host-seeding-radius-km", host_seeding_radius_km,
                     "HOST_WEIGHTED mode: search radius (km) around each "
@@ -533,8 +554,10 @@ OUTPUT
         ->check(CLI::NonNegativeNumber)
         ->group("Output & Debug");
     run->add_option("--max-population", max_population,
-                    "Population divergence threshold (0 = auto: "
-                    "n_patches × K_MAX × 10). Aborts if exceeded.")
+                    "Operational population guard (0 = disabled). If the "
+                    "total adult count exceeds this value the run aborts "
+                    "with an error. Numerical sanity check, not a "
+                    "biological capacity.")
         ->default_val(0)
         ->check(CLI::NonNegativeNumber)
         ->group("Output & Debug");
@@ -620,8 +643,9 @@ OUTPUT
         ->group("Transmission (SEIR-SEI)");
     run->add_option("--human-outbreak-min-density", human_outbreak_min_density,
                     "Adaptive trigger: outbreak waits until the best viable "
-                    "cell reaches this normalized mosquito density "
-                    "(agents/K_MAX; 0.1 ~ 100 females). 0 = trigger "
+                    "cell reaches this many adult mosquitoes (individuals "
+                    "per cell; the retired normalized 0.5 corresponds to "
+                    "500 adults with the old K_MAX=1000). 0 = trigger "
                     "exactly on --human-outbreak-day.")
         ->default_val(0.0f)
         ->check(CLI::NonNegativeNumber)
@@ -690,7 +714,8 @@ OUTPUT
     seeding_config.n_detections         = n_detections;
     seeding_config.n_adults_per_detection = n_adults_per_detection;
     seeding_config.n_larvae_per_detection = n_larvae_per_detection;
-    seeding_config.init_frac            = init_frac;
+    seeding_config.n_adults_per_patch    = seed_adults_per_patch;
+    seeding_config.n_immatures_per_patch = seed_immatures_per_patch;
     seeding_config.host_weight_radius_km = host_seeding_radius_km;
 
     // -- Runtime overrides for dispersal / larval parameters -----------
@@ -733,17 +758,25 @@ OUTPUT
         const bool is_nc = env_path.size() >= 3
             && env_path.substr(env_path.size() - 3) == ".nc";
         if (is_nc) {
-            shared_climate->load_from_env_nc(env_path, aoi, days);
-            if (days > 0 && shared_climate->n_days() < days) {
+            shared_climate->load_from_env_nc(env_path, aoi,
+                                             warmup_bands > 0
+                                                 ? warmup_bands + days
+                                                 : days);
+            const int32_t required =
+                (warmup_bands > 0) ? (warmup_bands + days) : days;
+            if (required > 0 && shared_climate->n_days() < required) {
                 throw std::runtime_error(
                     "env NC file has " + std::to_string(shared_climate->n_days())
-                    + " days but simulation requests " + std::to_string(days) + " days");
+                    + " days but simulation requests " + std::to_string(required)
+                    + " days (sim horizon"
+                    + (warmup_bands > 0 ? " + warm-up)" : ")"));
             }
+            shared_climate->set_base_day(warmup_bands);
         } else {
             throw std::runtime_error(
                 "env must be a daily NetCDF (.nc); got '" + env_path
                 + "'. The legacy COG/TIF env path was removed — rebuild with "
-                "'malariasim ingest' (daily NC).");
+                "'malariasim ingest' (daily NC, contract v3.0).");
         }
         std::cout << "abm_run: loaded climate data (" << shared_climate->n_days() 
                   << " days, " << shared_climate->h() << "x" << shared_climate->w() 
@@ -827,7 +860,7 @@ OUTPUT
             engine_ptr = std::make_unique<mal_abm_fast::Engine>(
                 aoi, thread_climate, habitat_path, rng, start_date,
                 seeding_config, overrides, hosts_path, mobility_dir,
-                wind_field_path, transmission_params);
+                wind_field_path, transmission_params, warmup_bands);
         } catch (const std::exception& e) {
             std::cerr << "abm_run: rollout " << i
                       << " failed to build engine: " << e.what() << "\n";

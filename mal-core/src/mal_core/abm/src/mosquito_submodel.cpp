@@ -160,53 +160,33 @@ static inline std::pair<int32_t, int32_t> LonLatToCell(
 }
 
 // ---------------------------------------------------------------------------
-// Construction
+// Round-robin constructor (explicit counts; contract 4.0 replacement
+// of the retired k_per_patch × init_frac path)
 // ---------------------------------------------------------------------------
 
-MosquitoSubmodel::MosquitoSubmodel(int32_t n_patches, int32_t k_per_patch,
-                                   float init_frac, uint64_t seed,
+MosquitoSubmodel::MosquitoSubmodel(int32_t n_patches,
+                                   int32_t n_adults_per_patch,
+                                   int32_t n_immatures_per_patch,
+                                   uint64_t seed,
                                    RuntimeOverrides overrides)
-    : rng_(seed), k_per_patch_(k_per_patch), overrides_(overrides) {
-    if (n_patches <= 0 || k_per_patch <= 0 || !(init_frac > 0.0f)) {
+    : rng_(seed), overrides_(overrides) {
+    if (n_patches <= 0 || n_adults_per_patch < 0 ||
+        n_immatures_per_patch < 0 ||
+        (n_adults_per_patch == 0 && n_immatures_per_patch == 0)) {
         soa_.n_alive  = 0;
         soa_.next_uid = 0;
         return;
     }
     const int64_t np = static_cast<int64_t>(n_patches);
-    const int64_t n  = static_cast<int64_t>(std::llround(
-        static_cast<double>(n_patches) *
-        static_cast<double>(k_per_patch)  *
-        static_cast<double>(init_frac)));
-    if (n <= 0) {
-        soa_.n_alive  = 0;
-        soa_.next_uid = 0;
-        return;
-    }
 
-    // Round-robin: each patch gets floor(n / n_patches) agents; the
-    // first (n % n_patches) patches get one more.
-    const int64_t base = n / np;
-    const int64_t rem  = n % np;
-    std::vector<int64_t> per_patch(static_cast<size_t>(np), base);
-    for (int64_t i = 0; i < rem; ++i) per_patch[static_cast<size_t>(i)] += 1;
-
-    // G3 lifecycle: seed 10% adults directly in SoA, 90% eggs in
-    // the aquatic cohort bank. Adults start with stage=1 so they
-    // disperse on day 1. Eggs develop through the cohort bank's
-    // thermal lifecycle and emerge as adults over time.
-    //
-    // NOTE: the legacy constructor does NOT have AOI context, so
-    // adults are placed at (lon=0, lat=0). The first adult_dispersal
-    // pass will snap them to the nearest cell. This is the same
-    // behaviour as the old detection-based constructor.
-    constexpr float UNIFORM_ADULT_FRAC = 0.10f;
+    // G3 lifecycle: seed the adults directly in SoA, the immatures as
+    // age-staggered egg cohorts in the aquatic cohort bank (1/5 each
+    // at dev 0.00/0.20/0.40/0.60/0.80 — seeding every egg at age zero
+    // creates an artificial emergence wave).
     int64_t total_adults = 0;
-    int64_t total_eggs = 0;
     for (int64_t p = 0; p < np; ++p) {
-        const int64_t k = per_patch[static_cast<size_t>(p)];
-        const int64_t n_adults = static_cast<int64_t>(std::llround(
-            static_cast<double>(k) * UNIFORM_ADULT_FRAC));
-        const int64_t n_eggs = k - n_adults;
+        const int64_t n_adults = n_adults_per_patch;
+        const int64_t n_eggs = n_immatures_per_patch;
         // Adults: stage=1, ready to disperse
         for (int64_t j = 0; j < n_adults; ++j) {
             soa_.uid.push_back(static_cast<int64_t>(soa_.uid.size()));
@@ -235,8 +215,6 @@ MosquitoSubmodel::MosquitoSubmodel(int32_t n_patches, int32_t k_per_patch,
             soa_.last_patch_update_row.push_back(0);
             soa_.last_patch_update_col.push_back(0);
         }
-        // Stagger egg development while preserving the legacy egg count.
-        // Seeding every egg at age zero creates an artificial emergence wave.
         if (n_eggs > 0) {
             const int64_t n0 = n_eggs / 5;
             const int64_t n1 = n_eggs / 5;
@@ -252,14 +230,13 @@ MosquitoSubmodel::MosquitoSubmodel(int32_t n_patches, int32_t k_per_patch,
             cohort_bank_.seed_stage(p, AquaticStage::EGG, 4, n4, 0.80f);
         }
         total_adults += n_adults;
-        total_eggs += n_eggs;
     }
     soa_.n_alive  = total_adults;
     soa_.next_uid = total_adults;
 }
 
 // ---------------------------------------------------------------------------
-// Detection-based constructor
+// Detection-based constructor (the only seeding path since contract 4.0)
 // ---------------------------------------------------------------------------
 //
 // For each `SeedInstruction`:
@@ -269,16 +246,16 @@ MosquitoSubmodel::MosquitoSubmodel(int32_t n_patches, int32_t k_per_patch,
 //     already adult, ready to disperse on day 1.
 //   * `n_larvae` agents are added with `stage = 0` (larva) and
 //     `development_progress = 0`. They must accumulate
-//     growing-degree-days before promotion (matches the legacy
-//     "seed K*init_frac larvae" path).
+//     growing-degree-days before promotion (the legacy
+//     "seed K*init_frac larvae" path retired with contract 4.0).
 // Adults get the instruction's lon/lat (the cell centre) so the
 // first `adult_dispersal` pass has a valid origin; larvae are placed
 // at the same (lon, lat) so subsequent cell snapping is consistent.
-MosquitoSubmodel::MosquitoSubmodel(int32_t n_patches, int32_t k_per_patch,
+MosquitoSubmodel::MosquitoSubmodel(int32_t n_patches,
                                    const std::vector<SeedInstruction>& instructions,
                                    uint64_t seed,
                                    RuntimeOverrides overrides)
-    : rng_(seed), k_per_patch_(k_per_patch), overrides_(overrides) {
+    : rng_(seed), overrides_(overrides) {
     (void)n_patches;  // not needed; instructions are explicit
     if (instructions.empty()) {
         soa_.n_alive  = 0;
@@ -323,22 +300,11 @@ MosquitoSubmodel::MosquitoSubmodel(int32_t n_patches, int32_t k_per_patch,
     soa_.last_patch_update_col.reserve(cap);
 
     for (const auto& inst : instructions) {
-        // Adults: cap at K_MAX per patch to prevent seeding above
-        // carrying capacity. Adults above K_MAX die faster than they
-        // can reproduce (K_MAX-limited births), causing a population
-        // crash that has nothing to do with biology.
-        //
-        // M17.4 PR-B: per-patch capacity scaling. Urban-sourced
-        // patches carry `urban_capacity_factor` in [0.30, 1.00]
-        // (plan §6.4); the cap is K_MAX * factor so dense urban
-        // centres seed close to full K while sparse suburbs seed
-        // ~30% of K. Terrain patches keep the legacy global cap
-        // (factor = 1.0). Back-compat preserved for any caller that
-        // constructs SeedInstruction without setting the field.
-        const int32_t cap = static_cast<int32_t>(
-            static_cast<float>(k_per_patch > 0 ? k_per_patch : K_MAX) *
-            std::max(0.0f, inst.urban_capacity_factor));
-        const int32_t n_adults_capped = std::min(inst.n_adults, cap);
+        // Contract 4.0: counts seed verbatim. The M17.4 adult cap
+        // (K_MAX × urban_capacity_factor) retired with the plan
+        // 03-retirada-k-max — initial population is an explicit
+        // condition, not a capacity-derived quantity.
+        const int32_t n_adults_capped = inst.n_adults;
         for (int32_t j = 0; j < n_adults_capped; ++j) {
             soa_.uid.push_back(static_cast<int64_t>(soa_.uid.size()));
             soa_.patch_id.push_back(inst.patch_id);

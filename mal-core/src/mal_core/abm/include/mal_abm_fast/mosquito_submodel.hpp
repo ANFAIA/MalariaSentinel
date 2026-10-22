@@ -76,24 +76,27 @@ class MosquitoSubmodel {
 public:
     MosquitoSubmodel() = default;
 
-    // Legacy / backward-compat constructor: seed
-    // `round(n_patches * k_per_patch * init_frac)` larvae, with
-    // round-robin patch assignment. `lon`/`lat` start at 0 (a
-    // placeholder — the coord subagent's `aggregate_density` only
-    // reads `patch_id`, not lon/lat; the first dispersal step
-    // overwrites them).
-    MosquitoSubmodel(int32_t n_patches, int32_t k_per_patch,
-                     float init_frac, uint64_t seed,
+    // Round-robin constructor with explicit per-patch counts (the
+    // contract 4.0 replacement of the retired `k_per_patch ×
+    // init_frac` path): every one of the `n_patches` patches receives
+    // `n_adults_per_patch` adults (SoA) plus `n_immatures_per_patch`
+    // immatures as age-staggered egg cohorts (1/5 each at dev
+    // 0.00/0.20/0.40/0.60/0.80). Adults start with stage=1 so they
+    // disperse on day 1.
+    MosquitoSubmodel(int32_t n_patches,
+                     int32_t n_adults_per_patch,
+                     int32_t n_immatures_per_patch,
+                     uint64_t seed,
                      RuntimeOverrides overrides = {});
 
-    // Detection-based constructor: seed a mix of adults and
-    // larvae at specific patches via the supplied SeedInstruction
-    // list. Adults start with `development_progress = EIP_THRESHOLD_GD` so
-    // they are ready to disperse on day 1; larvae start with
-    // `development_progress = 0` and must accumulate growing-degree-days
-    // before promotion. The `k_per_patch` is still required for
-    // the per-day `birth()` step (binomial draw per active patch).
-    MosquitoSubmodel(int32_t n_patches, int32_t k_per_patch,
+    // Detection-based constructor (the only one since contract 4.0):
+    // seed a mix of adults and larvae at specific patches via the
+    // supplied SeedInstruction list. Adults start with
+    // `development_progress = EIP_THRESHOLD_GD` so they are ready to
+    // disperse on day 1; larvae start with `development_progress = 0`
+    // and must accumulate growing-degree-days before promotion.
+    // Requested counts seed verbatim — no per-patch adult cap.
+    MosquitoSubmodel(int32_t n_patches,
                      const std::vector<SeedInstruction>& instructions,
                      uint64_t seed,
                      RuntimeOverrides overrides = {});
@@ -213,7 +216,6 @@ private:
     MosquitoSoA  soa_;
     AquaticCohortBank cohort_bank_;
     Prng         rng_;
-    int32_t      k_per_patch_ = K_MAX;
     RuntimeOverrides overrides_;
 
     DailyStats last_day_stats_{};

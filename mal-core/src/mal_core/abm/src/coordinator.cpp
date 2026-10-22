@@ -1,12 +1,18 @@
 // SPDX-License-Identifier: MIT
-// coordinator.cpp — F1.b CoordinatorModel implementation.
+// coordinator.cpp — CoordinatorModel (contract v3.0, proxy_habitat_v1).
 //
-// Per-day orchestrator that activates patches from the climate, builds
-// the per-patch state vector (union of pre-existing patches + dynamic
-// PLUVIAL_POOL cells), and aggregates the submodel's per-patch /
-// per-cell counts into the (H, W) state COG bands. Mirrors the Python
-// `mal_ghana_sim.abm.coordinator.CoordinatorModel` 1:1 so the F1.e
-// parity test can compare the C++ and Python engine outputs.
+// The per-day spatial state is the species-neutral pair
+//
+//   S[i, t]  = clip(sum_g w[g] * H[i, g] * A[i, k(g), t], 0, 1)
+//   K[i, t]  = K_ref * cell_area_km2 * S[i, t]           (absolute)
+//
+// with the pluvial state updated once per day from CHIRPS rainfall:
+//   z_dry = z_prev * exp(-delta_days / DRY_MEMORY_DAYS)
+//   z     = z_dry + (1 - z_dry) * (1 - exp(-rain_mm / RAIN_SCALE_MM))
+//
+// Warm-up: the Engine facade calls warm_up_pluvial() once — the SAME
+// recursion is integrated over the NC bands before the simulation
+// start (causal, no synthetic fixed-window assumption).
 #include "coordinator.hpp"
 
 #include <algorithm>
@@ -14,6 +20,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <iostream>
 #include <stdexcept>
 #include <tuple>
 #include <unordered_map>
@@ -21,12 +28,10 @@
 #include <utility>
 #include <vector>
 
-#include "aoi.hpp"
-#include "climate.hpp"
-#include "habitat_engine.hpp"
+#include "aquatic_stress.hpp"
+#include "habitat_availability.hpp"
 #include "mosquito_submodel.hpp"
 #include "output_contract.hpp"
-#include "pool_hydrology.hpp"
 #include "seeding.hpp"
 #include "wire.hpp"
 
@@ -40,398 +45,179 @@ CoordinatorModel::CoordinatorModel(AOI aoi, std::shared_ptr<ClimateEngine> clima
       habitat_(std::move(habitat)),
       rng_(static_cast<uint64_t>(seed)),
       current_date_(start_date),
-      next_dynamic_patch_id_(
-          static_cast<int64_t>(habitat_.patches().size())) {}
-
-void CoordinatorModel::set_climate_day(int32_t day_index) {
-    climate_->set_day(day_index);
+      next_patch_id_(static_cast<int64_t>(
+          habitat_.patches().size())) {
+    if (!climate_) {
+        throw std::runtime_error(
+            "CoordinatorModel: null climate engine");
+    }
+    H_ = climate_->h();
+    W_ = climate_->w();
+    const size_t hw = static_cast<size_t>(H_) * static_cast<size_t>(W_);
+    z_.assign(hw, 0.0f);
+    dry_days_.assign(hw, 0);
+    K_cell_.assign(hw, 0.0f);
+    feats_.reserve(hw);
+    for (int32_t r = 0; r < H_; ++r) {
+        for (int32_t c = 0; c < W_; ++c) {
+            feats_.push_back(climate_->habitat_features_at(r, c));
+        }
+    }
+    if (climate_->jrc_persistent().empty()) {
+        std::cout << "ClimateEngine: static habitat planes absent; "
+                  << "habitat-driven flows down to zero. Check the env NC "
+                  << "contract_version (v3.0 expected).\n";
+    }
 }
 
-void CoordinatorModel::build_K_eff_grid() {
-    // M17.4 PR-C (plan §3 / §6.4): build the per-cell K_eff array
-    // once. Inputs (`building_fraction`, `urban_class`) are static
-    // host data loaded by `set_host_landscape()`; this method MUST
-    // be called after that. Output is row-major float[H*W].
-    //
-    // Cost: ~O(H*W) = 429K ops for Ghana, <10ms. Negligible relative
-    // to the 56M-cohort aquatic loop.
-    if (host_landscape_ == nullptr) {
-        throw std::runtime_error(
-            "CoordinatorModel::build_K_eff_grid: host_landscape_ is null. "
-            "Call set_host_landscape() first.");
+void CoordinatorModel::warm_up_pluvial(int32_t n_warmup_bands) {
+    if (n_warmup_bands <= 0) return;
+    if (!climate_) return;
+    const int32_t base = climate_->base_day();
+    const int32_t cold_start = std::max(0, base - n_warmup_bands);
+    float z_cold = 0.0f;
+    for (int32_t band = cold_start; band < base; ++band) {
+        const std::vector<float> rain = climate_->rain_band(band);
+        const size_t n = static_cast<size_t>(H_) * static_cast<size_t>(W_);
+        if (z_.size() != n || rain.size() != n) return;
+        for (size_t i = 0; i < n; ++i) {
+            z_[i] = update_z_step(z_[i], std::max(0.0f, rain[i]), 1.0f);
+        }
     }
+    (void)z_cold;
+}
+
+void CoordinatorModel::update_habitat_day(float gamma_t) {
+    // MVP: gamma_T = 0 keeps drying purely rain-driven (plan §6.4 —
+    // temperature already acts through the aquatic development and
+    // adult-survival submodels; a second penalty would double-count).
+    // A future extension may scale tau with temperature when a
+    // calibration cycle shows a real deficit.
+    (void)gamma_t;
     const int32_t H = climate_->h();
     const int32_t W = climate_->w();
-    H_ = H;
-    W_ = W;
-    if (H <= 0 || W <= 0) {
-        K_eff_grid_.clear();
-        return;
-    }
-    const size_t hw = static_cast<size_t>(H) * static_cast<size_t>(W);
-
-    // M7.4.1: literature-anchored per-cell capacity from the env NC
-    // (`k_capacity_mult`, computed at ingest from water area × NDVI ×
-    // urban/shallow modifiers). K_patch = K_MAX × mult, so an empty
-    // entry means "no productive water" and the multiplier carries the
-    // absolute scale (values > 1 are expected and intended).
-    const std::vector<float> kcm = climate_->k_capacity_mult();
-    if (kcm.size() == hw) {
-        K_eff_grid_.assign(hw, 0.0f);
-        for (size_t i = 0; i < hw; ++i) {
-            K_eff_grid_[i] = kcm[i];
+    const size_t n = static_cast<size_t>(H) * static_cast<size_t>(W);
+    if (H_ != H || W_ != W) {
+        // Grid may differ if a custom bbox was requested post-load.
+        H_ = H;
+        W_ = W;
+        z_.assign(n, 0.0f);
+        dry_days_.assign(n, 0);
+        K_cell_.assign(n, 0.0f);
+        feats_.assign(n, HabitatFeatures{});
+        for (int32_t r = 0; r < H_; ++r) {
+            for (int32_t c = 0; c < W_; ++c) {
+                feats_[r * W_ + c] = climate_->habitat_features_at(r, c);
+            }
         }
-        return;
     }
 
-    // Legacy path: host-landscape-only urban clamp (back-compat for
-    // env NCs without k_capacity_mult).
-    K_eff_grid_.assign(hw, 1.0f);
+    const std::array<float, 6> weights_sq = default_species_weights();
+
+    // 1. Pluvial state advance (rain-driven only in the MVP).
+    for (size_t i = 0; i < n; ++i) {
+        const float rain = climate_->rain_daily()[i];
+        z_[i] = update_z_step(z_[i], std::max(0.0f, rain), 1.0f);
+    }
+
+    // 2. Accuracy S and per-cell dry streaks.
+    int64_t n_live = 0;
     for (int32_t r = 0; r < H; ++r) {
+        const double lat_cell_deg =
+            aoi_.north - (static_cast<double>(r) + 0.5) *
+            (aoi_.north - aoi_.south) / H;
+        const double row_area_km2 =
+            cell_area_km2(lat_cell_deg, aoi_.resolution_m);
         for (int32_t c = 0; c < W; ++c) {
             const size_t idx = static_cast<size_t>(r) *
                                    static_cast<size_t>(W) +
                                static_cast<size_t>(c);
-            const HostCell hc = host_landscape_->at(r, c);
-            if (hc.urban_class == URBAN_CLASS_THRESHOLD) {
-                K_eff_grid_[idx] = std::clamp(
-                    hc.building_fraction, URBAN_CAPACITY_FLOOR,
-                    URBAN_CAPACITY_CEIL);
+            const std::array<float, 6> h =
+                habitat_potential(feats_[idx]);
+            const float S = species_accuracy(h, weights_sq, z_[idx]);
+            if (S >= kActivationMin) {
+                dry_days_[idx] = 0;
+                ++n_live;
+            } else {
+                dry_days_[idx] += 1;
             }
+            K_cell_[idx] = static_cast<float>(k_habitat(S, row_area_km2));
         }
     }
-}
-
-float CoordinatorModel::K_eff_at(int32_t row, int32_t col) const {
-    if (K_eff_grid_.empty() || W_ <= 0) return 1.0f;
-    if (row < 0 || row >= H_ || col < 0 || col >= W_) return 1.0f;
-    return K_eff_grid_[static_cast<size_t>(row) *
-                           static_cast<size_t>(W_) +
-                       static_cast<size_t>(col)];
-}
-
-void CoordinatorModel::activate_patches() {
-    // F1.b note: the activation check is re-done in to_dataframe()
-    // (line 75-77 below) which constructs PatchState with
-    // `activated = (climate.rain_at(row, col) > PLUVIAL_POOL_RAIN_THRESHOLD_MM)`
-    // for every pre-existing patch cell. The HabitatPatch struct has no
-    // `activated` field in the M1.5 thin slice (per the contract
-    // history; see `docs/specs/abm/spec.md`).
-    // design — activation is derived from today's climate, not stored
-    // on the patch), so this function is a no-op for F1.b. The per-day
-    // contract still calls it (so the engine.step() API matches the
-    // Python AnophelesABM.step()); F2 will revisit when patch.activated
-    // becomes a mutable field (e.g. for site-fidelity extensions).
-}
-
-void CoordinatorModel::update_rain_antecedent(
-    const std::vector<float>& today_rain_mm) {
-    const size_t n = today_rain_mm.size();
-    // Shift older slots: oldest is index 6, we drop it.
-    for (int32_t slot = 6; slot > 0; --slot) {
-        rain_7d_buffer_[slot] = std::move(rain_7d_buffer_[slot - 1]);
-    }
-    rain_7d_buffer_[0] = today_rain_mm;  // today = slot 0
-    if (rain_7d_count_ < 7) ++rain_7d_count_;
-}
-
-float CoordinatorModel::rain_7d_at(int32_t row, int32_t col) const {
-    const ClimateEngine* ce = climate_.get();
-    const int32_t W = ce->w();
-    const size_t idx = static_cast<size_t>(row) * static_cast<size_t>(W) +
-                       static_cast<size_t>(col);
-    float sum = 0.0f;
-    const int32_t n = rain_7d_count_;
-    for (int32_t slot = 0; slot < n; ++slot) {
-        if (idx < rain_7d_buffer_[slot].size()) {
-            sum += rain_7d_buffer_[slot][idx];
-        }
-    }
-    return sum;
+    std::cout << "coordinator: band " << climate_->base_day()
+              << " live cells (S >= " << kActivationMin << "): " << n_live
+              << " / " << (n) << "\n";
 }
 
 std::vector<PatchState> CoordinatorModel::to_dataframe() {
-    // Use the current day for daily climate lookups.
-    // climate_->set_day() is called by the engine step loop before
-    // to_dataframe(); the accessors below read the daily band slice.
     const int32_t H = climate_->h();
     const int32_t W = climate_->w();
     const size_t hw = static_cast<size_t>(H) * static_cast<size_t>(W);
 
-    std::vector<PatchState> states;
-    states.reserve(habitat_.patches().size() + hw);
+    // Build the candidate union: gpkg patches + candidate cells from the
+    // static potential (plan §8: the candidate-floor rule).
+    std::unordered_set<std::pair<int32_t, int32_t>, PairHash> candidates;
+    candidates.reserve(habitat_.patches().size() + hw / 8);
+
+    for (const auto& patch : habitat_.patches()) {
+        candidates.insert({patch.row, patch.col});
+    }
+    for (size_t i = 0; i < hw; ++i) {
+        const float total = habitat_total_potential(
+            habitat_potential(feats_[i]));
+        if (total < kHabitatCandidateMin) continue;
+        candidates.insert({static_cast<int32_t>(i / W),
+                           static_cast<int32_t>(i % W)});
+    }
 
     std::unordered_map<std::pair<int32_t, int32_t>, int64_t, PairHash>
         pre_rowcol_to_pid;
     pre_rowcol_to_pid.reserve(habitat_.patches().size());
     for (size_t i = 0; i < habitat_.patches().size(); ++i) {
         const auto& patch = habitat_.patches()[i];
-        pre_rowcol_to_pid[{patch.row, patch.col}] =
-            static_cast<int64_t>(i);
+        pre_rowcol_to_pid[{patch.row, patch.col}] = static_cast<int64_t>(i);
     }
 
-    std::unordered_set<std::pair<int32_t, int32_t>, PairHash> union_cells;
-    union_cells.reserve(pre_rowcol_to_pid.size() + hw);
-
-    // Pre-existing habitat patches (rivers, lakes, wetlands from gpkg).
-    // They share the same water-balance rule; permanent water bodies
-    // maintain water_mm >= W_BREED because their water_frac is high.
-    for (const auto& patch : habitat_.patches()) {
-        union_cells.insert({patch.row, patch.col});
-    }
-
-    // Dynamic ephemeral pool rule: terrain (TWI + water_frac) or urban
-    // (building_fraction + GHS-SMOD urban_class) plus rain. Permanent
-    // water bypasses the rain gate (plan §5.3).
-    const std::vector<float> twi = climate_->twi_grid();
-    const bool has_twi = (twi.size() == hw);
-    for (int32_t r = 0; r < H; ++r) {
-        for (int32_t c = 0; c < W; ++c) {
-            const size_t idx = static_cast<size_t>(r) *
-                                   static_cast<size_t>(W) +
-                               static_cast<size_t>(c);
-            const float twi_val = has_twi ? twi[idx] : 0.0f;
-            const float water_frac_val = climate_->water_frac_at(r, c);
-            const float rain_val = climate_->rain_at(r, c);
-            const float rain_7d_val = rain_7d_at(r, c);
-
-            const bool permanent = climate_->permanent_water_at(r, c) > 0.0f;
-            const bool terrain_candidate = twi_val > PLUVIAL_POOL_TWI_THRESHOLD &&
-                water_frac_val > PLUVIAL_POOL_WATER_FRAC_MIN;
-            // Urban rule per plan §6.3: GHS-SMOD urban (== 30) AND
-            // building_fraction >= B_min AND (rain >= R_min OR
-            // antecedent_rain_7d >= R_min) AND TWI >= TWI_urban_min.
-            // The TWI term uses the urban-specific lower threshold
-            // because drainage is imperfect in built-up cells.
-            //
-            // TWI-missing fallback (M7.4.1 iteration): the env NC
-            // contract does not carry a TWI band, so twi_val reads 0
-            // everywhere and the urban rule could never fire — leaving
-            // the model with no aquatic habitats near cities (the gpkg
-            // patch set is rural-surface-water derived). When TWI data
-            // is absent we gate urban pools on rain + built cover only;
-            // the URBAN_DENSITY_CAP_FRACTION cap and the rain gate keep
-            // the rule bounded. With TWI present, behaviour is unchanged.
-            bool urban_candidate = false;
-            bool urban_persistent = false;
-            if (host_landscape_ != nullptr) {
-                const HostCell hc = host_landscape_->at(r, c);
-                const bool twi_ok = has_twi
-                    ? (twi_val >= urban_twi_min_)
-                    : true;
-                const bool is_urban =
-                    hc.urban_class == URBAN_CLASS_THRESHOLD;
-                urban_candidate = is_urban &&
-                    hc.building_fraction >= urban_b_min_ &&
-                    (rain_val >= urban_r_min_mm_ ||
-                     rain_7d_val >= urban_r_min_mm_) &&
-                    twi_ok;
-                // Urban persistent baseline (M7.4.1 fix): built-up cells
-                // with real building cover carry a year-round standing-
-                // water stock (gutters, broken pipes, irrigation —
-                // Klinkenberg 2008 Accra) that is NOT rain-gated. They
-                // join the patch union every day so POOL_URBAN_BASELINE_MM
-                // (6 mm >= BREED 5 mm) and the water-availability capacity
-                // scaling can act through the dry season. Without this,
-                // the daily union rebuild erased urban patches on any day
-                // with rain <= 15 mm, making the baseline dead code.
-                urban_persistent = is_urban &&
-                    hc.building_fraction >= urban_b_min_;
-            }
-
-            if (permanent || urban_persistent ||
-                ((terrain_candidate || urban_candidate) &&
-                 rain_val > PLUVIAL_POOL_RAIN_THRESHOLD_MM)) {
-                union_cells.insert({r, c});
-            }
-        }
-    }
-
-    // Urban density cap (plan §6.6): at most URBAN_DENSITY_CAP_FRACTION
-    // of grid cells can be urban-sourced patches. Applied post-loop so
-    // we always pick the highest-building_fraction urban cells first
-    // (deterministic priority — not random sampling, which would make
-    // calibration noisy).
-    const size_t grid_total = static_cast<size_t>(H) * static_cast<size_t>(W);
-    const size_t urban_cap_count = static_cast<size_t>(
-        static_cast<float>(grid_total) * urban_density_cap_);
-    if (urban_cap_count > 0 && host_landscape_ != nullptr) {
-        // Collect urban candidate cells with their building_fraction.
-        std::vector<std::tuple<int32_t, int32_t, float>> urban_cells;
-        for (int32_t r = 0; r < H; ++r) {
-            for (int32_t c = 0; c < W; ++c) {
-                const HostCell hc = host_landscape_->at(r, c);
-                if (hc.urban_class == URBAN_CLASS_THRESHOLD &&
-                    hc.building_fraction >= urban_b_min_) {
-                    const auto cell = std::make_pair(r, c);
-                    if (union_cells.count(cell) > 0) {
-                        urban_cells.emplace_back(r, c,
-                                                 hc.building_fraction);
-                    }
-                }
-            }
-        }
-        if (urban_cells.size() > urban_cap_count) {
-            // Keep top urban_cap_count by building_fraction.
-            std::sort(urban_cells.begin(), urban_cells.end(),
-                      [](const auto& a, const auto& b) {
-                          return std::get<2>(a) > std::get<2>(b);
-                      });
-            std::unordered_set<std::pair<int32_t, int32_t>, PairHash>
-                keep_urbans;
-            for (size_t i = 0; i < urban_cap_count; ++i) {
-                keep_urbans.insert({std::get<0>(urban_cells[i]),
-                                    std::get<1>(urban_cells[i])});
-            }
-            for (auto it = union_cells.begin(); it != union_cells.end(); ) {
-                const HostCell hc = host_landscape_->at(it->first,
-                                                        it->second);
-                if (hc.urban_class == URBAN_CLASS_THRESHOLD &&
-                    keep_urbans.count(*it) == 0) {
-                    it = union_cells.erase(it);
-                } else {
-                    ++it;
-                }
-            }
-        }
-    }
-
-    for (const auto& cell : union_cells) {
+    std::vector<PatchState> states;
+    states.reserve(candidates.size());
+    for (const auto& cell : candidates) {
         int64_t pid;
         auto pre_it = pre_rowcol_to_pid.find(cell);
         if (pre_it != pre_rowcol_to_pid.end()) {
             pid = pre_it->second;
-            dynamic_patch_registry_[cell] = pid;
+            patch_registry_[cell] = pid;
         } else {
-            auto reg_it = dynamic_patch_registry_.find(cell);
-            if (reg_it != dynamic_patch_registry_.end()) {
+            auto reg_it = patch_registry_.find(cell);
+            if (reg_it != patch_registry_.end()) {
                 pid = reg_it->second;
             } else {
-                pid = next_dynamic_patch_id_++;
-                dynamic_patch_registry_[cell] = pid;
+                pid = next_patch_id_++;
+                patch_registry_[cell] = pid;
             }
         }
 
-        // Advance pool hydrology for this patch. The catchment-runoff
-        // factor is DERIVED from data (M7.4.1): CR(cell) from the DEM
-        // (env NC `catchment_ratio` band) times the runoff coefficient
-        // C = f(building_fraction, NDVI, antecedent 7-day rain).
-        // Fallback when the band is absent: land-cover constants.
-        const float rain_val = climate_->rain_at(cell.first, cell.second);
-        const float temp_val = climate_->temp_at(cell.first, cell.second);
-        bool is_urban = false;
-        float bldg = 0.0f;
-        if (host_landscape_ != nullptr) {
-            const HostCell hc0 = host_landscape_->at(cell.first, cell.second);
-            is_urban = hc0.urban_class == URBAN_CLASS_THRESHOLD;
-            bldg = hc0.building_fraction;
-        }
-        // Terrain runoff coefficient: impervious cover drives urban C
-        // (ASCE urban hydrology: dense cover 0.7-0.95, medium 0.5);
-        // rural C falls with vegetation (bare soil 0.35, lush ~0.05).
-        const size_t cidx = static_cast<size_t>(cell.first) *
-            static_cast<size_t>(climate_->w()) + static_cast<size_t>(cell.second);
-        const std::vector<float>& ndvi_band = climate_->ndvi();
-        const float ndvi_cell =
-            (cidx < ndvi_band.size()) ? ndvi_band[cidx] : 0.0f;
-        const float ndvi_n = std::clamp(ndvi_cell, 0.0f, 1.0f);
-        const float c_terrain = is_urban
-            ? POOL_RUNOFF_URBAN_BASE +
-              POOL_RUNOFF_URBAN_SLOPE * std::clamp(bldg, 0.0f, 1.0f)
-            : std::max(POOL_RUNOFF_RURAL_FLOOR,
-                       POOL_RUNOFF_RURAL_BASE -
-                       POOL_RUNOFF_RURAL_NDVI_SLOPE * ndvi_n);
-        // Antecedent-moisture boost: saturated ground sheds more
-        // runoff (SCS-CN AMC logic), linear in the last 7 days of rain.
-        const float rain_7d = rain_7d_at(cell.first, cell.second);
-        const float c_moist = POOL_RUNOFF_SAT_MIN +
-            (1.0f - POOL_RUNOFF_SAT_MIN) *
-            std::min(1.0f, rain_7d / POOL_RUNOFF_SAT_REF_MM);
-        const float c_eff = c_terrain * c_moist;
-
-        const std::vector<float>& cr_band = climate_->catchment_ratio();
-        float catchment_factor;
-        if (!cr_band.empty() && cidx < cr_band.size()) {
-            catchment_factor = 1.0f + cr_band[cidx] * c_eff;
-        } else {
-            catchment_factor = is_urban ? POOL_CATCHMENT_URBAN
-                                        : POOL_CATCHMENT_RURAL;
-        }
-        // Shaded microhabitats lose water slower: dense vegetation and
-        // built-up shade both reduce open-water evaporation.
-        float evap_scale = 1.0f - POOL_EVAP_NDVI_SCALE * ndvi_n -
-            (is_urban ? POOL_EVAP_URBAN_EXTRA : 0.0f);
-        evap_scale = std::clamp(evap_scale, 0.55f, 1.0f);
-        DailyForcing forcing{rain_val, temp_val, catchment_factor,
-                             evap_scale};
-
-        auto pool_it = pool_states_.find(pid);
-        const bool pre_existing = (pre_it != pre_rowcol_to_pid.end());
-        const bool is_permanent = pre_existing
-            ? habitat_.patches()[static_cast<size_t>(pid)].is_permanent
-            : climate_->permanent_water_at(cell.first, cell.second) > 0.0f;
-        if (is_permanent) {
-            // Permanent water is not governed by the temporary-pool drying model.
-            PoolState stable;
-            stable.water_mm = POOL_WATER_MAX_MM;
-            stable.days_dry = 0;
-            stable.days_since_fill = 0;
-            pool_states_[pid] = stable;
-        } else if (pool_it == pool_states_.end()) {
-            // First day this patch is tracked — initialise from rain.
-            PoolState init;
-            init.water_mm = rain_val * forcing.catchment_factor;
-            init.days_dry = (rain_val < POOL_WATER_DRY_MM) ? 1 : 0;
-            init.days_since_fill = (rain_val > PLUVIAL_POOL_RAIN_THRESHOLD_MM)
-                ? 0 : 1;
-            pool_states_[pid] = init;
-        } else {
-            pool_states_[pid] = advance_pool(pool_it->second, forcing);
-        }
-
-        // Urban permanent baseline (M7.4.1): canals/gutters, broken
-        // pipes and irrigation keep a small standing-water stock in
-        // built-up cells year-round — rains amplify it, the dry season
-        // does not erase it (Klinkenberg 2008 Accra).
-        if (is_urban) {
-            PoolState& pooled = pool_states_[pid];
-            pooled.water_mm = std::max(pooled.water_mm,
-                                       POOL_URBAN_BASELINE_MM);
-            pooled.days_dry = 0;
-        }
-
-        const PoolState& pool = pool_states_[pid];
-
+        const int32_t r = cell.first;
+        const int32_t c = cell.second;
+        const size_t idx = static_cast<size_t>(r) *
+                               static_cast<size_t>(W) + static_cast<size_t>(c);
         PatchState ps;
         ps.patch_id = pid;
-        ps.row = cell.first;
-        ps.col = cell.second;
-        ps.activated = (pool.water_mm >= POOL_WATER_BREED_MM);
-        ps.rain_d = rain_val;
-        ps.temp_d = temp_val;
-        ps.water_frac = climate_->water_frac_at(cell.first, cell.second);
-        ps.salinity_ppt = climate_->salinity_at(cell.first, cell.second);
-        // Salinity hard gate (M7.8): a patch whose water salinity
-        // exceeds the species' high tolerance cannot breed. This
-        // deactivates coastal brackish cells for freshwater-limited
-        // species and also disables oviposition site search (which
-        // reads ps.activated) at those cells.
+        ps.row = r;
+        ps.col = c;
+        ps.rain_d = climate_->rain_at(r, c);
+        ps.temp_d = climate_->temp_at(r, c);
+        ps.salinity_ppt = climate_->salinity_at(r, c);
+
+        const auto h = habitat_potential(feats_[idx]);
+        ps.habitat_avail = species_accuracy(h, default_species_weights(), z_[idx]);
+        ps.activated = ps.habitat_avail >= kActivationMin;
+        ps.habitat_dry_days = dry_days_[idx];
+        ps.k_habitat = K_cell_[idx];
+
+        // Salinity hard gate (preserved M7.8): a patch whose water
+        // salinity exceeds the species' high tolerance cannot breed.
         if (ps.salinity_ppt >= salinity_hi_tol_ppt_) {
             ps.activated = false;
-        }
-        ps.pool_water_mm = pool.water_mm;
-        ps.pool_days_dry = pool.days_dry;
-        ps.is_permanent = is_permanent;
-        // Urban capacity scaling (plan §6.4): f(building_fraction) clamped
-        // to [URBAN_CAPACITY_FLOOR, URBAN_CAPACITY_CEIL]. For non-urban
-        // patches the factor stays at 1.0.
-        if (host_landscape_ != nullptr) {
-            const HostCell hc = host_landscape_->at(cell.first, cell.second);
-            if (hc.urban_class == URBAN_CLASS_THRESHOLD) {
-                ps.urban_capacity_factor = std::clamp(
-                    hc.building_fraction, URBAN_CAPACITY_FLOOR,
-                    URBAN_CAPACITY_CEIL);
-            }
         }
         states.push_back(ps);
     }
@@ -449,13 +235,9 @@ std::vector<PatchState> CoordinatorModel::to_dataframe() {
 
 std::vector<SeedInstruction> CoordinatorModel::build_seed_instructions(
     const SeedingConfig& config) {
-    // 1. Filter habitat patches by the viability rule:
-    //      water_frac > config.min_water_frac (default 0.05)
-    //      twi        > config.min_twi        (default 8.0)
-    // The current Ghana dataset has water_frac=1.0 and TWI > 8 on
-    // all 19,424 patches, so the filter is a no-op today. The
-    // criteria are present so the future datasets (where some
-    // cells are dry / low-TWI) drop out cleanly.
+    // Contract v3.0: viability is potential-based; config.min_water_frac
+    // / config.min_twi are retired gates and ignored (the SeedingConfig
+    // fields are required by the legacy engine surface).
     std::vector<int32_t> viable_ids;
     std::vector<std::array<double, 2>> viable_lonlat;
     std::vector<std::array<int32_t, 2>> viable_rowcol;
@@ -465,33 +247,14 @@ std::vector<SeedInstruction> CoordinatorModel::build_seed_instructions(
     viable_rowcol.reserve(patches.size());
     for (size_t i = 0; i < patches.size(); ++i) {
         const auto& p = patches[i];
-        // The HabitatPatch struct only carries twi_value; the
-        // water_frac is read from the climate's per-cell band
-        // (same source the dynamic-patch rule uses). We fall
-        // back to `p.water_frac_value` (a future field) when
-        // the climate lookup is unavailable; for now, the
-        // climate->water_frac_at(p.row, p.col) is the canonical
-        // source.
-        const float water_frac = (climate_ != nullptr)
-            ? climate_->water_frac_at(p.row, p.col)
-            : 1.0f;  // optimistic default: treat as viable
-        if (!(water_frac > config.min_water_frac)) continue;
-        if (!(p.twi_value > config.min_twi)) continue;
+        if (!(p.potential >= kHabitatCandidateMin)) continue;
         viable_ids.push_back(static_cast<int32_t>(i));
         viable_lonlat.push_back({p.lon, p.lat});
         viable_rowcol.push_back({p.row, p.col});
     }
 
-    // 2. Delegate to the free function in seeding.cpp. The
-    //    coordinator owns the per-rollout Prng, so the random
-    //    selection in RANDOM_VIABLE mode goes through it (keeping
-    //    the stream reproducible).
     std::vector<SeedInstruction> out;
     if (config.mode == SeedingMode::HOST_WEIGHTED) {
-        // HOST_WEIGHTED: compute per-cell host attractiveness from the
-        // host landscape using the species' preference weights, then
-        // let the builder weigh each viable patch by the nearby host
-        // field (Gaussian decay, mirroring host-seeking attraction).
         if (host_landscape_ == nullptr) {
             throw std::runtime_error(
                 "build_seed_instructions: HOST_WEIGHTED seeding requires "
@@ -505,9 +268,6 @@ std::vector<SeedInstruction> CoordinatorModel::build_seed_instructions(
         for (int32_t r = 0; r < gh; ++r) {
             for (int32_t c = 0; c < gw; ++c) {
                 const HostCell cell = host_landscape_->at(r, c);
-                // Same structure as HostSeekingModel::cell_attraction
-                // (host_seeking.cpp): hosts × pref × indoor × urban,
-                // without the per-cell distance decay (applied per patch).
                 const float indoor_mod =
                     1.0f + cell.indoor_fraction * 0.72f;
                 const float urban_mod = 1.0f + 0.2f * cell.urbanicity;
@@ -518,7 +278,7 @@ std::vector<SeedInstruction> CoordinatorModel::build_seed_instructions(
                 att += cell.goats_present     * prefs.goat;
                 att += cell.sheep_present     * prefs.sheep;
                 att += cell.pigs_present      * prefs.cattle;   // pigs ≈ cattle
-                att += cell.chickens_present  * prefs.wildlife; // chickens ≈ other
+                att += cell.chickens_present  * prefs.wildlife;
                 att += cell.wildlife_proxy    * prefs.wildlife;
                 att *= mod;
                 if (att > 0.0f) {
@@ -536,54 +296,23 @@ std::vector<SeedInstruction> CoordinatorModel::build_seed_instructions(
             config, viable_ids, viable_lonlat, viable_rowcol, rng_);
     }
 
-    // 3. M17.4 PR-A: stamp the urban_capacity_factor from the host
-    //    landscape onto each instruction. Mirrors the calculation in
-    //    to_dataframe() (lines ~280-285): clamp(building_fraction,
-    //    URBAN_CAPACITY_FLOOR, URBAN_CAPACITY_CEIL) for urban cells,
-    //    1.0 for terrain. The submodel uses this in PR-B to cap
-    //    adult counts per patch by K_MAX * factor.
-    if (host_landscape_ != nullptr && !out.empty()) {
-        for (auto& inst : out) {
-            const HostCell hc = host_landscape_->at(inst.row, inst.col);
-            if (hc.urban_class == URBAN_CLASS_THRESHOLD) {
-                inst.urban_capacity_factor = std::clamp(
-                    hc.building_fraction, URBAN_CAPACITY_FLOOR,
-                    URBAN_CAPACITY_CEIL);
-            }
-        }
-    }
+    // Contract v3.0 retired the per-seed urban capacity factor with the
+    // urban floor; contract 4.0 removed the field entirely — counts
+    // seed verbatim.
     return out;
 }
 
 std::vector<SeedInstruction>
 CoordinatorModel::build_uniform_seed_instructions(
-    float init_frac, int32_t k_per_patch) {
+    int32_t n_adults, int32_t n_immatures) {
     std::vector<SeedInstruction> out;
-    if (init_frac <= 0.0f || k_per_patch <= 0) return out;
+    if (n_adults < 0 || n_immatures < 0 ||
+        (n_adults == 0 && n_immatures == 0)) return out;
 
-    // Per-patch agent count — identical to the legacy round-robin
-    // uniform path (n = n_patches * k_per_patch * init_frac, evenly
-    // divided). Split 10% adults / 90% eggs (G3 lifecycle), matching
-    // MosquitoSubmodel's legacy constructor.
-    const int64_t per_patch = std::max<int64_t>(
-        1, static_cast<int64_t>(std::llround(
-               static_cast<double>(k_per_patch) *
-               static_cast<double>(init_frac))));
-    constexpr float kUniformAdultFrac = 0.10f;
-    const int64_t n_adults = static_cast<int64_t>(std::llround(
-        static_cast<double>(per_patch) * kUniformAdultFrac));
-    const int64_t n_larvae = per_patch - n_adults;
-    if (n_adults <= 0 && n_larvae <= 0) return out;
-
-    // Day-0 union via to_dataframe(): also registers the dynamic
-    // patch ids in dynamic_patch_registry_ with exactly the pid
-    // space the daily loop will use afterwards.
+    // Day-0 candidate union via to_dataframe(); stable pids are
+    // registered so the daily loop reuses the same numbering.
     const std::vector<PatchState> states = to_dataframe();
-    const int64_t n_pre =
-        static_cast<int64_t>(habitat_.patches().size());
 
-    // Cell-centre lon/lat from the AOI bounds (same derivation as
-    // write_state_cog's transform).
     const int32_t W = climate_->w() > 0 ? climate_->w() : 1;
     const int32_t H = climate_->h() > 0 ? climate_->h() : 1;
     const double pixel_w = (aoi_.east - aoi_.west) / W;
@@ -591,36 +320,23 @@ CoordinatorModel::build_uniform_seed_instructions(
 
     out.reserve(states.size());
     for (const auto& ps : states) {
-        const bool pre_existing =
-            ps.patch_id < n_pre && ps.patch_id >= 0;
-        bool urban_persistent = false;
-        if (host_landscape_ != nullptr) {
-            const HostCell hc = host_landscape_->at(ps.row, ps.col);
-            urban_persistent =
-                hc.urban_class == URBAN_CLASS_THRESHOLD &&
-                hc.building_fraction >= urban_b_min_;
-        }
-        // Seed pre-existing patches (legacy parity) plus the urban
-        // persistent baseline patches. Rain-day-only dynamic patches
-        // are left to natural colonisation.
-        if (!pre_existing && !urban_persistent) continue;
-
         SeedInstruction inst;
         inst.patch_id = static_cast<int32_t>(ps.patch_id);
         inst.row      = ps.row;
         inst.col      = ps.col;
         inst.lon      = aoi_.west + (ps.col + 0.5) * pixel_w;
         inst.lat      = aoi_.north - (ps.row + 0.5) * pixel_h;
-        inst.n_adults = static_cast<int32_t>(n_adults);
-        inst.n_larvae = static_cast<int32_t>(n_larvae);
-        inst.urban_capacity_factor = ps.urban_capacity_factor;
+        inst.n_adults = n_adults;
+        inst.n_larvae = n_immatures;
         out.push_back(inst);
     }
     return out;
 }
 
-DensityGrid CoordinatorModel::aggregate_density(const MosquitoSubmodel& sub,
-                                                int32_t k_max) const {
+DensityGrid CoordinatorModel::aggregate_density(
+                                                const MosquitoSubmodel& sub) const {
+    // Contract 4.0: raw per-cell adult counts (individuals). Adults are
+    // associated to a cell via their patch — no capacity normalization.
     const int32_t H = climate_->h();
     const int32_t W = climate_->w();
     DensityGrid grid;
@@ -630,13 +346,12 @@ DensityGrid CoordinatorModel::aggregate_density(const MosquitoSubmodel& sub,
     if (H <= 0 || W <= 0) return grid;
 
     std::unordered_map<int64_t, std::pair<int32_t, int32_t>> pid_to_cell;
-    pid_to_cell.reserve(habitat_.patches().size() +
-                        dynamic_patch_registry_.size());
+    pid_to_cell.reserve(habitat_.patches().size() + patch_registry_.size());
     for (size_t i = 0; i < habitat_.patches().size(); ++i) {
         const auto& patch = habitat_.patches()[i];
         pid_to_cell[static_cast<int64_t>(i)] = {patch.row, patch.col};
     }
-    for (const auto& kv : dynamic_patch_registry_) {
+    for (const auto& kv : patch_registry_) {
         pid_to_cell[kv.second] = kv.first;
     }
 
@@ -655,18 +370,18 @@ DensityGrid CoordinatorModel::aggregate_density(const MosquitoSubmodel& sub,
              static_cast<size_t>(col)] += static_cast<double>(count);
     }
 
-    const double kmax_d = (k_max > 0) ? static_cast<double>(k_max) : 1.0;
+    // Contract 4.0: raw counts — no division, no clamp.
     for (size_t i = 0; i < flat.size(); ++i) {
-        float v = static_cast<float>(flat[i] / kmax_d);
-        if (v < 0.0f) v = 0.0f;
-        if (v > 1.0f) v = 1.0f;
-        grid.data[i] = v;
+        grid.data[i] = static_cast<float>(flat[i]);
     }
     return grid;
 }
 
 SuitabilityGrid CoordinatorModel::suitability_grid(
-    const MosquitoSubmodel& sub, int32_t k_max) const {
+    const MosquitoSubmodel& sub) const {
+    // Contract 4.0: raw per-cell adult counts at the adults' current
+    // position — no capacity normalization. NOTE: this counts all
+    // adults (any sex/state), not only host-seeking females.
     const int32_t H = climate_->h();
     const int32_t W = climate_->w();
     SuitabilityGrid grid;
@@ -687,12 +402,9 @@ SuitabilityGrid CoordinatorModel::suitability_grid(
              static_cast<size_t>(col)] += static_cast<double>(n_adults);
     }
 
-    const double kmax_d = (k_max > 0) ? static_cast<double>(k_max) : 1.0;
+    // Contract 4.0: raw counts — no division, no clamp.
     for (size_t i = 0; i < flat.size(); ++i) {
-        float v = static_cast<float>(flat[i] / kmax_d);
-        if (v < 0.0f) v = 0.0f;
-        if (v > 1.0f) v = 1.0f;
-        grid.data[i] = v;
+        grid.data[i] = static_cast<float>(flat[i]);
     }
     return grid;
 }
@@ -711,17 +423,11 @@ std::string CoordinatorModel::write_state_cog(const std::string& path,
     meta.year = year;
     meta.month = month;
     meta.seed = seed;
-    // F1.c: propagate the per-rollout metadata to the sidecar.
     meta.n_rollouts    = n_rollouts;
     meta.rollout_index = rollout_index;
     meta.h = density.h;
     meta.w = density.w;
 
-    // Parity with the Python reference (coordinator.py:545): the transform
-    // is derived from `aoi.cells_per_side()` (the AOI-derived dimensions),
-    // not from the density grid's dimensions. This makes the sidecar JSON
-    // transform independent of the env COG's actual shape (which can be
-    // smaller than the AOI when the user passes a custom --bbox).
     const int32_t W_aoi = aoi_.cells_per_side();
     const int32_t H_aoi = cells_per_side_h(aoi_);
     const double safe_w = (W_aoi > 0) ? static_cast<double>(W_aoi) : 1.0;

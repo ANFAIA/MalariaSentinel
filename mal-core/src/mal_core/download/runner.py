@@ -28,6 +28,14 @@ def _check_auth(spec: DownloaderSpec) -> bool:
             if not os.environ.get("EARTHDATA_TOKEN"):
                 log.warning("Downloader '%s' requires EARTHDATA_TOKEN — skipping", spec.name)
                 return False
+        elif auth == "earthengine":
+            ee_creds = Path.home() / ".config" / "earthengine" / "credentials"
+            if not ee_creds.exists():
+                log.warning(
+                    "Downloader '%s' requires Earth Engine auth — run "
+                    "`earthengine authenticate` once (skipping)", spec.name,
+                )
+                return False
     return True
 
 

@@ -1,26 +1,25 @@
-"""D20: Washout response scorer (canonical; promoted from the calibration
-harness 2026-10).
+"""D20: Washout response scorer (canonical; contract v3.0, 2026-10-17).
 
-Verifies that heavy rain (>= 40mm) causes a measurable washout of
-aquatic cohorts:
-  - A 50mm rain event over an active pool reduces larval density by
-    >= 30% within 24 hours.
-  - A 30mm rain event (below washout threshold) causes no washout.
+Verifies that heavy rain causes a measured washout of aquatic cohorts:
+  - A 50 mm rain event maps to a >= 0.15 flush fraction (0.60 cap at
+    80 mm preserved from the M14 pool module).
+  - A 30 mm rain event (below the 40 mm threshold) causes no washout.
+  - Rain enters as the daily forcing the engine reads (rain_d = daily
+    rainfall, not a pool supply state) — the proxy redesign keeps rain
+    out of the static habitat planes by design (plan 02 §6).
 
-Based on: the 40mm negative correlation (washout of larvae by heavy
-rain) implemented in the C++ pool hydrology (wire.hpp washout model).
+The 40 mm threshold is the M14 heavy-rain washout anchor.
 """
 from __future__ import annotations
 
 from pathlib import Path
 from typing import Any
 
-from mal_core.abm.pool_hydrology import (
-    POOL_RAIN_WASH_MM,
-    POOL_WASH_FRACTION_MAX,
-    washout_fraction,
+from mal_core.habitat.aquatic_stress import washout_fraction
+from mal_core.habitat.constants import (
+    AQUATIC_RAIN_WASH_MM,
+    AQUATIC_WASHOUT_FRACTION_MAX,
 )
-
 from .base import Scorer, ScorerResult
 
 
@@ -31,42 +30,35 @@ class WashoutResponseScorer(Scorer):
     kind = "composite"
     weight = 1.0
     description = (
-        f"Heavy rain washes out larvae: 50mm -> >=0.15 (target 0.30); "
-        f"flat below {POOL_RAIN_WASH_MM}mm; cap {POOL_WASH_FRACTION_MAX} "
-        f"at 80mm"
+        f"Heavy rain washes out cohorts: 50mm -> >=0.15 (cap "
+        f"{AQUATIC_WASHOUT_FRACTION_MAX} at 80mm); flat below "
+        f"{AQUATIC_RAIN_WASH_MM}mm"
     )
     min_score = 0.70
 
     def score(self, run_dir: Path, ctx: dict[str, Any]) -> ScorerResult:
-        """Score washout response using the washout_fraction function.
-
-        Tests:
-          1. 50mm rain -> washout fraction >= 0.30 (biological target)
-          2. 30mm rain -> washout fraction == 0.0 (below threshold)
-          3. 80mm rain -> washout fraction == cap
-          4. 40mm rain -> at threshold, fraction ~0
-        """
+        """Score washout response with the aquatic-stress contract."""
         diagnostics: dict[str, Any] = {}
 
-        # Test 1: 50mm -> should produce washout.
+        # 1. 50 mm -> real washout.
         frac_50 = washout_fraction(50.0)
         diagnostics["frac_50mm"] = round(frac_50, 4)
-        test1_ok = frac_50 >= 0.15  # at least 15% at 50mm (target: 30%)
+        test1_ok = frac_50 >= 0.15
 
-        # Test 2: 30mm -> no washout (below threshold).
+        # 2. 30 mm -> no washout (below threshold).
         frac_30 = washout_fraction(30.0)
         diagnostics["frac_30mm"] = round(frac_30, 4)
         test2_ok = frac_30 == 0.0
 
-        # Test 3: 80mm -> at cap.
+        # 3. 80 mm -> cap.
         frac_80 = washout_fraction(80.0)
         diagnostics["frac_80mm"] = round(frac_80, 4)
-        test3_ok = abs(frac_80 - POOL_WASH_FRACTION_MAX) < 0.001
+        test3_ok = abs(frac_80 - AQUATIC_WASHOUT_FRACTION_MAX) < 0.001
 
-        # Test 4: 40mm -> exactly at threshold (should be 0 or very small).
+        # 4. 40 mm -> exactly at threshold (~0).
         frac_40 = washout_fraction(40.0)
         diagnostics["frac_40mm"] = round(frac_40, 4)
-        test4_ok = frac_40 <= 0.01  # at threshold, fraction should be ~0
+        test4_ok = frac_40 <= 0.01
 
         score = 0.0
         if test1_ok:
@@ -82,8 +74,8 @@ class WashoutResponseScorer(Scorer):
             score=round(score, 4),
             value=round(frac_50, 4),
             target=(
-                f"washout at 50mm >= 0.15; no washout at 30mm; "
-                f"cap at 80mm = {POOL_WASH_FRACTION_MAX}"
+                f"washout at 50mm >= 0.15; none at 30mm; cap at 80mm = "
+                f"{AQUATIC_WASHOUT_FRACTION_MAX}"
             ),
             diagnostics=diagnostics,
             passed=score >= 0.70,

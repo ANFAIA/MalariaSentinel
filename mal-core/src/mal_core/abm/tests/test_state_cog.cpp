@@ -37,6 +37,7 @@
 #include <ogr_api.h>
 #include <ogr_spatialref.h>
 #include <ogrsf_frmts.h>
+#include <netcdf.h>
 #include <nlohmann/json.hpp>
 
 #include "engine.hpp"
@@ -106,7 +107,6 @@ mal_abm_fast::StateCogMetadata make_meta() {
     m.nodata            = mal_abm_fast::NODATA_SENTINEL;
     m.h                 = 4;
     m.w                 = 4;
-    m.k_max             = mal_abm_fast::K_MAX;
     return m;
 }
 
@@ -238,7 +238,8 @@ TEST(MalAbmFastStateCog, WritesSidecarJsonWithContractVersion) {
     EXPECT_EQ(j.value("rollout_index", -1), 0);
     EXPECT_DOUBLE_EQ(j.value("nodata", 0.0),
                      static_cast<double>(mal_abm_fast::NODATA_SENTINEL));
-    EXPECT_EQ(j.value("k_max", 0), mal_abm_fast::K_MAX);
+    // Contract 4.0: `k_max` removed from the sidecar.
+    EXPECT_FALSE(j.contains("k_max"));
     EXPECT_EQ(j.value("crs", ""), "EPSG:4326");
 
     ASSERT_TRUE(j.contains("transform") && j["transform"].is_array());
@@ -315,48 +316,61 @@ TEST(MalAbmFastStateCog, TwoRolloutsDifferentSeedsProduceDifferentCogs) {
         ~Cleanup() { std::error_code ec; fs::remove_all(p, ec); }
     } cleanup{tmp_root};
 
-    const std::string env_path     = (tmp_root / "env.tif").string();
+    const std::string env_path     = (tmp_root / "env.nc").string();
     const std::string habitat_path = (tmp_root / "habitat.gpkg").string();
     const std::string tif_a_path   = (tmp_root / "seed_a.tif").string();
     const std::string tif_b_path   = (tmp_root / "seed_b.tif").string();
 
-    // Synthesize the env COG and habitat gpkg. (Reusing the test_engine
-    // helpers would mean linking those symbols across translation
-    // units; the helpers are not exported, so we inline the minimum
-    // needed for the determinism test.)
+    // Synthesize the v3.0 env NC and habitat gpkg. (Reusing the
+    // test_engine helpers would mean linking those symbols across
+    // translation units; the helpers are not exported, so we inline
+    // the minimum needed for the determinism test.)
     //
-    // The env is tuned so the PLUVIAL_POOL dynamic-patch rule fires:
-    // rainfall > 15 mm/day, water_frac > 0, TWI > 8. With dynamics
-    // the per-day ops (birth / dispersal) use the Prng, so different
-    // seeds produce byte-different state COGs.
+    // The env stays wet on every synthetic day so the pluvial z and the
+    // static planes keep the cells active; with dynamics the per-day
+    // ops (birth / dispersal) use the Prng, so different seeds produce
+    // byte-different state COGs.
     {
-        GDALDriver* drv = GetGDALDriverManager()->GetDriverByName("GTiff");
-        ASSERT_NE(drv, nullptr);
-        constexpr int H = 2, W = 2;
-        GDALDataset* ds = drv->Create(env_path.c_str(), W, H, 5,
-                                      GDT_Float32, nullptr);
-        ASSERT_NE(ds, nullptr);
-        double transform[6] = {0.0, 1.0, 0.0, 2.0, 0.0, -1.0};
-        ds->SetGeoTransform(transform);
-        OGRSpatialReference srs;
-        srs.SetFromUserInput("EPSG:4326");
-        ds->SetSpatialRef(&srs);
-        struct BandInit { const char* name; float v; };
-        const BandInit bands[5] = {
-            {"rainfall",         20.0f},  // > 15 mm/day
-            {"temp_suitability",  1.0f},  // peak -> 25 deg C
-            {"water_frac",        0.5f},  // > 0
-            {"ndvi",              0.5f},
-            {"twi",              10.0f},  // > 8
+        int ncid, dimids[3], vid[2];
+        int dimid_time, dimid_y, dimid_x;
+        ASSERT_EQ(nc_create(env_path.c_str(),
+                            NC_CLOBBER | NC_NETCDF4, &ncid), NC_NOERR);
+        ASSERT_EQ(nc_def_dim(ncid, "time", NC_UNLIMITED, &dimid_time), NC_NOERR);
+        ASSERT_EQ(nc_def_dim(ncid, "y", 2, &dimid_y), NC_NOERR);
+        ASSERT_EQ(nc_def_dim(ncid, "x", 2, &dimid_x), NC_NOERR);
+        dimids[0] = dimid_time; dimids[1] = dimid_y; dimids[2] = dimid_x;
+        ASSERT_EQ(nc_def_var(ncid, "rainfall", NC_FLOAT, 3, dimids, &vid[0]), NC_NOERR);
+        ASSERT_EQ(nc_def_var(ncid, "air_temp_c", NC_FLOAT, 3, dimids, &vid[1]), NC_NOERR);
+        ASSERT_EQ(nc_put_att_text(ncid, NC_GLOBAL, "Conventions", 6, "CF-1.8"), NC_NOERR);
+        nc_enddef(ncid);
+
+        auto def_static = [&](const char* name, float value) {
+            int dids[2] = {dimid_y, dimid_x};
+            int varid = -1;
+            ASSERT_EQ(nc_def_var(ncid, name, NC_FLOAT, 2, dids, &varid), NC_NOERR);
+            nc_enddef(ncid);
+            std::vector<float> plane(4, value);
+            ASSERT_EQ(nc_put_var_float(ncid, varid, plane.data()), NC_NOERR);
+            nc_redef(ncid);
         };
-        for (int band = 1; band <= 5; ++band) {
-            std::vector<float> buf(H * W, bands[band - 1].v);
-            GDALRasterBand* b = ds->GetRasterBand(band);
-            b->SetDescription(bands[band - 1].name);
-            (void)b->RasterIO(GF_Write, 0, 0, W, H, buf.data(),
-                              W, H, GDT_Float32, 0, 0);
+        def_static("jrc_persistent",      0.3f);
+        def_static("lc_built",            0.1f);
+        def_static("lc_wetland",          0.2f);
+        def_static("lc_open_plus_water",  0.3f);
+        def_static("lc_crop",             0.0f);
+        nc_enddef(ncid);
+
+        float buf[4];
+        size_t start[3] = {0, 0, 0};
+        size_t count[3] = {1, 2, 2};
+        for (int d = 0; d < 3; ++d) {
+            start[0] = static_cast<size_t>(d);
+            for (int i = 0; i < 4; ++i) buf[i] = 20.0f;
+            ASSERT_EQ(nc_put_vara_float(ncid, vid[0], start, count, buf), NC_NOERR);
+            for (int i = 0; i < 4; ++i) buf[i] = 25.0f;
+            ASSERT_EQ(nc_put_vara_float(ncid, vid[1], start, count, buf), NC_NOERR);
         }
-        GDALClose(ds);
+        ASSERT_EQ(nc_close(ncid), NC_NOERR);
     }
     {
         GDALDriver* drv = GetGDALDriverManager()->GetDriverByName("GPKG");
@@ -371,20 +385,14 @@ TEST(MalAbmFastStateCog, TwoRolloutsDifferentSeedsProduceDifferentCogs) {
         OGRLayer* layer = ds->CreateLayer(
             "patches", &srs, wkbPoint, nullptr);
         ASSERT_NE(layer, nullptr);
-        OGRFieldDefn hab_type_f("hab_type", OFTString);
-        (void)layer->CreateField(&hab_type_f);
-        OGRFieldDefn k_f("K", OFTInteger);
-        (void)layer->CreateField(&k_f);
-        OGRFieldDefn twi_f("twi_value", OFTReal);
-        (void)layer->CreateField(&twi_f);
+        OGRFieldDefn pot_f("habitat_potential", OFTReal);
+        (void)layer->CreateField(&pot_f);
         OGRFieldDefn row_f("row", OFTInteger);
         (void)layer->CreateField(&row_f);
         OGRFieldDefn col_f("col", OFTInteger);
         (void)layer->CreateField(&col_f);
         OGRFeature* feat = OGRFeature::CreateFeature(layer->GetLayerDefn());
-        feat->SetField("hab_type", "pluvial_pool");
-        feat->SetField("K", 1000);
-        feat->SetField("twi_value", 9.0);  // > HABITAT_MIN_TWI (8.0)
+        feat->SetField("habitat_potential", 0.9);
         feat->SetField("row", 0);
         feat->SetField("col", 0);
         OGRPoint pt(0.5, 0.5);

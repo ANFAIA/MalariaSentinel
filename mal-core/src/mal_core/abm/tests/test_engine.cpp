@@ -16,7 +16,7 @@
 //
 // NOTE: in the F1.b f1f-engine worktree the climate and habitat
 // modules are still stubs (they throw `runtime_error` from
-// `load_from_env_tif` / `load_from_gpkg`). The test is therefore
+// `load_from_env_nc` / `load_from_gpkg`). The test is therefore
 // expected to FAIL at runtime in the worktree (it cannot construct
 // the Engine without the real IO implementations). The link succeeds
 // because the stubs compile. After F1.b integration the climate /
@@ -49,6 +49,7 @@
 #include <ogr_spatialref.h>
 #include <ogrsf_frmts.h>
 #include <nlohmann/json.hpp>
+#include <netcdf.h>
 
 #include "engine.hpp"
 #include "prng.hpp"
@@ -83,59 +84,69 @@ private:
     std::string path_;
 };
 
-// Write a tiny 5-band env COG (2x2, float32) to `path`. The bands
-// are: rainfall, temp_suitability, water_frac, ndvi, twi. Values
-// are tuned so the PLUVIAL_POOL dynamic-patch rule fires (TWI > 8,
-// water_frac > 0, rain > 15 mm/day) — this gives the F1.c
-// determinism test a real per-day Prng draw to act on (without
-// dynamics, the simulation is fully determined by the initial
-// seeding, and different seeds produce byte-equal state COGs).
-//
-// temp_suitability uses a Mordecai-inverted value (1.0 on the
-// lower branch maps to 25 deg C); the engine's climate loader is
-// expected to apply the inverse to the band on read.
-void write_synthetic_env_tif(const std::string& path) {
-    GDALDriver* drv = GetGDALDriverManager()->GetDriverByName("GTiff");
-    if (drv == nullptr) {
-        throw std::runtime_error("write_synthetic_env_tif: no GTiff driver");
+// Write a synthetic v3.0 daily env NetCDF (rainfall + air_temp_c; five
+// static habitat planes) plus a candidate gpkg — the engine path only
+// accepts .nc now.
+void write_synthetic_env_nc(const std::string& path) {
+    int ncid, dimids[3], vid[2];
+    int dimid_time, dimid_y, dimid_x;
+    if (nc_create(path.c_str(), NC_CLOBBER | NC_NETCDF4, &ncid) != NC_NOERR) {
+        throw std::runtime_error("write_synthetic_env_nc: nc_create failed");
     }
-    constexpr int h = 2;
-    constexpr int w = 2;
-    GDALDataset* ds = drv->Create(path.c_str(), w, h, 5, GDT_Float32, nullptr);
-    if (ds == nullptr) {
-        throw std::runtime_error("write_synthetic_env_tif: Create failed");
+    if (nc_def_dim(ncid, "time", NC_UNLIMITED, &dimid_time) != NC_NOERR ||
+        nc_def_dim(ncid, "y", 2, &dimid_y) != NC_NOERR ||
+        nc_def_dim(ncid, "x", 2, &dimid_x) != NC_NOERR) {
+        throw std::runtime_error("write_synthetic_env_nc: nc_def_dim failed");
     }
-    // EPSG:4326 transform for a 2x2 grid spanning [0, 2] deg in x
-    // and [0, 2] deg in y. The cell size is 1 deg.
-    double transform[6] = {0.0, 1.0, 0.0, 2.0, 0.0, -1.0};
-    ds->SetGeoTransform(transform);
-    OGRSpatialReference srs;
-    srs.SetFromUserInput("EPSG:4326");
-    ds->SetSpatialRef(&srs);
+    dimids[0] = dimid_time; dimids[1] = dimid_y; dimids[2] = dimid_x;
+    if (nc_def_var(ncid, "rainfall", NC_FLOAT, 3, dimids, &vid[0]) != NC_NOERR ||
+        nc_def_var(ncid, "air_temp_c", NC_FLOAT, 3, dimids, &vid[1]) != NC_NOERR) {
+        throw std::runtime_error("write_synthetic_env_nc: nc_def_var failed");
+    }
+    nc_put_att_text(ncid, NC_GLOBAL, "Conventions", 6, "CF-1.8");
+    nc_enddef(ncid);
 
-    auto fill_band = [&](int band, const char* name, float v) {
-        std::vector<float> buf(h * w, v);
-        GDALRasterBand* b = ds->GetRasterBand(band);
-        b->SetDescription(name);
-        (void)b->RasterIO(GF_Write, 0, 0, w, h, buf.data(), w, h,
-                          GDT_Float32, 0, 0);
+    auto def_static = [&](const char* name, float value) {
+        int dids[2] = {dimid_y, dimid_x};
+        int varid = -1;
+        if (nc_def_var(ncid, name, NC_FLOAT, 2, dids, &varid) != NC_NOERR) {
+            throw std::runtime_error(
+                "write_synthetic_env_nc: static def_var failed");
+        }
+        nc_enddef(ncid);
+        std::vector<float> plane(4, value);
+        nc_put_var_float(ncid, varid, plane.data());
+        nc_redef(ncid);
     };
-    // Values chosen so the PLUVIAL_POOL rule (TWI > 8, water_frac > 0,
-    // rain > 15 mm/day) fires for every cell — see coordinator.cpp
-    // to_dataframe() for the rule itself.
-    fill_band(1, "rainfall",         20.0f);  // > 15 mm/day
-    fill_band(2, "temp_suitability",  1.0f);  // peak -> 25 deg C
-    fill_band(3, "water_frac",        0.5f);  // > 0
-    fill_band(4, "ndvi",              0.5f);
-    fill_band(5, "twi",              10.0f);  // > 8
-    GDALClose(ds);
+    def_static("jrc_persistent",      0.3f);
+    def_static("lc_built",            0.1f);
+    def_static("lc_wetland",          0.2f);
+    def_static("lc_open_plus_water",  0.3f);
+    def_static("lc_crop",             0.0f);
+    nc_enddef(ncid);
+
+    float buf[4];
+    size_t start[3] = {0, 0, 0};
+    size_t count[3] = {1, 2, 2};
+    for (int d = 0; d < 3; ++d) {
+        start[0] = static_cast<size_t>(d);
+        const float rain = 20.0f;  // wet every synthetic day
+        for (int i = 0; i < 4; ++i) buf[i] = rain;
+        if (nc_put_vara_float(ncid, vid[0], start, count, buf) != NC_NOERR) {
+            throw std::runtime_error(
+                "write_synthetic_env_nc: rainfall put failed");
+        }
+        for (int i = 0; i < 4; ++i) buf[i] = 25.0f;
+        if (nc_put_vara_float(ncid, vid[1], start, count, buf) != NC_NOERR) {
+            throw std::runtime_error(
+                "write_synthetic_env_nc: air_temp put failed");
+        }
+    }
+    nc_close(ncid);
 }
 
 // Write a tiny habitat patches gpkg with one Point feature at the
-// centre of the AOI. The point uses the 4326 CRS. The gpkg has
-// hab_type='pluvial_pool', K=1000, twi_value=9.0 (passes the
-// HABITAT_MIN_TWI build-time filter); the row/col fields are
-// pre-computed for the engine's load_from_gpkg.
+// centre of the AOI (contract v3.0 fields: habitat_potential, row, col).
 void write_synthetic_habitat_gpkg(const std::string& path) {
     GDALDriver* drv = GetGDALDriverManager()->GetDriverByName("GPKG");
     if (drv == nullptr) {
@@ -161,21 +172,15 @@ void write_synthetic_habitat_gpkg(const std::string& path) {
         throw std::runtime_error("write_synthetic_habitat_gpkg: CreateLayer failed");
     }
 
-    OGRFieldDefn hab_type_f("hab_type", OFTString);
-    (void)layer->CreateField(&hab_type_f);
-    OGRFieldDefn k_f("K", OFTInteger);
-    (void)layer->CreateField(&k_f);
-    OGRFieldDefn twi_f("twi_value", OFTReal);
-    (void)layer->CreateField(&twi_f);
+    OGRFieldDefn pot_f("habitat_potential", OFTReal);
+    (void)layer->CreateField(&pot_f);
     OGRFieldDefn row_f("row", OFTInteger);
     (void)layer->CreateField(&row_f);
     OGRFieldDefn col_f("col", OFTInteger);
     (void)layer->CreateField(&col_f);
 
     OGRFeature* feat = OGRFeature::CreateFeature(layer->GetLayerDefn());
-    feat->SetField("hab_type", "pluvial_pool");
-    feat->SetField("K", 1000);
-    feat->SetField("twi_value", 9.0);  // > HABITAT_MIN_TWI (8.0)
+    feat->SetField("habitat_potential", 0.9);
     feat->SetField("row", 0);
     feat->SetField("col", 0);
 
@@ -199,14 +204,14 @@ TEST(MalAbmFastEngine, EndToEndSnapshotWritesStateCogAndSidecar) {
     GDALAllRegister();
 
     TmpDir tmp;
-    const std::string env_path     = tmp.join("env.tif");
+    const std::string env_path     = tmp.join("env.nc");
     const std::string habitat_path = tmp.join("habitat.gpkg");
     const std::string output_path  = tmp.join("state.tif");
 
-    write_synthetic_env_tif(env_path);
+    write_synthetic_env_nc(env_path);
     write_synthetic_habitat_gpkg(habitat_path);
 
-    // 2x2 AOI matching the synthetic env COG. Resolution is 112000m
+    // 2x2 AOI matching the synthetic env NC. Resolution is 112000m
     // (just above 1 deg) so that cells_per_side() = 2 with the WGS84
     // constant + ceil rounding (matches the Python AOI). If we used
     // 1000m the formula would give 223, which is correct for a real
@@ -283,7 +288,8 @@ TEST(MalAbmFastEngine, EndToEndSnapshotWritesStateCogAndSidecar) {
     // default. Both keys must be present in the v1.1 sidecar.
     EXPECT_EQ(j.value("n_rollouts", -1), 1);
     EXPECT_EQ(j.value("rollout_index", -1), 0);
-    EXPECT_EQ(j.value("k_max", 0), mal_abm_fast::K_MAX);
+    // Contract 4.0: `k_max` removed from the sidecar.
+    EXPECT_FALSE(j.contains("k_max"));
 }
 
 // F1.c: end-to-end multi-rollout test.
@@ -306,11 +312,11 @@ TEST(MalAbmFastEngine, NRolloutsWritesPerRolloutOutputsAndSidecars) {
     GDALAllRegister();
 
     TmpDir tmp;
-    const std::string env_path     = tmp.join("env.tif");
+    const std::string env_path     = tmp.join("env.nc");
     const std::string habitat_path = tmp.join("habitat.gpkg");
     const std::string base_output  = tmp.join("state.tif");
 
-    write_synthetic_env_tif(env_path);
+    write_synthetic_env_nc(env_path);
     write_synthetic_habitat_gpkg(habitat_path);
 
     mal_abm_fast::AOI aoi;
@@ -428,10 +434,10 @@ TEST(MalAbmFastEngine, TwoRolloutsWithDifferentSeedsProduceDifferentCogs) {
     GDALAllRegister();
 
     TmpDir tmp;
-    const std::string env_path     = tmp.join("env.tif");
+    const std::string env_path     = tmp.join("env.nc");
     const std::string habitat_path = tmp.join("habitat.gpkg");
 
-    write_synthetic_env_tif(env_path);
+    write_synthetic_env_nc(env_path);
     write_synthetic_habitat_gpkg(habitat_path);
 
     mal_abm_fast::AOI aoi;
@@ -520,10 +526,10 @@ TEST(MalAbmFastEngine, TwoRolloutsWithSameSeedProduceIdenticalCogs) {
     GDALAllRegister();
 
     TmpDir tmp;
-    const std::string env_path     = tmp.join("env.tif");
+    const std::string env_path     = tmp.join("env.nc");
     const std::string habitat_path = tmp.join("habitat.gpkg");
 
-    write_synthetic_env_tif(env_path);
+    write_synthetic_env_nc(env_path);
     write_synthetic_habitat_gpkg(habitat_path);
 
     mal_abm_fast::AOI aoi;

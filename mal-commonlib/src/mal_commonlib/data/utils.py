@@ -45,11 +45,10 @@ def reproject_to_grid(
 
 def _nodata_policy(name: str) -> str | float:
     return {
-        "water_frac":  0.0,
+        "jrc_persistent": 0.0,
         "rainfall":    "aoi_mean",
         "temperature": "aoi_mean",
-        "ndvi":        "aoi_mean",
-        "elevation":   "aoi_mean",
+        "air_temp_c":  "aoi_mean",
     }.get(name, "aoi_mean")
 
 

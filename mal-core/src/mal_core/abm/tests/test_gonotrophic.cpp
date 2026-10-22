@@ -54,7 +54,9 @@ std::vector<mal_abm_fast::PatchState> make_patch_states(
         ps[static_cast<size_t>(i)].activated  = all_active;
         ps[static_cast<size_t>(i)].rain_d     = 20.0f;
         ps[static_cast<size_t>(i)].temp_d     = temp_c;
-        ps[static_cast<size_t>(i)].water_frac = 0.5f;
+        // Contract 4.0: explicit test capacity (numerically the retired
+        // K_MAX fallback). Without it K=0 means zero larval survival.
+        ps[static_cast<size_t>(i)].k_habitat  = 1000.0f;
     }
     return ps;
 }
@@ -344,7 +346,7 @@ TEST(MultirateScheduler, DayStateReset) {
 // ---------------------------------------------------------------------------
 
 TEST(MosquitoSoA, GonotrophicFieldsAfterConstruction) {
-    mal_abm_fast::MosquitoSubmodel sub(10, 100, 0.3f, 42);
+    mal_abm_fast::MosquitoSubmodel sub(10, 3, 27, 42);
     const auto& soa = sub.soa();
     EXPECT_EQ(static_cast<int64_t>(soa.gonotrophic_state.size()), soa.n_alive);
     EXPECT_EQ(static_cast<int64_t>(soa.gonotrophic_timer.size()), soa.n_alive);
@@ -365,7 +367,7 @@ TEST(MosquitoSoA, GonotrophicFieldsAfterConstruction) {
 // ---------------------------------------------------------------------------
 
 TEST(MosquitoSubmodelG4, AdvanceDayPopulatesGonotrophicStats) {
-    mal_abm_fast::MosquitoSubmodel sub(10, 100, 0.3f, 42);
+    mal_abm_fast::MosquitoSubmodel sub(10, 3, 27, 42);
     const auto aoi = make_test_aoi();
     const auto ps  = make_patch_states(25.0f);
     sub.advance_day(aoi, ps);
@@ -377,7 +379,7 @@ TEST(MosquitoSubmodelG4, AdvanceDayPopulatesGonotrophicStats) {
 }
 
 TEST(MosquitoSubmodelG4, TeneralToHostSeekingAfterOneDay) {
-    mal_abm_fast::MosquitoSubmodel sub(10, 100, 0.3f, 42);
+    mal_abm_fast::MosquitoSubmodel sub(10, 3, 27, 42);
     const auto aoi = make_test_aoi();
     const auto ps  = make_patch_states(25.0f);
     sub.advance_day(aoi, ps);
@@ -396,7 +398,7 @@ TEST(MosquitoSubmodelG4, TeneralToHostSeekingAfterOneDay) {
 TEST(MosquitoSubmodelG4, DeterministicFeedingAllFemalesFeed) {
     // In G4, feeding is deterministic (all HOST_SEEKING females feed).
     // Stochastic version comes in a later gate.
-    mal_abm_fast::MosquitoSubmodel sub(10, 100, 0.3f, 42);
+    mal_abm_fast::MosquitoSubmodel sub(10, 3, 27, 42);
     const auto aoi = make_test_aoi();
     const auto ps  = make_patch_states(25.0f);
 
@@ -414,7 +416,7 @@ TEST(MosquitoSubmodelG4, DeterministicFeedingAllFemalesFeed) {
 }
 
 TEST(MosquitoSubmodelG4, BiteLedgerRecordedDaily) {
-    mal_abm_fast::MosquitoSubmodel sub(10, 100, 0.3f, 42);
+    mal_abm_fast::MosquitoSubmodel sub(10, 3, 27, 42);
     const auto aoi = make_test_aoi();
     const auto ps  = make_patch_states(25.0f);
     sub.advance_day(aoi, ps);
@@ -425,8 +427,8 @@ TEST(MosquitoSubmodelG4, BiteLedgerRecordedDaily) {
 }
 
 TEST(MosquitoSubmodelG4, DeterminismWithGonotrophic) {
-    mal_abm_fast::MosquitoSubmodel a(10, 100, 0.3f, 42);
-    mal_abm_fast::MosquitoSubmodel b(10, 100, 0.3f, 42);
+    mal_abm_fast::MosquitoSubmodel a(10, 3, 27, 42);
+    mal_abm_fast::MosquitoSubmodel b(10, 3, 27, 42);
     const auto aoi = make_test_aoi();
     const auto ps  = make_patch_states(25.0f);
     for (int day = 0; day < 30; ++day) {
@@ -441,7 +443,7 @@ TEST(MosquitoSubmodelG4, DeterminismWithGonotrophic) {
 }
 
 TEST(MosquitoSubmodelG4, ThirtyDayPopulationStable) {
-    mal_abm_fast::MosquitoSubmodel sub(100, 1000, 0.3f, 42);
+    mal_abm_fast::MosquitoSubmodel sub(100, 30, 270, 42);
     const auto aoi = make_test_aoi();
     const auto ps  = make_patch_states(25.0f);
     for (int day = 0; day < 30; ++day) {
@@ -452,7 +454,7 @@ TEST(MosquitoSubmodelG4, ThirtyDayPopulationStable) {
 }
 
 TEST(MosquitoSubmodelG4, GonotrophicParamsAccessible) {
-    mal_abm_fast::MosquitoSubmodel sub(10, 100, 0.3f, 42);
+    mal_abm_fast::MosquitoSubmodel sub(10, 3, 27, 42);
     const auto& p = sub.gonotrophic_params();
     EXPECT_FLOAT_EQ(p.feeding_success_rate, 0.825f);
     // Mutable access works.
@@ -461,7 +463,7 @@ TEST(MosquitoSubmodelG4, GonotrophicParamsAccessible) {
 }
 
 TEST(MosquitoSubmodelG4, GonotrophicStatsInDailyStats) {
-    mal_abm_fast::MosquitoSubmodel sub(10, 100, 0.3f, 42);
+    mal_abm_fast::MosquitoSubmodel sub(10, 3, 27, 42);
     const auto aoi = make_test_aoi();
     const auto ps  = make_patch_states(25.0f);
     sub.advance_day(aoi, ps);

@@ -30,13 +30,15 @@ def _loader_module_names() -> list[str]:
 LOADER_MODULES = _loader_module_names()
 
 # Attribution substrings that are (legally) literal lines upstream requires.
+# Contract v3.0 + Dynamic World swap (2026-10-17): worldcover retired; the
+# dynamic_world attribution must keep the Copernicus Sentinel literal.
 MANDATORY_ATTRIBUTION_FRAGMENTS = {
     "era5": "Copernicus Climate Change Service",
-    "wildlife": "ESA WorldCover project",
+    "wildlife": "Copernicus Sentinel",
     "buildings": "OpenStreetMap contributors",
     "jrc_gsw": "Pekel",
     "chirps": "Funk",
-    "dem": "ODbL",
+    "dynamic_world": "Copernicus Sentinel",
 }
 
 

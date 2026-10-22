@@ -2,8 +2,9 @@
 // oviposition_seeking.cpp — Spatial oviposition-site-seeking kernel implementation.
 //
 // The attraction kernel uses an exponential distance decay with
-// water-vapour scale (50m) and multiplies by TWI × water_frac
-// to rank breeding sites by suitability.
+// water-vapour scale (50m) and multiplies by the candidate patch's
+// static habitat potential (contract v3.0: TWI and water_frac retired;
+// plan §6). Attraction = potential × decay.
 
 #include "oviposition_seeking.hpp"
 
@@ -43,12 +44,19 @@ std::vector<BreedingAttraction> OvipositionSeekingModel::compute_attraction(
         int64_t patch_id;
         int32_t row;
         int32_t col;
-        float   water_frac;
+        float   potential;
     };
     std::vector<ActivatedPatch> activated;
     for (const auto& ps : patch_states) {
         if (!ps.activated) continue;
-        activated.push_back({ps.patch_id, ps.row, ps.col, ps.water_frac});
+        float potential = 0.0f;
+        try {
+            potential = hab.patch_by_id(ps.patch_id).potential;
+        } catch (...) {
+            // Patch outside the gpkg: use the per-cell availability.
+            potential = ps.habitat_avail;
+        }
+        activated.push_back({ps.patch_id, ps.row, ps.col, potential});
     }
 
     // For each activated patch, compute attraction.
@@ -59,22 +67,11 @@ std::vector<BreedingAttraction> OvipositionSeekingModel::compute_attraction(
 
         if (dist_m > search_radius_m) continue;
 
-        // Look up the static TWI from HabitatPatch.
-        float twi = 0.0f;
-        try {
-            const auto& patch = hab.patch_by_id(ap.patch_id);
-            twi = patch.twi_value;
-        } catch (...) {
-            continue;  // patch not found — skip
-        }
-
         // Water-vapour plume decay.
         const float decay = std::exp(-dist_m / static_cast<float>(scale_m_));
 
-        // Attraction = TWI × water_frac × decay.
-        // TWI > 8 is the habitat threshold (wire.hpp HABITAT_MIN_TWI).
-        // water_frac > 0 means open water present.
-        const float att = twi * ap.water_frac * decay;
+        // Attraction = static potential × decay.
+        const float att = ap.potential * decay;
         if (att <= 0.0f) continue;
 
         BreedingAttraction entry;

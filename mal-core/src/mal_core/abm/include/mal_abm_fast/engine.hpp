@@ -58,9 +58,9 @@ public:
     // state leaks across rollouts.
     //
     // The `seeding_config` (default = UNIFORM mode) controls how
-    // the submodel is initialised. UNIFORM preserves the legacy
-    // behaviour (`init_frac` of K in every patch). RANDOM_VIABLE
-    // and EXPLICIT use detection-based seeding via the
+    // the submodel is initialised. UNIFORM seeds the explicit
+    // per-patch counts (SeedingConfig) in every candidate patch.
+    // RANDOM_VIABLE and EXPLICIT use detection-based seeding via the
     // `CoordinatorModel::build_seed_instructions` helper.
     //
     // Throws `std::runtime_error` if either IO load fails.
@@ -92,7 +92,8 @@ public:
            const std::string& hosts_path = "",
            const std::string& mobility_dir = "",
            const std::string& wind_field_path = "",
-           TransmissionParams transmission_params = TransmissionParams{});
+           TransmissionParams transmission_params = TransmissionParams{},
+           int32_t warmup_bands = 0);
 
     // Advance the model by one day. Mirrors `AnophelesABM.step()`:
     //   1. coord_->activate_patches()
@@ -171,8 +172,9 @@ public:
     };
     SeedingPatch seeding_patch() const { return seeding_patch_; }
 
-    // Override the population explosion threshold. 0 = auto
-    // (n_patches * K_MAX * 10). Set before calling step().
+    // Operational population guard (plan 03-retirada-k-max). 0 =
+    // disabled; positive value throws in step() when the total adult
+    // count exceeds it. Set before calling step().
     void set_max_population(int64_t v) { max_population_ = v; }
     int64_t max_population() const { return max_population_; }
 

@@ -62,10 +62,11 @@ struct TransmissionParams {
     double      human_cluster_radius_km   = 0.0;
     int32_t     human_cluster_radius_cells = 0;               // derived by the CLI from radius_km / resolution
     // Adaptive trigger (M7.4.1): when > 0, the outbreak waits (daily
-    // retry) until the best viable core cell reaches this normalized
-    // mosquito density (grid = agents / K_MAX, clipped to [0,1]; 0.1
-    // ≈ 100 females in the cell). Guarantees the concentrated outbreak
-    // lands where the vector population is actually established.
+    // retry) until the best viable core cell reaches this many adult
+    // mosquitoes (contract 4.0: raw per-cell adult counts, no K_MAX
+    // normalization — the retired 0.5 corresponded to 500 adults).
+    // Guarantees the concentrated outbreak lands where the vector
+    // population is actually established.
     float       human_outbreak_min_density = 0.0f;
     // Core population cap (M7.4.1): cells above this population are NOT
     // cluster cores — in dense urban cells the seeded vectors dilute

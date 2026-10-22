@@ -112,7 +112,7 @@ string in 12 places and any rename would silently break the pipeline.
 ### §5.3 Env tensor formats
 
 - **INV-11.** Daily NetCDF env file (the only env output of ingest; the legacy COG/TIF variant was removed on 2026-09-27):
-  - CF-1.8 conventions, dims `(time, y, x)`, vars `rainfall, water_temp_c, water_frac, ndvi`.
+  - CF-1.8 conventions, dims `(time, y, x)`, daily vars `rainfall, air_temp_c` + 2-D statics `jrc_persistent, lc_built, lc_wetland, lc_open_plus_water, lc_crop` (contract v3.0).
   - `time` axis covers the full multi-year range from the CHIRPS daily input (e.g. 2024-2025).
   - `contract_version: "2.0"`.
 - **INV-12.** NetCDF `_FillValue` is `-9999.0` (or xarray's NaN default for float32; the ABM treats NaN as no-data).
@@ -147,7 +147,7 @@ string in 12 places and any rename would silently break the pipeline.
         "2024": "ghana_regional_2024_2025_env.nc",
         "2025": "ghana_regional_2024_2025_env.nc"
       },
-      "variables": ["water_frac", "rainfall", "water_temp_c", "ndvi"],
+      "variables": ["rainfall", "air_temp_c", "jrc_persistent", "lc_built", "lc_wetland", "lc_open_plus_water", "lc_crop"],
       "required_for_abm": true,
       "period": { "start": "2024-01-01", "end": "2025-12-31" }
     },
@@ -183,9 +183,10 @@ now honours every kwarg (`type`, `required_for_abm`, `variables`,
 | `chirps_rainfall` | GeoTIFF | monthly | `<aoi>_rainfall_<year>.tif` | (deleted loader; disk artifacts only) | no |
 | `chirps_rainfall_daily` | NetCDF4 | daily | `<aoi>_rainfall_daily_<start>_<end>_daily.nc` | `chirps` (`load_chirps_rainfall_daily`) | yes |
 | `era5_temp` | GeoTIFF | monthly | `<aoi>_temp_suitability_<year>.tif` | `era5` (`load_era5_temp_suitability`) | no |
-| `era5_water_temp` | GeoTIFF | monthly | `<aoi>_water_temp_<year>.tif` | `era5` (`load_era5_water_temp`) | no |
+| `era5_air_temp_daily` | NetCDF | daily | `<aoi>_air_temp_daily_<years>_daily.nc` | `era5` (`load_era5_air_temp_daily`) | yes |
 | `wind` | NetCDF4 | 6-hourly | `<aoi>_wind_6hourly_<year>.nc` | `era5` (`load_era5_wind_6hourly`) | no |
-| `modis_ndvi` | GeoTIFF | monthly | `<aoi>_ndvi_<year>.tif` | `modis` | no |
+| `jrc_habitat_features` | NetCDF | static | `<aoi>_habitat_features.nc` | `jrc_gsw` (`load_jrc_gsw_habitat_features`) | yes |
+| `dw_class_fractions` | NetCDF | per-year stack | `<aoi>_class_fractions_<years>_daily.nc` | `dynamic_world` (`load_dw_class_fractions`) | yes |
 | `habitat` | GeoPackage | static/time-series | `<aoi>_regional_<year>_<month>_habitat_patches.gpkg` | ingest (built from DEM+TWI) | yes |
 | `dem` | GeoTIFF | static | `<aoi>_elevation.tif` | `dem` (`load_merit_dem`) | no |
 | `jrc_water` | GeoTIFF | static | `<aoi>_water_occurrence.tif` | `jrc_gsw` | no |
@@ -237,7 +238,7 @@ Provenance:
   `mobility_*`) register compound ids summing their inputs.
 - **Warnings**: download runner and ingest builders call
   `warn_manifest_limits(aoi)` — one aggregated UserWarning per process
-  listing which uses are limited (ODbL share-alike, Copernicus/WorldCover
+  listing which uses are limited (ODbL share-alike, Copernicus/Dynamic World
   literal attribution lines, BY-NC currency, citation obligations).
 - **Human-readable audit + decision log** (incl. MERIT DEM = ODbL branch
   elected 2026-09-27; Overture kept): `docs/licenses.md`; consolidated
@@ -245,14 +246,14 @@ Provenance:
 - **Contract test**: `mal-commonlib/tests/test_licenses.py` enforces
   that every `DOWNLOADER` carries a known id + literal attribution.
 
-**Deprecated**: `worldcover` — archived to `mal-commonlib/.../loaders/_legacy/worldcover.py`. Use `jrc_gsw` for `water_frac`.
+**Retired (v3.0 + DW swap 2026-10-17)**: `era5_water_temp`, `modis_ndvi` env-channel roles, `dem`, `worldcover` and its `wc_class_fractions` key (replaced by `dynamic_world`/`dw_class_fractions` — no alias), `worldcover_water`/`worldcover_wetland`/`hydrolakes_lakes`/`hydrorivers_rivers` extras.
 
 ## 7. Migration & deprecation
 
 - **Manifest v1 removed (2026-09-27)**: the flat `files` dict schema and its reader migration (`_migrate_v1_to_v2`) are gone, including the duplicate copy in `prediction/aoi_resolver.py`. The `update_manifest` / `list_files` legacy helpers were deleted (zero callers). No migration script existed; no v1 manifests exist on disk.
 - **Manifest v2 → v3.1**: writes always produce v3.1 (all kwargs honoured, `period` field supported).
 - **Env COG `contract_version: "1.0"` vs NetCDF `contract_version: "2.0"`**: the COG path is the M1/M2 contract pinned in `abm/spec.md` §5.2; the NetCDF path is a richer daily CF-1.8 surface used by some consumers. Bumping either without bumping the other is a P1 bug — see drift check.
-- **Deprecated**: `worldcover` dataset — archived to `mal-commonlib/.../loaders/_legacy/worldcover.py`. Use `jrc_gsw` for `water_frac`.
+- **Retired (v3.0)**: DEM/terrain pipeline, era5 annual water/temp, ndvi daily channel; superseded by the habitat-static planes + daily air_temp_c.
 - Deprecation policy: 1 MINOR spec version carries the warning; removed in the next MAJOR.
 
 ## 8. Drift check

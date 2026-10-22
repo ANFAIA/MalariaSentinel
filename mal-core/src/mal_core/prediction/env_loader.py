@@ -1,7 +1,8 @@
 """M6 & M7.4 — Load real environmental stack from AOI data (NetCDF/GeoTIFF) or runs/env_stack.npz.
 
-Selects the 4 channels the U-Net expects (water_frac, rainfall, temperature, ndvi),
-and resamples to the AOI grid (EPSG:4326).
+Selects the 4 channels the U-Net expects under contract v3.0 (rainfall,
+air_temp_c, jrc_persistent, lc_wetland), and resamples to the AOI grid
+(EPSG:4326).
 """
 from __future__ import annotations
 
@@ -14,7 +15,7 @@ from mal_commonlib.aoi import AOI
 from mal_commonlib.config import RUNS_DIR
 
 ENV_CHANNELS = 4
-ENV_CHANNEL_ORDER = ["water_frac", "rainfall", "water_temp_c", "temperature", "ndvi"]
+ENV_CHANNEL_ORDER = ["rainfall", "air_temp_c", "jrc_persistent", "lc_wetland"]
 
 
 def load_env_stack(aoi: AOI, env_path: str | Path | None = None) -> np.ndarray:
@@ -124,7 +125,7 @@ def load_env_stack(aoi: AOI, env_path: str | Path | None = None) -> np.ndarray:
             stack = data["stack"]
             present = list(data["present"])
             src_crs = str(data["crs"])
-            indices = [present.index(name) for name in ["water_frac", "rainfall", "temperature", "ndvi"] if name in present]
+            indices = [present.index(name) for name in ["rainfall", "air_temp_c", "jrc_persistent", "lc_wetland"] if name in present]
             if len(indices) != ENV_CHANNELS:
                 indices = list(range(min(ENV_CHANNELS, stack.shape[0])))
             src = stack[indices]

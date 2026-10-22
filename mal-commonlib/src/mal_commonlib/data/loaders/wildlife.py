@@ -9,18 +9,18 @@ Estimates spatial suitability for non-human, non-livestock blood hosts
 from three existing data layers:
 
     wildlife_host_proxy = (
-        0.5 * habitat_suitability   # ESA WorldCover class mapping
+        0.5 * habitat_suitability   # Dynamic World label mapping
       + 0.3 * water_presence        # JRC GSW occurrence (within-cell)
       + 0.2 * remoteness            # inverse of building density
     )
 
 Sources:
-    * **ESA WorldCover 10 m** — class codes mapped to habitat suitability
-      (via ``mal_commonlib.data.loaders.worldcover.load_worldcover_landcover``).
+    * **Google Dynamic World V1 10 m** — modal-label codes mapped to habitat
+      suitability (via ``mal_commonlib.data.loaders.dynamic_world.load_dw_label_mode``).
     * **JRC GSW 30 m** — occurrence band, normalized (saturates at ~33%).
     * **Overture Maps buildings** — building fraction inverted to remoteness.
 
-The loader is resilient to missing data: if WorldCover or JRC GSW fail
+The loader is resilient to missing data: if Dynamic World or JRC GSW fail
 to load, the corresponding component defaults to 0.5 (neutral). If
 buildings fail, remoteness defaults to 1.0 (assume remote).
 
@@ -41,29 +41,42 @@ import xarray as xr
 from rasterio.transform import from_bounds
 
 from mal_commonlib.aoi import AOI
-from mal_commonlib.data.loaders.worldcover import load_worldcover_landcover
+from mal_commonlib.data.loaders.dynamic_world import load_dw_label_mode
 
 log = logging.getLogger(__name__)
 
-# -- ESA WorldCover class → habitat suitability mapping -------------------
+# -- Dynamic World label → habitat suitability mapping --------------------
+#
+# WC heritage of each anchor (the table was re-keyed 2026-10-20 when the
+# source swapped WorldCover → Dynamic World; values conserve the WC-era
+# anchoring so wildlife calibration keeps meaning):
+#   DW 1 trees            <- WC 10  tree cover      0.9
+#   DW 5 shrub_and_scrub  <- WC 20  shrub cover     0.7
+#   DW 2 grass            <- WC 30  grassland       0.6
+#   DW 4 crops            <- WC 40  cropland        0.3
+#   DW 6 built            <- WC 50  built-up        0.05
+#   DW 7 bare             <- WC 60  bare / sparse   0.2
+#   DW 0 water            <- WC 80  perm. water     0.0
+#   DW 3 flooded_vegetation <- WC 90 (0.4) + WC 95 mangroves (0.5) → midpoint
+#   DW 8 snow_and_ice     <- WC 100 moss/lichen     0.1 (out of range for Ghana)
 
 HABITAT_SUITABILITY: dict[int, float] = {
-    10: 0.9,   # Tree cover
-    20: 0.7,   # Shrub cover
-    30: 0.6,   # Grassland
-    40: 0.3,   # Cropland
-    50: 0.05,  # Built-up
-    60: 0.2,   # Bare / sparse vegetation
-    80: 0.0,   # Permanent water bodies
-    90: 0.4,   # Herbaceous wetland
-    95: 0.5,   # Mangroves
-    100: 0.1,  # Moss and lichen
+    0: 0.0,    # water
+    1: 0.9,    # trees
+    2: 0.6,    # grass
+    3: 0.45,   # flooded_vegetation (wetland+mangrove midpoint)
+    4: 0.3,    # crops
+    5: 0.7,    # shrub_and_scrub
+    6: 0.05,   # built
+    7: 0.2,    # bare
+    8: 0.1,    # snow_and_ice (not expected in Ghana)
 }
 
-# Unknown / unlisted WorldCover class codes (e.g. snow/ice, class 70, or any
-# out-of-collection pixel value) map to 0.0 in the direct-pixel mapping of
-# the original implementation.
+# In-range codes not listed above (defensive) map to 0.0; out-of-range or
+# NoData (-9999) pixels keep NoData in the output rather than a fake 0.
 _UNKNOWN_CLASS_SCORE = 0.0
+_DW_MIN_LABEL = 0
+_DW_MAX_LABEL = 8
 
 # Weight vector for the three components
 _W_HABITAT = 0.5
@@ -76,13 +89,13 @@ _NODATA_OUT_SCALAR = -9999.0
 # -- Habitat suitability from shared WorldCover loader --------------------
 
 
-def _load_worldcover_habitat_pc(
+def _load_dw_habitat_pc(
     aoi: AOI,
     year: int,
 ) -> np.ndarray:
-    """Derive habitat suitability from the shared WorldCover classification.
+    """Derive habitat suitability from the shared Dynamic World classification.
 
-    ``load_worldcover_landcover`` streams each 3-degree tile's AOI bbox
+    ``load_dw_label_mode`` streams each cached EE tile's AOI bbox
     window into the AOI grid with nearest-neighbour resampling and a
     per-year STAC ``datetime`` filter. Because nearest resampling assigns
     each destination cell the same source pixel regardless of whether the
@@ -93,18 +106,21 @@ def _load_worldcover_habitat_pc(
     Returns (H, W) float32 habitat suitability in [0, 1], or -9999.0 for
     NoData.
     """
-    lc = load_worldcover_landcover(aoi, year=year)
+    lc = load_dw_label_mode(aoi, year=year)
     lc_vals = lc.values
 
-    # Build a lookup array indexed by class code for fast vectorised mapping.
-    max_class = max(HABITAT_SUITABILITY)
-    class_lut = np.full(max_class + 1, _UNKNOWN_CLASS_SCORE, dtype=np.float32)
+    # Build a lookup array indexed by label code for fast vectorised mapping.
+    class_lut = np.full(_DW_MAX_LABEL + 1, _UNKNOWN_CLASS_SCORE, dtype=np.float32)
     for cls, score in HABITAT_SUITABILITY.items():
         class_lut[cls] = score
 
+    # NoData pixels (-9999) stay NoData in the output: an unobserved cell is
+    # not a zero-suitability cell — downstream treats -9999 as neutral.
+    nodata = lc_vals == -9999
+    valid = (lc_vals >= _DW_MIN_LABEL) & (lc_vals <= _DW_MAX_LABEL)
     habitat = np.full_like(lc_vals, _NODATA_OUT_SCALAR, dtype=np.float32)
-    known = (lc_vals >= 0) & (lc_vals <= max_class)
-    habitat[known] = class_lut[lc_vals[known]]
+    inrange = valid & ~nodata
+    habitat[inrange] = class_lut[lc_vals[inrange]]
 
     return habitat
 
@@ -113,7 +129,7 @@ def _load_worldcover_habitat_pc(
 
 
 def _water_presence(water_frac: np.ndarray) -> np.ndarray:
-    """Convert JRC GSW water fraction to a within-cell water presence score.
+    """Convert a JRC water-fraction plane to a within-cell water presence.
 
     Formula: min(water_frac * 3, 1.0) — 0 → 0.0 (no water pixels in the
     cell), saturating at 1.0 when ~33% of the cell area is water. This is
@@ -121,6 +137,11 @@ def _water_presence(water_frac: np.ndarray) -> np.ndarray:
     without water receive no falloff contribution from neighbouring
     cells. Kept under this semantics for output parity with previously
     produced wildlife_proxy layers.
+
+    Contract v3.0 note: the input is now the ``jrc_persistent`` plane of
+    ``jrc_habitat_features`` (the >=80%-occurrence fraction — the same
+    plane the habitat contract carries). The retired per-year
+    ``load_jrc_gsw_water_frac`` is gone.
 
     NoData cells (-9999.0) are filled with 0.5 (neutral).
     """
@@ -161,7 +182,7 @@ def load_wildlife_host_proxy(
 
     Args:
         aoi: the AOI (bbox, CRS, resolution_m, slug).
-        year: WorldCover product year (2020 or 2021).
+        year: Dynamic World composite year (2015 → today).
         cache_dir: optional local cache for downloaded data.
 
     Returns:
@@ -174,21 +195,23 @@ def load_wildlife_host_proxy(
     H, W = aoi.cells_per_side()
     H, W = int(H), int(W)
 
-    # --- 1. Habitat suitability from WorldCover ----------------------
+    # --- 1. Habitat suitability from Dynamic World --------------------
     try:
-        habitat = _load_worldcover_habitat_pc(aoi, year)
-        log.info("wildlife: WorldCover habitat loaded successfully")
+        habitat = _load_dw_habitat_pc(aoi, year)
+        log.info("wildlife: Dynamic World habitat loaded successfully")
     except Exception as exc:
-        log.warning("wildlife: WorldCover failed (%s), using neutral 0.5", exc)
+        log.warning("wildlife: Dynamic World failed (%s), using neutral 0.5", exc)
         habitat = np.full((H, W), 0.5, dtype=np.float32)
 
     # --- 2. Water proximity from JRC GSW -----------------------------
     try:
-        from mal_commonlib.data.loaders.jrc_gsw import load_jrc_gsw_water_frac
+        from mal_commonlib.data.loaders.jrc_gsw import (
+            load_jrc_gsw_habitat_features,
+        )
 
-        water_da = load_jrc_gsw_water_frac(aoi, year=year, cache_dir=cache_dir)
-        water_frac = water_da.values.astype(np.float32)
-        log.info("wildlife: JRC GSW water loaded successfully")
+        jrc = load_jrc_gsw_habitat_features(aoi, cache_dir=cache_dir)
+        water_frac = jrc["jrc_persistent"].values.astype(np.float32)
+        log.info("wildlife: JRC persistent-water surface loaded successfully")
     except Exception as exc:
         log.warning("wildlife: JRC GSW failed (%s), using neutral 0.5", exc)
         water_frac = np.full((H, W), 0.5 / 3.0, dtype=np.float32)

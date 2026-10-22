@@ -23,7 +23,10 @@ upstream licenses. Attribution owed when publishing derived products:
   - European Commission, Joint Research Centre (CC BY 4.0 / EC reuse,
     Decision 2011/833/EU): JRC Global Surface Water v1.4 (Pekel et al.,
     2016, Nature 540, 418-422); GHS-SMOD R2023A
-  - ESA WorldCover project (CC BY 4.0):
+  - Google, Dynamic World V1 (CC BY 4.0; Brown et al. 2022,
+    doi:10.1038/s41597-022-01307-4): contains modified Copernicus
+    Sentinel data [Year]
+  - (Historic files) ESA WorldCover project (CC BY 4.0):
     "© ESA WorldCover project [2021] / Contains modified Copernicus
     Sentinel data (2021) processed by ESA WorldCover consortium"
   - Overture Maps Foundation buildings (ODbL 1.0):

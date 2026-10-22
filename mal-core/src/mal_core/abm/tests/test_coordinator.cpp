@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: MIT
-// test_coordinator.cpp — GoogleTest for mal_abm_fast CoordinatorModel (F1.b).
+// test_coordinator.cpp — GoogleTest for mal_abm_fast CoordinatorModel
+// (contract v3.0).
 //
-// Exercises the full per-day orchestrator (activate_patches → to_dataframe
-// → sub.advance_day → aggregate_density → suitability_grid → write_state_cog)
-// against default-constructed engines (the cross-module IO is stubbed
-// in the F1.b worktree; the integration step pulls in the real
-// implementations).
+// Exercises the per-day orchestrator (update_habitat_day → to_dataframe →
+// sub.advance_day → aggregate_density → write_state_cog) plus the
+// candidate floor, the pluvial daily toggle and the salinity gate.
 #include <gtest/gtest.h>
 
 #include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
@@ -30,6 +30,7 @@
 #include "climate.hpp"
 #include "coordinator.hpp"
 #include "habitat_engine.hpp"
+#include "habitat_availability.hpp"
 #include "mosquito_submodel.hpp"
 #include "output_contract.hpp"
 #include "wire.hpp"
@@ -38,9 +39,7 @@ namespace {
 
 mal_abm_fast::AOI make_aoi_4x4() {
     // (0.04 deg x 0.04 deg) at 1000m → cells_per_side() = 5 with the
-    // WGS84 constant + ceil rounding (matches the Python AOI). The
-    // helper is named "make_aoi_4x4" for historical reasons; the
-    // assertion in Aoi4x4 below expects 5, the W and H of the grid.
+    // WGS84 constant + ceil rounding (matches the Python AOI).
     mal_abm_fast::AOI aoi;
     aoi.west = 0.0;
     aoi.east = 0.04;
@@ -91,10 +90,12 @@ std::filesystem::path MakeTmpEnvNC() {
     return dir / "mal_abm_fast_test_coordinator.nc";
 }
 
+// Contract v3.0 env NC: rainfall + air_temp_c daily, the five static
+// habitat planes, optional daily salinity. Rain pattern 60/40 mm.
 void WriteSyntheticEnvNC(const std::filesystem::path& path, int n_days,
                          int h = 4, int w = 4,
                          const std::vector<float>& sal_vals = {}) {
-    int ncid, dimids[3], vid[4], vidsal;
+    int ncid, dimids[3], vid[2], vidsal;
     int dimid_time, dimid_y, dimid_x;
 
     ASSERT_EQ(nc_create(path.string().c_str(),
@@ -105,17 +106,29 @@ void WriteSyntheticEnvNC(const std::filesystem::path& path, int n_days,
     dimids[0] = dimid_time; dimids[1] = dimid_y; dimids[2] = dimid_x;
 
     ASSERT_EQ(nc_def_var(ncid, "rainfall", NC_FLOAT, 3, dimids, &vid[0]), NC_NOERR);
-    ASSERT_EQ(nc_def_var(ncid, "water_temp_c", NC_FLOAT, 3, dimids, &vid[1]), NC_NOERR);
-    ASSERT_EQ(nc_def_var(ncid, "water_frac", NC_FLOAT, 3, dimids, &vid[2]), NC_NOERR);
-    ASSERT_EQ(nc_def_var(ncid, "ndvi", NC_FLOAT, 3, dimids, &vid[3]), NC_NOERR);
+    ASSERT_EQ(nc_def_var(ncid, "air_temp_c", NC_FLOAT, 3, dimids, &vid[1]), NC_NOERR);
     const bool with_salinity = !sal_vals.empty();
     if (with_salinity) {
         ASSERT_EQ(nc_def_var(ncid, "salinity_ppt", NC_FLOAT, 3, dimids, &vidsal), NC_NOERR);
     }
     ASSERT_EQ(nc_put_att_text(ncid, NC_GLOBAL, "Conventions", 6, "CF-1.8"), NC_NOERR);
-    ASSERT_EQ(nc_enddef(ncid), NC_NOERR);
 
-    // Day 0: rain=60 (>50 threshold), Day 1: rain=40 (<50)
+    // Static habitat planes (2-D): a wetland-heavy cell so candidates exist.
+    auto def_static = [&](const char* name, float value) {
+        int dids[2] = {dimid_y, dimid_x};
+        int varid = -1;
+        ASSERT_EQ(nc_def_var(ncid, name, NC_FLOAT, 2, dids, &varid), NC_NOERR);
+        ASSERT_EQ(nc_enddef(ncid), NC_NOERR);
+        std::vector<float> plane(static_cast<size_t>(h) * w, value);
+        ASSERT_EQ(nc_put_var_float(ncid, varid, plane.data()), NC_NOERR);
+        ASSERT_EQ(nc_redef(ncid), NC_NOERR);
+    };
+    def_static("jrc_persistent",      0.2f);
+    def_static("lc_built",            0.0f);
+    def_static("lc_wetland",          0.3f);
+    def_static("lc_open_plus_water",  0.3f);
+    def_static("lc_crop",             0.0f);
+
     const float rain_vals[] = {60.0f, 40.0f};
     const float temp_vals[] = {25.0f, 20.0f};
     std::vector<float> buf(h * w);
@@ -128,16 +141,44 @@ void WriteSyntheticEnvNC(const std::filesystem::path& path, int n_days,
         ASSERT_EQ(nc_put_vara_float(ncid, vid[0], start, count, buf.data()), NC_NOERR);
         std::fill(buf.begin(), buf.end(), temp_vals[d % 2]);
         ASSERT_EQ(nc_put_vara_float(ncid, vid[1], start, count, buf.data()), NC_NOERR);
-        std::fill(buf.begin(), buf.end(), 0.5f);
-        ASSERT_EQ(nc_put_vara_float(ncid, vid[2], start, count, buf.data()), NC_NOERR);
-        std::fill(buf.begin(), buf.end(), 0.4f);
-        ASSERT_EQ(nc_put_vara_float(ncid, vid[3], start, count, buf.data()), NC_NOERR);
         if (with_salinity) {
             std::fill(buf.begin(), buf.end(), sal_vals[d % sal_vals.size()]);
             ASSERT_EQ(nc_put_vara_float(ncid, vidsal, start, count, buf.data()), NC_NOERR);
         }
     }
     ASSERT_EQ(nc_close(ncid), NC_NOERR);
+}
+
+// Write a single candidate habitat patch (gpkg) at (row, col).
+std::string write_hab_gpkg(const std::string& tag, const mal_abm_fast::AOI& aoi,
+                           int row, int col, double potential = 0.9) {
+    const std::string hab_path = temp_dir(tag) + "/hab.gpkg";
+    std::filesystem::create_directories(
+        std::filesystem::path(hab_path).parent_path());
+    GDALAllRegister();
+    GDALDriver* drv = GetGDALDriverManager()->GetDriverByName("GPKG");
+    EXPECT_NE(drv, nullptr);
+    GDALDataset* ds = drv->Create(hab_path.c_str(), 0, 0, 0, GDT_Unknown, nullptr);
+    if (ds == nullptr) return hab_path;
+    OGRLayer* lyr = ds->CreateLayer("habitat", ds->GetSpatialRef(), wkbPoint, nullptr);
+    if (lyr == nullptr) { GDALClose(ds); return hab_path; }
+    OGRFieldDefn fpot("habitat_potential", OFTReal);
+    lyr->CreateField(&fpot);
+    OGRFieldDefn frow("row", OFTInteger);
+    lyr->CreateField(&frow);
+    OGRFieldDefn fcol("col", OFTInteger);
+    lyr->CreateField(&fcol);
+    OGRFeature* f = OGRFeature::CreateFeature(lyr->GetLayerDefn());
+    f->SetField("habitat_potential", potential);
+    f->SetField("row", row);
+    f->SetField("col", col);
+    OGRPoint pt(aoi.west + (col + 0.5) * (aoi.east - aoi.west) / 4,
+                aoi.north - (row + 0.5) * (aoi.north - aoi.south) / 4);
+    f->SetGeometry(&pt);
+    lyr->CreateFeature(f);
+    OGRFeature::DestroyFeature(f);
+    GDALClose(ds);
+    return hab_path;
 }
 
 }  // namespace
@@ -152,14 +193,12 @@ TEST(MalAbmFastCoordinator, Aoi4x4) {
 
 TEST(MalAbmFastCoordinator, FullDayOrchestrator) {
     using namespace mal_abm_fast;
-    GDALAllRegister();  // needed for write_state_cog (GDAL GTiff driver)
+    GDALAllRegister();
 
     AOI aoi = make_aoi_4x4();
     EXPECT_EQ(aoi.cells_per_side(), 5);
     EXPECT_EQ(cells_per_side_h(aoi), 5);
 
-    // Write a synthetic 4x4 daily env NC (day 0: rain=60, water_temp_c=25,
-    // water_frac=0.5, ndvi=0.4) and load it.
     const auto nc_path = MakeTmpEnvNC();
     if (std::filesystem::exists(nc_path)) std::filesystem::remove(nc_path);
     WriteSyntheticEnvNC(nc_path, 1);
@@ -167,48 +206,17 @@ TEST(MalAbmFastCoordinator, FullDayOrchestrator) {
     auto climate = std::make_shared<ClimateEngine>();
     climate->load_from_env_nc(env_path, aoi);
 
-    // Write a synthetic 1-row habitat gpkg at (row=2, col=2) and load it.
-    const std::string hab_path = temp_dir("coordinator_hab") + "/hab.gpkg";
-    {
-        std::filesystem::create_directories(std::filesystem::path(hab_path).parent_path());
-        GDALDriver* drv = GetGDALDriverManager()->GetDriverByName("GPKG");
-        ASSERT_NE(drv, nullptr);
-        GDALDataset* ds = drv->Create(hab_path.c_str(), 0, 0, 0, GDT_Unknown, nullptr);
-        ASSERT_NE(ds, nullptr);
-        OGRLayer* lyr = ds->CreateLayer("habitat", ds->GetSpatialRef(), wkbPoint, nullptr);
-        ASSERT_NE(lyr, nullptr);
-        OGRFieldDefn hab_type("hab_type", OFTString);
-        lyr->CreateField(&hab_type);
-        OGRFieldDefn k("K", OFTInteger);
-        lyr->CreateField(&k);
-        OGRFieldDefn twi("twi_value", OFTReal);
-        lyr->CreateField(&twi);
-        OGRFieldDefn row("row", OFTInteger);
-        lyr->CreateField(&row);
-        OGRFieldDefn col("col", OFTInteger);
-        lyr->CreateField(&col);
-        OGRFeature* f = OGRFeature::CreateFeature(lyr->GetLayerDefn());
-        f->SetField("hab_type", "pluvial_pool");
-        f->SetField("K", 1000);
-        f->SetField("twi_value", 9.0);
-        f->SetField("row", 2);
-        f->SetField("col", 2);
-        OGRPoint pt(0.02, 0.02);  // centre of (2, 2) at 0.04 deg / 4 cells
-        f->SetGeometry(&pt);
-        lyr->CreateFeature(f);
-        OGRFeature::DestroyFeature(f);
-        GDALClose(ds);
-    }
+    const std::string hab_path = write_hab_gpkg("coordinator_hab", aoi, 2, 2);
     HabitatEngine habitat;
     habitat.load_from_gpkg(hab_path, aoi);
     ASSERT_EQ(habitat.patches().size(), 1u);
 
-    // Submodel with 1 patch, 30% of K seeded = 300 total.
-    // G3: 10% adults (30) + 90% eggs (270) in cohort bank.
     MosquitoSubmodel sub(
         /*n_patches=*/1,
-        /*k_per_patch=*/K_MAX,
-        /*init_frac=*/INIT_FRAC,
+        std::vector<SeedInstruction>{
+            SeedInstruction{/*patch_id=*/0, /*row=*/0, /*col=*/0,
+                            /*lon=*/0.0, /*lat=*/0.0,
+                            /*n_adults=*/30, /*n_larvae=*/270}},
         /*seed=*/uint64_t{42});
     ASSERT_EQ(sub.total_agents(), 30);
 
@@ -216,19 +224,19 @@ TEST(MalAbmFastCoordinator, FullDayOrchestrator) {
         std::move(aoi), climate, std::move(habitat),
         /*seed=*/int32_t{1}, make_date(2024, 1, 1));
 
-    coord.activate_patches();
+    coord.update_habitat_day();
     auto states = coord.to_dataframe();
     EXPECT_FALSE(states.empty());
 
     sub.advance_day(coord.aoi(), states);
 
-    auto density = coord.aggregate_density(sub, K_MAX);
+    auto density = coord.aggregate_density(sub);
     EXPECT_GT(density.h, 0);
     EXPECT_GT(density.w, 0);
     EXPECT_EQ(density.data.size(),
               static_cast<size_t>(density.h) * static_cast<size_t>(density.w));
 
-    auto suit = coord.suitability_grid(sub, K_MAX);
+    auto suit = coord.suitability_grid(sub);
     EXPECT_GT(suit.h, 0);
     EXPECT_GT(suit.w, 0);
     EXPECT_EQ(suit.data.size(),
@@ -254,7 +262,7 @@ TEST(MalAbmFastCoordinator, FullDayOrchestrator) {
 
 TEST(MalAbmFastCoordinator, WriteStateCogReturnsPathAndCreatesSidecar) {
     using namespace mal_abm_fast;
-    GDALAllRegister();  // needed for write_state_cog (GDAL GTiff driver)
+    GDALAllRegister();
 
     AOI aoi = make_aoi_4x4();
     auto climate = std::make_shared<ClimateEngine>();
@@ -291,7 +299,38 @@ TEST(MalAbmFastCoordinator, WriteStateCogReturnsPathAndCreatesSidecar) {
     std::filesystem::remove_all(out_dir);
 }
 
-TEST(CoordinatorModel, PatchActivationTogglesDaily) {
+TEST(CoordinatorModel, CandidateFloorDropsEmptyCells) {
+    using namespace mal_abm_fast;
+    GDALAllRegister();
+
+    //_zero-feature gpkg: candidates must come from the static planes.
+    const auto nc_path = MakeTmpEnvNC();
+    if (std::filesystem::exists(nc_path)) std::filesystem::remove(nc_path);
+    WriteSyntheticEnvNC(nc_path, 1);
+
+    AOI aoi = make_aoi_4x4();
+    auto climate = std::make_shared<ClimateEngine>();
+    climate->load_from_env_nc(nc_path.string(), aoi);
+
+    HabitatEngine habitat;  // empty gpkg — the union comes from statics
+    CoordinatorModel coord(
+        std::move(aoi), climate, std::move(habitat),
+        /*seed=*/int32_t{1}, make_date(2024, 1, 1));
+
+    coord.update_habitat_day();
+    auto states = coord.to_dataframe();
+    // Static planes sum: 0.8 >= candidate floor → every grid cell
+    // (4x4 = 16) is a candidate.
+    EXPECT_EQ(states.size(), 16u);
+    for (const auto& s : states) {
+        EXPECT_GT(s.habitat_avail, 0.0f);
+        EXPECT_GT(s.k_habitat, 0.0f);
+        EXPECT_STREQ(species_name(SpeciesId::COLUZZII), "coluzzii");
+    }
+    std::filesystem::remove(nc_path);
+}
+
+TEST(CoordinatorModel, PatchAccuracyTogglesWithRain) {
     using namespace mal_abm_fast;
     GDALAllRegister();
 
@@ -304,62 +343,42 @@ TEST(CoordinatorModel, PatchActivationTogglesDaily) {
     climate->load_from_env_nc(nc_path.string(), aoi);
     ASSERT_EQ(climate->n_days(), 2);
 
-    // Write a synthetic habitat gpkg at (row=2, col=2)
-    const std::string hab_path = temp_dir("coordinator_daily_hab") + "/hab.gpkg";
-    {
-        std::filesystem::create_directories(
-            std::filesystem::path(hab_path).parent_path());
-        GDALDriver* drv = GetGDALDriverManager()->GetDriverByName("GPKG");
-        ASSERT_NE(drv, nullptr);
-        GDALDataset* ds = drv->Create(hab_path.c_str(), 0, 0, 0, GDT_Unknown, nullptr);
-        ASSERT_NE(ds, nullptr);
-        OGRLayer* lyr = ds->CreateLayer("habitat", ds->GetSpatialRef(), wkbPoint, nullptr);
-        ASSERT_NE(lyr, nullptr);
-        OGRFieldDefn hab_type("hab_type", OFTString);
-        lyr->CreateField(&hab_type);
-        OGRFieldDefn k("K", OFTInteger);
-        lyr->CreateField(&k);
-        OGRFieldDefn twi("twi_value", OFTReal);
-        lyr->CreateField(&twi);
-        OGRFieldDefn row("row", OFTInteger);
-        lyr->CreateField(&row);
-        OGRFieldDefn col("col", OFTInteger);
-        lyr->CreateField(&col);
-        OGRFeature* f = OGRFeature::CreateFeature(lyr->GetLayerDefn());
-        f->SetField("hab_type", "pluvial_pool");
-        f->SetField("K", 1000);
-        f->SetField("twi_value", 9.0);
-        f->SetField("row", 2);
-        f->SetField("col", 2);
-        OGRPoint pt(0.02, 0.02);
-        f->SetGeometry(&pt);
-        lyr->CreateFeature(f);
-        OGRFeature::DestroyFeature(f);
-        GDALClose(ds);
-    }
+    const std::string hab_path = write_hab_gpkg("coordinator_daily_hab",
+                                                aoi, 2, 2);
     HabitatEngine habitat;
     habitat.load_from_gpkg(hab_path, aoi);
     ASSERT_EQ(habitat.patches().size(), 1u);
 
-    MosquitoSubmodel sub(
-        /*n_patches=*/1,
-        /*k_per_patch=*/K_MAX,
-        /*init_frac=*/INIT_FRAC,
-        /*seed=*/uint64_t{42});
-
-    // Day 0: rain=60 (>50 threshold) -> patches should be active
-    climate->set_day(0);
     CoordinatorModel coord0(
         std::move(aoi), climate, std::move(habitat),
         /*seed=*/int32_t{1}, make_date(2024, 1, 1));
 
-    coord0.activate_patches();
+    // Day 0: heavy rain raises z; both days remain biologically active
+    // via the static persistent planes.
+    climate->set_day(0);
+    coord0.update_habitat_day();
     auto states0 = coord0.to_dataframe();
-    EXPECT_FALSE(states0.empty()) << "Day 0: patches should be active (rain=60)";
-
-    // Verify patch has rain > threshold
+    bool saw_patch = false;
     for (const auto& s : states0) {
-        EXPECT_GT(s.rain_d, PLUVIAL_POOL_RAIN_THRESHOLD_MM);
+        if (s.patch_id == 0) {
+            saw_patch = true;
+            EXPECT_FLOAT_EQ(s.rain_d, 60.0f);
+            EXPECT_TRUE(s.activated);
+            EXPECT_EQ(s.habitat_dry_days, 0);
+        }
+    }
+    EXPECT_TRUE(saw_patch);
+
+    // Day 1: rain 40 mm — the pluvial z keeps decaying; dry streak off
+    // (static persistent weighting keeps S above the activation min).
+    climate->set_day(1);
+    coord0.update_habitat_day();
+    auto states1 = coord0.to_dataframe();
+    for (const auto& s : states1) {
+        if (s.patch_id == 0) {
+            EXPECT_FLOAT_EQ(s.rain_d, 40.0f);
+            EXPECT_TRUE(s.activated);
+        }
     }
 
     std::filesystem::remove(nc_path);
@@ -381,39 +400,8 @@ TEST(CoordinatorModel, SalinityAboveHiTolDeactivatesPatch) {
     climate->load_from_env_nc(nc_path.string(), aoi);
     ASSERT_EQ(climate->n_days(), 2);
 
-    // Single pre-existing habitat patch at (row=2, col=2).
-    const std::string hab_path = temp_dir("coordinator_salinity_hab") + "/hab.gpkg";
-    {
-        std::filesystem::create_directories(
-            std::filesystem::path(hab_path).parent_path());
-        GDALDriver* drv = GetGDALDriverManager()->GetDriverByName("GPKG");
-        ASSERT_NE(drv, nullptr);
-        GDALDataset* ds = drv->Create(hab_path.c_str(), 0, 0, 0, GDT_Unknown, nullptr);
-        ASSERT_NE(ds, nullptr);
-        OGRLayer* lyr = ds->CreateLayer("habitat", ds->GetSpatialRef(), wkbPoint, nullptr);
-        ASSERT_NE(lyr, nullptr);
-        OGRFieldDefn hab_type("hab_type", OFTString);
-        lyr->CreateField(&hab_type);
-        OGRFieldDefn k("K", OFTInteger);
-        lyr->CreateField(&k);
-        OGRFieldDefn twi("twi_value", OFTReal);
-        lyr->CreateField(&twi);
-        OGRFieldDefn row("row", OFTInteger);
-        lyr->CreateField(&row);
-        OGRFieldDefn col("col", OFTInteger);
-        lyr->CreateField(&col);
-        OGRFeature* f = OGRFeature::CreateFeature(lyr->GetLayerDefn());
-        f->SetField("hab_type", "pluvial_pool");
-        f->SetField("K", 1000);
-        f->SetField("twi_value", 9.0);
-        f->SetField("row", 2);
-        f->SetField("col", 2);
-        OGRPoint pt(0.02, 0.02);
-        f->SetGeometry(&pt);
-        lyr->CreateFeature(f);
-        OGRFeature::DestroyFeature(f);
-        GDALClose(ds);
-    }
+    const std::string hab_path = write_hab_gpkg("coordinator_salinity_hab",
+                                                aoi, 2, 2);
     HabitatEngine habitat;
     habitat.load_from_gpkg(hab_path, aoi);
     ASSERT_EQ(habitat.patches().size(), 1u);
@@ -423,22 +411,25 @@ TEST(CoordinatorModel, SalinityAboveHiTolDeactivatesPatch) {
     CoordinatorModel coord0(
         std::move(aoi), climate, std::move(habitat),
         /*seed=*/int32_t{1}, make_date(2024, 1, 1));
-    coord0.activate_patches();
+    coord0.update_habitat_day();
     auto states0 = coord0.to_dataframe();
-    ASSERT_EQ(states0.size(), 1u);
-    EXPECT_FLOAT_EQ(states0[0].salinity_ppt, 35.0f);
-    EXPECT_FALSE(states0[0].activated)
-        << "patch above salinity_hi_tol_ppt must be deactivated";
+    ASSERT_EQ(states0.size(), 16u);
+    for (const auto& s : states0) {
+        EXPECT_FLOAT_EQ(s.salinity_ppt, 35.0f);
+        EXPECT_FALSE(s.activated)
+            << "patch above salinity_hi_tol_ppt must be deactivated";
+    }
 
-    // Day 1: salinity 5 psu <= hi_tol -> activated by the water rule
-    // (pool water_mm = rain 40 >= POOL_WATER_BREED_MM).
+    // Day 1: salinity 5 psu <= hi_tol -> activated through the static
+    // persistent planes (S > ACTIVATION_MIN, no pool rule involved).
     climate->set_day(1);
-    coord0.activate_patches();
+    coord0.update_habitat_day();
     auto states1 = coord0.to_dataframe();
-    ASSERT_EQ(states1.size(), 1u);
-    EXPECT_FLOAT_EQ(states1[0].salinity_ppt, 5.0f);
-    EXPECT_TRUE(states1[0].activated)
-        << "patch at or below salinity_hi_tol_ppt must follow the water rule";
+    ASSERT_EQ(states1.size(), 16u);
+    for (const auto& s : states1) {
+        EXPECT_FLOAT_EQ(s.salinity_ppt, 5.0f);
+        EXPECT_TRUE(s.activated);
+    }
 
     // Raising the species' hi_tol re-enables the brackish patch.
     climate->set_day(0);
@@ -448,7 +439,7 @@ TEST(CoordinatorModel, SalinityAboveHiTolDeactivatesPatch) {
         make_aoi_4x4(), climate, std::move(habitat_high),
         /*seed=*/int32_t{1}, make_date(2024, 1, 1));
     coord_high.set_salinity_hi_tol_ppt(40.0f);
-    coord_high.activate_patches();
+    coord_high.update_habitat_day();
     auto states_high = coord_high.to_dataframe();
     bool saw_patch = false;
     for (const auto& s : states_high) {

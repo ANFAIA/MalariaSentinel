@@ -59,7 +59,7 @@ target_link_libraries(test_coordinator
 )
 gtest_discover_tests(test_coordinator DISCOVERY_TIMEOUT 30)
 
-# M7.4.1: catchment-runoff pool physics (water balance regression).
+# contract v3.0: pool-capacity view tests (habitat_availability).
 add_executable(test_pool_water test_pool_water.cpp)
 target_link_libraries(test_pool_water
     PRIVATE mal_abm_fast_core GTest::gtest GTest::gtest_main mal_abm_fast::warnings
@@ -76,7 +76,7 @@ gtest_discover_tests(test_mosquito_submodel DISCOVERY_TIMEOUT 30)
 # F1.b: state COG writer.
 add_executable(test_state_cog test_state_cog.cpp)
 target_link_libraries(test_state_cog
-    PRIVATE mal_abm_fast_core GTest::gtest GTest::gtest_main mal_abm_fast::warnings
+    PRIVATE mal_abm_fast_core GTest::gtest GTest::gtest_main mal_abm_fast::warnings netCDF::netcdf
 )
 gtest_discover_tests(test_state_cog DISCOVERY_TIMEOUT 30)
 

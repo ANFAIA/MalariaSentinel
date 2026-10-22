@@ -65,7 +65,7 @@ imported by everything else.
 ## 2. In scope
 
 - `AOI` and `Scale` (region-agnostic, M1.2a). Frozen Pydantic model.
-- TWI computation from a DEM (`compute_twi`, pure numpy/scipy).
+- (Removed) TWI terrain computation — the DEM/TWI module exists only in git history; the habitat contract carries no terrain criterion.
 - Repo path constants (`REPO_ROOT`, `DATA_DIR`, `PAPERS_DIR`, `TERRAIN_DIR`, `RUNS_DIR`).
 - Simulation/training parameters and utility functions (`config.py`).
 - Data utilities (`data/utils.py`, `data/host_utils.py`, `data/mobility.py`).
@@ -149,18 +149,29 @@ Function-style loaders. Each module exports a public `load_*` function. The load
 
 | Module | Function | Dataset |
 |---|---|---|
-| `jrc_gsw` | `load_jrc_gsw_water_frac` | JRC Global Surface Water — water occurrence fraction |
+| `jrc_gsw` | `load_jrc_gsw_habitat_features` | JRC GSW — per-cell >=80%-permanent-water fraction (static habitat plane) |
 | `worldpop` | `load_worldpop_population` | WorldPop population density |
 | `glw` | `load_glw_livestock` | FAO Gridded Livestock of the World v4 |
 | `ghsl` | `load_ghsl_urban_class` | GHS-SMOD settlement classification |
 | `wildlife` | `load_wildlife_host_proxy` | Wildlife host suitability proxy |
 | `buildings` | `load_buildings_fraction` | Overture Maps building footprint fraction |
 | `chirps` | `load_chirps_rainfall_daily` | CHIRPS rainfall (daily; monthly interface deleted 2026-09-29) |
-| `dem` | `load_merit_dem` | MERIT DEM elevation |
-| `era5` | `load_era5_temp_suitability`, `load_era5_water_temp`, `load_era5_wind_6hourly` | ERA5-Land (temperature, water temp, wind) |
-| `modis` | `load_modis_ndvi` | MODIS NDVI (MOD13A3) |
+| `era5` | `load_era5_air_temp_daily`, `load_era5_wind_6hourly` | ERA5-Land (daily air temperature °C, wind) |
+| `dynamic_world` | `load_dw_class_fractions`, `load_dw_label_mode` | Google Dynamic World V1 (Earth Engine, OAuth) — per-year modal-label areal fractions (habitat statics); label mode shared with wildlife |
+| `coastline` | `load_coastline_land_mask` | GSHHG land/water mask (saltwater filter) |
+| `smap` | `load_smap_salinity` | SMAP SSS (optional freshwater plume) |
 
-> **Internal/legacy:** `_legacy/worldcover.py` provides `load_worldcover_water_frac` (ESA WorldCover water fraction). Not re-exported from `loaders.__init__`.
+> **Retired (contract v3.0, 2026-10-17):** the `dem` loader and `terrain/twi.py`
+> (TWI), the ERA5 annual `temp_suitability`/`water_temp` products, the MODIS
+> NDVI env channel role (loader module still shipped for independent data
+> work but excluded from ABM defaults). `_legacy/hydrorivers.py`/`_legacy/
+> hydrolakes.py` remain parked, unregistered.
+>
+> **Shared utility:** `dynamic_world.load_dw_label_mode` (per-year modal label,
+> int32 codes 0-8) is an internal helper for the wildlife proxy loader; it is
+> NOT part of the habitat contract. EE auth: OAuth stored in
+> `~/.config/earthengine/credentials` (project `psyched-signal-437808-a7`);
+> missing creds raise with the `earthengine authenticate` fix.
 
 ## 5. Invariants
 
@@ -168,7 +179,7 @@ Function-style loaders. Each module exports a public `load_*` function. The load
 - **INV-2.** `AOI.slug` always matches `[a-z0-9]+(-[a-z0-9]+)*`.
 - **INV-3.** `AOI.bbox` always satisfies `west < east ∧ south < north`.
 - **INV-4.** `AOI.crs` is always parseable by `pyproj.CRS.from_user_input`.
-- **INV-5.** `compute_twi` output dtype is `float32` and NoData sentinel is exactly `-9999.0`.
+- **INV-5.** All habitat-contract static planes (`jrc_persistent`, `lc_*`) are float32 in [0, 1] with NoData `-9999.0` and carry `contract = "habitat-v3.0-statics"`.
 - **INV-6.** `AOI.cells_per_side()` is the single source of truth for the ABM output `(H, W)`. Any code that hardcodes `H = W = 128` outside `commonlib` is a drift bug.
 - **INV-7.** `RUNS_DIR` exists after import of `mal_commonlib.config`.
 - **INV-8.** `build_host_static_nc` output NetCDF contains CF-1.8 conventions with CRS coordinate variable.
@@ -188,7 +199,8 @@ Function-style loaders. Each module exports a public `load_*` function. The load
 - Adding a new `Scale` value → bump MINOR (additive).
 - Adding a new slug to `AOI.from_slug`'s registry → PATCH (data, not API).
 - Renaming `AOI` field → bump MAJOR.
-- Changing TWI formula → bump MAJOR (output consumers are pinned).
+- Retiring the TWI module (done with contract v3.0, 2026-10-17; DEM loaders removed).
+- Adding a new loader output → bump MINOR (registry + catalog identity keys).
 - Deprecation policy: 1 MINOR version carries the deprecation warning; removed in the next MAJOR.
 
 ## 8. Drift check
@@ -200,8 +212,8 @@ uv run python -c "from mal_commonlib.aoi import AOI; a = AOI.from_slug('ghana');
 # INV-2/3/4: validator surface
 uv run pytest mal-commonlib/tests/test_aoi.py -v
 
-# INV-5: TWI output contract
-uv run pytest mal-commonlib/tests/test_twi.py -v
+# INV-5: habitat statics contract
+uv run pytest mal-commonlib/tests/test_jrc_gsw.py mal-commonlib/tests/test_dynamic_world.py -v
 
 # INV-6: cells_per_side is the only source of (H, W)
 rg "H\s*=\s*W\s*=\s*128|H\s*=\s*128|W\s*=\s*128" mal-core/src/ mal-execution/src/ | grep -v tests
@@ -233,13 +245,11 @@ assert aoi2 == aoi
 ```
 
 ```python
-import xarray as xr
-from mal_commonlib.terrain.twi import compute_twi
+from mal_commonlib.data.loaders.jrc_gsw import load_jrc_gsw_habitat_features
 
-dem = xr.open_dataarray("terrain/ghana_dem.tif")
-twi = compute_twi(dem, cell_size_m=1000)
-assert twi.dtype == "float32"
-assert float(twi.rio.nodata) == -9999.0
+features = load_jrc_gsw_habitat_features(aoi)
+assert features["jrc_persistent"].dtype == "float32"
+assert features["jrc_persistent"].rio.nodata == -9999.0
 ```
 
 ```python

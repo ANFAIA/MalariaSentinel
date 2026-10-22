@@ -113,26 +113,28 @@ class TestCatalogStatus:
         keys = {r["key"] for r in rows}
         # Registry-derived (loader keys present no matter the manifest)
         assert "chirps_rainfall_daily" in keys
-        assert "jrc_water" in keys
+        assert "jrc_habitat_features" in keys
+        assert "era5_air_temp_daily" in keys
+        assert "dw_class_fractions" in keys
         assert "smap_salinity" in keys
         # Ingest artifacts derived from INGEST_ARTIFACTS
         assert {"env", "habitat", "host_static", "mobility_day"} <= keys
         kinds = {r["key"]: r["kind"] for r in rows}
         assert kinds["env"] == "artifact"
-        assert kinds["jrc_water"] == "download"
+        assert kinds["jrc_habitat_features"] == "download"
         # All registry downloadables covered
         assert len(rows) == len(downloadable_datasets()) + len(INGEST_ARTIFACTS)
 
     def test_manifest_and_disk_flags(self, tmp_path):
         d = tmp_path / "ghana"
         d.mkdir()
-        (d / "ghana_water_occurrence.tif").write_text("x")
+        (d / "ghana_habitat_features.tif").write_text("x")
         (d / "manifest.json").write_text(json.dumps({
-            "datasets": {"jrc_water": {"files": {"jrc_water": "ghana_water_occurrence.tif"}}},
+            "datasets": {"jrc_habitat_features": {"files": {"jrc_habitat_features": "ghana_habitat_features.tif"}}},
         }))
         rows = {r["key"]: r for r in catalog_status("ghana", data_root=tmp_path)}
-        assert rows["jrc_water"]["in_manifest"] is True
-        assert rows["jrc_water"]["on_disk"] is True
+        assert rows["jrc_habitat_features"]["in_manifest"] is True
+        assert rows["jrc_habitat_features"]["on_disk"] is True
         assert rows["chirps_rainfall_daily"]["in_manifest"] is False
         assert rows["chirps_rainfall_daily"]["on_disk"] is False
 

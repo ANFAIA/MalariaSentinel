@@ -17,7 +17,7 @@ affects:
     severity: breaking
   - target: ingest
     direction: upstream
-    reason: ingest relies on download for the raw inputs (rainfall, water_temp, ndvi, jrc_gsw, dem, wind, hosts)
+    reason: ingest relies on download for the raw inputs (rainfall, air_temp_daily, jrc habitat features, wc class fractions, wind, hosts)
     severity: breaking
   - target: abm
     direction: upstream
@@ -125,21 +125,22 @@ registry/auth/manifest plumbing, and the manifest would diverge.
 
 | Loader | Auth | Outputs | Manifest keys | Notes |
 |---|---|---|---|---|
-| `era5` | `cds` | `temp_suitability`, `water_temp`, `wind_6hourly` | `era5_temp`, `era5_water_temp`, `wind` | |
+| `era5` | `cds` | `air_temp_daily`, `wind_6hourly` | `era5_air_temp_daily`, `wind` | |
 | `chirps` | `none` | `rainfall`, `rainfall_daily` | `chirps_rainfall`, `chirps_rainfall_daily` | `formats`: `rainfall`=monthly, `rainfall_daily`=daily |
 | `dem` | `none` | `elevation` | `dem` | Falls back to NASADEM via Planetary Computer on MERIT auth failure |
 | `jrc_gsw` | `none` | `water_occurrence` | `jrc_water` | Source of permanent water for the ABM profile |
 | `coastline` | `none` | `land_mask` | `coastline_land_mask` | GSHHG (Wessel & Smith 1996) shapefile archive (~149 MB, cached); rasterises land/coastal-water mask on AOI grid. Consumed by `daily_nc.py` saltwater filter (default 5 km buffer, override with `COASTLINE_BUFFER_M` env var; negative disables) |
-| `modis` | `earthdata` | `ndvi` | `modis_ndvi` | |
+| `modis` | `earthdata` | `ndvi` — NOT an ABM default (no consumer in the habitat contract) | `modis_ndvi` | |
 | `smap` | `earthdata` | `salinity` | `smap_salinity` | RSS SMAP L3 SSS SMI Monthly V6.0 (PO.DAAC), `formats`: `salinity`=monthly_nc |
 | `worldpop` | `none` | `population` | `worldpop` | Accepts `AOI \| str`; optional `year` param (default 2019) |
 | `glw` | `none` | `cattle`, `goats`, `sheep`, `pigs`, `chickens` | `glw_cattle`, `glw_goats`, `glw_sheep`, `glw_pigs`, `glw_chickens` | Lambdas wrap `load_glw_livestock(aoi, species=...)`; accepts `AOI \| str` |
 | `ghsl` | `none` | `urban_class` | `ghsl_urban` | |
-| `wildlife` | `none` | `wildlife_host_proxy` | `wildlife_proxy` | Depends on jrc_gsw, buildings, worldcover |
+| `wildlife` | `none` | `wildlife_host_proxy` | `wildlife_proxy` | Depends on jrc_gsw, buildings, dynamic_world |
 | `buildings` | `none` | `building_fraction` | `buildings` | Uses Overture Maps parquet tiles |
 | `hydrorivers` | `none` | `permanent_rivers`, `river_proximity` | `hydrorivers_rivers`, `hydrorivers_proximity` | Kept for future flux modelling; no ABM consumer yet (`abm_default_outputs=[]`). Currently re-badges JRC GSW with a 60% threshold; a real HydroRIVERS vector loader is future work |
 
-- **DEPRECATED**: `worldcover` — archived to `_legacy/worldcover.py`. Use `jrc_gsw` for `water_frac`.
+- **RETIRED (v3.0)**: `dem` loader; era5 `temp_suitability`/`water_temp` annual outputs.
+- **WorldCover → Dynamic World (2026-10-17)**: the `worldcover` loader (ESA 2020/2021 snapshots via Planetary Computer) is REPLACED by `dynamic_world` (Google Earth Engine, OAuth project `psyched-signal-437808-a7`): per-run-year modal-label composites 2015→today, downloaded as cached GeoTIFF tiles at 100 m and aggregated to per-cell areal fractions; manifest key `dw_class_fractions`, required for ABM. No alias: the `wc_class_fractions` key is gone.
 - **DEPRECATED**: `hydrolakes` — archived to `_legacy/hydrolakes.py`. Was a JRC GSW threshold re-badge (>95% occurrence); use `jrc_gsw` instead.
 
 - **REMOVED**: `opera_dswx_s1` — removed from registry and loader surface.

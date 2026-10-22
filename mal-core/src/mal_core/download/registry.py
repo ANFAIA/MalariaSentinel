@@ -53,13 +53,14 @@ def discover_downloaders() -> dict[str, DownloaderSpec]:
             if raw is None:
                 continue
             profile_defaults = {
-                # --- env tensor (ingest/env.py) ---
+                # --- env tensor (ingest/daily_nc.py, contract v3.0) ---
                 "chirps": ["rainfall_daily"],
-                "era5": ["water_temp", "wind_6hourly"],
-                "jrc_gsw": ["water_occurrence"],
-                "modis": ["ndvi"],
-                # --- habitat patches (ingest/env.py) ---
-                "dem": ["elevation"],
+                "era5": ["air_temp_daily", "wind_6hourly"],
+                "jrc_gsw": ["habitat_features"],
+                "dynamic_world": ["class_fractions"],
+                # --- static habitat gpkg (ingest/env.py) ---
+                # dem/modis retired: no terrain or NDVI consumer in the
+                # redesign's contract (plan 01 §6-§7).
                 # --- host density (ingest/hosts.py) ---
                 "worldpop": ["population"],
                 "glw": ["cattle", "goats", "sheep", "pigs", "chickens"],
@@ -71,11 +72,13 @@ def discover_downloaders() -> dict[str, DownloaderSpec]:
                 # --- explicitly excluded (not ABM defaults) ---
                 "hydrorivers": [],
                 "smap": [],
-                "worldcover": [],
             }
             profile_formats = {
-                "era5": {"wind_6hourly": "daily", "water_temp": "monthly"},
-                "chirps": {"rainfall": "monthly", "rainfall_daily": "daily"},
+                "era5": {"air_temp_daily": "daily", "wind_6hourly": "daily"},
+                "chirps": {"rainfall_daily": "daily"},
+                # "daily" here only selects the runner's multi-year-NC
+                # writer: DW class_fractions is one frame per run year.
+                "dynamic_world": {"class_fractions": "daily"},
             }
             spec = DownloaderSpec(
                 name=raw["name"],

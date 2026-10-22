@@ -69,7 +69,7 @@ class RolloutDataset(Dataset):
                 if self.env_path.suffix in (".nc", ".nc4"):
                     import xarray as xr
                     with xr.open_dataset(self.env_path) as ds:
-                        vars_to_use = [v for v in ["water_frac", "rainfall", "water_temp_c", "ndvi", "temperature"] if v in ds]
+                        vars_to_use = [v for v in ["rainfall", "air_temp_c", "jrc_persistent", "lc_built", "lc_wetland", "lc_open_plus_water", "lc_crop"] if v in ds]
                         arrs = [ds[v].values.squeeze() for v in vars_to_use[:ENV_CHANNELS]]
                         if len(arrs) < ENV_CHANNELS:
                             H, W = arrs[0].shape[-2:]

@@ -105,7 +105,7 @@ SDSS multi-scale.
 ### §5.1 Input contract
 
 - **INV-1.** `model.predict(state: (2,H,W) float32, env: (4,H,W) float32) -> (1,H,W) float32`. State and env channels per `abm/spec.md` §5.1 INV-1 and §5.2 INV-6.
-- **INV-2.** `load_env_stack` selects channels in order `["water_frac", "rainfall", "temperature", "ndvi"]` (note: `temperature`, **not** `temp_suitability` — see §6.2).
+- **INV-2.** `load_env_stack` selects channels in order `["rainfall", "air_temp_c", "jrc_persistent", "lc_wetland"]` (contract v3.0; the retired `water_frac`/`temperature`/`ndvi` channels were dropped 2026-10-17).
 - **INV-3.** `load_abm_state` picks `state_seed{seed:04d}_day{min(360,max(7,month*30)):03d}.{npy,tif}`. Falls back to the first available snapshot if the target day is missing. Raises `FileNotFoundError` if no snapshots exist.
 
 ### §5.2 Model registry
@@ -183,7 +183,7 @@ assert isinstance(ModelRegistry().load.__wrapped__ if False else DummyModel(), D
 # §6.2 P0 drift #1: env channel naming mismatch
 uv run python -c "
 from mal_core.prediction.env_loader import ENV_CHANNEL_ORDER
-assert ENV_CHANNEL_ORDER == ['water_frac', 'rainfall', 'temperature', 'ndvi']
+assert ENV_CHANNEL_ORDER == ['rainfall', 'air_temp_c', 'jrc_persistent', 'lc_wetland']
 " && echo "DRIFT: env channel uses 'temperature', not 'temp_suitability'"
 
 # §6.2 P0 drift #4: sidecar suffix mismatch

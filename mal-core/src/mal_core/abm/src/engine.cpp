@@ -150,17 +150,12 @@ Engine::Engine(AOI aoi,
     seeding_config.host_seeking_scale_m = species_params_.host_seeking_scale_m;
 
     if (seeding_config.mode == SeedingMode::UNIFORM) {
-        // Legacy path: init_frac of K in every patch. The fraction
-        // comes from the seeding config (CLI --init-frac) with the
-        // historical 0.30 default preserved.
+        // UNIFORM path: explicit per-patch adult/immature counts over
+        // the day-0 union (contract 4.0 — retired init_frac × K_MAX).
         //
-        // M7.4.1 fix: the legacy round-robin constructor only covers
-        // the pre-existing habitat patches, so dynamic day-0 union
-        // patches — notably the urban persistent baseline — started
-        // empty and could never be colonised (adult dispersal max
-        // 2 km). Seed instructions over the day-0 union instead
-        // (pre-existing + urban-persistent), keeping per-patch counts
-        // identical to the legacy path.
+        // M7.4.1 fix (kept): seeding covers the day-0 union
+        // (pre-existing + urban-persistent), so dynamic patches are
+        // colonisable from day 0.
         if (!hosts_path.empty() && !host_landscape_) {
             host_landscape_ = std::make_unique<HostLandscape>();
             host_landscape_->load_from_nc(hosts_path, aoi_);
@@ -171,29 +166,37 @@ Engine::Engine(AOI aoi,
         std::vector<SeedInstruction> uniform_instructions;
         if (coord_ != nullptr) {
             uniform_instructions = coord_->build_uniform_seed_instructions(
-                seeding_config.init_frac, K_MAX);
+                seeding_config.n_adults_per_patch,
+                seeding_config.n_immatures_per_patch);
         }
         if (!uniform_instructions.empty()) {
             seeding_patch_.patch_id = uniform_instructions.front().patch_id;
             seeding_patch_.row      = uniform_instructions.front().row;
             seeding_patch_.col      = uniform_instructions.front().col;
             sub_ = std::make_unique<MosquitoSubmodel>(
-                n_patches, K_MAX, uniform_instructions,
+                n_patches, uniform_instructions,
                 sub_seed, overrides_);
             std::cout << "Engine: UNIFORM seeding over "
                       << uniform_instructions.size()
                       << " day-0 union patches (pre-existing + urban "
-                      << "persistent baseline)\n";
+                      << "persistent baseline), "
+                      << seeding_config.n_adults_per_patch << " adults + "
+                      << seeding_config.n_immatures_per_patch
+                      << " immatures per patch\n";
         } else {
+            // Nothing to seed (no candidate patches): empty population,
+            // driven by births once dynamic patches appear.
+            std::cout << "Engine: UNIFORM seeding: no candidate patches "
+                         "— population starts empty\n";
             sub_ = std::make_unique<MosquitoSubmodel>(
-                n_patches, K_MAX, seeding_config.init_frac,
+                n_patches, std::vector<SeedInstruction>{},
                 sub_seed, overrides_);
         }
     } else {
         // Detection-based path: ask the coordinator to filter
-        // habitat patches by viability (water_frac / TWI) and
-        // build the per-patch seed instructions, then construct
-        // the submodel from the explicit list.
+        // candidate patches by the potential floor and build the
+        // per-patch seed instructions, then construct the submodel
+        // from the explicit list.
         const std::vector<SeedInstruction> instructions =
             coord_->build_seed_instructions(seeding_config);
         if (!instructions.empty()) {
@@ -202,7 +205,7 @@ Engine::Engine(AOI aoi,
             seeding_patch_.col      = instructions.front().col;
         }
         sub_ = std::make_unique<MosquitoSubmodel>(
-            n_patches, K_MAX, instructions, sub_seed, overrides_);
+            n_patches, instructions, sub_seed, overrides_);
     }
 
     // -- Optional host-seeking components -----------------------------------
@@ -212,18 +215,9 @@ Engine::Engine(AOI aoi,
         std::cout << "Engine: loaded HostLandscape from " << hosts_path << "\n";
     }
     if (host_landscape_) coord_->set_host_landscape(host_landscape_.get());
-    // M17.4 PR-C: build the per-cell K_eff grid once from the static
-    // host data, then pass a non-owning view to the cohort bank so
-    // `larva_mortality_density` can apply per-patch Beverton-Holt
-    // capacity scaling. No-op when host_landscape_ is null.
-    if (host_landscape_ && coord_) {
-        coord_->build_K_eff_grid();
-        const auto v = coord_->k_eff_grid_view();
-        if (v.data != nullptr && v.width > 0 && v.height > 0 && sub_) {
-            sub_->cohort_bank_mutable().set_K_eff_view(
-                v.data, v.width, v.height);
-        }
-    }
+    // Contract v3.0: the per-cell capacity view is filled per-day by
+    // update_habitat_day (absolute K); the retired build_K_eff_grid
+    // static multiplier is gone.
     if (!mobility_dir.empty()) {
         mobility_schedule_ = std::make_unique<MobilitySchedule>();
         mobility_schedule_->load_from_directory(mobility_dir, aoi_);
@@ -335,7 +329,8 @@ Engine::Engine(AOI aoi,
                const std::string& hosts_path,
                const std::string& mobility_dir,
                const std::string& wind_field_path,
-               TransmissionParams transmission_params)
+               TransmissionParams transmission_params,
+               int32_t warmup_bands)
     : aoi_(std::move(aoi)),
       climate_(std::move(shared_climate)),
       current_date_(start_date),
@@ -364,6 +359,14 @@ Engine::Engine(AOI aoi,
     // M7.8 salinity: gate patch activation on the species' salinity
     // high-tolerance. Deterministic (no RNG draw).
     coord_->set_salinity_hi_tol_ppt(species_params_.salinity_hi_tol_ppt);
+    // Contract v3.0 warm-up: integrate pluvial z causally over the
+    // env-NC bands before the simulation start (opt-in via
+    // --warmup-bands; 0 = cold start z=0, legacy band-0 semantics).
+    if (warmup_bands > 0) {
+        coord_->warm_up_pluvial(warmup_bands);
+        std::cout << "Engine: warm-up integrated pluvial z over "
+                  << warmup_bands << " nc bands before start\n";
+    }
 
     const int32_t n_patches = static_cast<int32_t>(habitat_->patches().size());
 
@@ -393,17 +396,8 @@ Engine::Engine(AOI aoi,
     seeding_config.host_seeking_scale_m = species_params_.host_seeking_scale_m;
 
     if (seeding_config.mode == SeedingMode::UNIFORM) {
-        // Legacy path: init_frac of K in every patch. The fraction
-        // comes from the seeding config (CLI --init-frac) with the
-        // historical 0.30 default preserved.
-        //
-        // M7.4.1 fix: the legacy round-robin constructor only covers
-        // the pre-existing habitat patches, so dynamic day-0 union
-        // patches — notably the urban persistent baseline — started
-        // empty and could never be colonised (adult dispersal max
-        // 2 km). Seed instructions over the day-0 union instead
-        // (pre-existing + urban-persistent), keeping per-patch counts
-        // identical to the legacy path.
+        // UNIFORM path: explicit per-patch adult/immature counts over
+        // the day-0 union (contract 4.0 — retired init_frac × K_MAX).
         if (!hosts_path.empty() && !host_landscape_) {
             host_landscape_ = std::make_unique<HostLandscape>();
             host_landscape_->load_from_nc(hosts_path, aoi_);
@@ -414,22 +408,28 @@ Engine::Engine(AOI aoi,
         std::vector<SeedInstruction> uniform_instructions;
         if (coord_ != nullptr) {
             uniform_instructions = coord_->build_uniform_seed_instructions(
-                seeding_config.init_frac, K_MAX);
+                seeding_config.n_adults_per_patch,
+                seeding_config.n_immatures_per_patch);
         }
         if (!uniform_instructions.empty()) {
             seeding_patch_.patch_id = uniform_instructions.front().patch_id;
             seeding_patch_.row      = uniform_instructions.front().row;
             seeding_patch_.col      = uniform_instructions.front().col;
             sub_ = std::make_unique<MosquitoSubmodel>(
-                n_patches, K_MAX, uniform_instructions,
+                n_patches, uniform_instructions,
                 sub_seed, overrides_);
             std::cout << "Engine: UNIFORM seeding over "
                       << uniform_instructions.size()
                       << " day-0 union patches (pre-existing + urban "
-                      << "persistent baseline)\n";
+                      << "persistent baseline), "
+                      << seeding_config.n_adults_per_patch << " adults + "
+                      << seeding_config.n_immatures_per_patch
+                      << " immatures per patch\n";
         } else {
+            std::cout << "Engine: UNIFORM seeding: no candidate patches "
+                         "— population starts empty\n";
             sub_ = std::make_unique<MosquitoSubmodel>(
-                n_patches, K_MAX, seeding_config.init_frac,
+                n_patches, std::vector<SeedInstruction>{},
                 sub_seed, overrides_);
         }
     } else {
@@ -441,7 +441,7 @@ Engine::Engine(AOI aoi,
             seeding_patch_.col      = instructions.front().col;
         }
         sub_ = std::make_unique<MosquitoSubmodel>(
-            n_patches, K_MAX, instructions, sub_seed, overrides_);
+            n_patches, instructions, sub_seed, overrides_);
     }
 
     // -- Optional host-seeking components -----------------------------------
@@ -451,18 +451,9 @@ Engine::Engine(AOI aoi,
         std::cout << "Engine: loaded HostLandscape from " << hosts_path << "\n";
     }
     if (host_landscape_) coord_->set_host_landscape(host_landscape_.get());
-    // M17.4 PR-C: build the per-cell K_eff grid once from the static
-    // host data, then pass a non-owning view to the cohort bank so
-    // `larva_mortality_density` can apply per-patch Beverton-Holt
-    // capacity scaling. No-op when host_landscape_ is null.
-    if (host_landscape_ && coord_) {
-        coord_->build_K_eff_grid();
-        const auto v = coord_->k_eff_grid_view();
-        if (v.data != nullptr && v.width > 0 && v.height > 0 && sub_) {
-            sub_->cohort_bank_mutable().set_K_eff_view(
-                v.data, v.width, v.height);
-        }
-    }
+    // Contract v3.0: the per-cell capacity view is filled per-day by
+    // update_habitat_day (absolute K); the retired build_K_eff_grid
+    // static multiplier is gone.
     if (!mobility_dir.empty()) {
         mobility_schedule_ = std::make_unique<MobilitySchedule>();
         mobility_schedule_->load_from_directory(mobility_dir, aoi_);
@@ -569,7 +560,10 @@ void Engine::step() {
         (current_date_ - start_date_).count());
     coord_->set_climate_day(day_index);
 
-    coord_->activate_patches();
+    // Contract v3.0: advance the pluvial state z + per-cell accuracy S
+    // and absolute capacity K with today's rainfall (replaces
+    // activate_patches + build_K_eff_grid from the retired pool model).
+    coord_->update_habitat_day();
 
     coord_->to_dataframe();
 
@@ -587,7 +581,7 @@ void Engine::step() {
 
     // 3b. Transmission step (M7.4/M7.4.1): advance vector EIP, human infections, and record stats
     if (transmission_model_ && transmission_model_->is_enabled()) {
-        const DensityGrid current_density = coord_->aggregate_density(*sub_, K_MAX);
+        const DensityGrid current_density = coord_->aggregate_density(*sub_);
         transmission_model_->check_and_trigger_outbreak(
             day_index, current_density.data);
         if (transmission_model_->outbreak_triggered() &&
@@ -610,14 +604,14 @@ void Engine::step() {
             std::to_string(n) + ")");
     }
 
-    const int64_t cap = max_population_ > 0
-        ? max_population_
-        : static_cast<int64_t>(aoi_.cells_per_side()) *
-          static_cast<int64_t>(aoi_.cells_per_side()) *
-          static_cast<int64_t>(K_MAX) * 10;
-    if (n > cap) {
-        std::cerr << "warning: population " << n
-                  << " exceeds safe threshold " << cap << "\n";
+    // Operational guard (plan 03-retirada-k-max): explicit, independent
+    // of habitat or cell count. 0 = disabled; positive = hard error.
+    if (max_population_ > 0 && n > max_population_) {
+        throw std::runtime_error(
+            "Engine::step: population " + std::to_string(n) +
+            " exceeds --max-population " +
+            std::to_string(max_population_) +
+            " — aborting (operational guard, not a biological capacity)");
     }
 
     // 4. Advance the simulation date by one day. Mirrors
@@ -632,9 +626,8 @@ void Engine::snapshot(const std::string& path,
                       int32_t seed,
                       int32_t n_rollouts,
                       int32_t rollout_index) {
-    // Build the (H, W) density grid (mosquitoes / K_MAX, clipped to
-    // [0, 1]) and the (H, W) suitability grid (per-cell adult
-    // density / K_MAX, clipped to [0, 1]) from the submodel, then
+    // Build the (H, W) adult count grids (raw per-cell adult counts,
+    // contract 4.0 — no capacity normalization) from the submodel, then
     // delegate to the coordinator's writer. The coordinator handles
     // the StateCogMetadata construction and calls
     // write_state_cog + write_state_sidecar.
@@ -642,9 +635,9 @@ void Engine::snapshot(const std::string& path,
     // F1.c: n_rollouts / rollout_index are propagated to the sidecar
     // so each rollout's COG is self-describing.
     const DensityGrid density =
-        coord_->aggregate_density(*sub_, K_MAX);
+        coord_->aggregate_density(*sub_);
     const SuitabilityGrid suit =
-        coord_->suitability_grid(*sub_, K_MAX);
+        coord_->suitability_grid(*sub_);
 
     // NaN guards
     for (size_t i = 0; i < density.data.size(); ++i) {

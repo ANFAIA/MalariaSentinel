@@ -19,10 +19,12 @@
 #include <iomanip>
 #include <numeric>
 #include <random>
+#include <stdexcept>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 
-#include "mal_abm_fast/pool_hydrology.hpp"
+#include "mal_abm_fast/aquatic_stress.hpp"
 #include "mal_abm_fast/thermal_responses.hpp"
 
 namespace mal_abm_fast {
@@ -141,21 +143,20 @@ bool AquaticCohortBank::patch_to_cell(
 }
 
 // ---------------------------------------------------------------------------
-// desiccation — kill eggs and early instars at dry patches (M14)
+// desiccation — kill eggs and early instars at dry patches (preserved
+// from the M14 pool module; plan 01 §7).
 //
-// Uses the per-patch PoolState carried in PatchState.pool_water_mm and
-// PatchState.pool_days_dry. The desiccation_rate() function from
-// pool_hydrology.hpp handles the grace period and temperature ramp.
+// Driven by the proxy-habitat dry-day streak carried in
+// PatchState.habitat_dry_days: consecutive days with S <= ACTIVATION_MIN.
+// The desiccation_rate() function from aquatic_stress.hpp handles the
+// grace period and ramp.
 // ---------------------------------------------------------------------------
 void AquaticCohortBank::desiccation(
     const std::vector<PatchState>& patch_states) {
-    // Build lookup: patch_id → PoolState fields
-    std::unordered_map<int64_t, PoolState> pool_by_patch;
+    // Build lookup: patch_id → (dry_days, activated).
+    std::unordered_map<int64_t, int> dry_by_patch;
     for (const auto& ps : patch_states) {
-        PoolState pool;
-        pool.water_mm = ps.pool_water_mm;
-        pool.days_dry = ps.pool_days_dry;
-        pool_by_patch[ps.patch_id] = pool;
+        dry_by_patch[ps.patch_id] = ps.habitat_dry_days;
     }
 
     for (auto& c : cohorts_) {
@@ -169,8 +170,8 @@ void AquaticCohortBank::desiccation(
         }
         if (!vulnerable) continue;
 
-        auto it = pool_by_patch.find(c.patch_id);
-        if (it == pool_by_patch.end()) continue;  // patch not tracked
+        auto it = dry_by_patch.find(c.patch_id);
+        if (it == dry_by_patch.end()) continue;  // patch not tracked
         const float rate = desiccation_rate(it->second);
         if (rate <= 0.0f) continue;
 
@@ -242,14 +243,33 @@ void AquaticCohortBank::stage_mortality(
 //
 // Density-dependent survival is multiplied by the species' salinity
 // suitability s_hat = salinity_suitability(species_, patch.salinity_ppt)
-// as an INDEPENDENT factor. water_frac / pool hydrology are untouched:
-// salinity only gates species compatibility of the water, not its presence.
-// With the default coluzzii params and freshwater patches (salinity 0 psu)
-// s_hat == 1.0, so the legacy behaviour is preserved exactly.
+// as an INDEPENDENT factor: salinity only gates species compatibility of
+// the water, not its presence. With the default coluzzii params and
+// freshwater patches (salinity 0 psu) s_hat == 1.0.
+//
+// Contract v3.0/4.0: the per-patch capacity is the ABSOLUTE K[i, s, t]
+// (K_ref × cell_area_km2 × S, configured in the PatchState.k_habitat
+// field by the coordinator). Capacity contract (plan 03-retirada-k-max):
+//   K > 0    → Beverton-Holt survival p = S0 × K / (K + α × N)
+//   K == 0   → explicit zero capacity: p = 0 (all larvae of the patch
+//              die this day; pupae/eggs are NOT touched by this op)
+//   K < 0, NaN, +inf or missing patch state → hard error; no fallback
+//              capacity is ever invented. The retired K_eff view and
+//              the K_MAX fallback are gone.
 // ---------------------------------------------------------------------------
 void AquaticCohortBank::larva_mortality_density(
     const std::vector<PatchState>& patch_states,
     const RuntimeOverrides& overrides) {
+    // Validate α once: finite and non-negative (0/0 guard lives in the
+    // K==0 branch, which fires before the α division matters).
+    if (!std::isfinite(overrides.larva_bh_alpha) ||
+        overrides.larva_bh_alpha < 0.0f) {
+        throw std::runtime_error(
+            "larva_mortality_density: larva_bh_alpha must be finite and "
+            "non-negative (got " +
+            std::to_string(overrides.larva_bh_alpha) + ")");
+    }
+
     // Aggregate larva count per patch across all instars
     std::unordered_map<int64_t, int64_t> larva_per_patch;
     for (const auto& c : cohorts_) {
@@ -260,51 +280,46 @@ void AquaticCohortBank::larva_mortality_density(
 
     // Patch salinity lookup (missing patch => 0.0 freshwater => s_hat = 1.0)
     std::unordered_map<int64_t, float> salinity_by_patch;
-    // Patch pool-water lookup (M7.4.1 water-availability K scaling).
-    std::unordered_map<int64_t, float> pool_water_by_patch;
+    // Patch daily capacity lookup (plan §5.4: absolute K per cell).
+    std::unordered_map<int64_t, float> capacity_by_patch;
+    std::unordered_set<int64_t> known_patches;
     for (const auto& ps : patch_states) {
         salinity_by_patch[ps.patch_id] = ps.salinity_ppt;
-        pool_water_by_patch[ps.patch_id] = ps.pool_water_mm;
+        capacity_by_patch[ps.patch_id] = ps.k_habitat;
+        known_patches.insert(ps.patch_id);
     }
 
-    const double K = static_cast<double>(K_MAX);
     std::mt19937_64 rng(123);  // deterministic
     for (auto& c : cohorts_) {
         if (c.count <= 0 || c.stage != AquaticStage::LARVA) continue;
         const int64_t N = larva_per_patch[c.patch_id];
-        // M17.4 PR-C: per-patch K_eff from the host landscape grid
-        // (built once by CoordinatorModel::build_K_eff_grid()). Urban
-        // cells have K_eff in [0.30, 1.00] (plan §6.4); terrain cells
-        // have K_eff = 1.0 (equivalent to the legacy K_MAX). The
-        // lookup uses the cohort's patch_id via cell_id (resolved in
-        // patch_to_cell). If the view is empty (legacy wiring), K_eff
-        // = 1.0 and behaviour matches the pre-PR-C code exactly.
-        double K_eff = 1.0;
-        int32_t r = 0, col = 0;
-        if (patch_to_cell(c.patch_id, patch_states, r, col) &&
-            K_eff_data_ != nullptr &&
-            r >= 0 && r < K_eff_H_ && col >= 0 && col < K_eff_W_) {
-            K_eff = static_cast<double>(
-                K_eff_data_[static_cast<size_t>(r) *
-                                static_cast<size_t>(K_eff_W_) +
-                            static_cast<size_t>(col)]);
+
+        double K_patch;
+        if (known_patches.find(c.patch_id) == known_patches.end()) {
+            throw std::runtime_error(
+                "larva_mortality_density: cohort patch " +
+                std::to_string(c.patch_id) +
+                " has no PatchState for today — cannot resolve capacity");
         }
-        const double K_patch_base = K * K_eff;
-        // Water-availability capacity scaling (M7.4.1): habitat size
-        // grows with the pool's water stock — a flooded depression
-        // offers more breeding surface than a gutter film. Linear up
-        // to POOL_WATER_CAPACITY_SAT_MM, then saturated at 1.0.
-        // Permanent-water patches sit at POOL_WATER_MAX_MM → 1.0.
-        double water_factor = 1.0;
-        const auto w_it = pool_water_by_patch.find(c.patch_id);
-        if (w_it != pool_water_by_patch.end()) {
-            water_factor = std::min(
-                1.0, static_cast<double>(w_it->second) /
-                static_cast<double>(POOL_WATER_CAPACITY_SAT_MM));
+        const float k_raw = capacity_by_patch.at(c.patch_id);
+        if (!std::isfinite(k_raw) || k_raw < 0.0f) {
+            throw std::runtime_error(
+                "larva_mortality_density: patch " +
+                std::to_string(c.patch_id) +
+                " has invalid k_habitat " + std::to_string(k_raw) +
+                " (negative, NaN or +inf) — no fallback capacity");
         }
-        const double K_patch = K_patch_base * water_factor;
-        double p = static_cast<double>(LARVA_BH_S0) * K_patch /
-            (K_patch + static_cast<double>(overrides.larva_bh_alpha) * static_cast<double>(N));
+        K_patch = static_cast<double>(k_raw);
+
+        double p;
+        if (K_patch <= 0.0) {
+            // Explicit zero capacity: no water, no larval survival.
+            p = 0.0;
+        } else {
+            p = static_cast<double>(LARVA_BH_S0) * K_patch /
+                (K_patch + static_cast<double>(overrides.larva_bh_alpha) *
+                               static_cast<double>(N));
+        }
         // Independent salinity suitability multiplier (Fase 6).
         auto it = salinity_by_patch.find(c.patch_id);
         const float psu = (it == salinity_by_patch.end()) ? 0.0f : it->second;

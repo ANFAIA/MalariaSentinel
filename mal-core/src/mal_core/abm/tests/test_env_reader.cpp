@@ -1,11 +1,9 @@
 // SPDX-License-Identifier: MIT
-// test_env_reader.cpp — GoogleTest for env_reader::read_env_nc.
+// test_env_reader.cpp — GoogleTest for env_reader::read_env_nc (v3.0).
 //
 // Writes a multi-day synthetic NetCDF and exercises read_env_nc: shape,
 // per-day values, the vertical-gradient row-order check, the missing-
 // variable error, and the single-day case.
-// (The legacy COG/TIF reader tests were removed with read_env_tif — the
-// env input contract is NC-only; see docs/specs/abm/spec.md INV-6.)
 
 #include <gtest/gtest.h>
 
@@ -35,16 +33,16 @@ fs::path MakeTmpEnvNC() {
 }
 
 // Write a synthetic multi-day NetCDF file using the netCDF-C API.
-// Creates a CF-compliant file with 4 variables (rainfall, water_temp_c,
-// water_frac, ndvi), each with UNLIMITED time dimension.
+// Creates a CF-compliant file with the 2 daily variables (rainfall,
+// air_temp_c) and the 5 static habitat planes of contract v3.0.
 //
 // Per-day constant values:
 //   day 0: rain=20.0, temp=25.0
 //   day 1: rain=5.0,  temp=20.0
 //   day 2: rain=25.0, temp=30.0
-//   water_frac=0.5, ndvi=0.4 (constant across all days)
+// Static planes: 0.2 / 0.1 / 0.3 / 0.4 / 0.5.
 void WriteSyntheticEnvNC(const fs::path& path, int n_days) {
-    int ncid, dimids[3], vid[4];
+    int ncid, dimids[3], vid[2];
     int dimid_time, dimid_y, dimid_x;
 
     ASSERT_EQ(nc_create(path.string().c_str(),
@@ -58,11 +56,20 @@ void WriteSyntheticEnvNC(const fs::path& path, int n_days) {
     dimids[2] = dimid_x;
 
     ASSERT_EQ(nc_def_var(ncid, "rainfall", NC_FLOAT, 3, dimids, &vid[0]), NC_NOERR);
-    ASSERT_EQ(nc_def_var(ncid, "water_temp_c", NC_FLOAT, 3, dimids, &vid[1]), NC_NOERR);
-    ASSERT_EQ(nc_def_var(ncid, "water_frac", NC_FLOAT, 3, dimids, &vid[2]), NC_NOERR);
-    ASSERT_EQ(nc_def_var(ncid, "ndvi", NC_FLOAT, 3, dimids, &vid[3]), NC_NOERR);
-
+    ASSERT_EQ(nc_def_var(ncid, "air_temp_c", NC_FLOAT, 3, dimids, &vid[1]), NC_NOERR);
     ASSERT_EQ(nc_put_att_text(ncid, NC_GLOBAL, "Conventions", 6, "CF-1.8"), NC_NOERR);
+
+    // -- static habitat planes (2-D) ----------------------------------------
+    auto def_static = [&](const char* name, float value) {
+        int dids[2] = {dimid_y, dimid_x};
+        int varid = -1;
+        ASSERT_EQ(nc_def_var(ncid, name, NC_FLOAT, 2, dids, &varid), NC_NOERR);
+        ASSERT_EQ(nc_enddef(ncid), NC_NOERR);
+        std::vector<float> plane(static_cast<size_t>(kH) * kW, value);
+        ASSERT_EQ(nc_put_var_float(ncid, varid, plane.data()), NC_NOERR);
+        ASSERT_EQ(nc_redef(ncid), NC_NOERR);
+    };
+
     ASSERT_EQ(nc_enddef(ncid), NC_NOERR);
 
     const float rain_vals[] = {20.0f, 5.0f, 25.0f};
@@ -86,13 +93,22 @@ void WriteSyntheticEnvNC(const fs::path& path, int n_days) {
 
         std::fill(buf, buf + kH * kW, temp);
         ASSERT_EQ(nc_put_vara_float(ncid, vid[1], start, count, buf), NC_NOERR);
-
-        std::fill(buf, buf + kH * kW, 0.5f);
-        ASSERT_EQ(nc_put_vara_float(ncid, vid[2], start, count, buf), NC_NOERR);
-
-        std::fill(buf, buf + kH * kW, 0.4f);
-        ASSERT_EQ(nc_put_vara_float(ncid, vid[3], start, count, buf), NC_NOERR);
     }
+    (void)vid;
+
+    // Static planes get written once (independent of time).
+    nc_enddef(ncid);
+    for (int d = 0; d < n_days; ++d) {
+        start[0] = d;
+        // No-op; statics below write the whole plane.
+        (void)d;
+    }
+    nc_redef(ncid);
+    def_static("jrc_persistent", 0.2f);
+    def_static("lc_built",       0.1f);
+    def_static("lc_wetland",     0.3f);
+    def_static("lc_open_plus_water", 0.4f);
+    def_static("lc_crop",        0.5f);
 
     ASSERT_EQ(nc_close(ncid), NC_NOERR);
 }
@@ -116,9 +132,12 @@ TEST(EnvReader, ReadsDailyNetCDF) {
     EXPECT_EQ(b.h, kH);
     EXPECT_EQ(b.w, kW);
     EXPECT_EQ(b.rainfall.size(),     static_cast<size_t>(3 * kH * kW));
-    EXPECT_EQ(b.water_temp_c.size(), static_cast<size_t>(3 * kH * kW));
-    EXPECT_EQ(b.water_frac.size(),   static_cast<size_t>(3 * kH * kW));
-    EXPECT_EQ(b.ndvi.size(),         static_cast<size_t>(3 * kH * kW));
+    EXPECT_EQ(b.air_temp_c.size(),   static_cast<size_t>(3 * kH * kW));
+    EXPECT_EQ(b.jrc_persistent.size(),     static_cast<size_t>(kH * kW));
+    EXPECT_EQ(b.lc_built.size(),           static_cast<size_t>(kH * kW));
+    EXPECT_EQ(b.lc_wetland.size(),         static_cast<size_t>(kH * kW));
+    EXPECT_EQ(b.lc_open_plus_water.size(), static_cast<size_t>(kH * kW));
+    EXPECT_EQ(b.lc_crop.size(),            static_cast<size_t>(kH * kW));
 
     // Vertical gradients verify NetCDF rows remain aligned with producer
     // row-major order after GDAL's north-up conversion.
@@ -130,24 +149,23 @@ TEST(EnvReader, ReadsDailyNetCDF) {
                                 base + static_cast<float>(r));
     }
 
-    // Water temp in °C (NO Mordecai inverse applied)
+    // Air temp in °C (the daily 2 m mean; NO artificial fanout)
     // Day 0: 25.0, Day 1: 20.0, Day 2: 30.0
     for (int i = 0; i < kH * kW; ++i)
-        EXPECT_FLOAT_EQ(b.water_temp_c[0 * kH * kW + i], 25.0f);
+        EXPECT_FLOAT_EQ(b.air_temp_c[0 * kH * kW + i], 25.0f);
     for (int i = 0; i < kH * kW; ++i)
-        EXPECT_FLOAT_EQ(b.water_temp_c[1 * kH * kW + i], 20.0f);
+        EXPECT_FLOAT_EQ(b.air_temp_c[1 * kH * kW + i], 20.0f);
     for (int i = 0; i < kH * kW; ++i)
-        EXPECT_FLOAT_EQ(b.water_temp_c[2 * kH * kW + i], 30.0f);
+        EXPECT_FLOAT_EQ(b.air_temp_c[2 * kH * kW + i], 30.0f);
 
-    // water_frac constant across all days
-    for (int d = 0; d < 3; ++d)
-        for (int i = 0; i < kH * kW; ++i)
-            EXPECT_FLOAT_EQ(b.water_frac[d * kH * kW + i], 0.5f);
-
-    // ndvi constant across all days
-    for (int d = 0; d < 3; ++d)
-        for (int i = 0; i < kH * kW; ++i)
-            EXPECT_FLOAT_EQ(b.ndvi[d * kH * kW + i], 0.4f);
+    // Static planes land on every cell.
+    for (int i = 0; i < kH * kW; ++i) {
+        EXPECT_FLOAT_EQ(b.jrc_persistent[i],     0.2f);
+        EXPECT_FLOAT_EQ(b.lc_built[i],           0.1f);
+        EXPECT_FLOAT_EQ(b.lc_wetland[i],         0.3f);
+        EXPECT_FLOAT_EQ(b.lc_open_plus_water[i], 0.4f);
+        EXPECT_FLOAT_EQ(b.lc_crop[i],            0.5f);
+    }
 
     fs::remove(path);
 }
@@ -156,7 +174,7 @@ TEST(EnvReader, MissingRequiredVariableThrows) {
     const fs::path path = MakeTmpEnvNC();
     if (fs::exists(path)) fs::remove(path);
 
-    // Write a netCDF with only rainfall (missing water_frac, etc.)
+    // Write a netCDF with only rainfall (missing air_temp_c)
     int ncid, dimids[3], vid;
     int dimid_time, dimid_y, dimid_x;
     ASSERT_EQ(nc_create(path.string().c_str(),

@@ -3,15 +3,16 @@
 //
 // This is the canonical "data contract" header. Every module in
 // mal-abm-fast includes wire.hpp to pick up:
-//   * the F1.5 default constants (EIP thresholds, dispersal kernel, birth rate,
-//     PLUVIAL_POOL rule thresholds, the no-data sentinel, the state-band
-//     names, the contract / generator version strings)
+//   * the engine defaults (EIP thresholds, dispersal kernel, birth rate,
+//     the no-data sentinel, the state-band names, the contract /
+//     generator version strings)
 //   * the shared value types (AOI, HabitatPatch, PatchState, DensityGrid,
 //     SuitabilityGrid)
 //
-// The constants must match `mal_ghana_sim.abm` defaults exactly — the C++
-// engine's per-day outputs must be bit-for-bit compatible with the Python
-// Mesa-Geo engine for the same (env, habitat, seed, days) inputs.
+// Historical note: bit-for-bit parity with the retired Python Mesa-Geo
+// engine was the constraining invariant until proxy_habitat_v1 removed
+// the Python engine (plan docs/plans/in-process/redesign/01-retirada-*.md
+// §9). Parity tests compare against the historical baseline outputs.
 //
 // The wire.hpp header is header-only. The AOI::cells_per_side() method is
 // defined in aoi.hpp (separately compiled into the library, although
@@ -30,15 +31,12 @@ namespace mal_abm_fast {
 // Constants — match mal_ghana_sim.abm defaults exactly (M1.5 thin slice).
 // ---------------------------------------------------------------------------
 
-// Per-patch larval carrying capacity (Beverton-Holt scale) and the
-// seed-size denominator for UNIFORM seeding: initial agent count per
-// patch = round(K_MAX * init_frac) (10% adults / 90% aquatic). The
-// legacy constant K_PER_PATCH_DEFAULT (a numerically-identical twin
-// used only for seeding) was removed on 2026-10-13 — one capacity
-// constant, INIT_FRAC floats on top of it.
-inline constexpr int    K_MAX                       = 1000;
-// 30% of K is seeded as larvae on construction.
-inline constexpr float  INIT_FRAC                   = 0.30f;
+// K_MAX retired (plan 03-retirada-k-max): the larval capacity is the
+// absolute per-cell K_ref × area_km2 × S computed by the coordinator
+// (habitat_availability.hpp k_habitat); initial populations are
+// explicit adult/immature counts (SeedingConfig), and the state COG
+// carries raw per-cell adult counts. No global adult-capacity
+// constant exists anymore.
 
 // EIP (extrinsic incubation period) growing-degree-day model.
 //   daily_gd       = max(0, T - EIP_BASE_C)
@@ -175,115 +173,43 @@ inline constexpr float  ADULT_MORT_FLOOR        = 0.60f;
 // the biological threshold for ephemeral pool formation. Also, daily rain
 // >40mm correlates NEGATIVELY with larval density (heavy rain washes larvae
 // out of pools), so 50mm was biologically counterproductive as well.
-inline constexpr float  PLUVIAL_POOL_RAIN_THRESHOLD_MM = 15.0f;
-inline constexpr float  PLUVIAL_POOL_TWI_THRESHOLD  = 8.0f;
-inline constexpr float  PLUVIAL_POOL_WATER_FRAC_MIN = 0.0f;  // strictly > 0
-
-// Urban temporary habitat rule (plan §6.3):
-//   urban_class == 30 AND building_fraction >= B_min AND
-//   (rain >= R_min OR rain_7d >= R7_min) AND (TWI >= TWI_urban_min OR lowland)
-// Plus capacity scaling (plan §6.4):
-//   urban_capacity = base_capacity * f(building_fraction, urban_class)
-// Plus density cap (plan §6.6) to prevent explosion: at most
-// URBAN_DENSITY_CAP_FRACTION of total cells can be urban patches.
-inline constexpr float  URBAN_B_MIN                = 0.05f;   // §6.3
-inline constexpr float  URBAN_R_MIN_MM             = 12.0f;   // §6.3 (mid-range of 10-15)
-inline constexpr float  URBAN_TWI_MIN              = 7.0f;    // §6.3 (mid-range of 6-8)
-inline constexpr int32_t URBAN_CLASS_THRESHOLD      = 30;      // GHS-SMOD urban = 30
-inline constexpr float  URBAN_CAPACITY_FLOOR       = 0.30f;   // §6.4 monotonic, min 30% of base
-inline constexpr float  URBAN_CAPACITY_CEIL        = 1.00f;   // §6.4 monotonic, cap 100% of base
-inline constexpr float  URBAN_DENSITY_CAP_FRACTION = 0.05f;   // §6.6 max 5% of grid cells
-
-// Pool hydrology (M14) — per-patch water-balance model.
-// All water amounts in mm (same units as CHIRPS daily rainfall).
-// Activation: patch is active when water_mm >= POOL_WATER_BREED_MM.
-// Desiccation: eggs + L1-L2 die when water_mm < POOL_WATER_DRY_MM
-//   after a grace period of POOL_DESICCATION_GRACE_DAYS dry days.
-// Washout: heavy rain (>= POOL_RAIN_WASH_MM) flushes a fraction of
-//   aquatic cohorts. Linear from 0 at WASH to WASH_FRACTION_MAX at 2*WASH.
-// Evaporation: simplified Penman-Monteith (FAO 1998, Ward 2015).
-inline constexpr float  POOL_WATER_BREED_MM         = 5.0f;    // min depth for oviposition
-inline constexpr float  POOL_WATER_DRY_MM           = 1.0f;    // below this: larvae desiccate
-inline constexpr float  POOL_WATER_MAX_MM           = 500.0f;  // cap to prevent runaway accumulation
-// Catchment-runoff model constants (M7.4.1). A pool receives the
-// runoff of its catchment: factor = 1 + CR(cell) * C_eff, with
-// CR = exp(TWI)*tan(beta)/cell_m (env NC `catchment_ratio` band) and
-// C_eff = C_terrain * C_moisture below. The urban/rural constants are
-// ONLY the fallback when the band is absent.
-//   C_terrain urban: impervious cover (ASCE urban hydrology — dense
-//   cover 0.7-0.95, medium 0.5). Rural: bare soil 0.35, falls with
-//   NDVI (vegetated ~0.05).
-//   C_moisture: antecedent-moisture boost (SCS-CN AMC): saturated
-//   ground sheds more runoff, linear in 7-day rain up to REF_MM.
-//   Evaporation scale: shaded microhabitats lose water slower —
-//   dense vegetation (NDVI) and built-up shade.
-inline constexpr float  POOL_CATCHMENT_URBAN        = 10.0f;
-inline constexpr float  POOL_CATCHMENT_RURAL        = 2.0f;
-inline constexpr float  POOL_RUNOFF_URBAN_BASE      = 0.40f;
-inline constexpr float  POOL_RUNOFF_URBAN_SLOPE     = 0.50f;
-inline constexpr float  POOL_RUNOFF_RURAL_BASE      = 0.35f;
-inline constexpr float  POOL_RUNOFF_RURAL_FLOOR     = 0.05f;
-inline constexpr float  POOL_RUNOFF_RURAL_NDVI_SLOPE = 0.30f;
-inline constexpr float  POOL_RUNOFF_SAT_MIN         = 0.60f;
-inline constexpr float  POOL_RUNOFF_SAT_REF_MM      = 25.0f;
-inline constexpr float  POOL_EVAP_NDVI_SCALE        = 0.30f;
-inline constexpr float  POOL_EVAP_URBAN_EXTRA       = 0.15f;
-// Larval habitat capacity scales with the pool's water stock: a
-// 60 mm flooded depression presents more breeding surface than a
-// 6 mm gutter film (habitat size grows with depression volume).
-// K_patch is multiplied by min(1, water_mm / SAT_MM); permanent
-// water (500 mm) saturates at 1.0.
-inline constexpr float  POOL_WATER_CAPACITY_SAT_MM  = 50.0f;
-// Urban permanent standing-water floor (M7.4.1): canals/gutters with
-// residual flow, broken pipes, standpipe spillage, lawn/garden
-// irrigation keep a small but PERMANENT stock of water in built-up
-// cells through the dry season (Klinkenberg 2008 Accra: urban malaria
-// persists year-round). Floor sits just above POOL_WATER_BREED_MM so
-// the baseline habitat is breeding-capable; rains amplify it, the dry
-// season does not erase it. Depth kept small: the baseline supports a
-// modest urban vector population, not a permanent-water habitat class.
-// Expressed as a fraction of POOL_WATER_CAPACITY_SAT_MM so the urban
-// water-availability factor is pinned: K_patch = K_MAX * k_capacity_mult
-// * 0.12 at the baseline, rising with rain events up to 1.0.
-inline constexpr float  POOL_URBAN_BASELINE_FACTOR  = 0.12f;
-inline constexpr float  POOL_URBAN_BASELINE_MM      =
-    POOL_URBAN_BASELINE_FACTOR * POOL_WATER_CAPACITY_SAT_MM;  // 6.0 mm
-inline constexpr float  POOL_RAIN_WASH_MM           = 40.0f;   // heavy rain: washout event
-inline constexpr float  POOL_DESICCATION_GRACE_DAYS = 5.0f;    // grace before desiccation starts
-inline constexpr float  POOL_EVAP_REF_MM            = 5.0f;    // reference evap at 30°C (mm/day)
-inline constexpr float  POOL_EVAP_REF_T             = 30.0f;   // reference temperature (°C)
-inline constexpr float  POOL_EVAP_T_COEFF           = 0.07f;   // fractional change per °C from ref
-inline constexpr float  POOL_WASH_FRACTION_MAX      = 0.6f;    // at rain=80mm, 60% larvae flushed
-inline constexpr float  POOL_DESICC_BASE_DAILY      = 0.10f;   // baseline desiccation after grace
-
-// Habitat-engine build-time filter: a gpkg patch is loaded only if
-// its TWI exceeds this threshold. TWI is a static terrain signal
-// (Topographic Wetness Index, derived from the SRTM DEM) and should
-// NOT be a daily dynamic rule. Daily dynamics use water_frac + rain
-// (see PLUVIAL_POOL_RAIN_THRESHOLD_MM above).
-// Threshold 8.0: standard cut-off for terrain-driven Anopheles
-// habitat identification (Aduvukha 2026, Kleinschmidt 2000).
-inline constexpr float  HABITAT_MIN_TWI             = 8.0f;
+// [RETIRED proxy-habitat-v1 2026-10] The mm-driven pool module, TWI gate,
+// urban bar, water fraction and runoff/catchment/evaporation constants are
+// deleted (plan docs/plans/in-process/redesign/01-retirada-*.md §6-§8).
+// Habitat availability is now proxy_habitat_v1: static H[i,g] from six
+// habitat types, two shared temporal responses with
+//   RAIN_SCALE_MM, DRY_MEMORY_DAYS, ACTIVATION_MIN (habitat_availability.hpp)
+// and preserved biological stress bits with
+//   RAIN_WASH_MM, DESICCATION_GRACE_DAYS, DESICC_BASE_DAILY
+// (aquatic_stress.hpp).
 
 // No-data sentinel for the 2-band state COG.
 inline constexpr float  NODATA_SENTINEL             = -9999.0f;
 
-// State COG band identifiers. The 2 bands are (in order):
-//   band 1 (STATE_BAND_DENSITY)     — total adult mosquito occupancy in cell (post-dispersal) / K_MAX
-//   band 2 (STATE_BAND_SUITABILITY) — female host-seeking/biting pressure in cell / K_MAX
+// State COG band identifiers. Contract 4.0: both bands are RAW
+// per-cell adult counts (individuals), NOT normalized by any
+// capacity constant (K_MAX retired). In order:
+//   band 1 (STATE_BAND_DENSITY)     — adults associated with each cell
+//                                     via their patch (post-dispersal)
+//   band 2 (STATE_BAND_SUITABILITY) — adults counted at their current
+//                                     position (lon/lat snap)
 inline constexpr int    STATE_BAND_DENSITY          = 1;
 inline constexpr int    STATE_BAND_SUITABILITY      = 2;
-inline constexpr const char* STATE_BAND_NAMES[2]     = {"adult_occupancy", "host_seeking_pressure"};
+inline constexpr const char* STATE_BAND_NAMES[2]     = {"adult_patch_count", "adult_cell_count"};
 
 // Contract and generator version strings — written into the sidecar JSON
 // and used by the Python parity test (F1.e) to verify engine equivalence.
 //
-// CONTRACT_VERSION bumped to "1.1" in F1.c with the addition of
-// `n_rollouts` and `rollout_index` to the sidecar JSON (see
-// output_contract.hpp). Bumped to "2.0" in M7.1+M7.2 with the
-// band rename: band 1 = adult_occupancy, band 2 = host_seeking_pressure.
-inline constexpr const char* CONTRACT_VERSION        = "2.0";
-inline constexpr const char* GENERATOR_VERSION       = "m7.1-m7.2-multiscale";
+// CONTRACT_VERSION bumped to "1.1" in F1.c, to "2.0" in M7.1+M7.2,
+// to "3.0" with proxy_habitat_v1 (contract docs/plans/in-process/
+// redesign/02-oferta-criaderos-proxies-download-ingest-abm.md §5: the
+// ingested env NC planes and the habitat gpkg schema changed), and to
+// "4.0" with the K_MAX retirement (plan 03-retirada-k-max): the state
+// COG bands are raw per-cell adult counts, the sidecar no longer
+// carries `k_max`, and the band names changed. Consumers must
+// version-gate on the sidecar string.
+inline constexpr const char* CONTRACT_VERSION        = "4.0";
+inline constexpr const char* GENERATOR_VERSION       = "proxy_habitat_v1";
 
 // ---------------------------------------------------------------------------
 // Value types — shared across all modules.
@@ -326,41 +252,34 @@ struct PatchState {
     bool    activated     = false;
     float   rain_d        = 0.0f;     // mm, today's daily rainfall at the cell
     float   temp_d        = 25.0f;    // deg C, post Mordecai inverse (EIP uses T)
-    float   water_frac    = 0.0f;     // [0, 1], open-water fraction in the cell
-    // Pool hydrology (M14).
-    float   pool_water_mm = 0.0f;     // current pool water depth (mm)
-    int     pool_days_dry = 0;        // consecutive dry days
+    // proxy_habitat_v1: species-neutral overall availability of the patch
+    // today, S(i, t) in [0, 1] (weights + H total + z combined). Replaces
+    // the retired water_frac / pool_water_mm signalling.
+    float   habitat_avail = 0.0f;
+    int     habitat_dry_days = 0;     // consecutive days below ACTIVATION_MIN
+    float   k_habitat     = 0.0f;     // daily Beverton-Holt capacity (absolute count)
     float   salinity_ppt  = 0.0f;     // env water salinity (psu); 0 = freshwater
-    bool    is_permanent  = false;    // permanent water; bypasses drying
-    // Urban capacity factor (plan §6.4): in [URBAN_CAPACITY_FLOOR,
-    // URBAN_CAPACITY_CEIL] for urban-sourced patches; 1.0 for terrain
-    // patches. Currently informational; the per-patch seed path does
-    // not yet consume this — the global k_per_patch_ cap dominates.
-    float   urban_capacity_factor = 1.0f;
 };
 
 // A single habitat patch loaded from the gpkg. Carries the cell (row, col),
-// the carrying capacity K, the (static) TWI value, and a flag for the
-// patch subtype. The loader accepts both hab_type == "pluvial_pool" and
-// hab_type == "permanent_water"; the subtype is captured in is_permanent.
-//
-// Note: this struct is forward-declared in habitat_engine.hpp; the
-// canonical definition lives in wire.hpp to keep all shared data types
-// in one place. The .hpp file then reopens the namespace with extra
-// members (e.g. lon, lat) and free functions.
+// the static potential amplitude (H total in [0, 1]) and the dominant
+// habitat type's dynamics label. proxy_habitat_v1 contract (env.py):
+//   * patch_id    — row-major WM index for the (row, col); runtime assigned
+//   * potential   — H_total = sum_g H[i,g] (attraction amplitude)
+//   * hab_col_    — the six per-type H features are carried at the
+//                   coordinator level (habitat_features struct), not here.
 struct HabitatPatch {
     int64_t patch_id  = 0;
     int32_t row       = 0;
     int32_t col       = 0;
-    int32_t K         = K_MAX;
-    float   twi_value = 0.0f;
+    float   potential = 0.0f;         // H_total in [0, 1]
     double  lon       = 0.0;   // EPSG:4326 deg
     double  lat       = 0.0;   // EPSG:4326 deg
-    bool    hab_pluvial_pool = true;
-    bool    is_permanent = false;     // explicit hydrologic permanence
+    int     dynamics  = 0;      // 0 = persistent offer, 1 = pluvial offer
+                               // (dominant type; diagnostic only)
 };
 
-// Two-band density grid (mosquitoes / K_MAX, clipped to [0, 1]).
+// Two-band adult count grid (raw per-cell adult counts, contract 4.0).
 // Row-major float32 layout matching GDAL/rasterio conventions.
 struct DensityGrid {
     std::vector<float> data;
@@ -368,7 +287,8 @@ struct DensityGrid {
     int32_t w = 0;
 };
 
-// Two-band suitability grid (per-cell adult density / K_MAX, clipped to [0, 1]).
+// Two-band suitability grid (raw per-cell adult counts at their
+// current position, contract 4.0).
 // Row-major float32 layout matching GDAL/rasterio conventions.
 struct SuitabilityGrid {
     std::vector<float> data;

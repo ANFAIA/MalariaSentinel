@@ -60,8 +60,12 @@ class UNet(nn.Module):
         return self.head(x)
 
 
-def soft_dice_loss(pred: torch.Tensor, target: torch.Tensor, tau: float = 0.1, thresh: float = 0.01) -> torch.Tensor:
-    """Soft Dice loss computed across batch and spatial dims."""
+def soft_dice_loss(pred: torch.Tensor, target: torch.Tensor, tau: float = 0.5, thresh: float = 0.5) -> torch.Tensor:
+    """Soft Dice loss computed across batch and spatial dims.
+
+    Thresholds are expressed in adult counts (contract 4.0 state
+    bands): thresh 0.5 means any cell with >= 1 adult.
+    """
     p = torch.sigmoid((pred - thresh) / tau)
     t = torch.sigmoid((target - thresh) / tau)
     inter = (p * t).sum()
@@ -79,8 +83,11 @@ def combined_loss(pred: torch.Tensor, target: torch.Tensor) -> tuple[torch.Tenso
 
 
 @torch.no_grad()
-def eval_dice(pred: torch.Tensor, target: torch.Tensor, thresh: float = 0.01) -> float:
-    """Evaluate hard Dice score on the primary channel (vector density)."""
+def eval_dice(pred: torch.Tensor, target: torch.Tensor, thresh: float = 0.5) -> float:
+    """Evaluate hard Dice score on the primary channel (vector density).
+
+    thresh is in adult counts (contract 4.0): 0.5 ⇒ >= 1 adult.
+    """
     p = (pred[:, :1] > thresh).float()
     t = (target[:, :1] > thresh).float()
     inter = (p * t).sum()

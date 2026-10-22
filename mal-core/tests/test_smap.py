@@ -189,10 +189,23 @@ def _write_rainfall(tmp_path, times):
     ).to_netcdf(tmp_path / "ghana_rainfall_daily_2024_2025_daily.nc")
 
 
+from _habitat_fixtures import (  # noqa: E402
+    write_air_temp_daily_nc,
+    write_jrc_features_nc,
+    write_dw_fractions_nc,
+)
+
+
 def _write_static_inputs(tmp_path):
-    _write_tif(tmp_path / "ghana_water_occurrence.tif", [[0.1, 0.1], [0.1, 0.1]])
-    _write_tif(tmp_path / "ghana_water_temp_2024.tif", [[25.0, 25.0], [25.0, 25.0]])
-    _write_tif(tmp_path / "ghana_ndvi_2024.tif", [[0.5, 0.5], [0.5, 0.5]])
+    import numpy as _np
+    times = _np.arange(
+        _np.datetime64("2024-06-01"), _np.datetime64("2024-08-01")
+    ).astype("datetime64[D]")
+    write_air_temp_daily_nc(
+        tmp_path / "ghana_air_temp_daily_2024_2025_daily.nc", times)
+    write_jrc_features_nc(
+        tmp_path / "ghana_habitat_features.nc", [[0.1, 0.1], [0.1, 0.1]])
+    write_dw_fractions_nc(tmp_path / "ghana_class_fractions.nc")
 
 
 def test_daily_nc_salinity_monthly_broadcast(tmp_path, write_manifest):
@@ -226,9 +239,9 @@ def test_daily_nc_salinity_monthly_broadcast(tmp_path, write_manifest):
 
     write_manifest(tmp_path, {
         "chirps_rainfall_daily": "ghana_rainfall_daily_2024_2025_daily.nc",
-        "jrc_water": "ghana_water_occurrence.tif",
-        "era5_water_temp": {"2024": "ghana_water_temp_2024.tif"},
-        "modis_ndvi": {"2024": "ghana_ndvi_2024.tif"},        "smap_salinity": "ghana_salinity_2024_2025_monthly.nc",
+        "jrc_habitat_features": "ghana_habitat_features.nc",
+        "era5_air_temp_daily": "ghana_air_temp_daily_2024_2025_daily.nc",
+        "dw_class_fractions": "ghana_class_fractions.nc",        "smap_salinity": "ghana_salinity_2024_2025_monthly.nc",
     })
     result = build_daily_env_nc("ghana", tmp_path)
     assert "salinity_ppt" in result["variables"]
@@ -264,9 +277,9 @@ def test_daily_nc_no_salinity_backward_compat(tmp_path, write_manifest):
 
     write_manifest(tmp_path, {
         "chirps_rainfall_daily": "ghana_rainfall_daily_2024_2025_daily.nc",
-        "jrc_water": "ghana_water_occurrence.tif",
-        "era5_water_temp": {"2024": "ghana_water_temp_2024.tif"},
-        "modis_ndvi": {"2024": "ghana_ndvi_2024.tif"},
+        "jrc_habitat_features": "ghana_habitat_features.nc",
+        "era5_air_temp_daily": "ghana_air_temp_daily_2024_2025_daily.nc",
+        "dw_class_fractions": "ghana_class_fractions.nc",
     })
     result = build_daily_env_nc("ghana", tmp_path)
     assert "salinity_ppt" not in result["variables"]
