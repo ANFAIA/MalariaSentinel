@@ -180,7 +180,9 @@ def abm(
     timeout: int | None = typer.Option(None, "--timeout", help="Optional subprocess timeout in seconds (default: None)."),
     output_dir: Path = typer.Option(Path("runs/abm"), "--output-dir", help="Output directory for simulation results."),
     data_root: Path | None = typer.Option(None, "--data-root", help="Root containing AOI manifest."),
+    bbox: str | None = typer.Option(None, "--bbox", help="Custom AOI bbox 'lon_min,lat_min,lon_max,lat_max' (required for non-catalog AOI slugs)."),
     gif: bool = typer.Option(False, "--gif", help="Auto-generate an animation GIF after the run."),
+    gif_max_width: int = typer.Option(1280, "--gif-max-width", help="Downscale --gif animation frames to this max width in pixels (0 = full resolution)."),
     debug: bool = typer.Option(False, "--debug", help="Post-run debug visualisation: hosts-vs-vectors overlay GIF (humans green, livestock brown, mosquitoes blue, I_V red)."),
     compile: bool = typer.Option(False, "--compile", "-c", help="Compile the C++ ABM engine (mal_abm_fast) from source."),
     clean: bool = typer.Option(False, "--clean", help="Clean build directory before compiling (used with --compile)."),
@@ -269,6 +271,9 @@ def abm(
 
     from .abm import run_abm_from_manifest
 
+    # The C++ engine needs an explicit bbox for AOI slugs it does not know.
+    bbox_kwargs = {"bbox": bbox} if bbox else {}
+
     result = run_abm_from_manifest(
         aoi=aoi,
         year=year,
@@ -310,6 +315,7 @@ def abm(
         immunity_duration_days=immunity_duration_days,
         enable_immunity=enable_immunity,
         transmission_snapshot_every=transmission_snapshot_every,
+        **bbox_kwargs,
     )
     typer.echo(f"ABM result: {result}")
 
@@ -320,6 +326,7 @@ def abm(
             output_dir=output_dir,
             cohort_log=cohort_log,
             enable_transmission=enable_transmission,
+            max_width=gif_max_width,
         )
 
     if debug:
@@ -336,6 +343,7 @@ def _render_animation(
     output_dir: Path,
     cohort_log: Path | None,
     enable_transmission: bool = False,
+    max_width: int = 1280,
 ) -> None:
     """Generate animation GIFs for an ABM run (used by --gif)."""
     import shutil
@@ -351,6 +359,8 @@ def _render_animation(
     argv_v = ["--run-dir", str(run_dir), "--output", str(vector_gif)]
     if cohort_path.exists():
         argv_v += ["--cohort-log", str(cohort_path)]
+    if max_width and max_width > 0:
+        argv_v += ["--max-width", str(max_width)]
     try:
         visualize_vectors(argv_v)
         if vector_gif.exists():
@@ -358,6 +368,8 @@ def _render_animation(
         typer.echo(f"Vector animation saved: {vector_gif}")
     except SystemExit as e:
         typer.echo(f"Vector animation failed (exit {e.code}): no state snapshots?", err=True)
+    except Exception as e:  # noqa: BLE001 — GIF rendering must never fail a finished run
+        typer.echo(f"Vector animation failed (run unaffected): {e}", err=True)
 
     # 2. Transmission Dynamics GIF (if transmission was enabled or transmission rasters exist)
     trans_files = list(run_dir.glob("*transmission*.tif"))
@@ -369,6 +381,8 @@ def _render_animation(
             typer.echo(f"Transmission animation saved: {trans_gif}")
         except SystemExit as e:
             typer.echo(f"Transmission animation failed (exit {e.code}): no transmission snapshots?", err=True)
+        except Exception as e:  # noqa: BLE001 — GIF rendering must never fail a finished run
+            typer.echo(f"Transmission animation failed (run unaffected): {e}", err=True)
 
 
 @app.command("score")

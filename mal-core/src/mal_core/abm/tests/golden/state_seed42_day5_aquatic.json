@@ -1,25 +1,25 @@
 {
   "day": 5,
-  "total_aquatic": 58,
+  "total_aquatic": 44,
   "by_stage": {
-    "egg": 15,
-    "larva": 40,
-    "pupa": 3
+    "egg": 5,
+    "larva": 38,
+    "pupa": 1
   },
   "by_instar": {
-    "L1": 10,
-    "L2": 7,
-    "L3": 14,
-    "L4": 9
+    "L1": 14,
+    "L2": 1,
+    "L3": 10,
+    "L4": 13
   },
   "top_patches": [
-    {"patch_id": 921, "count": 21},
-    {"patch_id": 77, "count": 20},
-    {"patch_id": 1350, "count": 17}
+    {"patch_id": 1350, "count": 17},
+    {"patch_id": 921, "count": 14},
+    {"patch_id": 77, "count": 13}
   ],
   "mean_development": {
     "egg": 0.0000,
-    "larva": 0.3395,
+    "larva": 0.5138,
     "pupa": 0.5800
   }
 }

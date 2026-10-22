@@ -17,6 +17,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
 #include <fstream>
 #include <iomanip>
 #include <numeric>
@@ -418,6 +419,90 @@ void AquaticCohortBank::advance_day(
     const std::vector<PatchState>& patch_states,
     const RuntimeOverrides& overrides) {
     if (cohorts_.empty()) return;
+
+    // -- DEBUG (env-gated, permanent): per-day aquatic summary for days 0-49
+    // of the run — enabled ONLY with MAL_ABM_AQUATIC_DEBUG=1. Prints
+    // DBGADV lines to stderr (counts, activated patches, and on days
+    // 25/36/37 the first 7 cohorts with their patch thermodynamics).
+    // Used to prove the 2026-10-20 whole-year aquatic freeze (nodata
+    // sentinel -9999 deg C in the env NC reached the thermal curves);
+    // kept behind the flag because it is the only in-engine trace of
+    // cohort hygiene.
+    static int64_t dbg_day = 0;
+    {
+        static const bool dbg_enabled =
+            std::getenv("MAL_ABM_AQUATIC_DEBUG") != nullptr;
+        const bool dbg = dbg_enabled && dbg_day < 50;
+        int64_t n_act = 0;
+        std::unordered_set<int64_t> known;
+        for (const auto& ps : patch_states) {
+            if (ps.activated) ++n_act;
+            known.insert(ps.patch_id);
+        }
+        if (dbg) {
+            int64_t n_known_c = 0, total = 0;
+            for (const auto& c : cohorts_) {
+                total += c.count;
+                if (known.count(c.patch_id)) ++n_known_c;
+            }
+            std::fprintf(stderr,
+                "DBGADV day=%lld cohorts=%zu total=%lld known=%lld "
+                "act_patches=%lld/%zu\n",
+                static_cast<long long>(dbg_day), cohorts_.size(),
+                static_cast<long long>(total),
+                static_cast<long long>(n_known_c),
+                static_cast<long long>(n_act), patch_states.size());
+            if (dbg_day == 25 || dbg_day == 36 || dbg_day == 37) {
+                int shown = 0;
+                for (const auto& c : cohorts_) {
+                    if (c.count <= 0) continue;
+                    if (shown++ > 6) break;
+                    std::fprintf(stderr,
+                        "DBGADV c pid=%lld r=%d c=%d stage=%u instar=%u count=%lld dev=%.3f act=%d dry=%d k=%.2f temp=%.1f\n",
+                        static_cast<long long>(c.patch_id),
+                        [] (const std::vector<PatchState>& s, int64_t p) {
+                            for (const auto& x : s) if (x.patch_id == p) return x.row;
+                            return -1; } (patch_states, c.patch_id),
+                        [] (const std::vector<PatchState>& s, int64_t p) {
+                            for (const auto& x : s) if (x.patch_id == p) return x.col;
+                            return -1; } (patch_states, c.patch_id),
+                        static_cast<unsigned>(c.stage),
+                        static_cast<unsigned>(c.larval_instar),
+                        static_cast<long long>(c.count),
+                        c.development,
+                        known.count(c.patch_id)
+                            ? ([](const std::vector<PatchState>& s, int64_t p)
+                               { int a=-1;
+                                 for (const auto& x : s)
+                                   if (x.patch_id == p) { a=(int)x.activated; }
+                                 return a; })(patch_states, c.patch_id)
+                            : -1,
+                        known.count(c.patch_id)
+                            ? ([](const std::vector<PatchState>& s, int64_t p)
+                               { for (const auto& x : s)
+                                   if (x.patch_id == p)
+                                     return (int)x.habitat_dry_days;
+                                 return -1; })(patch_states, c.patch_id)
+                            : -1,
+                        known.count(c.patch_id)
+                            ? ([](const std::vector<PatchState>& s, int64_t p)
+                               { for (const auto& x : s)
+                                   if (x.patch_id == p)
+                                     return x.k_habitat;
+                                 return -1.0f; })(patch_states, c.patch_id)
+                            : -1.0f,
+                        known.count(c.patch_id)
+                            ? ([](const std::vector<PatchState>& s, int64_t p)
+                               { for (const auto& x : s)
+                                   if (x.patch_id == p)
+                                     return x.temp_d;
+                                 return -999.0f; })(patch_states, c.patch_id)
+                            : -999.0f);
+                }
+            }
+        }
+        ++dbg_day;
+    }
 
     // 1. Desiccation (eggs + early instars at dry patches)
     desiccation(patch_states);

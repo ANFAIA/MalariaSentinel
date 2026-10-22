@@ -52,6 +52,7 @@ ERA5_DATASET: str = "derived-era5-land-daily-statistics"
 ERA5_VARIABLE: str = "2m_temperature"
 ERA5_DAILY_STATISTIC: str = "daily_mean"  # daily mean; daily °C contract
 ERA5_FREQ: str = "1_hourly"               # CDS frequency for daily-statistics dataset
+ERA5_AREA_PAD_DEG: float = 0.5            # CDS area padding (see _cds_request)
 
 # CDS API requests use the long variable name "2m_temperature", but the
 # NetCDF files it ships use the short name "t2m". Map long → short so the
@@ -94,15 +95,81 @@ def _reproject_to_aoi_grid(
     da: xr.DataArray,
     aoi: AOI,
 ) -> np.ndarray:
-    """Reproject a 2-D DataArray to the AOI's grid; returns float32 (H, W)."""
+    """Reproject a 2-D DataArray to the AOI's grid; returns float32 (H, W).
+
+    2026-10-20 freeze bug — three defects compounded here:
+
+    1. CDS accepted tiny-area requests ([5.75, 0.05, 5.35, 0.6]) but served
+       a near-empty grid (1 of 24 cells finite per day, reproducible via a
+       fresh request), while proven-good requests for the same dataset use
+       padded areas (e.g. the Ghana-wide 71x51 caches are 100% finite).
+       The source grid is 0.1 deg — the AOI must be padded by at least one
+       margin so every requested point sits inside grid coverage.
+    2. CDS netCDF ships the slice with ``_FillValue = NaN``; GDAL's bilinear
+       warper turns every NaN source cell into an expanding nodata fillet,
+       so with a sparse-valid source almost the whole target plane came
+       back NaN (only a ~6x6 corner survived in the committed env NC).
+       NaN nodata is replaced by a finite sentinel BEFORE the warp.
+    3. After the warp the target plane is nearest-filled for any remaining
+       hole so a broken interior cannot slip into the env NC silently.
+
+    Raises RuntimeError if the source slice is still near-empty — garbage
+    source data must fail the download loudly, not survive as a mostly-
+    nodata NC that the engine then silently zeros.
+    """
+    import scipy.ndimage
+
+    v = np.asarray(da.values, dtype=np.float32)
+    finite = np.isfinite(v)
+    valid_cells = int(finite.sum())
+    if valid_cells < 0.5 * v.size:
+        raise RuntimeError(
+            "ERA5 source slice is near-empty "
+            f"({valid_cells} of {v.size} cells finite): CDS served missing "
+            "data for the requested area. Retry the download or widen the "
+            "request area; a mostly-nodata air temperature plane would "
+            "silently freeze the model."
+        )
+    if valid_cells < v.size:
+        missing = ~finite & (v != ERA5_NODATA)
+        if missing.any():
+            # Nearest-neighbour fill of interior CDS holes before the
+            # warp — GDAL's bilinear fillets cannot be trusted on NaN.
+            idx = scipy.ndimage.distance_transform_edt(
+                missing, return_distances=False, return_indices=True)
+            v = v[tuple(idx)]  # NaN holes become the nearest finite value
+        da = da.copy(data=v)
+        da.rio.write_nodata(ERA5_NODATA, inplace=True)
+    da_ = da
+    if da_.rio.crs is None:
+        da_.rio.write_crs("EPSG:4326", inplace=True)
     ref = _ref_grid_for_aoi(aoi)
-    rep = da.rio.reproject_match(ref, resampling=rasterio.enums.Resampling.bilinear)
-    return np.asarray(rep.values, dtype=np.float32)
+    rep = da_.rio.reproject_match(ref, resampling=rasterio.enums.Resampling.bilinear)
+    out = np.asarray(rep.values, dtype=np.float32)
+    bad = ~np.isfinite(out) | (out == ERA5_NODATA)
+    if bad.any():
+        idx = scipy.ndimage.distance_transform_edt(
+            bad, return_distances=False, return_indices=True)
+        out = out[tuple(idx)]
+    return out
 
 
 def _cds_request(year: int, month: int, bbox_wsen: tuple[float, float, float, float]) -> dict:
-    """Build a CDS API request for the AOI bbox and (year, month)."""
+    """Build a CDS API request for the AOI bbox and (year, month).
+
+    2026-10-20: the CDS request area is PADDED by ERA5_AREA_PAD_DEG.
+    Reproduced failure (see _reproject_to_aoi_grid docstring): a request for
+    the bare 0.55 deg-wide accra-coastal-test box ([5.75, 0.05, 5.35, 0.6])
+    returned a 4x6 source grid with exactly 1 of 24 cells finite per day
+    (validated on a fresh request); the same dataset with a padded area
+    (Ghana-wide caches, 71x51) is fully finite every day. Padding also keeps
+    the bilinear warp off the source edges. The crop below removes the
+    padding again once the NC is on the AOI grid.
+    """
+    import os
+
     w, s, e, n = bbox_wsen
+    pad = float(os.environ.get("ERA5_AREA_PAD_DEG", ERA5_AREA_PAD_DEG))
     return {
         "variable": [ERA5_VARIABLE],
         "daily_statistic": [ERA5_DAILY_STATISTIC],
@@ -111,7 +178,7 @@ def _cds_request(year: int, month: int, bbox_wsen: tuple[float, float, float, fl
         "day": _days_in_month(year, month),
         "time_zone": "utc+00:00",
         "frequency": [ERA5_FREQ],
-        "area": [n, w, s, e],  # CDS API: [N, W, S, E]
+        "area": [n + pad, w - pad, s - pad, e + pad],  # CDS API: [N, W, S, E]
     }
 
 
