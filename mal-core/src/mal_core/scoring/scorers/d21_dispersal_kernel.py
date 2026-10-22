@@ -5,18 +5,15 @@ SEEDING centroid at the day-30 snapshot (individual scale, one month —
 still dominated by first-generation movement) and compares it with
 mark-release-recapture (MRR) expectations:
 
-- Costantini et al. 1996 (Burkina Faso): 350-650 m/day mean daily
-  dispersal.
-- Thomas et al. 2013 (The Gambia): median 295-386 m; 90th percentile
-  1.28-1.64 km; 95th percentile 1.67-2.83 km (negative exponential and
-  half-Cauchy fits).
-- Midega et al. 2007 (Kenya coast): maximum flight distance recorded
-  661 m; sub-km daily movement.
-- Saarman et al. 2019: mean first-flight MDT 579 m.
+- Costantini et al. 1996 (Burkina Faso): mean daily dispersal.
+- Thomas et al. 2013 (The Gambia): median, 90th and 95th percentiles of
+  the fitted dispersal kernels (negative exponential and half-Cauchy).
+- Midega et al. 2007 (Kenya coast): maximum recorded flight distance;
+  sub-km daily movement.
+- Saarman et al. 2019: mean first-flight MDT.
 
-Expected bands at one month: p50 in [0.15, 0.70] km, p90 in
-[0.70, 3.00] km. Score = mean of both sub-scores (Gaussian falloff
-outside each band).
+Expected bands at one month live in ``P50_BAND`` / ``P90_BAND`` below.
+Score = mean of both sub-scores (Gaussian falloff outside each band).
 
 Full table with references:
 papers/anopheles-dynamics/dispersal-kernel-calibration.md.
@@ -39,8 +36,8 @@ from .base import (
     grid_transform,
 )
 
-P50_BAND = (0.15, 0.70)   # km — Thomas 2013 median 295-386 m
-P90_BAND = (0.70, 3.00)   # km — Thomas 2013 p90-p95; Midega max 661 m
+P50_BAND = (0.15, 0.70)   # km — MRR median band (Thomas 2013)
+P90_BAND = (0.70, 3.00)   # km — MRR p90-p95 band (Thomas 2013; Midega 2007)
 P50_CENTER, P50_SIGMA = 0.40, 0.20
 P90_CENTER, P90_SIGMA = 1.60, 0.80
 

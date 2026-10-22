@@ -61,7 +61,7 @@ struct TransmissionParams {
     // seeded as ONE spatially concentrated outbreak — a single core cell
     // (random-viable: highest-population viable cell; explicit: the given
     // coordinate) plus satellite cells within this radius (in grid cells;
-    // a 1 km cell ⇒ radius_km * 1000 / resolution_m). Cases are split
+    // radius_km is converted with the AOI resolution_m). Cases are split
     // across cluster cells ∝ cell population. 0 = legacy behaviour
     // (independent foci wherever viability picks them).
     double      human_cluster_radius_km   = 0.0;
@@ -69,7 +69,7 @@ struct TransmissionParams {
     // Adaptive trigger (M7.4.1): when > 0, the outbreak waits (daily
     // retry) until the best viable core cell reaches this many adult
     // mosquitoes (contract 4.0: raw per-cell adult counts, no K_MAX
-    // normalization — the retired 0.5 corresponded to 500 adults).
+    // normalization).
     // Guarantees the concentrated outbreak lands where the vector
     // population is actually established.
     float       human_outbreak_min_density = 0.0f;

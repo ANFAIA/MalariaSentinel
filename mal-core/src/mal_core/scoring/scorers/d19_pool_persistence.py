@@ -2,17 +2,17 @@
 
 Verifies that the proxy-habitat model produces biologically plausible
 persistence behaviour:
-  - A 30 mm rain event keeps the pluvial availability z above the
-    activation floor for at least 4 days, then z decays to near-zero
-    within the drying-memory scale at +7 days.
+  - A heavy rain pulse keeps the pluvial availability z above the
+    activation floor for several days, then z decays to near-zero
+    within the drying-memory scale.
   - Persistence-weighted species accuracy keeps a positive dry-season
     floor from the persistent habitat types (JRC / urban / wetland):
     built surface and wetlands ride at availability 1 (plan 02 §5,
     k(g) = 0 for the persistent columns).
 
-Anchors: Bøgh 2004 (67% of available habitats colonised, Mbita);
-Ndenga 2011 (86% of surveyed habitats human-made, western Kenya) —
-persistence is a supply property, not a rainfall spell.
+Anchors: Bøgh 2004 (habitat colonisation rate, Mbita); Ndenga 2011
+(human-made habitats dominate, western Kenya) — persistence is a
+supply property, not a rainfall spell.
 """
 from __future__ import annotations
 
@@ -52,12 +52,12 @@ class PoolPersistenceScorer(Scorer):
         """Score habitat persistence with the shared pluvial recursion.
 
         Scenario:
-          Day 0-2: 30 mm events (recharge; the activation pulse)
+          Day 0-2: rain pulses (recharge; the activation pulse)
           Day 3-12: 0 mm (drying memory)
 
         Checks:
-          1. z >= 0.05 for at least 4 days
-          2. z < 0.05 inside 3 * pluvial.dry_memory_days (memory scale)
+          1. z stays above the activation floor for several days
+          2. z falls below the floor inside 3 * pluvial.dry_memory_days
           3. monotone decay through the no-rain phase
           4. persistent floor: species accuracy at z = 0 stays positive
              (human dry-season supply) and short of the z = 1 value

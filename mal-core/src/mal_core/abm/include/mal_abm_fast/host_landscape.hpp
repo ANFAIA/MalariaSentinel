@@ -3,7 +3,7 @@
 //
 // HostLandscape provides per-cell host densities and urbanicity derived
 // from the Python-built `host_static.nc` NetCDF file. If the file is
-// absent, defaults are returned (humans=1.0, everything else=0).
+// absent, defaults are returned (humans present, everything else zero).
 //
 // The NC file has 5 2-D variables on (y, x):
 //   human       — persons per ABM cell (float32)
@@ -31,7 +31,7 @@ struct HostCell {
     float chickens_present     = 0.0f;
     float wildlife_proxy       = 0.0f;   // from NC wildlife_host_proxy; 0 if no data
     float building_fraction    = 0.0f;   // [0,1] from Overture Maps
-    float indoor_fraction      = 0.5f;   // 0.72 for urban, 0.30 for rural (gambiae)
+    float indoor_fraction      = 0.5f;   // host_seeking.indoor_fraction_* (urban/rural)
     float residential_fraction = 0.5f;
     float urbanicity           = 0.0f;   // 1.0 = urban, 0.0 = rural
     int32_t urban_class        = 0;      // GHS-SMOD (30=urban, 50=rural, 0=unset)

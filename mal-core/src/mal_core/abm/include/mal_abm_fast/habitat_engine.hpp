@@ -3,7 +3,7 @@
 //
 // Contract v3.0: a single-layer OGR Point datasource; the loader reads
 //   * optional `hab_type`     (string; accepted without filtering)
-//   * optional `habitat_potential` (float, [0,1]; default 1.0)
+//   * optional `habitat_potential` (float, [0,1]; default = full potential)
 //   * optional `dynamics`     (int; 0 = persistent, 1 = pluvial)
 //   * optional `row`, `col`   (int32; pre-computed cell index)
 //   * the Point geometry      (lon, lat)

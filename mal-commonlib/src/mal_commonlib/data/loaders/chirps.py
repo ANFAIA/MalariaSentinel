@@ -13,13 +13,14 @@ Notes:
       but reading those requires ``netCDF4`` or ``h5netcdf``, neither of which
       is a project dependency. v1 therefore uses the daily GeoTIFFs, which
       are readable with the already-installed ``rasterio`` / ``rioxarray``.
-    * Returns raw mm per day. The ABM compares the env band against
-      ``RAIN_THRESHOLD_MM = 15`` to activate habitat patches, so the band
-      must be in mm. The suitability overlay applies its own min-max
-      normalization at consumption time. A previous version of the (now
-      deleted) monthly loader normalized the band in [0, 1], which broke
-      the ABM's threshold check; that normalization no longer exists
-      anywhere in the codebase.
+    * Returns raw mm per day. The ABM consumes the band in mm: the
+      pluvial availability response uses ``pluvial.rain_scale_mm`` and the
+      washout response uses ``aquatic_stress.wash_threshold_mm`` (both in
+      model_constants.yaml), so the band must stay in mm. The suitability
+      overlay applies its own min-max normalization at consumption time.
+      A previous version of the (now deleted) monthly loader normalized
+      the band in [0, 1], which broke the ABM's rain semantics; that
+      normalization no longer exists anywhere in the codebase.
     * This loader only emits a single channel (``rainfall``); the M1.3b CLI
       assembles it into the (C_env=4, H, W) env tensor.
 """
@@ -193,7 +194,8 @@ def _read_chirps_tif_gz(path: pathlib.Path, aoi: AOI) -> xr.DataArray:
             "x": np.arange(arr.shape[1]) * transform.a + transform.c,
         },
     )
-    # CHIRPS uses -9999.0 as nodata; if the file has no nodata tag, mask the
+    # CHIRPS masks with the shared NoData sentinel; if the file has no
+    # nodata tag, mask the
     # same sentinel value to NaN. Land/ocean mask handled by the loader.
     sentinel = nodata if nodata is not None else CHIRPS_NODATA
     da = da.where(da != sentinel)
@@ -201,7 +203,7 @@ def _read_chirps_tif_gz(path: pathlib.Path, aoi: AOI) -> xr.DataArray:
     # infers them from the 1-D corner coords when absent, and for tight
     # windows (e.g. an 8x11-pixel coastal clip like accra-coastal-test)
     # that inference produced a transform rioxarray treats as misaligned,
-    # reprojecting the whole day to 100% NaN (all layers → -9999 in the
+    # reprojecting the whole day to 100% NaN (all layers → the NoData sentinel in the
     # runner NC). window_transform(win) is exactly the affine of this read.
     da.rio.write_crs(src_crs, inplace=True)
     da.rio.write_transform(transform, inplace=True)
@@ -256,7 +258,7 @@ def load_chirps_rainfall_daily(
     This is the canonical CHIRPS interface: per-day values written into a
     daily NetCDF env file. The historical monthly-total loader
     (``load_chirps_rainfall``) has been deleted; daily rainfall is what the
-    ABM's PLUVIAL_POOL rule needs. Each day's values are
+    ABM's pluvial availability response needs. Each day's values are
     reprojected to the AOI's grid independently.
 
     Args:

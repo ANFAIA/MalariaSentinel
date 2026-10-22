@@ -25,7 +25,7 @@ import numpy as np
 from .config import CONFIG
 # Emergency-adult scaling constant for the py DIAGNOSTIC capacity path
 # (renamed from the retired K_REF_DAILY_PER_KM2 .py constant; it is NOT a
-# model_constants.yaml key — the engine's k_ref = 50.0 is a different
+# model_constants.yaml key — the engine's k_ref is a different
 # concept; plan constants-yaml §9.1: dies here without conversion).
 K_REF_DIAG_PER_KM2: float = 0.143 * 9.3 * 1.0e6  # [ind·km⁻²·d⁻¹ diagnostic]
 from .potential import total_potential

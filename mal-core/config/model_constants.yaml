@@ -3,58 +3,53 @@
 # Toda clave es OBLIGATORIA; loaders fallan listando faltantes. Unidades entre [ ].
 # 'frozen' = contrato; cambiar requiere version-bump + PR de contratos.
 
-version: 2                                # int; bump obligatorio en cambio frozen
+version: 2                                # [int] versión del esquema; bump obligatorio en cambio frozen
 
-contracts:              # DOS contratos distintos, claves SEPARADAS (ver plan §9.3)
-  env_nc: "3.0"         # frozen — contrato del env NC, entrada habitat (daily_nc.py)
-  cogs_state: "4.0"     # frozen — contrato del state COG + sidecar (wire.hpp)
+contracts:              # contratos congelados de entrada/salida (plan §9.3)
+  env_nc: "3.0"         # [string] contrato del env NC (entrada habitat; daily_nc.py)
+  cogs_state: "4.0"     # [string] contrato del state COG + sidecar (wire.hpp)
 
-habitat_types:          # frozen — orden = API de índice py; C++ carga por NOMBRE
+habitat_types:          # tipos de hábitat del motor (orden = API de índice py; C++ carga por NOMBRE)
   types: [surface_persistent, wetland_persistent, urban_persistent,
-          wetland_pluvial, open_pluvial, crop_pluvial]      # 6 tipos
-  dynamics:             # k(g): persistent → A=1; pluvial → A=z
-    surface_persistent:  persistent
-    wetland_persistent:  persistent
-    urban_persistent:    persistent
-    wetland_pluvial:     pluvial
-    open_pluvial:        pluvial
-    crop_pluvial:        pluvial
+          wetland_pluvial, open_pluvial, crop_pluvial]      # [lista] los 6 tipos de hábitat
+  dynamics:             # [categórico] respuesta temporal k(g): persistent → A=1; pluvial → A=z
+    surface_persistent:  persistent   # [categórico] agua superficial permanente
+    wetland_persistent:  persistent   # [categórico] humedal/manglar permanente
+    urban_persistent:    persistent   # [categórico] superficie construida permanente
+    wetland_pluvial:     pluvial      # [categórico] humedal estacional (lluvia)
+    open_pluvial:        pluvial      # [categórico] agua abierta estacional (lluvia)
+    crop_pluvial:        pluvial      # [categórico] cultivo estacional (lluvia)
 
 habitat:
-  activation_min_engine: 0.01  # [índice] umbral S ≥ 0.01 ⇒ celda parche viva
-                               # (coordinator.cpp:138,148,213; reset hab_dry_days).
-                               # [conflict: py=0.10 (constante muerta en runtime) /
-                               #  cpp=0.01 → 0.01] — el 0.10 muere, plan §5
-  candidate_min_engine: 0.01   # [índice] piso de parche del MOTOR (union coordinator +
-                               # filtro gpkg). [conflict: py=1.0e-6 / cpp=0.01 → 0.01].
-                               # El 1e-6 vive separado como ingest.candidate_min_ingest
-                               # (rol distinto: census del ingest vs parche ABM)
+  activation_min_engine: 0.01  # [índice] umbral S ⇒ celda parche viva (coordinator.cpp); el valor py muerto no entra (plan §5)
+  candidate_min_engine: 0.01   # [índice] piso de parche del MOTOR (union coordinator + filtro gpkg);
+                               # el census del ingest usa ingest.candidate_min_ingest (rol distinto)
 
 pluvial:
-  rain_scale_mm: 2.5       # [mm] [conflict: py=20.0 / cpp=2.5 → 2.5] — valor del motor;
-                           # los scorers d19/d20 se alinean (paso 4 de §8)
-  dry_memory_days: 5.0     # [días] τ_ref (único espejo 1:1 que hoy era correcto)
+  rain_scale_mm: 2.5       # [mm] escala de lluvia del relleno pluvial (valor del motor; alineado con scorers d19/d20)
+  dry_memory_days: 5.0     # [días] τ_ref de memoria seca (único espejo 1:1 correcto)
   delta_days: 1.0          # [días] paso temporal normal
-  cold_start_z: 0.0        # z inicial de arranque/warm-up
+  cold_start_z: 0.0        # [adimensional] z inicial de arranque/warm-up
 
 aquatic_stress:
-  desicc_grace_days: 5.0        # [días]
-  desicc_base_daily: 0.10       # [1/día] techo del ramp (muere el 3er gemelo muerto)
-  desicc_ramp_decay: 0.3        # [1/día] exponente (hoy literal mágico −0.3 en 2 lados)
-  wash_threshold_mm: 40.0       # [mm] UNA clave para los 3 nombres de hoy
-  wash_fraction_max: 0.60
-  vulnerable_instar_max: 2      # EGG + L1 + L2 desecan
+  desicc_grace_days: 5.0        # [días] días secos de gracia antes de desecar
+  desicc_base_daily: 0.10       # [1/día] techo diario del ramp de desecación
+  desicc_ramp_decay: 0.3        # [1/día] exponente del ramp de desecación
+  wash_threshold_mm: 40.0       # [mm] lluvia diaria que dispara lavado de cohortes (fuente única de los 3 nombres previos)
+  wash_fraction_max: 0.60       # [fracción] fracción máxima de cohortes lavada por lluvia
+  vulnerable_instar_max: 2      # [instar] último instar vulnerable a desecación (EGG + L1 + L2)
 
 urban:
-  beta_urban: 0.75              # H_urban = 0.75 · lc_built
-  rain_pools_built_damage: 0.3  # h[open_pluvial] += 0.3·lc_built — SIN espejo py hoy;
-                                # potential.py se alinea añadiendo el término (P0 §6)
+  beta_urban: 0.75              # [adimensional] H_urban = beta_urban · lc_built
+  rain_pools_built_damage: 0.3  # [adimensional] h[open_pluvial] += valor · lc_built
+                                # (potential.py aplica el mismo término)
+
 species:
-  default_species: coluzzii
+  default_species: coluzzii     # [string] fila de especie activa por defecto
   # K único del motor: UNA clave, no por especie — el engine tiene un solo
   # k_ref; K_ref per-species es extensión futura (version-bump).
-  k_ref: 50.0   # [ind·km⁻²·d⁻¹] [conflict: py=1.33e6 (OTRA unidad; NO entra) /
-                #               cpp=50.0 → 50.0] — veredicto y conversión en §9.1
+  k_ref: 50.0   # [ind·km⁻²·d⁻¹] capacidad de Beverton-Holt por especie;
+                # la versión py en OTRA unidad no entra (veredicto §9.1)
   # Pesos por especie, por NOMBRE de habitat_types. Mapping fila C++ ZoneId
   # {jrc, urban, wetland, open, crop, forest} → nombres YAML:
   #   jrc→surface_persistent, urban→urban_persistent, wetland→wetland_persistent,
@@ -67,108 +62,106 @@ species:
   # salinity: s = (1−frac)·exp(−slope·(psu−opt)), hard cap 0 en psu ≥ hi_tol.
   coluzzii:
     weights: {surface_persistent: 0.40, wetland_persistent: 0.10, urban_persistent: 0.20,
-              wetland_pluvial: 0.00, open_pluvial: 0.25, crop_pluvial: 0.05}   # Σ=1.00
-    activity_weights: [0.02, 0.10, 0.80, 0.08]          # Σ=1.00
-    pref: {human: 0.99, cattle: 0.005, goat: 0.003, sheep: 0.001, wildlife: 0.001}  # Σ=1.00
-    salinity_opt_ppt: 0.0                               # [psu]
-    salinity_hi_tol_ppt: 30.0                           # [psu]
-    salinity_slope: 0.08                                # [psu⁻¹]
-    host_seeking_scale_m: 300.0   # [m] [conflict: wire=100.0 / species_params=300 → 300]
-    host_seeking_radius_m: 1500.0 # [m] [conflict: wire=300.0 / species_params=1500 → 1500]
+              wetland_pluvial: 0.00, open_pluvial: 0.25, crop_pluvial: 0.05}   # [fracción] afinidad por tipo de hábitat (Σ=1.00)
+    activity_weights: [0.02, 0.10, 0.80, 0.08]          # [fracción] actividad por fase DAY/EVENING/NIGHT/DAWN (Σ=1.00); forma nocturna de Akuoko 2024, pesos = engineering prior
+    pref: {human: 0.99, cattle: 0.005, goat: 0.003, sheep: 0.001, wildlife: 0.001}  # [fracción] preferencia por tipo de hospedador (Σ=1.00)
+    salinity_opt_ppt: 0.0                               # [psu] salinidad óptima (factor = 1)
+    salinity_hi_tol_ppt: 30.0                           # [psu] tolerancia máxima; por encima no cría
+    salinity_slope: 0.08                                # [psu⁻¹] decaimiento del factor de salinidad
+    host_seeking_scale_m: 300.0   # [m] escala del decaimiento del penacho (mecanismo: Giraldo 2023); valor = engineering prior, sin medición local
+    host_seeking_radius_m: 1500.0 # [m] radio del campo de atracción = engineering prior (sin medición directa del penacho en las fuentes locales)
   gambiae_ss:
     weights: {surface_persistent: 0.05, wetland_persistent: 0.05, urban_persistent: 0.15,
-              wetland_pluvial: 0.00, open_pluvial: 0.65, crop_pluvial: 0.10}   # Σ=1.00
-    activity_weights: [0.02, 0.10, 0.80, 0.08]
-    pref: {human: 0.99, cattle: 0.005, goat: 0.003, sheep: 0.001, wildlife: 0.001}
-    salinity_opt_ppt: 0.0
-    salinity_hi_tol_ppt: 20.0
-    salinity_slope: 0.12     # STEEPER que coluzzii
-    host_seeking_scale_m: 300.0
-    host_seeking_radius_m: 1500.0
+              wetland_pluvial: 0.00, open_pluvial: 0.65, crop_pluvial: 0.10}   # [fracción] afinidad por tipo de hábitat (Σ=1.00)
+    activity_weights: [0.02, 0.10, 0.80, 0.08]          # [fracción] actividad por fase DAY/EVENING/NIGHT/DAWN (Σ=1.00); forma nocturna de Akuoko 2024, pesos = engineering prior
+    pref: {human: 0.99, cattle: 0.005, goat: 0.003, sheep: 0.001, wildlife: 0.001}  # [fracción] preferencia por tipo de hospedador (Σ=1.00)
+    salinity_opt_ppt: 0.0                               # [psu] salinidad óptima (factor = 1)
+    salinity_hi_tol_ppt: 20.0                           # [psu] tolerancia máxima; por encima no cría
+    salinity_slope: 0.12     # [psu⁻¹] decaimiento del factor de salinidad (más abrupto que coluzzii)
+    host_seeking_scale_m: 300.0   # [m] escala del decaimiento del penacho (mecanismo: Giraldo 2023); valor = engineering prior, sin medición local
+    host_seeking_radius_m: 1500.0 # [m] radio del campo de atracción = engineering prior (sin medición directa del penacho en las fuentes locales)
   funestus:
     weights: {surface_persistent: 0.45, wetland_persistent: 0.30, urban_persistent: 0.10,
-              wetland_pluvial: 0.00, open_pluvial: 0.10, crop_pluvial: 0.05}   # Σ=1.00
-    activity_weights: [0.02, 0.10, 0.80, 0.08]
-    pref: {human: 0.99, cattle: 0.005, goat: 0.003, sheep: 0.001, wildlife: 0.001}
-    salinity_opt_ppt: 0.0
-    salinity_hi_tol_ppt: 15.0
-    salinity_slope: 0.15
-    host_seeking_scale_m: 300.0
-    host_seeking_radius_m: 1500.0
+              wetland_pluvial: 0.00, open_pluvial: 0.10, crop_pluvial: 0.05}   # [fracción] afinidad por tipo de hábitat (Σ=1.00)
+    activity_weights: [0.02, 0.10, 0.80, 0.08]          # [fracción] actividad por fase DAY/EVENING/NIGHT/DAWN (Σ=1.00); forma nocturna de Akuoko 2024, pesos = engineering prior
+    pref: {human: 0.99, cattle: 0.005, goat: 0.003, sheep: 0.001, wildlife: 0.001}  # [fracción] preferencia por tipo de hospedador (Σ=1.00)
+    salinity_opt_ppt: 0.0                               # [psu] salinidad óptima (factor = 1)
+    salinity_hi_tol_ppt: 15.0                           # [psu] tolerancia máxima; por encima no cría
+    salinity_slope: 0.15                                # [psu⁻¹] decaimiento del factor de salinidad
+    host_seeking_scale_m: 300.0   # [m] escala del decaimiento del penacho (mecanismo: Giraldo 2023); valor = engineering prior, sin medición local
+    host_seeking_radius_m: 1500.0 # [m] radio del campo de atracción = engineering prior (sin medición directa del penacho en las fuentes locales)
   arabiensis:
     weights: {surface_persistent: 0.10, wetland_persistent: 0.10, urban_persistent: 0.15,
-              wetland_pluvial: 0.00, open_pluvial: 0.55, crop_pluvial: 0.10}   # Σ=1.00
-    activity_weights: [0.02, 0.10, 0.80, 0.08]
-    pref: {human: 0.50, cattle: 0.20, goat: 0.15, sheep: 0.10, wildlife: 0.05}
-    salinity_opt_ppt: 0.0
-    salinity_hi_tol_ppt: 15.0
-    salinity_slope: 0.15
-    host_seeking_scale_m: 120.0   # arabiensis sí difiere
-    host_seeking_radius_m: 1500.0
+              wetland_pluvial: 0.00, open_pluvial: 0.55, crop_pluvial: 0.10}   # [fracción] afinidad por tipo de hábitat (Σ=1.00)
+    activity_weights: [0.02, 0.10, 0.80, 0.08]          # [fracción] actividad por fase DAY/EVENING/NIGHT/DAWN (Σ=1.00); forma nocturna de Akuoko 2024, pesos = engineering prior
+    pref: {human: 0.50, cattle: 0.20, goat: 0.15, sheep: 0.10, wildlife: 0.05}  # [fracción] preferencia por tipo de hospedador (Σ=1.00)
+    salinity_opt_ppt: 0.0                               # [psu] salinidad óptima (factor = 1)
+    salinity_hi_tol_ppt: 15.0                           # [psu] tolerancia máxima; por encima no cría
+    salinity_slope: 0.15                                # [psu⁻¹] decaimiento del factor de salinidad
+    host_seeking_scale_m: 120.0   # [m] escala del penacho (mecanismo: Giraldo 2023); fila arabiensis = engineering prior de menor alcance
+    host_seeking_radius_m: 1500.0 # [m] radio del campo de atracción = engineering prior (sin medición directa del penacho en las fuentes locales)
   melas:            # dormant — mangrove/brackish; sin población activa; PR de
                     # calibración NO los toca sin ticket de activación coastal
     weights: {surface_persistent: 0.25, wetland_persistent: 0.15, urban_persistent: 0.15,
-              wetland_pluvial: 0.00, open_pluvial: 0.40, crop_pluvial: 0.05}   # = neutral
-    activity_weights: [0.02, 0.10, 0.80, 0.08]
-    pref: {human: 0.99, cattle: 0.005, goat: 0.003, sheep: 0.001, wildlife: 0.001}
-    salinity_opt_ppt: 0.0
-    salinity_hi_tol_ppt: 38.0   # sobre marine PSD
-    salinity_slope: 0.02        # la más suave
-    host_seeking_scale_m: 300.0
-    host_seeking_radius_m: 1500.0
+              wetland_pluvial: 0.00, open_pluvial: 0.40, crop_pluvial: 0.05}   # [fracción] afinidad por tipo de hábitat (= neutral)
+    activity_weights: [0.02, 0.10, 0.80, 0.08]          # [fracción] actividad por fase DAY/EVENING/NIGHT/DAWN (Σ=1.00); fila dormant, pesos copiados de gambiae_ss = engineering prior (sin datos propios)
+    pref: {human: 0.99, cattle: 0.005, goat: 0.003, sheep: 0.001, wildlife: 0.001}  # [fracción] preferencia por tipo de hospedador (Σ=1.00)
+    salinity_opt_ppt: 0.0                               # [psu] salinidad óptima (factor = 1)
+    salinity_hi_tol_ppt: 38.0   # [psu] tolerancia máxima (sobre marine PSD)
+    salinity_slope: 0.02        # [psu⁻¹] decaimiento más suave de todas las filas
+    host_seeking_scale_m: 300.0   # [m] escala del decaimiento del penacho (mecanismo: Giraldo 2023); valor = engineering prior, sin medición local
+    host_seeking_radius_m: 1500.0 # [m] radio del campo de atracción = engineering prior (sin medición directa del penacho en las fuentes locales)
   stephensi:        # dormant — urban invader M8+
     weights: {surface_persistent: 0.25, wetland_persistent: 0.15, urban_persistent: 0.15,
-              wetland_pluvial: 0.00, open_pluvial: 0.40, crop_pluvial: 0.05}   # = neutral
-    activity_weights: [0.02, 0.10, 0.80, 0.08]
-    pref: {human: 0.70, cattle: 0.15, goat: 0.05, sheep: 0.05, wildlife: 0.05}
-    salinity_opt_ppt: 0.0
-    salinity_hi_tol_ppt: 20.0
-    salinity_slope: 0.15
-    host_seeking_scale_m: 300.0
-    host_seeking_radius_m: 1500.0
-  neutral:      # fila species-neutral del motor (coordinator.cpp:115,212)
+              wetland_pluvial: 0.00, open_pluvial: 0.40, crop_pluvial: 0.05}   # [fracción] afinidad por tipo de hábitat (= neutral)
+    activity_weights: [0.02, 0.10, 0.80, 0.08]          # [fracción] actividad por fase DAY/EVENING/NIGHT/DAWN (Σ=1.00); fila dormant, pesos copiados de gambiae_ss = engineering prior (sin datos propios)
+    pref: {human: 0.70, cattle: 0.15, goat: 0.05, sheep: 0.05, wildlife: 0.05}  # [fracción] preferencia por tipo de hospedador (Σ=1.00)
+    salinity_opt_ppt: 0.0                               # [psu] salinidad óptima (factor = 1)
+    salinity_hi_tol_ppt: 20.0                           # [psu] tolerancia máxima; por encima no cría
+    salinity_slope: 0.15                                # [psu⁻¹] decaimiento del factor de salinidad
+    host_seeking_scale_m: 300.0   # [m] escala del decaimiento del penacho (mecanismo: Giraldo 2023); valor = engineering prior, sin medición local
+    host_seeking_radius_m: 1500.0 # [m] radio del campo de atracción = engineering prior (sin medición directa del penacho en las fuentes locales)
+  neutral:      # especies neutrales del motor (habitat_availability.hpp)
     weights: {surface_persistent: 0.25, wetland_persistent: 0.15, urban_persistent: 0.15,
-              wetland_pluvial: 0.00, open_pluvial: 0.40, crop_pluvial: 0.05}   # Σ=1.00
+              wetland_pluvial: 0.00, open_pluvial: 0.40, crop_pluvial: 0.05}   # [fracción] afinidad por tipo de hábitat (Σ=1.00)
 
 capacity:
-  persistent_availability: 1.0    # A(persistent)=1 MVP (UNA clave; muere la dup
-                                  # species_weighted_constant)
+  persistent_availability: 1.0    # [adimensional] A(persistent) del MVP (UNA clave)
 
 geodesy:
-  earth_radius_m: 6371008.8       # [m] WGS84 mean (el lado vivo es el C++, wire.hpp:319)
-  metres_per_deg_lat: 111195.08023353292  # [m/°] = π·R/180 EXACTO (loader valida la
-                                  # relación ±1e-9); NO el 111320 ni el 111194.9
-                                  # redondeado de los docstring mentirosos
+  earth_radius_m: 6371008.8       # [m] radio medio WGS84 (el lado vivo es el C++, wire.hpp)
+  metres_per_deg_lat: 111195.08023353292  # [m/°] = π·R/180 exacto (el loader valida la
+                                  # relación ±1e-9; no usar redondeos de docstrings)
 
 ingest:          # lado py (escritor NC) + valores de paridad cruzada C++⇄py
-  nodata_sentinel: -9999.0      # frozen — sentinel float compartido (COGs C++ escritos ⇄
-                                # relectura py atol=1.0); 4 defs → 1 clave
-  nodata_sentinel_int: -9999    # frozen — mirror int label-mode (dynamic_world.py:467,474)
+  nodata_sentinel: -9999.0      # [float] sentinel NoData congelado (COGs C++ ⇄ relectura py atol=1.0)
+  nodata_sentinel_int: -9999    # [int] mirror int del sentinel (label-mode; dynamic_world.py)
   residential_from_indoor_frac: 0.8  # [fracción] host_landscape: residential =
-                                     # building_fraction (si >0) else indoor×0.8
-  coastline_buffer_m: 5000.0    # [m]
-  cell_size_hint_m: 1000.0      # [m] resolución default (muere la dup wire.hpp:236)
+                                     # building_fraction (si >0) else indoor·este factor
+  coastline_buffer_m: 5000.0    # [m] buffer de máscara de costa del filtro de salinidad
+  cell_size_hint_m: 1000.0      # [m] resolución por defecto del hint de celda
   candidate_min_ingest: 1.0e-6  # [índice] piso census del ingest — rol DISTINTO de
-                                # candidate_min_engine (NO espejo; por diseño: marcas
-                                # casi-todo en NC y el motor filtra a 0.01)
-  min_dilation_radius_cells: 1
-  fill_frac_valid_max: 0.5      # celda válida si <50% nodata
-  ocean_mask_threshold: 0.5
-  land_mask_threshold: 0.5
-  valid_count_epsilon: 1.0e-9
-  grid_degrees_step_max: 1
-  nc_compression_level: 4       # config de fichero (no modelo), unificada aquí
+                                # candidate_min_engine (NO espejo; por diseño: marca
+                                # casi-todo en NC y el motor filtra a su umbral)
+  min_dilation_radius_cells: 1  # [celdas] radio mínimo de dilatación de la máscara
+  fill_frac_valid_max: 0.5      # [fracción] celda válida si su fracción NoData es menor que este tope
+  ocean_mask_threshold: 0.5     # [fracción] umbral de la máscara de océano
+  land_mask_threshold: 0.5      # [fracción] umbral de la máscara de tierra
+  valid_count_epsilon: 1.0e-9   # [cuentas] tolerancia para considerar cero el conteo válido
+  grid_degrees_step_max: 1      # [°] paso máximo implícito al reconstruir rejillas en grados
+  nc_compression_level: 4       # [nivel] compresión zlib del NC (config de fichero, no modelo)
 
-adults:
-  daily_mort_basal: 0.87      # [1/día] Lardeux (0.87 → vida media ≈7.7 d)
-  opt_c: 25.0                 # [°C] centro gaussiana supervivencia
-  sigma_c: 15.0               # [°C] ancho térmico
-  mort_cap: 0.93              # supervivencia diaria máx
-  mort_floor: 0.60            # supervivencia diaria mín
+adults:          # OJO: las claves `mort_*` son SUPERVIVENCIA diaria (p_d), no mortalidad
+  daily_mort_basal: 0.87      # [prob/día] supervivencia basal diaria (nombre histórico `mort`;
+                              # Lardeux; vida media resultante)
+  opt_c: 25.0                 # [°C] centro de la gaussiana de supervivencia (Lardeux)
+  sigma_c: 15.0               # [°C] ancho térmico de la gaussiana (Lardeux)
+  mort_cap: 0.93              # [fracción] cota superior del clamp de p_d (supervivencia)
+  mort_floor: 0.60            # [fracción] cota inferior del clamp de p_d (supervivencia)
 
 eip:
-  base_c: 16.0                # [°C] piso térmico GDD
-  threshold_gd: 110.0         # [grados-día] cota de infectividad
+  base_c: 16.0                # [°C] piso térmico del modelo de grados-día
+  threshold_gd: 110.0         # [grados-día] cota de infectividad del EIP
 
 transmission:     # SEIR-SEI Ross-Macdonald (transmission.hpp; CLI --beta-hv/...)
   beta_hv: 0.40               # [prob/mordida] humano→vector (infecciosa)
@@ -179,78 +172,78 @@ transmission:     # SEIR-SEI Ross-Macdonald (transmission.hpp; CLI --beta-hv/...
   initial_human_prevalence: 0.05    # [fracción] I_H inicial, modo uniform-legacy
   initial_vector_infected_frac: 0.0 # [fracción] I_V inicial de hembras adultas
 
-thermal:          # curvas térmicas acuáticas + EFD (Mordecai 2013, Couper 2021)
-  efd_max_eggs_per_day: 0.5        # [huevos·hembra⁻¹·día⁻¹] máximo en Topt
-  efd_tmin_c: 16.0                 # [°C] umbral inferior de reproducción
-  efd_tmax_c: 34.0                 # [°C] umbral superior de reproducción
-  efd_topt_c: 25.0                 # [°C] óptimo (normalización del modifier)
-  egg_development_tmin_c: 10.0     # [°C] Brière-1 umbral inferior
-  egg_development_tmax_c: 40.0     # [°C] Brière-1 umbral superior
-  egg_development_scale: 0.00062   # [escala] a de rate=a·T·(T−TL)·√(TH−T)
-  larva_development_tmin_c: 10.0   # [°C] cuadrática umbral inferior
-  larva_development_tmax_c: 40.0   # [°C] cuadrática umbral superior
-  larva_development_scale: 0.001   # [escala] a de rate=a·(T−TL)·(TH−T)
-  pupa_development_tmin_c: 12.0    # [°C] Brière-1 umbral inferior
-  pupa_development_tmax_c: 40.0    # [°C] Brière-1 umbral superior
-  pupa_development_scale: 0.00066  # [escala] a de rate=a·T·(T−TL)·√(TH−T)
+thermal:          # curvas térmicas acuáticas + EFD (forma: Mordecai 2013; escalas ajustadas a Bayoh & Lindsay 2003)
+  efd_max_eggs_per_day: 0.5        # [huevos·hembra⁻¹·día⁻¹] escala máxima de la curva de EFD (forma: Mordecai 2013; el máximo es calibración, no EFD absoluto)
+  efd_tmin_c: 16.0                 # [°C] umbral inferior de reproducción (Mordecai 2013)
+  efd_tmax_c: 34.0                 # [°C] umbral superior de reproducción (Mordecai 2013)
+  efd_topt_c: 25.0                 # [°C] óptimo (normalización del modifier) (Mordecai 2013)
+  egg_development_tmin_c: 10.0     # [°C] Brière-1 umbral inferior (forma: Mordecai 2013; límite de ajuste sobre datos de Bayoh & Lindsay 2003)
+  egg_development_tmax_c: 40.0     # [°C] Brière-1 umbral superior (forma: Mordecai 2013; límite de ajuste sobre datos de Bayoh & Lindsay 2003)
+  egg_development_scale: 0.00062   # [escala] a de rate=a·T·(T−TL)·√(TH−T) (forma: Mordecai 2013; ajuste: Bayoh & Lindsay 2003)
+  larva_development_tmin_c: 10.0   # [°C] cuadrática umbral inferior (límite de ajuste sobre Bayoh & Lindsay 2003)
+  larva_development_tmax_c: 40.0   # [°C] cuadrática umbral superior (límite de ajuste sobre Bayoh & Lindsay 2003)
+  larva_development_scale: 0.001   # [escala] a de rate=a·(T−TL)·(TH−T) (calibrada Bayoh & Lindsay 2003; validada Agyekum 2022, Ouédraogo 2024)
+  pupa_development_tmin_c: 12.0    # [°C] Brière-1 umbral inferior (forma: Mordecai 2013; límite de ajuste sobre datos de Bayoh & Lindsay 2003)
+  pupa_development_tmax_c: 40.0    # [°C] Brière-1 umbral superior (forma: Mordecai 2013; límite de ajuste sobre datos de Bayoh & Lindsay 2003)
+  pupa_development_scale: 0.00066  # [escala] a de rate=a·T·(T−TL)·√(TH−T) (forma: Mordecai 2013; ajuste: Bayoh & Lindsay 2003)
 
 gonotrophic:      # ciclo gonotrófico (gonotrophic_cycle.hpp); fuente única del ciclo
   cycle_duration_days: 2.0     # [días] maduración tras el primer ciclo (redondeo ceil)
   first_cycle_days: 4.0        # [días] maduración del primer ciclo (ceil)
   feeding_success_rate: 0.825  # [fracción] PROBING→BLOOD_FED
-  egg_batch_mean: 120          # [huevos] media del draw binomial(n, 0.5)
+  egg_batch_mean: 120          # [huevos] media del draw binomial
   egg_batch_n: 240             # [ensayos] n del draw binomial
   egg_batch_min: 30            # [huevos] cota inferior del lote
   egg_batch_max: 170           # [huevos] cota superior del lote
   resting_duration_days: 0.5   # [días] BLOOD_FED→RESTING (redondeo int)
 
 dispersal:
-  adult_prob_day: 0.05        # [1/día] (docstring wire «10%» MIENTE — corregido paso 0)
-  adult_sigma_m: 450.0        # [m] Costantini 1996 midpoint
-  adult_max_m: 2000.0         # [m]
-  wind_migration_prob: 0.05
-  wind_flight_hours: 4.0      # [h] Huestis 2019 mid
-  wind_survival: 0.85         # Faiman 2020 mid
-  wind_self_speed_ms: 1.0     # [m/s]
-  flight_hour: 20             # set_current_hour (motor)
+  adult_prob_day: 0.05        # [1/día] probabilidad diaria de dispersión adulta
+  adult_sigma_m: 450.0        # [m] sigma del kernel gaussiano adulto; Costantini 1996 mide 350–650 m/día y este valor es un prior conservador DENTRO del rango (no es el punto medio)
+  adult_max_m: 2000.0         # [m] cap de distancia de dispersión adulta; Thomas 2013 da p95 1.67 km (exponencial) y 2.83 km (half-Cauchy); este cap es un prior de compromiso, no un p95
+  wind_migration_prob: 0.05   # [1/día] probabilidad diaria de migración eólica
+  wind_flight_hours: 4.0      # [h] duración del vuelo eólico (Huestis 2019: transporte nocturno; Faiman 2020: vuelo sostenido de horas; el cap es engineering prior)
+  wind_survival: 0.85         # [fracción] supervivencia durante migración eólica (Sanogo 2021: alta supervivencia en ensayo de altitud; la fracción es engineering prior)
+  wind_self_speed_ms: 1.0     # [m/s] velocidad propia añadida al viento
+  flight_hour: 20             # [h] hora de set_current_hour para el vuelo
   host_flight_step_m: 500.0   # [m] paso del vuelo dirigido a host (step_toward_host)
   snap_radius_m: 500.0        # [m] snap adulto→parche activado más cercano
-  night_start_hour: 18        # [h] inicio ventana nocturna (dispersión eólica/multirate)
+  night_start_hour: 18        # [h] inicio de la ventana nocturna (dispersión eólica/multirate)
   night_end_hour: 6           # [h] fin exclusivo; si < start la ventana cruza medianoche
 
 host_seeking:   # la capa viva (la que engine ejecuta vía species_params); el per-species
                 # scale/radius vive en species.<name>
-  starvation_days: 7
-  indoor_attraction_add: 0.72     # +(0.72·indoor_fraction) — sin anclaje documentado hoy
-  urbanicity_add: 0.2             # +(0.2·urbanicity)
+  starvation_days: 7              # [días] inanición máxima sin hospedador antes de morir
+  indoor_attraction_add: 0.72     # [adimensional] +(valor·indoor_fraction); engineering prior sin fuente documentada
+  urbanicity_add: 0.2             # [adimensional] +(valor·urbanicity); engineering prior
   # host_landscape urban_class→fraction mapping (review-a3 INFRA-7: antes
-  # literales 0.72/0.30 réplicas en C++)
-  indoor_fraction_urban: 0.72     # 72% endofílico urbano (An. gambiae)
-  indoor_fraction_rural: 0.30
+  # literales replicados en C++)
+  indoor_fraction_urban: 0.72     # [fracción] endofilia urbana (An. gambiae)
+  indoor_fraction_rural: 0.30     # [fracción] endofilia rural
   # rango de detección del kernel del MOTOR (el caller lo pasa explícito y
-  # gana sobre species.<fila>.host_seeking_radius_m=1500). Ese 1500 es un
+  # gana sobre species.<fila>.host_seeking_radius_m). Ese radio per-species es un
   # concepto DISTINTO: radio del campo de atracción de compute_attraction
   # cuando el caller pasa el sentinel -1 (p.ej. feeding phase-aware).
   detect_range_m: 2000.0          # [m] detect_host_cell desde HOST_APPROACH
   approach_step_m: 50.0           # [m] paso de approach_vector
 
 oviposition:
-  scale_m: 50.0       # [m] decaimiento del penacho (Okal 2013)
+  scale_m: 50.0       # [m] decaimiento del penacho (mecanismo: Okal 2013; escala = engineering prior)
   detect_range_m: 2000.0  # [m] ÚNICO radio del kernel: detect_breeding_cell y
                           # compute_attraction lo reciben del caller (engine)
   step_m: 50.0            # [m] paso de step_toward
   min_attraction: 0.3     # [adimensional] atracción mínima para aceptar un criadero
-  timeout_days: 7
+  timeout_days: 7         # [días] timeout de búsqueda de criadero
 
 aquatic_stages:
-  egg_daily_mort: 0.08        # [1/día] Giglioli/Depinay
-  pupa_daily_mort: 0.05       # [1/día]
-  larva_bh_s0: 0.95           # Beverton-Holt supervivencia basal
-  larva_bh_alpha: 0.05        # coef competencia α
-  last_larval_instar: 4
+  egg_daily_mort: 0.08        # [1/día] mortalidad diaria de huevo; engineering prior (Giglioli no es verificable en papers/; Depinay 2004 local da ~0.99 de supervivencia diaria, ≈0.01 de mortalidad, diferencia documentada)
+  pupa_daily_mort: 0.05       # [1/día] mortalidad diaria de pupa
+  larva_bh_s0: 0.95           # [fracción] supervivencia basal de Beverton-Holt larvaria
+  larva_bh_alpha: 0.05        # [adimensional] coef de competencia α de Beverton-Holt
+  last_larval_instar: 4       # [instar] último instar larvario (L4)
   salinity_missing_psu: 0.0   # [psu] sin datos ⇒ agua dulce (UNA clave para 6 sitios)
 
 rng:          # seeds de PRODUCCIÓN del motor (reproducibilidad; test fixtures NO van aquí)
-  aquatic_seed_washout: 789
-  aquatic_seed_stage_mortality: 42
-  aquatic_seed_larva_mortality: 123
+  aquatic_seed_washout: 789             # [int] seed del sub-stream de lavado por lluvia
+  aquatic_seed_stage_mortality: 42      # [int] seed del sub-stream de mortalidad por etapa
+  aquatic_seed_larva_mortality: 123     # [int] seed del sub-stream de mortalidad larvaria

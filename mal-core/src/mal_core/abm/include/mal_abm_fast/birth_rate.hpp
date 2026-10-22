@@ -1,14 +1,12 @@
 // SPDX-License-Identifier: MIT
 // birth_rate.hpp — Temperature-dependent egg production rate (EFD).
 //
-// Based on Mordecai et al. (2013) thermal response curves for Anopheles gambiae.
 // The EFD function is a quadratic thermal response:
 //   EFD(T) = afd * (T - T0) * (Tm - T) / ((Tm - T0)^2 / 4)
 // where afd / T0 / Tm / Topt live in model_constants.yaml (thermal.efd_*).
 //
-// This temperature-dependent modifier is wired (2026-10-13) into the
-// OVIPOSITING egg-batch draw in mosquito_submodel.cpp, replacing the
-// legacy constant BIRTH_FECUNDITY (removed — dead code).
+// This temperature-dependent modifier is wired into the OVIPOSITING
+// egg-batch draw in mosquito_submodel.cpp.
 #pragma once
 
 #include <cmath>
@@ -20,7 +18,7 @@ namespace mal_abm_fast {
 
 // Temperature-dependent egg production rate (eggs per female per day).
 // Returns 0 outside [efd_tmin_c, efd_tmax_c]. Quadratic thermal response
-// from Mordecai et al. (2013) "Thermal biology of mosquito-borne disease".
+// with parameters from thermal.efd_*.
 inline double egg_production_rate(double temp_c) {
     static const ThermalCfg& cfg = load_config().thermal;
     if (temp_c < cfg.efd_tmin_c || temp_c > cfg.efd_tmax_c) return 0.0;

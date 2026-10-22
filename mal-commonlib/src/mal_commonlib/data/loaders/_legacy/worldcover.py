@@ -40,7 +40,7 @@ Output contract (per ``docs/abm-output-contract.md`` §2, channel 0):
     * dims (y, x), dtype ``float32``
     * CRS = ``aoi.crs``
     * values in [0, 1]
-    * NoData: ``-9999.0``
+    * NoData: ``NODATA_SENTINEL()``
 """
 from __future__ import annotations
 
@@ -169,7 +169,7 @@ def _load_worldcover_pc(
         (arr, profile) where ``arr`` is a ``(H, W)`` float32 array on the
         AOI's grid (CRS = AOI CRS, transform = AOI transform), values in
         [0, 1] (per-AOI-cell water fraction = mean of binary water mask
-        over all tiles that covered the cell), and ``-9999.0`` for cells
+        over all tiles that covered the cell), and ``NODATA_SENTINEL()`` for cells
         that no tile covered. ``profile`` is a dict with ``crs``,
         ``transform``, ``height``, ``width``.
     """
@@ -388,7 +388,7 @@ def load_worldcover_water_frac(
 
     Returns:
         xr.DataArray with dims (y, x), dtype ``float32``, CRS = ``aoi.crs``.
-        Values in [0, 1]. ``-9999.0`` for NoData.
+        Values in [0, 1]. ``NODATA_SENTINEL()`` for NoData.
     """
     if year not in (2020, 2021):
         raise ValueError(f"WorldCover year must be 2020 or 2021; got {year}")

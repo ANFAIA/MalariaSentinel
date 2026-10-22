@@ -100,15 +100,15 @@ public:
     // Per-day: advance z with today's rainfall per cell, recompute the
     // species-neutral daily accuracy S[i, t] and capacity K[i, t], and
     // track per-cell dry-day streaks. Call AFTER climate_->set_day().
-    // `gamma_t` (default 0 for MVP): temperature scaling of the pluvial
-    // drying memory — tau_eff = pluvial.dry_memory_days * (1 - gamma_T *
+    // `gamma_t`: temperature scaling of the pluvial drying memory —
+    // tau_eff = pluvial.dry_memory_days * (1 - gamma_T *
     // clamp((T_opt - temp)/T_ref)) when gamma_T > 0.
     void update_habitat_day(float gamma_t = 0.0f);
 
     // Species salinity high-tolerance (psu). Patches whose water
     // salinity exceeds this cannot breed (activated=false). Engine
-    // wires the active species' `salinity_hi_tol_ppt`; default =
-    // coluzzii 30.0 psu.
+    // wires the active species' `salinity_hi_tol_ppt`; the default
+    // comes from the default species row.
     void set_salinity_hi_tol_ppt(float ppt) { salinity_hi_tol_ppt_ = ppt; }
     void set_host_landscape(const HostLandscape* hosts)
     { host_landscape_ = hosts; }
@@ -136,8 +136,7 @@ public:
     // UNIFORM-mode seeding: every candidate habitat cell (patch union
     // at day 0) receives the explicit `n_adults` + `n_immatures`
     // counts (contract 4.0; the retired init_frac × K_MAX product is
-    // replaced by direct counts — 30/270 reproduces the historical
-    // 0.30 × 1000 mix).
+    // replaced by direct counts).
     std::vector<SeedInstruction> build_uniform_seed_instructions(
         int32_t n_adults, int32_t n_immatures);
 
@@ -182,7 +181,7 @@ private:
         patch_registry_;   // stable pid per (row, col) candidate cell
     int64_t                              next_patch_id_ = 0;
     std::vector<PatchState>                   cached_states_;
-    // Species salinity high-tolerance (psu); default = coluzzii 30.0.
+    // Species salinity high-tolerance (psu); default from the default species row.
     float salinity_hi_tol_ppt_ = static_cast<float>(
         load_config()
             .species.rows.at(load_config().species.default_species)
@@ -193,7 +192,7 @@ private:
     int32_t                                   W_ = 0;
     std::vector<float>                        z_;         // pluvial state per cell [0,1]
     std::vector<HabitatFeatures>              feats_;     // static features per cell
-    std::vector<int>                          dry_days_;  // consecutive days S <= ACTIVATION_MIN
+    std::vector<int>                          dry_days_;  // consecutive days S <= habitat.activation_min_engine
     std::vector<float>                        K_cell_;    // daily capacity per cell (absolute units)
     bool                                      dry_count_configured_ = false;
 };

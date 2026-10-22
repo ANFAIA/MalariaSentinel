@@ -3,10 +3,10 @@
 Moran's I computed on ACTIVE pixels only (band 2, host-seeking
 pressure) — including the ~99% empty background biases I toward 0.
 
-Target band [0.20, 0.85]: larval habitats cluster strongly in
-heterogeneous landscapes (Tokarz & Novak 2018; Bissett 2026);
-empirical Ghana 731-day value ≈ 0.52. Band catches spatial randomness
-(I ≈ 0) and pathological over-clustering (I → 1).
+Target band (applied in ``score()``): larval habitats cluster strongly
+in heterogeneous landscapes (Tokarz & Novak 2018; Bissett 2026). The
+band catches spatial randomness (I ≈ 0) and pathological
+over-clustering (I → 1).
 """
 from __future__ import annotations
 

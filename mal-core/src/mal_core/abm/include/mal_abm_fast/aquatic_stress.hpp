@@ -9,13 +9,6 @@
 //       driver (dry mm days count); replaced one-to-one by the
 //       habitat-dry streak (the aquatic module contract changes only in
 //       the driver, not in the stressor semantics).
-//   desiccation_rate(int days_dry)  — grace period + exponential ramp on
-//       the consecutive days the cell was habitat-dry (consecutive days
-//       with accuracy S <= habitat.activation_min_engine; carried in
-//       PatchState.habitat_dry_days). PoolState days_dry was the old
-//       driver (dry mm days count); replaced one-to-one by the
-//       habitat-dry streak (the aquatic module contract changes only in
-//       the driver, not in the stressor semantics).
 //   washout_fraction(float rain_d)  — flush fraction on heavy rain;
 //       linear ramp preserved from the pool module.
 //   aquatic_survival_factor(float temp_d) — thermal gate on aquatic

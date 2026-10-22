@@ -11,9 +11,6 @@
 // day_index is the 0-based simulation day; it maps to the first
 // time step of that day (slot 0 = 00:00 UTC). hour_of_day (0-23)
 // selects which 6-hourly slot to interpolate within.
-//
-// Reference: Huestis et al. 2019 (Nature Communications) — windborne
-// migration of Anopheles in the Sahel, ERA5 + HYSPLIT trajectories.
 #pragma once
 
 #include <cstdint>

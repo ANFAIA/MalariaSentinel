@@ -33,15 +33,12 @@ float HostSeekingModel::cell_attraction(
     const HostCell& cell, float dist_m) const
 {
     // Exponential distance decay: scale = species host_seeking_scale_m
-    // (default 100m, CO₂ + body-odour plume; overridable via
-    // set_species_params). Giraldo 2023: CO₂ detection ~60m; Spitzen
-    // 2013: 60-70m nocturnal; Okumu 2013: significant attraction at
-    // 70m, activates at 100m.
+    // (overridable via set_species_params).
     const float kScale = scale_m_;
     const float decay = std::exp(-dist_m / kScale);
 
-    // Indoor modifier: endophilic species get a boost indoors.
-    // An. gambiae: 72% endophilic → indoor modifier = 1 + indoor_frac × 0.72
+    // Indoor modifier: endophilic species get a boost indoors
+    // (host_seeking.indoor_attraction_add).
     const float indoor_mod =
         1.0f + cell.indoor_fraction *
             static_cast<float>(

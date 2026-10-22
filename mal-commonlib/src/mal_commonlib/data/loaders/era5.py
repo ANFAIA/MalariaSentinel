@@ -27,7 +27,7 @@ Notes:
       Lardeaux style habitat model of the previous regime is NOT a loss to
       the redesign; it never used this channel anyway.
     * Output dims: (time, y, x) daily float32 in degrees Celsius.
-      NoData: -9999.0. The daily multi-year path is wired through
+      NoData: the NoData sentinel. The daily multi-year path is wired through
       ``formats["air_temp_daily"] = "daily"`` in the DOWNLOADER dict (the
       runner writes ONE multi-year daily NC and registers it with period
       metadata).
@@ -308,7 +308,7 @@ def load_era5_air_temp_daily(
 
     Returns:
         xr.DataArray with dims (time, y, x), dtype float32, CRS = aoi.crs.
-        Values in degrees Celsius. ``-9999.0`` for NoData.
+        Values in degrees Celsius. ``NODATA_SENTINEL()`` for NoData.
     """
     if months is None:
         months = list(range(1, 13))

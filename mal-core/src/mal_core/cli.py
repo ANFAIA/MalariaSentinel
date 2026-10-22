@@ -227,7 +227,7 @@ def abm(
         help="Path to gawt worktree (e.g. .gitagent/worktree) for isolated compile and run.",
     ),
     seeding_mode: str = typer.Option("random-viable", "--seeding-mode", help="Initial mosquito seeding mode: 'uniform' | 'random-viable' | 'explicit' | 'host-weighted'."),
-    seed_adults_per_patch: int = typer.Option(30, "--seed-adults-per-patch", help="UNIFORM mode: adult mosquitoes seeded per candidate patch (explicit count; 30/270 reproduces the retired 0.30×K_MAX=1000 mix)."),
+    seed_adults_per_patch: int = typer.Option(30, "--seed-adults-per-patch", help="UNIFORM mode: adult mosquitoes seeded per candidate patch (explicit count; 30/270 reproduces the retired capacity-fraction mixing)."),
     seed_immatures_per_patch: int = typer.Option(270, "--seed-immatures-per-patch", help="UNIFORM mode: immatures (eggs+larvae+pupae) seeded per candidate patch."),
     host_seeding_radius_km: float = typer.Option(5.0, "--host-seeding-radius-km", help="HOST_WEIGHTED mode: radius (km) around each patch to weight nearby host abundance."),
     n_detections: int = typer.Option(3, "--n-detections", help="Number of patches to seed. RANDOM_VIABLE / HOST_WEIGHTED modes."),

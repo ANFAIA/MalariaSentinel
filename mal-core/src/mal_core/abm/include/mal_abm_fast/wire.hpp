@@ -3,9 +3,10 @@
 //
 // This is the canonical "data contract" header. Every module in
 // mal-abm-fast includes wire.hpp to pick up:
-//   * the engine defaults (EIP thresholds, dispersal kernel, birth rate,
-//     the no-data sentinel, the state-band names, the contract /
-//     generator version strings)
+//   * the model-constant accessors (EIP thresholds, dispersal kernel,
+//     birth rate, the no-data sentinel — all read from
+//     model_constants.yaml), the state-band names and the contract /
+//     generator version strings
 //   * the shared value types (AOI, HabitatPatch, PatchState, DensityGrid,
 //     SuitabilityGrid)
 //
@@ -69,45 +70,18 @@ inline std::string CONTRACT_VERSION() { return load_config().contracts.cogs_stat
 // EIP (extrinsic incubation period) growing-degree-day model.
 //   daily_gd       = max(0, T - EIP_BASE_C)
 //   infective when eip_progress >= EIP_THRESHOLD_GD
-// Tuned for An. gambiae s.s. in the M1.5 thin slice.
 
-// Adult dispersal kernel: isotropic Gaussian in metres, clipped at 2000 m.
-// 5% of adults move per day (An. gambiae rural dispersal).
-// Sigma=450m: midpoint of Costantini et al. 1996 (350-650 m/day, Burkina
-//   Faso MRR) and Thomas et al. 2013 (median 386m, The Gambia).
-// Cap=2000m: Thomas et al. 2013 95th percentile (1.7-2.8 km); captures
-//   rare long-distance colonization events.
+// Adult dispersal kernel: isotropic Gaussian in metres, clipped at
+// dispersal.adult_max_m (probabilities and widths come from dispersal.*).
 
-// Windborne long-range migration (M7.6 Phase 1).
-// Huestis et al. 2019 (Nature Communications): Sahel aerial sampling
-//   + ERA5/HYSPLIT. Mean nightly displacement: 30km (2h) / 120km (9h).
-//   90% females, 90% blood-fed. Jul-Oct (monsoon) + Dec-Mar (Harmattan).
-// Faiman et al. 2020: survival at altitude 70-90%.
-// North & Godfray 2018: d_M = 0.01-0.05/day, without wind 0% colonization,
-//   with wind 100% colonization of Sahel.
-
-// Host-seeking plume parameters (Plan D).
-// CO₂ + body-odour plume: kScale=100m (Giraldo 2023, Spitzen 2013,
-// Okumu 2013). search_radius=300m (Yang 2009: 94% malaria reduction
-// when habitats within 300m of houses are eliminated).
-
-// Oviposition-seeking plume parameters (Plan D).
-// Water-vapour + VOC plume: kScale from oviposition.scale_m (Okal 2013);
-// the detection window comes from oviposition.detect_range_m at the caller.
+// Windborne long-range migration (M7.6 Phase 1). Parameters come from
+// dispersal.wind_* in model_constants.yaml.
 
 // Egg batch size is temperature-scaled at oviposition time via the EFD
-// thermal modifier (birth_rate.hpp, Mordecai 2013): the binomial draw of
+// thermal modifier (birth_rate.hpp): the binomial draw of
 // GonotrophicParams::egg_batch_n trials uses
 // p = (egg_batch_mean / egg_batch_n) × birth_rate_modifier(T),
-// with T the same per-patch temp_d that drives Lardeux adult survival.
-// The legacy per-adult-per-day constant BIRTH_FECUNDITY (0.25) was removed
-// on 2026-10-13 as dead code: the constant per-day birth path it
-// parameterised no longer exists (eggs enter exclusively through the
-// gonotrophic cycle), its RuntimeOverrides field had zero consumers, and
-// the --birth-fecundity CLI flag did nothing. The M1.5 tuning note
-// ("raise only masks the structural point-source collapse") is superseded
-// by the aquatic-bottleneck diagnosis: 0.87 mortality (Saarman 2019) +
-// wired OvipositionSeekingModel + thermal egg batches.
+// with T the same per-patch temp_d that drives adult survival.
 
 // Larva density-dependent mortality (Beverton-Holt, docs/abm-status.md:79).
 
@@ -120,74 +94,26 @@ struct RuntimeOverrides {
     float larva_bh_alpha   = static_cast<float>(load_config().aquatic_stages.larva_bh_alpha);
 };
 
-// Adult daily mortality — Lardeux thermo-dependent with basal cap.
-//   p_d = ADULT_DAILY_MORT_BASAL * exp(-((T - ADULT_OPT_C)^2) / (2 * ADULT_SIGMA^2))
-//   clipped to [ADULT_MORT_FLOOR, ADULT_MORT_CAP]
-// ADULT_DAILY_MORT_BASAL (0.87 since 2026-10-13, Saarman 2019 midpoint) is
-// the maximum daily survival at the optimal temperature. It accounts for
-// non-thermal mortality sources (senescence, predation, accidents) that
-// the Lardeux Gaussian does not model. At T=25°C: p_d=0.87, mean life
-// ~7.1 days. At Ghana July medians (27-29°C): p_d=0.84-0.86.
-// History: 0.95/0.93 probes produced a structural point-source collapse
-// blamed on mortality that is actually the aquatic bottleneck (see 2026
-// A/B in runs/abm_mort_v3); Costantini 1996 MRR gives 0.80-0.88.
-//   - Saarman 2019:    0.87 (West Africa, self-marking)  <- current value
-//   - North 2018:      0.875 (model param)
-//   - Costantini 1996: 0.80-0.88 (Burkina Faso savanna)
-//   - Midega 2007:     0.83-0.95 (Kenya coast)
-// ADULT_OPT_C = 25°C: matches Mordecai 2013 + Lunde 2013 (Bayoh-Mordecai).
-// ADULT_SIGMA = 15: broader curve, matches Martens 1997 (West Africa MRR
-// at 30-35°C remains survivable). With sigma=7, survival at 32°C was only
-// 57.7% (mean life 2.5 days) — too low for field observations. Sigma=15
-// gives p_d=0.78 at 32°C (mean life ~4 days), matching the "survivable"
-// range from Martens 1997 and Costantini 1996.
-// ADULT_MORT_CAP = 0.93: empirical upper bound (Midega 2007). Dormant with
-// BASAL=0.87 — the Gaussian never exceeds 0.87 at improving temps; the
-// cap would only bind again if BASAL rises above 0.93.
-// ADULT_MORT_FLOOR = 0.60: emergency floor for extreme temps (max 40%/day).
-// ADULT_SIGMA = 15: broader curve, matches Martens 1997 (West Africa MRR
-// at 30-35°C remains survivable). With sigma=7, survival at 32°C was only
-// 57.7% (mean life 2.5 days) — too low for field observations. Sigma=15
-// gives p_d=0.852 at 32°C (mean life 6.8 days), matching the "survivable"
-// range from Martens 1997 and Costantini 1996.
+// Adult daily mortality: thermo-dependent survival with a basal cap
+// (values in adults.*; formula in mosquito_submodel.cpp).
 
-// Temperature NaN policy (2026-10-13): the legacy per-lookup constant
-// ADULT_TEMP_FALLBACK_C (25 deg C) was removed. Out-of-coverage /
-// sea-mask NaN pixels in the env NC water_temp_c channel are imputed
-// at load time by neighbor-mean wavefront fill (climate.cpp
-// impute_temp_nans) — each imputed cell inherits the same day's
-// spatial temperature field, so it tracks the seasonal cycle instead
-// of pinning 25 deg C year-round (the fixed fallback put out-of-place
-// values on coastal/edge cells in hot and cold seasons). temp_at()
-// clamps off-grid (row, col) to the border cell; the only remaining
-// fallback is a documented degenerate-engine guard (25 deg C literal)
-// for an all-NaN slice or an unloaded engine.
+// Temperature NaN policy (2026-10-13): the legacy per-lookup temperature
+// fallback constant was removed. Out-of-coverage / sea-mask NaN pixels
+// in the env NC water_temp_c channel are imputed at load time by
+// neighbor-mean wavefront fill (climate.cpp impute_temp_nans) — each
+// imputed cell inherits the same day's spatial temperature field, so it
+// tracks the seasonal cycle instead of pinning a fixed value year-round
+// (the fixed fallback put out-of-place values on coastal/edge cells in
+// hot and cold seasons). temp_at() clamps off-grid (row, col) to the
+// border cell; the only remaining fallback is a documented
+// degenerate-engine guard for an all-NaN slice or an unloaded engine.
 
-// Larva desiccation (Depinay 2004 §3.1) is wired by the pool_hydrology
-// constants below: POOL_DESICCATION_GRACE_DAYS + POOL_DESICC_BASE_DAILY
-// (m14-pool-hydrology). The legacy LARVA_DESICCATION grace/ rate duo /
-// LARVA_DESICCATION_DAILY_RATE twins (same values) were removed on
-// 2026-10-13 — no runtime consumer since M14's desiccation_rate().
+// Larva desiccation: grace + daily rate live in aquatic_stress.*
+// (see aquatic_stress.hpp).
 
-// PLUVIAL_POOL dynamic-patch rule (M2 combined, C2):
-//   cell (r, c) is a habitat patch today iff
-//       TWI(r, c) >  PLUVIAL_POOL_TWI_THRESHOLD
-//       water_frac(r, c) > PLUVIAL_POOL_WATER_FRAC_MIN  (strictly > 0)
-//       rain_d(r, c) >  PLUVIAL_POOL_RAIN_THRESHOLD_MM
-//
-// Rationale for 15mm (was 50mm): Ghana's rainy season averages 5-15mm/day,
-// so 50mm was almost never reached and the rule rarely activated. 15mm is
-// the biological threshold for ephemeral pool formation. Also, daily rain
-// >40mm correlates NEGATIVELY with larval density (heavy rain washes larvae
-// out of pools), so 50mm was biologically counterproductive as well.
-// [RETIRED proxy-habitat-v1 2026-10] The mm-driven pool module, TWI gate,
-// urban bar, water fraction and runoff/catchment/evaporation constants are
-// deleted (plan docs/plans/in-process/redesign/01-retirada-*.md §6-§8).
-// Habitat availability is now proxy_habitat_v1: static H[i,g] from six
-// habitat types, two shared temporal responses with
-// and preserved biological stress bits with
-//   RAIN_WASH_MM, DESICCATION_GRACE_DAYS, DESICC_BASE_DAILY
-// (aquatic_stress.hpp).
+// proxy_habitat_v1: habitat availability is the static H[i, g] over the
+// six habitat types; the biological stress bits (rain wash, desiccation)
+// live in aquatic_stress.hpp.
 
 // No-data sentinel for the 2-band state COG.
 
@@ -256,12 +182,12 @@ struct PatchState {
     int32_t col           = 0;
     bool    activated     = false;
     float   rain_d        = 0.0f;     // mm, today's daily rainfall at the cell
-    float   temp_d        = 25.0f;    // deg C, post Mordecai inverse (EIP uses T)
+    float   temp_d        = 25.0f;    // deg C, post thermal inverse (EIP uses T)
     // proxy_habitat_v1: species-neutral overall availability of the patch
     // today, S(i, t) in [0, 1] (weights + H total + z combined). Replaces
     // the retired water_frac / pool_water_mm signalling.
     float   habitat_avail = 0.0f;
-    int     habitat_dry_days = 0;     // consecutive days below ACTIVATION_MIN
+    int     habitat_dry_days = 0;     // consecutive days below habitat.activation_min_engine
     float   k_habitat     = 0.0f;     // daily Beverton-Holt capacity (absolute count)
     float   salinity_ppt  = 0.0f;     // env water salinity (psu); 0 = freshwater
 };
@@ -312,15 +238,14 @@ struct SuitabilityGrid {
 // contains the related free function `cells_per_side_h` (H dimension).
 //
 // Parity with the Python reference (mal_commonlib.aoi.AOI.cells_per_side):
-//   m_per_deg_lat  = (pi * 6371008.8) / 180.0  (WGS84 mean Earth radius)
+//   m_per_deg_lat  = π · R / 180 from geodesy.* (WGS84 mean Earth radius)
 //   width_m        = (east - west) * m_per_deg_lat * cos(centroid_lat_rad)
 //   cells_per_side = ceil(width_m / resolution_m)  (NOT lround — see parity note)
 //
 // F1.b parity note: Python's `mal_commonlib.aoi.AOI.cells_per_side` uses
 // `math.ceil` (not `round`); we use `std::ceil` to match. For the Ghana
-// regional AOI both formulas give 551/779; for AOIs near a cell
-// boundary the rounding mode diverges (e.g. width_m = 999.5 m at
-// resolution_m = 1000: Python gives 1, lround gives 1, floor gives 0).
+// regional AOI both formulas agree; for AOIs near a cell boundary the
+// rounding mode diverges.
 inline constexpr double kPi              = 3.14159265358979323846;
 
 inline int32_t AOI::cells_per_side() const noexcept {

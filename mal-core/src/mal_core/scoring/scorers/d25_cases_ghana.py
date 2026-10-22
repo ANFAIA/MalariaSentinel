@@ -13,7 +13,8 @@ climatology (mean daily human incidence per month from the
 ``*_transmission_daily.json`` log written by ``--enable-transmission``
 runs) and the OBSERVED calendar-month climatology (pooled mean monthly
 cases of the 3 regions, Covid-2020 months excluded via the dataset's
-own Covid flag). r >= 0.6 -> 1.0, Gaussian decay below.
+own Covid flag). Correlation at or above ``R_TARGET`` -> 1.0;
+Gaussian decay below it.
 
 Ghana-only by construction: the dataset covers 3 of Ghana's 16 regions
 and carries no population denominators, so it does not generalize to

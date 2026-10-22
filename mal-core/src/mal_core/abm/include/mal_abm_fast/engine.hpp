@@ -162,7 +162,7 @@ public:
     // (patch_id, row, col) of the first detection-based seeding
     // instruction produced by the constructor. Returns {-1, 0, 0}
     // for UNIFORM mode (no detection-based seeding). Used by the
-    // --debug-population CLI flag to log the Lardeux p_d at the
+    // --debug-population CLI flag to log the daily survival probability at the
     // seeding patch, which is the most direct signal for whether
     // the calibrated mortality model is being applied.
     struct SeedingPatch {

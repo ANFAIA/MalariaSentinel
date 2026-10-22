@@ -14,8 +14,7 @@ Format: Cloud-Optimized GeoTIFF (COG), one band — DENSITY in heads/km² (NOT p
 
 Notes:
     * Returns livestock DENSITY in heads/km², nearest-resampled onto the
-      AOI grid. For ~1 km² ABM cells the value doubles as heads/cell
-      (density × 1 km² ≈ heads per cell).
+      AOI grid. For km²-scale ABM cells the value doubles as heads/cell.
     * Resolution is ~10 km (5 arc-minutes). Density is an intensive
       quantity: resample to a finer grid with nearest/bilinear. NEVER
       sum-resample density — that inflates values by the number of fine
@@ -224,8 +223,8 @@ def load_glw_livestock(
 
     Returns:
         xr.DataArray with dims (y, x), dtype float32, CRS = aoi.crs.
-        Values are livestock DENSITY in heads/km² (for ~1 km² ABM cells
-        this equals heads per cell). ``-9999.0`` for cells with no data.
+        Values are livestock DENSITY in heads/km² (for km²-scale ABM
+        cells this equals heads per cell). ``NODATA_SENTINEL()`` for cells with no data.
     """
     from mal_commonlib.aoi import AOI as AOIType
 

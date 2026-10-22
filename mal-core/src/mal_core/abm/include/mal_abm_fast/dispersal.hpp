@@ -2,9 +2,9 @@
 // dispersal.hpp — adult mosquito dispersal kernel.
 //
 // The 2D Gaussian kernel is isotropic in metres, clipped at max_m
-// (the rural An. gambiae s.s. 2 km cap). The longitude offset is
-// divided by cos(lat) so the ground distance is correct at the
-// patch's latitude.
+// (the species adult dispersal cap, dispersal.adult_max_m). The
+// longitude offset is divided by cos(lat) so the ground distance is
+// correct at the patch's latitude.
 //
 //   dx = N(0, sigma_m)
 //   dy = N(0, sigma_m)

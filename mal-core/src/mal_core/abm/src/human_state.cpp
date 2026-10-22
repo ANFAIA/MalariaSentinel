@@ -184,14 +184,15 @@ std::vector<std::pair<int32_t, int32_t>> HumanCompartmentGrid::seed_outbreak_clu
     }
     if (cands.empty()) return seeded;
 
-    // 2. Share per cell ∝ pop × (0.05 + mosquito density): cases
+    // 2. Share per cell ∝ pop × (floor + mosquito density): cases
     //    concentrate where humans AND vectors coexist — the imported
     //    cases land in the transmission-receptive part of the cluster,
-    //    not in the densest (most diluting) cell. The 0.05 floor keeps
+    //    not in the densest (most diluting) cell. The floor keeps
     //    temporarily vector-free cells in the pool. Cells can receive
     //    at most their susceptible count (seed_infections truncates);
     //    redistribute the remainder over the next-largest cells so a
     //    small-core cluster still concentrates the cases.
+    //    The floor is a local scenario constant (not a YAML model key).
     std::vector<double> shares(cands.size());
     double w_total = 0.0;
     for (size_t i = 0; i < cands.size(); ++i) {

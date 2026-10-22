@@ -40,7 +40,7 @@ Output contract (per ``docs/abm-output-contract.md`` §2, channel 0):
     * dims (y, x), dtype ``float32``
     * CRS = ``aoi.crs``
     * values in {0.0, 1.0} (binary mask: 1 = permanent lake cell)
-    * NoData: ``-9999.0``
+    * NoData: ``NODATA_SENTINEL()``
 """
 from __future__ import annotations
 
@@ -110,7 +110,7 @@ def _load_permanent_water_pc(
 
     Returns:
         (arr, profile) where ``arr`` is a ``(H, W)`` float32 array with
-        values in {0.0, 1.0} and ``-9999.0`` for NoData.
+        values in {0.0, 1.0} and ``NODATA_SENTINEL()`` for NoData.
     """
     import planetary_computer
     import pystac_client
@@ -239,7 +239,7 @@ def load_hydrolakes_permanent_lakes(
     Returns:
         xr.DataArray with dims (y, x), dtype ``float32``, CRS = ``aoi.crs``.
         Values in {0.0, 1.0} (binary: 1 = permanent lake cell).
-        ``-9999.0`` for NoData.
+        ``NODATA_SENTINEL()`` for NoData.
     """
     threshold_pct = DEFAULT_LAKE_THRESHOLD_PCT
 
@@ -255,7 +255,7 @@ def load_hydrolakes_permanent_lakes(
     arr, profile = _load_permanent_water_pc(aoi, int(year), int(threshold_pct))
 
     # Binary: 1.0 if any tile detected as permanent water, else 0.0.
-    # Values from _load_permanent_water_pc are already binary (0/1 or -9999).
+    # Values from _load_permanent_water_pc are already binary (0/1 or the NoData sentinel).
     values = arr.copy()
 
     da = xr.DataArray(

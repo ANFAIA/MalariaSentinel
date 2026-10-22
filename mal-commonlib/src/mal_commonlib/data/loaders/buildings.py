@@ -23,7 +23,7 @@ Implementation notes:
     * The resulting raster is cached as ``.npz`` keyed by AOI + release;
       re-runs skip the download entirely.
     * Values are in [0, 1] (1.0 = at least one footprint centroid in cell).
-    * NoData value is -9999.0 (cells with no buildings).
+    * NoData value is ``NODATA_SENTINEL()`` (cells with no buildings).
 """
 from __future__ import annotations
 
@@ -186,7 +186,7 @@ def load_buildings_fraction(
     Returns:
         xr.DataArray with dims (y, x), dtype float32, CRS = aoi.crs.
         Values in [0, 1] (1.0 = building centroid present in cell).
-        ``-9999.0`` for cells with no data.
+        ``NODATA_SENTINEL()`` for cells with no data.
     """
     if isinstance(aoi, str):
         from mal_commonlib.aoi import AOI

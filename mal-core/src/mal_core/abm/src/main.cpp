@@ -484,15 +484,15 @@ OUTPUT
                     "UNIFORM mode: adult females+males seeded in every "
                     "candidate patch (explicit count, independent of "
                     "any capacity). Default 30 reproduces the retired "
-                    "0.30 × K_MAX=1000 mix (10% adults).")
+                    "capacity-fraction seeding mix (10% adults).")
         ->default_val(30)
         ->check(CLI::NonNegativeNumber)
         ->group("Seeding");
     run->add_option("--seed-immatures-per-patch", seed_immatures_per_patch,
                     "UNIFORM mode: immatures (eggs+larvae+pupae, "
                     "age-structured) seeded in every candidate patch. "
-                    "Default 270 reproduces the retired 0.30 × "
-                    "K_MAX=1000 mix (90% immatures).")
+                    "Default 270 reproduces the retired "
+                    "capacity-fraction seeding mix (90% immatures).")
         ->default_val(270)
         ->check(CLI::NonNegativeNumber)
         ->group("Seeding");
@@ -654,8 +654,9 @@ OUTPUT
     run->add_option("--human-outbreak-min-density", human_outbreak_min_density,
                     "Adaptive trigger: outbreak waits until the best viable "
                     "cell reaches this many adult mosquitoes (individuals "
-                    "per cell; the retired normalized 0.5 corresponds to "
-                    "500 adults with the old K_MAX=1000). 0 = trigger "
+                    "per cell; the retired normalized value corresponds "
+                    "to 500 adults under the old capacity normalization). "
+                    "0 = trigger "
                     "exactly on --human-outbreak-day.")
         ->default_val(0.0f)
         ->check(CLI::NonNegativeNumber)
@@ -819,7 +820,7 @@ OUTPUT
     transmission_params.human_outbreak_cases = human_outbreak_cases;
     transmission_params.human_min_cell_pop = human_min_cell_pop;
     transmission_params.human_foci_coords = human_foci_coords;
-    // Cluster radius in grid cells (1 km cells ⇒ km*1000/resolution_m).
+    // Cluster radius in grid cells (km converted with the AOI resolution_m).
     if (human_cluster_radius_km > 0.0) {
         const float res_m = static_cast<float>(aoi.resolution_m);
         transmission_params.human_cluster_radius_cells =
@@ -883,7 +884,7 @@ OUTPUT
         // -- debug instrumentation (M7.0 population-crash investigation)
         // When the user passes --debug-population, the submodel emits
         // one stderr line per day with the population counts, the
-        // Lardeux p_d at the seeding patch, and the per-day
+        // daily survival probability at the seeding patch, and the per-day
         // births/deaths/maturation counts. Rate-limited: every day
         // for the first 10 days, then every 5 days.
         if (debug_population) {

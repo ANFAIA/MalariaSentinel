@@ -28,12 +28,12 @@ namespace mal_abm_fast {
 enum class GonotrophicState : uint8_t {
     TENERAL = 0,          // newly emerged, needs first blood meal
     MATE_SEEKING,         // seeking mating (pre-host-seeking)
-    HOST_SEEKING,         // searching for host (18:00–06:00 active)
+    HOST_SEEKING,         // searching for host (nightly active)
     HOST_APPROACH,        // approaching detected host (close range)
     PROBING,              // probing / attempting to feed
     BLOOD_FED,            // post-feeding, abdomen distended
     RESTING,              // post-feed rest (endophilic / exophilic)
-    EGG_MATURING,         // developing eggs (2–4 days)
+    EGG_MATURING,         // developing eggs
     GRAVID,               // ready to oviposit
     OVIPOSITION_SEEKING,  // searching for oviposition site
     OVIPOSITING,          // laying eggs
@@ -125,7 +125,7 @@ inline bool advance_gonotrophic_one_day(
         break;
 
     case GonotrophicState::PROBING:
-        // Caller computes feeding success (0.75–0.90).
+        // Caller computes feeding success (gonotrophic.feeding_success_rate).
         // If success: state → BLOOD_FED, record in BiteLedger.
         // If fail (host defense, ITN): state → HOST_SEEKING.
         break;

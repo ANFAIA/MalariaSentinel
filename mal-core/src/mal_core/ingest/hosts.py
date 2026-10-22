@@ -50,7 +50,8 @@ def build_host_dataset(
         worldpop_year: WorldPop product year.
         cache_dir: local cache for downloads.
         skip_buildings: skip Overture buildings (use urban_class heuristic).
-        skip_wildlife: skip wildlife host proxy (use constant 0.3).
+        skip_wildlife: skip wildlife host proxy (use the neutral constant
+            applied in this module).
 
     Returns:
         dict with 'nc_path', 'manifest_path', and stats.

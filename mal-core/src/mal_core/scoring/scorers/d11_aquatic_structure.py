@@ -6,15 +6,15 @@ egg/larva/pupa). This scorer validates the stage distribution of the
 aquatic population against stage-duration data:
 
 - Bayoh & Lindsay 2003 (papers/anopheles-dynamics/, constant 25 C):
-  egg ~1.1 d, each larval instar 2-3 d (4 instars = 8-12 d), pupa
-  ~1.2 d -> expected larva fraction = 8-12 / 10.3-14.3 = 0.78-0.84,
-  pupa fraction = 1.2 / 10.3-14.3 = 0.08-0.12.
-- Ouedraogo et al. 2024 (semi-field, Burkina Faso, 24.5-28.5 C):
-  L1 -> pupation 11.87 d — consistent stage ratios.
-- Depinay et al. 2004: total egg-to-adult 11-13 d at 25 C.
+  egg, larval-instar and pupa durations give the expected larva and
+  pupa fractions.
+- Ouedraogo et al. 2024 (semi-field, Burkina Faso): L1 -> pupation
+  timing consistent with those stage ratios.
+- Depinay et al. 2004: total egg-to-adult development consistent with
+  the same ratios.
 
-Bands (widened for temperature-driven ratio drift between 18-30 C):
-larva fraction [0.65, 0.90]; pupa fraction [0.02, 0.15].
+Bands (widened for temperature-driven ratio drift) live in
+``LARVA_BAND`` / ``PUPA_BAND`` below.
 Score = mean of both sub-scores. Fallback: final summary aquatic JSON
 when per-day files are absent.
 """
@@ -85,8 +85,8 @@ class AquaticStructureScorer(Scorer):
         larva_frac = sum(larva_fracs) / len(larva_fracs)
         pupa_frac = sum(pupa_fracs) / len(pupa_fracs)
 
-        # stage-duration expectation (Bayoh & Lindsay 2003, 25 C):
-        # larva 0.78-0.84, pupa 0.08-0.12; bands widened for 18-30 C drift
+        # stage-duration expectation (Bayoh & Lindsay 2003); bands widened
+        # for temperature-driven ratio drift (LARVA_BAND / PUPA_BAND)
         lo, hi = LARVA_BAND
         if lo <= larva_frac <= hi:
             larva_ok = 1.0

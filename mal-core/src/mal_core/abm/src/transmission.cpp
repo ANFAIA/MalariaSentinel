@@ -138,14 +138,14 @@ void TransmissionModel::check_and_trigger_outbreak(
 
     // A human cell is a viable focus when adult vectors are present in
     // the cell OR in its 8-neighbourhood. The biting kernel detects and
-    // bites hosts up to host_seeking_radius_m (~1.5 km, i.e. one grid
-    // cell at this resolution) away, so requiring same-cell presence is
-    // inconsistent with the contact process: it rejects the cells where
-    // transmission can actually start and waits until random dispersal
-    // drops a single mosquito into the settlement. In the Accra run that
-    // delay seeded the outbreak on day 8, when the vector cohort had
-    // already crashed, and the human→vector hazard was evaluated only a
-    // handful of times during the 20-day human infectious window.
+    // bites hosts up to species host_seeking_radius_m away, so requiring
+    // same-cell presence is inconsistent with the contact process: it
+    // rejects the cells where transmission can actually start and waits
+    // until random dispersal drops a single mosquito into the settlement.
+    // In the Accra run that delay seeded the outbreak late, when the
+    // vector cohort had already crashed, and the human→vector hazard was
+    // evaluated only a handful of times during the human infectious
+    // window.
     std::vector<float> seed_density = mosquito_density;
     if (!mosquito_density.empty() &&
         mosquito_density.size() == static_cast<size_t>(h_) * static_cast<size_t>(w_)) {

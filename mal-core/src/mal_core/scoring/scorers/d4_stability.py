@@ -1,7 +1,8 @@
 """D4: Population stability (no adult collapse, no explosion).
 
-Collapse: min(n_alive) at days 30/60/90 relative to day 0 — target
-0.10-0.80. Explosion: max(n_alive)/day0 ≤ 5x. Mean of both sub-scores.
+Collapse: min(n_alive) at the check days relative to day 0 — target
+fraction window below. Explosion: peak/day0 within the explosion bound.
+Both thresholds live in ``score()``. Mean of both sub-scores.
 
 Note: n_alive in the cohort log counts adults; larval stages live in
 the aquatic JSONs (see D11).

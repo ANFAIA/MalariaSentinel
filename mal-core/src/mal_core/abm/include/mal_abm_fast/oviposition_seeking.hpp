@@ -3,24 +3,20 @@
 //
 // OvipositionSeekingModel computes a distance-weighted attraction
 // field over nearby activated habitat patches for gravid female
-// mosquitoes. The kernel uses water-vapour + VOC plume decay
-// (Okal 2013, Lindh 2015) to model active site detection.
+// mosquitoes. The kernel uses water-vapour + VOC plume decay to model
+// active site detection.
 //
 // Attraction formula (per patch j):
 //   A_j = twi_value_j × water_frac_j × exp(-dist_j / scale)
 //
 // where:
-//   scale = oviposition.scale_m (water-vapour plume decay, Okal 2013)
+//   scale = oviposition.scale_m (plume decay)
 //   twi_value = static Topographic Wetness Index from HabitatPatch
 //   water_frac = dynamic open-water fraction from PatchState
 //
 // The search radius is not stored here: every caller passes the engine
-// detection window (oviposition.detect_range_m) explicitly.
-//
-// Biological basis:
-//   - Water vapour: ≥5m detection (Okal 2013 semi-field)
-//   - Cedrol/VOCs: 9+m attraction (Lindh 2015 semi-field)
-//   - Visual cues: polarised light from water surfaces
+// detection window (oviposition.detect_range_m) explicitly. The kernel
+// values and their sources live in model_constants.yaml.
 #pragma once
 
 #include <cstdint>

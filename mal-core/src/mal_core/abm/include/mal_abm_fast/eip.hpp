@@ -5,14 +5,14 @@
 // subagent (F1.c) keeps them as-is — the formulas are pinned by
 // `tests/test_smoke.cpp::EipAccumulate` (F1.a).
 //
-//   daily_gd       = max(0, T - EIP_BASE_C())            (deg C above 16)
+//   daily_gd       = max(0, T - EIP_BASE_C())            (deg C above base_c)
 //   eip_progress'  = eip_progress + daily_gd           (NaN-safe)
-//   infective iff  = eip_progress >= EIP_THRESHOLD_GD() (110 GD)
+//   infective iff  = eip_progress >= EIP_THRESHOLD_GD() (threshold_gd)
 //
 // The NaN check is essential: when the env COG has a no-data pixel
-// (e.g. ocean / non-land), rasterio returns -9999 (the NODATA
-// sentinel). After the Mordecai inverse that becomes a NaN, and the
-// growth step must not corrupt the eip_progress.
+// (e.g. ocean / non-land), rasterio returns the NoData sentinel.
+// After the thermal inverse that becomes a NaN, and the growth step
+// must not corrupt the eip_progress.
 #pragma once
 
 #include <algorithm>

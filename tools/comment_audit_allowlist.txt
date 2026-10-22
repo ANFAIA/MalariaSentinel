@@ -1,0 +1,80 @@
+# Accepted-noise allowlist for tools/audit_comment_constants.py.
+# One case-insensitive regex per non-comment line; a hit whose comment line
+# matches ANY pattern is accepted. Patterns are PHRASES, not single generic
+# words: a line saying "oviposition threshold 0.3" must NOT be accepted.
+#
+# Accepted noise, by category, with the reason it is not a model-constant
+# leak. Keep this list specific; add a phrase only with its category reason.
+
+# 1. Dataset/product descriptors and their native resolutions: facts about
+#    the source data (WorldPop ~100 m, JRC GSW 30 m, CHIRPS 0.05°, ERA5
+#    2 m, GLW4 10 km), not model parameters.
+(WorldCover|JRC GSW|GLW4|SMAP|MOD13A3|CHIRPS|ERA5|Dynamic World|WorldPop|GHS_SMOD|GSHHG|Mollweide|Sentinel-2|hydrolakes|hydrorivers|2m_temperature|2 m daily mean|sss_smap)
+(0\.05°|0\.25°|5 arc-min|~5 arc-minutes|180 MB|~0\.4 MB|80 ?%[- ]occurrence|occurrence >= 80 ?%|80 % occurrence)
+
+# 2. AOI/grid geometry descriptors (legacy AOI schema, v1 simulator).
+(AOI grid|AOI cell|working grid|coarse pixel|tile window|synthetic coastline|at 1 km|at 10 m|at 30 m|at 100 m|(1|5) km grid|779[x×]551)
+
+# 3. Time/index/slot narration: day and band indices, 0-based wording,
+#    slot-to-hour tables, per-day scheduling. ("per day" is NOT here: it is
+#    a unit word, so a value next to it must be reported.)
+(channel 0|band 0|slot 0|slot 1|slot 2|slot 3|0-based|1-based|day 0|day 1|day 30|day-0|day=5|days 0-|Days? [0-9]|day [0-9]|hour_of_day|00:00|06:00|12:00|18:00|0-23|0, 24|6-hourly|4 per day|per-day|first 10 days|every 5 days|30-day|--days|n_days_|adults emerged|one day|Advance the simulation date|5 per-day ops|month\*30|timeout 300 s|within 300 s)
+
+# 4. Algorithm-internal narration: normalized factors, state variables and
+#    progress values of the code itself (s=0..1, z, dev=, rate of 1.0,
+#    instar numbering, lambda_H range, force-of-infection maths).
+(development=|instar|emerges? in|pupates in|hatch in|adult ~|s = |s reaches|z\[i|A = |rate of 1\.0|Σ=1|sum=1|frac =|hard cap|lambda_H|vectors/human|<< 1|freshwater|salinity 0 psu)
+
+# 5. Struct/code zero defaults and output shape: the value is already in
+#    the code on the same line; the comment only adds unit/semantics.
+(= 0\.0f|k_ref = 0\.0|2-band|state COG)
+
+# 6. Test/scorer scenario data: fixtures legitimately cite values as test
+#    inputs (30 mm pulse, 50 mm washout, day 30). Only these explicit
+#    scenario phrases, never the bare words "test"/"threshold"/"pulse".
+(30 mm pulse|50 mm -> real washout|30 mm -> no washout|40 mm -> exactly at threshold|>= 4 days|measurement snapshot|sampled day|sub-scores)
+
+# 7. Contract/schema versions and paper/plan references.
+(contract [0-9]|contract v[0-9]|v2: activity_weights|CHIRPS v2|v2\.0|v3\.0|v4\.0|plan [0-9]|§[0-9]|M[0-9]+\.[0-9]|M12|F1\.|C\+\+|_legacy|P0)
+
+# 8. Date/time library narration.
+(day index|simulation day|calendar day|current date|date\(\)|day\(\)|year/month/day)
+
+# 9. Dataset encoding/scaling facts (SMAP raw ×1000 → PSU), formula
+#    narration with clamp bounds, debug-log narration, list numbering.
+(Branch by magnitude|gets /1000|raw stored|raw × 1e-3|PSU/PSS|daily_gd|max\(0,|= 25\.0f|first 7 cohorts|several days|peak/day0|100% NaN|all-NaN|all layers)
+
+# 10. Environment-variable interface switches (value is the documented
+#     control code of the env var, not a model constant).
+(COASTLINE_BUFFER_M ?= ?0|MAL_ABM_[A-Z_]*DEBUG ?= ?1|JANUS_NO_ASK_USER ?= ?1)
+
+# 11. Dataset class codes (JRC GSW class 1 = permanent water) and enum
+#     members defined in code (TENERAL, NIGHT, MALE, EGG, JRC_PERSISTENT):
+#     codes, not model constants.
+(JRC ?= ?1(\.0)?|TENERAL ?= ?0|(NIGHT|MALE|EGG|DAY|EVENING|DAWN|LARVA|PUPA|JRC_PERSISTENT) ?= ?[0-9])
+
+# 12. Numerical/statistical narration that is not a model parameter:
+#     PRNG error bounds and data-sparsity description.
+(< 0\.1%|0\.1% and the stddev|empty background)
+
+# 13. Runtime state / algorithm-equation identifiers assigned their initial,
+#     enum or example value. The name is a variable or argument in the code,
+#     not a tunable model key.
+(\b(z|stage|first|n_rollouts|rollout_index|indoor_modifier|urban_modifier|p|K|X|n|days_dry|n_emerged|C_env|fill|buffer_m|group|parallel|persistent)\s*=\s*[0-9])
+
+# 14. Numbered-list markers in module docstrings ("1. Step ..."), not values.
+^\s*[0-9]+\.\s+[A-ZÁÉÍÓÚÑ]
+
+# 15. Dataset occurrence thresholds and mask classes (input-raster
+#     properties): JRC GSW permanent-water cut-offs and the lake/river
+#     occurrence masks. Not engine parameters.
+(occurrence|permanent water|lake|river|observations must detect water|threshold|binarisation|NO 80 % binarisation).{0,80}(80|95|60)\s?%
+((80|95|60)\s?%.{0,60}(occurrence|permanent|lake|river|pixels|observations))
+NO 80 % binarisation
+
+# 16. Raster/grid geometry, sampling and debug-case sizes (dataset or
+#     window shape, not a rate/parameter).
+(30 m pixel|30 m .{0,20}occurrence|<30 m wide|1 km (sinusoidal|aggregation|AOI)|reprojected to 1 km|100 m sampling|100x cheaper|71x51|4x6 source grid|1 of 24 cells|100% finite)
+
+# 17. Normalisation/statistics narration about the input data.
+(saturating at 1\.0 when ~33%|~99% of the (source mass|population total))

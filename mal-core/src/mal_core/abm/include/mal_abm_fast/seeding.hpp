@@ -13,8 +13,8 @@
 //                        per-patch counts (`build_uniform_seed_instructions`).
 //                        patch (backward compatible).
 //   * `RANDOM_VIABLE`  — pick N random patch_ids from the
-//                        "viable" set (water_frac > 0.05 AND
-//                        twi > 8). Each chosen patch gets a
+//                        "viable" set (water_frac > min_water_frac AND
+//                        twi > min_twi). Each chosen patch gets a
 //                        configurable mix of adults and larvae.
 //   * `EXPLICIT`       — user provides lat/lon points. For each
 //                        point, find the nearest patch within
@@ -88,7 +88,7 @@ struct SeedingConfig {
 
     // For UNIFORM: explicit per-patch initial counts (contract 4.0 —
     // the retired init_frac × K_MAX product is replaced by direct
-    // counts; 30/270 reproduces the historical 0.30 × 1000 mix).
+    // counts).
     int32_t n_adults_per_patch    = 30;
     int32_t n_immatures_per_patch = 270;
 
@@ -103,7 +103,7 @@ struct SeedingConfig {
 
     // For HOST_WEIGHTED:
     double host_weight_radius_km = 5.0;  // search radius around each patch
-    // Review-a3 P1-4: the seeding-local 100.0f mirror is GONE. This is an
+    // Review-a3 P1-4: the seeding-local scale mirror is GONE. This is an
     // engine-injected slot: engine.cpp always overwrites it with
     // SpeciesParams::host_seeking_scale_m (model_constants.yaml
     // species.<name>.host_seeking_scale_m) before the coordinator builds

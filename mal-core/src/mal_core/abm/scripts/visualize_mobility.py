@@ -313,7 +313,7 @@ def main(argv: list[str] | None = None) -> None:
     nrow_l, ncol_l, nnz_l, rp_l, ci_l, vl_l = read_csr(live_csr)
     print(f"[mobility]   livestock {nrow_l}x{ncol_l} nnz={nnz_l}")
 
-    cell_size_km = 1.0  # ABM grid is 1 km cells
+    cell_size_km = 1.0  # script assumes kilometre-scale ABM cells (AOI resolution_m)
 
     # --- deterministic effective hosts ---------------------------------------
     print("[mobility] deterministic expectations ...")

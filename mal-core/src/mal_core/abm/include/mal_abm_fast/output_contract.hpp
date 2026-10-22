@@ -3,7 +3,7 @@
 //
 // The state COG is a 2-band GeoTIFF (band 1 = adult_occupancy, band 2 =
 // host_seeking_pressure), tiled, deflate-compressed, 128x128 blocks, with
-// `nodata = NODATA_SENTINEL()` (-9999). The sidecar JSON is a small
+// `nodata = NODATA_SENTINEL()`. The sidecar JSON is a small
 // metadata file written next to the .tif (e.g.
 // `ghana_regional_2024_06_seed0001.json` for the COG
 // `ghana_regional_2024_06_seed0001.tif`).

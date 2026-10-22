@@ -6,8 +6,8 @@
 // (total adult mosquitoes in the cell, associated via their patch,
 // post-dispersal), band 2 = adult_cell_count (all adults counted at
 // their current position). Contract 4.0: raw per-cell counts, no
-// capacity normalization. The nodata sentinel is `NODATA_SENTINEL()`
-// (-9999). The COG profile mirrors the output contract spec
+// capacity normalization. The nodata sentinel is `NODATA_SENTINEL()`.
+// The COG profile mirrors the output contract spec
 // (`docs/specs/abm/spec.md`).
 //
 // `write_state_sidecar` writes a JSON sidecar next to the .tif, with

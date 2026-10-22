@@ -5,9 +5,9 @@ whose EIP has completed. Without the transmission module enabled the
 field is degenerate (constant 1.0 from seeding) — in that case the
 scorer reports ``skipped`` rather than punishing the run.
 
-With transmission on, the target is a completed-EIP fraction of
-0.20-0.50 at day 30 (Mordecai 2013: Briere optimum 25 C, EIP 11-14 d
-at 25-28 C).
+With transmission on, the target is a completed-EIP fraction window
+anchored on the EIP thermal model (Mordecai 2013); the exact band and
+day live in the scorer constants below.
 """
 from __future__ import annotations
 

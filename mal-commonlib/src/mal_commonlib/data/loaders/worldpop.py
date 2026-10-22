@@ -176,7 +176,8 @@ def _sum_preserving_axis_aligned(
     src_left = src_bounds.left
     src_top = src_bounds.top
 
-    # Treat any value == dst_nodata as missing (covers the common -9999 / -99999 cases).
+    # Treat any value == dst_nodata as missing (covers the common fill
+    # sentinels of the source products).
     src_mask = src != dst_nodata
     src_zero = np.where(src_mask, src, 0.0).astype(np.float64)
 
@@ -280,7 +281,8 @@ def _read_clip(
         arr = src.read(1, window=win)
         src_transform_window = src.window_transform(win)
         nodata = src.nodata
-        # The source file may use a different sentinel (e.g. -99999). Re-map
+        # The source file may use a different sentinel (a product-specific
+        # fill value). Re-map
         # to our output sentinel so downstream masks are consistent.
         if nodata is None:
             sentinel = output_nodata
@@ -427,7 +429,7 @@ def load_worldpop_population(
     Returns:
         ``xr.DataArray`` with dims ``(y, x)``, dtype float32, CRS = ``aoi.crs``.
         Values are **population count per AOI cell** (sum-preserving across
-        the source raster). ``-9999.0`` for cells with no source coverage.
+        the source raster). ``NODATA_SENTINEL()`` for cells with no source coverage.
 
     Raises:
         ValueError: if ``aoi.iso3`` is missing or ``year`` is outside the

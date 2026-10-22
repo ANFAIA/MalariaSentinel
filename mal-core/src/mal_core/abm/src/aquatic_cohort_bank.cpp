@@ -5,7 +5,8 @@
 //
 // Daily update order within advance_day():
 //   1. Desiccation (eggs + early instars at inactive patches)
-//   2. Stage mortality (egg ~8%/day, pupa ~5%/day, density-dependent for larvae)
+//   2. Stage mortality (aquatic_stages.egg_daily_mort / pupa_daily_mort;
+//      density-dependent for larvae)
 //   3. Development (thermal curves from thermal_responses.hpp)
 //   4. Promotion (Egg→L1 when dev>=1, L1→L2, L2→L3, L3→L4, L4→Pupa)
 //
@@ -149,7 +150,7 @@ bool AquaticCohortBank::patch_to_cell(
 // from the M14 pool module; plan 01 §7).
 //
 // Driven by the proxy-habitat dry-day streak carried in
-// PatchState.habitat_dry_days: consecutive days with S <= ACTIVATION_MIN.
+// PatchState.habitat_dry_days: consecutive days with S <= habitat.activation_min_engine.
 // The desiccation_rate() function from aquatic_stress.hpp handles the
 // grace period and ramp.
 // ---------------------------------------------------------------------------
@@ -188,7 +189,7 @@ void AquaticCohortBank::desiccation(
 // ---------------------------------------------------------------------------
 // washout — flush aquatic cohorts during heavy rain (M14)
 //
-// Heavy rain (>= POOL_RAIN_WASH_MM) washes larvae out of pools.
+// Heavy rain (>= aquatic_stress.wash_threshold_mm) washes larvae out of pools.
 // Applies to eggs, larvae, and pupae. Adult washout is NOT modelled
 // (mosquitoes are not aquatic; they can shelter).
 // ---------------------------------------------------------------------------
@@ -283,7 +284,7 @@ void AquaticCohortBank::larva_mortality_density(
     }
 
     // Patch salinity lookup (missing patch => aquatic_stages.
-    // salinity_missing_psu => s_hat = 1.0 for the default 0.0 anchor)
+    // salinity_missing_psu => s_hat = 1.0, the freshwater anchor)
     std::unordered_map<int64_t, float> salinity_by_patch;
     // Patch daily capacity lookup (plan §5.4: absolute K per cell).
     std::unordered_map<int64_t, float> capacity_by_patch;
@@ -423,10 +424,10 @@ void AquaticCohortBank::advance_day(
 
     // -- DEBUG (env-gated, permanent): per-day aquatic summary for days 0-49
     // of the run — enabled ONLY with MAL_ABM_AQUATIC_DEBUG=1. Prints
-    // DBGADV lines to stderr (counts, activated patches, and on days
-    // 25/36/37 the first 7 cohorts with their patch thermodynamics).
-    // Used to prove the 2026-10-20 whole-year aquatic freeze (nodata
-    // sentinel -9999 deg C in the env NC reached the thermal curves);
+    // DBGADV lines to stderr (counts, activated patches, and on selected
+    // days the first 7 cohorts with their patch thermodynamics).
+    // Used to prove the 2026-10-20 whole-year aquatic freeze (NoData
+    // sentinel in the env NC reached the thermal curves);
     // kept behind the flag because it is the only in-engine trace of
     // cohort hygiene.
     static int64_t dbg_day = 0;

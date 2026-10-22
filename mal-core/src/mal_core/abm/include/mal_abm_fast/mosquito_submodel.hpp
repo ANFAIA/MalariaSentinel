@@ -168,15 +168,15 @@ public:
     // per-day births / deaths / larva-to-adult maturations. Rate-
     // limited: every day for the first 10 days, then every 5 days.
     // Default off — does not change the per-day RNG stream or the
-    // state COG output. Use for diagnosing crashes like M7.0's
-    // "500 adults → 20-24 in 30 days" without rerunning the ABM.
+    // state COG output. Use for diagnosing population-crash regressions
+    // without rerunning the ABM.
     void set_debug_population(bool on) { debug_population_ = on; }
 
     // Record the (patch_id, row, col) used for the most recent
     // detection-based seeding pass. The advance_day() debug log
-    // reports the Lardeux p_d at this cell on each logged day, which
-    // pinpoints whether the seeding patch is hitting the mortality
-    // floor (T too low / NaN) or the calibrated Lardeux curve.
+    // reports the daily survival probability at this cell on each logged
+    // day, which pinpoints whether the seeding patch is hitting the
+    // mortality floor (T too low / NaN) or the calibrated curve.
     void set_debug_seeding_patch(int64_t patch_id, int32_t row, int32_t col) {
         debug_seeding_pid_  = patch_id;
         debug_seeding_row_  = row;
@@ -185,10 +185,10 @@ public:
 
     // -- per-day operations -----------------------------------------------
 
-    // 1. Adult dispersal: 5% of adults move by clipped Gaussian.
+    // 1. Adult dispersal: clipped Gaussian (dispersal.adult_prob_day).
     void adult_dispersal(const AOI& aoi);
 
-    // 2. Adult mortality — Lardeux thermo-dependent daily survival.
+    // 2. Adult mortality — thermo-dependent daily survival.
     void adult_mortality(const std::vector<PatchState>& patch_states);
 
     // 3. Patch tracking: update patch_id after position change (Plan D).
@@ -243,7 +243,7 @@ private:
     // Wind field (M7.6 — non-owning pointer; Engine owns it).
     const WindField*        wind_field_        = nullptr;
     int                     current_month_     = 1;  // 1-12, set daily by Engine
-    int                     current_hour_      = 20; // 0-23, set daily by Engine (default 8pm)
+    int                     current_hour_      = 20; // 0-23, set daily by Engine
     int                     current_day_index_ = 0;  // 0-based simulation day for wind lookup
 
     // -- debug instrumentation state (see set_debug_population) -----

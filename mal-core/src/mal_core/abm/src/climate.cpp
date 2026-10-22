@@ -118,7 +118,7 @@ void impute_temp_nans(float* T, int32_t h, int32_t w) {
         }
     }
     // gcnt == 0: no finite cell anywhere — leave NaN; temp_at() serves
-    // its degenerate guard (25 deg C literal) for this all-NaN case.
+    // its degenerate guard for this all-NaN case.
 }
 
 }  // namespace

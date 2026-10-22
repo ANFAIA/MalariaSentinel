@@ -54,7 +54,7 @@ def aggregate_to_grid(
         target_crs: CRS of the target grid.
         target_shape: (H_dst, W_dst) of the target grid.
         method: "sum" (conservative) or "nearest" (categorical).
-        nodata: sentinel value to mask before summing (default -9999.0).
+        nodata: sentinel value to mask before summing (default: the NoData sentinel).
 
     Returns:
         (H_dst, W_dst) numpy array (float32).

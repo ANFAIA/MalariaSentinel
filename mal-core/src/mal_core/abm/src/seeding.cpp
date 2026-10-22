@@ -17,10 +17,9 @@
 //              within radius, the point is silently dropped.
 //
 // Distance is computed in degrees (Euclidean on the (lon, lat)
-// grid). The Ghana regional AOI spans ~5 deg lon, ~7 deg lat, so
-// 1 deg ~ 111 km. A `detection_radius_km = 5.0` translates to
-// ~0.045 deg, which is far above the Ghana cell resolution of
-// 0.011 deg (1 km / 111 km/deg). This is a coarse approximation
+// grid). The Ghana regional AOI spans a few degrees, so the degree
+// conversion is coarse but stable: the km radius is divided by the
+// geodesy metres-per-degree accessor. This is a coarse approximation
 // but adequate for "snap a village to the nearest patch".
 #include "mal_abm_fast/seeding.hpp"
 
@@ -35,11 +34,10 @@ namespace mal_abm_fast {
 
 namespace {
 
-// 1 degree of latitude is ~111.32 km everywhere. 1 degree of
-// longitude varies with latitude (cos(lat)). We use a single
-// combined factor — `km_per_deg_lon` and `km_per_deg_lat` — so
-// the squared-distance formula is isotropic in the AOI's local
-// tangent plane.
+// Flat-tangent-plane degree conversion: latitude uses the local
+// km-per-degree factor; longitude varies with latitude (cos(lat)).
+// The combined factors keep the squared-distance formula isotropic
+// in the AOI's local tangent plane.
 constexpr double kKmPerDegLat = 111.32;
 
 inline double km_per_deg_lon(double lat_deg) {

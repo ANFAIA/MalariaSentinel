@@ -16,7 +16,8 @@ PO.DAAC / NASA Earthdata.
     Grid       : 0.25° × 0.25° (WGS-84), longitude 0..360
     Variables  : sss_smap (70 km standard), sss_smap_40km (40 km),
                  fland / gland (land fraction), uncertainties
-    Units      : practical salinity units (PSU/PSS); raw stored ×1000, fill -9999
+    Units      : practical salinity units (PSU/PSS); raw stored ×1000,
+                 fill = the NoData sentinel
 
 Output contract
 ---------------
@@ -169,7 +170,7 @@ def _postprocess_smap_ds(raw: xr.Dataset, aoi: AOI) -> xr.DataArray:
            to ``sss_smap`` (70 km standard); land fraction ``fland``/``gland``.
         2. longitude 0..360 → -180..180, sort both dims.
         3. clip to the AOI bbox.
-        4. apply scale 1e-3 and mask fill -9999 → NaN.
+        4. apply scale 1e-3 and mask the NoData sentinel → NaN.
         5. mask continental cells from ``fland``/``gland`` (>0.5 land) → NaN.
     """
     if "sss_smap_40km" in raw:

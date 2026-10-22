@@ -203,14 +203,13 @@ DailyEnvBands read_env_nc(const std::string& path, int32_t max_days) {
     out.rainfall     = read_variable("rainfall");
     out.air_temp_c   = read_variable("air_temp_c");
 
-    // Correctness guard (2026-10-20 freeze bug): the NC nodata sentinel
-    // (-9999.0) is a FINITE float, so it slipped past the isfinite checks
+    // Correctness guard (2026-10-20 freeze bug): the NC NoData sentinel
+    // is a FINITE float, so it slipped past the isfinite checks
     // downstream and reached the thermal development curves as a valid
-    // temperature of -9999 deg C — every rate curve returns 0 at T <=
-    // threshold and the aquatic cohorts never develop (whole-year freeze,
-    // n_emerged = 0). Replace the sentinel with NaN here so the
-    // load-time neighbor imputation (climate.cpp) fills it as missing
-    // data, the intended path.
+    // temperature — every rate curve returns 0 at T <= threshold and the
+    // aquatic cohorts never develop (whole-year freeze, n_emerged = 0).
+    // Replace the sentinel with NaN here so the load-time neighbor
+    // imputation (climate.cpp) fills it as missing data, the intended path.
     for (float& t : out.air_temp_c) {
         if (!std::isfinite(t) || t < -900.0f) t = std::numeric_limits<float>::quiet_NaN();
     }

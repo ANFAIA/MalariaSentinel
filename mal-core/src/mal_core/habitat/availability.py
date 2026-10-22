@@ -2,9 +2,10 @@
 
 Two responses only (plan 02 §5.2-§5.4):
 
-* ``persistent``   — A = 1.0 every day (MVP: the persistent offer is not
-  reduced by extraordinary drought; a future calibrated scarcity term is a
-  documented extension, never part of this contract).
+* ``persistent``   — A = capacity.persistent_availability every day (MVP:
+  the persistent offer is not reduced by extraordinary drought; a future
+  calibrated scarcity term is a documented extension, never part of this
+  contract).
 * ``pluvial``      — state z[i,t] in [0, 1] with exponential drying memory
   and saturating rain recharge:
 

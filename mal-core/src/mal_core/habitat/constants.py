@@ -5,7 +5,7 @@ This module raises for every attribute: new code must read
 ``mal_core.habitat.config`` (CONFIG singleton) — the YAML is the single
 source of shared py⇄C++ model constants.
 
-The engine-side k_ref (50.0 ind·km⁻¹·d⁻¹) and the py-diagnostic
+The engine-side k_ref (species.k_ref, ind·km⁻¹·d⁻¹) and the py-diagnostic
 K_REF_DIAG_PER_KM2 are different concepts (plan §9.1); the diagnostic
 constant lives in ``mal_core.habitat.capacity``.
 """

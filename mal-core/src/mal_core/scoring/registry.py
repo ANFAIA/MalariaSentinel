@@ -5,8 +5,8 @@ Weights reflect validation value for the question "is the system good?"
 are gates, not dimensions (see docs/specs or AGENTS.md conventions).
 
 Anchors (all papers live in papers/):
-- D1  occupancy: Bogh 2004; Ndenga 2011 (20-70% of habitats occupied)
-- D2  survival: Saarman 2019; Midega 2007 (8-15 d lifespan)
+- D1  occupancy: Bogh 2004; Ndenga 2011 (habitat occupancy range)
+- D2  survival: Saarman 2019; Midega 2007 (adult lifespan window)
 - D3  EIP: Mordecai 2013
 - D11 stage structure: Bayoh & Lindsay 2003; Ouedraogo 2024
 - D16 detection coverage: validate-detections launch-and-measure design

@@ -31,15 +31,16 @@ Strategy
 3. Open with geopandas; clip polygons to the AOI bbox.
 4. ``rasterio.features.rasterize`` the result onto the AOI grid as
    fill=1 (land), background=0 (ocean).
-5. Apply the 5 km coastline buffer by dilating the land mask outward
-   (so cells within 5 km of the coast are treated as "coastal water" and
-   kept by the saltwater filter — see daily_nc.py && env.py for consumer).
+5. Apply the coastline buffer (``ingest.coastline_buffer_m``) by dilating
+   the land mask outward (so cells within that distance of the coast are
+   treated as "coastal water" and kept by the saltwater filter — see
+   daily_nc.py && env.py for consumer).
 
 The output is a binary raster aligned to the AOI grid:
     * dims (y, x), dtype ``float32``
     * CRS = ``aoi.crs``
     * values in {0.0, 1.0} (1 = land, 0 = ocean)
-    * NoData: ``-9999.0``
+    * NoData: ``NODATA_SENTINEL()``
 
 Notes
 -----
@@ -47,8 +48,9 @@ Notes
   The smoother ``l`` or ``i`` resolutions may improve the coastline shape
   in irregular regions but are an order of magnitude larger; not justified
   at the current AOI scale.
-* The default 5 km buffer is applied via morphological dilation in cells
-  (5 km / cell_size_m rounded up). Set ``buffer_m=0`` to disable.
+* The default buffer (``ingest.coastline_buffer_m``) is applied via
+  morphological dilation in cells (buffer_m / cell_size_m rounded up).
+  Set ``buffer_m=0`` to disable.
 * The loader's archive download is one-time and cached; subsequent calls
   with the same ``cache_dir`` only extract the per-resolution files.
 
@@ -190,15 +192,15 @@ def load_coastline_land_mask(
         buffer_m: distance (in metres) to dilate the land mask outward. Cells
             within this distance of the coastline are treated as "coastal water"
             and kept by the saltwater filter (i.e. land-side buffer, allowing
-            lagoons and estuaries but excluding open ocean). Default 5_000 m.
-            Set to 0 to disable buffering.
+            lagoons and estuaries but excluding open ocean). Default:
+            ``ingest.coastline_buffer_m``. Set to 0 to disable buffering.
         cache_dir: local cache for the GSHHG archive. Defaults to
             ``~/.cache/malaria_sentinel/gshhg/``.
 
     Returns:
         xr.DataArray with dims (y, x), dtype ``float32``, CRS = ``aoi.crs``.
         Values in {0.0, 1.0}: 1.0 = land (or coastal water), 0.0 = open ocean.
-        ``-9999.0`` for NoData (only when the AOI bbox falls entirely outside
+        ``NODATA_SENTINEL()`` for NoData (only when the AOI bbox falls entirely outside
         the GSHHG coverage; not expected for Ghana).
     """
     if resolution not in {"c", "l", "i", "h", "f"}:

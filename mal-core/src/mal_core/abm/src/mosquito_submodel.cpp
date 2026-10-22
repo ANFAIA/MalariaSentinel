@@ -83,7 +83,7 @@ inline void record_female_feed(
     const bool is_infectious =
         (soa.vector_state[si] == static_cast<uint8_t>(VectorTransmissionState::INFECTIOUS));
     // Epidemiological credit goes to the HOST's cell: the bite landed on
-    // a host detected up to host_seeking_radius_m (1500m) away, so both
+    // a host detected up to species host_seeking_radius_m away, so both
     // the infectious-meal record (vector→human pressure) and the
     // human→vector prevalence draw must use the host cell, not the
     // mosquito's resting cell.
@@ -453,7 +453,7 @@ inline float seeding_temp_d(const std::vector<PatchState>& ps,
     return std::numeric_limits<float>::quiet_NaN();
 }
 
-// Lardeux daily survival probability at temperature T. Mirrors the
+// Daily survival probability at temperature T. Mirrors the
 // formula in adult_mortality() so the debug log shows the same
 // value the mortality step uses.
 inline float lardeux_p_d(float T) {
@@ -629,7 +629,7 @@ void MosquitoSubmodel::advance_day(const AOI& aoi,
                     *habitat_engine_for_ovip_, patch_states, aoi,
                     load_config().oviposition.detect_range_m);
                 if (!target) {
-                    // No breeding site within 2km; increment timer.
+                    // No breeding site within the detection range; increment timer.
                     g_timer += 1;
                     soa_.gonotrophic_timer[si] = g_timer;
                 } else {
@@ -698,11 +698,10 @@ void MosquitoSubmodel::advance_day(const AOI& aoi,
             update_patch_id(i, soa_.row[si], soa_.col[si], patch_states, aoi);
             // Egg batch size is a stochastic binomial draw (per female,
             // per oviposition), clamped to the species' feasible range.
-            // EFD thermal modifier (Mordecai 2013, birth_rate.hpp): the
-            // per-trial probability is scaled by birth_rate_modifier(T)
-            // in [0,1] — the same per-patch water temperature (temp_d)
-            // that drives Lardeux survival. Cold (16°C) and hot (34°C)
-            // extremes zero the batch; at 25°C the draw is unchanged.
+            // The per-trial probability is scaled by the EFD thermal
+            // modifier (birth_rate.hpp, in [0,1]) — the same per-patch
+            // water temperature (temp_d) that drives adult survival.
+            // Temperature extremes zero the batch.
             // NaN temp (patch absent from today's states) → no modifier.
             double p_batch =
                 static_cast<double>(gonotrophic_params_.egg_batch_mean) /
@@ -860,8 +859,8 @@ void MosquitoSubmodel::advance_day(const AOI& aoi,
     adult_dispersal(aoi);
 
     // 4b. Update patch_id after dispersal (Plan D Phase 4).
-    // Every adult that moved may have changed patch; snap to nearest
-    // activated patch within 500m.
+    // Every adult that moved may have changed patch; snap to the nearest
+    // activated patch within dispersal.snap_radius_m.
     for (int64_t i = 0; i < soa_.n_alive; ++i) {
         const size_t si = static_cast<size_t>(i);
         if (soa_.stage[si] != 1) continue;
@@ -869,7 +868,7 @@ void MosquitoSubmodel::advance_day(const AOI& aoi,
     }
 
     const int64_t pre_mort_n_alive = soa_.n_alive;
-    // 5. Adult mortality (Lardeux)
+    // 5. Adult mortality
     adult_mortality(patch_states);
     const int64_t post_mort_n_alive = soa_.n_alive;
 
@@ -956,8 +955,9 @@ void MosquitoSubmodel::update_patch_id(
     const size_t si = static_cast<size_t>(idx);
 
     // Fast path: if position hasn't changed since last update, skip
-    // the O(N_patches) scan. This is the common case — 95% of adults
-    // don't move each day (only 5% disperse via Gaussian kernel).
+    // the O(N_patches) scan. This is the common case — most adults
+    // don't move each day (only dispersal.adult_prob_day disperse via
+    // the Gaussian kernel).
     if (soa_.last_patch_update_row[si] == new_row &&
         soa_.last_patch_update_col[si] == new_col) {
         return;
@@ -1083,7 +1083,7 @@ void MosquitoSubmodel::adult_dispersal(const AOI& aoi) {
 }
 
 // ---------------------------------------------------------------------------
-// Op 6: adult mortality (Lardeux thermo-dependent daily survival)
+// Op 6: adult mortality (thermo-dependent daily survival)
 // ---------------------------------------------------------------------------
 
 void MosquitoSubmodel::adult_mortality(

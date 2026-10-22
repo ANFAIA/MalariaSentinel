@@ -29,9 +29,7 @@ inline const SpeciesRow& default_species_row() {
 
 // Daily phase activity weights, in TimePhase order:
 //   [DAY, EVENING, NIGHT, DAWN]
-// Default for An. coluzzii / gambiae s.l. (Ghana + West Africa HLC):
-//   Akuoko et al. 2024 (Parasit Vectors 17:16): LE 22-04h 66.6%, EM 04-06h 20.1%,
-//   EE 18-22h 13.3% mapped onto the 4 phase windows.
+// Values come from species.<row>.activity_weights in model_constants.yaml.
 inline constexpr int PHASE_WEIGHT_COUNT = 4;
 
 struct SpeciesParams {
@@ -60,8 +58,7 @@ struct SpeciesParams {
         static_cast<float>(detail::default_species_row().pref[4]);
 
     // Host-seeking kernel scale/radius (metres), from the default species
-    // row. Radius 1500 m: An. gambiae host-seeking flight is 0.5-2 km
-    // (Gillies & Wilkes 1970; Costantini 1996 MRR).
+    // row (species.<name>.host_seeking_scale_m / _radius_m).
     float host_seeking_scale_m =
         static_cast<float>(detail::default_species_row().host_seeking_scale_m);
     float host_seeking_radius_m =

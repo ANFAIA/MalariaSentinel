@@ -9,10 +9,10 @@ detection spots the simulated population actually reached: covered =
 at least one occupied cell (band 1 > 0) within ``radius_km`` of the
 spot in the final snapshot. Score = covered / spots.
 
-Radius default 5 km (~5 cells at ~1 km grain): matches the engine's
-own ``detection_radius_km`` snap convention — a mosquito within 5 km
-of a trap is the same local population. Sensitivity at 2/5/10 km is
-reported in diagnostics.
+Radius default lives in ``RADIUS_KM_DEFAULT`` and matches the
+engine's own detection-radius snap convention — a mosquito within that
+radius of a trap is the same local population. Sensitivity radii are
+reported from ``SENSITIVITY_RADII_KM`` in diagnostics.
 
 Extinction (cohort final adults == 0) scores 0 with an ``extinct``
 diagnostic — the population failed to establish, which IS the result.

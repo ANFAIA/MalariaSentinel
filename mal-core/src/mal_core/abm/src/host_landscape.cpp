@@ -106,7 +106,8 @@ std::vector<float> ReadInt32BandAsFloat(GDALRasterBandH band) {
 }
 
 // Map urban_class to indoor_fraction.
-// An. gambiae: 72% endophilic (indoor) in urban, ~30% in rural.
+// An. gambiae is more endophilic in urban than in rural settings; the two
+// fractions live in host_seeking.indoor_fraction_urban/_rural.
 float urban_class_to_indoor_fraction(float urban_class) {
     // GHSL SMOD: 30 = urban centre, 50 = rural.
     // Treat any value <= 40 as urban, >= 40 as rural.

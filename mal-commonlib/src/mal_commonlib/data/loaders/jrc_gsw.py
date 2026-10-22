@@ -31,7 +31,7 @@ Output contract (plan 02 §5, static plane):
     * dims (y, x), dtype ``float32``
     * CRS = ``aoi.crs``
     * values in ``[0, 1]`` (fraction of >= 80 %-permanent pixels)
-    * NoData: ``-9999.0``
+    * NoData: ``NODATA_SENTINEL()``
 """
 
 from __future__ import annotations
@@ -138,7 +138,7 @@ def _load_jrc_gsw_pc(
         (arr, profile) where ``arr`` is a ``(H, W)`` float32 array on the
         AOI's grid (CRS = AOI CRS, transform = AOI transform), values in
         [0, 1] (per-AOI-cell water fraction = mean of binary water mask
-        over all tiles that covered the cell), and ``-9999.0`` for cells
+        over all tiles that covered the cell), and ``NODATA_SENTINEL()`` for cells
         that no tile covered. ``profile`` is a dict with ``crs``,
         ``transform``, ``height``, ``width``, and ``jrc_gsw_year`` (the
         year actually fetched — equals the requested year if available,
@@ -286,7 +286,7 @@ def load_jrc_gsw_habitat_features(
     Returns:
         ``xr.Dataset`` with one variable ``jrc_persistent`` of dims
         (y, x), dtype float32, CRS = ``aoi.crs``, in [0, 1];
-        ``-9999.0`` for NoData.
+        ``NODATA_SENTINEL()`` for NoData.
     """
     if not (_MIN_YEAR <= int(year) <= _MAX_YEAR):
         raise ValueError(

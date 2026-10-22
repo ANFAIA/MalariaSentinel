@@ -6,15 +6,15 @@ aquatic-capable habitat) that are actually occupied by adults (band 1
 occupancy" quantity measured by longitudinal field studies:
 
 - Fillinger et al. 2008 / Majambere et al. 2008 / Ndenga et al. 2011
-  (reviewed in Herrera-Varela 2015): on any given sampling date only
-  20-50% of aquatic habitats contained anopheline larvae.
-- Bogh et al. 2004 (Mbita, Kenya, 20-month survey): on average 67% of
+  (reviewed in Herrera-Varela 2015): on any given sampling date only a
+  fraction of aquatic habitats contained anopheline larvae.
+- Bogh et al. 2004 (Mbita, Kenya, long survey): average share of
   available habitats colonized by Anopheles per sampling date.
-- Ndenga et al. 2011 (western Kenya): 24-41% of habitats positive,
-  season-dependent.
+- Ndenga et al. 2011 (western Kenya): season-dependent positive
+  habitat share.
 
-Literature band: [0.20, 0.70] occupancy, centered ~0.45. Occupancy 0
-(extinction) scores ~0.
+The literature band and Gaussian centring live in ``OCC_BAND`` /
+``OCC_CENTER`` / ``OCC_SIGMA`` below. Occupancy 0 (extinction) scores ~0.
 
 References: see papers/anopheles-dynamics/bogh-2004-larval-habitats-mbita.md
 and papers/anopheles-dynamics/ndenga-2011-larval-habitats-western-kenya.md.

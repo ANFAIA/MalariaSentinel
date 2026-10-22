@@ -6,13 +6,10 @@ Public surface
 
 Estimates spatial suitability for non-human, non-livestock blood hosts
 (antelopes, rodents, other wild mammals) as a ``[0, 1]`` score derived
-from three existing data layers:
-
-    wildlife_host_proxy = (
-        0.5 * habitat_suitability   # Dynamic World label mapping
-      + 0.3 * water_presence        # JRC GSW occurrence (within-cell)
-      + 0.2 * remoteness            # inverse of building density
-    )
+from three existing data layers: a weighted combination of habitat
+suitability, water presence and remoteness. The weights are the module
+constants ``_W_HABITAT`` / ``_W_WATER`` / ``_W_REMOTE``; they are pending
+migration to ``model_constants.yaml`` (task-07 backlog).
 
 Sources:
     * **Google Dynamic World V1 10 m** — modal-label codes mapped to habitat
@@ -28,7 +25,7 @@ Output contract (per ``docs/abm-output-contract.md``):
     * dims (y, x), dtype ``float32``
     * CRS = ``aoi.crs``
     * values in [0, 1]
-    * NoData: ``-9999.0``
+    * NoData: ``NODATA_SENTINEL()``
 """
 from __future__ import annotations
 
@@ -104,7 +101,7 @@ def _load_dw_habitat_pc(
     reprojected (int32) classification through ``HABITAT_SUITABILITY``
     reproduces the original per-tixel mapping exactly.
 
-    Returns (H, W) float32 habitat suitability in [0, 1], or -9999.0 for
+    Returns (H, W) float32 habitat suitability in [0, 1], or the NoData sentinel for
     NoData.
     """
     lc = load_dw_label_mode(aoi, year=year)
@@ -188,7 +185,7 @@ def load_wildlife_host_proxy(
 
     Returns:
         xr.DataArray with dims (y, x), dtype float32, CRS = aoi.crs.
-        Values in [0, 1]. ``-9999.0`` for NoData.
+        Values in [0, 1]. ``NODATA_SENTINEL()`` for NoData.
     """
     if isinstance(aoi, str):
         aoi = AOI.from_slug(aoi)
@@ -254,8 +251,9 @@ def load_wildlife_host_proxy(
                 f"ESA WorldCover {year} + JRC GSW + Overture Maps buildings"
             ),
             "formula": (
-                "0.5 * habitat_suitability + 0.3 * water_presence "
-                "+ 0.2 * remoteness"
+                "weighted combination of habitat_suitability, "
+                "water_presence and remoteness (weights: module "
+                "constants _W_*, pending model_constants.yaml migration)"
             ),
             "nodata": _NODATA_OUT_SCALAR,
         },

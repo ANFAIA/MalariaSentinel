@@ -3,13 +3,14 @@
 Catches long-run demographic failures (e.g. the day-90 crash class)
 that 30-day scorers never see. Three sub-scores (geometric mean):
 
-- survival: pop(last day) >= 30% of peak
-- no_extinction: total aquatic > 0 for every sampled day >= 30
-- expansion: occupied cells at last day >= 20% of cells at day 30
-  (from state COGs; falls back to top_patches counts)
+- survival: pop(last day) >= a fraction of peak (see ``score()``)
+- no_extinction: total aquatic > 0 for every sampled day after the
+  minimum horizon
+- expansion: occupied cells at last day >= a fraction of cells at the
+  horizon (from state COGs; falls back to top_patches counts)
 
-Horizon = last available day (>= 30). Runs shorter than 30 days are
-skipped.
+Horizon = last available day; runs shorter than the minimum horizon
+(``score()``) are skipped.
 """
 from __future__ import annotations
 

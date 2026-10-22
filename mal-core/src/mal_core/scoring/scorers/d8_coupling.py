@@ -3,7 +3,8 @@
 Pearson r between adult density (band 1) and host-seeking pressure
 (band 2) on active pixels of the FINAL state. Verifies the engine
 actually allocates density according to the habitat field
-(birth-at-cell fix C1). r >= 0.30 passes; score = r/0.50 clipped.
+(birth-at-cell fix C1). The pass threshold and score scaling are the
+literals applied in ``score()``.
 """
 from __future__ import annotations
 

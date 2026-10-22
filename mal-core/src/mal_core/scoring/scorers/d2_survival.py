@@ -3,8 +3,9 @@
 Mean adult lifespan from the second half of the simulation (steady
 state; the first half includes the initial post-seeding crash).
 
-Literature: Saarman 2019 0.87 daily survival; Midega 2007 0.83-0.95
-→ mean lifespan 8-15 days. Score: Gaussian around 11 days (sigma 4).
+The accepted lifespan window is anchored on field survival estimates
+(Saarman 2019; Midega 2007); the scorer's target text and Gaussian
+width live in the constants below.
 """
 from __future__ import annotations
 

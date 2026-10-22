@@ -117,8 +117,8 @@ Engine::Engine(AOI aoi,
 
     // The submodel is seeded with the derived sub_seed and the
     // count of pre-existing patches. An empty gpkg is allowed (M2
-    // combined, C2: dynamic patches emerge from the PLUVIAL_POOL
-    // rule); the submodel's population is then driven by births in
+    // combined, C2: dynamic patches emerge from the pluvial
+    // availability response); the submodel's population is then driven by births in
     // those dynamic cells. We log a soft warning here when
     // n_patches == 0 so the CLI output surfaces the case for the
     // test harness.
@@ -243,8 +243,8 @@ Engine::Engine(AOI aoi,
     // -- Directed oviposition-site seeking (Plan D) --------------------------
     // Wire the water-vapour/VOC plume kernel so gravid females actively walk
     // toward activated breeding patches instead of relying on the standing-cell
-    // fallback (which strands them above dry land with no timer). Uses the
-    // wire.hpp OVIPOSITION_* constants (scale 50 m, radius 500 m).
+    // fallback (which strands them above dry land with no timer). Kernel
+    // values come from oviposition.* in model_constants.yaml.
     if (sub_ && habitat_) {
         sub_->set_habitat_engine(habitat_.get());
         oviposition_seeking_model_ =
@@ -479,8 +479,8 @@ Engine::Engine(AOI aoi,
     // -- Directed oviposition-site seeking (Plan D) --------------------------
     // Wire the water-vapour/VOC plume kernel so gravid females actively walk
     // toward activated breeding patches instead of relying on the standing-cell
-    // fallback (which strands them above dry land with no timer). Uses the
-    // wire.hpp OVIPOSITION_* constants (scale 50 m, radius 500 m).
+    // fallback (which strands them above dry land with no timer). Kernel
+    // values come from oviposition.* in model_constants.yaml.
     if (sub_ && habitat_) {
         sub_->set_habitat_engine(habitat_.get());
         oviposition_seeking_model_ =

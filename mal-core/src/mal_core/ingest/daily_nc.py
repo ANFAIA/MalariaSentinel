@@ -49,10 +49,11 @@ _ENV_NC = str(_MODEL_CONSTANTS["contracts"]["env_nc"])
 NODATA_SENTINEL = float(_INGEST["nodata_sentinel"])
 
 # Saltwater filter (M12-fix 2026-08-26; preserved): cells outside the buffered
-# GSHHG land mask are dropped from the static JRC feature. Default 5 km
-# buffer keeps coastal lagoons and estuaries while rejecting open ocean (where
-# JRC GSW sees permanent surf). Set ``COASTLINE_BUFFER_M=0`` to disable
-# buffering, negative to disable the filter entirely.
+# GSHHG land mask are dropped from the static JRC feature. The default buffer
+# (ingest.coastline_buffer_m) keeps coastal lagoons and estuaries while
+# rejecting open ocean (where JRC GSW sees permanent surf). Set
+# ``COASTLINE_BUFFER_M=0`` to disable buffering, negative to disable the
+# filter entirely.
 COASTLINE_BUFFER_M_DEFAULT = float(_INGEST["coastline_buffer_m"])
 
 # Candidate-cell floor: cells whose total potential (sum of the six H
@@ -190,7 +191,7 @@ def build_daily_env_nc(
     n_days, h, w = rainfall_raw.shape
     target_shape = (h, w)
 
-    # Mask rainfall nodata (-9999) with the NEAREST VALID CELL's value for
+    # Mask rainfall NoData (ingest.nodata_sentinel) with the NEAREST VALID CELL's value for
     # that day (M7.4.1-fix preserved).  Open ocean (land_mask == 0) gets 0.0.
     rainfall = rainfall_raw.astype(np.float32)
     nodata_mask = rainfall_raw == NODATA_SENTINEL

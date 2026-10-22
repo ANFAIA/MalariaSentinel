@@ -25,7 +25,7 @@ Output contract (per ``docs/abm-output-contract.md`` §2, channel 3):
     * dims (y, x), dtype ``float32``
     * CRS = ``aoi.crs``
     * values in [0, 1] (rescaled from raw [-1, 1] via ``(ndvi + 1) / 2``)
-    * NoData: ``-9999.0``
+    * NoData: ``NODATA_SENTINEL()``
 
 The function is structured so the heavy parts (network I/O, open/reproject of
 the real MOD13A3 file) can be monkeypatched in tests. A "dry-run" path with
@@ -248,7 +248,7 @@ def _ndvi_band_from_hdf(hdf_path: pathlib.Path) -> xr.DataArray:
 
 
 def _rescale_ndvi(arr_raw: np.ndarray) -> np.ndarray:
-    """Rescale MOD13A3 raw NDVI ∈ [-0.2, 1.0] to [0, 1]; emit -9999.0 for fill.
+    """Rescale MOD13A3 raw NDVI ∈ [-0.2, 1.0] to [0, 1]; emit the NoData sentinel for fill.
 
     The MOD13A3 SDS is stored as int16 in [-2000, 10000] corresponding to
     NDVI in [-0.2, 1.0]. If we get the raw int16 range we rescale by
@@ -300,7 +300,7 @@ def _merge_and_reproject(
 
     Each tile is reprojected independently to the AOI reference grid; the
     resampled arrays are then combined by taking the mean of the valid (non
-    nodata) pixels. Cells where every tile is nodata stay ``-9999.0``.
+    nodata) pixels. Cells where every tile is nodata stay ``NODATA_SENTINEL()``.
     """
     bands = list(ndvi_bands)
     if not bands:
@@ -402,7 +402,7 @@ def load_modis_ndvi(
     Returns:
         xr.DataArray with dtype ``float32``, CRS = ``aoi.crs``.
         2-D (y, x) if single month, 3-D (time, y, x) if multiple.
-        Values in [0, 1]. ``-9999.0`` for NoData.
+        Values in [0, 1]. ``NODATA_SENTINEL()`` for NoData.
     """
     if months is None:
         months = list(range(1, 13))

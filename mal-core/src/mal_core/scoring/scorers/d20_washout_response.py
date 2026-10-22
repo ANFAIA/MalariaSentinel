@@ -1,14 +1,15 @@
 """D20: Washout response scorer (canonical; contract v3.0, 2026-10-17).
 
 Verifies that heavy rain causes a measured washout of aquatic cohorts:
-  - A 50 mm rain event maps to a >= 0.15 flush fraction (0.60 cap at
-    80 mm preserved from the M14 pool module).
-  - A 30 mm rain event (below the 40 mm threshold) causes no washout.
+  - A rain event above ``aquatic_stress.wash_threshold_mm`` maps to a
+    flush fraction that grows linearly and is capped by
+    ``aquatic_stress.wash_fraction_max``.
+  - A rain event below that threshold causes no washout.
   - Rain enters as the daily forcing the engine reads (rain_d = daily
     rainfall, not a pool supply state) — the proxy redesign keeps rain
     out of the static habitat planes by design (plan 02 §6).
 
-The 40 mm threshold is the M14 heavy-rain washout anchor.
+Both anchors are read from model_constants.yaml (single source).
 """
 from __future__ import annotations
 

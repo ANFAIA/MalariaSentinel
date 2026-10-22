@@ -14,15 +14,16 @@ breeding-pool layers:
   3. Fracción de días activos 2024-2025 por celda
   4. Zoom Accra el día pico
 
-Rules replicated (wire.hpp / coordinator.cpp):
-  terrain: twi > 8 & water_frac > 0
-  urban:   urban_class==30 & bldg>=0.05 & (rain>=12 | rain7d>=12) & twi>=7
-  union:   permanent | ((terrain|urban) & rain > 15 mm)
-  urban cap: top 5% of grid by building_fraction
-  water:   W' = clip(W + rain*(1+CR*C_eff) - evap, 0, 500), evap =
-           5*(1+0.07*(T-30)) * clamp(1-0.30*ndvi-0.15*urban, .55, 1)
-  urban floor: water = max(water, 6 mm) on urban union cells
-  active:  water >= 5 mm
+Rules replicated (retired v1 pool model; the current engine uses the
+proxy-habitat model instead). The script below holds the historical
+literals; this summary stays symbolic:
+  terrain: TWI above the terrain threshold and any water
+  urban:   built class with building, rain and TWI thresholds
+  union:   permanent water or terrain/urban above the rain threshold
+  urban cap: top building-fraction quantile of the grid
+  water:   water balance with rain, runoff, evaporation and a depth cap
+  urban floor: minimum urban water depth on the union
+  active:  water above the breeding minimum
 
 Usage (from mal-data-explorer/):
   uv run python 14_breeding_pools.py

@@ -2,9 +2,8 @@
 // host_seeking.hpp — Spatial host-seeking kernel for An. gambiae.
 //
 // HostSeekingModel computes a distance-weighted attraction field over
-// nearby cells and selects a host type stochastically using
-// anthropophilic weights (99% human, 0.5% cattle, 0.3% goat, 0.1%
-// sheep, 0.1% wildlife).
+// nearby cells and selects a host type stochastically using the species
+// host preference weights (species.<row>.pref in model_constants.yaml).
 //
 // Attraction formula (per cell j, per host type k):
 //   A_jk = host_count_jk × indoor_modifier × urban_modifier
@@ -12,16 +11,11 @@
 //
 // where:
 //   indoor_modifier = 1 + indoor_fraction × (endophilic_ratio - 1)
-//   urban_modifier  = 1 + 0.2 × urbanicity  (urban hosts are more
-//                      detectable due to concentrated CO₂)
-//   scale           = 100m (CO₂ + body-odour plume, Plan D)
+//   urban_modifier  = 1 + host_seeking.urbanicity_add × urbanicity
+//   scale           = species.<row>.host_seeking_scale_m
 //
-// Biological basis:
-//   - CO₂ plume: ~60m detection (Giraldo 2023), significant at 70m
-//     (Okumu 2013), activates at 100m (Okumu 2013)
-//   - Body odour: >CO₂ for long-range (Giraldo 2023)
-//   - 300m: 94% malaria reduction when habitats removed (Yang 2009)
-//   - Host preference: de facto anthropophily (Takken et al. 1998)
+// The host-seeking values (scale, radius, urbanicity add, indoor
+// fractions) and their sources live in model_constants.yaml.
 #pragma once
 
 #include <cstdint>
