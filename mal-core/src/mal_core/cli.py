@@ -15,6 +15,7 @@ Standalone commands (no ordering required):
 """
 from __future__ import annotations
 
+import functools
 from pathlib import Path
 
 import typer
@@ -33,7 +34,37 @@ app = typer.Typer(
 )
 
 
+def _validate_model_constants() -> None:
+    """Gate every command on the single YAML validator (R2).
+
+    One helper, applied through the ``_requires_model_constants``
+    decorator: no command duplicates the check and ``--help`` stays
+    side-effect free.
+    """
+    from .config_validation import SchemaError, resolve_path, validate_model_config
+
+    path = resolve_path()
+    try:
+        validate_model_config(path)
+    except SchemaError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=1) from None
+    typer.echo(f"model_constants: {path}", err=True)
+
+
+def _requires_model_constants(fn):
+    """Wrap a Typer command so the YAML is validated before it runs."""
+
+    @functools.wraps(fn)
+    def wrapper(*args, **kwargs):
+        _validate_model_constants()
+        return fn(*args, **kwargs)
+
+    return wrapper
+
+
 @app.command()
+@_requires_model_constants
 def predict(
     aoi: str | None = typer.Option(None, "--aoi", help="AOI slug (e.g. ghana)"),
     scale: Scale = typer.Option(Scale.REGIONAL, "--scale", help="Prediction scale"),
@@ -83,6 +114,7 @@ def predict(
 
 
 @app.command()
+@_requires_model_constants
 def download(
     aoi: str = typer.Option("ghana", "--aoi", help="AOI slug"),
     datasets: str = typer.Option("", "--datasets", help="Comma-separated dataset names (empty = all registered)"),
@@ -123,6 +155,7 @@ def download(
 
 
 @app.command()
+@_requires_model_constants
 def ingest(
     aoi: str = typer.Option("ghana", "--aoi", help="AOI slug"),
     year: int = typer.Option(2024, "--year", help="Year"),
@@ -168,6 +201,7 @@ def ingest(
 
 
 @app.command()
+@_requires_model_constants
 def abm(
     aoi: str | None = typer.Option(None, "--aoi", help="AOI slug (e.g. ghana). Required for simulation."),
     year: int = typer.Option(2024, "--year", help="Simulation start year."),
@@ -386,6 +420,7 @@ def _render_animation(
 
 
 @app.command("score")
+@_requires_model_constants
 def score_cmd(
     run_dir: Path | None = typer.Option(None, "--run-dir", help="Directory with ABM outputs"),
     aoi: str | None = typer.Option(None, "--aoi", help="AOI slug (auto-detected from run metadata if omitted)"),
@@ -442,6 +477,7 @@ def score_cmd(
 
 
 @app.command("validate-detections")
+@_requires_model_constants
 def validate_detections(
     aoi: str = typer.Option(..., "--aoi", help="AOI slug (explicit; e.g. ghana)"),
     occurrence: Path | None = typer.Option(
@@ -534,6 +570,7 @@ def validate_detections(
 
 
 @app.command("validate-cases")
+@_requires_model_constants
 def validate_cases(
     aoi: str = typer.Option("ghana", "--aoi", help="AOI slug (explicit; dataset-dependent, ghana-only score)"),
     start_year: int = typer.Option(2022, "--start-year", help="First simulation year (warm-up)"),
@@ -745,6 +782,7 @@ def _ensure_abm_inputs(aoi: str, data_dir: Path) -> None:
 
 
 @app.command()
+@_requires_model_constants
 def train(
     run_dir: Path = typer.Option(..., "--run-dir", help="Directory with ABM rollout outputs"),
     output_dir: Path = typer.Option(Path("runs/training"), "--output-dir", help="Model output directory"),
@@ -782,6 +820,7 @@ def train(
 
 
 @app.command("datasets")
+@_requires_model_constants
 def datasets_cmd(
     aoi: str = typer.Option("ghana", "--aoi", help="AOI slug"),
     missing_only: bool = typer.Option(False, "--missing", help="Show only rows not fully registered+on disk"),
@@ -813,6 +852,7 @@ def datasets_cmd(
 
 
 @app.command()
+@_requires_model_constants
 def feedback(
     run_dir: Path = typer.Option(..., "--run-dir", help="Directory with ABM outputs"),
     baseline_dir: Path | None = typer.Option(None, "--baseline", help="Baseline for comparison"),
@@ -835,6 +875,7 @@ def feedback(
 
 
 @app.command()
+@_requires_model_constants
 def status(
     aoi: str = typer.Option(..., "--aoi", help="AOI slug"),
 ) -> None:
@@ -848,6 +889,7 @@ def status(
 
 
 @app.command()
+@_requires_model_constants
 def serve(
     host: str = typer.Option("127.0.0.1", "--host", help="Bind host"),
     port: int = typer.Option(8000, "--port", help="Bind port"),

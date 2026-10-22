@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
-// config.cc — YAML-subset micro-parser + ModelConfig loader/validation
-// (plan constants-yaml §4). No yaml-cpp: engine deps stay find_package.
+// config.cc — YAML-subset micro-parser + ModelConfig loader (plan §4).
+// No yaml-cpp: engine deps stay find_package. Schema and business
+// invariants are validated ONCE in mal_core/config_validation.py (R2);
+// this parser only enforces syntax and reports missing key access.
 //
 // Supported subset (exactly what model_constants.yaml needs):
 //   * top-level `key:` sections, nested `key:` blocks by 2-space indent
@@ -202,15 +204,6 @@ int parse_scalar_int(const std::string& raw, int line_no) {
     }
 }
 
-bool parse_scalar_bool(const std::string& raw, int line_no) {
-    const std::string s = strip_quotes(trim(raw));
-    if (s != "persistent" && s != "pluvial") {
-        throw ConfigError("config parse error line " + std::to_string(line_no) +
-                          ": expected persistent|pluvial, got '" + s + "'");
-    }
-    return s == "persistent";
-}
-
 std::vector<std::string> parse_flow_list(const std::string& raw, int line_no) {
     if (raw.front() != '[' || raw.back() != ']') {
         throw ConfigError("config parse error line " + std::to_string(line_no) +
@@ -364,32 +357,13 @@ YNode parse_block(const std::vector<Line>& lines, size_t& cursor,
 }
 
 // ---------------------------------------------------------------------------
-// Schema validation (the schema shared literally with habitat/config.py)
+// Required-key accessor + error bookkeeping.  Unknown keys and
+// cross-section invariants belong to the Python validator (R2).
 // ---------------------------------------------------------------------------
 
 const std::array<const char*, 6> kNamedSpecies = {
     "coluzzii", "gambiae_ss", "funestus", "arabiensis", "melas",
     "stephensi"};
-
-const std::array<const char*, 6> kHabitatTypesV1 = {
-    "surface_persistent", "wetland_persistent", "urban_persistent",
-    "wetland_pluvial", "open_pluvial", "crop_pluvial"};
-
-const std::map<std::string, std::string>& habitat_dynamics_expected() {
-    static const std::map<std::string, std::string> d = {
-        {"surface_persistent", "persistent"},
-        {"wetland_persistent", "persistent"},
-        {"urban_persistent", "persistent"},
-        {"wetland_pluvial", "pluvial"},
-        {"open_pluvial", "pluvial"},
-        {"crop_pluvial", "pluvial"},
-    };
-    return d;
-}
-
-const std::array<const char*, 6>& species_weights_keys() {
-    return kHabitatTypesV1;
-}
 
 template <typename T>
 struct Checked {  // typed accessor with error bookkeeping
@@ -399,7 +373,6 @@ struct Loader {
     const YNode* root;
     std::string path;
     std::vector<std::string> missing;
-    std::vector<std::string> unknown;
     std::vector<std::string> bad_type;
 
     const YNode* section(const YNode* node, const char* name) {
@@ -424,18 +397,6 @@ struct Loader {
             return nullptr;
         }
         return &it->second;
-    }
-
-    void check_unknown(const YNode* section_node, const std::string& sname,
-                       const std::vector<const char*>& allowed) {
-        if (section_node == nullptr || section_node->kind != YNode::Kind::Map)
-            return;
-        for (const auto& kv : section_node->map) {
-            bool ok = false;
-            for (const char* a : allowed)
-                if (kv.first == a) { ok = true; break; }
-            if (!ok) unknown.push_back(sname + "." + kv.first);
-        }
     }
 
     double num(const YNode* v, const std::string& dotted) {
@@ -491,16 +452,12 @@ struct Loader {
 
     void raise() const {
         std::ostringstream msg;
-        size_t n = missing.size() + unknown.size() + bad_type.size();
+        size_t n = missing.size() + bad_type.size();
         if (n == 0) return;
-        msg << "config schema: " << n << " problem(s) in " << path << ":\n";
+        msg << "config access: " << n << " problem(s) in " << path << ":\n";
         if (!missing.empty()) {
             msg << "  missing keys:\n";
             for (const auto& m : missing) msg << "    " << m << "\n";
-        }
-        if (!unknown.empty()) {
-            msg << "  unrecognized keys:\n";
-            for (const auto& m : unknown) msg << "    " << m << "\n";
         }
         if (!bad_type.empty()) {
             msg << "  wrong types:\n";
@@ -540,8 +497,6 @@ ModelConfig parse_config_file(const std::string& path) {
                                  "contracts.env_nc");
     cfg.contracts.cogs_state = L.str(
         L.key(contracts, "contracts", "cogs_state"), "contracts.cogs_state");
-    L.check_unknown(contracts, "contracts",
-                    {"env_nc", "cogs_state"});
 
     // -- habitat_types -------------------------------------------------------
     const YNode* ht = L.section(&root, "habitat_types");
@@ -554,7 +509,6 @@ ModelConfig parse_config_file(const std::string& path) {
                 trim(kv.second.scalar);
         }
     }
-    L.check_unknown(ht, "habitat_types", {"types", "dynamics"});
 
     // -- habitat thresholds --------------------------------------------------
     const YNode* hab = L.section(&root, "habitat");
@@ -564,8 +518,6 @@ ModelConfig parse_config_file(const std::string& path) {
     cfg.habitat.candidate_min_engine = L.num(
         L.key(hab, "habitat", "candidate_min_engine"),
         "habitat.candidate_min_engine");
-    L.check_unknown(hab, "habitat",
-                    {"activation_min_engine", "candidate_min_engine"});
 
     // -- pluvial -------------------------------------------------------------
     const YNode* pluv = L.section(&root, "pluvial");
@@ -578,9 +530,6 @@ ModelConfig parse_config_file(const std::string& path) {
         L.key(pluv, "pluvial", "delta_days"), "pluvial.delta_days");
     cfg.pluvial.cold_start_z = L.num(
         L.key(pluv, "pluvial", "cold_start_z"), "pluvial.cold_start_z");
-    L.check_unknown(pluv, "pluvial",
-                    {"rain_scale_mm", "dry_memory_days", "delta_days",
-                     "cold_start_z"});
 
     // -- aquatic_stress ------------------------------------------------------
     const YNode* aq = L.section(&root, "aquatic_stress");
@@ -602,10 +551,6 @@ ModelConfig parse_config_file(const std::string& path) {
     cfg.aquatic_stress.vulnerable_instar_max = L.integer(
         L.key(aq, "aquatic_stress", "vulnerable_instar_max"),
         "aquatic_stress.vulnerable_instar_max");
-    L.check_unknown(aq, "aquatic_stress",
-                    {"desicc_grace_days", "desicc_base_daily",
-                     "desicc_ramp_decay", "wash_threshold_mm",
-                     "wash_fraction_max", "vulnerable_instar_max"});
 
     // -- urban ---------------------------------------------------------------
     const YNode* urb = L.section(&root, "urban");
@@ -614,28 +559,12 @@ ModelConfig parse_config_file(const std::string& path) {
     cfg.urban.rain_pools_built_damage = L.num(
         L.key(urb, "urban", "rain_pools_built_damage"),
         "urban.rain_pools_built_damage");
-    L.check_unknown(urb, "urban",
-                    {"beta_urban", "rain_pools_built_damage"});
 
     // -- species -------------------------------------------------------------
     const YNode* sp = L.section(&root, "species");
     cfg.species.default_species = L.str(
         L.key(sp, "species", "default_species"), "species.default_species");
     cfg.species.k_ref = L.num(L.key(sp, "species", "k_ref"), "species.k_ref");
-    const std::vector<const char*> sp_row_keys = {
-        "weights", "activity_weights", "pref", "salinity_opt_ppt",
-        "salinity_hi_tol_ppt", "salinity_slope", "host_seeking_scale_m",
-        "host_seeking_radius_m"};
-    L.check_unknown(sp, "species", {
-        "default_species", "k_ref", "coluzzii", "gambiae_ss", "funestus",
-        "arabiensis", "melas", "stephensi", "neutral"});
-    if (root.kind == YNode::Kind::Map) {
-        L.check_unknown(&root, "model_constants", {
-            "version", "contracts", "habitat_types", "habitat", "pluvial",
-            "aquatic_stress", "urban", "species", "capacity", "geodesy",
-            "ingest", "adults", "eip", "dispersal", "host_seeking",
-            "oviposition", "aquatic_stages", "rng"});
-    }
     for (const char* name : kNamedSpecies) {
         const YNode* row = L.key(sp, "species", name);
         if (row == nullptr) continue;
@@ -643,40 +572,17 @@ ModelConfig parse_config_file(const std::string& path) {
         out.name = name;
         const YNode* w = L.key(row, std::string("species.") + name, "weights");
         if (w != nullptr && w->kind == YNode::Kind::Map) {
-            if (w->map.size() != kNumZoneId) {
-                L.bad_type.push_back(std::string("species.") + name +
-                                     ".weights (expected " +
-                                     std::to_string(kNumZoneId) + " keys)");
-            }
             for (const auto& [gname, val] : w->map) {
                 if (gname == "wetland_pluvial") {
-                    // No ZoneId — validated as 0.00 separately below.
+                    // No ZoneId in the engine; the Python validator pins it
+                    // to 0.00 (plan §2), so there is nothing to map here.
                     continue;
                 }
                 const auto zone = zone_id_of_habitat(gname);
-                if (!zone.has_value()) {
-                    L.unknown.push_back(std::string("species.") + name +
-                                        ".weights." + gname);
-                    continue;
-                }
+                if (!zone.has_value()) continue;
                 out.weights[static_cast<size_t>(*zone)] =
                     L.num(&val, std::string("species.") + name +
                                     ".weights." + gname);
-            }
-        }
-        // wetland_pluvial has no ZoneId: a non-zero weight would be dropped
-        // silently — that is forbidden (plan §2).
-        if (w != nullptr && w->kind == YNode::Kind::Map) {
-            if (const auto wp = w->map.find("wetland_pluvial");
-                wp != w->map.end()) {
-                const double v = L.num(&wp->second,
-                                       std::string("species.") + name +
-                                           ".weights.wetland_pluvial");
-                if (v != 0.0) {
-                    L.bad_type.push_back(
-                        std::string("species.") + name +
-                        ".weights.wetland_pluvial must be 0.00");
-                }
             }
         }
         out.salinity_hi_tol_ppt = L.num(
@@ -727,10 +633,6 @@ ModelConfig parse_config_file(const std::string& path) {
             L.key(row, std::string("species.") + name,
                   "host_seeking_radius_m"),
             std::string("species.") + name + ".host_seeking_radius_m");
-        if (row->kind == YNode::Kind::Map) {
-            L.check_unknown(row, std::string("species.") + name,
-                            sp_row_keys);
-        }
         cfg.species.rows[name] = out;
     }
     const YNode* neutral = L.key(sp, "species", "neutral");
@@ -739,19 +641,16 @@ ModelConfig parse_config_file(const std::string& path) {
         if (w != nullptr && w->kind == YNode::Kind::Map) {
             for (const auto& [gname, val] : w->map) {
                 if (gname == "wetland_pluvial") {
-                    // No ZoneId — validated as 0.00 separately below.
+                    // No ZoneId in the engine; the Python validator pins it
+                    // to 0.00 (plan §2), so there is nothing to map here.
                     continue;
                 }
                 const auto zone = zone_id_of_habitat(gname);
-                if (!zone.has_value()) {
-                    L.unknown.push_back("species.neutral.weights." + gname);
-                    continue;
-                }
+                if (!zone.has_value()) continue;
                 cfg.species.neutral_weights[static_cast<size_t>(*zone)] =
                     L.num(&val, "species.neutral.weights." + gname);
             }
         }
-        L.check_unknown(neutral, "species.neutral", {"weights"});
     }
 
     // -- capacity ------------------------------------------------------------
@@ -759,7 +658,6 @@ ModelConfig parse_config_file(const std::string& path) {
     cfg.capacity.persistent_availability = L.num(
         L.key(cap, "capacity", "persistent_availability"),
         "capacity.persistent_availability");
-    L.check_unknown(cap, "capacity", {"persistent_availability"});
 
     // -- geodesy -------------------------------------------------------------
     const YNode* geo = L.section(&root, "geodesy");
@@ -768,8 +666,6 @@ ModelConfig parse_config_file(const std::string& path) {
     cfg.geodesy.metres_per_deg_lat = L.num(
         L.key(geo, "geodesy", "metres_per_deg_lat"),
         "geodesy.metres_per_deg_lat");
-    L.check_unknown(geo, "geodesy",
-                    {"earth_radius_m", "metres_per_deg_lat"});
 
     // -- ingest --------------------------------------------------------------
     const YNode* ing = L.section(&root, "ingest");
@@ -807,12 +703,6 @@ ModelConfig parse_config_file(const std::string& path) {
     cfg.ingest.nc_compression_level = L.integer(
         L.key(ing, "ingest", "nc_compression_level"),
         "ingest.nc_compression_level");
-    L.check_unknown(ing, "ingest", {
-        "nodata_sentinel", "nodata_sentinel_int", "coastline_buffer_m",
-        "cell_size_hint_m", "candidate_min_ingest",
-        "min_dilation_radius_cells", "fill_frac_valid_max",
-        "ocean_mask_threshold", "land_mask_threshold", "valid_count_epsilon",
-        "grid_degrees_step_max", "nc_compression_level"});
 
     // -- adults --------------------------------------------------------------
     const YNode* ad = L.section(&root, "adults");
@@ -825,16 +715,12 @@ ModelConfig parse_config_file(const std::string& path) {
                                 "adults.mort_cap");
     cfg.adults.mort_floor = L.num(L.key(ad, "adults", "mort_floor"),
                                   "adults.mort_floor");
-    L.check_unknown(ad, "adults",
-                    {"daily_mort_basal", "opt_c", "sigma_c", "mort_cap",
-                     "mort_floor"});
 
     // -- eip -----------------------------------------------------------------
     const YNode* eipn = L.section(&root, "eip");
     cfg.eip.base_c = L.num(L.key(eipn, "eip", "base_c"), "eip.base_c");
     cfg.eip.threshold_gd = L.num(L.key(eipn, "eip", "threshold_gd"),
                                  "eip.threshold_gd");
-    L.check_unknown(eipn, "eip", {"base_c", "threshold_gd"});
 
     // -- dispersal -----------------------------------------------------------
     const YNode* dsp = L.section(&root, "dispersal");
@@ -857,10 +743,6 @@ ModelConfig parse_config_file(const std::string& path) {
         "dispersal.wind_self_speed_ms");
     cfg.dispersal.flight_hour = L.integer(
         L.key(dsp, "dispersal", "flight_hour"), "dispersal.flight_hour");
-    L.check_unknown(dsp, "dispersal",
-                    {"adult_prob_day", "adult_sigma_m", "adult_max_m",
-                     "wind_migration_prob", "wind_flight_hours",
-                     "wind_survival", "wind_self_speed_ms", "flight_hour"});
 
     // -- host_seeking --------------------------------------------------------
     const YNode* hs = L.section(&root, "host_seeking");
@@ -879,10 +761,6 @@ ModelConfig parse_config_file(const std::string& path) {
     cfg.host_seeking.indoor_fraction_rural = L.num(
         L.key(hs, "host_seeking", "indoor_fraction_rural"),
         "host_seeking.indoor_fraction_rural");
-    L.check_unknown(hs, "host_seeking",
-                    {"starvation_days", "indoor_attraction_add",
-                     "urbanicity_add", "indoor_fraction_urban",
-                     "indoor_fraction_rural"});
 
     // -- oviposition ---------------------------------------------------------
     const YNode* ov = L.section(&root, "oviposition");
@@ -893,8 +771,6 @@ ModelConfig parse_config_file(const std::string& path) {
     cfg.oviposition.timeout_days = L.integer(
         L.key(ov, "oviposition", "timeout_days"),
         "oviposition.timeout_days");
-    L.check_unknown(ov, "oviposition",
-                    {"scale_m", "radius_m", "timeout_days"});
 
     // -- aquatic_stages ------------------------------------------------------
     const YNode* stg = L.section(&root, "aquatic_stages");
@@ -916,10 +792,6 @@ ModelConfig parse_config_file(const std::string& path) {
     cfg.aquatic_stages.salinity_missing_psu = L.num(
         L.key(stg, "aquatic_stages", "salinity_missing_psu"),
         "aquatic_stages.salinity_missing_psu");
-    L.check_unknown(stg, "aquatic_stages",
-                    {"egg_daily_mort", "pupa_daily_mort", "larva_bh_s0",
-                     "larva_bh_alpha", "last_larval_instar",
-                     "salinity_missing_psu"});
 
     // -- rng -----------------------------------------------------------------
     const YNode* rng = L.section(&root, "rng");
@@ -932,56 +804,10 @@ ModelConfig parse_config_file(const std::string& path) {
     cfg.rng.aquatic_seed_larva_mortality = L.integer(
         L.key(rng, "rng", "aquatic_seed_larva_mortality"),
         "rng.aquatic_seed_larva_mortality");
-    L.check_unknown(rng, "rng",
-                    {"aquatic_seed_washout", "aquatic_seed_stage_mortality",
-                     "aquatic_seed_larva_mortality"});
 
     L.raise();
 
-    // -- invariants (same as habitat/config.py) ------------------------------
-    if (cfg.version <= 0) {
-        throw ConfigError("config invariant: version must be positive");
-    }
-    for (const std::pair<const char*, std::string>& c : std::array<
-             std::pair<const char*, std::string>, 2>{
-             {{"env_nc", cfg.contracts.env_nc},
-              {"cogs_state", cfg.contracts.cogs_state}}}) {
-        const std::string& s = c.second;
-        const size_t dot = s.find('.');
-        if (dot == std::string::npos || dot == 0 || dot + 1 >= s.size() ||
-            s.find_first_not_of("0123456789.", 0) != std::string::npos ||
-            s.find('.', dot + 1) != std::string::npos) {
-            throw ConfigError(std::string("contracts.") + c.first +
-                              ": expected 'mayor.menor' string, got '" + s +
-                              "'");
-        }
-    }
-    if (cfg.habitat_types.types.size() != kNumZoneId) {
-        throw ConfigError(
-            "config invariant: habitat_types.types must have " +
-            std::to_string(kNumZoneId) + " entries (frozen contract), got " +
-            std::to_string(cfg.habitat_types.types.size()));
-    }
-    if (!std::equal(cfg.habitat_types.types.begin(),
-                    cfg.habitat_types.types.end(),
-                    kHabitatTypesV1.begin(),
-                    [](const std::string& a, const char* b) {
-                        return a == b;
-                    })) {
-        throw ConfigError(
-            "config invariant: habitat_types.types order is a frozen "
-            "contract (must match habitat/config.py)");
-    }
-    if (cfg.habitat_types.dynamics !=
-        habitat_dynamics_expected()) {
-        std::string dump;
-        for (const auto& kv : cfg.habitat_types.dynamics)
-            dump += "[" + kv.first + "=" + kv.second + "]";
-        if (dump.empty()) dump = "(empty)";
-        throw ConfigError(
-            "config invariant: habitat_types.dynamics is a frozen contract "
-            "(parsed: " + dump + ")");
-    }
+    // -- derived values (plan §9.5: never stored in the YAML) ---------------
     cfg.habitat_types.num_persistent = 0;
     std::fill(cfg.habitat_types.persistent_zone.begin(),
               cfg.habitat_types.persistent_zone.end(), false);
@@ -993,42 +819,7 @@ ModelConfig parse_config_file(const std::string& path) {
                 kv.second == "persistent";
         }
     }
-    if (cfg.habitat_types.num_persistent == 0) {
-        throw ConfigError(
-            "config invariant: derived num_persistent must be >= 1");
-    }
-    if (cfg.species.rows.find(cfg.species.default_species) ==
-        cfg.species.rows.end()) {
-        throw ConfigError(
-            "config invariant: species.default_species '" +
-            cfg.species.default_species + "' is not a named species row");
-    }
-    auto check_sum = [&L](const std::array<double, kNumZoneId>& w,
-                          const std::string& what) {
-        double total = 0.0;
-        for (const double v : w) total += v;
-        if (std::fabs(total - 1.0) > 1e-9) {
-            L.bad_type.push_back(what + " sum " + std::to_string(total) +
-                                 " != 1.0 (±1e-9)");
-        }
-    };
-    for (const auto& [name, row] : cfg.species.rows) {
-        check_sum(row.weights, "species." + name + ".weights");
-    }
-    check_sum(cfg.species.neutral_weights, "species.neutral.weights");
-    const double expected_mpd =
-        3.14159265358979323846 * cfg.geodesy.earth_radius_m / 180.0;
-    if (std::fabs(cfg.geodesy.metres_per_deg_lat - expected_mpd) > 1e-9) {
-        throw ConfigError(
-            "config invariant: geodesy.metres_per_deg_lat must equal "
-            "pi·earth_radius_m/180 (±1e-9)");
-    }
-    if (cfg.ingest.nodata_sentinel >= 0.0 ||
-        cfg.ingest.nodata_sentinel_int >= 0) {
-        throw ConfigError(
-            "config invariant: ingest.nodata_sentinel(_int) must be negative");
-    }
-    L.raise();
+
     return cfg;
 }
 
