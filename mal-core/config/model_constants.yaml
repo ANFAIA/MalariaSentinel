@@ -144,6 +144,8 @@ ingest:          # lado py (escritor NC) + valores de paridad cruzada C++⇄py
   nodata_sentinel: -9999.0      # frozen — sentinel float compartido (COGs C++ escritos ⇄
                                 # relectura py atol=1.0); 4 defs → 1 clave
   nodata_sentinel_int: -9999    # frozen — mirror int label-mode (dynamic_world.py:467,474)
+  residential_from_indoor_frac: 0.8  # [fracción] host_landscape: residential =
+                                     # building_fraction (si >0) else indoor×0.8
   coastline_buffer_m: 5000.0    # [m]
   cell_size_hint_m: 1000.0      # [m] resolución default (muere la dup wire.hpp:236)
   candidate_min_ingest: 1.0e-6  # [índice] piso census del ingest — rol DISTINTO de
@@ -168,6 +170,40 @@ eip:
   base_c: 16.0                # [°C] piso térmico GDD
   threshold_gd: 110.0         # [grados-día] cota de infectividad
 
+transmission:     # SEIR-SEI Ross-Macdonald (transmission.hpp; CLI --beta-hv/...)
+  beta_hv: 0.40               # [prob/mordida] humano→vector (infecciosa)
+  beta_vh: 0.50               # [prob/mordida] vector→humano (infecciosa)
+  human_incubation_days: 12   # [días] E_H→I_H (periodo intrínseco)
+  human_infectious_days: 20   # [días] I_H→R_H/S_H
+  human_immunity_days: 180    # [días] R_H→S_H (solo con --enable-immunity; default off)
+  initial_human_prevalence: 0.05    # [fracción] I_H inicial, modo uniform-legacy
+  initial_vector_infected_frac: 0.0 # [fracción] I_V inicial de hembras adultas
+
+thermal:          # curvas térmicas acuáticas + EFD (Mordecai 2013, Couper 2021)
+  efd_max_eggs_per_day: 0.5        # [huevos·hembra⁻¹·día⁻¹] máximo en Topt
+  efd_tmin_c: 16.0                 # [°C] umbral inferior de reproducción
+  efd_tmax_c: 34.0                 # [°C] umbral superior de reproducción
+  efd_topt_c: 25.0                 # [°C] óptimo (normalización del modifier)
+  egg_development_tmin_c: 10.0     # [°C] Brière-1 umbral inferior
+  egg_development_tmax_c: 40.0     # [°C] Brière-1 umbral superior
+  egg_development_scale: 0.00062   # [escala] a de rate=a·T·(T−TL)·√(TH−T)
+  larva_development_tmin_c: 10.0   # [°C] cuadrática umbral inferior
+  larva_development_tmax_c: 40.0   # [°C] cuadrática umbral superior
+  larva_development_scale: 0.001   # [escala] a de rate=a·(T−TL)·(TH−T)
+  pupa_development_tmin_c: 12.0    # [°C] Brière-1 umbral inferior
+  pupa_development_tmax_c: 40.0    # [°C] Brière-1 umbral superior
+  pupa_development_scale: 0.00066  # [escala] a de rate=a·T·(T−TL)·√(TH−T)
+
+gonotrophic:      # ciclo gonotrófico (gonotrophic_cycle.hpp); B8 pendiente en task-01
+  cycle_duration_days: 2.0     # [días] maduración tras el primer ciclo (redondeo ceil)
+  first_cycle_days: 4.0        # [días] maduración del primer ciclo (ceil)
+  feeding_success_rate: 0.825  # [fracción] PROBING→BLOOD_FED
+  egg_batch_mean: 120          # [huevos] media del draw binomial(n, 0.5)
+  egg_batch_n: 240             # [ensayos] n del draw binomial
+  egg_batch_min: 30            # [huevos] cota inferior del lote
+  egg_batch_max: 170           # [huevos] cota superior del lote
+  resting_duration_days: 0.5   # [días] BLOOD_FED→RESTING (redondeo int)
+
 dispersal:
   adult_prob_day: 0.05        # [1/día] (docstring wire «10%» MIENTE — corregido paso 0)
   adult_sigma_m: 450.0        # [m] Costantini 1996 midpoint
@@ -177,6 +213,10 @@ dispersal:
   wind_survival: 0.85         # Faiman 2020 mid
   wind_self_speed_ms: 1.0     # [m/s]
   flight_hour: 20             # set_current_hour (motor)
+  host_flight_step_m: 500.0   # [m] paso del vuelo dirigido a host (step_toward_host)
+  snap_radius_m: 500.0        # [m] snap adulto→parche activado más cercano
+  night_start_hour: 18        # [h] inicio ventana nocturna (dispersión eólica/multirate)
+  night_end_hour: 6           # [h] fin exclusivo; si < start la ventana cruza medianoche
 
 host_seeking:   # la capa viva (la que engine ejecuta vía species_params); el per-species
                 # scale/radius vive en species.<name>
@@ -187,10 +227,18 @@ host_seeking:   # la capa viva (la que engine ejecuta vía species_params); el p
   # literales 0.72/0.30 réplicas en C++)
   indoor_fraction_urban: 0.72     # 72% endofílico urbano (An. gambiae)
   indoor_fraction_rural: 0.30
+  # rango de detección del kernel del MOTOR (el caller lo pasa explícito y
+  # gana sobre species.<fila>.host_seeking_radius_m=1500, que sigue vigente
+  # como default de compute_attraction cuando el caller pasa -1)
+  detect_range_m: 2000.0          # [m] detect_host_cell desde HOST_APPROACH
+  approach_step_m: 50.0           # [m] paso de approach_vector
 
 oviposition:
-  scale_m: 50.0       # [m]
-  radius_m: 500.0     # [m]
+  scale_m: 50.0       # [m] decaimiento del penacho (Okal 2013)
+  radius_m: 500.0     # [m] radio default de compute_attraction (Okal/Lindh)
+  detect_range_m: 2000.0  # [m] detect_breeding_cell: el caller explícito gana
+  step_m: 50.0            # [m] paso de step_toward
+  min_attraction: 0.3     # [adimensional] atracción mínima para aceptar un criadero
   timeout_days: 7
 
 aquatic_stages:

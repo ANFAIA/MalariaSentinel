@@ -105,7 +105,10 @@ std::optional<std::pair<int32_t, int32_t>> OvipositionSeekingModel::detect_breed
     if (attractions.empty()) return std::nullopt;
 
     // Best site must exceed minimum attraction threshold.
-    if (attractions[0].attraction <= 0.3f) return std::nullopt;
+    if (attractions[0].attraction <=
+        static_cast<float>(load_config().oviposition.min_attraction)) {
+        return std::nullopt;
+    }
 
     return std::make_pair(attractions[0].row, attractions[0].col);
 }

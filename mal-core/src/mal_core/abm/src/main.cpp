@@ -297,7 +297,8 @@ OUTPUT
     std::string aoi_slug;
     std::string bbox_str;
     std::string crs         = "EPSG:4326";
-    int         resolution_m = 1000;
+    int         resolution_m = static_cast<int>(
+        mal_abm_fast::load_config().ingest.cell_size_hint_m);
     std::string scale_str   = "regional";
     int         year        = 2024;
     int         month       = 6;
@@ -340,16 +341,21 @@ OUTPUT
     bool debug_population = false;
     std::string cohort_log_path;
 
-    // Transmission (M7.4/M7.4.1 SEIR-SEI).
+    // Transmission (M7.4/M7.4.1 SEIR-SEI). Model values come from
+    // model_constants.yaml (transmission:); the CLI only overrides them.
+    const mal_abm_fast::TransmissionCfg& transmission_cfg =
+        mal_abm_fast::load_config().transmission;
     bool   enable_transmission          = false;
-    float  beta_hv                      = 0.40f;
-    float  beta_vh                      = 0.50f;
-    int    human_incubation_days        = 12;
-    int    human_infectious_days        = 20;
-    int    immunity_duration_days       = 180;
+    float  beta_hv = static_cast<float>(transmission_cfg.beta_hv);
+    float  beta_vh = static_cast<float>(transmission_cfg.beta_vh);
+    int    human_incubation_days = transmission_cfg.human_incubation_days;
+    int    human_infectious_days = transmission_cfg.human_infectious_days;
+    int    immunity_duration_days = transmission_cfg.human_immunity_days;
     bool   enable_immunity              = false;
-    double initial_human_prevalence     = 0.05;
-    double initial_vector_infected_frac = 0.0;
+    double initial_human_prevalence =
+        transmission_cfg.initial_human_prevalence;
+    double initial_vector_infected_frac =
+        transmission_cfg.initial_vector_infected_frac;
     std::string human_seeding_mode      = "random-viable";
     int    human_outbreak_day           = 0;
     int    human_outbreak_foci          = 3;
@@ -376,7 +382,8 @@ OUTPUT
                     "Coordinate Reference System (default 'EPSG:4326').")
         ->group("Spatial & Temporal");
     run->add_option("--resolution-m", resolution_m,
-                    "Ground cell resolution in metres (default 1000). "
+                    "Ground cell resolution in metres "
+                    "(default from model_constants.yaml). "
                     "Controls patch density: smaller = more patches.")
         ->group("Spatial & Temporal");
     run->add_option("--scale", scale_str,
@@ -578,34 +585,34 @@ OUTPUT
                   "Enable spatial SEIR-SEI malaria transmission model.")
         ->group("Transmission (SEIR-SEI)");
     run->add_option("--beta-hv", beta_hv,
-                    "Human-to-vector transmission probability per bite (default 0.40).")
-        ->default_val(0.40f)
+                    "Human-to-vector transmission probability per bite "
+                    "(default from model_constants.yaml).")
         ->group("Transmission (SEIR-SEI)");
     run->add_option("--beta-vh", beta_vh,
-                    "Vector-to-human transmission probability per bite (default 0.50).")
-        ->default_val(0.50f)
+                    "Vector-to-human transmission probability per bite "
+                    "(default from model_constants.yaml).")
         ->group("Transmission (SEIR-SEI)");
     run->add_option("--human-incubation-days", human_incubation_days,
-                    "Human intrinsic incubation period E_H -> I_H in days (default 12).")
-        ->default_val(12)
+                    "Human intrinsic incubation period E_H -> I_H in days "
+                    "(default from model_constants.yaml).")
         ->check(CLI::PositiveNumber)
         ->group("Transmission (SEIR-SEI)");
     run->add_option("--human-infectious-days", human_infectious_days,
-                    "Human infectious duration I_H in days (default 20).")
-        ->default_val(20)
+                    "Human infectious duration I_H in days "
+                    "(default from model_constants.yaml).")
         ->check(CLI::PositiveNumber)
         ->group("Transmission (SEIR-SEI)");
     run->add_option("--immunity-duration-days", immunity_duration_days,
-                    "Duration of temporary human immunity R_H in days (default 180).")
-        ->default_val(180)
+                    "Duration of temporary human immunity R_H in days "
+                    "(default from model_constants.yaml).")
         ->check(CLI::PositiveNumber)
         ->group("Transmission (SEIR-SEI)");
     run->add_flag("--enable-immunity", enable_immunity,
                   "Enable temporary human immunity (R_H -> S_H waning). Default false (SIS-like).")
         ->group("Transmission (SEIR-SEI)");
     run->add_option("--initial-human-prevalence", initial_human_prevalence,
-                    "Initial infectious fraction of human population (default 0.05).")
-        ->default_val(0.05)
+                    "Initial infectious fraction of human population "
+                    "(default from model_constants.yaml).")
         ->group("Transmission (SEIR-SEI)");
     run->add_option("--human-seeding-mode", human_seeding_mode,
                     "Human infection seeding mode: 'random-viable' | 'explicit' | 'uniform-legacy' | 'none' (default 'random-viable').")
@@ -657,9 +664,10 @@ OUTPUT
         ->default_val(0.0)
         ->check(CLI::NonNegativeNumber)
         ->group("Transmission (SEIR-SEI)");
-    run->add_option("--initial-vector-infected-frac", initial_vector_infected_frac,
-                    "Initial infectious fraction of adult female mosquitoes (default 0.0).")
-        ->default_val(0.0)
+    run->add_option("--initial-vector-infected-frac",
+                    initial_vector_infected_frac,
+                    "Initial infectious fraction of adult female mosquitoes "
+                    "(default from model_constants.yaml).")
         ->group("Transmission (SEIR-SEI)");
     run->add_option("--transmission-focus-threshold", transmission_focus_threshold,
                     "Prevalence threshold for active transmission focus band (default 0.01).")

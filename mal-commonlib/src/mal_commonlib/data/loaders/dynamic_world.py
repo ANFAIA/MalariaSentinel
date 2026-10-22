@@ -46,6 +46,8 @@ import xarray as xr
 from rasterio.transform import from_bounds
 from rasterio.warp import Resampling, reproject
 
+from mal_commonlib.model_constants import model_constant
+
 if TYPE_CHECKING:
     from mal_commonlib.aoi import AOI
 
@@ -103,7 +105,10 @@ FEATURE_NAMES: tuple[str, ...] = tuple(FEATURE_CLASSES)
 
 MIN_YEAR: int = 2015  # DW record starts 2015-06-27
 
-NODATA_OUT = -9999.0
+# NoData sentinel shared with the engine: model_constants.yaml: ingest.*
+# (read-only accessor; validation lives in mal-core, R2).
+NODATA_OUT = float(model_constant("ingest", "nodata_sentinel"))
+NODATA_OUT_INT = int(model_constant("ingest", "nodata_sentinel_int"))
 
 ATTRIBUTION = (
     "Dynamic World V1 (Brown et al. 2022, doi:10.1038/s41597-022-01307-4) "
@@ -348,7 +353,7 @@ def load_dw_class_fractions(
     Returns:
         ``xr.Dataset`` dims (time, y, x) with variables ``lc_built``,
         ``lc_wetland``, ``lc_crop``, ``lc_open_plus_water`` (float32,
-        [0,1], ``-9999.0`` NoData), CRS = aoi.crs.
+        [0,1], ``ingest.nodata_sentinel`` NoData), CRS = aoi.crs.
     """
     if not years:
         raise ValueError("load_dw_class_fractions needs at least one year")
@@ -418,7 +423,7 @@ def load_dw_label_mode(
 
     Returns:
         xr.DataArray dims (y, x), dtype int32, CRS = aoi.crs, values are
-        Dynamic World label codes 0-8. ``-9999`` NoData.
+        Dynamic World label codes 0-8. ``ingest.nodata_sentinel_int`` NoData.
     """
     bbox = _aoi_bbox_wgs84(aoi)
     if not all(np.isfinite(b) for b in bbox):
@@ -464,14 +469,14 @@ def load_dw_label_mode(
     covered = valid > 0
     if covered.any():
         vote[covered] = np.argmax(votes_acc[covered], axis=-1).astype(np.int32)
-    vote[~covered] = -9999
+    vote[~covered] = NODATA_OUT_INT
 
     da = xr.DataArray(vote, dims=("y", "x"), name="label")
     da.rio.write_crs(aoi.crs_obj, inplace=True)
     da.rio.write_transform(
         from_bounds(*aoi.bbox, *aoi.cells_per_side()), inplace=True
     )
-    da.rio.write_nodata(-9999, inplace=True)
+    da.rio.write_nodata(NODATA_OUT_INT, inplace=True)
     da.attrs["source"] = f"Dynamic World V1 modal label {year} (GEE)"
     da.attrs["attribution"] = ATTRIBUTION.replace("[Year]", str(year))
     return da

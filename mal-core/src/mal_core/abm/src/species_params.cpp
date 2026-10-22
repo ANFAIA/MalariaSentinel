@@ -64,8 +64,9 @@ SpeciesParams species_params_for(MosquitoSpeciesId id) {
     sp.salinity_opt_ppt    = static_cast<float>(row.salinity_opt_ppt);
     sp.salinity_hi_tol_ppt = static_cast<float>(row.salinity_hi_tol_ppt);
     sp.salinity_slope      = static_cast<float>(row.salinity_slope);
-    // gonotrophic_days: dead knob (no runtime consumer) — the struct
-    // default 2.0f remains for tests only; NOT a YAML key.
+    // gonotrophic_days: dead knob (no runtime consumer). The live cycle
+    // reads gonotrophic.* from the YAML via GonotrophicParams' constructor;
+    // this SpeciesParams field stays unwired (B8, task-01).
     return sp;
 }
 

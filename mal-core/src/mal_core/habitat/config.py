@@ -100,8 +100,9 @@ def dump_raw(path: str | os.PathLike[str] | None = None) -> dict[str, Any]:
             out[f"species.{name}.pref"] = [
                 float(row["pref"][h]) for h in
                 ("human", "cattle", "goat", "sheep", "wildlife")]
-    for sec in ("ingest", "adults", "eip", "dispersal", "host_seeking",
-                "oviposition", "aquatic_stages", "rng"):
+    for sec in ("ingest", "adults", "eip", "transmission", "dispersal",
+                "host_seeking", "oviposition", "aquatic_stages", "thermal",
+                "gonotrophic", "rng"):
         for k, v in data[sec].items():
             out[f"{sec}.{k}"] = v
     return out

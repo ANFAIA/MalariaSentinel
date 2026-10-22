@@ -117,6 +117,9 @@ _MISSING_CASES = [
     ("ingest", "nodata_sentinel"),
     ("adults", "daily_mort_basal"),
     ("eip", "base_c"),
+    ("transmission", "beta_hv"),
+    ("thermal", "efd_topt_c"),
+    ("gonotrophic", "egg_batch_n"),
     ("dispersal", "adult_prob_day"),
     ("host_seeking", "starvation_days"),
     ("oviposition", "scale_m"),
@@ -446,3 +449,87 @@ def test_no_duplicate_validation_in_cpp_or_thin_loader():
     assert "def _check_invariants" not in loader
     assert "def _check_tree" not in loader
     assert "validate_model_config" in loader
+
+
+# -- task-07 sections: probabilities, thresholds and kernels ---------------
+
+@pytest.mark.parametrize("path,value", [
+    (("transmission", "beta_hv"), 1.5),
+    (("transmission", "beta_vh"), -0.1),
+    (("transmission", "initial_human_prevalence"), 2.0),
+    (("gonotrophic", "feeding_success_rate"), 1.2),
+    (("oviposition", "min_attraction"), 2.0),
+    (("ingest", "residential_from_indoor_frac"), 1.5),
+])
+def test_probability_must_be_a_fraction(tmp_path, path, value):
+    def mutate(data):
+        node = data
+        for key in path[:-1]:
+            node = node[key]
+        node[path[-1]] = value
+
+    message = _message(_tmp_yaml(tmp_path, mutate))
+    assert ".".join(path) in message
+    assert "[0, 1]" in message
+
+
+@pytest.mark.parametrize("path", [
+    ("transmission", "human_incubation_days"),
+    ("transmission", "human_infectious_days"),
+    ("transmission", "human_immunity_days"),
+    ("gonotrophic", "cycle_duration_days"),
+    ("gonotrophic", "first_cycle_days"),
+    ("gonotrophic", "resting_duration_days"),
+])
+def test_duration_must_be_positive(tmp_path, path):
+    def mutate(data):
+        data[path[0]][path[1]] = 0
+
+    message = _message(_tmp_yaml(tmp_path, mutate))
+    assert ".".join(path) in message
+    assert "> 0" in message
+
+
+def test_thermal_thresholds_must_be_ordered(tmp_path):
+    def mutate(data):
+        data["thermal"]["efd_topt_c"] = 40.0
+
+    message = _message(_tmp_yaml(tmp_path, mutate))
+    assert "thermal.efd_*" in message
+    assert "tmin < topt < tmax" in message
+
+
+@pytest.mark.parametrize("stage", ["egg", "larva", "pupa"])
+def test_stage_thresholds_must_be_ordered(tmp_path, stage):
+    def mutate(data):
+        data["thermal"][f"{stage}_development_tmin_c"] = 50.0
+
+    message = _message(_tmp_yaml(tmp_path, mutate))
+    assert f"thermal.{stage}_development_tmin_c" in message
+
+
+def test_egg_batch_ordering_invariant(tmp_path):
+    def mutate(data):
+        data["gonotrophic"]["egg_batch_min"] = 200
+
+    message = _message(_tmp_yaml(tmp_path, mutate))
+    assert "gonotrophic egg batch" in message
+    assert "min <= mean <= max" in message
+
+
+@pytest.mark.parametrize("hour", [-1, 24])
+def test_night_hours_must_be_in_day(tmp_path, hour):
+    def mutate(data):
+        data["dispersal"]["night_start_hour"] = hour
+
+    message = _message(_tmp_yaml(tmp_path, mutate))
+    assert "dispersal.night_start_hour" in message
+    assert "[0, 24)" in message
+
+
+def test_night_window_must_not_be_empty(tmp_path):
+    def mutate(data):
+        data["dispersal"]["night_end_hour"] = data["dispersal"]["night_start_hour"]
+
+    message = _message(_tmp_yaml(tmp_path, mutate))
+    assert "night_start_hour" in message

@@ -29,6 +29,11 @@ loader tests):
 * ``geodesy.metres_per_deg_lat == π · earth_radius_m / 180`` (±1e-9).
 * ``contracts.*`` match ``mayor.menor``; ``ingest.nodata_*`` are negative;
   ``species.k_ref > 0``; ``version > 0``.
+* ``transmission.*`` probabilities/fractions in ``[0, 1]`` and durations
+  positive; ``thermal.*`` thresholds ordered (tmin < topt < tmax) with
+  positive scales; ``gonotrophic`` egg batch ``0 < min <= mean <= max <= n``;
+  movement kernels positive, ``oviposition.min_attraction`` in ``[0, 1]``
+  and ``dispersal.night_*_hour`` in ``[0, 24)`` with a non-empty window.
 
 Growing the schema (R2): add the field to the matching ``BaseModel``
 below.  Unknown keys fail loudly, so a YAML edit without a matching model
@@ -182,6 +187,7 @@ class Geodesy(_StrictModel):
 class Ingest(_StrictModel):
     nodata_sentinel: float
     nodata_sentinel_int: int
+    residential_from_indoor_frac: float
     coastline_buffer_m: float
     cell_size_hint_m: float
     candidate_min_ingest: float
@@ -207,6 +213,43 @@ class Eip(_StrictModel):
     threshold_gd: float
 
 
+class Transmission(_StrictModel):
+    beta_hv: float
+    beta_vh: float
+    human_incubation_days: int
+    human_infectious_days: int
+    human_immunity_days: int
+    initial_human_prevalence: float
+    initial_vector_infected_frac: float
+
+
+class Thermal(_StrictModel):
+    efd_max_eggs_per_day: float
+    efd_tmin_c: float
+    efd_tmax_c: float
+    efd_topt_c: float
+    egg_development_tmin_c: float
+    egg_development_tmax_c: float
+    egg_development_scale: float
+    larva_development_tmin_c: float
+    larva_development_tmax_c: float
+    larva_development_scale: float
+    pupa_development_tmin_c: float
+    pupa_development_tmax_c: float
+    pupa_development_scale: float
+
+
+class Gonotrophic(_StrictModel):
+    cycle_duration_days: float
+    first_cycle_days: float
+    feeding_success_rate: float
+    egg_batch_mean: int
+    egg_batch_n: int
+    egg_batch_min: int
+    egg_batch_max: int
+    resting_duration_days: float
+
+
 class Dispersal(_StrictModel):
     adult_prob_day: float
     adult_sigma_m: float
@@ -216,6 +259,10 @@ class Dispersal(_StrictModel):
     wind_survival: float
     wind_self_speed_ms: float
     flight_hour: int
+    host_flight_step_m: float
+    snap_radius_m: float
+    night_start_hour: int
+    night_end_hour: int
 
 
 class HostSeeking(_StrictModel):
@@ -224,11 +271,16 @@ class HostSeeking(_StrictModel):
     urbanicity_add: float
     indoor_fraction_urban: float
     indoor_fraction_rural: float
+    detect_range_m: float
+    approach_step_m: float
 
 
 class Oviposition(_StrictModel):
     scale_m: float
     radius_m: float
+    detect_range_m: float
+    step_m: float
+    min_attraction: float
     timeout_days: int
 
 
@@ -263,10 +315,13 @@ class ModelConfig(_StrictModel):
     ingest: Ingest
     adults: Adults
     eip: Eip
+    transmission: Transmission
     dispersal: Dispersal
     host_seeking: HostSeeking
     oviposition: Oviposition
     aquatic_stages: AquaticStages
+    thermal: Thermal
+    gonotrophic: Gonotrophic
     rng: Rng
 
     _source_path: pathlib.Path | None = PrivateAttr(default=None)
@@ -390,6 +445,100 @@ class ModelConfig(_StrictModel):
             errors.append(
                 "ingest.nodata_sentinel_int must be negative, got "
                 f"{self.ingest.nodata_sentinel_int!r}")
+
+        # [0, 1] fractions/probabilities (task-07 sections).
+        for name, value in (
+                ("transmission.beta_hv", self.transmission.beta_hv),
+                ("transmission.beta_vh", self.transmission.beta_vh),
+                ("transmission.initial_human_prevalence",
+                 self.transmission.initial_human_prevalence),
+                ("transmission.initial_vector_infected_frac",
+                 self.transmission.initial_vector_infected_frac),
+                ("gonotrophic.feeding_success_rate",
+                 self.gonotrophic.feeding_success_rate),
+                ("oviposition.min_attraction",
+                 self.oviposition.min_attraction),
+                ("ingest.residential_from_indoor_frac",
+                 self.ingest.residential_from_indoor_frac)):
+            if not (0.0 <= value <= 1.0):
+                errors.append(f"{name} must be in [0, 1], got {value!r}")
+
+        for name, value in (
+                ("transmission.human_incubation_days",
+                 self.transmission.human_incubation_days),
+                ("transmission.human_infectious_days",
+                 self.transmission.human_infectious_days),
+                ("transmission.human_immunity_days",
+                 self.transmission.human_immunity_days),
+                ("gonotrophic.cycle_duration_days",
+                 self.gonotrophic.cycle_duration_days),
+                ("gonotrophic.first_cycle_days",
+                 self.gonotrophic.first_cycle_days),
+                ("gonotrophic.resting_duration_days",
+                 self.gonotrophic.resting_duration_days)):
+            if value <= 0:
+                errors.append(f"{name} must be > 0, got {value!r}")
+
+        thermal = self.thermal
+        if not (thermal.efd_tmin_c < thermal.efd_topt_c < thermal.efd_tmax_c):
+            errors.append(
+                "thermal.efd_* must satisfy tmin < topt < tmax, got "
+                f"{thermal.efd_tmin_c!r}/{thermal.efd_topt_c!r}/"
+                f"{thermal.efd_tmax_c!r}")
+        if thermal.efd_max_eggs_per_day <= 0:
+            errors.append(
+                "thermal.efd_max_eggs_per_day must be > 0, got "
+                f"{thermal.efd_max_eggs_per_day!r}")
+        for stage in ("egg", "larva", "pupa"):
+            tmin = getattr(thermal, f"{stage}_development_tmin_c")
+            tmax = getattr(thermal, f"{stage}_development_tmax_c")
+            scale = getattr(thermal, f"{stage}_development_scale")
+            if not tmin < tmax:
+                errors.append(
+                    f"thermal.{stage}_development_tmin_c must be < "
+                    f"{stage}_development_tmax_c, got {tmin!r}/{tmax!r}")
+            if scale <= 0:
+                errors.append(
+                    f"thermal.{stage}_development_scale must be > 0, got "
+                    f"{scale!r}")
+
+        gono = self.gonotrophic
+        if gono.egg_batch_n <= 0:
+            errors.append(
+                f"gonotrophic.egg_batch_n must be > 0, got {gono.egg_batch_n!r}")
+        if not (0 < gono.egg_batch_min <= gono.egg_batch_mean
+                <= gono.egg_batch_max <= gono.egg_batch_n):
+            errors.append(
+                "gonotrophic egg batch must satisfy 0 < min <= mean <= max "
+                f"<= n, got {gono.egg_batch_min!r}/{gono.egg_batch_mean!r}/"
+                f"{gono.egg_batch_max!r}/{gono.egg_batch_n!r}")
+
+        if self.host_seeking.detect_range_m <= 0:
+            errors.append(
+                "host_seeking.detect_range_m must be > 0, got "
+                f"{self.host_seeking.detect_range_m!r}")
+        if self.host_seeking.approach_step_m <= 0:
+            errors.append(
+                "host_seeking.approach_step_m must be > 0, got "
+                f"{self.host_seeking.approach_step_m!r}")
+        if self.oviposition.detect_range_m <= 0:
+            errors.append(
+                "oviposition.detect_range_m must be > 0, got "
+                f"{self.oviposition.detect_range_m!r}")
+        if self.oviposition.step_m <= 0:
+            errors.append(
+                f"oviposition.step_m must be > 0, got "
+                f"{self.oviposition.step_m!r}")
+
+        for name, hour in (("dispersal.night_start_hour",
+                            self.dispersal.night_start_hour),
+                           ("dispersal.night_end_hour",
+                            self.dispersal.night_end_hour)):
+            if not (0 <= hour < 24):
+                errors.append(f"{name} must be in [0, 24), got {hour!r}")
+        if self.dispersal.night_start_hour == self.dispersal.night_end_hour:
+            errors.append(
+                "dispersal.night_start_hour must differ from night_end_hour")
 
         if errors:
             raise ValueError(

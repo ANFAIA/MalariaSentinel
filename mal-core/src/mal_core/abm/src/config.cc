@@ -674,6 +674,9 @@ ModelConfig parse_config_file(const std::string& path) {
     cfg.ingest.nodata_sentinel_int = L.integer(
         L.key(ing, "ingest", "nodata_sentinel_int"),
         "ingest.nodata_sentinel_int");
+    cfg.ingest.residential_from_indoor_frac = L.num(
+        L.key(ing, "ingest", "residential_from_indoor_frac"),
+        "ingest.residential_from_indoor_frac");
     cfg.ingest.coastline_buffer_m = L.num(
         L.key(ing, "ingest", "coastline_buffer_m"),
         "ingest.coastline_buffer_m");
@@ -722,6 +725,28 @@ ModelConfig parse_config_file(const std::string& path) {
     cfg.eip.threshold_gd = L.num(L.key(eipn, "eip", "threshold_gd"),
                                  "eip.threshold_gd");
 
+    // -- transmission --------------------------------------------------------
+    const YNode* txn = L.section(&root, "transmission");
+    cfg.transmission.beta_hv = L.num(
+        L.key(txn, "transmission", "beta_hv"), "transmission.beta_hv");
+    cfg.transmission.beta_vh = L.num(
+        L.key(txn, "transmission", "beta_vh"), "transmission.beta_vh");
+    cfg.transmission.human_incubation_days = L.integer(
+        L.key(txn, "transmission", "human_incubation_days"),
+        "transmission.human_incubation_days");
+    cfg.transmission.human_infectious_days = L.integer(
+        L.key(txn, "transmission", "human_infectious_days"),
+        "transmission.human_infectious_days");
+    cfg.transmission.human_immunity_days = L.integer(
+        L.key(txn, "transmission", "human_immunity_days"),
+        "transmission.human_immunity_days");
+    cfg.transmission.initial_human_prevalence = L.num(
+        L.key(txn, "transmission", "initial_human_prevalence"),
+        "transmission.initial_human_prevalence");
+    cfg.transmission.initial_vector_infected_frac = L.num(
+        L.key(txn, "transmission", "initial_vector_infected_frac"),
+        "transmission.initial_vector_infected_frac");
+
     // -- dispersal -----------------------------------------------------------
     const YNode* dsp = L.section(&root, "dispersal");
     cfg.dispersal.adult_prob_day = L.num(
@@ -743,6 +768,17 @@ ModelConfig parse_config_file(const std::string& path) {
         "dispersal.wind_self_speed_ms");
     cfg.dispersal.flight_hour = L.integer(
         L.key(dsp, "dispersal", "flight_hour"), "dispersal.flight_hour");
+    cfg.dispersal.host_flight_step_m = L.num(
+        L.key(dsp, "dispersal", "host_flight_step_m"),
+        "dispersal.host_flight_step_m");
+    cfg.dispersal.snap_radius_m = L.num(
+        L.key(dsp, "dispersal", "snap_radius_m"), "dispersal.snap_radius_m");
+    cfg.dispersal.night_start_hour = L.integer(
+        L.key(dsp, "dispersal", "night_start_hour"),
+        "dispersal.night_start_hour");
+    cfg.dispersal.night_end_hour = L.integer(
+        L.key(dsp, "dispersal", "night_end_hour"),
+        "dispersal.night_end_hour");
 
     // -- host_seeking --------------------------------------------------------
     const YNode* hs = L.section(&root, "host_seeking");
@@ -761,6 +797,12 @@ ModelConfig parse_config_file(const std::string& path) {
     cfg.host_seeking.indoor_fraction_rural = L.num(
         L.key(hs, "host_seeking", "indoor_fraction_rural"),
         "host_seeking.indoor_fraction_rural");
+    cfg.host_seeking.detect_range_m = L.num(
+        L.key(hs, "host_seeking", "detect_range_m"),
+        "host_seeking.detect_range_m");
+    cfg.host_seeking.approach_step_m = L.num(
+        L.key(hs, "host_seeking", "approach_step_m"),
+        "host_seeking.approach_step_m");
 
     // -- oviposition ---------------------------------------------------------
     const YNode* ov = L.section(&root, "oviposition");
@@ -768,6 +810,14 @@ ModelConfig parse_config_file(const std::string& path) {
                                     "oviposition.scale_m");
     cfg.oviposition.radius_m = L.num(L.key(ov, "oviposition", "radius_m"),
                                      "oviposition.radius_m");
+    cfg.oviposition.detect_range_m = L.num(
+        L.key(ov, "oviposition", "detect_range_m"),
+        "oviposition.detect_range_m");
+    cfg.oviposition.step_m = L.num(L.key(ov, "oviposition", "step_m"),
+                                   "oviposition.step_m");
+    cfg.oviposition.min_attraction = L.num(
+        L.key(ov, "oviposition", "min_attraction"),
+        "oviposition.min_attraction");
     cfg.oviposition.timeout_days = L.integer(
         L.key(ov, "oviposition", "timeout_days"),
         "oviposition.timeout_days");
@@ -792,6 +842,72 @@ ModelConfig parse_config_file(const std::string& path) {
     cfg.aquatic_stages.salinity_missing_psu = L.num(
         L.key(stg, "aquatic_stages", "salinity_missing_psu"),
         "aquatic_stages.salinity_missing_psu");
+
+    // -- thermal -------------------------------------------------------------
+    const YNode* thm = L.section(&root, "thermal");
+    cfg.thermal.efd_max_eggs_per_day = L.num(
+        L.key(thm, "thermal", "efd_max_eggs_per_day"),
+        "thermal.efd_max_eggs_per_day");
+    cfg.thermal.efd_tmin_c = L.num(L.key(thm, "thermal", "efd_tmin_c"),
+                                   "thermal.efd_tmin_c");
+    cfg.thermal.efd_tmax_c = L.num(L.key(thm, "thermal", "efd_tmax_c"),
+                                   "thermal.efd_tmax_c");
+    cfg.thermal.efd_topt_c = L.num(L.key(thm, "thermal", "efd_topt_c"),
+                                   "thermal.efd_topt_c");
+    cfg.thermal.egg_development_tmin_c = L.num(
+        L.key(thm, "thermal", "egg_development_tmin_c"),
+        "thermal.egg_development_tmin_c");
+    cfg.thermal.egg_development_tmax_c = L.num(
+        L.key(thm, "thermal", "egg_development_tmax_c"),
+        "thermal.egg_development_tmax_c");
+    cfg.thermal.egg_development_scale = L.num(
+        L.key(thm, "thermal", "egg_development_scale"),
+        "thermal.egg_development_scale");
+    cfg.thermal.larva_development_tmin_c = L.num(
+        L.key(thm, "thermal", "larva_development_tmin_c"),
+        "thermal.larva_development_tmin_c");
+    cfg.thermal.larva_development_tmax_c = L.num(
+        L.key(thm, "thermal", "larva_development_tmax_c"),
+        "thermal.larva_development_tmax_c");
+    cfg.thermal.larva_development_scale = L.num(
+        L.key(thm, "thermal", "larva_development_scale"),
+        "thermal.larva_development_scale");
+    cfg.thermal.pupa_development_tmin_c = L.num(
+        L.key(thm, "thermal", "pupa_development_tmin_c"),
+        "thermal.pupa_development_tmin_c");
+    cfg.thermal.pupa_development_tmax_c = L.num(
+        L.key(thm, "thermal", "pupa_development_tmax_c"),
+        "thermal.pupa_development_tmax_c");
+    cfg.thermal.pupa_development_scale = L.num(
+        L.key(thm, "thermal", "pupa_development_scale"),
+        "thermal.pupa_development_scale");
+
+    // -- gonotrophic ---------------------------------------------------------
+    const YNode* gon = L.section(&root, "gonotrophic");
+    cfg.gonotrophic.cycle_duration_days = L.num(
+        L.key(gon, "gonotrophic", "cycle_duration_days"),
+        "gonotrophic.cycle_duration_days");
+    cfg.gonotrophic.first_cycle_days = L.num(
+        L.key(gon, "gonotrophic", "first_cycle_days"),
+        "gonotrophic.first_cycle_days");
+    cfg.gonotrophic.feeding_success_rate = L.num(
+        L.key(gon, "gonotrophic", "feeding_success_rate"),
+        "gonotrophic.feeding_success_rate");
+    cfg.gonotrophic.egg_batch_mean = L.integer(
+        L.key(gon, "gonotrophic", "egg_batch_mean"),
+        "gonotrophic.egg_batch_mean");
+    cfg.gonotrophic.egg_batch_n = L.integer(
+        L.key(gon, "gonotrophic", "egg_batch_n"),
+        "gonotrophic.egg_batch_n");
+    cfg.gonotrophic.egg_batch_min = L.integer(
+        L.key(gon, "gonotrophic", "egg_batch_min"),
+        "gonotrophic.egg_batch_min");
+    cfg.gonotrophic.egg_batch_max = L.integer(
+        L.key(gon, "gonotrophic", "egg_batch_max"),
+        "gonotrophic.egg_batch_max");
+    cfg.gonotrophic.resting_duration_days = L.num(
+        L.key(gon, "gonotrophic", "resting_duration_days"),
+        "gonotrophic.resting_duration_days");
 
     // -- rng -----------------------------------------------------------------
     const YNode* rng = L.section(&root, "rng");

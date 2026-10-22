@@ -48,7 +48,9 @@ float HostSeekingModel::cell_attraction(
                 load_config().host_seeking.indoor_attraction_add);
 
     // Urban modifier: concentrated CO₂ in settlements.
-    const float urban_mod = 1.0f + 0.2f * cell.urbanicity;
+    const float urban_mod =
+        1.0f + static_cast<float>(
+            load_config().host_seeking.urbanicity_add) * cell.urbanicity;
 
     // Weighted sum across host types.
     float att = 0.0f;
@@ -292,8 +294,10 @@ std::optional<std::pair<int32_t, int32_t>> HostSeekingModel::step_toward_host(
     const AOI& aoi,
     float step_size_m) const
 {
-    // Detect the strongest host cell within the 2000m plume range.
-    const auto target = detect_host_cell(row, col, eff_landscape, aoi, 2000.0);
+    // Detect the strongest host cell within the configured plume range.
+    const auto target = detect_host_cell(
+        row, col, eff_landscape, aoi,
+        static_cast<double>(load_config().host_seeking.detect_range_m));
     if (!target) return std::nullopt;
 
     // One step toward it, clamped to step_size_m, rounded to the nearest

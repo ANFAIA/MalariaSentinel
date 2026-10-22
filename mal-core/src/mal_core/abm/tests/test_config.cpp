@@ -6,6 +6,11 @@
 #include <fstream>
 
 #include "mal_abm_fast/config.hpp"
+#include "mal_abm_fast/birth_rate.hpp"
+#include "mal_abm_fast/gonotrophic_cycle.hpp"
+#include "mal_abm_fast/thermal_responses.hpp"
+#include "mal_abm_fast/transmission.hpp"
+#include "mal_abm_fast/multirate_scheduler.hpp"
 
 namespace fs = std::filesystem;
 
@@ -126,4 +131,63 @@ TEST(ConfigParser, MissingKeysListedTogether) {
 TEST(ConfigParser, LoadConfigSingletonResolved) {
     const auto& cfg = mal_abm_fast::load_config();
     EXPECT_EQ(cfg.version, 2);
+}
+
+// -- task-07: struct defaults are YAML-bound (no compiled model values) -------
+
+TEST(ConfigBoundDefaults, GonotrophicParamsComeFromYaml) {
+    const auto cfg = mal_abm_fast::parse_config_file(canonical_yaml());
+    const mal_abm_fast::GonotrophicParams p;
+    EXPECT_FLOAT_EQ(p.cycle_duration_days,
+                    float(cfg.gonotrophic.cycle_duration_days));
+    EXPECT_FLOAT_EQ(p.first_cycle_days,
+                    float(cfg.gonotrophic.first_cycle_days));
+    EXPECT_FLOAT_EQ(p.feeding_success_rate,
+                    float(cfg.gonotrophic.feeding_success_rate));
+    EXPECT_EQ(p.egg_batch_mean, cfg.gonotrophic.egg_batch_mean);
+    EXPECT_EQ(p.egg_batch_n, cfg.gonotrophic.egg_batch_n);
+    EXPECT_EQ(p.egg_batch_min, cfg.gonotrophic.egg_batch_min);
+    EXPECT_EQ(p.egg_batch_max, cfg.gonotrophic.egg_batch_max);
+    EXPECT_FLOAT_EQ(p.resting_duration_days,
+                    float(cfg.gonotrophic.resting_duration_days));
+}
+
+TEST(ConfigBoundDefaults, TransmissionParamsComeFromYaml) {
+    const auto cfg = mal_abm_fast::parse_config_file(canonical_yaml());
+    const mal_abm_fast::TransmissionParams p;
+    EXPECT_FLOAT_EQ(p.beta_hv, float(cfg.transmission.beta_hv));
+    EXPECT_FLOAT_EQ(p.beta_vh, float(cfg.transmission.beta_vh));
+    EXPECT_EQ(p.human_incubation_days, cfg.transmission.human_incubation_days);
+    EXPECT_EQ(p.human_infectious_days, cfg.transmission.human_infectious_days);
+    EXPECT_EQ(p.immunity_duration_days, cfg.transmission.human_immunity_days);
+    EXPECT_DOUBLE_EQ(p.initial_human_prevalence,
+                     cfg.transmission.initial_human_prevalence);
+    EXPECT_DOUBLE_EQ(p.initial_vector_infected_frac,
+                     cfg.transmission.initial_vector_infected_frac);
+}
+
+TEST(ConfigBoundDefaults, ThermalCurvesUseYamlParameters) {
+    const auto cfg = mal_abm_fast::parse_config_file(canonical_yaml());
+    const auto& t = cfg.thermal;
+    EXPECT_NEAR(mal_abm_fast::egg_production_rate(t.efd_topt_c),
+                t.efd_max_eggs_per_day, 1e-12);
+    EXPECT_DOUBLE_EQ(mal_abm_fast::egg_production_rate(t.efd_tmin_c), 0.0);
+    EXPECT_DOUBLE_EQ(mal_abm_fast::egg_production_rate(t.efd_tmax_c), 0.0);
+    EXPECT_EQ(mal_abm_fast::egg_development_rate(
+                  static_cast<float>(t.egg_development_tmin_c)), 0.0f);
+    EXPECT_EQ(mal_abm_fast::larva_development_rate(
+                  static_cast<float>(t.larva_development_tmax_c)), 0.0f);
+    EXPECT_EQ(mal_abm_fast::pupa_development_rate(
+                  static_cast<float>(t.pupa_development_tmin_c)), 0.0f);
+}
+
+TEST(ConfigBoundDefaults, NightWindowComesFromYaml) {
+    const auto cfg = mal_abm_fast::parse_config_file(canonical_yaml());
+    EXPECT_TRUE(mal_abm_fast::is_nighttime_hour(
+        cfg.dispersal.night_start_hour));
+    EXPECT_FALSE(mal_abm_fast::is_nighttime_hour(
+        (cfg.dispersal.night_start_hour + 12) % 24));
+    EXPECT_EQ(mal_abm_fast::nighttime_hours_count(),
+              (cfg.dispersal.night_end_hour -
+               cfg.dispersal.night_start_hour + 24) % 24);
 }

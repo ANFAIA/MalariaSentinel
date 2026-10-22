@@ -27,22 +27,27 @@
 namespace mal_abm_fast {
 
 /// Parameters for SEIR-SEI transmission.
+///
+/// Model values are read from ``transmission:`` in model_constants.yaml by
+/// the default constructor (single source, R1). Seeding/outbreak knobs stay
+/// as scenario defaults (CLI, classified (iii) in task-07): they are not
+/// model parameters of the transmission equations.
 struct TransmissionParams {
     bool enabled = false;
 
-    // Transmission efficiencies
-    float beta_hv = 0.40f;   // Human-to-vector transmission probability per infectious bite
-    float beta_vh = 0.50f;   // Vector-to-human transmission probability per infectious bite
+    // Transmission efficiencies (model_constants.yaml: transmission.*)
+    float beta_hv;
+    float beta_vh;
 
     // Human epidemiology durations (days)
-    int32_t human_incubation_days = 12;   // Intrinsic incubation period (E_H -> I_H)
-    int32_t human_infectious_days = 20;   // Human infectious duration (I_H -> R_H / S_H)
-    int32_t immunity_duration_days = 180; // Waning immunity duration (R_H -> S_H)
+    int32_t human_incubation_days;
+    int32_t human_infectious_days;
+    int32_t immunity_duration_days;
     bool    immunity_enabled       = false; // If false: SIS-like I_H -> S_H recovery
 
     // Initial infection conditions
-    double initial_human_prevalence     = 0.05; // Initial I_H fraction in inhabited cells (used if mode == "uniform-legacy")
-    double initial_vector_infected_frac = 0.0;  // Initial I_V fraction in adult females
+    double initial_human_prevalence;
+    double initial_vector_infected_frac;
     std::string initial_infected_path   = "";   // Optional raster/json path
 
     // Focal seeding & outbreak control (M7.4.1)
@@ -79,10 +84,19 @@ struct TransmissionParams {
     // Threshold for active transmission focus band
     float focus_threshold = 0.01f;
 
-    // EIP parameters (Plasmodium falciparum extrinsic incubation period)
-    float eip_base_temp     = EIP_BASE_C();       // 16.0 deg C
-    float eip_threshold_gd  = EIP_THRESHOLD_GD(); // 110.0 GDD
+    TransmissionParams();
 };
+
+inline TransmissionParams::TransmissionParams() {
+    const TransmissionCfg& cfg = load_config().transmission;
+    beta_hv = static_cast<float>(cfg.beta_hv);
+    beta_vh = static_cast<float>(cfg.beta_vh);
+    human_incubation_days = cfg.human_incubation_days;
+    human_infectious_days = cfg.human_infectious_days;
+    immunity_duration_days = cfg.human_immunity_days;
+    initial_human_prevalence = cfg.initial_human_prevalence;
+    initial_vector_infected_frac = cfg.initial_vector_infected_frac;
+}
 
 /// Daily aggregated statistics for transmission.
 struct TransmissionDailyStats {

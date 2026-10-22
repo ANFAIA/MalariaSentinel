@@ -14,6 +14,8 @@
 #include <cstdint>
 #include <vector>
 
+#include "config.hpp"
+
 namespace mal_abm_fast {
 
 /// Gonotrophic state for adult female mosquitoes.
@@ -46,22 +48,33 @@ enum class HostType : uint8_t {
     OTHER  = 4,
 };
 
-/// Gonotrophic cycle parameters. Defaults are calibrated for
-/// An. gambiae s.s. in West Africa (Ghana).
+/// Gonotrophic cycle parameters. Values come from ``gonotrophic:`` in
+/// model_constants.yaml (single source, R1); the default constructor reads
+/// the validated config so no compiled default exists.
 struct GonotrophicParams {
-    float cycle_duration_days   = 2.0f;    // post-first-cycle egg maturation
-                                           // (An. gambiae s.l. 2-3d, Gillies
-                                           // & Wilkes 1961; warm-season end)
-    float first_cycle_days      = 4.0f;    // first-cycle egg maturation
-    float feeding_success_rate  = 0.825f;  // [0.75, 0.90]
-    int32_t egg_batch_mean      = 120;     // binomial(240, 0.5)
-    int32_t egg_batch_n         = 240;     // trials for the egg-batch draw
-    int32_t egg_batch_min       = 30;
-    int32_t egg_batch_max       = 170;
-    float resting_duration_days = 0.5f;    // post-feed rest (short pre-gravid
-                                           // rest; full cycle ≈ 2.5d between
-                                           // blood meals ≈ 0.40 bites/day)
+    float cycle_duration_days;    // post-first-cycle egg maturation
+    float first_cycle_days;       // first-cycle egg maturation
+    float feeding_success_rate;   // PROBING -> BLOOD_FED
+    int32_t egg_batch_mean;       // binomial(n, 0.5) mean
+    int32_t egg_batch_n;          // trials for the egg-batch draw
+    int32_t egg_batch_min;
+    int32_t egg_batch_max;
+    float resting_duration_days;  // post-feed rest (BLOOD_FED -> RESTING)
+
+    GonotrophicParams();
 };
+
+inline GonotrophicParams::GonotrophicParams() {
+    const GonotrophicCfg& cfg = load_config().gonotrophic;
+    cycle_duration_days = static_cast<float>(cfg.cycle_duration_days);
+    first_cycle_days = static_cast<float>(cfg.first_cycle_days);
+    feeding_success_rate = static_cast<float>(cfg.feeding_success_rate);
+    egg_batch_mean = cfg.egg_batch_mean;
+    egg_batch_n = cfg.egg_batch_n;
+    egg_batch_min = cfg.egg_batch_min;
+    egg_batch_max = cfg.egg_batch_max;
+    resting_duration_days = static_cast<float>(cfg.resting_duration_days);
+}
 
 /// Advance one female's gonotrophic state by one day.
 ///

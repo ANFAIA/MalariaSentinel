@@ -65,8 +65,6 @@ TEST(TransmissionModel, VectorEipProgressionAtConstantTemp) {
     TransmissionModel tm;
     TransmissionParams params;
     params.enabled = true;
-    params.eip_base_temp = 16.0f;
-    params.eip_threshold_gd = 110.0f;
 
     std::vector<float> human_pop = {100.0f};
     tm.init(1, 1, human_pop, params, 1);
@@ -119,7 +117,6 @@ TEST(TransmissionModel, SeedVectorInfections) {
     TransmissionModel tm;
     TransmissionParams params;
     params.enabled = true;
-    params.eip_threshold_gd = 110.0f;
 
     std::vector<float> human_pop = {100.0f};
     tm.init(1, 1, human_pop, params, 77);

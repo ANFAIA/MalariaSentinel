@@ -101,6 +101,7 @@ struct GeodesyCfg {
 struct IngestCfg {
     double nodata_sentinel = 0.0;
     int nodata_sentinel_int = 0;
+    double residential_from_indoor_frac = 0.0;
     double coastline_buffer_m = 0.0;
     double cell_size_hint_m = 0.0;
     double candidate_min_ingest = 0.0;
@@ -126,6 +127,43 @@ struct EipCfg {
     double threshold_gd = 0.0;
 };
 
+struct TransmissionCfg {
+    double beta_hv = 0.0;
+    double beta_vh = 0.0;
+    int human_incubation_days = 0;
+    int human_infectious_days = 0;
+    int human_immunity_days = 0;
+    double initial_human_prevalence = 0.0;
+    double initial_vector_infected_frac = 0.0;
+};
+
+struct ThermalCfg {
+    double efd_max_eggs_per_day = 0.0;
+    double efd_tmin_c = 0.0;
+    double efd_tmax_c = 0.0;
+    double efd_topt_c = 0.0;
+    double egg_development_tmin_c = 0.0;
+    double egg_development_tmax_c = 0.0;
+    double egg_development_scale = 0.0;
+    double larva_development_tmin_c = 0.0;
+    double larva_development_tmax_c = 0.0;
+    double larva_development_scale = 0.0;
+    double pupa_development_tmin_c = 0.0;
+    double pupa_development_tmax_c = 0.0;
+    double pupa_development_scale = 0.0;
+};
+
+struct GonotrophicCfg {
+    double cycle_duration_days = 0.0;
+    double first_cycle_days = 0.0;
+    double feeding_success_rate = 0.0;
+    int egg_batch_mean = 0;
+    int egg_batch_n = 0;
+    int egg_batch_min = 0;
+    int egg_batch_max = 0;
+    double resting_duration_days = 0.0;
+};
+
 struct DispersalCfg {
     double adult_prob_day = 0.0;
     double adult_sigma_m = 0.0;
@@ -135,6 +173,10 @@ struct DispersalCfg {
     double wind_survival = 0.0;
     double wind_self_speed_ms = 0.0;
     int flight_hour = 0;
+    double host_flight_step_m = 0.0;
+    double snap_radius_m = 0.0;
+    int night_start_hour = 0;
+    int night_end_hour = 0;
 };
 
 struct HostSeekingCfg {
@@ -143,11 +185,16 @@ struct HostSeekingCfg {
     double urbanicity_add = 0.0;
     double indoor_fraction_urban = 0.0;
     double indoor_fraction_rural = 0.0;
+    double detect_range_m = 0.0;
+    double approach_step_m = 0.0;
 };
 
 struct OvipositionCfg {
     double scale_m = 0.0;
     double radius_m = 0.0;
+    double detect_range_m = 0.0;
+    double step_m = 0.0;
+    double min_attraction = 0.0;
     int timeout_days = 0;
 };
 
@@ -180,10 +227,13 @@ struct ModelConfig {
     IngestCfg ingest;
     AdultsCfg adults;
     EipCfg eip;
+    TransmissionCfg transmission;
     DispersalCfg dispersal;
     HostSeekingCfg host_seeking;
     OvipositionCfg oviposition;
     AquaticStagesCfg aquatic_stages;
+    ThermalCfg thermal;
+    GonotrophicCfg gonotrophic;
     RngCfg rng;
 };
 

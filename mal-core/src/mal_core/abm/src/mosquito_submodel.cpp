@@ -575,7 +575,8 @@ void MosquitoSubmodel::advance_day(const AOI& aoi,
         // Handle HOST_APPROACH: directed flight toward detected host (Plan D).
         if (g_state == GonotrophicState::HOST_APPROACH && host_seeking_ && host_landscape_) {
             auto target = host_seeking_->detect_host_cell(
-                soa_.row[si], soa_.col[si], *host_landscape_, aoi, 2000.0);
+                soa_.row[si], soa_.col[si], *host_landscape_, aoi,
+                load_config().host_seeking.detect_range_m);
             if (!target) {
                 g_state = GonotrophicState::HOST_SEEKING;
                 g_timer = 0;
@@ -584,7 +585,8 @@ void MosquitoSubmodel::advance_day(const AOI& aoi,
             } else {
                 auto [step_r, step_c] = host_seeking_->approach_vector(
                     soa_.row[si], soa_.col[si],
-                    target->first, target->second, aoi, 50.0f);
+                    target->first, target->second, aoi,
+                    static_cast<float>(load_config().host_seeking.approach_step_m));
                 // Apply step (round to nearest cell)
                 int32_t new_row = soa_.row[si] + static_cast<int32_t>(std::round(step_r));
                 int32_t new_col = soa_.col[si] + static_cast<int32_t>(std::round(step_c));
@@ -624,7 +626,8 @@ void MosquitoSubmodel::advance_day(const AOI& aoi,
             if (oviposition_seeking_) {
                 auto target = oviposition_seeking_->detect_breeding_cell(
                     soa_.row[si], soa_.col[si],
-                    *habitat_engine_for_ovip_, patch_states, aoi, 2000.0);
+                    *habitat_engine_for_ovip_, patch_states, aoi,
+                    load_config().oviposition.detect_range_m);
                 if (!target) {
                     // No breeding site within 2km; increment timer.
                     g_timer += 1;
@@ -633,7 +636,8 @@ void MosquitoSubmodel::advance_day(const AOI& aoi,
                     // Walk toward target.
                     auto [new_row, new_col] = oviposition_seeking_->step_toward(
                         soa_.row[si], soa_.col[si],
-                        target->first, target->second, aoi, 50.0f);
+                        target->first, target->second, aoi,
+                        static_cast<float>(load_config().oviposition.step_m));
                     soa_.row[si] = new_row;
                     soa_.col[si] = new_col;
                     // Snap lon/lat to new cell centre.
@@ -811,7 +815,9 @@ void MosquitoSubmodel::advance_day(const AOI& aoi,
 
                 // Directed movement toward the best host cell (plan F3).
                 const auto target = host_seeking_->step_toward_host(
-                    soa_.row[si], soa_.col[si], eff, aoi, 500.0f);
+                    soa_.row[si], soa_.col[si], eff, aoi,
+                    static_cast<float>(
+                        load_config().dispersal.host_flight_step_m));
                 if (target && (target->first != soa_.row[si] ||
                                target->second != soa_.col[si])) {
                     ++n_phase_moved;
@@ -959,7 +965,7 @@ void MosquitoSubmodel::update_patch_id(
     soa_.last_patch_update_row[si] = new_row;
     soa_.last_patch_update_col[si] = new_col;
 
-    // Full scan: snap to nearest activated patch within 500m.
+    // Full scan: snap to nearest activated patch within the YAML radius.
     const float cell_size_m = static_cast<float>(aoi.resolution_m);
     int64_t best_patch = -1;
     float best_dist_m = std::numeric_limits<float>::infinity();
@@ -968,7 +974,7 @@ void MosquitoSubmodel::update_patch_id(
         const float dy = static_cast<float>(ps.row - new_row) * cell_size_m;
         const float dx = static_cast<float>(ps.col - new_col) * cell_size_m;
         const float d = std::sqrt(dy * dy + dx * dx);
-        if (d > 500.0f) continue;
+        if (d > static_cast<float>(load_config().dispersal.snap_radius_m)) continue;
         if (d < best_dist_m) {
             best_dist_m = d;
             best_patch = ps.patch_id;
@@ -987,7 +993,7 @@ void MosquitoSubmodel::update_patch_id(
 void MosquitoSubmodel::adult_dispersal(const AOI& aoi) {
     const bool wind_active = wind_field_ &&
         WindField::is_migration_season(current_month_) &&
-        (current_hour_ >= 18 || current_hour_ < 6);  // night-only flight
+        is_nighttime_hour(current_hour_);  // night-only flight
 
     for (int64_t i = 0; i < soa_.n_alive; ++i) {
         const size_t si = static_cast<size_t>(i);

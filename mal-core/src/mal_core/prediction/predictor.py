@@ -22,6 +22,7 @@ from mal_commonlib.config import RUNS_DIR
 from .aggregator import get_aggregator, grid_shape, make_aoi
 from .env_loader import ENV_CHANNELS, load_env_stack
 from .registry import ModelRegistry
+from ..habitat.config import CONFIG
 from ..scenario import ScenarioConfig, interventions_to_params
 from .state_loader import load_abm_state
 
@@ -117,7 +118,7 @@ def run_prediction(
         "width": aggregated.shape[-1],
         "crs": aoi.crs,
         "transform": transform,
-        "nodata": -9999.0,
+        "nodata": float(CONFIG["ingest"]["nodata_sentinel"]),
         "tiled": True,
         "compress": "deflate",
         "blockxsize": 128,

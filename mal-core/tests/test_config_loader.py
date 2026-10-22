@@ -289,3 +289,31 @@ def test_dump_raw_shape():
     assert raw["habitat_types.types.0"] == "surface_persistent"
     assert abs(sum(raw["species.coluzzii.weights"]) - 1.0) < 1e-9
     assert raw["pluvial.rain_scale_mm"] == 2.5
+
+
+# -- task-07: per-section parity for the new model domains ------------------
+
+_TASK07_SECTIONS = ("transmission", "thermal", "gonotrophic")
+
+
+@pytest.mark.parametrize("section", _TASK07_SECTIONS)
+def test_task07_section_parity(section):
+    """Each section added by task-07 is dumped 1:1 by py and C++."""
+    exe = _config_dump_path()
+    if exe is None:
+        pytest.skip("config_dump binary not built")
+    import json
+    import subprocess
+
+    out = subprocess.run([str(exe), "--yaml", str(DEFAULT_PATH)],
+                         capture_output=True, text=True)
+    assert out.returncode == 0, out.stderr
+    cxx = json.loads(out.stdout)
+    py = dump_raw()
+    prefix = section + "."
+    py_keys = {k: v for k, v in py.items() if k.startswith(prefix)}
+    cxx_keys = {k: v for k, v in cxx.items() if k.startswith(prefix)}
+    assert py_keys, f"{section}: no keys in the py raw dump"
+    assert set(py_keys) == set(cxx_keys), section
+    for key, value in py_keys.items():
+        assert abs(float(value) - float(cxx[key])) < 1e-9, key

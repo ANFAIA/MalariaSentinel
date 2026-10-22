@@ -14,25 +14,35 @@
 
 #include <cstdint>
 
+#include "config.hpp"
+
 namespace mal_abm_fast {
 
 /// Hour of day in [0, 24). Used by the multirate scheduler.
 using HourOfDay = int32_t;
 
 /// Check whether a given hour falls within the active nighttime
-/// window for host-seeking An. gambiae.
-///
-/// Active window: 18:00–05:59 (12 hours total).
-/// Hours 0–5 (midnight–dawn) and 18–23 (dusk–midnight) are active.
+/// window for host-seeking An. gambiae. The window lives in
+/// model_constants.yaml (dispersal.night_start_hour/night_end_hour);
+/// a window whose end is <= start crosses midnight.
 inline bool is_nighttime_hour(HourOfDay hour) {
-    return hour >= 18 || hour < 6;
+    const DispersalCfg& cfg = load_config().dispersal;
+    if (cfg.night_start_hour <= cfg.night_end_hour) {
+        return hour >= cfg.night_start_hour && hour < cfg.night_end_hour;
+    }
+    return hour >= cfg.night_start_hour || hour < cfg.night_end_hour;
 }
 
 /// Return the first active hour of the day (inclusive).
-inline constexpr HourOfDay nighttime_start() { return 18; }
+inline HourOfDay nighttime_start() {
+    return load_config().dispersal.night_start_hour;
+}
 
-/// Return the number of active nighttime hours per day.
-inline constexpr int32_t nighttime_hours_count() { return 12; }
+/// Return the number of active nighttime hours per day (derived).
+inline int32_t nighttime_hours_count() {
+    const DispersalCfg& cfg = load_config().dispersal;
+    return (cfg.night_end_hour - cfg.night_start_hour + 24) % 24;
+}
 
 /// Get the hour-of-day from a global hour count.
 /// hour_of_day = global_hour % 24.

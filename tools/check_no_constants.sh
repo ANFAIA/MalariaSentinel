@@ -73,6 +73,42 @@ hits=$(grep -rn --include='*.cpp' -e '789' -e '\b42\b' -e '\b123\b' \
     | grep -v "config.cc\|config_dump.cpp" || true)
 [ -n "$hits" ] && { echo "HIT [seeds outside rng]:"; echo "$hits" | head -4; fail=1; }
 
+# task-07: model literals moved to the YAML must not reappear in the origin
+# files. Each pattern targets the exact field/constant that now has a key.
+check_absent() {
+    _file="$1"; _pattern="$2"; _label="$3"
+    _hits=$(grep -nE "$_pattern" "$_file" 2>/dev/null || true)
+    [ -n "$_hits" ] && { echo "HIT [$_label]:"; echo "$_hits" | head -4; fail=1; }
+    return 0
+}
+T07_ABM=mal-core/src/mal_core/abm
+check_absent "$T07_ABM/include/mal_abm_fast/transmission.hpp" \
+    '(beta_hv|beta_vh|human_incubation_days|human_infectious_days|immunity_duration_days|initial_human_prevalence|initial_vector_infected_frac)[[:space:]]*=[[:space:]]*[0-9]|eip_base_temp|eip_threshold_gd' \
+    'transmission literals'
+check_absent "$T07_ABM/include/mal_abm_fast/birth_rate.hpp" \
+    'EFD_(AFD|T0|TM|TOPT)' 'EFD thermal literals'
+check_absent "$T07_ABM/include/mal_abm_fast/thermal_responses.hpp" \
+    '(EGG|LARVA|PUPA)_(TL|TH|A)[[:space:]]*=' 'stage thermal literals'
+check_absent "$T07_ABM/include/mal_abm_fast/gonotrophic_cycle.hpp" \
+    '(cycle_duration_days|first_cycle_days|feeding_success_rate|egg_batch_mean|egg_batch_n|egg_batch_min|egg_batch_max|resting_duration_days)[[:space:]]*=[[:space:]]*[0-9]' \
+    'gonotrophic literals'
+check_absent "$T07_ABM/src/mosquito_submodel.cpp" \
+    '2000\.0|500\.0f|50\.0f|current_hour_ >= 18|current_hour_ < 6' \
+    'movement kernel literals'
+check_absent "$T07_ABM/src/host_seeking.cpp" \
+    'detect_host_cell\([^;]*2000\.0|1\.0f \+ 0\.2f' 'host-seeking kernel literals'
+check_absent "$T07_ABM/src/oviposition_seeking.cpp" \
+    '0\.3f' 'oviposition min_attraction literal'
+check_absent "$T07_ABM/src/host_landscape.cpp" \
+    'indoor_fraction \* 0\.8f|indoor_fraction \* 0\.8' \
+    'residential fraction literal'
+check_absent "$T07_ABM/src/engine.cpp" \
+    'set_current_hour\([0-9]' 'engine flight hour literal'
+hits=$(grep -nE -- '-9999' \
+    mal-commonlib/src/mal_commonlib/data/loaders/dynamic_world.py \
+    mal-core/src/mal_core/prediction/predictor.py 2>/dev/null || true)
+[ -n "$hits" ] && { echo "HIT [nodata literal in origin py]:"; echo "$hits" | head -4; fail=1; }
+
 [ "$fail" -eq 0 ] && echo "check_no_constants: OK" && exit 0
 echo "check_no_constants: FAILED — migrate the hits to mal-core/config/model_constants.yaml"
 exit 1

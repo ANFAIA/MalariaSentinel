@@ -574,7 +574,7 @@ void Engine::step() {
     if (wind_field_) {
         const auto ymd = std::chrono::year_month_day{current_date_};
         sub_->set_current_month(static_cast<int>(unsigned{ymd.month()}));
-        sub_->set_current_hour(20);  // 8pm — typical mosquito flight start
+        sub_->set_current_hour(load_config().dispersal.flight_hour);
         sub_->set_current_day_index(day_index);
     }
     sub_->advance_day(aoi_, coord_->patch_states_today());

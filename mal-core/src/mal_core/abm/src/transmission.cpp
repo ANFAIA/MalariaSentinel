@@ -91,7 +91,7 @@ void TransmissionModel::seed_vector_infections(MosquitoSoA& soa, double fraction
 
         if (rng_.uniform_double() < frac) {
             soa.vector_state[si] = static_cast<uint8_t>(VectorTransmissionState::INFECTIOUS);
-            soa.parasite_eip_progress[si] = params_.eip_threshold_gd;
+            soa.parasite_eip_progress[si] = static_cast<float>(EIP_THRESHOLD_GD());
         }
     }
 }

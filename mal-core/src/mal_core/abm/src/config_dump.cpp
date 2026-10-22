@@ -113,6 +113,8 @@ int main(int argc, char** argv) {
         out["geodesy.metres_per_deg_lat"] = cfg.geodesy.metres_per_deg_lat;
         out["ingest.nodata_sentinel"] = cfg.ingest.nodata_sentinel;
         out["ingest.nodata_sentinel_int"] = cfg.ingest.nodata_sentinel_int;
+        out["ingest.residential_from_indoor_frac"] =
+            cfg.ingest.residential_from_indoor_frac;
         out["ingest.coastline_buffer_m"] = cfg.ingest.coastline_buffer_m;
         out["ingest.cell_size_hint_m"] = cfg.ingest.cell_size_hint_m;
         out["ingest.candidate_min_ingest"] = cfg.ingest.candidate_min_ingest;
@@ -133,6 +135,18 @@ int main(int argc, char** argv) {
         out["adults.mort_floor"] = cfg.adults.mort_floor;
         out["eip.base_c"] = cfg.eip.base_c;
         out["eip.threshold_gd"] = cfg.eip.threshold_gd;
+        out["transmission.beta_hv"] = cfg.transmission.beta_hv;
+        out["transmission.beta_vh"] = cfg.transmission.beta_vh;
+        out["transmission.human_incubation_days"] =
+            cfg.transmission.human_incubation_days;
+        out["transmission.human_infectious_days"] =
+            cfg.transmission.human_infectious_days;
+        out["transmission.human_immunity_days"] =
+            cfg.transmission.human_immunity_days;
+        out["transmission.initial_human_prevalence"] =
+            cfg.transmission.initial_human_prevalence;
+        out["transmission.initial_vector_infected_frac"] =
+            cfg.transmission.initial_vector_infected_frac;
         out["dispersal.adult_prob_day"] = cfg.dispersal.adult_prob_day;
         out["dispersal.adult_sigma_m"] = cfg.dispersal.adult_sigma_m;
         out["dispersal.adult_max_m"] = cfg.dispersal.adult_max_m;
@@ -143,6 +157,11 @@ int main(int argc, char** argv) {
         out["dispersal.wind_self_speed_ms"] =
             cfg.dispersal.wind_self_speed_ms;
         out["dispersal.flight_hour"] = cfg.dispersal.flight_hour;
+        out["dispersal.host_flight_step_m"] =
+            cfg.dispersal.host_flight_step_m;
+        out["dispersal.snap_radius_m"] = cfg.dispersal.snap_radius_m;
+        out["dispersal.night_start_hour"] = cfg.dispersal.night_start_hour;
+        out["dispersal.night_end_hour"] = cfg.dispersal.night_end_hour;
         out["host_seeking.starvation_days"] =
             cfg.host_seeking.starvation_days;
         out["host_seeking.indoor_attraction_add"] =
@@ -153,8 +172,15 @@ int main(int argc, char** argv) {
             cfg.host_seeking.indoor_fraction_urban;
         out["host_seeking.indoor_fraction_rural"] =
             cfg.host_seeking.indoor_fraction_rural;
+        out["host_seeking.detect_range_m"] =
+            cfg.host_seeking.detect_range_m;
+        out["host_seeking.approach_step_m"] =
+            cfg.host_seeking.approach_step_m;
         out["oviposition.scale_m"] = cfg.oviposition.scale_m;
         out["oviposition.radius_m"] = cfg.oviposition.radius_m;
+        out["oviposition.detect_range_m"] = cfg.oviposition.detect_range_m;
+        out["oviposition.step_m"] = cfg.oviposition.step_m;
+        out["oviposition.min_attraction"] = cfg.oviposition.min_attraction;
         out["oviposition.timeout_days"] = cfg.oviposition.timeout_days;
         out["aquatic_stages.egg_daily_mort"] =
             cfg.aquatic_stages.egg_daily_mort;
@@ -167,6 +193,42 @@ int main(int argc, char** argv) {
             cfg.aquatic_stages.last_larval_instar;
         out["aquatic_stages.salinity_missing_psu"] =
             cfg.aquatic_stages.salinity_missing_psu;
+        out["thermal.efd_max_eggs_per_day"] =
+            cfg.thermal.efd_max_eggs_per_day;
+        out["thermal.efd_tmin_c"] = cfg.thermal.efd_tmin_c;
+        out["thermal.efd_tmax_c"] = cfg.thermal.efd_tmax_c;
+        out["thermal.efd_topt_c"] = cfg.thermal.efd_topt_c;
+        out["thermal.egg_development_tmin_c"] =
+            cfg.thermal.egg_development_tmin_c;
+        out["thermal.egg_development_tmax_c"] =
+            cfg.thermal.egg_development_tmax_c;
+        out["thermal.egg_development_scale"] =
+            cfg.thermal.egg_development_scale;
+        out["thermal.larva_development_tmin_c"] =
+            cfg.thermal.larva_development_tmin_c;
+        out["thermal.larva_development_tmax_c"] =
+            cfg.thermal.larva_development_tmax_c;
+        out["thermal.larva_development_scale"] =
+            cfg.thermal.larva_development_scale;
+        out["thermal.pupa_development_tmin_c"] =
+            cfg.thermal.pupa_development_tmin_c;
+        out["thermal.pupa_development_tmax_c"] =
+            cfg.thermal.pupa_development_tmax_c;
+        out["thermal.pupa_development_scale"] =
+            cfg.thermal.pupa_development_scale;
+        out["gonotrophic.cycle_duration_days"] =
+            cfg.gonotrophic.cycle_duration_days;
+        out["gonotrophic.first_cycle_days"] =
+            cfg.gonotrophic.first_cycle_days;
+        out["gonotrophic.feeding_success_rate"] =
+            cfg.gonotrophic.feeding_success_rate;
+        out["gonotrophic.egg_batch_mean"] =
+            cfg.gonotrophic.egg_batch_mean;
+        out["gonotrophic.egg_batch_n"] = cfg.gonotrophic.egg_batch_n;
+        out["gonotrophic.egg_batch_min"] = cfg.gonotrophic.egg_batch_min;
+        out["gonotrophic.egg_batch_max"] = cfg.gonotrophic.egg_batch_max;
+        out["gonotrophic.resting_duration_days"] =
+            cfg.gonotrophic.resting_duration_days;
         out["rng.aquatic_seed_washout"] = cfg.rng.aquatic_seed_washout;
         out["rng.aquatic_seed_stage_mortality"] =
             cfg.rng.aquatic_seed_stage_mortality;

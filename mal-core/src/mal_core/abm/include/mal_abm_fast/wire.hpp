@@ -237,7 +237,8 @@ struct AOI {
     double  north         = 0.0;
     std::string crs       = "EPSG:4326";
     std::string slug      = "custom";
-    int32_t  resolution_m = 1000;
+    int32_t  resolution_m = static_cast<int32_t>(
+        load_config().ingest.cell_size_hint_m);
     std::string scale    = "regional";  // matches Scale.REGIONAL.value
 
     int32_t cells_per_side() const noexcept;
