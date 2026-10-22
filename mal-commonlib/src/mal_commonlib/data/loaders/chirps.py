@@ -192,11 +192,19 @@ def _read_chirps_tif_gz(path: pathlib.Path, aoi: AOI) -> xr.DataArray:
             "x": np.arange(arr.shape[1]) * transform.a + transform.c,
         },
     )
-    da.rio.write_crs(src_crs, inplace=True)
     # CHIRPS uses -9999.0 as nodata; if the file has no nodata tag, mask the
     # same sentinel value to NaN. Land/ocean mask handled by the loader.
     sentinel = nodata if nodata is not None else CHIRPS_NODATA
     da = da.where(da != sentinel)
+    # Attach transform + nodata EXPLICITLY: rioxarray's reproject_match
+    # infers them from the 1-D corner coords when absent, and for tight
+    # windows (e.g. an 8x11-pixel coastal clip like accra-coastal-test)
+    # that inference produced a transform rioxarray treats as misaligned,
+    # reprojecting the whole day to 100% NaN (all layers → -9999 in the
+    # runner NC). window_transform(win) is exactly the affine of this read.
+    da.rio.write_crs(src_crs, inplace=True)
+    da.rio.write_transform(transform, inplace=True)
+    da.rio.write_nodata(CHIRPS_NODATA, inplace=True)
     return da
 
 
@@ -222,7 +230,12 @@ def _reproject_to_aoi_grid(
 ) -> np.ndarray:
     """Reproject a rain field (EPSG:4326) to the AOI's target grid."""
     ref = _ref_grid_for_aoi(aoi)
-    rep = rain_field.rio.reproject_match(ref, resampling=rasterio.enums.Resampling.bilinear)
+    # NOTE: nearest-neighbour, not bilinear. For small coastal AOIs the source
+    # windows are tiny (e.g. 8x11 px at 0.05 deg) and mostly ocean nodata; a
+    # bilinear blend propagates that nodata (NaN) into every destination cell,
+    # producing an all-nodata field. Nearest neighbour keeps the valid land
+    # pixels intact and never blends across the nodata boundary.
+    rep = rain_field.rio.reproject_match(ref, resampling=rasterio.enums.Resampling.nearest)
     return np.asarray(rep.values, dtype=np.float32)
 
 

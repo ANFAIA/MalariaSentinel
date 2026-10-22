@@ -119,6 +119,12 @@ def _download_and_rasterize(
 
     con = duckdb.connect()
     try:
+        # nono sandbox gotcha: INSTALL downloads extensions into
+        # ~/.duckdb/extensions (home dotdir, not writable under the sandbox).
+        # Redirect the extension store to the user cache (readwrite).
+        ext_dir = pathlib.Path.home() / ".cache" / "mal_commonlib" / "duckdb_ext"
+        ext_dir.mkdir(parents=True, exist_ok=True)
+        con.execute(f"SET extension_directory='{ext_dir}';")
         con.execute("INSTALL httpfs; LOAD httpfs;")
         con.execute("INSTALL spatial; LOAD spatial;")
         con.execute(f"SET s3_region='{_OVERTURE_S3_REGION}';")

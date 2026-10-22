@@ -260,9 +260,10 @@ def load_era5_air_temp_daily(
             all_arrays.append(da)
 
     if len(all_arrays) == 1:
-        return all_arrays[0]
+        # Contract var name: the daily channel the ABM env NC consumes.
+        return all_arrays[0].rename("air_temp_c")
 
-    merged = xr.concat(all_arrays, dim="time")
+    merged = xr.concat(all_arrays, dim="time").rename("air_temp_c")
     merged.attrs.update({
         "long_name": "ERA5-Land 2m temperature (daily mean)",
         "units": "degC",

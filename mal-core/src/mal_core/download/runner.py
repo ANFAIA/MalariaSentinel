@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import os
 from pathlib import Path
 from typing import Any
 
@@ -19,12 +20,18 @@ _REPO_ROOT = Path(__file__).resolve().parents[4]
 def _check_auth(spec: DownloaderSpec) -> bool:
     for auth in spec.requires_auth:
         if auth == "cds":
-            cdsapirc = Path.home() / ".cdsapirc"
-            if not cdsapirc.exists():
-                log.warning("Downloader '%s' requires CDS auth (~/.cdsapirc) — skipping", spec.name)
+            # CDSAPI_RC overrides the rc location (cdsapi honours it too);
+            # Path.exists() raises OSError (EPERM) under sandboxes that deny
+            # the home dotfile — treat any probe error as "no auth".
+            cdsapirc = Path(os.environ.get("CDSAPI_RC") or (Path.home() / ".cdsapirc"))
+            try:
+                have_rc = cdsapirc.exists()
+            except OSError:
+                have_rc = False
+            if not have_rc:
+                log.warning("Downloader '%s' requires CDS auth (~/.cdsapirc or CDSAPI_RC) — skipping", spec.name)
                 return False
         elif auth == "earthdata":
-            import os
             if not os.environ.get("EARTHDATA_TOKEN"):
                 log.warning("Downloader '%s' requires EARTHDATA_TOKEN — skipping", spec.name)
                 return False
@@ -122,9 +129,14 @@ def run_download(
                         if result is None:
                             continue
                         # 3D DataArray → NC via xarray.to_netcdf()
-                        # Variable name: strip "_daily" suffix for ABM compatibility
-                        # (e.g. "rainfall_daily" → "rainfall")
-                        nc_var_name = output_name.removesuffix("_daily")
+                        # Variable name: the loader's own DataArray name is
+                        # the contract channel (e.g. air_temp_c) — fall back
+                        # to output_name minus "_daily" for legacy output.
+                        nc_var_name = (
+                            output_name.removesuffix("_daily")
+                            if getattr(result, "name", None) is None
+                            else result.name
+                        )
                         path = _standard_path_daily(aoi, output_name, min(years), max(years), data_dir=out_dir)
                         path.parent.mkdir(parents=True, exist_ok=True)
                         save_product(result, path, format="nc", var_name=nc_var_name)

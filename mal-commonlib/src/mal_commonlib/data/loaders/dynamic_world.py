@@ -33,6 +33,7 @@ calls ``ee.Initialize(project=EE_PROJECT_ID)``; without stored credentials
 from __future__ import annotations
 
 import io
+import json
 import logging
 import math
 from pathlib import Path
@@ -330,6 +331,7 @@ def load_dw_class_fractions(
     aoi: "AOI",
     *,
     years: Sequence[int],
+    months: Sequence[int] | None = None,  # runner kwarg; ignored (annual mode)
     cache_dir: Path | None = None,
 ) -> xr.Dataset:
     """Per-year Dynamic World modal-label fractions on the AOI grid.
@@ -375,7 +377,10 @@ def load_dw_class_fractions(
                 "contract": "habitat-v3.0-statics",
                 "source": f"Dynamic World V1 modal label, year {year} (GEE)",
                 "resolution_m": _REQUEST_SCALE_M,
-                "class_map": {k: list(v) for k, v in FEATURE_CLASSES.items()},
+                # netCDF attrs cannot hold dicts — serialize as JSON.
+                "class_map": json.dumps(
+                    {k: list(v) for k, v in FEATURE_CLASSES.items()}
+                ),
                 "attribution": ATTRIBUTION.replace("[Year]", str(year)),
                 "nodata": NODATA_OUT,
             },

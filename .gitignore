@@ -18,6 +18,8 @@ runs/layers/*.zip
 
 #   Large env NetCDF files (regenerable via scripts/build_2year_nc.py)
 data/ghana/
+#   accra-coastal-test e2e data (re-downloadable .nc/.tif/.gpkg; 12 MB)
+data/accra-coastal-test/
 
 # Experiment artifacts (regenerable from the pipeline)
 runs/
@@ -62,3 +64,18 @@ docs/.obsidian/workspace.json
 docs/.obsidian/workspace-mobile.json
 docs/.obsidian/cache
 .DS_Store
+.cdsapirc
+
+# clangd LSP (symlink a la database del build del ABM)
+compile_commands.json
+.clangd
+
+# marimo notebook cache
+mal-data-explorer/__marimo__/
+
+# opencode skill installer artifacts (not project code)
+.agents/skills/
+skills-lock.json
+
+# opencode agent working docs (live work, not repo code)
+.opencode/plan/
