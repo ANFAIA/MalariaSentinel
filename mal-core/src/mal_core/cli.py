@@ -353,6 +353,14 @@ def abm(
     )
     typer.echo(f"ABM result: {result}")
 
+    rc = result.get("returncode")
+    if rc not in (0, None):
+        typer.echo(
+            f"ABM engine failed (rc={rc}):\n{result.get('stderr', '')[-1500:]}",
+            err=True,
+        )
+        raise typer.Exit(code=1)
+
     if gif:
         _render_animation(
             aoi=aoi,

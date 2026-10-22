@@ -114,6 +114,18 @@ def run_abm_from_manifest(
 
     data_dir = (data_root or Path("data")) / aoi
 
+    # The C++ engine only knows "ghana" natively; for any other catalog slug
+    # forward the aois.yaml bbox/resolution/scale. Custom slugs keep using the
+    # caller-provided --bbox.
+    catalog_aoi = None
+    if not kwargs.get("bbox"):
+        try:
+            from mal_commonlib.aoi import AOI
+
+            catalog_aoi = AOI.from_slug(str(aoi))
+        except ValueError:
+            catalog_aoi = None
+
     env_path = resolve(
         aoi, INGEST_ARTIFACTS["env"].key, year=year,
         data_dir=data_dir, data_root=data_root,
@@ -175,6 +187,11 @@ def run_abm_from_manifest(
     if cohort_log is None:
         cohort_log = output_dir / f"{aoi}_abm_seed{seed:04d}_cohort.json"
     flags["emit_cohort_log"] = str(cohort_log)
+
+    if catalog_aoi is not None:
+        flags["bbox"] = ",".join(f"{coord:g}" for coord in catalog_aoi.bbox)
+        flags["resolution_m"] = catalog_aoi.resolution_m
+        flags["scale"] = catalog_aoi.scale.value
 
     if kwargs.get("enable_transmission") or kwargs.get("enable-transmission"):
         trans_log = kwargs.pop("emit_transmission_log", None) or kwargs.pop("transmission_log", None)
