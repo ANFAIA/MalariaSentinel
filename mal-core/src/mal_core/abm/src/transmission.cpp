@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdlib>
 #include <fstream>
 #include <iostream>
 #include <stdexcept>
@@ -135,6 +136,86 @@ void TransmissionModel::check_and_trigger_outbreak(
         if (max_density < params_.human_outbreak_min_density) return;  // retry tomorrow
     }
 
+    // A human cell is a viable focus when adult vectors are present in
+    // the cell OR in its 8-neighbourhood. The biting kernel detects and
+    // bites hosts up to host_seeking_radius_m (~1.5 km, i.e. one grid
+    // cell at this resolution) away, so requiring same-cell presence is
+    // inconsistent with the contact process: it rejects the cells where
+    // transmission can actually start and waits until random dispersal
+    // drops a single mosquito into the settlement. In the Accra run that
+    // delay seeded the outbreak on day 8, when the vector cohort had
+    // already crashed, and the human→vector hazard was evaluated only a
+    // handful of times during the 20-day human infectious window.
+    std::vector<float> seed_density = mosquito_density;
+    if (!mosquito_density.empty() &&
+        mosquito_density.size() == static_cast<size_t>(h_) * static_cast<size_t>(w_)) {
+        seed_density.assign(mosquito_density.size(), 0.0f);
+        for (int32_t r = 0; r < h_; ++r) {
+            for (int32_t c = 0; c < w_; ++c) {
+                float best = 0.0f;
+                const int32_t r0 = std::max(0, r - 1);
+                const int32_t r1 = std::min(h_ - 1, r + 1);
+                const int32_t c0 = std::max(0, c - 1);
+                const int32_t c1 = std::min(w_ - 1, c + 1);
+                for (int32_t rr = r0; rr <= r1; ++rr) {
+                    for (int32_t cc = c0; cc <= c1; ++cc) {
+                        const float d = mosquito_density[
+                            static_cast<size_t>(rr) * static_cast<size_t>(w_) +
+                            static_cast<size_t>(cc)];
+                        if (d > best) best = d;
+                    }
+                }
+                seed_density[static_cast<size_t>(r) * static_cast<size_t>(w_) +
+                             static_cast<size_t>(c)] = best;
+            }
+        }
+    }
+
+    const bool tx_debug = (std::getenv("MAL_ABM_TRANSMISSION_DEBUG") != nullptr);
+    if (tx_debug) {
+        int64_t n_pos = 0;
+        int64_t n_cand = 0;
+        int64_t n_cand_dilated = 0;
+        float max_dens = 0.0f;
+        for (size_t i = 0; i < mosquito_density.size(); ++i) {
+            const float d = mosquito_density[i];
+            if (d > 0.0f) ++n_pos;
+            if (d > max_dens) max_dens = d;
+            if (i < human_grid_.population().size() &&
+                human_grid_.population()[i] >= params_.human_min_cell_pop) {
+                if (d > 0.0f) ++n_cand;
+                if (i < seed_density.size() && seed_density[i] > 0.0f) {
+                    ++n_cand_dilated;
+                }
+            }
+        }
+        std::cerr << "abm_tx_seed_debug: day=" << day_index
+                  << " mode=" << params_.human_seeding_mode
+                  << " min_density=" << params_.human_outbreak_min_density
+                  << " cells_with_vectors=" << n_pos
+                  << " max_density=" << max_dens
+                  << " candidates(pop>=" << params_.human_min_cell_pop
+                  << " & vectors>0)=" << n_cand
+                  << " candidates_dilated=" << n_cand_dilated;
+        // Top-3 density cells with their human population.
+        std::vector<float> dens_copy = mosquito_density;
+        for (int k = 0; k < 3; ++k) {
+            size_t best = dens_copy.size();
+            float best_d = 0.0f;
+            for (size_t i = 0; i < dens_copy.size(); ++i) {
+                if (dens_copy[i] > best_d) { best_d = dens_copy[i]; best = i; }
+            }
+            if (best == dens_copy.size()) break;
+            const int32_t r = static_cast<int32_t>(best / w_);
+            const int32_t c = static_cast<int32_t>(best % w_);
+            std::cerr << " | top" << (k + 1) << "=(r" << r << ",c" << c
+                      << ",dens=" << best_d << ",pop="
+                      << human_grid_.population()[best] << ")";
+            dens_copy[best] = 0.0f;
+        }
+        std::cerr << "\n";
+    }
+
     if (params_.human_seeding_mode == "random-viable") {
         if (mosquito_density.empty()) {
             std::cerr << "warning: outbreak not seeded: no current mosquito density\n";
@@ -160,8 +241,8 @@ void TransmissionModel::check_and_trigger_outbreak(
                 const size_t idx = static_cast<size_t>(c);
                 if (pop[idx] <= best_pop) continue;
                 if (pop[idx] > max_core_pop) continue;  // too dense: vectors dilute
-                if (idx >= mosquito_density.size() ||
-                    mosquito_density[idx] < core_min_density) continue;
+                if (idx >= seed_density.size() ||
+                    seed_density[idx] < core_min_density) continue;
                 best = c;
                 best_pop = pop[idx];
             }
@@ -178,7 +259,7 @@ void TransmissionModel::check_and_trigger_outbreak(
                 params_.human_outbreak_cases,
                 params_.human_cluster_radius_cells,
                 /*min_pop=*/1.0,
-                mosquito_density,
+                seed_density,
                 rng_);
             const double infectious_after = human_grid_.compute_stats().total_infectious;
             outbreak_triggered_ = infectious_after > infectious_before;
@@ -207,7 +288,7 @@ void TransmissionModel::check_and_trigger_outbreak(
             params_.human_outbreak_foci,
             params_.human_outbreak_cases,
             params_.human_min_cell_pop,
-            mosquito_density,
+            seed_density,
             rng_);
         const double infectious_after = human_grid_.compute_stats().total_infectious;
         outbreak_triggered_ = infectious_after > infectious_before;

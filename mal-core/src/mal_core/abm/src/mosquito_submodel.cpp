@@ -25,6 +25,7 @@
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
+#include <cstdlib>
 #include <limits>
 #include <unordered_map>
 #include <utility>
@@ -47,6 +48,30 @@ namespace mal_abm_fast {
 
 namespace {
 
+// Transmission-step counters (environment-gated: MAL_ABM_TRANSMISSION_DEBUG=1).
+// They exist to prove where the human→vector link is lost: how many feeds
+// happen, how many land on humans, how many of those see I_H > 0 in the
+// host cell, and how many infection draws succeed.
+struct TransmissionDebugStats {
+    int64_t feeds            = 0;
+    int64_t human_feeds      = 0;
+    int64_t human_evaluated  = 0;  // susceptible vector + enabled params
+    int64_t human_prev_pos   = 0;  // host cell had I_H > 0
+    int64_t human_infected   = 0;  // p_inf draw succeeded
+    double  p_sum            = 0.0;
+    double  p_max            = 0.0;
+    int64_t grid_null        = 0;
+    int64_t params_null      = 0;
+    int64_t params_disabled  = 0;
+};
+
+TransmissionDebugStats g_tdbg;
+
+inline bool transmission_debug_enabled() {
+    static const bool on = (std::getenv("MAL_ABM_TRANSMISSION_DEBUG") != nullptr);
+    return on;
+}
+
 inline void record_female_feed(
     size_t si, MosquitoSoA& soa, HostType host,
     int32_t host_row, int32_t host_col,
@@ -68,18 +93,36 @@ inline void record_female_feed(
         bite_ledger.record_success(host_row, host_col, host);
     }
 
+    const bool dbg = transmission_debug_enabled();
+    if (dbg) {
+        ++g_tdbg.feeds;
+        if (host == HostType::HUMAN) ++g_tdbg.human_feeds;
+    }
     if (host == HostType::HUMAN &&
         soa.vector_state[si] == static_cast<uint8_t>(VectorTransmissionState::SUSCEPTIBLE) &&
         human_grid && transmission_params && transmission_params->enabled)
     {
         const double prev = human_grid->prev_at(host_row, host_col);
+        if (dbg) {
+            ++g_tdbg.human_evaluated;
+            if (prev > 0.0) ++g_tdbg.human_prev_pos;
+        }
         if (prev > 0.0) {
             const double p_inf = static_cast<double>(transmission_params->beta_hv) * prev;
+            if (dbg) {
+                g_tdbg.p_sum += p_inf;
+                if (p_inf > g_tdbg.p_max) g_tdbg.p_max = p_inf;
+            }
             if (rng.uniform_double() < p_inf) {
                 soa.vector_state[si] = static_cast<uint8_t>(VectorTransmissionState::EXPOSED);
                 soa.parasite_eip_progress[si] = 0.0f;
+                if (dbg) ++g_tdbg.human_infected;
             }
         }
+    } else if (dbg && host == HostType::HUMAN) {
+        if (!human_grid) ++g_tdbg.grid_null;
+        else if (!transmission_params) ++g_tdbg.params_null;
+        else if (!transmission_params->enabled) ++g_tdbg.params_disabled;
     }
 }
 
@@ -443,6 +486,25 @@ void MosquitoSubmodel::advance_day(const AOI& aoi,
         want_log = (day_idx < 10) || (day_idx % 5 == 0);
     }
 
+    if (transmission_debug_enabled()) {
+        int64_t n_hs = 0;
+        for (int64_t i = 0; i < soa_.n_alive; ++i) {
+            const size_t si = static_cast<size_t>(i);
+            if (soa_.stage[si] == 1 && soa_.sex[si] == 1 &&
+                soa_.gonotrophic_state[si] ==
+                    static_cast<uint8_t>(GonotrophicState::HOST_SEEKING)) {
+                ++n_hs;
+            }
+        }
+        std::fprintf(stderr,
+            "abm_tx_wiring: day=%lld eff_hosts=%d host_landscape=%d "
+            "host_seeking=%d mobility=%d n_host_seeking_start=%lld\n",
+            static_cast<long long>(day_idx),
+            effective_hosts_ ? 1 : 0, host_landscape_ ? 1 : 0,
+            host_seeking_ ? 1 : 0, mobility_schedule_ ? 1 : 0,
+            static_cast<long long>(n_hs));
+    }
+
     // -- G3 lifecycle: aquatic cohort bank handles egg/larva/pupa --
     // 1. Advance aquatic development, mortality, promotions
     cohort_bank_.advance_day(patch_states, overrides_);
@@ -719,6 +781,8 @@ void MosquitoSubmodel::advance_day(const AOI& aoi,
     // Build H_eff(d,p) ONCE per (day, phase) and share it across all
     // HOST_SEEKING females (plan §3.3: one realization per day+phase).
     // A female feeds in the first active phase where hosts are detected.
+    int64_t n_phase_hs = 0;
+    int64_t n_phase_moved = 0;
     if (effective_hosts_ && host_landscape_ && host_seeking_) {
         const int32_t h = cells_per_side_h(aoi);
         const int32_t w = aoi.cells_per_side();
@@ -743,10 +807,15 @@ void MosquitoSubmodel::advance_day(const AOI& aoi,
                 const auto gs =
                     static_cast<GonotrophicState>(soa_.gonotrophic_state[si]);
                 if (gs != GonotrophicState::HOST_SEEKING) continue;
+                ++n_phase_hs;
 
                 // Directed movement toward the best host cell (plan F3).
                 const auto target = host_seeking_->step_toward_host(
                     soa_.row[si], soa_.col[si], eff, aoi, 500.0f);
+                if (target && (target->first != soa_.row[si] ||
+                               target->second != soa_.col[si])) {
+                    ++n_phase_moved;
+                }
                 if (target) {
                     soa_.row[si] = target->first;
                     soa_.col[si] = target->second;
@@ -842,6 +911,28 @@ void MosquitoSubmodel::advance_day(const AOI& aoi,
             static_cast<double>(temp_d),
             static_cast<double>(p_d),
             static_cast<long long>(n_deaths));
+    }
+
+    if (transmission_debug_enabled()) {
+        std::fprintf(stderr,
+            "abm_tx_debug: day=%lld feeds=%lld human_feeds=%lld "
+            "human_eval=%lld human_prev_pos=%lld human_infected=%lld "
+            "p_sum=%.6f p_max=%.6f grid_null=%lld params_null=%lld "
+            "params_disabled=%lld n_alive=%lld phase_hs=%lld phase_moved=%lld\n",
+            static_cast<long long>(day_idx),
+            static_cast<long long>(g_tdbg.feeds),
+            static_cast<long long>(g_tdbg.human_feeds),
+            static_cast<long long>(g_tdbg.human_evaluated),
+            static_cast<long long>(g_tdbg.human_prev_pos),
+            static_cast<long long>(g_tdbg.human_infected),
+            g_tdbg.p_sum, g_tdbg.p_max,
+            static_cast<long long>(g_tdbg.grid_null),
+            static_cast<long long>(g_tdbg.params_null),
+            static_cast<long long>(g_tdbg.params_disabled),
+            static_cast<long long>(last_day_stats_.n_alive),
+            static_cast<long long>(n_phase_hs),
+            static_cast<long long>(n_phase_moved));
+        g_tdbg = TransmissionDebugStats{};
     }
 }
 

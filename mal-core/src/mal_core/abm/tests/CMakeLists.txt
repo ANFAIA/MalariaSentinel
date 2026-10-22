@@ -176,6 +176,14 @@ target_link_libraries(test_transmission
 )
 gtest_discover_tests(test_transmission DISCOVERY_TIMEOUT 30)
 
+# BUG-3 regression: human -> vector -> human chain completes when the human
+# focus is reachable from the vector population (task-05).
+add_executable(test_transmission_chain test_transmission_chain.cpp)
+target_link_libraries(test_transmission_chain
+    PRIVATE mal_abm_fast_core GTest::gtest GTest::gtest_main mal_abm_fast::warnings
+)
+gtest_discover_tests(test_transmission_chain DISCOVERY_TIMEOUT 30)
+
 # M7.4: Transmission Outputs (GeoTIFF 4-band + Sidecar).
 add_executable(test_transmission_output test_transmission_output.cpp)
 target_link_libraries(test_transmission_output
