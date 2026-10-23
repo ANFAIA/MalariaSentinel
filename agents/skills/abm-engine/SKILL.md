@@ -252,13 +252,13 @@ cd mal-core/src/mal_core/abm && ./build/src/mal_abm_fast run \
 
 ### Visualization
 
-Use `mal-core/src/mal_core/abm/scripts/visualize_state.py` to generate GIF animations:
+The engine renders its GIF in-process from live state; no Python script reads
+the COGs back:
 
 ```bash
-cd mal-core/src/mal_core/abm && uv run python scripts/visualize_state.py \
-  --run-dir /tmp/invasion \
-  --output /tmp/invasion/animation.gif \
-  --sample-every 5
+mal-core/src/mal_core/abm/bin/mal_abm_fast_darwin run ... \
+  --gif /tmp/invasion/animation.gif --gif-every 5 --gif-fps 6
+# or: uv run malariasim abm --aoi ghana --days 30 --gif
 ```
 
 ---

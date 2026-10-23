@@ -123,7 +123,7 @@ The Centinela implements a 5-stage pipeline:
 | **ML surrogate** | `mal-core/src/mal_core/training/` + CLI `malariasim train` | U-Net transition model trained on ABM rollouts |
 | **Automated outputs** | `mal-execution/scripts/` | CLI entrypoints, batch jobs, HPC/cloud automation |
 | **Cyclical re-entry** | Calibration framework (`mal-core/src/mal_core/abm/tests/calibration/`) | Scorers feed outcomes back into parameter tuning |
-| **Risk maps** | CLI `malariasim predict` + `mal-core/scripts/visualize_state.py` | Risk-expansion visualisation |
+| **Risk maps** | CLI `malariasim predict` + engine `--gif` flag (in-process render, no post-run script) | Risk-expansion visualisation |
 
 ### Data flow
 

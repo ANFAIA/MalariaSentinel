@@ -209,6 +209,25 @@ def run_abm_from_manifest(
         flags["livestock_mobility"] = livestock_mobility_path
     if wind_path:
         flags["wind_field"] = wind_path
+
+    # Native in-process GIF (plan 04). `gif` arrives in three shapes:
+    #   None/False   -> no GIF
+    #   ""           -> bare `--gif`: default `<output_dir>/<aoi>_abm_seedNNNN.gif`
+    #   str/Path     -> explicit output path, forwarded verbatim
+    # The render knobs are forwarded to the C++ CLI in all enabled cases.
+    gif = kwargs.pop("gif", None)
+    if gif is not None and gif is not False:
+        gif_path = (
+            Path(gif)
+            if isinstance(gif, (str, Path)) and str(gif) != ""
+            else output_dir / f"{aoi}_abm_seed{seed:04d}.gif"
+        )
+        flags["gif"] = str(gif_path)
+    for key in ("gif_every", "gif_fps", "gif_max_width"):
+        value = kwargs.pop(key, None)
+        if value is not None:
+            flags[key] = value
+
     flags.update(kwargs)
 
     log.info("Running ABM for %s (year=%d, seed=%d)", aoi, year, seed)

@@ -67,7 +67,7 @@ pins is the load-bearing wall: every downstream spec (`training`,
 - C++ ABM engine (`wire.hpp`, CMake build) and the Mesa-Geo adapter for the thin slice.
 - ABM runner (`runner.py`), the Python wrapper around the binary (`wrapper.py`), and the compile entry (`compile.py`, `malariasim abm --compile`).
 - **Output contract** (§5–§7 below): state tensor, env tensor, file naming, sidecar, NoData, tile rules, `H/W`. (The v4.0 `K_max` retirement is documented in INV-2/INV-9.)
-- Visualization script (`scripts/visualize_state.py`).
+- Native in-process GIF renderer (`include/mal_abm_fast/viz.hpp`, `src/viz.cpp`): optional per-run animation, `--gif` on the engine CLI and on `malariasim abm`.
 - Pipeline position: stage 3 (after ingest). Reads manifest for env/habitat/hosts paths.
 
 ## 3. Out of scope
@@ -126,6 +126,7 @@ pins is the load-bearing wall: every downstream spec (`training`,
 ## 6. Data contracts
 
 - Output: GeoTIFF state COG + sidecar JSON per §5.1, §5.3, §5.4.
+- Optional run artifacts (not part of the data contract, never consumed downstream): a native GIF rendered in-process by `--gif` (`--gif-every`, `--gif-fps`, `--gif-max-width`) from live engine state, and the cohort/transmission JSON logs. Per-day transmission COGs are **not** emitted by default: `--transmission-snapshot-every 0` now means final snapshot only (the retired `visualize_transmission.py` was their only consumer).
 - Input env: CF-1.8 daily NetCDF (per §5.2 INV-6; the only accepted format — the legacy COG reader was removed on 2026-09-27). The C++ engine has one reader: `read_env_nc`. The habitat/availability model v3.0 reads the static planes + habitat gpkg feature list directly from this path.
 - Input mobility + host layers: produced by `ingest`. `run_abm_from_manifest` validates manifest completeness and resolves paths; the pipeline-level `pipeline/spec.md` §5 INV-3 is the authoritative validation point for the full pipeline.
 

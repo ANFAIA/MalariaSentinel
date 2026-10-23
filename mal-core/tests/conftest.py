@@ -2,8 +2,18 @@
 from __future__ import annotations
 
 import json
+import sys
+from pathlib import Path
 
 import pytest
+
+# Helper modules such as `_habitat_fixtures` live next to the tests and are
+# imported by module name. pytest's default "prepend" import mode adds this
+# directory to sys.path; `--import-mode=importlib` does not, so make it
+# explicit and keep both invocations working.
+_TESTS_DIR = str(Path(__file__).resolve().parent)
+if _TESTS_DIR not in sys.path:
+    sys.path.insert(0, _TESTS_DIR)
 
 
 @pytest.fixture

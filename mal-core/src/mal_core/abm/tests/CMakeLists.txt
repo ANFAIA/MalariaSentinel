@@ -52,6 +52,14 @@ target_link_libraries(test_climate
 )
 gtest_discover_tests(test_climate DISCOVERY_TIMEOUT 30)
 
+# D12: single-band (`--days 1`) climate path — clone carries the base band
+# and set_day(0) still copies band 0.
+add_executable(test_climate_single_band test_climate_single_band.cpp)
+target_link_libraries(test_climate_single_band
+    PRIVATE mal_abm_fast_core GTest::gtest GTest::gtest_main mal_abm_fast::warnings netCDF::netcdf
+)
+gtest_discover_tests(test_climate_single_band DISCOVERY_TIMEOUT 30)
+
 # F1.b: math primitives (prng, eip, dispersal).
 add_executable(test_prng test_prng.cpp)
 target_link_libraries(test_prng

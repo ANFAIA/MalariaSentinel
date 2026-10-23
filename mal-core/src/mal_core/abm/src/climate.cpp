@@ -10,6 +10,7 @@
 // lookup — NaN pixels were imputed at load time, see impute_temp_nans).
 #include "climate.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <iostream>
@@ -231,7 +232,13 @@ void ClimateEngine::set_base_day(int32_t band_index) {
 }
 
 void ClimateEngine::set_day(int32_t day) {
-    if (n_days_ <= 1) return;  // single-day env: no daily switching
+    // Always copy the clamped band, including on a single-band env. The old
+    // early return for `n_days_ <= 1` left the accessors at whatever the
+    // caller had (a fresh thread clone carries 0.0 rain / 25.0 C defaults),
+    // so `--days 1` simulated a different climate day than day 1 of a
+    // longer run started on the same date. With one band the clamp below
+    // lands on band 0, which is the band that run would have used.
+    if (!rain_nc_ || !air_temp_nc_ || n_days_ <= 0) return;
     // `day` is relative to base_day_: negative values read warm-up
     // bands, values >= 0 read simulation bands.
     int32_t band = base_day_ + day;
@@ -240,7 +247,12 @@ void ClimateEngine::set_day(int32_t day) {
     cur_day_ = band;
 
     const size_t slice = static_cast<size_t>(h_) * static_cast<size_t>(w_);
+    if (slice == 0) return;
     const size_t offset = static_cast<size_t>(cur_day_) * slice;
+    if (offset + slice > rain_nc_->size() ||
+        offset + slice > air_temp_nc_->size()) {
+        return;  // malformed bands: keep the current accessors
+    }
     for (size_t i = 0; i < slice; ++i) {
         rain_[i] = (*rain_nc_)[offset + i];
         temp_[i] = (*air_temp_nc_)[offset + i];
@@ -272,7 +284,10 @@ std::shared_ptr<ClimateEngine> ClimateEngine::clone_for_thread() const {
     clone->air_temp_nc_ = air_temp_nc_;
     clone->salinity_nc_ = salinity_nc_;
 
-    // Independent single-day arrays (thread-local)
+    // Independent single-day arrays (thread-local). Seed them from the base
+    // band instead of 0.0 rain / 25.0 C placeholders: the first `set_day()`
+    // overwrites them with the same band, but anything that reads the
+    // accessors earlier (and every single-band env) now sees real climate.
     const size_t slice = static_cast<size_t>(h_) * static_cast<size_t>(w_);
     clone->rain_.assign(slice, 0.0f);
     clone->temp_.assign(slice, 25.0f);
@@ -280,6 +295,25 @@ std::shared_ptr<ClimateEngine> ClimateEngine::clone_for_thread() const {
         clone->salinity_.assign(slice, 0.0f);
     } else {
         clone->salinity_.clear();
+    }
+    if (slice > 0 && rain_nc_ && air_temp_nc_ && n_days_ > 0) {
+        const size_t off =
+            static_cast<size_t>(base_day_) * slice;
+        if (off + slice <= rain_nc_->size()) {
+            std::copy_n(rain_nc_->begin() + static_cast<std::ptrdiff_t>(off),
+                        static_cast<std::ptrdiff_t>(slice),
+                        clone->rain_.begin());
+        }
+        if (off + slice <= air_temp_nc_->size()) {
+            std::copy_n(
+                air_temp_nc_->begin() + static_cast<std::ptrdiff_t>(off),
+                static_cast<std::ptrdiff_t>(slice), clone->temp_.begin());
+        }
+        if (salinity_nc_ && off + slice <= salinity_nc_->size()) {
+            std::copy_n(
+                salinity_nc_->begin() + static_cast<std::ptrdiff_t>(off),
+                static_cast<std::ptrdiff_t>(slice), clone->salinity_.begin());
+        }
     }
 
     // static features are read-only; share by copy (bounded memory: 5 planes)

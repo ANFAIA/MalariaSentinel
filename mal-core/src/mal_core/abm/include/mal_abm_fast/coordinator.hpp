@@ -153,6 +153,12 @@ public:
     };
     JetView J_view() const { return {K_cell_.data(), W_, H_}; }
 
+    // Read-only per-cell pluvial state z in [0,1] (plan 04 §2.3 — the GIF
+    // inset reads the SAME grid the coordinator integrates, so the inset
+    // cannot drift from the engine). Row-major (H,W) matching
+    // ClimateEngine::h()/w(); empty until the first update_habitat_day().
+    const std::vector<float>& z_grid() const { return z_; }
+
     // -- adult count aggregation --------------------------------------------
     //
     // Contract 4.0: both grids carry RAW per-cell adult counts

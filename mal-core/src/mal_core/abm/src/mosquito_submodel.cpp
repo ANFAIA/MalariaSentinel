@@ -477,6 +477,10 @@ void MosquitoSubmodel::advance_day(const AOI& aoi,
                                    const std::vector<PatchState>& patch_states) {
     // -- debug snapshot: pre-day counts
     const int64_t day_idx = day_counter_++;
+    // Plan 04 §3: today's flux counters start empty. This runs BEFORE
+    // cohort_bank_.advance_day()/collect_emergence() so the ovipositions and
+    // emergences of this same day land in the cleared map.
+    patch_daily_flux_.clear();
     int64_t pre_n_alive  = 0;
     int64_t pre_n_adults = 0;
     bool    want_log    = false;
@@ -548,6 +552,7 @@ void MosquitoSubmodel::advance_day(const AOI& aoi,
             soa_.last_patch_update_col.push_back(ev.col);
         }
         n_emerged += ev.n_adults;
+        patch_daily_flux_[ev.patch_id].emerged += ev.n_adults;
     }
     soa_.n_alive = static_cast<int64_t>(soa_.uid.size());
 
@@ -719,6 +724,7 @@ void MosquitoSubmodel::advance_day(const AOI& aoi,
                 eggs = gonotrophic_params_.egg_batch_max;
             cohort_bank_.add_eggs(soa_.patch_id[si],
                                   static_cast<int64_t>(eggs));
+            patch_daily_flux_[soa_.patch_id[si]].eggs_laid += eggs;
             g_state = GonotrophicState::HOST_SEEKING;
             g_timer = 0;
             soa_.gonotrophic_state[si] = static_cast<uint8_t>(g_state);

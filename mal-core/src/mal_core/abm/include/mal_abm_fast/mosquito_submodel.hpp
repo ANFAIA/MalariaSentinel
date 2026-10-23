@@ -21,6 +21,7 @@
 
 #include <cstdint>
 #include <tuple>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -72,10 +73,20 @@ struct DailyStats {
     int64_t n_ovipositions     = 0;  // eggs deposited via gonotrophic cycle
 };
 
+/// Per-patch reproductive flux for one simulated day (plan 04 §3).
+///
+/// Cleared at the start of `advance_day` and filled by the same day's
+/// oviposition (`eggs_laid`) and emergence (`emerged`) events. It is a
+/// diagnostic counter for the native GIF, not a model state: it does not
+/// feed back into the simulation and does not change the RNG stream.
+struct PatchDailyFlux {
+    int64_t eggs_laid = 0;   // eggs deposited today by ovipositing females
+    int64_t emerged   = 0;   // adults emerging today from pupae
+};
+
 class MosquitoSubmodel {
 public:
     MosquitoSubmodel() = default;
-
     // Round-robin constructor with explicit per-patch counts (the
     // contract 4.0 replacement of the retired `k_per_patch ×
     // init_frac` path): every one of the `n_patches` patches receives
@@ -104,6 +115,16 @@ public:
     // Read-only access to the SoA (the submodel owns it; the
     // coordinator reads it for density aggregation).
     const MosquitoSoA& soa() const { return soa_; }
+
+    // Alias used by the native GIF renderer (plan 04 §3): individuals are
+    // drawn one disc per live adult, never an aggregate.
+    const MosquitoSoA& agents() const { return soa_; }
+
+    // Today's per-patch reproductive flux (plan 04 §3). Empty before the
+    // first advance_day(). Keys are PatchState::patch_id.
+    const std::unordered_map<int64_t, PatchDailyFlux>& patch_daily_flux() const {
+        return patch_daily_flux_;
+    }
 
     // Mutable access to the SoA (for transmission EIP / infection updates).
     MosquitoSoA& soa_mutable() { return soa_; }
@@ -219,6 +240,9 @@ private:
     RuntimeOverrides overrides_;
 
     DailyStats last_day_stats_{};
+
+    // Per-patch reproductive flux for the current day (plan 04 §3).
+    std::unordered_map<int64_t, PatchDailyFlux> patch_daily_flux_;
 
     // G4: gonotrophic cycle
     GonotrophicParams gonotrophic_params_;

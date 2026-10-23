@@ -24,15 +24,9 @@ def test_abm_cli_propagates_engine_failure(monkeypatch, returncode):
             "stderr": "abm_run: unknown --aoi slug 'accra-coastal-test'",
         }
 
-    gif_calls: list = []
     monkeypatch.setattr(abm_pkg, "run_abm_from_manifest", fake)
-    monkeypatch.setattr(
-        "mal_core.cli._render_animation",
-        lambda **kwargs: gif_calls.append(kwargs),
-    )
 
     result = runner.invoke(app, ["abm", "--aoi", "ghana", "--days", "1"])
 
     assert result.exit_code == 1
     assert "ABM engine failed" in result.output
-    assert gif_calls == []

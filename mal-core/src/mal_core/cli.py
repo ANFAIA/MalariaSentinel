@@ -19,6 +19,7 @@ import functools
 from pathlib import Path
 
 import typer
+from typer.core import TyperCommand
 
 from mal_commonlib.aoi import Scale
 
@@ -32,6 +33,44 @@ app = typer.Typer(
          "Each stage reads artefacts written by the previous one.",
     no_args_is_help=True,
 )
+
+
+# `--gif` must work both as `--gif <path>` and as a bare flag (default
+# artifact name). Typer drops click's optional-value support (`is_flag=False`
+# + `flag_value`), so the subcommand rewrites a valueless `--gif` into
+# `--gif=<sentinel>` before click parses it; the sentinel then collapses back
+# to "use the default path" in the command body.
+_GIF_DEFAULT_SENTINEL = "__malariasim_gif_default__"
+
+
+def _normalise_gif_args(args: list[str]) -> list[str]:
+    """Rewrite a value-less ``--gif`` to ``--gif=<sentinel>``.
+
+    Leaves ``--gif PATH`` and ``--gif=PATH`` untouched. A following token that
+    starts with ``-`` counts as "no value given".
+    """
+    out: list[str] = []
+    i = 0
+    while i < len(args):
+        arg = args[i]
+        if arg == "--gif":
+            nxt = args[i + 1] if i + 1 < len(args) else None
+            if nxt is None or nxt.startswith("-"):
+                out.append(f"--gif={_GIF_DEFAULT_SENTINEL}")
+            else:
+                out.extend(["--gif", nxt])
+                i += 1
+        else:
+            out.append(arg)
+        i += 1
+    return out
+
+
+class _GifAwareCommand(TyperCommand):
+    """TyperCommand that accepts ``--gif`` with or without a value."""
+
+    def parse_args(self, ctx, args):  # type: ignore[override]
+        return super().parse_args(ctx, _normalise_gif_args(list(args)))
 
 
 def _validate_model_constants() -> None:
@@ -200,7 +239,7 @@ def ingest(
     typer.echo(f"Ingest results: {list(results.keys())}")
 
 
-@app.command()
+@app.command(cls=_GifAwareCommand)
 @_requires_model_constants
 def abm(
     aoi: str | None = typer.Option(None, "--aoi", help="AOI slug (e.g. ghana). Required for simulation."),
@@ -215,9 +254,10 @@ def abm(
     output_dir: Path = typer.Option(Path("runs/abm"), "--output-dir", help="Output directory for simulation results."),
     data_root: Path | None = typer.Option(None, "--data-root", help="Root containing AOI manifest."),
     bbox: str | None = typer.Option(None, "--bbox", help="Custom AOI bbox 'lon_min,lat_min,lon_max,lat_max' (required for non-catalog AOI slugs)."),
-    gif: bool = typer.Option(False, "--gif", help="Auto-generate an animation GIF after the run."),
-    gif_max_width: int = typer.Option(1280, "--gif-max-width", help="Downscale --gif animation frames to this max width in pixels (0 = full resolution)."),
-    debug: bool = typer.Option(False, "--debug", help="Post-run debug visualisation: hosts-vs-vectors overlay GIF (humans green, livestock brown, mosquitoes blue, I_V red)."),
+    gif: str | None = typer.Option(None, "--gif", help="Render a native in-process GIF of the run (one frame per --gif-every days). Optional path: bare --gif writes <output-dir>/<aoi>_abm_seedNNNN.gif."),
+    gif_every: int = typer.Option(1, "--gif-every", help="Emit one GIF frame every N simulated days."),
+    gif_fps: int = typer.Option(6, "--gif-fps", help="GIF playback rate in frames per second."),
+    gif_max_width: int = typer.Option(1280, "--gif-max-width", help="GIF canvas width in pixels (clamped to 640..2048; height = 0.60 × width)."),
     compile: bool = typer.Option(False, "--compile", "-c", help="Compile the C++ ABM engine (mal_abm_fast) from source."),
     clean: bool = typer.Option(False, "--clean", help="Clean build directory before compiling (used with --compile)."),
     worktree: Path | None = typer.Option(
@@ -276,7 +316,7 @@ def abm(
       --seed: PRNG seed for reproducibility
       --snapshot-every: Intermediate output interval
       --cohort-log: Daily eggs/larvae/pupae/adult statistics JSON
-      --gif: Auto-generate an animation GIF after the run
+      --gif: Native in-process animation GIF (one frame per --gif-every days)
       --worktree: Path to gawt worktree for isolated execution
 
     Use one invocation for multi-year runs. Splitting by month loses
@@ -349,6 +389,10 @@ def abm(
         immunity_duration_days=immunity_duration_days,
         enable_immunity=enable_immunity,
         transmission_snapshot_every=transmission_snapshot_every,
+        gif=("" if gif == _GIF_DEFAULT_SENTINEL else gif),
+        gif_every=gif_every,
+        gif_fps=gif_fps,
+        gif_max_width=gif_max_width,
         **bbox_kwargs,
     )
     typer.echo(f"ABM result: {result}")
@@ -360,71 +404,6 @@ def abm(
             err=True,
         )
         raise typer.Exit(code=1)
-
-    if gif:
-        _render_animation(
-            aoi=aoi,
-            seed=seed,
-            output_dir=output_dir,
-            cohort_log=cohort_log,
-            enable_transmission=enable_transmission,
-            max_width=gif_max_width,
-        )
-
-    if debug:
-        from .abm.scripts.overlay_hosts import render_overlay
-        try:
-            render_overlay(output_dir, aoi, output_dir / "overlay_hosts.gif")
-        except Exception as e:  # noqa: BLE001 — debug aid must never fail the run
-            typer.echo(f"overlay debug GIF failed (run unaffected): {e}")
-
-
-def _render_animation(
-    aoi: str,
-    seed: int,
-    output_dir: Path,
-    cohort_log: Path | None,
-    enable_transmission: bool = False,
-    max_width: int = 1280,
-) -> None:
-    """Generate animation GIFs for an ABM run (used by --gif)."""
-    import shutil
-    from .abm.scripts.visualize_state import main as visualize_vectors
-    from .abm.scripts.visualize_transmission import main as visualize_trans
-
-    run_dir = Path(output_dir)
-    vector_gif = run_dir / f"{aoi}_abm_seed{seed:04d}_vectors.gif"
-    default_gif = run_dir / f"{aoi}_abm_seed{seed:04d}.gif"
-    cohort_path = cohort_log or run_dir / f"{aoi}_abm_seed{seed:04d}_cohort.json"
-
-    # 1. Vector Dynamics GIF
-    argv_v = ["--run-dir", str(run_dir), "--output", str(vector_gif)]
-    if cohort_path.exists():
-        argv_v += ["--cohort-log", str(cohort_path)]
-    if max_width and max_width > 0:
-        argv_v += ["--max-width", str(max_width)]
-    try:
-        visualize_vectors(argv_v)
-        if vector_gif.exists():
-            shutil.copyfile(vector_gif, default_gif)
-        typer.echo(f"Vector animation saved: {vector_gif}")
-    except SystemExit as e:
-        typer.echo(f"Vector animation failed (exit {e.code}): no state snapshots?", err=True)
-    except Exception as e:  # noqa: BLE001 — GIF rendering must never fail a finished run
-        typer.echo(f"Vector animation failed (run unaffected): {e}", err=True)
-
-    # 2. Transmission Dynamics GIF (if transmission was enabled or transmission rasters exist)
-    trans_files = list(run_dir.glob("*transmission*.tif"))
-    if enable_transmission or len(trans_files) > 0:
-        trans_gif = run_dir / f"{aoi}_abm_seed{seed:04d}_transmission.gif"
-        argv_t = ["--run-dir", str(run_dir), "--output", str(trans_gif)]
-        try:
-            visualize_trans(argv_t)
-            typer.echo(f"Transmission animation saved: {trans_gif}")
-        except SystemExit as e:
-            typer.echo(f"Transmission animation failed (exit {e.code}): no transmission snapshots?", err=True)
-        except Exception as e:  # noqa: BLE001 — GIF rendering must never fail a finished run
-            typer.echo(f"Transmission animation failed (run unaffected): {e}", err=True)
 
 
 @app.command("score")

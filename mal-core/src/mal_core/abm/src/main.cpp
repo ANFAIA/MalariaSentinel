@@ -43,6 +43,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <regex>
 
 #include <CLI/CLI.hpp>
 #include <omp.h>
@@ -51,6 +52,7 @@
 #include "output_contract.hpp"
 #include "prng.hpp"
 #include "seeding.hpp"
+#include "viz.hpp"
 #include "wire.hpp"
 #include "transmission.hpp"
 #include "transmission_output.hpp"
@@ -225,6 +227,40 @@ std::string rollout_transmission_day_path(const std::string& rollout_trans_path,
     return (parent / name.str()).string();
 }
 
+// Build the per-rollout GIF path (plan 04 §2.5): with n_rollouts > 1 the
+// rollout id is inserted as `_seedNNNN` before the `.gif` extension.
+// Naming rule for multi-rollout GIFs (D10). The default artifact name is
+// `<aoi>_abm_seed{NNNN}.gif`, so appending a second suffix produced
+// `..._seed0042_seed0001.gif`. If the stem already ends with `_seed` plus
+// four digits, rollout 0 keeps that suffix verbatim and rollout i replaces
+// the number with the rollout's own seed (`--seed + i`, the value the engine
+// is actually seeded with); otherwise the `_seed{index}` suffix is appended
+// exactly as the state COGs do.
+std::string rollout_gif_path(const std::string& requested,
+                             int rollout_index,
+                             int n_rollouts) {
+    if (requested.empty()) return {};
+    if (n_rollouts == 1 && rollout_index == 0) return requested;
+    const std::filesystem::path p(requested);
+    const std::filesystem::path parent = p.has_parent_path()
+        ? p.parent_path() : std::filesystem::path{};
+    std::string stem = p.stem().string();
+    const std::string ext = p.has_extension() ? p.extension().string() : ".gif";
+    static const std::regex kTrailingSeed("^(.*)_seed([0-9]{4})$");
+    std::smatch m;
+    std::ostringstream name;
+    if (std::regex_match(stem, m, kTrailingSeed)) {
+        const int base_seed = std::stoi(m[2].str());
+        const int seed_rollout = base_seed + rollout_index;
+        name << m[1].str() << "_seed" << std::setw(4)
+             << std::setfill('0') << seed_rollout << ext;
+    } else {
+        name << stem << "_seed" << std::setw(4) << std::setfill('0')
+             << rollout_index << ext;
+    }
+    return (parent / name.str()).string();
+}
+
 // Parse a "lat1,lon1;lat2,lon2;..." string into a list of
 // DetectionPoint. The default per-point adult / larva counts are
 // taken from the supplied SeedingConfig so the user can override
@@ -359,6 +395,12 @@ OUTPUT
 
     bool debug_population = false;
     std::string cohort_log_path;
+
+    // Native GIF (plan 04): rendered in-process from live engine state.
+    std::string gif_path;
+    int gif_every     = 1;
+    int gif_fps       = 6;
+    int gif_max_width = 1280;
 
     // Transmission (M7.4/M7.4.1 SEIR-SEI). Model values come from
     // model_constants.yaml (transmission:); the CLI only overrides them.
@@ -599,6 +641,28 @@ OUTPUT
                     "eip_frac.")
         ->default_val("")
         ->group("Output & Debug");
+    run->add_option("--gif", gif_path,
+                    "Render a native in-process GIF of the run to this path. "
+                    "One frame per simulated day by default; the renderer "
+                    "never aborts the simulation.")
+        ->default_val("")
+        ->group("Output & Debug");
+    run->add_option("--gif-every", gif_every,
+                    "Emit one GIF frame every N simulated days (default 1).")
+        ->default_val(1)
+        ->check(CLI::Range(1, 100000))
+        ->group("Output & Debug");
+    run->add_option("--gif-fps", gif_fps,
+                    "GIF playback rate in frames per second (default 6).")
+        ->default_val(6)
+        ->check(CLI::Range(1, 120))
+        ->group("Output & Debug");
+    run->add_option("--gif-max-width", gif_max_width,
+                    "GIF canvas width in pixels, clamped to [640, 2048] "
+                    "(default 1280; height = 0.60 × width).")
+        ->default_val(1280)
+        ->check(CLI::Range(1, 8192))
+        ->group("Output & Debug");
 
     // ─── Transmission (SEIR-SEI) ─────────────────────────────────────────
     run->add_flag("--enable-transmission", enable_transmission,
@@ -695,7 +759,8 @@ OUTPUT
                     "(default from TransmissionParams).")
         ->group("Transmission (SEIR-SEI)");
     run->add_option("--transmission-snapshot-every", transmission_snapshot_every,
-                    "Intermediate transmission snapshot interval in days (0 = matches --snapshot-every).")
+                    "Intermediate transmission snapshot interval in days "
+                    "(0 = final snapshot only; no per-day transmission COGs).")
         ->default_val(0)
         ->group("Transmission (SEIR-SEI)");
     run->add_option("--emit-transmission-log", transmission_log_path,
@@ -957,10 +1022,32 @@ OUTPUT
             engine.set_foci_log_path(foci_path);
         }
 
-        // -- Cohort log collection -----------------------------------
-        std::vector<mal_abm_fast::DailyStats> cohort_log;
-        if (!cohort_log_path.empty()) {
-            cohort_log.reserve(static_cast<size_t>(days));
+        // -- Cohort log + GIF stats collection ------------------------
+        // stats_history feeds both the cohort-log JSON and the native GIF
+        // population panel, so it must be filled whenever either is active.
+        const bool collect_stats = !cohort_log_path.empty() || !gif_path.empty();
+        std::vector<mal_abm_fast::DailyStats> stats_history;
+        if (collect_stats) {
+            stats_history.reserve(static_cast<size_t>(days));
+        }
+
+        // -- Native GIF (plan 04) -------------------------------------
+        std::unique_ptr<mal_abm_fast::GifViz> gif_viz;
+        std::string rollout_gif;
+        if (!gif_path.empty()) {
+            rollout_gif = rollout_gif_path(gif_path, i, n_rollouts);
+            mal_abm_fast::GifVizConfig gif_cfg;
+            gif_cfg.path = rollout_gif;
+            gif_cfg.width = gif_max_width;
+            gif_cfg.fps = gif_fps;
+            gif_cfg.every = gif_every;
+            gif_cfg.transmission = enable_transmission;
+            gif_viz = std::make_unique<mal_abm_fast::GifViz>(gif_cfg);
+            if (!gif_viz->ok()) {
+                std::cerr << "abm_run: rollout " << i
+                          << " GIF disabled (renderer init failed); "
+                             "simulation continues\n";
+            }
         }
 
         // -- Step ----------------------------------------------------
@@ -975,8 +1062,11 @@ OUTPUT
                     std::exit(EXIT_FAILURE);
                 }
 
-                if (!cohort_log_path.empty()) {
-                    cohort_log.push_back(engine.last_day_stats());
+                if (collect_stats) {
+                    stats_history.push_back(engine.last_day_stats());
+                }
+                if (gif_viz && gif_viz->ok()) {
+                    gif_viz->observe(engine, stats_history, d + 1, days);
                 }
 
                 // Intermediate snapshot every N days
@@ -996,11 +1086,13 @@ OUTPUT
                               << " -> " << day_path << std::endl;
                 }
 
-                // Intermediate transmission snapshot (M7.4)
-                const int effective_trans_snapshot = (transmission_snapshot_every > 0)
-                    ? transmission_snapshot_every : snapshot_every;
-                if (enable_transmission && effective_trans_snapshot > 0 &&
-                    (d + 1) % effective_trans_snapshot == 0) {
+                // Intermediate transmission snapshot (M7.4 / plan 04 §4).
+                // transmission_snapshot_every == 0 now means "final snapshot
+                // only": it no longer mirrors --snapshot-every, because the
+                // per-day transmission COGs had a single consumer
+                // (visualize_transmission.py) that the native GIF replaced.
+                if (enable_transmission && transmission_snapshot_every > 0 &&
+                    (d + 1) % transmission_snapshot_every == 0) {
                     const std::string trans_base =
                         rollout_transmission_output_path(output_path, i, n_rollouts);
                     const std::string trans_day_path =
@@ -1025,8 +1117,22 @@ OUTPUT
             std::exit(EXIT_FAILURE);
         }
 
+        // -- Close the native GIF -------------------------------------
+        if (gif_viz) {
+            gif_viz->finish();
+            if (gif_viz->ok()) {
+                std::cout << "abm_run: rollout " << i << "/" << n_rollouts
+                          << " gif -> " << rollout_gif
+                          << " (" << gif_viz->frame_count() << " frames)"
+                          << std::endl;
+            } else {
+                std::cerr << "abm_run: rollout " << i
+                          << " GIF render failed (simulation unaffected)\n";
+            }
+        }
+
         // -- Write cohort log JSON ----------------------------------
-        if (!cohort_log_path.empty() && !cohort_log.empty()) {
+        if (!cohort_log_path.empty() && !stats_history.empty()) {
             std::string rollout_cohort_path;
             if (n_rollouts == 1) {
                 rollout_cohort_path = cohort_log_path;
@@ -1052,8 +1158,8 @@ OUTPUT
             }
             std::ofstream ofs(rollout_cohort_path);
             ofs << "{\n  \"n_days\": " << days << ",\n  \"daily\": [\n";
-            for (size_t di = 0; di < cohort_log.size(); ++di) {
-                const auto& s = cohort_log[di];
+            for (size_t di = 0; di < stats_history.size(); ++di) {
+                const auto& s = stats_history[di];
                 ofs << "    {\"day\": " << s.day
                     << ", \"n_alive\": " << s.n_alive
                     << ", \"n_adults\": " << s.n_adults
@@ -1066,7 +1172,7 @@ OUTPUT
                     << ", \"n_maturation\": " << s.n_maturation
                     << ", \"eip_frac\": " << std::fixed << std::setprecision(4) << s.eip_frac
                     << "}";
-                if (di + 1 < cohort_log.size()) ofs << ",";
+                if (di + 1 < stats_history.size()) ofs << ",";
                 ofs << "\n";
             }
             ofs << "  ]\n}\n";
