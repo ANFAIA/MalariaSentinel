@@ -157,6 +157,15 @@ For the legacy DwC occurrence archives and SRTM tiles, see
 
 ---
 
+## Contributing
+
+`main` is protected by the **Main Protection** ruleset: changes land via pull request, and
+force-pushes and deletions are blocked. See [CONTRIBUTING.md](CONTRIBUTING.md) for the
+branch/commit conventions, local quality gates (`uv run pytest`,
+`uv run malariasim abm --compile`, `ctest`), and the PR checklist.
+
+---
+
 ## Institutions & Support
 
 - **[ANFAIA](https://www.anfaia.org/)** — Artificial Intelligence Non-Profit Research Organization driving open-source AI solutions for global health.
