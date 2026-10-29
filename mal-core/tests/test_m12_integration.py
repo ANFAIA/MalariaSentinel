@@ -103,8 +103,12 @@ def test_daily_env_nc_nodata_inputs_fail_loud(tmp_path, write_manifest):
 
 
 def test_coastline_zeros_ocean_static_plane(tmp_path, monkeypatch, write_manifest):
-    """Saltwater filter (preserved): ocean cells' JRC persistent plane is
-    zeroed; the daily channels keep their values."""
+    """Open-sea cells lose JRC *and* their daily rainfall/temperature.
+
+    With a zero coastal band the water column is open sea, so the coastline
+    fix (2026-10) masks it everywhere; land keeps its values. The mask is now
+    the land-fraction rule, not a dilated binary raster.
+    """
     monkeypatch.setenv("COASTLINE_BUFFER_M", "0")
     times = np.arange(np.datetime64("2024-06-01"), np.datetime64("2024-06-03"))
     _base_inputs(
@@ -118,11 +122,130 @@ def test_coastline_zeros_ocean_static_plane(tmp_path, monkeypatch, write_manifes
         np.testing.assert_allclose(
             ds["jrc_persistent"].values, [[1.0, 0.0], [1.0, 0.0]]
         )
-        # rainfall survives everywhere (the filter targets statics).
-        assert float(ds["rainfall"].isel(time=0).values.max()) == 1.0
+        np.testing.assert_allclose(
+            ds["rainfall"].isel(time=0).values, [[1.0, 0.0], [1.0, 0.0]]
+        )
+        np.testing.assert_allclose(
+            ds["air_temp_c"].isel(time=0).values, [[25.0, 0.0], [25.0, 0.0]]
+        )
+        # Additive truthful basemap plane.
+        assert "land_frac" in ds
+        np.testing.assert_allclose(
+            ds["land_frac"].values, [[1.0, 0.0], [1.0, 0.0]], atol=1e-6
+        )
+        assert "land_frac" in result["variables"]
         assert "coastline_applied" not in result
     finally:
         ds.close()
+
+
+def test_coastline_band_keeps_coastal_water(tmp_path, monkeypatch, write_manifest):
+    """Coastal water (inside the band) keeps rain, temperature and JRC.
+
+    Same 2x2 grid as above: the water column is 1 km from land, so a 5 km
+    band classifies it as coastal water rather than open sea. This is the
+    behaviour the old 5 km dilation faked by turning water into "land".
+    """
+    monkeypatch.setenv("COASTLINE_BUFFER_M", "5000")
+    times = np.arange(np.datetime64("2024-06-01"), np.datetime64("2024-06-03"))
+    _base_inputs(
+        tmp_path, write_manifest,
+        times=times, jrc=[[1.0, 1.0], [1.0, 1.0]],
+        coastline="ghana_land_mask.tif", land_mask=[[1.0, 0.0], [1.0, 0.0]],
+    )
+    result = build_daily_env_nc("ghana", tmp_path)
+    ds = xr.open_dataset(result["env_path"])
+    try:
+        # Nothing is open sea: the water column is inside the band.
+        np.testing.assert_allclose(
+            ds["jrc_persistent"].values, [[1.0, 1.0], [1.0, 1.0]]
+        )
+        np.testing.assert_allclose(
+            ds["rainfall"].isel(time=0).values, [[1.0, 1.0], [1.0, 1.0]]
+        )
+        np.testing.assert_allclose(
+            ds["air_temp_c"].isel(time=0).values, [[25.0, 25.0], [25.0, 25.0]]
+        )
+        np.testing.assert_allclose(
+            ds["land_frac"].values, [[1.0, 0.0], [1.0, 0.0]], atol=1e-6
+        )
+    finally:
+        ds.close()
+
+
+def test_open_sea_has_no_habitat_statics_and_no_candidate(
+        tmp_path, monkeypatch, write_manifest):
+    """D1: open sea carries zero habitat.
+
+    Dynamic World reports its "water" class at 1.0 on every ocean cell, so
+    without masking all five statics, ``h_total > 0`` everywhere and the
+    habitat gpkg keeps a breeding candidate in mid-ocean (the engine then
+    seeded aquatic cohorts on cells with S = 0). The coastal band keeps its
+    statics: lagoons and river mouths are real habitat.
+    """
+    from mal_core.habitat.potential import static_potential, total_potential
+
+    monkeypatch.setenv("COASTLINE_BUFFER_M", "0")
+    times = np.arange(np.datetime64("2024-06-01"), np.datetime64("2024-06-03"))
+    # 2x2: column 0 land, column 1 ocean. DW open+water = 1.0 everywhere,
+    # i.e. exactly the ocean artefact this test pins.
+    _base_inputs(
+        tmp_path, write_manifest,
+        times=times, jrc=[[0.5, 0.5], [0.5, 0.5]],
+        coastline="ghana_land_mask.tif", land_mask=[[1.0, 0.0], [1.0, 0.0]],
+        extra_manifest=None,
+    )
+    result = build_daily_env_nc("ghana", tmp_path)
+    ds = xr.open_dataset(result["env_path"])
+    try:
+        sea = np.array([[False, True], [False, True]])
+        for name in ("jrc_persistent", "lc_built", "lc_wetland",
+                     "lc_open_plus_water", "lc_crop"):
+            arr = ds[name].values
+            assert np.all(arr[sea] == 0.0), f"{name} leaks into open sea"
+            assert np.any(arr[~sea] > 0.0), f"{name} wiped on land"
+        h_total = total_potential(static_potential({
+            "jrc_persistent": ds.jrc_persistent.values,
+            "lc_built": ds.lc_built.values,
+            "lc_wetland": ds.lc_wetland.values,
+            "lc_open_plus_water": ds.lc_open_plus_water.values,
+            "lc_crop": ds.lc_crop.values,
+        }))
+        assert np.all(np.asarray(h_total)[sea] == 0.0)
+    finally:
+        ds.close()
+
+    # The gpkg candidate union follows the statics: land cells only here,
+    # i.e. exactly the number of non-sea cells with h_total > 0.
+    import geopandas as gpd
+
+    from mal_core.ingest.env import _write_habitat_patches_gpkg
+
+    ds = xr.open_dataset(result["env_path"])
+    statics = {
+        "jrc_persistent": ds.jrc_persistent.values,
+        "lc_built": ds.lc_built.values,
+        "lc_wetland": ds.lc_wetland.values,
+        "lc_open_plus_water": ds.lc_open_plus_water.values,
+        "lc_crop": ds.lc_crop.values,
+    }
+    ds.close()
+    # Minimal AOI stub matching the 2x2 grid written by the fixtures.
+    class _Stub:
+        slug = "ghana"
+        crs = "EPSG:4326"
+        bbox = (0.0, 0.0, 2.0, 2.0)
+
+        @staticmethod
+        def cells_per_side():
+            return (2, 2)
+
+    path = _write_habitat_patches_gpkg(
+        tmp_path / "patches.gpkg", statics, _Stub())
+    gdf = gpd.read_file(path)
+    expected = int((np.asarray(total_potential(static_potential(statics))) > 0).sum())
+    assert len(gdf) == expected
+    assert len(gdf) < 4, "open sea must not become a candidate cell"
 
 
 def test_coastline_disabled_by_negative_env(tmp_path, monkeypatch, write_manifest):

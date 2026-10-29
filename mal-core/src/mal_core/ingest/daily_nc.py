@@ -20,6 +20,12 @@ here is recomputed per year and nothing is broadcast into daily bands:
   - ``lc_open_plus_water``  DW grass+shrub+bare+water fraction (labels 2/5/7/0)
   - ``lc_crop``             Dynamic World crops fraction (label 4)
 
+Habitat statics are zeroed on **open sea** (the `sea_mask` rule above): open
+ocean is not larval habitat for these species, and Dynamic World reports its
+"water" class at 1.0 there, which would otherwise make every ocean cell a
+breeding candidate. The coastal band keeps its statics (lagoons, estuaries,
+the shallow plume).
+
 Retention: the full daily rainfall/temperature series available at build
 time is written WHOLE — days before the simulation start are the causal
 warm-up window the C++ coordinator integrates the pluvial state (z) over
@@ -48,13 +54,19 @@ _ENV_NC = str(_MODEL_CONSTANTS["contracts"]["env_nc"])
 
 NODATA_SENTINEL = float(_INGEST["nodata_sentinel"])
 
-# Saltwater filter (M12-fix 2026-08-26; preserved): cells outside the buffered
-# GSHHG land mask are dropped from the static JRC feature. The default buffer
-# (ingest.coastline_buffer_m) keeps coastal lagoons and estuaries while
-# rejecting open ocean (where JRC GSW sees permanent surf). Set
-# ``COASTLINE_BUFFER_M=0`` to disable buffering, negative to disable the
-# filter entirely.
+# Open-sea rule (2026-10 coastline fix). The coastline artifact is a per-cell
+# LAND FRACTION from GSHHG full resolution; "open sea" is derived from it:
+#
+#     sea  <=>  land_frac < sea_water_floor  AND  dist_to_land > coast_band_m
+#
+# Only open-sea cells lose rainfall/temperature and JRC permanent water. The
+# coastal band (ingest.coastline_buffer_m, historical name) keeps lagoons,
+# estuaries and the shallow plume visible in satellite imagery. There is no
+# blind dilation anywhere: it moved the coast kilometres inland (542 "land"
+# cells vs 78 real ones on accra-coastal-test). Set ``COASTLINE_BUFFER_M=0``
+# to shrink the band to zero, a negative value to disable the filter.
 COASTLINE_BUFFER_M_DEFAULT = float(_INGEST["coastline_buffer_m"])
+SEA_WATER_FLOOR = float(_INGEST["sea_water_floor"])
 
 # Candidate-cell floor: cells whose total potential (sum of the six H
 # features, computed by mal_core.habitat.potential) is below this are
@@ -210,14 +222,35 @@ def build_daily_env_nc(
         rainfall[nodata_mask] = 0.0
     rainfall[rainfall < 0] = 0.0
 
-    ocean_mask = None
+    # --- coastline: land fraction -> open-sea mask ------------------------
+    from mal_commonlib.data.loaders.coastline import (
+        distance_to_land_m as _dist_to_land,
+        sea_mask as _sea_mask,
+    )
+
+    land_frac = None
+    ocean_mask = None          # open sea (the only masked-out class)
+    coastal_water_mask = None  # water inside the coastal band (keeps JRC)
+    coast_band_m = COASTLINE_BUFFER_M_DEFAULT
     if coastline_file is not None:
         try:
-            lm = read_static_tif(coastline_file, target_shape)
-            lm = np.nan_to_num(lm, nan=0.0)
-            ocean_mask = lm <= float(_INGEST["ocean_mask_threshold"])
-            for d in range(n_days):
-                rainfall[d][ocean_mask] = 0.0
+            lf = read_static_tif(coastline_file, target_shape)
+            lf = np.clip(np.nan_to_num(lf, nan=0.0), 0.0, 1.0).astype(np.float32)
+            land_frac = lf
+            band_env = os.environ.get("COASTLINE_BUFFER_M")
+            if band_env is not None:
+                coast_band_m = float(band_env)
+            try:
+                res_m = float(rain_ds.attrs.get(
+                    "resolution_m", float(_INGEST["cell_size_hint_m"])))
+            except Exception:
+                res_m = float(_INGEST["cell_size_hint_m"])
+            dist_m = _dist_to_land(lf, res_m, SEA_WATER_FLOOR)
+            if coast_band_m >= 0:
+                ocean_mask = _sea_mask(lf, dist_m, coast_band_m, SEA_WATER_FLOOR)
+                coastal_water_mask = (lf < SEA_WATER_FLOOR) & ~ocean_mask
+                for d in range(n_days):
+                    rainfall[d][ocean_mask] = 0.0
         except Exception as e:
             print(f"warning: could not read {coastline_file}: {e}")
 
@@ -249,6 +282,12 @@ def build_daily_env_nc(
         [air_temp_c[at_index[str(d)]]
          for d in env_days], axis=0
     ).astype(np.float32)
+    # Sea temperature keeps the 0.0 sentinel (not NaN). Rationale: the 0.0
+    # block is the convention the C++ ClimateEngine and the renderer's
+    # land/habitat display mask already understand, and NaN would be imputed
+    # from neighbouring land cells by climate.cpp (impute_temp_nans) -- i.e.
+    # it would quietly turn sea pixels into plausible land temperatures and
+    # hide the very signal the basemap needs to show.
     if ocean_mask is not None:
         for d in range(n_days):
             air_temp_c[d][ocean_mask] = 0.0
@@ -285,45 +324,54 @@ def build_daily_env_nc(
         ("lc_built", "lc_wetland", "lc_open_plus_water", "lc_crop"),
     )
 
-    # --- M12-fix saltwater filter on the static JRC signal (preserved) ----
-    buffer_env = os.environ.get("COASTLINE_BUFFER_M")
-    buffer_m = float(buffer_env) if buffer_env is not None else COASTLINE_BUFFER_M_DEFAULT
-    if coastline_file is not None and buffer_m >= 0:
-        print(f"Reading coastline land mask: {coastline_file}")
-        land_mask = read_static_tif(coastline_file, target_shape)
-        land_mask = np.nan_to_num(land_mask, nan=0.0)
-        land_mask = (land_mask > float(_INGEST["land_mask_threshold"])).astype(np.float32)
-        if buffer_m > 0:
-            from scipy import ndimage
-            cell_size_hint = float(_INGEST["cell_size_hint_m"])
-            try:
-                cell_size_hint = float(
-                    rain_ds.attrs.get("resolution_m",
-                                      float(_INGEST["cell_size_hint_m"])))
-            except Exception:
-                pass
-            radius_cells = max(int(_INGEST["min_dilation_radius_cells"]),
-                               int(np.ceil(buffer_m / cell_size_hint)))
-            structure = np.ones((2 * radius_cells + 1, 2 * radius_cells + 1), dtype=bool)
-            land_mask = ndimage.binary_dilation(
-                land_mask > 0.5, structure=structure
-            ).astype(np.float32)
-        before = float(jrc["jrc_persistent"].sum())
-        jrc["jrc_persistent"] *= land_mask
+    # --- open ocean carries no larval habitat ------------------------------
+    # Open ocean is not larval habitat for these species: An. coluzzii /
+    # gambiae breed in standing fresh water on land (pools, puddles, drains,
+    # lagoons), not in the sea. coastal water INSIDE the band keeps its
+    # statics — lagoons, estuaries and river mouths are real habitat and the
+    # 2 km band is where the satellite shows the shallow plume.
+    #
+    # So ALL FIVE habitat statics are zeroed on open sea, not just JRC.
+    # Without this, Dynamic World's `lc_open_plus_water` is 1.0 on every ocean
+    # cell (the "water" class), h_total > 0, the gpkg keeps 2745 candidates
+    # and the engine can seed aquatic cohorts on open sea where S = 0 —
+    # cohorts drawn as habitat in mid-ocean. See the round-2 AOI review.
+    # No dilation: the band is a distance query, not a mask mutation.
+    if land_frac is not None and ocean_mask is not None:
+        print(f"Reading coastline land fraction: {coastline_file}")
+        keep = (~ocean_mask).astype(np.float32)
+        jrc_before = float(jrc["jrc_persistent"].sum())
+        jrc["jrc_persistent"] *= keep
+        wc_before = {k: float(v.sum()) for k, v in wc.items()}
+        for k in wc:
+            wc[k] = wc[k] * keep
         after = float(jrc["jrc_persistent"].sum())
         print(
-            f"Saltwater filter: JRC persistent sum {before:.1f} -> {after:.1f} "
-            f"(coastline cells kept: {int(land_mask.sum())} of {land_mask.size})"
+            f"Saltwater filter: JRC persistent sum {jrc_before:.1f} -> "
+            f"{after:.1f}; lc_open_plus_water {wc_before['lc_open_plus_water']:.1f}"
+            f" -> {float(wc['lc_open_plus_water'].sum()):.1f} "
+            f"(cells kept: {int(keep.sum())} of {keep.size}: "
+            f"land {int((land_frac > 0.5).sum())}, "
+            f"coastal water {int(coastal_water_mask.sum())})"
         )
     else:
         warning = (
-            "no land_mask.tif found — saltwater filter skipped; JRC GSW "
+            "no coastline artifact found — saltwater filter skipped; JRC GSW "
             "may include open-ocean cells."
         )
-        print(("disabled by COASTLINE_BUFFER_M<0" if coastline_file is not None
-               else "WARNING: ") + warning
-              if coastline_file is None else
-              f"note: {warning} (filter disabled)")
+        print(("WARNING: " if coastline_file is None else "note: ") + warning)
+
+    # --- coastline census (auditable one-liner) ---------------------------
+    if land_frac is not None and ocean_mask is not None:
+        n_land = int((land_frac > 0.5).sum())
+        n_mixed = int(((land_frac > SEA_WATER_FLOOR) & (land_frac <= 0.5)).sum())
+        n_coast = int(coastal_water_mask.sum())
+        n_sea = int(ocean_mask.sum())
+        print(
+            f"coast: land {n_land} cells (>50% land), mixed {n_mixed}, "
+            f"coastal water {n_coast}, open sea {n_sea} "
+            f"(band {coast_band_m:.0f} m, floor {SEA_WATER_FLOOR:g})"
+        )
 
     # --- candidate-cell census (pure statics, no DEM, no NDVI thresholds) --
     from mal_core.habitat import potential as _pot
@@ -392,6 +440,15 @@ def build_daily_env_nc(
             "n_candidate_cells": int(n_candidates),
         },
     )
+    if land_frac is not None:
+        # Additive static plane: the truthful basemap the renderer draws.
+        # Same grid, values 0..1 (fraction of the cell covered by land).
+        ds["land_frac"] = (
+            ["y", "x"], land_frac.astype(np.float32),
+            {"long_name": "GSHHG land fraction per AOI cell "
+                          "(0 = open water, 1 = fully land)",
+             "units": "1"},
+        )
     if salinity_ppt is not None:
         ds["salinity_ppt"] = (
             ["time", "y", "x"], salinity_ppt,
@@ -439,6 +496,8 @@ def build_daily_env_nc(
     ds.to_netcdf(output_path, encoding=encoding)
 
     variables = ["rainfall", "air_temp_c"] + [v for v in jrc] + [v for v in wc]
+    if land_frac is not None:
+        variables.append("land_frac")
     if salinity_ppt is not None:
         variables.append("salinity_ppt")
 

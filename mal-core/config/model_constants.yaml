@@ -138,7 +138,15 @@ ingest:          # lado py (escritor NC) + valores de paridad cruzada C++⇄py
   nodata_sentinel_int: -9999    # [int] mirror int del sentinel (label-mode; dynamic_world.py)
   residential_from_indoor_frac: 0.8  # [fracción] host_landscape: residential =
                                      # building_fraction (si >0) else indoor·este factor
-  coastline_buffer_m: 5000.0    # [m] buffer de máscara de costa del filtro de salinidad
+  coastline_buffer_m: 2000.0    # [m] ancho de la BANDA COSTERA (aguas someras que
+                                # conservan su JRC). Ya NO dilata la máscara de tierra:
+                                # la banda se consulta con sea_mask(land_frac, dist, band).
+                                # Nombre histórico conservado para que los manifiestos viejos carguen.
+  coastline_resolution: "f"     # [GSHHG] resolución del shapefile: c/l/i/h/f.
+                                # f = full (~30 m) por defecto; c (crude) está a varios km
+                                # de la costa real en una rejilla de 1 km.
+  sea_water_floor: 0.05         # [fracción] land_frac por debajo de este umbral = agua.
+                                # Regla de mar abierto: agua Y distancia a tierra > banda.
   cell_size_hint_m: 1000.0      # [m] resolución por defecto del hint de celda
   candidate_min_ingest: 1.0e-6  # [índice] piso census del ingest — rol DISTINTO de
                                 # candidate_min_engine (NO espejo; por diseño: marca

@@ -198,7 +198,11 @@ class Ingest(_StrictModel):
     nodata_sentinel: float
     nodata_sentinel_int: int
     residential_from_indoor_frac: float
+    # Width of the shallow coastal band that keeps its JRC water (the name is
+    # historical: it no longer dilates the land mask).
     coastline_buffer_m: float
+    coastline_resolution: str
+    sea_water_floor: float
     cell_size_hint_m: float
     candidate_min_ingest: float
     min_dilation_radius_cells: int
@@ -466,6 +470,18 @@ class ModelConfig(_StrictModel):
             errors.append(
                 "ingest.nodata_sentinel_int must be negative, got "
                 f"{self.ingest.nodata_sentinel_int!r}")
+        if self.ingest.coastline_resolution not in {"c", "l", "i", "h", "f"}:
+            errors.append(
+                "ingest.coastline_resolution must be one of c/l/i/h/f, got "
+                f"{self.ingest.coastline_resolution!r}")
+        if self.ingest.coastline_buffer_m < 0:
+            errors.append(
+                "ingest.coastline_buffer_m (coastal band width) must be >= 0, "
+                f"got {self.ingest.coastline_buffer_m!r}")
+        if not (0.0 < self.ingest.sea_water_floor < 1.0):
+            errors.append(
+                "ingest.sea_water_floor must be in (0, 1), got "
+                f"{self.ingest.sea_water_floor!r}")
 
         wildlife = self.wildlife
         expected_classes = set(WILDLIFE_CLASSES)

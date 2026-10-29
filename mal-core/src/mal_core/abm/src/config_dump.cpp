@@ -116,6 +116,8 @@ int main(int argc, char** argv) {
         out["ingest.residential_from_indoor_frac"] =
             cfg.ingest.residential_from_indoor_frac;
         out["ingest.coastline_buffer_m"] = cfg.ingest.coastline_buffer_m;
+        out["ingest.coastline_resolution"] = cfg.ingest.coastline_resolution;
+        out["ingest.sea_water_floor"] = cfg.ingest.sea_water_floor;
         out["ingest.cell_size_hint_m"] = cfg.ingest.cell_size_hint_m;
         out["ingest.candidate_min_ingest"] = cfg.ingest.candidate_min_ingest;
         out["ingest.min_dilation_radius_cells"] =

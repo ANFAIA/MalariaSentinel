@@ -45,6 +45,10 @@ public:
     const std::vector<float>& lc_wetland()         const { return lc_wetland_; }
     const std::vector<float>& lc_open_plus_water() const { return lc_open_plus_water_; }
     const std::vector<float>& lc_crop()            const { return lc_crop_; }
+    // Truthful basemap plane (fraction of cell covered by land). Renderer /
+    // diagnostics only: it is NOT part of HabitatFeatures and never enters
+    // the habitat or capacity math. Empty for env NCs predating the plane.
+    const std::vector<float>& land_frac()          const { return land_frac_; }
 
     // Per-cell static features bundle for the coordinator (bounds-clamped).
     HabitatFeatures habitat_features_at(int32_t row, int32_t col) const {
@@ -114,6 +118,7 @@ private:
     std::vector<float>   lc_wetland_;
     std::vector<float>   lc_open_plus_water_;
     std::vector<float>   lc_crop_;
+    std::vector<float>   land_frac_;
     // Daily NC state - shared across threads via shared_ptr
     std::shared_ptr<std::vector<float>>   rain_nc_;      // n_days * h * w
     std::shared_ptr<std::vector<float>>   air_temp_nc_;  // n_days * h * w (deg C)

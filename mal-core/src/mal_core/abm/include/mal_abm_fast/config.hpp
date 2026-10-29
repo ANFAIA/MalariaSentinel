@@ -102,7 +102,13 @@ struct IngestCfg {
     double nodata_sentinel = 0.0;
     int nodata_sentinel_int = 0;
     double residential_from_indoor_frac = 0.0;
+    // Width of the coastal band that keeps its JRC water (historical name:
+    // it no longer dilates the land mask; see coastline.py sea_mask()).
     double coastline_buffer_m = 0.0;
+    // GSHHG resolution code for the coastline artifact: c/l/i/h/f.
+    std::string coastline_resolution = "f";
+    // Land fraction below which an AOI cell counts as water.
+    double sea_water_floor = 0.05;
     double cell_size_hint_m = 0.0;
     double candidate_min_ingest = 0.0;
     int min_dilation_radius_cells = 0;

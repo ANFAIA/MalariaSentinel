@@ -28,6 +28,10 @@ struct DailyEnvBands {
     std::vector<float> lc_wetland;         // wetland+mangrove fraction
     std::vector<float> lc_open_plus_water; // open/low-veg + bare + water fraction
     std::vector<float> lc_crop;            // cropland fraction
+    // Optional truthful basemap: fraction of the cell covered by land
+    // (GSHHG full). Additive, never used by the habitat math. Empty when
+    // the env NC predates it.
+    std::vector<float> land_frac;
     std::vector<float> salinity_ppt;  // psu; empty if the NC has no salinity_ppt
     int32_t             n_days = 0;
     int32_t             h      = 0;
