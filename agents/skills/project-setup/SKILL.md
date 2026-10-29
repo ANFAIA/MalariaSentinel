@@ -184,9 +184,7 @@ Once setup is verified:
 - **Explore datasets**: see `agents/skills/data-explorer/SKILL.md`
 - **Build the ABM engine**: see `agents/skills/abm-engine/SKILL.md`
 - **Deploy to CESGA HPC**: see `agents/skills/cesga/SKILL.md`
-- **Operate the knowledge graph**: see `.agents/skills/project-memory/SKILL.md`
 - **Check project conventions**: read `AGENTS.md`
-- **Set up the knowledge graph**: see `agents/skills/memory-setup/SKILL.md`
 - **Use subagents**: see `agents/skills/subagents-loops/SKILL.md`
 - **Run CLI commands**: see `agents/skills/mal-execution-api/SKILL.md`
 - **Onboard from scratch**: see `agents/skills/agent-onboarding/SKILL.md`

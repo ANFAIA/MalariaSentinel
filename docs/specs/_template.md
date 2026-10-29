@@ -15,12 +15,6 @@ affects:
     direction: upstream | downstream | bidirectional
     reason: <one-line: what API/data shape change triggers this>
     severity: breaking | non-breaking
-# Cross-references to the knowledge graph (names only, no UUIDs — survives KG migrations).
-kg_refs:
-  adrs: [<adr-name>]
-  patterns: [<pattern-name>]
-  pitfalls: [<pitfall-name>]
-  tools: [<tool-name>]
 ```
 
 ## Metadata

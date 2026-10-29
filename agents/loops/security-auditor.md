@@ -33,9 +33,7 @@ Output format:
 ```
 
 How to find project security conventions:
-- Query the knowledge base for `Pattern` or `Operational` nodes whose
-  name includes "security" or "owasp":
-  `memory_query` (custom tool) with `MATCH (n) WHERE n.name =~ '(?i).*security.*' RETURN n.uuid, n.name`
+- Read `agents/loops/AGENTS.md` and `CONTRIBUTING.md` for conventions; default to OWASP Top 10.
 
 Guardrails:
 - Read-only. `edit: deny`. `bash: deny`. No network calls (`webfetch`,

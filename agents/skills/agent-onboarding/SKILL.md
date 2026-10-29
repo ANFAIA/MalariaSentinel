@@ -1,29 +1,26 @@
 ---
 name: agent-onboarding
-description: "Complete onboarding guide for new agents starting from scratch on MalariaSentinel. Covers the full path from GitHub clone to expert operation: project setup, memory module initialization, understanding the monorepo, running pipelines, using subagents, and contributing. Load this skill FIRST when you land in this project for the first time."
+description: "Complete onboarding guide for new agents starting from scratch on MalariaSentinel. Covers the full path from GitHub clone to expert operation: project setup, understanding the monorepo, running pipelines, using subagents, and contributing. Load this skill FIRST when you land in this project for the first time."
 ---
 
 # Agent Onboarding
 
-Single entry point for any agent starting from scratch on MalariaSentinel. Follow the steps in order — each builds on the previous. Estimated total time: ~35 minutes for full onboarding, or skip ahead using the Quick Reference Card.
+Single entry point for any agent starting from scratch on MalariaSentinel. Follow the steps in order — each builds on the previous. Estimated total time: ~25 minutes for full onboarding, or skip ahead using the Quick Reference Card.
 
 ## Quick Reference Card
 
 | I need to... | Skill to load |
 |---|---|
 | Set up the project | `project-setup` |
-| Start a session | `agent-ops` |
 | Understand the domain | `sdss-reference` |
 | Run Ghana simulation | `ghana-pipeline` |
 | Run ABM simulations | `abm-engine` |
 | Validate ABM output | `abm-engine` (`malariasim score --run-dir <dir>`) |
 | Explore datasets | `data-explorer` |
-| Use the knowledge graph | `project-memory` |
 | Deploy to HPC | `cesga` |
 | Use shared utilities | `mal-commonlib-api` |
 | Use core API | `mal-core-api` |
 | Work across packages | `monorepo-dev` |
-| Set up memory module | `memory-setup` |
 | Use subagents/loops | `subagents-loops` |
 | Run CLI commands | `mal-execution-api` |
 | Onboard from scratch | `agent-onboarding` (this skill) |
@@ -59,39 +56,17 @@ bash tools/verify.sh
 
 **Full details**: load the `project-setup` skill for prerequisites (Python 3.12+, uv, CMake/Ninja for ABM, GDAL), troubleshooting, and data source documentation.
 
-## Step 2: Memory Module Setup (~10 min)
+## Step 2: Session Start (~2 min)
 
-The knowledge graph (Neo4j + Graphiti MCP) gives the agent persistent project memory across sessions. Docker must be running.
+Every session begins by orienting on the project state:
 
-```bash
-# Install the memory module (interactive — asks for project slug, Neo4j password, OpenAI key)
-bash agents/memory/install.sh
+1. Read `AGENTS.md` at the repo root — conventions, decision tables, protected files.
+2. Check the kanban (GitHub Projects): exactly one issue In Progress; pick the highest-priority unblocked issue if none is active.
+3. Read the issue's acceptance criteria before touching code.
 
-# Cold-start: seed the graph with bootstrap entries
-make -f agents/memory/scripts/Makefile bootstrap
+Durability across sessions comes from GitHub (issues, milestones, and PR descriptions) — not from any local memory service.
 
-# Verify everything is healthy
-make -f agents/memory/scripts/Makefile status
-make -f agents/memory/scripts/Makefile audit
-```
-
-If `audit` reports violations (orphan rels, unlabeled nodes, out-of-schema labels), fix them before proceeding — see the `project-memory` skill for the schema and invariant details.
-
-**Troubleshooting**: load the `project-memory` skill. It covers the 8-label schema (`Component`, `Investigation`, `Architecture`, `Pattern`, `Pitfall`, `Tool`, `Operational`, `Preference`), the three invariants, and the session lifecycle contract.
-
-## Step 3: Session Start (~2 min)
-
-Every session begins with a memory recall to load prior context:
-
-```bash
-make -f agents/memory/scripts/Makefile session-start
-```
-
-This runs the audit, then surfaces open investigations, active pitfalls, architecture decisions, components, and operational patterns. Pick one open investigation to advance.
-
-**Full details**: load the `agent-ops` skill for the complete session lifecycle (start, parallel execution, end-of-session writes), the kanban workflow, and the "exactly one issue In Progress" discipline.
-
-## Step 4: Understand the Project (~10 min)
+## Step 3: Understand the Project (~10 min)
 
 Read `AGENTS.md` at the repo root — it contains the project's rules, the monorepo layout, the promotion flow, and the decision tables.
 
@@ -106,7 +81,7 @@ Then load these skills for deeper context:
 
 **Key insight**: MalariaSentinel has two tiers — **core** (the Centinela: `mal-commonlib`, `mal-core`, `mal-execution`) and **experiments** (`mal-data-explorer`). Experiments either die or promote stable code into core. Nothing depends on experiments.
 
-## Step 5: Run Something (~5 min)
+## Step 4: Run Something (~5 min)
 
 Get a working pipeline run under your belt.
 
@@ -126,7 +101,7 @@ uv run python 03_map_ghana.py
 
 **Full details**: load `ghana-pipeline` for the 6-stage pipeline (ingest → suitability → simulate → train → predict → map) or `data-explorer` for the 20+ visualization and bias-analysis scripts.
 
-## Step 6: Use Subagents (when needed)
+## Step 5: Use Subagents (when needed)
 
 The supervisor agent delegates to specialised loops via the `task` tool. Available loops:
 
@@ -134,16 +109,16 @@ The supervisor agent delegates to specialised loops via the `task` tool. Availab
 |---|---|
 | `test-fixer` | Iterate a check command until it passes |
 | `code-reviewer` | Structured diff review (read-only) |
-| `doc-researcher` | Query knowledge graph first, web as fallback |
+| `doc-researcher` | Research from repo and web; returns a sourced brief |
 | `security-auditor` | OWASP-style audit (read-only) |
 
 For multi-agent isolated edits (multiple features in parallel), use the `gitagent` skill — it spawns worktrees per agent, collects proposals as patches, and integrates one clean commit.
 
 **Parallelism rule**: the supervisor parallelises by default. N independent `task` calls in one message run concurrently. Serialise only when B depends on A's output.
 
-**Full details**: load `agent-ops` for parallel execution patterns and the `gitagent` skill for the propose/worktree workflow.
+**Full details**: load `subagents-loops` for loop selection and the `gitagent` skill for the propose/worktree workflow.
 
-## Step 7: Contribute
+## Step 6: Contribute
 
 Branch naming conventions:
 
@@ -163,11 +138,11 @@ Branch naming conventions:
 4. Delete the original from the experiment. Leave a pointer comment.
 5. Update `mal-execution/` scripts to use the promoted module.
 
-**Decision table**: config/paths → `mal-commonlib`, pipeline logic → `mal-core`, CLI scripts → `mal-execution/scripts`, domain entities → knowledge graph.
+**Decision table**: config/paths → `mal-commonlib`, pipeline logic → `mal-core`, CLI scripts → `mal-execution/scripts`.
 
 **Full details**: load `monorepo-dev` for the full contribution guide and the promotion decision table.
 
-## Step 8: Deploy to HPC (optional)
+## Step 7: Deploy to HPC (optional)
 
 For large-scale simulations on CESGA's HPC cluster:
 
@@ -177,10 +152,6 @@ For large-scale simulations on CESGA's HPC cluster:
 
 When wrapping up a non-trivial session:
 
-1. Update affected `Investigation` nodes (status + evidence).
-2. Add newly-discovered typed nodes (patterns, pitfalls, components).
-3. Write a free-form session episode via `mcp__graphiti-memory__add_memory` with `source: "text"`.
-4. Edit `AGENTS.md` if a new convention emerged.
-5. Run `make -f agents/memory/scripts/Makefile audit` to re-verify.
+1. Edit `AGENTS.md` if a new convention emerged.
 
 Skip the contract for trivial sessions (single tool call, no state change).

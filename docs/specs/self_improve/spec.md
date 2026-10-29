@@ -45,12 +45,6 @@ affects:
     direction: bidirectional
     reason: self_improve patches prompts and janus config that commonlib specialists read
     severity: non-breaking
-# Cross-references to the knowledge graph (names only, no UUIDs — survives KG migrations).
-kg_refs:
-  adrs: []
-  patterns: []
-  pitfalls: []
-  tools: []
 ```
 
 ## Metadata
@@ -122,9 +116,6 @@ runtime-output directories listed in §3. Specifically:
   `.pytest_cache/`, `.gitagent/`. These are generated outputs, not
   source.
 - **External data**: `data/**` (downloaded AOI datasets).
-- **Knowledge graph content**: `agents/memory/seed/*.yaml` is owned by
-  the curator role. `self_improve` reads the KG but does not edit
-  seed yaml.
 - **Root project files**: the root `AGENTS.md` is the agent's own
   operating instructions and is human-owned.
 - **Other specialists' outputs**: `runs/<session>/session.jsonl`,
@@ -195,7 +186,6 @@ The specialist responds with a JSON summary:
     agents/janus/src/agents_janus/tests/` to verify the change.
   - One `mcp__gitagent__send_message` to `__orchestrator__` with the
     summary.
-  - One knowledge-graph write (best-effort) via `memory.sh`.
 
 ## 7. Migration & deprecation
 
@@ -215,9 +205,6 @@ rg "edits_allow" agents/janus/src/agents_janus/config/subagents.yaml \
 
 # INV-2: read-before-write — check no template modification without a read
 rg "edit_file" agents/janus/src/agents_janus/prompts/per_subagent/self_improve.md.j2
-
-# INV-3: KG recording — check the prompt mentions memory.sh or memory_recall_kg
-rg "memory" agents/janus/src/agents_janus/prompts/per_subagent/self_improve.md.j2
 
 # INV-6: no domain-code edits — check the prompt says no mal-core edits
 rg "mal-core|mal-commonlib|mal-execution" agents/janus/src/agents_janus/prompts/per_subagent/self_improve.md.j2

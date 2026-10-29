@@ -951,21 +951,15 @@ graph TB
     subgraph LOOPS["Loops (subagentes)"]
         TF["test-fixer<br/>auto: allow"]
         CR["code-reviewer<br/>ask: read-only"]
-        DR["doc-researcher<br/>ask: KB + web"]
+        DR["doc-researcher<br/>ask: repo + web"]
         SA["security-auditor<br/>ask: OWASP"]
-        MC["memory-curator<br/>ask: unico writer"]
         IA["improvement-agent<br/>ask: auto-aplica"]
     end
 
     subgraph DEEPAGENTS["Janus orchestrator (M10)"]
         DA["agents/janus/<br/>LangChain deepagents"]
         DA_CYCLES["3 cycles:<br/>calibration, feature, research"]
-        DA_TOOLS["4 tools:<br/>gitagent, pipeline,<br/>kg, opencode"]
-    end
-
-    subgraph MEMORIA["Memory module"]
-        MEM["agents/memory/<br/>Neo4j + Graphiti MCP<br/>8-label schema"]
-        TOOLS["8 herramientas custom<br/>memory_node, memory_rel,<br/>memory_query, etc."]
+        DA_TOOLS["3 tools:<br/>gitagent, pipeline,<br/>opencode"]
     end
 
     subgraph HARNESS["Research harness"]
@@ -978,7 +972,6 @@ graph TB
     SUP -->|"delega"| CR
     SUP -->|"delega"| DR
     SUP -->|"delega"| SA
-    SUP -->|"delega"| MC
     SUP -->|"delega"| IA
     SUP -->|"delega"| RH
     SUP -->|"delega"| DA
@@ -987,15 +980,11 @@ graph TB
     DA --> DA_TOOLS
     DA_TOOLS -->|"pipeline scoring"| ABM_PIPE["mal-core pipeline"]
 
-    MC -->|"escribe"| MEM
-    MEM <-->|"lee/escribe"| TOOLS
     RH -->|"usa"| SK
-    RH -->|"registra hallazgos"| MEM
 
     style SUP fill:#FFB6C1
     style LOOPS fill:#E6F3FF
     style DEEPAGENTS fill:#DDA0DD
-    style MEMORIA fill:#E6FFE6
     style HARNESS fill:#FFF5E6
 ```
 
@@ -1005,9 +994,8 @@ graph TB
 |---|---|---|
 | `test-fixer` | Itera verificacion hasta exit 0 | allow (auto) |
 | `code-reviewer` | Revisa diffs (solo lectura) | ask |
-| `doc-researcher` | Busca en KB, luego web | ask |
+| `doc-researcher` | Busca en repo, luego web | ask |
 | `security-auditor` | Auditoria OWASP (solo lectura) | ask |
-| `memory-curator` | Unico writer al knowledge graph | ask |
 | `improvement-agent` | Revisa + aplica mejoras | ask |
 | `janus-orchestrator` | LangChain deepagents: calibracion ABM via ciclos | primary |
 
@@ -1021,24 +1009,17 @@ Orquestador LangChain DeepAgents para calibracion automatica del ABM. Usa gitage
 
 | Ciclo | Descripcion |
 |---|---|
-| `calibration` | Recall KG → baseline score → spawn worker improvement → re-score |
-| `feature` | Recall KG → design feature → spawn worker → test |
-| `research` | Recall KG → web search → write findings → hypothesize |
+| `calibration` | Baseline score → spawn worker improvement → re-score |
+| `feature` | Design feature → spawn worker → test |
+| `research` | Web search → write findings → hypothesize |
 
 | Tool | Funcion |
 |---|---|
 | `gitagent_tool.py` | Spawn, proposals, integrate, finalize worktrees |
 | `pipeline_tool.py` | Run calibration, compare scorecards |
-| `kg_tool.py` | Memory recall from knowledge graph |
 | `opencode_tool.py` | Web search via OpenCode/Exa |
 
 **Session logger**: registra cada paso del ciclo en JSON para auditoria.
-
-### Memory module
-
-- Neo4j + Graphiti MCP docker stack
-- Schema 8 labels: Component, Investigation, Architecture, Pattern, Pitfall, Tool, Operational, Preference
-- 8 herramientas custom: memory_audit, memory_init, memory_node, memory_query, memory_recall, memory_rel, memory_seed, memory_status
 
 ### Research harness
 

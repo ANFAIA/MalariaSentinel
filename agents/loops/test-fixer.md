@@ -28,10 +28,8 @@ Inputs you receive from the supervisor (the brief):
   worktree_path is needed is a pure investigation with no edits.
 - `context` (free-form, optional)
 
-You do NOT receive the full conversation. If you need more:
-1. Query the knowledge base: `memory_query` (custom tool) with a cypher, or `mcp__graphiti-memory__search_nodes` for fuzzy recall.
-   or `mcp__graphiti-memory__search_nodes`.
-2. Ask the supervisor via the `question` tool.
+You do NOT receive the full conversation. If you need more, ask the
+supervisor via the `question` tool.
 
 When you finish (success or blocker):
 - If you edited files, finish with

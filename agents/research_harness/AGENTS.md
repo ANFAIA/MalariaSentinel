@@ -9,7 +9,7 @@ Updated automatically after each research cycle.
 
 **Objective:** Fill 4 empty paper subdirectories (abm-intervention, anopheles-dynamics, risk-mapping, sdss-elimination) with structured summaries of key papers referenced in hypotheses.md but lacking summaries.
 
-**Sources consulted:** Knowledge graph (memory_recall), existing papers/ directory, web search (4 parallel searches), hypotheses.md reference list.
+**Sources consulted:** papers/ directory, web search (4 parallel searches), hypotheses.md reference list.
 
 ## Papers Written
 

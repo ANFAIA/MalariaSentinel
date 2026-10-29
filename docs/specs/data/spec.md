@@ -37,12 +37,6 @@ affects:
     direction: bidirectional
     reason: data root path computed in commonlib.config; loaders live in commonlib.data.loaders
     severity: non-breaking
-# Cross-references to the knowledge graph (names only, no UUIDs — survives KG migrations).
-kg_refs:
-  adrs: [adr-spec-design-2026-07-30]
-  patterns: []
-  pitfalls: []
-  tools: []
 ```
 
 ## Metadata

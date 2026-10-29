@@ -16,7 +16,6 @@ from .prompts import (
     REVIEWER_PROMPT,
     HYPOTHESIS_PROMPT,
     FULL_CYCLE_PROMPT,
-    MEMORY_EVAL_PROMPT,
     IMPROVEMENT_PROMPT,
 )
 
@@ -122,12 +121,6 @@ def run_hypothesis_phase() -> str:
     return call_opencode("Phase 4/4: Hypothesize", HYPOTHESIS_PROMPT)
 
 
-def run_memory_eval(phase_label: str, phase_output: str) -> str:
-    """Evaluate phase output and persist relevant findings to memory."""
-    body = f"{MEMORY_EVAL_PROMPT}\n\nPhase: {phase_label}\n\n{phase_output}"
-    return call_opencode(f"Memory Eval: {phase_label}", body, timeout=300)
-
-
 def run_improvement(all_outputs: str) -> str:
     """Review the complete cycle and auto-apply improvements."""
     body = f"{IMPROVEMENT_PROMPT}\n\nComplete cycle output:\n{all_outputs}"
@@ -135,9 +128,9 @@ def run_improvement(all_outputs: str) -> str:
 
 
 def run_research_cycle(topic: str | None = None) -> str:
-    """Run a complete research cycle with memory evaluation and improvement.
+    """Run a complete research cycle with improvement.
 
-    Flow: Search → [Memory] → Write → [Memory] → Review → [Memory] → Hypothesis → [Memory] → Improve
+    Flow: Search → Write → Review → Hypothesis → Improve
 
     Args:
         topic: Research topic. If None, uses default topics from config.
@@ -157,32 +150,20 @@ def run_research_cycle(topic: str | None = None) -> str:
     research = run_research_phase(topic)
     results.append(f"=== RESEARCH ===\n{research}")
 
-    logger.info("Memory eval: Research")
-    run_memory_eval("Research", research)
-
     # Phase 2: Writing
     logger.info("Phase 2: Writing")
     writing = run_writing_phase(research)
     results.append(f"=== WRITING ===\n{writing}")
-
-    logger.info("Memory eval: Writing")
-    run_memory_eval("Writing", writing)
 
     # Phase 3: Review
     logger.info("Phase 3: Review")
     review = run_review_phase()
     results.append(f"=== REVIEW ===\n{review}")
 
-    logger.info("Memory eval: Review")
-    run_memory_eval("Review", review)
-
     # Phase 4: Hypothesis
     logger.info("Phase 4: Hypothesis")
     hypothesis = run_hypothesis_phase()
     results.append(f"=== HYPOTHESIS ===\n{hypothesis}")
-
-    logger.info("Memory eval: Hypothesis")
-    run_memory_eval("Hypothesis", hypothesis)
 
     # Improvement phase
     logger.info("Improvement phase")

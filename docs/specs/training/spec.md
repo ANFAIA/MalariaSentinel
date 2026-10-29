@@ -31,12 +31,6 @@ affects:
     direction: upstream
     reason: training reads paths under RUNS_DIR defined in commonlib
     severity: non-breaking
-# Cross-references to the knowledge graph (names only, no UUIDs — survives KG migrations).
-kg_refs:
-  adrs: [adr-spec-design-2026-07-30]
-  patterns: []
-  pitfalls: []
-  tools: []
 ```
 
 ## Metadata

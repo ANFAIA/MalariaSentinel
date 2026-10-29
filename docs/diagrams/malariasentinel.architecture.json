@@ -36,19 +36,10 @@
       "id": "agents",
       "type": "cloud",
       "label": "agents/ — OpenCode",
-      "sublabel": "loops · memory module",
+      "sublabel": "loops · agent infrastructure",
       "sources": [{ "path": "AGENTS.md" }],
       "pos": [880, 100],
       "size": [130, 60]
-    },
-    {
-      "id": "kg",
-      "type": "database",
-      "label": "Neo4j knowledge graph",
-      "sublabel": "Graphiti MCP · 8 labels",
-      "sources": [{ "path": "agents/memory/scripts/Makefile" }],
-      "pos": [1130, 100],
-      "size": [150, 60]
     },
     {
       "id": "earth",
@@ -121,11 +112,6 @@
       "kind": "region",
       "label": "Core tier — the Centinela",
       "wraps": ["cli", "core", "abm", "commonlib", "execution"]
-    },
-    {
-      "kind": "region",
-      "label": "Project memory",
-      "wraps": ["agents", "kg"]
     }
   ],
   "connections": [
@@ -137,7 +123,6 @@
     { "id": "cli-core", "from": "cli", "to": "core", "label": "invokes", "labelDy": 24 },
     { "id": "explorer-data", "from": "explorer", "to": "data", "label": "reads", "labelDy": 24 },
     { "id": "agents-cli", "from": "agents", "to": "cli", "label": "supervisor" },
-    { "id": "agents-kg", "from": "agents", "to": "kg", "label": "typed writes" },
     { "id": "core-commonlib", "from": "core", "to": "commonlib", "label": "imports", "labelDy": 24 },
     { "id": "execution-core", "from": "execution", "to": "core", "label": "batch jobs" },
     { "id": "execution-runs", "from": "execution", "to": "runs", "label": "remote runs" }
@@ -159,15 +144,6 @@
         "Core: mal-commonlib · mal-core · mal-execution",
         "Experiment: mal-data-explorer (viz · bias analysis)",
         "Promotion is one-way: experiment → core, then delete the original"
-      ]
-    },
-    {
-      "dot": "violet",
-      "title": "Project memory",
-      "items": [
-        "Neo4j knowledge graph via Graphiti MCP",
-        "8-label schema · 3 invariants on every audit",
-        "Recall before write — supersede, never duplicate"
       ]
     }
   ]

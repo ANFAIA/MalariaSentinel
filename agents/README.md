@@ -14,26 +14,19 @@ project root.
 | `loops/supervisor.md` | Primary orchestrator: talks to the user, plans, delegates, integrates results. |
 | `loops/test-fixer.md` | Subagent: iterate a check command until it exits 0. |
 | `loops/code-reviewer.md` | Subagent: review a code change and return structured findings. Read-only. |
-| `loops/doc-researcher.md` | Subagent: query the project knowledge base first; web is a fallback. |
+| `loops/doc-researcher.md` | Subagent: research questions from the repo and the web; returns a sourced brief. |
 | `loops/security-auditor.md` | Subagent: OWASP-style audit. Read-only. |
 | `loops/gawt-editor.md` | Subagent: file-editing specialist inside a shared gawt worktree (all edits via gawt MCP). |
 | `loops/improvement-agent.md` | Subagent: reviews research-harness cycles and auto-applies improvements. |
-| `loops/kb-update-daily.md` | Subagent: turns recent commits into a KB update plan (delegates the writes). |
-| `loops/memory-curator.md` | Subagent: the only loop that writes to the knowledge graph. |
 | `janus/README.md` | The `agents/janus/` deepagents multi-agent orchestrator (separate subsystem). |
-| `memory/README.md` | The `agents/memory/` installable module — see its README for layout, install, uninstall. |
 
 ## How the pieces relate
 
 - **OpenCode** is the runtime. Agents are defined in `.opencode/agents/<name>.md`
   (per-project) and the active primary agent (Build / Plan / General)
   supervises the session. See `opencode.json` for the active configuration.
-- **Knowledge base** lives in `agents/memory/` (Neo4j + Graphiti MCP, plus
-  native OpenCode tools and a conceptual skill). The `doc-researcher` loop
-  queries it first, before going to the web. Other loops and the supervisor
-  can also query it on demand.
 - **Protection** of project-level governance files (this README,
-  `AGENTS.md`, `.gitignore`, `opencode.json`, `agents/memory/.project`) is
+  `AGENTS.md`, `.gitignore`, `opencode.json`) is
   handled by OpenCode's `permission.edit` block in `opencode.json`. Every
   edit to a protected file prompts the user — no allowance subsystem, no
   pre-commit hook, no separate file list.
@@ -46,8 +39,8 @@ project root.
 - **No orchestration wrapper.** Loops are just subagents. The supervisor
   invokes them with `@<name>` or via the `task` tool; OpenCode handles
   session isolation and child session navigation.
-- **No state store.** The knowledge base (Neo4j) is the only persistent
-  state. The session itself is the only short-term state.
+- **No state store.** The session itself is the only short-term state;
+  durable facts live in GitHub issues, milestones, and PR descriptions.
 
 ## Adding a new loop
 
@@ -60,20 +53,3 @@ project root.
    reports project state).
 3. Restart OpenCode so the new agent is registered. New subagents are
    picked up at startup, not on the fly.
-4. Add a `Component` node in the knowledge base (see
-   `agents/memory/README.md`) so the next session can recall it exists.
-
-## The `agents/memory/` installable module
-
-The `memory/` subdirectory is a self-contained, installable package:
-Neo4j + Graphiti MCP docker stack, a shell wrapper that validates
-labels, a conceptual skill (`project-memory`), and 6 custom tools
-(`memory_node`, `memory_rel`, `memory_query`, `memory_audit`,
-`memory_seed`, `memory_status`) that the LLM can call directly. The
-`install.sh` script wires it into a consumer project: writes
-`.project` and `runtime/.env`, copies the opencode-stubs (skill +
-tools) into the project's `.agents/skills/` and `.opencode/tools/`,
-and patches `opencode.json` and `.gitignore` idempotently. The
-`uninstall.sh` script reverses the install.
-
-

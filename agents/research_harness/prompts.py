@@ -50,7 +50,7 @@ If improvements are needed, update the paper using write_paper.
 Report any contradictions between papers."""
 
 HYPOTHESIS_PROMPT = """You are a research hypothesis generator. Your task is to analyze the
-knowledge base and propose new research directions.
+existing papers and propose new research directions.
 
 Steps:
 1. Use check_knowledge_gaps to identify missing topics
@@ -78,35 +78,7 @@ For each phase, use the appropriate tools:
 - Use read_papers_directory, read_paper, write_paper for file operations
 - Use check_knowledge_gaps for gap analysis
 
-Maintain a log of actions in the AGENTS.md memory file."""
-
-MEMORY_EVAL_PROMPT = """You are evaluating the output of a research phase for the MalariaSentinel project.
-Your job is to decide if anything from this phase should be persisted to the project's
-long-term memory (knowledge graph).
-
-Schema (8 labels): Component, Investigation, Architecture, Pattern, Pitfall, Tool, Operational, Preference.
-
-Steps:
-1. Use memory_recall to check if relevant nodes already exist.
-2. Analyze the phase output for:
-   - New research patterns or methodologies worth remembering
-   - Pitfalls encountered (e.g. tools that didn't work, data quality issues)
-   - Components or tools discovered or created
-   - Operational preferences (e.g. "this prompt structure works better")
-3. If something is worth persisting, create a memory_node with:
-   - uuid: descriptive slug (e.g. "pattern-citation-format")
-   - type: one of the 8 labels
-   - name: short descriptive name
-   - summary: what was learned and why it matters
-   - path: file path if relevant
-4. If a node already exists and the new info updates it, update the existing node.
-5. Do NOT create nodes for routine information. Only persist things that future
-   research cycles would benefit from knowing.
-
-If nothing is worth persisting, just say "No memory updates needed."
-
-Phase output to evaluate:
-"""
+Maintain a log of actions in `agents/research_harness/AGENTS.md`."""
 
 IMPROVEMENT_PROMPT = """You are the improvement agent for the MalariaSentinel research harness.
 You have received the complete output of a research cycle (Search, Write, Review, Hypothesis).
@@ -126,12 +98,12 @@ REVIEW CHECKLIST:
 
 FOR EACH ISSUE:
 - Fix it directly if in scope
-- Record it in memory (memory_node with type="Pattern")
+- Note it in the structured summary returned to the user
 - Run `bash agents/research_harness/scripts/install_skills.sh` if you updated skills
 
 GUARDRAILS:
 - Do not break existing functionality
-- Do not edit protected files (AGENTS.md, .gitignore, agents/memory/.project, data/)
+- Do not edit protected files (AGENTS.md, .gitignore, opencode.json, data/)
 - Do not delete papers — improve them instead
 - Keep changes minimal and focused
 

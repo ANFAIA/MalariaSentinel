@@ -41,7 +41,6 @@ graph TB
     subgraph Infrastructure["⚙️ Infrastructure"]
         direction LR
         GAWT["gawt MCP<br/>(session + worktree)"]
-        KG["Neo4j<br/>Knowledge Graph"]
         LF["Langfuse<br/>Tracing"]
         Pipeline["mal-core<br/>Pipeline"]
     end
@@ -56,8 +55,6 @@ graph TB
     C -->|"delegate_to_dispatcher()"| D
     D -->|"start_session + task()"| Specialists
     Specialists -->|"edit_file / write_file"| GAWT
-    C -->|"memory_recall_kg()"| KG
-    D -->|"memory_recall_kg()"| KG
     C -->|"traces"| LF
     D -->|"traces"| LF
     D -->|"pipeline_run_calibration()"| Pipeline
@@ -72,15 +69,12 @@ sequenceDiagram
     participant D as 🎯 Dispatcher<br/>(one-shot)
     participant GW as gawt MCP
     participant SP as Specialist<br/>(e.g. scoring)
-    participant KG as Neo4j KG
     participant LF as Langfuse
 
     User->>C: "Fix population extinction bug"
 
     rect rgb(230, 245, 255)
         Note over C: Phase 1: Investigation
-        C->>KG: memory_recall_kg("extinction")
-        KG-->>C: related patterns, pitfalls
         C->>SP: task("abm", "[MODE:research]<br/>What causes extinction?")
         SP-->>C: "Adult survival = 0 in D14 scorer"
     end
@@ -133,8 +127,7 @@ graph LR
         CT6["onboard_list_components"]
         CT7["delegate_to_dispatcher"]
         CT8["onboard_ask_subagent"]
-        CT9["memory_recall_kg"]
-        CT10["ask_user"]
+        CT9["ask_user"]
     end
 
     subgraph DispatcherTools["🎯 Dispatcher Tools"]
@@ -144,9 +137,8 @@ graph LR
         DT4["abm_test"]
         DT5["abm_score"]
         DT6["web_search"]
-        DT7["memory_recall_kg"]
-        DT8["ask_user"]
-        DT9["gawt_mcp_*<br/>(12 tools)"]
+        DT7["ask_user"]
+        DT8["gawt_mcp_*<br/>(12 tools)"]
     end
 
     subgraph SpecialistTools["🔧 Specialist Tools"]
@@ -156,14 +148,11 @@ graph LR
     end
 
     subgraph Shared["🤝 Shared"]
-        SH1["memory_recall_kg"]
-        SH2["ask_user"]
+        SH1["ask_user"]
     end
 
     CT9 -.-> Shared
     DT7 -.-> Shared
-    CT10 -.-> Shared
-    DT8 -.-> Shared
 ```
 
 ## 4. Specialist Subagent Lifecycle (gawt workflow)
@@ -252,7 +241,6 @@ graph TB
         CU["{% if mode == 'centinela' %}<br/>Centinela Protocol<br/>• conversational REPL<br/>• explain-then-delegate<br/>• onboard tools"]
         DU["{% if mode == 'dispatcher' %}<br/>Dispatcher Protocol<br/>• decompose goal<br/>• start gawt session<br/>• dispatch specialists<br/>• monitor + finalize"]
         SA["Subagent Access<br/>(shared)"]
-        KG["Knowledge Graph<br/>(shared)"]
     end
 
     C_OUT["🎭 Centinela Prompt"] 
@@ -264,8 +252,6 @@ graph TB
     DU --> D_OUT
     SA --> C_OUT
     SA --> D_OUT
-    KG --> C_OUT
-    KG --> D_OUT
 ```
 
 ## 8. gawt MCP — Session Isolation
@@ -362,7 +348,6 @@ graph TB
 
     subgraph External["External Services"]
         LLM["🧠 LLM Provider<br/>(OpenRouter / Anthropic / OpenAI)"]:::infra
-        KG["🗂️ Neo4j<br/>Knowledge Graph"]:::infra
         LF["📈 Langfuse<br/>Tracing Dashboard"]:::infra
         GAWT["🔧 gawt MCP<br/>Session + Worktree Isolation"]:::infra
         PIPE["⚙️ mal-core Pipeline<br/>ABM, Scorers, Calibration"]:::infra
@@ -386,8 +371,6 @@ graph TB
     Specialists -->|"edit_file / write_file"| GAWT
     Specialists -->|"abm_run / test / score"| PIPE
 
-    C -->|"memory_recall_kg()"| KG
-    D -->|"memory_recall_kg()"| KG
     C -->|"Langfuse trace"| LF
     D -->|"Langfuse trace"| LF
     C -.->|"LLM calls"| LLM

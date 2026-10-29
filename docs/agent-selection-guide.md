@@ -10,8 +10,7 @@ This document defines when to use each agent type and rules for preventing timeo
 | Codebase exploration (finding files, understanding structure) | `explore` | Fast, read-only, parallel-safe |
 | Code review (diff analysis, conventions) | `code-reviewer` | Read-only, structured findings |
 | Test iteration (fix until passing) | `test-fixer` | Specialized loop, knows when to stop |
-| Knowledge graph writes (nodes, relations) | `memory-curator` | Single writer, validates schema |
-| Documentation research | `doc-researcher` | KB-first, web fallback |
+| Documentation research | `doc-researcher` | Repo-first, web fallback |
 | Security audit | `security-auditor` | OWASP-focused, read-only |
 | Orchestration ONLY | `supervisor` | Delegates, never implements |
 
@@ -71,7 +70,5 @@ User request arrives
   │   └─ Delegate to `code-reviewer`.
   ├─ Does it involve iterating on tests?
   │   └─ Delegate to `test-fixer`.
-  ├─ Does it involve writing to the knowledge graph?
-  │   └─ Delegate to `memory-curator`.
   └─ Anything else: decompose first, then assign.
 ```
