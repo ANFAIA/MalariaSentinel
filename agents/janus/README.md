@@ -47,7 +47,7 @@ Global flags: `--no-tracing` (Langfuse tracing is ON by default), `--no-codebase
 │ REQUEST ROUTER (centinela)                               │
 │ Backend: MalariasimShellBackend(virtual_mode=True)       │
 │ execute tool (bash) → malariasim only                    │
-│ + onboard tools, memory_kg, ask_user, task()             │
+│ + onboard tools, ask_user, task()                           │
 └───────────┬──────────────────────────────────────────────┘
             │ delegate_to_dispatcher() → gawt session
             ▼
@@ -126,7 +126,6 @@ agents/janus/
 | Tool | Router | Dispatcher | Specialists |
 |---|---|---|---|
 | `ask_user` | ✅ | ✅ | ✅ |
-| `memory_recall_kg` (Neo4j knowledge graph) | ✅ | ✅ | via plugin |
 | `execute` (bash → `malariasim` only) | ✅ | ✅ | abm only |
 | `onboard_status`, `onboard_ask_subagent` | ✅ | ❌ | ❌ |
 | `delegate_to_dispatcher` | ✅ | ❌ | ❌ |

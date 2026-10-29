@@ -50,7 +50,7 @@ create_orchestrator(mode="centinela")     create_orchestrator(mode="dispatcher")
   │  (rendered mode=centinela)               │  (rendered mode=dispatcher)
   │                                         │
   ├─ tools: onboard + ask_user              ├─ tools: search + gawt_mcp + ask_user
-  │  + memory_kg + delegate_to_disp         │  + memory_kg
+  │  + delegate_to_disp                     │
   │                                         │
   ├─ subagents: 8 specialists ✅             ├─ subagents: 8 specialists ✅
   │                                         │
@@ -90,7 +90,6 @@ Dispatcher (goal-driven, one-shot):
 | Tool | Centinela | Dispatcher | Subagents |
 |---|---|---|---|
 | `ask_user` | ✅ | ✅ | ✅ |
-| `memory_recall_kg` | ✅ | ✅ | via plugin |
 | `execute` (bash → `malariasim` only) | ✅ | ✅ | abm only |
 | `onboard_status` | ✅ | ❌ | ❌ |
 | `onboard_ask_subagent` | ✅ | ❌ | ❌ |
@@ -195,7 +194,7 @@ agents/janus/src/agents_janus/
 ├── config/subagents.yaml       # 8 subagent definitions
 ├── plugins/                    # Plugin chain (per-domain)
 ├── subagents/                  # Registry, builder, base types
-├── tools/                      # KG, ask_user, delegate_to_dispatcher, onboard_tools
+├── tools/                      # ask_user, delegate_to_dispatcher, onboard_tools
 ├── prompts/                    # orchestrator.md.j2, specialist.md.tmpl, per_subagent/
 └── tests/                      # unit, integration, LLM-as-judge tests
 ```

@@ -23,7 +23,7 @@ servers:
     command: /Users/davidflorezmazuera/.local/bin/codebase-memory-mcp
     args: []
     cwd: <repo_root>
-    # Optional dependency. Enable after CBM/Neo4j health check passes.
+    # Optional dependency. Enable after the CBM health check passes.
     enabled: false
 
 index_on_startup:

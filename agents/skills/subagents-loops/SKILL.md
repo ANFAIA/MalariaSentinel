@@ -1,11 +1,11 @@
 ---
 name: subagents-loops
-description: Reference guide for all 7 subagent loops in MalariaSentinel. Covers when to use each loop, what brief to send, expected outputs, and coordination patterns. Use when delegating work to a subagent, choosing the right loop for a task, or understanding the agent architecture.
+description: Reference guide for all 5 subagent loops in MalariaSentinel. Covers when to use each loop, what brief to send, expected outputs, and coordination patterns. Use when delegating work to a subagent, choosing the right loop for a task, or understanding the agent architecture.
 ---
 
 # Subagent Loops Reference
 
-The supervisor delegates work to 7 specialised loops. Each loop is a self-contained subagent (or primary agent) with bounded permissions and a structured output contract. This skill tells you **which loop to spawn**, **what to put in the brief**, and **what comes back**.
+The supervisor delegates work to 5 specialised loops. Each loop is a self-contained subagent (or primary agent) with bounded permissions and a structured output contract. This skill tells you **which loop to spawn**, **what to put in the brief**, and **what comes back**.
 
 ## Overview
 
@@ -15,8 +15,6 @@ The supervisor delegates work to 7 specialised loops. Each loop is a self-contai
 | `code-reviewer` | subagent | read-only | Reviewing a diff, validating conventions | `diff_or_paths`, `focus_areas` |
 | `doc-researcher` | subagent | read-only + web | Answering a research question | `question` |
 | `security-auditor` | subagent | read-only | Security review, OWASP audit | `paths` or `diff` or `config` |
-| `memory-curator` | subagent | write (KG only) | Recording findings, adding nodes/rels | items to record |
-| `kb-updater` | primary | read-only + KG read | Daily KB maintenance from commits | none (self-directed) |
 | `improvement-agent` | primary | write (harness only) | After a research cycle, improving prompts/tools | phase outputs |
 
 ---
@@ -33,7 +31,6 @@ The supervisor delegates work to 7 specialised loops. Each loop is a self-contai
 **When NOT to use:**
 - You need a code review (use `code-reviewer`)
 - You need to understand *why* something fails before fixing (use `doc-researcher` or investigate manually first)
-- The failure requires knowledge graph changes (route to `memory-curator`)
 
 **Brief format:**
 ```json
@@ -94,14 +91,12 @@ The supervisor delegates work to 7 specialised loops. Each loop is a self-contai
 ```json
 {
   "diff_or_paths": "git diff main..HEAD" | ["mal-core/foo.py", "mal-core/bar.py"],
-  "focus_areas": ["security", "performance", "conventions"],
-  "conventions_ref": "pref-python-conventions"
+  "focus_areas": ["security", "performance", "conventions"]
 }
 ```
 
 - `diff_or_paths` — **required**. Either a diff string or a list of file paths.
 - `focus_areas` — optional. Areas to focus on (e.g. `security`, `performance`, `conventions`).
-- `conventions_ref` — optional. UUID of a `Preference` node in the KB with project conventions.
 
 **Expected output:**
 ```json
@@ -130,7 +125,7 @@ The supervisor delegates work to 7 specialised loops. Each loop is a self-contai
 
 ## 3. doc-researcher
 
-**Purpose:** Answers research questions by querying the knowledge base first, falling back to web search when the KB is insufficient. Returns a brief summary, not raw content.
+**Purpose:** Answers research questions by searching the repo and the web, then returning a sourced brief. Returns a summary, not raw content.
 
 **When to use:**
 - "What does the Kelly et al. 2012 paper say about X?"
@@ -138,7 +133,6 @@ The supervisor delegates work to 7 specialised loops. Each loop is a self-contai
 - "What's the current approach to calibration scoring?"
 
 **When NOT to use:**
-- You need to record a new finding (use `memory-curator`)
 - You need code fixed (use `test-fixer`)
 - You need a code review (use `code-reviewer`)
 
@@ -157,16 +151,13 @@ The supervisor delegates work to 7 specialised loops. Each loop is a self-contai
   "status": "ok" | "partial" | "blocked",
   "brief": "The suitability model uses DEM tiles from...",
   "evidence": [
-    {"source": "kb", "ref": "uuid-comp-terrain", "excerpt": "..."},
+    {"source": "repo", "ref": "mal-core/src/mal_core/suitability.py", "excerpt": "..."},
     {"source": "web", "ref": "https://...", "excerpt": "..."}
-  ],
-  "suggested_kb_writes": [
-    {"type": "Pattern", "name": "Terrain data pipeline", "summary": "..."}
   ]
 }
 ```
 
-**Permissions:** `edit=deny`, `webfetch/websearch=allow`. No writes to the KB — returns `suggested_kb_writes` for the supervisor to route to `memory-curator`.
+**Permissions:** `edit=deny`, `webfetch/websearch=allow`. Read-only — returns a sourced brief for the supervisor to integrate.
 
 **Example invocation:**
 ```json
@@ -229,91 +220,7 @@ At least one of `paths`, `diff`, or `config` is required.
 
 ---
 
-## 5. memory-curator
-
-**Purpose:** The **only** loop that writes to the knowledge graph. Decides label, tree placement, parent, and lateral edges. All other loops read the KB; they never write.
-
-**When to use:**
-- Recording a pitfall, pattern, or architecture decision
-- Adding a new component or investigation node
-- Connecting nodes with lateral edges (USES, IMPLEMENTS, BLOCKS, etc.)
-- Updating existing nodes with new evidence
-
-**When NOT to use:**
-- You need to *read* the KB (use `doc-researcher` or query directly)
-- You need code fixed (use `test-fixer`)
-- You need to plan a KB update from commits (use `kb-updater`)
-
-**Brief format:**
-```json
-{
-  "items": [
-    {"action": "create|update|connect", "type": "Pitfall", "name": "...", "summary": "...", "parent": "project-wisdom"},
-    {"action": "connect", "type": "MITIGATED_BY", "src": "pitfall-x", "dst": "pattern-y"}
-  ],
-  "pre_approved": false
-}
-```
-
-- `items` — **required**. List of operations (create, update, connect).
-- `pre_approved` — optional. If `true` and UUIDs are provided, skips individual recall.
-
-**Mandatory first step:** Load the `project-memory` skill before doing anything.
-
-**Expected output:**
-```json
-{
-  "status": "ok" | "blocked" | "needs_decision",
-  "writes": [
-    {"op": "create", "uuid": "pitfall-test-skip", "type": "Pitfall", "label": "Pitfall", "summary_of_change": "Created node"}
-  ],
-  "evidence_refs": ["memory_audit output"]
-}
-```
-
-**Permissions:** `memory_node/memory_rel=ask` (every write prompts approval), `memory_query/recall/audit/status=allow`. No `edit`, no `bash`, no `web`.
-
-**Example invocation:**
-```json
-{
-  "description": "Record new pitfall from test failure investigation",
-  "subagent_type": "memory-curator",
-  "prompt": "Items:\n- create Pitfall uuid=pitfall-unet-missing-import summary='U-Net training fails when mal_commonlib.geometry is not imported before torch...'\n- connect MITIGATED_BY src=pitfall-unet-missing-import dst=pattern-import-ordering"
-}
-```
-
----
-
-## 6. kb-updater
-
-**Purpose:** Daily KB maintenance — reviews recent commits, identifies what's missing from the knowledge graph, produces a structured update plan, and delegates execution to `memory-curator`. **Never writes to the KG directly.**
-
-**When to use:**
-- End-of-day or end-of-session KB sync
-- After a batch of commits that introduced new components, decisions, or patterns
-- Periodic maintenance to keep the KG current
-
-**When NOT to use:**
-- You need to record a single finding immediately (use `memory-curator` directly)
-- You need code or tests fixed (use `test-fixer`)
-
-**Brief format:** None — this is a primary agent that runs self-directed. It reads `git log` and the KG on its own.
-
-**Expected output:** A structured plan (markdown tables of updates, creates, connections, episode) that gets passed as the brief to `memory-curator`.
-
-**Mode:** Primary (Tab or `opencode run --agent kb-updater`). Not spawned via `task`.
-
-**Permissions:** `git log/show/diff=allow`, `memory_query/recall=allow`, `task=allow` (to delegate to `memory-curator`). No `edit`, no `memory_node/rel`.
-
-**Pipeline:**
-1. `kb-updater` reviews commits, produces plan
-2. `kb-updater` spawns `memory-curator` via `task` with the plan as pre-approved brief
-3. `memory-curator` executes the writes
-4. `kb-updater` verifies with `memory_audit`
-
----
-
-## 7. improvement-agent
+## 5. improvement-agent
 
 **Purpose:** Reviews the output of a complete research cycle and auto-applies improvements to prompts, tools, skills, and papers. The only loop that edits the research harness.
 
@@ -323,7 +230,6 @@ At least one of `paths`, `diff`, or `config` is required.
 - When new tools or skills are needed for the harness
 
 **When NOT to use:**
-- You need to record improvements in the KB (use `memory-curator` after this loop)
 - You need general code review (use `code-reviewer`)
 - You need to fix tests (use `test-fixer`)
 
@@ -334,7 +240,7 @@ At least one of `paths`, `diff`, or `config` is required.
 - `papers/` — research papers, hypotheses, documentation
 - `opencode.json` — only for research-runner/improvement-agent config
 
-**Cannot edit:** `AGENTS.md`, `.gitignore`, `agents/memory/.project`, `data/`, or code outside `agents/research_harness/` and `papers/`.
+**Cannot edit:** `AGENTS.md`, `.gitignore`, `opencode.json` (beyond its own config), `data/`, or code outside `agents/research_harness/` and `papers/`.
 
 **Expected output:**
 ```json
@@ -343,7 +249,6 @@ At least one of `paths`, `diff`, or `config` is required.
     {"file": "agents/research_harness/prompts.py", "change": "Added DOI requirement", "reason": "3/5 papers missing DOIs"}
   ],
   "skills_updated": ["malaria_research"],
-  "memory_nodes_created": ["improvement-2026-07-17-001"],
   "recommendations_for_supervisor": ["Consider adding a citation validation tool"]
 }
 ```
@@ -372,38 +277,16 @@ supervisor → code-reviewer (brief: diff_or_paths)
            → supervisor integrates
 ```
 
-### Pattern 3: Discovery → KB write
-
-```
-supervisor finds something (pitfall, pattern, decision)
-           → memory-curator (brief: items to record)
-           → memory-curator loads project-memory skill, recalls, writes
-           → memory-curator returns artifact
-           → supervisor verifies with memory_audit
-```
-
-### Pattern 4: Daily maintenance pipeline
-
-```
-kb-updater (primary, self-directed)
-  → reviews git log, recalls from KG
-  → produces structured plan
-  → spawns memory-curator with pre-approved brief
-  → memory-curator executes writes
-  → kb-updater verifies with memory_audit
-```
-
-### Pattern 5: Research cycle pipeline
+### Pattern 3: Research cycle pipeline
 
 ```
 research-runner (primary)
   → runs Search → Write → Review → Hypothesis phases
   → spawns improvement-agent with phase outputs
   → improvement-agent edits prompts/tools/skills
-  → improvement-agent records changes in KG
 ```
 
-### Pattern 6: Security gate
+### Pattern 4: Security gate
 
 ```
 supervisor → security-auditor (brief: paths or diff)
@@ -423,8 +306,6 @@ Loops that **edit files** must operate inside a gitagent worktree:
 4. **The supervisor integrates** by reviewing and accepting/rejecting the proposal.
 
 Loops that are **read-only** (`code-reviewer`, `security-auditor`, `doc-researcher`) do NOT need a worktree — they return artifacts directly.
-
-Loops that write **only to the KG** (`memory-curator`) do NOT need a gitagent worktree — they use `memory_node`/`memory_rel` tools with `ask` permission.
 
 ---
 
@@ -449,8 +330,6 @@ Multiple `task` calls in one message run **in parallel**. Each loop gets its own
 |---|---|---|
 | Make tests pass | `test-fixer` | `code-reviewer` |
 | Review code quality | `code-reviewer` | `test-fixer` |
-| Answer a research question | `doc-researcher` | `memory-curator` |
+| Answer a research question | `doc-researcher` | do it yourself in-context |
 | Audit for security issues | `security-auditor` | `code-reviewer` |
-| Write to the knowledge graph | `memory-curator` | any other loop |
-| Sync KB with recent commits | `kb-updater` | `memory-curator` directly |
 | Improve research harness | `improvement-agent` | `test-fixer` |

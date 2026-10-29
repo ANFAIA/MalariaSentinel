@@ -8,10 +8,9 @@
 
 **The reference framework is the SDSS for malaria elimination proposed by Kelly et al. (2012)** — see `papers/spatial-analysis/MalariaEliminationWithSpatialDecisionSupportSystems.md`. That paper argues for a spatial decision support framework that integrates surveillance, targeted interventions, and service delivery in endemic settings. The Centinela is the engineering realisation of that framework, parameterised for specific regions (Ghana being the first working case).
 
-- **Stack**: Python (uv workspace), Neo4j + Graphiti MCP for the project knowledge graph.
+- **Stack**: Python (uv workspace).
 - **Layout**: monorepo with 5 packages (see "Monorepo layout" below).
 - **Runtime**: OpenCode is the agent harness. Configuration lives in `opencode.json` at the project root.
-- **Why a knowledge graph**: the SDSS decision pipeline accumulates components, investigations, patterns, pitfalls, and architecture decisions across sessions. A typed graph (queried just-in-time) is a better fit than a single growing `AGENTS.md` — see "Where knowledge lives".
 
 ## How to build, test, run
 
@@ -31,13 +30,6 @@ malariasim predict --aoi ghana --year 2026
 cd mal-data-explorer
 uv run python 03_map_ghana.py
 uv run python 12_bias_plot.py
-
-# Operate the project memory subsystem
-make -f agents/memory/scripts/Makefile status
-make -f agents/memory/scripts/Makefile audit
-make -f agents/memory/scripts/Makefile seed
-make -f agents/memory/scripts/Makefile session-start
-make -f agents/memory/scripts/Makefile session-end
 
 # Download data for an AOI
 malariasim download --aoi ghana --datasets era5 --outputs wind_6hourly --years 2024,2025
@@ -60,7 +52,7 @@ uv run pytest -m full -v          # 10 scorers + LLM, 5 seeds, 90 days
 | `mal-execution/` | CLI entrypoints, batch jobs. | core + commonlib |
 | `mal-ghana-sim/` | Ghana spread simulation + U-Net surrogate (research). | commonlib |
 | `mal-data-explorer/` | Dataset visualisation, mapping, bias analysis. | — |
-| `agents/` | Loops + installable memory module. Not a runtime — OpenCode is. | — |
+| `agents/` | Agent loops and infrastructure. Not a runtime — OpenCode is. | — |
 | `data/`, `papers/`, `terrain/`, `runs/` | Datasets, papers, DEM tiles, experiment outputs (mostly gitignored). | — |
 
 **Dependency rule**: nothing depends on research/script packages. When research code stabilises, promote to `mal-core` or `mal-commonlib` and update `mal-execution` scripts to use the promoted modules.
@@ -100,7 +92,6 @@ Promotion moves stable, useful code from an experiment into the core tier. It is
 | Configuration, paths, data utilities (no domain logic) | `mal-commonlib/` |
 | Pipeline logic (a complete, reusable piece of the Centinela) | `mal-core/` |
 | A CLI script that orchestrates the pipeline | `mal-execution/scripts/` |
-| A new schema label or domain entity in the knowledge graph | `agents/memory/runtime/config/config.yaml` (after a `pitfall-` recording explains why) |
 
 **When NOT to promote**: code that is tied to the experiment's specific hypothesis (e.g., Ghana-specific terrain processing that won't generalise to another region), code that is exploratory (changes too fast to be "stable"), code that has no tests.
 
@@ -114,11 +105,10 @@ Promotion moves stable, useful code from an experiment into the core tier. It is
 | `read`, `write`, `edit` | File I/O. | `edit` and `write` are `ask` on protected files (see below). |
 | `glob`, `grep` | Finding files and content. | glob for paths, grep for content. |
 | `task` | Delegating to specialised loops and subagents. Subagents get a brief, not the full conversation. **Multiple `task` calls in one message run in parallel** — use this to fan out independent subtasks. | Subagents get a brief, not the full conversation. |
-| `skill` | Loading a specialised skill on demand. | E.g. `project-memory` for the knowledge graph manual. |
+| `skill` | Loading a specialised skill on demand. | Skills live in `agents/skills/`. |
 | `todowrite` | Tracking multi-step work. | One list; exactly one item `in_progress` at a time. |
 | `question` | Asking the user when you need a decision. | Don't guess on irreversible choices. |
 | `mcp__gitagent__*` | **gawt v0.5.0 MCP** — multi-agent git isolation: sessions, agents, intents, file edits, inbox messaging. | Replaces the old gitagent CLI. Use `start_session` → `register_agent` → `edit_file`/`write_file`/`read_file` → `finalize_session`. Supervisor orchestrates; subagents use `edit_file`/`write_file` in their registered agent context. |
-| `memory_node`, `memory_rel`, `memory_query`, `memory_audit`, `memory_status`, `memory_seed` | Knowledge graph reads and writes. | All validate labels against the schema before any write. |
 
 ## Protected files (opencode-native `permission.edit: "ask"`)
 
@@ -127,7 +117,6 @@ Promotion moves stable, useful code from an experiment into the core tier. It is
 | `AGENTS.md` | This file — the agent's own instructions. |
 | `.gitignore` | Affects git tracking. |
 | `opencode.json` | Project-wide permissions and agent config. |
-| `agents/memory/.project` | The Neo4j `group_id` (project identity). |
 | `data/` | Datasets. Prevents accidental edits. |
 
 **Rules**:
@@ -135,45 +124,24 @@ Promotion moves stable, useful code from an experiment into the core tier. It is
 - Don't retry with a different phrasing. Don't batch the change with another edit. Don't delegate the edit to a subagent to bypass the prompt.
 - Adding a new protected file = edit `opencode.json` and add `"<path>": "ask"` under `permission.edit`.
 
-**Bash denies (defence against typos)**: `make -f agents/memory/scripts/Makefile {wipe,set-project}` are denied for every agent (global block + per-agent block in `opencode.json`). Use `make` itself for normal work; the deny patterns only block the destructive subcommands.
-
-## MCP memory — which tool, when
+## gawt MCP — which tool, when
 
 | Path | Use |
 |---|---|
-| `mcp__graphiti-memory__add_memory` with `source: "text"` | Free-form session summaries, observations, "remember this" notes. |
-| `memory_node` (custom tool) or `memory.sh node` | Typed node writes: `Component`, `Investigation`, `Architecture`, `Pattern`, `Pitfall`, `Tool`, `Operational`, `Preference`. |
-| `memory_rel` (custom tool) or `memory.sh rel` | Typed relations between typed nodes. |
-| `memory_query` / `memory_audit` / `memory_status` | Reads and invariants. |
-| `mcp__graphiti-memory__add_memory` with `source: "json"` | **Forbidden.** The LLM extractor in MCP 1.26.0 ignores `type` and re-classifies from text, producing mis-labelled graphs (verified 2026-07-04: 261-node / 411-rel wipe). |
-| `mcp__graphiti-memory__add_triplet` | **Not available in MCP 1.26.0.** Use `memory_node` + `memory_rel`. |
 | `mcp__gitagent__start_session` | Start a gawt session for a feature. Creates a global worktree. |
 | `mcp__gitagent__register_agent` | Register a subagent in the current session. Returns `agent_id`. |
 | `mcp__gitagent__edit_file` / `write_file` / `read_file` / `delete_file` | File edits within an agent's isolated worktree. |
 | `mcp__gitagent__start_intent` / `repurpose` | Track what an agent is working on (semantic intent). |
 | `mcp__gitagent__send_message` / `check_inbox` | Inter-agent messaging within a session. |
 | `mcp__gitagent__finalize_session` | Commit all accepted work onto the target branch. |
-| `memory_init` (custom tool) | Check the memory module's installation state. Returns: which files are in place, whether Neo4j is up, what the next step is. Call this when you land in a project that may or may not have the memory module wired up. | Lives at `agents/memory/opencode-stubs/tools/memory_init.ts`; installed copy at `.opencode/tools/memory_init.ts`. |
-
-**Schema (8 labels, validated on every write)**: `Component`, `Investigation`, `Architecture`, `Pattern`, `Pitfall`, `Tool`, `Operational`, `Preference`. The full manual — schema details, 3 invariants, session lifecycle, recall-before-write rule — is in the `project-memory` skill: `skill({ name: "project-memory" })` on demand.
-
-**Three invariants** (run on every `make audit`):
-1. No `Entity`-only node — every node has at least one schema label.
-2. No orphan relation — every rel endpoint exists.
-3. No out-of-schema label — every label is in `agents/memory/runtime/config/config.yaml`.
 
 ## Where knowledge lives
 
 | What | Where |
 |---|---|
-| Procedural how-to (build, test, push, session lifecycle, conventions) | This file (`AGENTS.md`). |
-| Project-specific facts (components, investigations, patterns, pitfalls, conventions) | Knowledge graph (Neo4j via `agents/memory/`). Use `memory_node` / `memory_rel` for typed writes; `memory_query` for reads. |
-| Free-form session notes, observations, summaries | Knowledge graph as text episodes via `mcp__add_memory` with `source: "text"`. |
-| Stack health / schema / session routines | `make -f agents/memory/scripts/Makefile {status,audit,session-start,session-end}`. |
-
-**Why split**: `AGENTS.md` enters every session. Project-specific facts would bloat it with context irrelevant to most tasks. The knowledge graph is queried just-in-time.
-
-**Recall before writing**: always run `memory_query` or `mcp__graphiti-memory__search_nodes` first. If a relevant node or fact already exists, supersede it with a new write — never duplicate.
+| Procedural how-to (build, test, push, conventions) | This file (`AGENTS.md`). |
+| Project-specific durable facts | GitHub issues, milestones, and PR descriptions. |
+| Session working notes and summaries | The session's own context (auto-compacted by OpenCode). |
 
 ## Decision table: where does this go?
 
@@ -184,14 +152,11 @@ Promotion moves stable, useful code from an experiment into the core tier. It is
 | Run a Ghana-specific experiment | Put it in `mal-ghana-sim/` (experiment tier). | Don't run it inline in `mal-execution/`; that tier is for production. |
 | Run a dataset visualisation / bias analysis | Put it in `mal-data-explorer/`. | Don't put it in `mal-core/`; that's for reusable pipeline logic. |
 | Promote stable code from an experiment to core | Follow the "Promotion flow" above. | Don't copy-and-tweak — refactor + tests + delete the original. |
-| Record a project fact | Use `memory_node` / `memory_rel`. | Don't paste it into `AGENTS.md` (one-off facts bloat the file). |
-| Recall a fact from last session | Use `memory_query` or `mcp__graphiti-memory__search_nodes`. | Don't re-read source files hoping to find it. |
 | Ask a one-off question | Use the `question` tool. | Don't guess on irreversible choices. |
 | Delegate a multi-step task | Use `task` with a `subagent_type`. | Don't do it in this context if the work needs a fresh window. |
-| Execute N independent subtasks | Run them in one message: parallel `task` calls + parallel read/grep + parallel `memory_query`. | Don't serialise them across N turns. |
+| Execute N independent subtasks | Run them in one message: parallel `task` calls + parallel read/grep. | Don't serialise them across N turns. |
 | Edit a protected file | Ask the user (the `ask` prompt is the mechanism). | Don't try to bypass the `ask` prompt via delegation. |
 | Push to remote after a rewrite | `git ps origin main` (force-with-lease). | Don't use `git push --force`. |
-| Wipe or set the project | `make -f agents/memory/scripts/Makefile wipe` / `set-project`. | Don't call without the global+per-agent `deny` being lifted by the user. |
 
 ## Data format conventions
 
@@ -233,42 +198,16 @@ Delta comparison: every scorecard is compared against both the **previous run**
 (immediate delta) and the **best historical run** (all-time best composite).
 This prevents losing sight of the all-time best when iterating.
 
-## Context architecture (3 layers + 2)
+## Context architecture
 
 | Layer | Owner | Lives in |
 |---|---|---|
 | Operational | OpenCode (this primary agent) | The current session's context window. |
 | Compaction | OpenCode (built-in) | Auto-summarised when the operational layer grows. |
-| Episodic | `agents/memory/` | Free-form session summaries, observations, "what was done". |
-| Semantic | `agents/memory/` | Typed nodes: components, investigations, patterns, etc. |
 
-**Discipline**: keep the operational layer compact — objective, plan, key decisions, references (paths, UUIDs, commit IDs, proposal IDs). Never paste multi-thousand-line tool outputs into the supervisor's prompt. Long outputs go to the knowledge graph or a summary.
+**Discipline**: keep the operational layer compact — objective, plan, key decisions, references (paths, commit IDs, proposal IDs). Never paste multi-thousand-line tool outputs into the supervisor's prompt. Long outputs go to a summary.
 
-**Subagents** see a brief, not the full conversation. If they need more context, they query the knowledge graph or ask the supervisor.
-
-## Parallel execution (default)
-
-The supervisor **parallelises by default**. When two or more
-actions have no data dependency, run them in the **same message**
-so they execute concurrently. Serialise only when B depends on
-A's output.
-
-| Action | Parallel-safe? | Notes |
-|---|---|---|
-| `read`, `glob`, `grep`, `bash` (read-only) | Yes | Batch N independent calls into one message. |
-| `task` (subagent) | Yes | N subagent briefs in one message; each runs in its own context. |
-| `mcp__gitagent__register_agent` | Yes, after `start_session` | Spawn N agents in one message, then wait for proposals. |
-| `memory_query` / `memory_recall` / `mcp__search_nodes` | Yes | Run N queries in one message; merge results. |
-| `webfetch` / `websearch` (independent URLs/queries) | Yes | Batch. |
-| `memory_node` then `memory_rel` (when rel needs the node's uuid) | No | Two messages: write → read uuid → write rel. |
-| Edits to the same file in one message | No | One edit per file per message. |
-| `mcp__gitagent__start_session` / `finalize_session` / `abort_session` | No | Single-call, ordering matters. |
-| Edits to a protected file | No (and not via delegation) | Always `ask` the user; never batch with other edits. |
-
-**Per-issue parallelism**: the kanban "exactly one issue In Progress
-at a time" rule still holds. Parallelism is *within* the active
-issue (e.g. read 3 files, spawn 2 subagents, query 2 KB nodes), not
-*across* issues.
+**Subagents** see a brief, not the full conversation. If they need more context, they ask the supervisor.
 
 ## Git push workflow
 
@@ -295,26 +234,20 @@ git merge-base HEAD origin/main       # divergence point, if any
 
 ## Session lifecycle
 
-**Start**: `make -f agents/memory/scripts/Makefile session-start` — runs the audit, then lists open investigations, active pitfalls, architecture decisions, components, preferences, and operational patterns. If the audit fails, fix at the source (don't patch the audit).
-
 **End** (non-trivial sessions only):
-1. Update affected `Investigation` nodes (open / in-progress / resolved / blocked + evidence).
-2. Add newly-discovered typed nodes (patterns, pitfalls, components, architecture).
-3. Write a free-form session episode via `mcp__graphiti-memory__add_memory` with `source: "text"`.
-4. Edit `AGENTS.md` if a new convention emerged.
-5. `make -f agents/memory/scripts/Makefile audit` — re-verify.
+1. Edit `AGENTS.md` if a new convention emerged (requires user approval — protected file).
 
 **Skip the contract for trivial sessions** (single tool call, no state change).
 
 ## Milestones and kanban (M* system)
 
-The project follows numbered milestones (**M1**, **M2**, …). Each milestone is a named deliverable (e.g. "ABM scaffolding", "U-Net training", "End-to-end run"). The set of milestones, their descriptions, and their KB references live in the knowledge graph (labels: `Operational`, prefix `op-m`); this file only describes the format and the workflow.
+The project follows numbered milestones (**M1**, **M2**, …). Each milestone is a named deliverable (e.g. "ABM scaffolding", "U-Net training", "End-to-end run"). Milestones are tracked as GitHub milestones; this file only describes the format and the workflow.
 
 **Milestone shape** (what every milestone looks like):
 - A numbered identifier (`M<n>`), a short deliverable name, and an acceptance threshold (model metric, run time, artifact output).
 - A list of granular issues in GitHub, each with the milestone label (`M<n>`) and a type label (`enhancement`, `investigation`).
 - A `blocked` label on any issue gated by an external dependency.
-- A KB `Operational` node with a stable uuid (`op-m<n>-<slug>`), so the agent can recall the plan from the graph. The GitHub milestone has the same name and due date.
+- The GitHub milestone has the same name and due date.
 
 ### Issue <-> board <-> agent workflow
 
@@ -336,7 +269,7 @@ The agent (supervisor) is responsible for keeping the board in sync with the ses
 2. **Working on an issue**: keep it in **In Progress** until all acceptance criteria pass. If a new blocker is discovered, add the `blocked` label, post a comment with the reason, and move to **Todo**.
 3. **Completing an issue**: run the acceptance criteria (tests pass, lint clean). Close the issue with a comment referencing the commit SHA. Move it to **Done**.
 4. **New work emerging mid-session**: create the issue in Todo with the right milestone/labels. Do not derail the current In Progress item — finish it first.
-5. **End of milestone**: close the GitHub milestone (which auto-closes remaining issues or moves them to the next milestone). Write a KB entry summarising the milestone's outcome.
+5. **End of milestone**: close the GitHub milestone (which auto-closes remaining issues or moves them to the next milestone). Write a summary comment on the last issue.
 
 **Discipline**: exactly one issue In Progress at a time. Never batch closes. Always reference the commit SHA in the closing comment so the board is traceable.
 
@@ -348,7 +281,7 @@ Invoke with `@<name>` or the `task` tool. Each subagent's prompt lives at `agent
 |---|---|---|
 | `test-fixer` | Iterate a check command until it exits 0. | `allow` |
 | `code-reviewer` | Review a diff; return structured findings. Read-only. | `ask` |
-| `doc-researcher` | Query the knowledge base first; web is a fallback. | `ask` |
+| `doc-researcher` | Research documentation and code; returns a brief with sources. | `ask` |
 | `security-auditor` | OWASP-style audit. Read-only. | `ask` |
 
 The supervisor is the default primary agent (`default_agent: "supervisor"` in `opencode.json`). It owns the running context, decomposes work, delegates to loops and subagents, and integrates via the gawt MCP (`mcp__gitagent__*`) for isolated multi-agent edits. The supervisor's prompt (`.opencode/agents/supervisor.md`) is generic and reusable; project rules live here in `AGENTS.md`. Tab cycles between `supervisor` (default), `build` (single-tool ad-hoc), and `plan` (read-only review).

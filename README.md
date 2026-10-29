@@ -32,7 +32,7 @@ MalariaSentinel/
   agents/janus/               Multi-agent orchestrator (deepagents + gawt)
 
   # ─── Agent infrastructure ──────────────────────────────────────
-  agents/                     Loops + installable memory module (Neo4j knowledge graph)
+  agents/                     Agent loops and infrastructure
   .opencode/                  Per-project OpenCode agents and tools
 
   # ─── Research & data content ───────────────────────────────────
@@ -60,6 +60,17 @@ MalariaSentinel/
 | `agents/janus` | `mal-core` (via `malariasim` shell) | Multi-agent orchestration |
 
 **Nothing depends on the research packages.** When research code stabilizes, promote it to `mal-core` or `mal-commonlib`.
+
+## Configurable YAMLs
+
+Model behaviour is driven by YAML files, not hard-coded constants:
+
+| File | Purpose |
+|------|---------|
+| `mal-core/config/model_constants.yaml` | **Single source of truth** for all model constants. Every leaf carries a comment and a unit; validated by pydantic (`extra=forbid`, no defaults) and mirrored in the C++ engine (`config.cc`). |
+| `mal-core/src/mal_core/abm/tests/calibration/thresholds.yaml` | Calibration scorer thresholds (`min_score`, `max_delta`, `hard_floor`). |
+
+Never add magic numbers to code or CLI flags — add the constant to `model_constants.yaml` instead.
 
 ## Running the Ghana Simulation (ABM pipeline)
 

@@ -70,9 +70,8 @@ config; it calls `hcloud`, which reads the token from
    ```bash
    which hcloud jq ssh rsync
    ```
-5. **Project knowledge graph stays on your Mac** — do **not** put the
-   Neo4j container on the VM. The VM is compute-only; it never sees
-   `agents/`.
+5. **Agent infrastructure stays on your Mac** — the VM is
+   compute-only; it never sees `agents/`.
 
 > **Budget alert** — set a **€5/month** alert in the Hetzner console
 > (Project → Settings → Alerts). The CLI cannot set this for you. The

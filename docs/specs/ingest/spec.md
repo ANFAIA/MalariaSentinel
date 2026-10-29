@@ -36,12 +36,6 @@ affects:
     direction: upstream
     reason: ingest imports AOI, Scale, TWI, host_utils, mobility helpers from commonlib
     severity: non-breaking
-# Cross-references to the knowledge graph (names only, no UUIDs — survives KG migrations).
-kg_refs:
-  adrs: [adr-spec-design-2026-07-30]
-  patterns: []
-  pitfalls: []
-  tools: []
 ```
 
 ## Metadata

@@ -8,7 +8,7 @@ regressed / collapsed) plus a list of concerns, recommendations, and
 literature grounding.
 
 The LLM is invoked directly via :mod:`langchain_openai` — there is no
-OpenCode harness, no agent loop, no project knowledge graph. The scorer
+OpenCode harness and no agent loop. The scorer
 runs in ~1-3 seconds, is deterministic at temperature 0, and is
 content-hash-cached so repeated runs against the same report are free.
 

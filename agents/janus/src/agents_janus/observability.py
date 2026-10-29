@@ -57,11 +57,6 @@ _TOOL_CATEGORIES: dict[str, str] = {
     "mcp__gitagent__unregister_agent": "gawt",
     # Execute tool (bash restricted to malariasim)
     "execute": "abm",
-    # Memory tools
-    "memory_recall_kg": "memory",
-    "memory_node": "memory",
-    "memory_rel": "memory",
-    "memory_query": "memory",
     # User interaction
     "ask_user": "user",
     # Dispatch delegation

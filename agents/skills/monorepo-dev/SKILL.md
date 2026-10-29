@@ -153,7 +153,6 @@ Promotion moves stable, useful code from an experiment (e.g., `mal-ghana-sim`) i
 | Configuration, paths, data utilities (no domain logic) | `mal-commonlib/` |
 | Pipeline logic (reusable SDSS piece) | `mal-core/` |
 | A CLI script that orchestrates the pipeline | `mal-execution/scripts/` or `mal-core` CLI entrypoint |
-| A new schema label or domain entity | `agents/memory/runtime/config/config.yaml` (after a `Pitfall` node explains why) |
 
 ### When NOT to promote
 

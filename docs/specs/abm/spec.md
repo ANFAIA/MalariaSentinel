@@ -31,12 +31,6 @@ affects:
     direction: upstream
     reason: AOI.cells_per_side() pins the (H, W) for state/env rasters
     severity: breaking
-# Cross-references to the knowledge graph (names only, no UUIDs — survives KG migrations).
-kg_refs:
-  adrs: [adr-spec-design-2026-07-30]
-  patterns: []
-  pitfalls: []
-  tools: []
 ```
 
 ## Metadata

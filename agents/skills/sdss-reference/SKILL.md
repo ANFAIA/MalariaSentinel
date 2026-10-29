@@ -13,7 +13,7 @@ The **Centinela** (Sentinel) is the engineering realisation of the Spatial Decis
 - **Targeted interventions** — focal IRS, universal LLIN distribution, active case detection
 - **Service delivery** — risk maps, real-time dashboards, supply chain visibility
 
-The Centinela extends this framework with modern methods: agent-based modelling, neural network surrogates, and a knowledge graph for accumulating project decisions across sessions.
+The Centinela extends this framework with modern methods: agent-based modelling, neural network surrogates, and agent infrastructure for accumulating project decisions across sessions.
 
 **Reference**: `papers/spatial-analysis/MalariaEliminationWithSpatialDecisionSupportSystems.md`
 
@@ -117,7 +117,7 @@ The Centinela implements a 5-stage pipeline:
 |---|---|---|
 | **Data inputs** | `mal-core/src/mal_core/ingest/` + CLI `malariasim ingest` | Reproject & resample env rasters |
 | **Baseline GIS layers** | `data/`, `terrain/`, `runs/layers/` | SRTM DEM, JRC water, CHIRPS rainfall, WorldClim temperature, MODIS NDVI |
-| **Expert knowledge** | `agents/`, `AGENTS.md`, knowledge graph | Accumulated conventions, patterns, pitfalls |
+| **Expert knowledge** | `agents/`, `AGENTS.md` | Accumulated conventions, patterns, pitfalls |
 | **Spatial analysis** | C++ ABM engine (`mal-core/src/mal_core/abm/`) | Suitability weights + thermal curve (climate.hpp) |
 | **Modeling (ABM)** | `mal-core/src/mal_core/abm/` | Agent-based mosquito simulation (C++ engine) |
 | **ML surrogate** | `mal-core/src/mal_core/training/` + CLI `malariasim train` | U-Net transition model trained on ABM rollouts |
@@ -260,10 +260,8 @@ The Ghana simulation models mosquito population expansion from seed points (obse
 | `abm-engine` | Validating biological parameterization of the ABM against empirical targets (post-run scoring: `malariasim score`)
 | `data-explorer` | Exploring, mapping, and bias-analysing input datasets |
 | `cesga` | Deploying simulation jobs to CESGA FinisTerrae III HPC |
-| `project-memory` | Querying or recording domain knowledge in the project knowledge graph |
 | `monorepo-dev` | Monorepo conventions, promotion flow, package structure |
 | `project-setup` | First-time project setup and verification |
-| `memory-setup` | Setting up the knowledge graph for domain knowledge storage. |
 | `subagents-loops` | Using agent loops for domain research and review. |
 | `mal-execution-api` | Running production CLI commands and training scripts. |
 | `agent-onboarding` | Complete onboarding guide for new agents. |

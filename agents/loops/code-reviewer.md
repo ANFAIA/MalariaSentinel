@@ -5,7 +5,6 @@ Goal: produce a structured review of a code change.
 Inputs from supervisor (the brief):
 - `diff_or_paths` (string or list of paths, required)
 - `focus_areas` (list, optional — e.g. `["security", "performance", "conventions"]`)
-- `conventions_ref` (optional — UUID in Neo4j pointing to project conventions)
 
 Output format:
 ```
@@ -20,12 +19,8 @@ Output format:
 ```
 
 How to find project conventions:
-1. If `conventions_ref` is provided, query the knowledge base:
-   `memory_query` (custom tool) with a cypher like `MATCH (n {uuid: '<ref>'}) RETURN n`
-2. Otherwise, run `mcp__graphiti-memory__search_nodes` with terms from
-   `focus_areas`.
-3. If neither returns a convention, fall back to the
-   `agents/loops/AGENTS.md` common rules.
+1. Read `agents/loops/AGENTS.md` (if present), `AGENTS.md`, and
+   `CONTRIBUTING.md`. Use `focus_areas` to pick the relevant sections.
 
 Guardrails:
 - Read-only. `edit: deny`. Even if the user asks for a fix, return the

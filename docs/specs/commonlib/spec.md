@@ -31,12 +31,6 @@ affects:
     direction: downstream
     reason: prediction needs AOI + grid resolution to instantiate the U-Net input window
     severity: breaking
-# Cross-references to the knowledge graph (names only, no UUIDs — survives KG migrations).
-kg_refs:
-  adrs: [adr-spec-design-2026-07-30]
-  patterns: []
-  pitfalls: []
-  tools: []
 ```
 
 ## Metadata
@@ -158,7 +152,7 @@ Function-style loaders. Each module exports a public `load_*` function. The load
 | `chirps` | `load_chirps_rainfall_daily` | CHIRPS rainfall (daily; monthly interface deleted 2026-09-29) |
 | `era5` | `load_era5_air_temp_daily`, `load_era5_wind_6hourly` | ERA5-Land (daily air temperature °C, wind) |
 | `dynamic_world` | `load_dw_class_fractions`, `load_dw_label_mode` | Google Dynamic World V1 (Earth Engine, OAuth) — per-year modal-label areal fractions (habitat statics); label mode shared with wildlife |
-| `coastline` | `load_coastline_land_mask` | GSHHG land/water mask (saltwater filter) |
+| `coastline` | `load_coastline_land_mask` | GSHHG (full resolution) **land fraction** per AOI cell, plus `sea_mask(land_frac, distance_to_land_m, coast_band_m)` = open-sea rule (`land_frac < ingest.sea_water_floor` AND farther than `ingest.coastline_buffer_m` from land); the loader no longer dilates |
 | `smap` | `load_smap_salinity` | SMAP SSS (optional freshwater plume) |
 
 > **Retired (contract v3.0, 2026-10-17):** the `dem` loader and `terrain/twi.py`

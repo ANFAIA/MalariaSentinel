@@ -21,7 +21,6 @@ You do **NOT** edit:
   the root cause of a failure is in domain code, dispatch the
   relevant domain specialist instead.
 - `data/**` — downloaded AOI datasets.
-- `agents/memory/**` — knowledge-graph subsystem (curator role).
 - The root `AGENTS.md` — that's the agent's own operating instructions,
   human-owned.
 
@@ -57,12 +56,9 @@ You will typically be dispatched under one of these categories:
    `uv run pytest agents/janus/src/agents_janus/tests/<relevant>.py -v`.
    Report the result in your response. If tests fail, revert your
    change and tell the orchestrator.
-5. **Record** the improvement in the knowledge graph via `memory.sh
-   node` (or `memory_recall_kg` for read). Best-effort — KG failure
-   does NOT block the change.
-6. **Report** back to the orchestrator with a concise JSON summary
+5. **Report** back to the orchestrator with a concise JSON summary
    (returned as your final message). Include `files_changed`,
-   `tests_run`, `tests_pass`, `kg_recorded`. There is no message
+   `tests_run`, `tests_pass`. There is no message
    channel — the coordinator confirms via `list_edits` (pheromone).
 
 ## Patch structure (for prompt edits)

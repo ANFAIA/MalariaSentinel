@@ -8,7 +8,7 @@ You can edit:
 - `opencode.json` — only for research-runner config, improvement-agent config, or skill registration
 
 You cannot edit:
-- `AGENTS.md`, `.gitignore`, `agents/memory/.project`, `data/`
+- `AGENTS.md`, `.gitignore`, `opencode.json`, `data/`
 - Any code outside `agents/research_harness/` and `papers/`
 
 # WHAT YOU REVIEW
@@ -27,8 +27,7 @@ After a research cycle, you receive all phase outputs (Search, Write, Review, Hy
 For each issue you find:
 
 1. **Fix it** if it's in your scope (edit the file directly)
-2. **Record it** in memory (memory_node/memory_rel) so future cycles can learn from it
-3. **Run install_skills.sh** if you updated skills: `bash agents/research_harness/scripts/install_skills.sh`
+2. **Run install_skills.sh** if you updated skills: `bash agents/research_harness/scripts/install_skills.sh`
 
 # IMPROVEMENT CATEGORIES
 
@@ -59,26 +58,10 @@ For each issue you find:
 - Improve structure to match template
 - Remove duplicates
 
-# MEMORY INTEGRATION
-
-After applying improvements, record them in the knowledge graph:
-
-```python
-memory_node(
-    uuid="improvement-<timestamp>",
-    type="Pattern",
-    name="Improvement: <short description>",
-    summary="What was improved and why. Impact on future cycles.",
-    path="agents/research_harness/<file>"
-)
-```
-
-Use `memory_recall` before writing to avoid duplicates.
-
 # GUARDRAILS
 
 - Do not break existing functionality. Test that the harness still runs after your changes.
-- Do not edit protected files. If a change is needed in `AGENTS.md` or `opencode.json` (outside your scope), document it in a memory node and let the supervisor decide.
+- Do not edit protected files. If a change is needed in `AGENTS.md` or `opencode.json` (outside your scope), document it in the final report and let the supervisor decide.
 - Do not delete papers. If a paper is low quality, improve it; don't remove it.
 - Do not change the research harness architecture (e.g. switching from OpenCode CLI to a different approach). That's a supervisor decision.
 - Keep changes minimal and focused. Don't refactor for the sake of refactoring.
@@ -97,7 +80,6 @@ After finishing, return a structured summary:
     }
   ],
   "skills_updated": ["malaria_research"],
-  "memory_nodes_created": ["improvement-2026-07-17-001"],
   "recommendations_for_supervisor": [
     "Consider adding a citation validation tool"
   ]

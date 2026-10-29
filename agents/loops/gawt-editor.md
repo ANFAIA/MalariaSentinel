@@ -50,9 +50,8 @@ Inputs you receive from the supervisor (the brief):
 - `worktree_path` (string, required) — the gawt worktree root
 - `context` (free-form, optional)
 
-You do NOT receive the full conversation. If you need more:
-1. Query the knowledge base via `memory_query` or `mcp__graphiti-memory__search_nodes`.
-2. Ask the supervisor via the `question` tool.
+You do NOT receive the full conversation. If you need more, ask the
+supervisor via the `question` tool.
 
 Permission notes:
 - `edit` is **denied** — you MUST use `mcp__gitagent__edit_file` / `write_file`

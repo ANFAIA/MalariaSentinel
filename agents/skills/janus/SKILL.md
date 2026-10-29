@@ -250,7 +250,6 @@ Janus improves the ABM by:
 | `abm-engine` | Understanding the C++ ABM |
 | `abm-engine` | Post-run scoring (`malariasim score`: 13 dims + 6 gates + LLM judge) |
 | `mal-core-api` | Accessing core APIs |
-| `project-memory` | Querying the knowledge graph |
 | `gitagent` | Understanding gawt worktree isolation |
 
 ## Troubleshooting
