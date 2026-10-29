@@ -219,7 +219,10 @@ DailyEnvBands read_env_nc(const std::string& path, int32_t max_days) {
     // features to 0 and the habitat potential degenerates accordingly).
     const size_t expected_static =
         static_cast<size_t>(out.h) * static_cast<size_t>(out.w);
-    auto read_static = [&](const char* name, std::vector<float>& dst) {
+    // `optional` planes (the additive basemap) stay silent when absent: an
+    // env NC predating the plane is a normal, supported input, not a defect.
+    auto read_static = [&](const char* name, std::vector<float>& dst,
+                           bool optional = false) {
         try {
             std::vector<float> v = read_variable(name, /*static_plane=*/true);
             if (v.size() == expected_static) {
@@ -230,6 +233,7 @@ DailyEnvBands read_env_nc(const std::string& path, int32_t max_days) {
                 dst = std::move(v);
             }
         } catch (const std::exception&) {
+            if (optional) return;
             std::cerr << "env_reader: WARNING static var '" << name
                       << "' unavailable in env NC; treating as 0.\n";
         }
@@ -239,6 +243,12 @@ DailyEnvBands read_env_nc(const std::string& path, int32_t max_days) {
     read_static("lc_wetland",          out.lc_wetland);
     read_static("lc_open_plus_water",  out.lc_open_plus_water);
     read_static("lc_crop",             out.lc_crop);
+    // Optional land fraction (0..1): the truthful basemap plane. Read with
+    // the same static-plane path as the habitat features (a plain
+    // read_variable() call rejects 2-D planes). Missing -> empty; the
+    // renderer then falls back to the legacy basemap. Never enters
+    // HabitatFeatures, so dynamics are untouched.
+    read_static("land_frac", out.land_frac, /*optional=*/true);
 
     // Optional salinity (psu). The env NC predates salinity; a file
     // without `salinity_ppt` must load identically (salinity_ empty,
@@ -297,6 +307,20 @@ DailyEnvBands read_env_nc(const std::string& path, int32_t max_days) {
     read_static_netcdf("lc_wetland",          out.lc_wetland);
     read_static_netcdf("lc_open_plus_water",  out.lc_open_plus_water);
     read_static_netcdf("lc_crop",             out.lc_crop);
+    // Optional truthful basemap (additive plane; see header). The GDAL
+    // reader above normally fills this; this netCDF pass is the fallback
+    // for files GDAL cannot enumerate.
+    if (out.land_frac.empty()) {
+        std::vector<float> v;
+        read_static_netcdf("land_frac", v);
+        if (v.size() == static_cast<size_t>(out.h) * static_cast<size_t>(out.w)) {
+            out.land_frac = std::move(v);
+        }
+    }
+    if (out.land_frac.empty()) {
+        std::cerr << "env_reader: note: env NC has no usable 'land_frac' plane; "
+                     "the renderer falls back to the legacy basemap.\n";
+    }
 
     if (out.h <= 0 || out.w <= 0) {
         throw std::runtime_error(

@@ -208,6 +208,9 @@ void ClimateEngine::load_from_env_nc(const std::string& path,
     move_static(bands.lc_wetland,         lc_wetland_,         "lc_wetland");
     move_static(bands.lc_open_plus_water, lc_open_plus_water_, "lc_open_plus_water");
     move_static(bands.lc_crop,            lc_crop_,            "lc_crop");
+    // Optional land-fraction basemap: absent in older env NCs (empty), and
+    // deliberately NOT part of HabitatFeatures.
+    land_frac_ = std::move(bands.land_frac);
     if (!jrc_persistent_.empty()) {
         std::cout << "ClimateEngine: env NC carries the five static habitat "
                   << "planes (" << h_ << "x" << w_ << ")\n";
@@ -322,6 +325,7 @@ std::shared_ptr<ClimateEngine> ClimateEngine::clone_for_thread() const {
     clone->lc_wetland_ = lc_wetland_;
     clone->lc_open_plus_water_ = lc_open_plus_water_;
     clone->lc_crop_ = lc_crop_;
+    clone->land_frac_ = land_frac_;
     return clone;
 }
 

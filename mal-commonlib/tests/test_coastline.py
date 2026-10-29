@@ -75,7 +75,7 @@ def _patch_urlopen(zip_path: pathlib.Path):
     return patch("urllib.request.urlopen", _open)
 
 
-def test_coastline_loader_returns_binary_land_mask(tmp_path):
+def test_coastline_loader_returns_land_fraction(tmp_path):
     from mal_commonlib.data.loaders.coastline import load_coastline_land_mask
 
     zip_path = _make_gshhg_zip(
@@ -84,34 +84,95 @@ def test_coastline_loader_returns_binary_land_mask(tmp_path):
 
     aoi = AOI.from_bbox(-0.5, -0.5, 1.5, 1.5, "EPSG:4326", "test-coast-1", 1000)
     with _patch_urlopen(zip_path):
-        da = load_coastline_land_mask(aoi, cache_dir=tmp_path / "cache")
+        # resolution="c": the fake archive only ships the crude layer.
+        da = load_coastline_land_mask(
+            aoi, resolution="c", cache_dir=tmp_path / "cache")
 
     arr = np.asarray(da.values)
     assert arr.shape == aoi.cells_per_side()
     assert arr.dtype == np.float32
-    assert set(np.unique(arr).tolist()).issubset({0.0, 1.0})
-    land_cells = int(arr.sum())
-    assert 0 < land_cells < arr.size, f"unexpected land_cells={land_cells}"
+    # A fraction, not a binary raster: every value in [0, 1] and the edge
+    # cells land partially (the polygon boundary crosses them).
+    assert arr.min() >= 0.0 and arr.max() <= 1.0
+    assert 0 < int((arr > 0.5).sum()) < arr.size
+    assert ((arr > 0.0) & (arr < 1.0)).any(), "expected partial cells"
+    assert float(arr.sum()) > 0.0
+    assert da.attrs["variable"] == "land_frac"
+    assert da.name == "land_mask"
 
 
-def test_coastline_buffer_dilates_land(tmp_path):
-    from mal_commonlib.data.loaders.coastline import load_coastline_land_mask
+def test_coastline_band_does_not_dilate_the_mask(tmp_path):
+    """The coastal band is a query, not a mask mutation.
+
+    Old behaviour: the loader dilated the land mask by ``buffer_m``, which
+    moved the real coastline several km inland. Now the loader returns the
+    same fraction for any band width; ``sea_mask`` applies the band.
+    """
+    from mal_commonlib.data.loaders.coastline import (
+        distance_to_land_m,
+        load_coastline_land_mask,
+        sea_mask,
+    )
 
     land_strip = Polygon([(0, 0), (0.5, 0), (0.5, 2), (0, 2)])
     zip_path = _make_gshhg_zip(tmp_path, land_strip)
 
     aoi = AOI.from_bbox(0.0, 0.0, 2.0, 2.0, "EPSG:4326", "test-coast-2", 1000)
     with _patch_urlopen(zip_path):
-        no_buf = load_coastline_land_mask(aoi, buffer_m=0, cache_dir=tmp_path / "c0")
-        with_buf = load_coastline_land_mask(
-            aoi, buffer_m=4000.0, cache_dir=tmp_path / "c4"
-        )
+        narrow = load_coastline_land_mask(
+            aoi, resolution="c", coast_band_m=0.0, cache_dir=tmp_path / "c0")
+        wide = load_coastline_land_mask(
+            aoi, resolution="c", coast_band_m=4000.0, cache_dir=tmp_path / "c4")
 
-    no_buf_cells = int(np.asarray(no_buf.values).sum())
-    with_buf_cells = int(np.asarray(with_buf.values).sum())
-    assert with_buf_cells > no_buf_cells, (
-        f"buffer should add cells: {with_buf_cells} vs {no_buf_cells}"
+    np.testing.assert_allclose(
+        np.asarray(narrow.values), np.asarray(wide.values),
+        err_msg="the loader must not dilate the land fraction",
     )
+    assert narrow.attrs["coast_band_m"] == 0.0
+    assert wide.attrs["coast_band_m"] == 4000.0
+
+    frac = np.asarray(wide.values)
+    dist_m = distance_to_land_m(frac, 1000.0, water_floor=0.05)
+    sea_narrow = sea_mask(frac, dist_m, 0.0, 0.05)
+    sea_wide = sea_mask(frac, dist_m, 4000.0, 0.05)
+    # The wide band keeps strictly more water (as coastal water).
+    assert int(sea_wide.sum()) < int(sea_narrow.sum())
+    # Land is never sea, and the band never rewrites land into water.
+    assert not (sea_wide & (frac >= 0.05)).any()
+
+
+def test_sea_mask_rule():
+    """sea <=> land_frac < water_floor AND distance > coast_band_m."""
+    from mal_commonlib.data.loaders.coastline import sea_mask
+
+    frac = np.array([[1.0, 0.0, 0.0, 0.0]], dtype=np.float32)
+    dist = np.array([[0.0, 1000.0, 3000.0, 9000.0]], dtype=np.float64)
+    got = sea_mask(frac, dist, coast_band_m=2000.0, water_floor=0.05)
+    np.testing.assert_array_equal(got, [[False, False, True, True]])
+    # Zero band: every water cell is sea.
+    np.testing.assert_array_equal(
+        sea_mask(frac, dist, 0.0, 0.05), [[False, True, True, True]])
+    # A cell below the floor but very close to land can never be sea when the
+    # band is wide.
+    np.testing.assert_array_equal(
+        sea_mask(frac, dist, 10_000.0, 0.05), [[False, False, False, False]])
+
+
+def test_distance_to_land_and_sea_mask_consistent():
+    from mal_commonlib.data.loaders.coastline import (
+        distance_to_land_m, sea_mask,
+    )
+
+    frac = np.zeros((3, 3), dtype=np.float32)
+    frac[1, 1] = 1.0
+    dist = distance_to_land_m(frac, 1000.0, water_floor=0.05)
+    assert dist[1, 1] == 0.0
+    assert abs(dist[0, 1] - 1000.0) < 1e-6
+    assert abs(dist[0, 0] - 1414.2135) < 1e-3
+    sea = sea_mask(frac, dist, 1000.0, 0.05)
+    assert not sea[0, 1]      # exactly 1 km: not *beyond* a 1 km band
+    assert sea[0, 0]          # 1.41 km: outside the band
+    assert not sea[1, 1]      # land
 
 
 def test_coastline_invalid_resolution_raises():
@@ -120,3 +181,14 @@ def test_coastline_invalid_resolution_raises():
     aoi = AOI.from_bbox(0.0, 0.0, 0.5, 0.5, "EPSG:4326", "test-coast-bad", 1000)
     with pytest.raises(ValueError, match="resolution must be one of"):
         load_coastline_land_mask(aoi, resolution="x")
+
+
+def test_default_resolution_is_gshhg_full():
+    """The loader now defaults to GSHHG full ("f"); crude was off by km."""
+    from mal_commonlib.data.loaders.coastline import (
+        default_coast_band_m, default_resolution, default_sea_water_floor,
+    )
+
+    assert default_resolution() == "f"
+    assert default_coast_band_m() == 2000.0
+    assert default_sea_water_floor() == 0.05

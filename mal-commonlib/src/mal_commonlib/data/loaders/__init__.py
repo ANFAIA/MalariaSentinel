@@ -13,7 +13,11 @@ from .jrc_gsw import load_jrc_gsw_habitat_features
 from .dynamic_world import load_dw_class_fractions
 from .dynamic_world import load_dw_label_mode  # shared utility (wildlife)
 from .chirps import load_chirps_rainfall_daily
-from .coastline import load_coastline_land_mask
+from .coastline import (
+    distance_to_land_m,
+    load_coastline_land_mask,
+    sea_mask,
+)
 from .worldpop import load_worldpop_population
 from .glw import load_glw_livestock
 from .ghsl import load_ghsl_urban_class
@@ -29,6 +33,8 @@ __all__ = [
     "load_dw_label_mode",
     "load_chirps_rainfall_daily",
     "load_coastline_land_mask",
+    "sea_mask",
+    "distance_to_land_m",
     "load_worldpop_population",
     "load_glw_livestock",
     "load_ghsl_urban_class",

@@ -225,6 +225,15 @@ constexpr Color kPanelBorder{48, 54, 66, 255};
 constexpr Color kText{228, 231, 238, 255};
 constexpr Color kTextDim{148, 155, 168, 255};
 constexpr Color kNeutralCell{54, 58, 66, 255};
+// Truthful basemap tones (2026-10 coastline fix). Open sea is deep navy,
+// coastal water a steel blue, land a muted olive/tan that cannot be confused
+// with the habitat palette.
+constexpr Color kOpenSea{14, 30, 52, 255};
+constexpr Color kCoastalWater{78, 128, 168, 255};
+constexpr Color kLandBase{140, 132, 102, 255};
+// Land-fraction threshold under which a cell is water; mirrors
+// ingest.sea_water_floor (0.05) from model_constants.yaml.
+constexpr float kSeaWaterFloor = 0.05f;
 constexpr Color kWater{38, 92, 190, 255};
 constexpr Color kPrev{214, 48, 48, 255};
 constexpr Color kAmber{240, 180, 60, 255};
@@ -246,15 +255,22 @@ constexpr Color kDry{170, 170, 176, 255};
 constexpr int kSBoundCount = 9;
 constexpr double kSBounds[kSBoundCount] = {
     0.00, 0.02, 0.10, 0.20, 0.25, 0.30, 0.35, 0.45, 1.00};
+// D6: the S palette is a LAND palette. Blue already means water in the
+// basemap (navy open sea, steel coastal band), and the old ramp put its
+// [0.10,0.20) class at (34,104,168) — a blue, which is exactly where dry-
+// season land sits (S ~ 0.12). The result was land reading as water and the
+// coastal band (S = 0.25) reading as land. The sequence below runs
+// taupe -> khaki -> olive -> green -> yellow -> cream, so "more habitat"
+// stays monotone in warmth/lightness and no class can be confused with sea.
 constexpr Color kSClassColors[kSBoundCount - 1] = {
-    {38, 44, 56, 255},    // [0.00,0.02) no habitat (2/3 of the AOI grid)
-    {58, 66, 96, 255},    // [0.02,0.10) trace
-    {34, 104, 168, 255},  // [0.10,0.20) low, single-zone cells
-    {24, 150, 164, 255},  // [0.20,0.25) below the persistent floor
-    {36, 168, 116, 255},  // [0.25,0.30) persistent water, dry
-    {128, 200, 80, 255},  // [0.30,0.35) persistent + first rain
-    {238, 186, 60, 255},  // [0.35,0.45) standing water
-    {252, 244, 180, 255}, // [0.45,1.00] near-saturated, wet season
+    {86, 84, 80, 255},    // [0.00,0.02) no habitat: basemap shows through
+    {128, 124, 112, 255}, // [0.02,0.10) trace, grey-taupe
+    {150, 142, 104, 255}, // [0.10,0.20) low, single-zone cells: khaki
+    {168, 158, 96, 255},  // [0.20,0.25) below the persistent floor
+    {150, 176, 84, 255},  // [0.25,0.30) persistent water, dry: olive
+    {120, 178, 80, 255},  // [0.30,0.35) persistent + first rain: green
+    {208, 196, 96, 255},  // [0.35,0.45) standing water: yellow
+    {242, 236, 168, 255}, // [0.45,1.00] near-saturated, wet season: cream
 };
 
 int s_class_index(double v) {
@@ -309,7 +325,10 @@ int plot_y(double v, double vmin, double vmax, int y0, int h, bool log_scale) {
         if (hi - lo < 1.0e-9) hi = lo + 1.0;
     }
     const double t = std::clamp((v - lo) / (hi - lo), 0.0, 1.0);
-    return y0 + static_cast<int>(std::lround((1.0 - t) * h));
+    // Keep the mark one pixel inside the box: a sample at the floor (v = 0 on
+    // a log axis) must not sit on the plot border, where it reads as clipped.
+    const int y = y0 + static_cast<int>(std::lround((1.0 - t) * h));
+    return std::clamp(y, y0 + 1, y0 + std::max(1, h - 1));
 }
 
 // ---------------------------------------------------------------------------
@@ -338,10 +357,10 @@ void draw_s_legend(Canvas& cv, int x, int y, int w, int h,
     const bool wide = (h >= 40);
     int strip_y = y + 14;
     if (wide) {
-        cv.text(x + pad, y + 4, "S avail. classes", kTextDim, 1);
+        cv.text(x + pad, y + 4, "S avail. land", kTextDim, 1);
         char run[48];
         std::snprintf(run, sizeof(run), "run %.2f-%.2f", s_min, s_max);
-        if (text_w(run, 1) + text_w("S avail. classes", 1) + 4 * pad <= w) {
+        if (text_w(run, 1) + text_w("S avail. land", 1) + 4 * pad <= w) {
             cv.text(x + w - pad - text_w(run, 1), y + 4, run, kTextDim, 1);
         }
     } else {
@@ -382,8 +401,14 @@ void draw_s_legend(Canvas& cv, int x, int y, int w, int h,
     }
 }
 
+// D3: fast, exact power of ten for the decade bounds.
+double dec_pow10(int d) {
+    return std::pow(10.0, static_cast<double>(d));
+}
+
 void draw_population(Canvas& cv, int x, int y, int w, int h,
-                     const std::vector<DailyStats>& history) {
+                     const std::vector<DailyStats>& history,
+                     int lo_dec, int hi_dec) {
     draw_panel_frame(cv, x, y, w, h, "pop log10");
     const int px = x + 8;
     const int py = y + 26;
@@ -404,26 +429,24 @@ void draw_population(Canvas& cv, int x, int y, int w, int h,
         if (n <= 1) return px + pw - 1;
         return px + (pw - 1) * i / (n - 1);
     };
-    double vmax = 10.0;
-    for (const auto& s : history) {
-        vmax = std::max(vmax, static_cast<double>(s.n_adults));
-        vmax = std::max(vmax, static_cast<double>(s.n_eggs));
-        vmax = std::max(vmax, static_cast<double>(s.n_larvae));
-        vmax = std::max(vmax, static_cast<double>(s.n_pupae));
-    }
-    vmax *= 1.5;
+    // D3: the axis is driven by the decade bounds the caller tracks across
+    // frames (monotone, never shrinking), not by "1.5 x today's max" — that
+    // made the data touch the top of the box on every busy day and let the
+    // plotted values disagree with the decade labels.
+    const double vmin = dec_pow10(lo_dec);
+    const double vmax = dec_pow10(hi_dec);
 
-    // Decade gridlines.
-    const int lo_dec = 0;
-    const int hi_dec = static_cast<int>(std::ceil(std::log10(vmax)));
+    // Decade gridlines, labelled with the decade they actually are.
     for (int d = lo_dec; d <= hi_dec; ++d) {
-        const double v = std::pow(10.0, d);
-        if (v > vmax) break;
-        const int yy = plot_y(v, 1.0, vmax, py, ph, true);
+        const double v = dec_pow10(d);
+        const int yy = plot_y(v, vmin, vmax, py, ph, true);
         cv.line(px, yy, px + pw - 1, yy, Color{46, 49, 58, 255});
         char buf[16];
         std::snprintf(buf, sizeof(buf), "%d", d);
-        cv.text(x + w - 10 - text_w(buf, 2), yy - 8, buf, kTextDim, 2);
+        // Keep the top decade label out of the title/key row: annotate it
+        // just below its gridline instead of 8 px above.
+        const int lab_y = (yy - 8 < py + 2) ? py + 2 : yy - 8;
+        cv.text(x + w - 10 - text_w(buf, 2), lab_y, buf, kTextDim, 2);
     }
 
     auto draw_series = [&](auto field, Color c, bool mean_only) {
@@ -437,9 +460,9 @@ void draw_population(Canvas& cv, int x, int y, int w, int h,
             for (int i = 1; i < n; ++i) {
                 const int xa = sx_at(i - 1);
                 const int xb = sx_at(i);
-                const int ya = plot_y(vals[static_cast<size_t>(i - 1)], 1.0,
+                const int ya = plot_y(vals[static_cast<size_t>(i - 1)], vmin,
                                       vmax, py, ph, true);
-                const int yb = plot_y(vals[static_cast<size_t>(i)], 1.0,
+                const int yb = plot_y(vals[static_cast<size_t>(i)], vmin,
                                       vmax, py, ph, true);
                 cv.line(xa, ya, xb, yb, faint);
             }
@@ -454,7 +477,7 @@ void draw_population(Canvas& cv, int x, int y, int w, int h,
             }
             const double m = sum / static_cast<double>(std::max(1, cnt));
             const int xa = sx_at(i);
-            const int ya = plot_y(m, 1.0, vmax, py, ph, true);
+            const int ya = plot_y(m, vmin, vmax, py, ph, true);
             if (i > 0) {
                 double psum = 0.0;
                 int pcnt = 0;
@@ -464,7 +487,7 @@ void draw_population(Canvas& cv, int x, int y, int w, int h,
                 }
                 const double pm = psum / static_cast<double>(std::max(1, pcnt));
                 const int xb = sx_at(i - 1);
-                const int yb = plot_y(pm, 1.0, vmax, py, ph, true);
+                const int yb = plot_y(pm, vmin, vmax, py, ph, true);
                 cv.line(xb, yb, xa, ya, c);
             } else if (n == 1) {
                 // Single-day history: a dot is the only way the series can
@@ -621,7 +644,7 @@ void draw_info(Canvas& cv, int x, int y, int w, int h,
     }
 }
 
-void draw_legend(Canvas& cv, int x, int y) {
+void draw_legend(Canvas& cv, int x, int y, bool have_land_frac) {
     cv.text(x, y, "legend", kTextDim, 2);
     int cx = x + 104;
 
@@ -635,8 +658,11 @@ void draw_legend(Canvas& cv, int x, int y) {
     swatch_circle(kBloodFed, "blood-fed");
     swatch_circle(kGravid, "gravid");
 
-    // Second row: scale encoding.
-    const int y2 = y + 24;
+    // Second row: scale encoding. 19 px pitch (16 px glyphs, 3 px gap) and a
+    // 2 px top inset: three rows end at y + 52, i.e. 4 px above the footer
+    // edge. A 20 px pitch with a 6 px inset overflowed the 58 px footer by
+    // 2 px at every width (visible as a clipped "base" row at 2048).
+    const int y2 = y + 19;
     int cx2 = x + 104;
     auto swatch_square = [&](Color c, const std::string& label) {
         cv.fill_rect(cx2 - 5, y2 + 1, 11, 11, c);
@@ -654,6 +680,25 @@ void draw_legend(Canvas& cv, int x, int y) {
     swatch_dot(kPupa, "emerged");
     cv.ring(cx2, y2 + 6, 6, kInfectious);
     cv.text(cx2 + 10, y2, "I_V", kText, 2);
+
+    // Third row: the truthful basemap tones (or the legacy notice when the
+    // env NC predates the `land_frac` plane). Rows at +0, +19, +36.
+    const int y3 = y + 36;
+    int cx3 = x + 104;
+    cv.text(x, y3, "base", kTextDim, 2);
+    if (!have_land_frac) {
+        cv.text(cx3, y3, "legacy (no land_frac)", kTextDim, 2);
+        return;
+    }
+    auto swatch_base = [&](Color c, const std::string& label) {
+        cv.fill_rect(cx3 - 5, y3 + 1, 11, 11, c);
+        cv.stroke_rect(cx3 - 5, y3 + 1, 11, 11, Color{12, 12, 14, 255});
+        cv.text(cx3 + 10, y3, label, kText, 2);
+        cx3 += 10 + text_w(label, 2) + 22;
+    };
+    swatch_base(kOpenSea, "open sea");
+    swatch_base(kCoastalWater, "coastal water");
+    swatch_base(kLandBase, "land");
 }
 
 }  // namespace
@@ -782,6 +827,14 @@ struct GifViz::Impl {
 
     std::vector<float> rain_hist;
     std::vector<float> temp_hist;
+
+    // D3: population-panel decade window, tracked over the whole run so the
+    // axis never shrinks between frames and no sample is clipped.
+    //   hi = max(1, ceil(log10(max of the four series AND their 7-day means)))
+    //   lo = min(0, floor(log10(min positive sample)))
+    //   span >= 2 decades
+    int pop_lo_dec = 0;
+    int pop_hi_dec = 2;
 
     std::vector<uint8_t> pluvial_mask;
     int mask_h = 0;
@@ -998,6 +1051,32 @@ void GifViz::Impl::draw(const Engine& engine,
     const bool have_prev = tr != nullptr &&
         tr->human_grid().h() == H && tr->human_grid().w() == W;
 
+    // -- truthful basemap -------------------------------------------------
+    // Three-way base from the env NC `land_frac` plane (added by the 2026-10
+    // coastline fix). The classes mirror the ingest rule exactly:
+    //   water   : land_frac < sea_water_floor
+    //   open sea: water AND the day slice carries the ingest 0.0 temperature
+    //             sentinel (the ingest only zeroes temperature on open sea)
+    //   coastal : water AND NOT open sea (lagoons, estuaries, the shallow
+    //             plume that keeps its JRC water)
+    //   land    : NOT water
+    // The old NC has no `land_frac`: fall back to the legacy look (S class
+    // colour / neutral grey + JRC tint) and say so in the legend.
+    const auto& lf = climate.land_frac();
+    const size_t n_cells_map = static_cast<size_t>(H) * static_cast<size_t>(W);
+    const bool have_lf = lf.size() == n_cells_map;
+    const auto& temp_now = climate.temp_d();
+    const bool temp_map_ok = temp_now.size() == n_cells_map;
+    bool temp_zero_block = false;
+    if (temp_map_ok) {
+        size_t zeros = 0;
+        for (const float v : temp_now) {
+            if (v == 0.0f) ++zeros;
+        }
+        temp_zero_block =
+            zeros >= static_cast<size_t>(std::max<size_t>(1, n_cells_map / 100));
+    }
+
     for (int r = 0; r < H; ++r) {
         const int y0 = cell_y(r);
         const int y1 = cell_y(r + 1);
@@ -1010,16 +1089,53 @@ void GifViz::Impl::draw(const Engine& engine,
                                static_cast<size_t>(c);
             const PatchState* ps = grid[idx];
             Color base = kNeutralCell;
-            if (ps != nullptr) {
-                base = s_class_color(static_cast<double>(ps->habitat_avail));
+            bool is_water = false;
+            if (!have_lf) {
+                if (ps != nullptr) {
+                    base = s_class_color(static_cast<double>(ps->habitat_avail));
+                }
+            } else {
+                const bool water = lf[idx] < kSeaWaterFloor;
+                is_water = water;
+                bool sea = water;
+                if (water && temp_map_ok && temp_zero_block) {
+                    // Only trust the sentinel when the zero block is a real
+                    // sea block (>= 1 % of the grid), so a genuinely 0 C AOI
+                    // is not painted as ocean.
+                    sea = (temp_now[idx] == 0.0f);
+                }
+                base = sea ? kOpenSea : (water ? kCoastalWater : kLandBase);
             }
             cv.fill_rect(x0, y0, cw, ch, base);
 
-            // (b) persistent-water tint
+            // (b) persistent-water tint. Drawn BEFORE the habitat class so
+            // the class keeps its land identity: the tint is a blue wash, and
+            // painting it on top of the cream class turned the wettest land
+            // (high S AND persistent water) into a pale teal that read as
+            // water. Underneath, it still marks water on land without
+            // competing with "how much habitat".
             if (have_jrc && jrc[idx] > 0.05f) {
                 Color w = kWater;
                 w.a = 90;  // 0.35 × 255
                 cv.fill_rect(x0, y0, cw, ch, w);
+            }
+
+            // Habitat overlay: land only, and only from the second class up.
+            //   * class [0.00,0.02) is "no habitat" -> nothing drawn, the
+            //     basemap tile shows through (bare ground stays bare);
+            //   * water cells keep the basemap colour: S on the coastal band
+            //     is the structural persistent floor (0.25), not a habitat
+            //     gradient, so tinting it would paint the water green and
+            //     destroy the one cue that separates land from sea.
+            // On land the class fill is strong (200/255) because the land
+            // base is itself a tan tone; the coastline stays readable because
+            // the water cells are never touched by this layer.
+            if (have_lf && !is_water && ps != nullptr &&
+                ps->habitat_avail >= kSBounds[1]) {
+                Color s = s_class_color(
+                    static_cast<double>(ps->habitat_avail));
+                s.a = 200;
+                cv.fill_rect(x0, y0, cw, ch, s);
             }
             // (c) human prevalence tint
             if (have_prev && tr->human_grid().prev_at(r, c) > 0.0) {
@@ -1329,7 +1445,8 @@ void GifViz::Impl::draw(const Engine& engine,
     if (pop_h + forc_h > charts_h) {
         pop_h = std::max(30, charts_h - forc_h);
     }
-    draw_population(cv, col_x, body_top, col_w, pop_h, history);
+    draw_population(cv, col_x, body_top, col_w, pop_h, history,
+                    pop_lo_dec, pop_hi_dec);
     if (legend_below_map) {
         draw_s_legend(cv, map_rect_x, my + mh + 2, map_rect_w, 22, s_min,
                       s_max);
@@ -1401,10 +1518,17 @@ void GifViz::Impl::draw(const Engine& engine,
     info.emplace_back(line, kText);
     std::snprintf(line, sizeof(line), "K_total  %s", fmt_count(k_total).c_str());
     info.emplace_back(line, kText);
-    const double adults_per_k =
-        k_total > 0 ? static_cast<double>(adults) / static_cast<double>(k_total)
+    // D4: adults/K as a percentage with two significant digits. "0.000"
+    // hid a real (if small) occupancy; "<0.1%" is explicit about the floor.
+    const double adults_pct =
+        k_total > 0 ? 100.0 * static_cast<double>(adults) /
+                          static_cast<double>(k_total)
                     : 0.0;
-    std::snprintf(line, sizeof(line), "adults/K  %.3f", adults_per_k);
+    if (adults_pct >= 0.1) {
+        std::snprintf(line, sizeof(line), "adults/K  %.2g%%", adults_pct);
+    } else {
+        std::snprintf(line, sizeof(line), "adults/K  <0.1%%");
+    }
     info.emplace_back(line, kText);
     if (temp_unusable) {
         std::snprintf(line, sizeof(line), "rain %.1fmm  T n/a", rain_mean);
@@ -1456,7 +1580,7 @@ void GifViz::Impl::draw(const Engine& engine,
     // -- footer legend ----------------------------------------------------
     cv.fill_rect(0, height - footer_h, width, footer_h, kPanel);
     cv.line(0, height - footer_h, width, height - footer_h, kPanelBorder);
-    draw_legend(cv, margin, height - footer_h + 6);
+    draw_legend(cv, margin, height - footer_h + 2, have_lf);
 }
 
 // ---------------------------------------------------------------------------
@@ -1535,6 +1659,53 @@ void GifViz::observe(const Engine& engine,
         im.temp_hist.push_back(static_cast<float>(
             temp_n > 0 ? temp_sum / static_cast<double>(temp_n)
                        : std::numeric_limits<float>::quiet_NaN()));
+
+        // D3: extend the population decade window from this frame's data
+        // (raw samples and their 7-day trailing means). Monotone: the window
+        // only ever grows, so a series can never leave the box later.
+        {
+            const int n_hist = static_cast<int>(history.size());
+            double vmax = 1.0;
+            double vmin_pos = std::numeric_limits<double>::infinity();
+            for (int i = 0; i < n_hist; ++i) {
+                const DailyStats& st = history[static_cast<size_t>(i)];
+                const double raw[4] = {static_cast<double>(st.n_adults),
+                                       static_cast<double>(st.n_eggs),
+                                       static_cast<double>(st.n_larvae),
+                                       static_cast<double>(st.n_pupae)};
+                for (double v : raw) {
+                    vmax = std::max(vmax, v);
+                    if (v > 0.0) vmin_pos = std::min(vmin_pos, v);
+                }
+                for (int s_i = 0; s_i < 4; ++s_i) {
+                    double sum = 0.0;
+                    int cnt = 0;
+                    for (int k = std::max(0, i - 6); k <= i; ++k) {
+                        const DailyStats& sk = history[static_cast<size_t>(k)];
+                        switch (s_i) {
+                            case 0: sum += static_cast<double>(sk.n_adults); break;
+                            case 1: sum += static_cast<double>(sk.n_eggs); break;
+                            case 2: sum += static_cast<double>(sk.n_larvae); break;
+                            default: sum += static_cast<double>(sk.n_pupae); break;
+                        }
+                        ++cnt;
+                    }
+                    const double m = sum / static_cast<double>(std::max(1, cnt));
+                    vmax = std::max(vmax, m);
+                    if (m > 0.0) vmin_pos = std::min(vmin_pos, m);
+                }
+            }
+            const int hi_needed = std::max(
+                1, static_cast<int>(std::ceil(std::log10(std::max(1.0, vmax)))));
+            int lo_needed = 0;
+            if (std::isfinite(vmin_pos)) {
+                lo_needed = std::min(
+                    0, static_cast<int>(std::floor(std::log10(vmin_pos))));
+            }
+            im.pop_hi_dec = std::max(im.pop_hi_dec, hi_needed);
+            im.pop_lo_dec = std::min(im.pop_lo_dec, lo_needed);
+            while (im.pop_hi_dec - im.pop_lo_dec < 2) ++im.pop_hi_dec;
+        }
 
         // Running S range: updated every day, so the colour scale is stable
         // across frames but adapts to the whole run (plan 04 §2.2).

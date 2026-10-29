@@ -680,6 +680,12 @@ ModelConfig parse_config_file(const std::string& path) {
     cfg.ingest.coastline_buffer_m = L.num(
         L.key(ing, "ingest", "coastline_buffer_m"),
         "ingest.coastline_buffer_m");
+    cfg.ingest.coastline_resolution = L.str(
+        L.key(ing, "ingest", "coastline_resolution"),
+        "ingest.coastline_resolution");
+    cfg.ingest.sea_water_floor = L.num(
+        L.key(ing, "ingest", "sea_water_floor"),
+        "ingest.sea_water_floor");
     cfg.ingest.cell_size_hint_m = L.num(
         L.key(ing, "ingest", "cell_size_hint_m"), "ingest.cell_size_hint_m");
     cfg.ingest.candidate_min_ingest = L.num(
