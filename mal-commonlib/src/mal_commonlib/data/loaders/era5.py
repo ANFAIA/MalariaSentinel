@@ -11,7 +11,7 @@ Auth:
     ERA5-Land requires CDS API credentials (``~/.cdsapirc`` or
     ``CDSAPI_URL``/``CDSAPI_KEY`` env vars). In an env without those, the
     loader raises ``RuntimeError`` with a clear message. See
-    ``op-m1-3a-data-layer-auth`` in the project knowledge graph for the
+    ``op-m1-3a-data-layer-auth`` runbook for the
     data-layer auth runbook.
 
 Notes:
