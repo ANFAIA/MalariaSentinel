@@ -24,9 +24,8 @@ You are in research mode. Your job is to investigate, analyze, and report findin
 2. **Read specific snippets**: `codebase_get_code_snippet(qualified_name="...")` — pull just the function body.
 3. **Trace dependencies**: `codebase_trace_path(function_name="...")` — see callers/callees.
 4. **Fall back to file reads**: use the available `read_file` tool only if the graph does not have it.
-5. **Search the knowledge base**: `memory_recall_kg(query="...")` — past patterns, pitfalls.
-6. **Ask** the user if uncertain: `ask_user(question="...")`
-7. **Report** structured findings back to the orchestrator
+5. **Ask** the user if uncertain: `ask_user(question="...")`
+6. **Report** structured findings back to the orchestrator
 
 ### Research Rules
 - **Do NOT** modify any files
@@ -127,7 +126,6 @@ the coordinator for re-scoping.
 {% endif %}
 
 ## Knowledge
-- Use `memory_recall_kg(query="...")` to recall past patterns
 - Use `ask_user(question="...")` to clarify with the human when uncertain
 
 {% if spec_text %}

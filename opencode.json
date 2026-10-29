@@ -34,15 +34,10 @@
       "AGENTS.md": "ask",
       ".gitignore": "ask",
       "opencode.json": "ask",
-      "agents/memory/.project": "ask",
       "data/": "ask"
     },
     "bash": {
       "*": "allow",
-      "make -f agents/memory/scripts/Makefile wipe *": "deny",
-      "make -f agents/memory/scripts/Makefile set-project *": "deny",
-      "*make*wipe*": "deny",
-      "*make*set-project*": "deny",
       "rm *": "ask",
       "rmdir *": "ask",
       "git push *": "ask",
@@ -116,13 +111,6 @@
       "frontend-design": "deny",
       "ipynb": "deny"
     },
-    "memory_node": "ask",
-    "memory_rel": "ask",
-    "memory_query": "allow",
-    "memory_recall": "allow",
-    "memory_audit": "allow",
-    "memory_seed": "ask",
-    "memory_status": "allow",
     "external_directory": {
       "~/Downloads/MalariaSentinel/*": "allow",
       "*": "ask"
@@ -130,7 +118,7 @@
   },
   "agent": {
     "supervisor": {
-      "description": "Primary orchestrator. Uses gawt MCP (gitagent-mcp) for worktree isolation and multi-agent coordination. Delegates to loops and subagents. Reads the knowledge graph; does NOT write to it (delegates writes to memory-curator).",
+      "description": "Primary orchestrator. Uses gawt MCP (gitagent-mcp) for worktree isolation and multi-agent coordination. Delegates to loops and subagents.",
       "prompt": "{file:agents/loops/supervisor.md}",
       "permission": {
         "task": "allow",
@@ -139,13 +127,6 @@
         "read": "allow",
         "glob": "allow",
         "grep": "allow",
-        "memory_node": "deny",
-        "memory_rel": "deny",
-        "memory_query": "allow",
-        "memory_recall": "allow",
-        "memory_audit": "allow",
-        "memory_seed": "deny",
-        "memory_status": "allow",
         "mcp__gitagent__start_session": "allow",
         "mcp__gitagent__finalize_session": "allow",
         "mcp__gitagent__abort_session": "allow",
@@ -211,13 +192,6 @@
         "read": "allow",
         "grep": "allow",
         "glob": "allow",
-        "memory_node": "deny",
-        "memory_rel": "deny",
-        "memory_query": "allow",
-        "memory_recall": "allow",
-        "memory_audit": "allow",
-        "memory_seed": "deny",
-        "memory_status": "allow",
         "mcp__gitagent__register_agent": "allow",
         "mcp__gitagent__unregister_agent": "allow",
         "mcp__gitagent__start_intent": "allow",
@@ -236,11 +210,7 @@
           "uv run pytest *": "allow",
           "git diff *": "allow",
           "git status *": "allow",
-          "git log *": "allow",
-          "make -f agents/memory/scripts/Makefile wipe *": "deny",
-          "make -f agents/memory/scripts/Makefile set-project *": "deny",
-          "*make*wipe*": "deny",
-          "*make*set-project*": "deny"
+          "git log *": "allow"
         },
         "webfetch": "deny",
         "websearch": "deny",
@@ -257,21 +227,10 @@
         "read": "allow",
         "grep": "allow",
         "glob": "allow",
-        "memory_node": "deny",
-        "memory_rel": "deny",
-        "memory_query": "allow",
-        "memory_recall": "allow",
-        "memory_audit": "allow",
-        "memory_seed": "deny",
-        "memory_status": "allow",
         "bash": {
           "*": "ask",
           "git diff *": "allow",
-          "git log *": "allow",
-          "make -f agents/memory/scripts/Makefile wipe *": "deny",
-          "make -f agents/memory/scripts/Makefile set-project *": "deny",
-          "*make*wipe*": "deny",
-          "*make*set-project*": "deny"
+          "git log *": "allow"
         },
         "webfetch": "ask",
         "websearch": "deny",
@@ -279,7 +238,7 @@
       }
     },
     "doc-researcher": {
-      "description": "Searches the knowledge base in Neo4j first; web is a fallback. Returns a brief, not raw content.",
+      "description": "Researches documentation and code from the repo and the web. Returns a brief, not raw content.",
       "mode": "subagent",
       "prompt": "{file:agents/loops/doc-researcher.md}",
       "permission": {
@@ -287,19 +246,8 @@
         "read": "allow",
         "grep": "allow",
         "glob": "allow",
-        "memory_node": "deny",
-        "memory_rel": "deny",
-        "memory_query": "allow",
-        "memory_recall": "allow",
-        "memory_audit": "allow",
-        "memory_seed": "deny",
-        "memory_status": "allow",
         "bash": {
-          "*": "ask",
-          "make -f agents/memory/scripts/Makefile wipe *": "deny",
-          "make -f agents/memory/scripts/Makefile set-project *": "deny",
-          "*make*wipe*": "deny",
-          "*make*set-project*": "deny"
+          "*": "ask"
         },
         "webfetch": "allow",
         "websearch": "allow",
@@ -321,81 +269,8 @@
         "question": "allow"
       }
     },
-    "memory-curator": {
-      "description": "The single writer to the project knowledge graph. Loads project-memory skill first. Reads for recall, writes via memory_node / memory_rel (ask — supervisor approves each), and re-embeds when embeddings are missing. Never uses mcp__add_memory source:json. See agents/loops/memory-curator.md for the full contract.",
-      "mode": "subagent",
-      "prompt": "{file:agents/loops/memory-curator.md}",
-      "permission": {
-        "edit": "deny",
-        "read": "allow",
-        "grep": "allow",
-        "glob": "allow",
-        "memory_node": "ask",
-        "memory_rel": "ask",
-        "memory_query": "allow",
-        "memory_recall": "allow",
-        "memory_audit": "allow",
-        "memory_seed": "ask",
-        "memory_status": "allow",
-        "bash": {
-          "*": "ask",
-          "bash agents/memory/scripts/memory.sh *": "ask",
-          "bash agents/memory/scripts/recall.sh *": "allow",
-          "bash agents/memory/scripts/reembed.sh *": "ask",
-          "bash agents/memory/scripts/audit.sh *": "allow",
-          "bash agents/memory/scripts/seed.sh *": "ask",
-          "neo4j-cli query *": "allow",
-          "neo4j-cli query * --rw *": "ask",
-          "make -f agents/memory/scripts/Makefile wipe *": "deny",
-          "make -f agents/memory/scripts/Makefile set-project *": "deny",
-          "*make*wipe*": "deny",
-          "*make*set-project*": "deny"
-        },
-        "webfetch": "deny",
-        "websearch": "deny",
-        "question": "allow"
-      }
-    },
-    "kb-updater": {
-      "description": "Daily KB update workflow. Loads the kb-update-daily protocol, runs the read-only analysis (commits + recall), produces a plan, and delegates the writes to the memory-curator via task. Does NOT write to the KG directly. Designed to be invoked as a primary agent (Tab or `opencode run --agent kb-updater`) so it does not get trapped in plan mode.",
-      "mode": "primary",
-      "prompt": "{file:agents/loops/kb-update-daily.md}",
-      "permission": {
-        "edit": "deny",
-        "read": "allow",
-        "glob": "allow",
-        "grep": "allow",
-        "bash": {
-          "*": "ask",
-          "git log *": "allow",
-          "git show *": "allow",
-          "git diff *": "allow",
-          "git status *": "allow",
-          "make -f agents/memory/scripts/Makefile status": "allow",
-          "make -f agents/memory/scripts/Makefile audit": "allow",
-          "make -f agents/memory/scripts/Makefile session-start": "allow",
-          "make -f agents/memory/scripts/Makefile session-end": "allow",
-          "make -f agents/memory/scripts/Makefile wipe *": "deny",
-          "make -f agents/memory/scripts/Makefile set-project *": "deny",
-          "*make*wipe*": "deny",
-          "*make*set-project*": "deny"
-        },
-        "task": "allow",
-        "memory_node": "deny",
-        "memory_rel": "deny",
-        "memory_query": "allow",
-        "memory_recall": "allow",
-        "memory_audit": "allow",
-        "memory_seed": "deny",
-        "memory_status": "allow",
-        "webfetch": "ask",
-        "websearch": "ask",
-        "question": "allow",
-        "todowrite": "allow"
-      }
-    },
     "research-runner": {
-      "description": "Focused worker for the research_harness/ pipeline. Pre-approves websearch, webfetch, and bash calls needed to run `uv run python -m agents.research_harness.run` and read/write papers/. Does NOT edit any file outside papers/. Used as primary agent via `opencode run --agent research-runner`. Also handles memory evaluation after each phase.",
+      "description": "Focused worker for the research_harness/ pipeline. Pre-approves websearch, webfetch, and bash calls needed to run `uv run python -m agents.research_harness.run` and read/write papers/. Does NOT edit any file outside papers/. Used as primary agent via `opencode run --agent research-runner`.",
       "mode": "primary",
       "prompt": "You are a research executor. Your job is to run the MalariaSentinel research harness cycle (search → write → review → hypothesize) and report back. Use the CLI: `uv run python -m agents.research_harness.run --mode <search|condense|review|hypothesize> --topic '<topic>'`. The harness itself calls opencode internally with --auto and --title, so you do not need to handle those flags. Do not edit any file outside papers/. Return a structured summary of what each phase produced, paths to files written, and any errors.",
       "permission": {
@@ -416,12 +291,6 @@
         "grep": "allow",
         "webfetch": "allow",
         "websearch": "allow",
-        "memory_node": "allow",
-        "memory_rel": "allow",
-        "memory_query": "allow",
-        "memory_recall": "allow",
-        "memory_audit": "allow",
-        "memory_status": "allow",
         "question": "allow"
       }
     },
@@ -435,13 +304,6 @@
         "glob": "allow",
         "grep": "allow",
         "list": "allow",
-        "memory_node": "deny",
-        "memory_rel": "deny",
-        "memory_query": "allow",
-        "memory_recall": "allow",
-        "memory_audit": "allow",
-        "memory_seed": "deny",
-        "memory_status": "allow",
         "mcp__gitagent__start_session": "deny",
         "mcp__gitagent__finalize_session": "deny",
         "mcp__gitagent__abort_session": "deny",
@@ -490,8 +352,6 @@
         "task": "allow",
         "edit": "ask",
         "read": "allow",
-        "memory_query": "allow",
-        "memory_recall": "allow",
         "mcp__gitagent__start_session": "allow",
         "mcp__gitagent__finalize_session": "allow",
         "mcp__gitagent__abort_session": "allow",
@@ -513,7 +373,7 @@
       }
     },
     "improvement-agent": {
-      "description": "Reviews the output of a complete research cycle and auto-applies improvements to prompts, tools, skills, and papers. Records improvements in the knowledge graph. Can edit agents/research_harness/, papers/, and opencode.json (for skill/agent config only).",
+      "description": "Reviews the output of a complete research cycle and auto-applies improvements to prompts, tools, skills, and papers. Can edit agents/research_harness/, papers/, and opencode.json (for skill/agent config only).",
       "mode": "primary",
       "prompt": "{file:agents/loops/improvement-agent.md}",
       "permission": {
@@ -537,14 +397,12 @@
         "grep": "allow",
         "websearch": "allow",
         "webfetch": "allow",
-        "memory_node": "allow",
-        "memory_rel": "allow",
-        "memory_query": "allow",
-        "memory_recall": "allow",
-        "memory_audit": "allow",
-        "memory_status": "allow",
         "question": "allow"
       }
     }
-  },"compaction": {"auto":false,"prune":false}
+  },
+  "compaction": {
+    "auto": false,
+    "prune": false
+  }
 }

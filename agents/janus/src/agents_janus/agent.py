@@ -186,19 +186,17 @@ monitor progress, and finalize changes.
 # ── Tool sets ───────────────────────────────────────────────────────────
 
 def _get_implementation_tools():
-    """Tools for implementation coordinator: search, memory, ask_user.
+    """Tools for implementation coordinator: search, ask_user.
 
     Shell access comes from the built-in `execute` tool (MalariasimShellBackend
     restricts it to `malariasim` only) — no custom ABM execution tools.
     """
     from agents_janus.tools import (
         ask_user,
-        memory_recall_kg,
         web_search,
     )
     return [
         _wrap_with_logging(web_search),
-        _wrap_with_logging(memory_recall_kg),
         _wrap_with_logging(ask_user),
     ]
 
