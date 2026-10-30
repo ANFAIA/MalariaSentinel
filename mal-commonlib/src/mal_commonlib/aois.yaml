@@ -24,7 +24,12 @@ ghana:
 
 accra-coastal-test:
   name: Accra Coastal Test AOI
-  bbox: [0.05, 5.35, 0.60, 5.75]
+  # Window moved 2026-10-29. The old bbox [0.05, 5.35, 0.60, 5.75] put the
+  # shoreline in a corner: GSHHG full gives 2.9 % of its 2745 cells >=50 % land
+  # and 94.8 % open sea. The new window keeps the Accra-Tema shoreline on the
+  # south edge and runs inland to 6.0 N: 87.4 % of 3416 cells >=50 % land
+  # (86.6 % >=95 %), 9.2 % open sea, 1.6 % partial-coast cells.
+  bbox: [-0.45, 5.50, 0.10, 6.00]
   crs: "EPSG:4326"
   resolution_m: 1000
   scale: regional
