@@ -151,6 +151,13 @@ public:
     const CoordinatorModel& coordinator() const { return *coord_; }
     const MosquitoSubmodel& submodel()    const { return *sub_; }
 
+    // Optional host / mobility / effective-host components (plan 05 §7).
+    // Nullable: they are only loaded when --hosts / a mobility dir is given.
+    // The transmission GIF reads them read-only; they never mutate state.
+    const HostLandscape*          host_landscape()    const { return host_landscape_.get(); }
+    const MobilitySchedule*       mobility_schedule() const { return mobility_schedule_.get(); }
+    const EffectiveHostLandscape* effective_hosts()   const { return effective_hosts_.get(); }
+
     const TransmissionModel* transmission() const { return transmission_model_.get(); }
     TransmissionModel* transmission_mutable() { return transmission_model_.get(); }
 

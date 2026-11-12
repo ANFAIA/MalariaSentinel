@@ -111,6 +111,12 @@ TEST(TransmissionModel, VectorEipProgressionAtConstantTemp) {
     tm.advance_vector_eip(soa, climate, patch_states, aoi);
     EXPECT_EQ(soa.vector_state[0], static_cast<uint8_t>(VectorTransmissionState::INFECTIOUS));
     EXPECT_NEAR(soa.parasite_eip_progress[0], 117.0f, 1e-4f);
+
+    // Exactly one exposed-to-infectious transition was counted, on day 13.
+    BiteLedger bites;
+    tm.record_daily_stats(0, soa, bites);
+    EXPECT_EQ(tm.last_day_stats().vector_eip_completions, 1);
+    EXPECT_EQ(tm.last_day_stats().vector_new_exposures, 0);
 }
 
 TEST(TransmissionModel, SeedVectorInfections) {
@@ -160,6 +166,20 @@ TEST(TransmissionModel, SeedVectorInfections) {
     }
     EXPECT_GT(count_inf, 5);
     EXPECT_LT(count_inf, 40);
+    EXPECT_EQ(tm.initial_vector_infected(), count_inf);
+
+    // The true baseline is separate from subsequent daily acquisitions.
+    BiteLedger bites;
+    tm.record_daily_stats(0, soa, bites);
+    EXPECT_EQ(tm.last_day_stats().vector_seeded_initial, count_inf);
+    EXPECT_EQ(tm.last_day_stats().vector_new_exposures, 0);
+
+    tm.params_mutable().record_vector_new_exposure();
+    tm.record_daily_stats(1, soa, bites);
+    EXPECT_EQ(tm.last_day_stats().vector_seeded_initial, count_inf);
+    EXPECT_EQ(tm.last_day_stats().vector_new_exposures, 1);
+    tm.record_daily_stats(2, soa, bites);
+    EXPECT_EQ(tm.last_day_stats().vector_new_exposures, 0);
 }
 
 TEST(TransmissionModel, FemaleOnlyVectorInfectionInvariant) {

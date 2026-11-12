@@ -70,8 +70,8 @@ compile_commands.json
 mal-data-explorer/__marimo__/
 
 # opencode skill installer artifacts (not project code)
-.agents/skills/
-skills-lock.json
+#.agents/skills/
+#skills-lock.json
 
 # opencode agent working docs (live work, not repo code)
 .opencode/plan/

@@ -25,7 +25,10 @@ add_library(mal_abm_fast_core STATIC
     human_state.cpp
     transmission.cpp
     transmission_output.cpp
+    transmission_debug_log.cpp
     viz.cpp
+    viz_common.cpp
+    viz_tx.cpp
 )
 target_include_directories(mal_abm_fast_core
     PUBLIC

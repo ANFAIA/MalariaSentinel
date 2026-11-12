@@ -140,3 +140,73 @@ def test_wrapper_honours_explicit_gif_path(monkeypatch, tmp_path):
     )
 
     assert captured["gif"] == str(explicit)
+
+
+def test_wrapper_transmission_sets_trans_log_and_keeps_gif(monkeypatch, tmp_path):
+    """Transmission on: the `_transmission` sibling artifact appears (daily
+    log), the habitat GIF maps normally, and NO new transmission-GIF kwarg is
+    required — the binary auto-emits `<stem>_transmission.gif` itself."""
+    from mal_core.abm import wrapper as wrapper_mod
+
+    captured: dict = {}
+
+    class FakeWrapper:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def run(self, _timeout=None, **flags):
+            captured.update(flags)
+            return {"stdout": "", "stderr": "", "returncode": 0}
+
+    monkeypatch.setattr(wrapper_mod, "CppAbmWrapper", FakeWrapper)
+    import mal_core.download.catalog as catalog_mod
+    monkeypatch.setattr(
+        catalog_mod, "resolve",
+        lambda *a, key=None, **k: str(tmp_path / "env.bin"))
+    import mal_core.download.manifest as manifest_mod
+    monkeypatch.setattr(manifest_mod, "validate_completeness", lambda *a, **k: [])
+
+    wrapper_mod.run_abm_from_manifest(
+        aoi="ghana", year=2024, month=1, days=1, seed=7,
+        output_dir=tmp_path, data_root=tmp_path, gif="",
+        enable_transmission=True,
+    )
+
+    # Transmission daily-log sibling uses the `_transmission` naming that the
+    # binary's automatic `_transmission.gif` also follows.
+    assert captured["emit_transmission_log"].endswith("_transmission_daily.json")
+    # The habitat GIF is still mapped to its default; no extra GIF kwarg.
+    assert captured["gif"] == str(tmp_path / "ghana_abm_seed0007.gif")
+    # enable_transmission reaches the binary (which then emits the GIF).
+    assert captured["enable_transmission"] is True
+
+
+def test_wrapper_without_transmission_omits_trans_artifacts(monkeypatch, tmp_path):
+    """Transmission off: no `_transmission` log is requested (and the binary
+    therefore emits no `_transmission.gif`)."""
+    from mal_core.abm import wrapper as wrapper_mod
+
+    captured: dict = {}
+
+    class FakeWrapper:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def run(self, _timeout=None, **flags):
+            captured.update(flags)
+            return {"stdout": "", "stderr": "", "returncode": 0}
+
+    monkeypatch.setattr(wrapper_mod, "CppAbmWrapper", FakeWrapper)
+    import mal_core.download.catalog as catalog_mod
+    monkeypatch.setattr(
+        catalog_mod, "resolve",
+        lambda *a, key=None, **k: str(tmp_path / "env.bin"))
+    import mal_core.download.manifest as manifest_mod
+    monkeypatch.setattr(manifest_mod, "validate_completeness", lambda *a, **k: [])
+
+    wrapper_mod.run_abm_from_manifest(
+        aoi="ghana", year=2024, month=1, days=1, seed=7,
+        output_dir=tmp_path, data_root=tmp_path, gif="",
+    )
+
+    assert "emit_transmission_log" not in captured

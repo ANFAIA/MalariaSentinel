@@ -53,9 +53,11 @@
 #include "prng.hpp"
 #include "seeding.hpp"
 #include "viz.hpp"
+#include "viz_tx.hpp"
 #include "wire.hpp"
 #include "transmission.hpp"
 #include "transmission_output.hpp"
+#include "transmission_debug_log.hpp"
 
 namespace {
 
@@ -259,6 +261,49 @@ std::string rollout_gif_path(const std::string& requested,
              << rollout_index << ext;
     }
     return (parent / name.str()).string();
+}
+
+// Build the structured debug-log sibling of the transmission GIF:
+// `<transmission-gif-stem>_debug.jsonl`.
+std::string rollout_transmission_debug_log_path(
+    const std::string& transmission_gif_path) {
+    if (transmission_gif_path.empty()) return {};
+    const std::filesystem::path p(transmission_gif_path);
+    const std::string stem = p.stem().string() + "_debug.jsonl";
+    return p.has_parent_path() ? (p.parent_path() / stem).string() : stem;
+}
+
+// Build the per-rollout TRANSMISSION GIF path (plan 05 §1.3). This GIF is
+// produced AUTOMATICALLY on any run with transmission enabled (no new flag),
+// so it cannot depend on `--gif`. Base: the map-1 GIF's directory + stem
+// when `--gif` is present (the two artifacts then sit side by side with the
+// same rollout seed); else the `--output` stem. Result:
+// `<stem>_transmission.gif`, honouring the same `_seedNNNN` multi-rollout
+// convention as the state COGs and map 1.
+std::string rollout_transmission_gif_path(const std::string& gif_path,
+                                          const std::string& output_path,
+                                          int rollout_index,
+                                          int n_rollouts) {
+    if (!gif_path.empty()) {
+        const std::filesystem::path p(
+            rollout_gif_path(gif_path, rollout_index, n_rollouts));
+        const std::string stem = p.stem().string() + "_transmission";
+        const std::filesystem::path name(stem + ".gif");
+        return p.has_parent_path() ? (p.parent_path() / name).string()
+                                   : name.string();
+    }
+    if (output_path.empty()) return {};
+    const std::filesystem::path p(output_path);
+    const std::string stem = p.stem().string() + "_transmission";
+    std::ostringstream name;
+    if (n_rollouts == 1 && rollout_index == 0) {
+        name << stem << ".gif";
+    } else {
+        name << stem << "_seed" << std::setw(4) << std::setfill('0')
+             << rollout_index << ".gif";
+    }
+    return p.has_parent_path() ? (p.parent_path() / name.str()).string()
+                               : name.str();
 }
 
 // Parse a "lat1,lon1;lat2,lon2;..." string into a list of
@@ -939,6 +984,22 @@ OUTPUT
                     return EXIT_FAILURE;
                 }
             }
+            if (enable_transmission) {
+                const std::string tx_gif_path = rollout_transmission_gif_path(
+                    gif_path, output_path, i, n_rollouts);
+                const std::filesystem::path debug_abs =
+                    std::filesystem::absolute(
+                        rollout_transmission_debug_log_path(tx_gif_path))
+                        .lexically_normal();
+                if (tx_abs == debug_abs) {
+                    std::cerr
+                        << "abm_run: --emit-transmission-log collides with "
+                           "the automatic transmission debug log ("
+                        << tx_abs.string()
+                        << "); choose a different log path or output stem\n";
+                    return EXIT_FAILURE;
+                }
+            }
         }
     }
 
@@ -1050,6 +1111,65 @@ OUTPUT
             }
         }
 
+        // -- Transmission GIF (plan 05): automatic with transmission ----
+        // No new flag: produced on every run with --enable-transmission,
+        // sharing --gif-every/--gif-fps/--gif-max-width with map 1.
+        std::unique_ptr<mal_abm_fast::GifVizTx> gif_tx;
+        std::string rollout_tx_gif;
+        if (enable_transmission) {
+            rollout_tx_gif = rollout_transmission_gif_path(
+                gif_path, output_path, i, n_rollouts);
+            if (!rollout_tx_gif.empty()) {
+                mal_abm_fast::GifVizTxConfig txcfg;
+                txcfg.path = rollout_tx_gif;
+                txcfg.width = gif_max_width;
+                txcfg.fps = gif_fps;
+                txcfg.every = gif_every;
+                gif_tx = std::make_unique<mal_abm_fast::GifVizTx>(txcfg);
+                if (!gif_tx->ok()) {
+                    std::cerr << "abm_run: rollout " << i
+                              << " transmission GIF disabled (renderer init "
+                                 "failed); simulation continues\n";
+                }
+            }
+        }
+
+        // -- Structured per-run transmission debug log ----------------
+        // The logger is intentionally outside Engine::step: after step()
+        // records TransmissionDailyStats and before the next step resets the
+        // BiteLedger. Logging is read-only and does not touch either RNG.
+        std::unique_ptr<mal_abm_fast::TransmissionDebugLog> tx_debug_log;
+        if (enable_transmission) {
+            const std::string tx_debug_path =
+                rollout_transmission_debug_log_path(rollout_tx_gif);
+            if (!tx_debug_path.empty()) {
+                const std::filesystem::path debug_out(tx_debug_path);
+                if (debug_out.has_parent_path()) {
+                    std::error_code ec;
+                    std::filesystem::create_directories(debug_out.parent_path(), ec);
+                    if (ec) {
+                        std::cerr << "abm_run: rollout " << i
+                                  << " transmission debug log directory warning: "
+                                  << ec.message() << "; simulation continues\n";
+                    }
+                }
+                mal_abm_fast::TransmissionDebugRunMetadata debug_meta;
+                debug_meta.aoi = aoi.slug;
+                debug_meta.year = year;
+                debug_meta.month = month;
+                debug_meta.seed = static_cast<int32_t>(seed_rollout);
+                debug_meta.n_rollouts = n_rollouts;
+                debug_meta.rollout_index = i;
+                debug_meta.days = days;
+                debug_meta.human_cluster_radius_km = human_cluster_radius_km;
+                tx_debug_log = std::make_unique<mal_abm_fast::TransmissionDebugLog>(
+                    tx_debug_path, debug_meta, transmission_params);
+                std::cout << "abm_run: rollout " << i << "/" << n_rollouts
+                          << " transmission debug log -> " << tx_debug_path
+                          << std::endl;
+            }
+        }
+
         // -- Step ----------------------------------------------------
         try {
             for (int d = 0; d < days; ++d) {
@@ -1062,11 +1182,21 @@ OUTPUT
                     std::exit(EXIT_FAILURE);
                 }
 
+                if (tx_debug_log && engine.transmission()) {
+                    tx_debug_log->record_day(
+                        d, start_date + std::chrono::days{d},
+                        engine.transmission()->last_day_stats(),
+                        engine.submodel().bite_ledger());
+                }
+
                 if (collect_stats) {
                     stats_history.push_back(engine.last_day_stats());
                 }
                 if (gif_viz && gif_viz->ok()) {
                     gif_viz->observe(engine, stats_history, d + 1, days);
+                }
+                if (gif_tx && gif_tx->ok()) {
+                    gif_tx->observe(engine, stats_history, d + 1, days);
                 }
 
                 // Intermediate snapshot every N days
@@ -1128,6 +1258,21 @@ OUTPUT
             } else {
                 std::cerr << "abm_run: rollout " << i
                           << " GIF render failed (simulation unaffected)\n";
+            }
+        }
+
+        // -- Close the transmission GIF -------------------------------
+        if (gif_tx) {
+            gif_tx->finish();
+            if (gif_tx->ok()) {
+                std::cout << "abm_run: rollout " << i << "/" << n_rollouts
+                          << " transmission gif -> " << rollout_tx_gif
+                          << " (" << gif_tx->frame_count() << " frames)"
+                          << std::endl;
+            } else {
+                std::cerr << "abm_run: rollout " << i
+                          << " transmission GIF render failed (simulation "
+                             "unaffected)\n";
             }
         }
 

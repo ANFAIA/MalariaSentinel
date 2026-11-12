@@ -116,6 +116,7 @@ inline void record_female_feed(
             if (rng.uniform_double() < p_inf) {
                 soa.vector_state[si] = static_cast<uint8_t>(VectorTransmissionState::EXPOSED);
                 soa.parasite_eip_progress[si] = 0.0f;
+                transmission_params->record_vector_new_exposure();
                 if (dbg) ++g_tdbg.human_infected;
             }
         }
@@ -797,6 +798,8 @@ void MosquitoSubmodel::advance_day(const AOI& aoi,
     if (effective_hosts_ && host_landscape_ && host_seeking_) {
         const int32_t h = cells_per_side_h(aoi);
         const int32_t w = aoi.cells_per_side();
+        // Fresh diagnostic snapshot each day the phase-aware pass runs.
+        eff_phase_snapshot_ = EffectivePhaseSnapshot{};
         for (int p = 0; p < PHASE_WEIGHT_COUNT; ++p) {
             const TimePhase phase = static_cast<TimePhase>(p);
             if (!phase_active(species_params_, phase)) continue;
@@ -810,6 +813,12 @@ void MosquitoSubmodel::advance_day(const AOI& aoi,
             const HostLandscape eff =
                 HostLandscape::make_effective(
                     *host_landscape_, eff_grid_human, eff_grid_livestock, h, w);
+            // Diagnostic copy of the realized grids (plan 05 §7): a pure copy
+            // of the already-sampled vectors, zero RNG impact.
+            eff_phase_snapshot_.human[static_cast<size_t>(p)] = eff_grid_human;
+            eff_phase_snapshot_.livestock[static_cast<size_t>(p)] =
+                eff_grid_livestock;
+            eff_phase_snapshot_.valid = true;
 
             for (int64_t i = 0; i < soa_.n_alive; ++i) {
                 const size_t si = static_cast<size_t>(i);

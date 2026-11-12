@@ -214,6 +214,33 @@ TEST(ConfigEngineGolden, CollidingTransmissionLogPathIsRejected) {
         << "collision path must not be written: " << colliding;
 }
 
+TEST(ConfigEngineGolden, CollidingTransmissionDebugLogPathIsRejected) {
+    auto fixtures = find_fixtures();
+    ASSERT_TRUE(fixtures.has_value()) << "golden fixtures missing";
+    const fs::path bin = engine_binary();
+    ASSERT_FALSE(bin.empty()) << "MAL_ABM_FAST_ENGINE_BIN not defined";
+    ASSERT_TRUE(fs::exists(bin)) << "engine binary not linked: " << bin;
+
+    const fs::path out_dir = temp_dir_for("mal_abm_golden_debug_collision");
+    const std::string out_tif = (out_dir / "state.tif").string();
+    const std::string colliding =
+        (out_dir / "state_transmission_debug.jsonl").string();
+    std::string cmd = bin.string() +
+        " run --bbox " + kBox + " --crs EPSG:4326"
+        " --resolution-m 1000 --year 2024 --month 1"
+        " --seed " + std::to_string(kSeed) + " --days 1"
+        " --enable-transmission --initial-vector-infected-frac 0.2"
+        " --env " + (fixtures->fixture_dir / "tiny_env.nc").string() +
+        " --habitat " + (fixtures->fixture_dir / "tiny_habitat.gpkg").string() +
+        " --hosts " + (fixtures->fixture_dir / "tiny_hosts.nc").string() +
+        " --output " + out_tif +
+        " --emit-transmission-log " + colliding;
+    const int rc = std::system(cmd.c_str());
+    EXPECT_NE(rc, 0) << "collision should be rejected: " << cmd;
+    EXPECT_FALSE(fs::exists(colliding))
+        << "collision path must not be written: " << colliding;
+}
+
 // Same guard, diagnostic sidecars: the engine writes `_aquatic.json`
 // unconditionally (submodel present) and `_foci.json` on outbreak.
 TEST(ConfigEngineGolden, CollidingDiagnosticSidecarPathsAreRejected) {

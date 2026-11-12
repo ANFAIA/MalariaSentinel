@@ -278,6 +278,14 @@ public:
     bool has_human() const { return human_loaded_; }
     bool has_livestock() const { return livestock_loaded_; }
     bool has_data() const { return human_loaded_ || livestock_loaded_; }
+
+    /// Read-only access to the raw OD matrix for a phase (diagnostic;
+    /// plan 05). Mirrors the private select_od: throws std::runtime_error
+    /// when that OD is not loaded — callers guard with has_human/has_livestock.
+    const SparseOD& od(TimePhase phase, bool is_livestock) const {
+        return select_od(phase, is_livestock);
+    }
+
     int32_t n_matrices() const {
         return (human_loaded_ ? 2 : 0) + (livestock_loaded_ ? 1 : 0);
     }
