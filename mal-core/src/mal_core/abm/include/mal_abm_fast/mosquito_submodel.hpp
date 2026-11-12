@@ -19,6 +19,7 @@
 // development rates and binomial mortality.
 #pragma once
 
+#include <array>
 #include <cstdint>
 #include <tuple>
 #include <unordered_map>
@@ -84,6 +85,19 @@ struct PatchDailyFlux {
     int64_t emerged   = 0;   // adults emerging today from pupae
 };
 
+/// Diagnostic copy of the phase-aware H_eff realizations for one day
+/// (plan 05 §7). Stores the ALREADY-SAMPLED effective host grids from the
+/// multinomial flow pass (no re-sampling, zero RNG impact) so the
+/// transmission GIF can render the DAY vs NIGHT host-presence contrast.
+/// A pure diagnostic: it never feeds back into the simulation.
+/// `valid=false` when the phase-aware pass did not run (no mobility /
+/// hosts / host-seeking wired).
+struct EffectivePhaseSnapshot {
+    bool valid = false;
+    std::array<EffectiveGrid, PHASE_WEIGHT_COUNT> human{};
+    std::array<EffectiveGrid, PHASE_WEIGHT_COUNT> livestock{};
+};
+
 class MosquitoSubmodel {
 public:
     MosquitoSubmodel() = default;
@@ -124,6 +138,13 @@ public:
     // first advance_day(). Keys are PatchState::patch_id.
     const std::unordered_map<int64_t, PatchDailyFlux>& patch_daily_flux() const {
         return patch_daily_flux_;
+    }
+
+    // Realized per-phase H_eff grids for the current day (plan 05 §7).
+    // `valid=false` before the first phase-aware advance_day(). A pure
+    // diagnostic copy of the already-sampled realizations.
+    const EffectivePhaseSnapshot& effective_phase_snapshot() const {
+        return eff_phase_snapshot_;
     }
 
     // Mutable access to the SoA (for transmission EIP / infection updates).
@@ -243,6 +264,9 @@ private:
 
     // Per-patch reproductive flux for the current day (plan 04 §3).
     std::unordered_map<int64_t, PatchDailyFlux> patch_daily_flux_;
+
+    // Realized per-phase H_eff snapshot for the current day (plan 05 §7).
+    EffectivePhaseSnapshot eff_phase_snapshot_;
 
     // G4: gonotrophic cycle
     GonotrophicParams gonotrophic_params_;

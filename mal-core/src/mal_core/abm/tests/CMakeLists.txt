@@ -198,3 +198,18 @@ target_link_libraries(test_transmission_output
     PRIVATE mal_abm_fast_core GTest::gtest GTest::gtest_main mal_abm_fast::warnings
 )
 gtest_discover_tests(test_transmission_output DISCOVERY_TIMEOUT 30)
+
+# Structured per-run transmission diagnostics (JSONL schema + daily records).
+add_executable(test_transmission_debug_log test_transmission_debug_log.cpp)
+target_link_libraries(test_transmission_debug_log
+    PRIVATE mal_abm_fast_core GTest::gtest GTest::gtest_main mal_abm_fast::warnings
+)
+gtest_discover_tests(test_transmission_debug_log DISCOVERY_TIMEOUT 30)
+
+# Plan 05: transmission GIF (mapa 2) — host classes, movement-flow
+# diagnostics, seeded I_V series, and renderer lifecycle.
+add_executable(test_viz_tx test_viz_tx.cpp)
+target_link_libraries(test_viz_tx
+    PRIVATE mal_abm_fast_core GTest::gtest GTest::gtest_main mal_abm_fast::warnings
+)
+gtest_discover_tests(test_viz_tx DISCOVERY_TIMEOUT 30)

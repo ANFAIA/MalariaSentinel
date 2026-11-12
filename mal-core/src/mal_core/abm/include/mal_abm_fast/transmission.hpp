@@ -10,9 +10,11 @@
 //   lambda_V(x) = beta_hv * I_H(x) / H(x)  (per blood meal on human)
 #pragma once
 
+#include <atomic>
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "aoi.hpp"
@@ -25,6 +27,25 @@
 #include "wire.hpp"
 
 namespace mal_abm_fast {
+
+/// Event counters shared by TransmissionModel and the mosquito feed step.
+/// They are drained/reset by record_daily_stats() after each day's events.
+struct TransmissionDailyEventCounters {
+    std::atomic<int64_t> vector_new_exposures{0};
+    std::atomic<int64_t> vector_eip_completions{0};
+
+    void reset() {
+        vector_new_exposures.store(0, std::memory_order_relaxed);
+        vector_eip_completions.store(0, std::memory_order_relaxed);
+    }
+
+    std::pair<int64_t, int64_t> take() {
+        return {
+            vector_new_exposures.exchange(0, std::memory_order_relaxed),
+            vector_eip_completions.exchange(0, std::memory_order_relaxed)
+        };
+    }
+};
 
 /// Parameters for SEIR-SEI transmission.
 ///
@@ -86,6 +107,33 @@ struct TransmissionParams {
     // source: the CLI initialises its override from this field.
     float focus_threshold = 0.01f;
 
+    // Shared event sink: TransmissionParams is copied into TransmissionModel,
+    // then its copy is passed to MosquitoSubmodel. Successful human-to-vector
+    // acquisitions and EIP transitions are counted here without changing the
+    // stochastic path. record_daily_stats() drains these after the day's work.
+    std::shared_ptr<TransmissionDailyEventCounters> daily_event_counters =
+        std::make_shared<TransmissionDailyEventCounters>();
+
+    void record_vector_new_exposure() const {
+        if (daily_event_counters) {
+            daily_event_counters->vector_new_exposures.fetch_add(
+                1, std::memory_order_relaxed);
+        }
+    }
+    void record_vector_eip_completion() const {
+        if (daily_event_counters) {
+            daily_event_counters->vector_eip_completions.fetch_add(
+                1, std::memory_order_relaxed);
+        }
+    }
+    void reset_daily_event_counters() const {
+        if (daily_event_counters) daily_event_counters->reset();
+    }
+    std::pair<int64_t, int64_t> take_daily_event_counts() const {
+        return daily_event_counters
+            ? daily_event_counters->take() : std::pair<int64_t, int64_t>{0, 0};
+    }
+
     TransmissionParams();
 };
 
@@ -118,6 +166,17 @@ struct TransmissionDailyStats {
     int64_t vector_e     = 0;
     int64_t vector_i     = 0;
     int64_t vector_total = 0;
+
+    // Initial infections are a baseline condition, not incidence. This value
+    // is repeated in daily rows for provenance; the accessor on TransmissionModel
+    // exposes it directly for a true pre-step day-0 I_V sample.
+    int64_t vector_seeded_initial = 0;
+    // Successful susceptible-female -> exposed acquisitions from a human feed
+    // with positive human prevalence and enabled transmission, counted today.
+    int64_t vector_new_exposures = 0;
+    // Exposed-female -> infectious transitions when the accumulated EIP crosses
+    // its threshold today; distinct from new human-to-vector exposures.
+    int64_t vector_eip_completions = 0;
 
     // Feeding & transmission pressure
     int64_t total_bites_on_humans = 0;
@@ -196,6 +255,12 @@ public:
     const TransmissionDailyStats& last_day_stats() const { return last_day_stats_; }
     const std::vector<TransmissionDailyStats>& history() const { return history_; }
 
+    /// True pre-step day-0 I_V baseline: actual initially infectious adult females
+    /// captured after initial vector seeding (zero when no infection was seeded).
+    /// Daily history day 0 is recorded after that day's simulation step, so use
+    /// this accessor when a renderer needs the initial point before day 0 runs.
+    int64_t initial_vector_infected() const { return initial_vector_infected_; }
+
     bool is_enabled() const { return params_.enabled; }
 
     /// Force of infection lambda_H grid for today (row-major, size h*w)
@@ -216,6 +281,7 @@ private:
     std::vector<float>  infectious_pressure_;  // infectious bites per cell today
     TransmissionDailyStats last_day_stats_{};
     std::vector<TransmissionDailyStats> history_;
+    int64_t initial_vector_infected_ = 0;
     bool outbreak_triggered_ = false;
     std::vector<FociLogEntry> last_foci_log_;
 };

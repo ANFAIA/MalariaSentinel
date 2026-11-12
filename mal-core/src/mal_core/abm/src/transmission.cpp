@@ -66,6 +66,8 @@ void TransmissionModel::init(
     infectious_pressure_.assign(static_cast<size_t>(n_cells), 0.0f);
     history_.clear();
     last_day_stats_ = TransmissionDailyStats{};
+    initial_vector_infected_ = 0;
+    params_.reset_daily_event_counters();
     outbreak_triggered_ = false;
 
     double init_prev = (params_.human_seeding_mode == "uniform-legacy")
@@ -82,7 +84,23 @@ void TransmissionModel::init(
 }
 
 void TransmissionModel::seed_vector_infections(MosquitoSoA& soa, double fraction) {
-    if (fraction <= 0.0) return;
+    const auto count_infectious_females = [&soa]() {
+        int64_t count = 0;
+        for (int64_t i = 0; i < soa.n_alive; ++i) {
+            const size_t si = static_cast<size_t>(i);
+            if (soa.stage[si] == 1 && soa.sex[si] == 1 &&
+                soa.vector_state[si] == static_cast<uint8_t>(VectorTransmissionState::INFECTIOUS)) {
+                ++count;
+            }
+        }
+        return count;
+    };
+
+    // Preserve the original zero/negative-fraction path: it consumes no RNG.
+    if (fraction <= 0.0) {
+        initial_vector_infected_ = count_infectious_females();
+        return;
+    }
     const double frac = std::clamp(fraction, 0.0, 1.0);
 
     for (int64_t i = 0; i < soa.n_alive; ++i) {
@@ -94,6 +112,10 @@ void TransmissionModel::seed_vector_infections(MosquitoSoA& soa, double fraction
             soa.parasite_eip_progress[si] = static_cast<float>(EIP_THRESHOLD_GD());
         }
     }
+
+    // Capture the actual I_V count, rather than the requested fraction times
+    // the female population. It is a baseline condition, not a new exposure.
+    initial_vector_infected_ = count_infectious_females();
 }
 
 void TransmissionModel::seed_human_infections(int32_t row, int32_t col, double count) {
@@ -416,6 +438,7 @@ void TransmissionModel::advance_vector_eip(
 
         if (is_infective(new_eip)) {
             soa.vector_state[si] = static_cast<uint8_t>(VectorTransmissionState::INFECTIOUS);
+            params_.record_vector_eip_completion();
         }
     }
 }
@@ -496,6 +519,7 @@ void TransmissionModel::record_daily_stats(
     stats.vector_e     = v_e;
     stats.vector_i     = v_i;
     stats.vector_total = v_tot;
+    stats.vector_seeded_initial = initial_vector_infected_;
 
     int64_t human_meals = 0;
     int64_t inf_meals   = 0;
@@ -515,6 +539,14 @@ void TransmissionModel::record_daily_stats(
     } else {
         stats.r_eff_approx = 0.0;
     }
+
+    // record_daily_stats() runs after the engine's daily feeding and EIP steps.
+    // Taking the shared counters here both records today's events and resets
+    // them for the next day; if this method is sampled less often, these values
+    // consequently cover the interval since its previous call.
+    const auto [new_exposures, eip_completions] = params_.take_daily_event_counts();
+    stats.vector_new_exposures = new_exposures;
+    stats.vector_eip_completions = eip_completions;
 
     last_day_stats_ = stats;
     history_.push_back(stats);

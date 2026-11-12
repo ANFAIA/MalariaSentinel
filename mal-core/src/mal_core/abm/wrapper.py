@@ -100,6 +100,14 @@ def run_abm_from_manifest(
 
     Reads manifest, validates completeness, resolves paths,
     then calls the C++ binary via CppAbmWrapper.
+
+    When ``enable_transmission`` is true, the binary also writes a versioned
+    per-run JSONL debug artifact beside its automatic transmission GIF:
+    ``<transmission-GIF-stem>_debug.jsonl`` (for the default output this is
+    ``<aoi>_abm_seedNNNN_transmission_debug.jsonl``). It contains one metadata
+    record and one daily record with compartment counts, bites by host group,
+    and vector seeding/exposure/EIP event counts. This is distinct from the
+    legacy ``emit_transmission_log`` daily summary JSON.
     """
     from mal_core.download.catalog import INGEST_ARTIFACTS, resolve
     from mal_core.download.manifest import validate_completeness
@@ -215,6 +223,14 @@ def run_abm_from_manifest(
     #   ""           -> bare `--gif`: default `<output_dir>/<aoi>_abm_seedNNNN.gif`
     #   str/Path     -> explicit output path, forwarded verbatim
     # The render knobs are forwarded to the C++ CLI in all enabled cases.
+    #
+    # TRANSMISSION GIF (plan 05): when the run has enable_transmission, the
+    # C++ binary ALSO emits a second, automatic GIF named
+    # `<stem>_transmission.gif` (sibling of the habitat GIF, or of `--output`
+    # when `--gif` is absent). It shares --gif-every/--gif-fps/--gif-max-width
+    # and needs NO new kwarg here — its path is computed inside the binary.
+    # The binary writes the structured sibling `<stem>_transmission_debug.jsonl`
+    # automatically as well; each rollout gets its own seed-suffixed artifact.
     gif = kwargs.pop("gif", None)
     if gif is not None and gif is not False:
         gif_path = (

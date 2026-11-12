@@ -9,6 +9,7 @@
 // The map background is S(i,t) (species-neutral availability), never the
 // gpkg `habitat_potential` (~0.9999 at ingest) and never K (K ∝ S).
 #include "mal_abm_fast/viz.hpp"
+#include "mal_abm_fast/viz_common.hpp"
 
 #include <algorithm>
 #include <chrono>
@@ -23,9 +24,6 @@
 #include <utility>
 #include <vector>
 
-#include "mal_abm_fast/third_party/font8x8_basic.hpp"
-#include "mal_abm_fast/third_party/gif.h"
-
 #include "mal_abm_fast/aoi.hpp"
 #include "mal_abm_fast/climate.hpp"
 #include "mal_abm_fast/config.hpp"
@@ -39,191 +37,15 @@
 namespace mal_abm_fast {
 namespace {
 
-// ---------------------------------------------------------------------------
-// Canvas primitives
-// ---------------------------------------------------------------------------
-
-struct Color {
-    uint8_t r = 0, g = 0, b = 0, a = 255;
-};
-
-Color lerp(Color a, Color b, double t) {
-    t = std::clamp(t, 0.0, 1.0);
-    auto mix = [t](uint8_t x, uint8_t y) {
-        return static_cast<uint8_t>(std::lround(
-            static_cast<double>(x) * (1.0 - t) + static_cast<double>(y) * t));
-    };
-    return Color{mix(a.r, b.r), mix(a.g, b.g), mix(a.b, b.b), 255};
-}
-
-class Canvas {
-public:
-    Canvas(int w, int h)
-        : w_(w), h_(h),
-          px_(static_cast<size_t>(std::max(0, w)) *
-                  static_cast<size_t>(std::max(0, h)) * 4u,
-              0) {}
-
-    int width() const { return w_; }
-    int height() const { return h_; }
-    uint8_t* data() { return px_.data(); }
-    const uint8_t* data() const { return px_.data(); }
-    bool valid() const {
-        return w_ > 0 && h_ > 0 &&
-               px_.size() == static_cast<size_t>(w_) *
-                                 static_cast<size_t>(h_) * 4u;
-    }
-
-    void fill(Color c) {
-        for (size_t i = 0; i + 3 < px_.size(); i += 4) {
-            px_[i] = c.r;
-            px_[i + 1] = c.g;
-            px_[i + 2] = c.b;
-            px_[i + 3] = 255;
-        }
-    }
-
-    void blend(int x, int y, Color c) {
-        if (x < 0 || y < 0 || x >= w_ || y >= h_ || c.a == 0) return;
-        const size_t i = (static_cast<size_t>(y) * static_cast<size_t>(w_) +
-                          static_cast<size_t>(x)) * 4u;
-        if (c.a == 255) {
-            px_[i] = c.r;
-            px_[i + 1] = c.g;
-            px_[i + 2] = c.b;
-            px_[i + 3] = 255;
-            return;
-        }
-        const int a = static_cast<int>(c.a);
-        const int ia = 255 - a;
-        px_[i] = static_cast<uint8_t>(
-            (static_cast<int>(c.r) * a + static_cast<int>(px_[i]) * ia) / 255);
-        px_[i + 1] = static_cast<uint8_t>(
-            (static_cast<int>(c.g) * a + static_cast<int>(px_[i + 1]) * ia) / 255);
-        px_[i + 2] = static_cast<uint8_t>(
-            (static_cast<int>(c.b) * a + static_cast<int>(px_[i + 2]) * ia) / 255);
-        px_[i + 3] = 255;
-    }
-
-    void fill_rect(int x, int y, int w, int h, Color c) {
-        if (w <= 0 || h <= 0) return;
-        const int x0 = std::max(0, x);
-        const int y0 = std::max(0, y);
-        const int x1 = std::min(w_, x + w);
-        const int y1 = std::min(h_, y + h);
-        for (int yy = y0; yy < y1; ++yy)
-            for (int xx = x0; xx < x1; ++xx) blend(xx, yy, c);
-    }
-
-    void stroke_rect(int x, int y, int w, int h, Color c) {
-        if (w <= 0 || h <= 0) return;
-        for (int xx = x; xx < x + w; ++xx) {
-            blend(xx, y, c);
-            blend(xx, y + h - 1, c);
-        }
-        for (int yy = y; yy < y + h; ++yy) {
-            blend(x, yy, c);
-            blend(x + w - 1, yy, c);
-        }
-    }
-
-    void disc(int cx, int cy, int r, Color c) {
-        const int rr = std::max(0, r);
-        for (int dy = -rr; dy <= rr; ++dy)
-            for (int dx = -rr; dx <= rr; ++dx)
-                if (dx * dx + dy * dy <= rr * rr) blend(cx + dx, cy + dy, c);
-    }
-
-    void ring(int cx, int cy, int r, Color c) {
-        if (r <= 0) {
-            blend(cx, cy, c);
-            return;
-        }
-        // Midpoint circle, 8-way symmetry.
-        int x = r;
-        int y = 0;
-        int err = 1 - r;
-        while (x >= y) {
-            blend(cx + x, cy + y, c);
-            blend(cx + y, cy + x, c);
-            blend(cx - y, cy + x, c);
-            blend(cx - x, cy + y, c);
-            blend(cx - x, cy - y, c);
-            blend(cx - y, cy - x, c);
-            blend(cx + y, cy - x, c);
-            blend(cx + x, cy - y, c);
-            ++y;
-            if (err < 0) {
-                err += 2 * y + 1;
-            } else {
-                --x;
-                err += 2 * (y - x) + 1;
-            }
-        }
-    }
-
-    void line(int x0, int y0, int x1, int y1, Color c) {
-        const int dx = x1 - x0;
-        const int dy = y1 - y0;
-        const int steps = std::max(std::abs(dx), std::abs(dy));
-        if (steps == 0) {
-            blend(x0, y0, c);
-            return;
-        }
-        for (int i = 0; i <= steps; ++i) {
-            const double t = static_cast<double>(i) / static_cast<double>(steps);
-            const int x = x0 + static_cast<int>(std::lround(
-                                    static_cast<double>(dx) * t));
-            const int y = y0 + static_cast<int>(std::lround(
-                                    static_cast<double>(dy) * t));
-            blend(x, y, c);
-        }
-    }
-
-    void text(int x, int y, const std::string& s, Color c, int scale = 2) {
-        const int sc = std::max(1, scale);
-        int cx = x;
-        for (const char ch : s) {
-            unsigned char u = static_cast<unsigned char>(ch);
-            if (u >= 128u) u = static_cast<unsigned char>('?');
-            if (u >= static_cast<unsigned char>(' ')) {
-                for (int row = 0; row < 8; ++row) {
-                    const unsigned char bits = font8x8_basic[u][row];
-                    if (bits == 0u) continue;
-                    for (int bit = 0; bit < 8; ++bit) {
-                        // bit0 is the leftmost pixel of the row byte.
-                        if (((bits >> bit) & 1u) == 0u) continue;
-                        fill_rect(cx + bit * sc, y + row * sc, sc, sc, c);
-                    }
-                }
-            }
-            cx += 8 * sc;
-        }
-    }
-
-private:
-    int w_ = 0;
-    int h_ = 0;
-    std::vector<uint8_t> px_;
-};
-
-int text_w(const std::string& s, int scale = 2) {
-    return static_cast<int>(s.size()) * 8 * std::max(1, scale);
-}
-
-int text_scale_fit(const std::string& s, int avail_px) {
-    return text_w(s, 2) <= avail_px ? 2 : 1;
-}
 
 // ---------------------------------------------------------------------------
 // Palette
 // ---------------------------------------------------------------------------
 
-constexpr Color kBackground{13, 15, 19, 255};
-constexpr Color kPanel{23, 26, 32, 255};
-constexpr Color kPanelBorder{48, 54, 66, 255};
-constexpr Color kText{228, 231, 238, 255};
-constexpr Color kTextDim{148, 155, 168, 255};
+// Shared chrome + mosquito-state colours (kBackground, kPanel, kText,
+// kHostSeek, kBloodFed, kGravid, kInfectious, kPrev, …) now live in
+// viz_common.hpp (plan 05 §7) and are NOT redeclared here. Only map-1
+// colours remain.
 constexpr Color kNeutralCell{54, 58, 66, 255};
 // Truthful basemap tones (2026-10 coastline fix). Open sea is deep navy,
 // coastal water a steel blue, land a muted olive/tan that cannot be confused
@@ -235,14 +57,9 @@ constexpr Color kLandBase{140, 132, 102, 255};
 // ingest.sea_water_floor (0.05) from model_constants.yaml.
 constexpr float kSeaWaterFloor = 0.05f;
 constexpr Color kWater{38, 92, 190, 255};
-constexpr Color kPrev{214, 48, 48, 255};
 constexpr Color kAmber{240, 180, 60, 255};
 constexpr Color kLarva{60, 200, 120, 255};
 constexpr Color kPupa{230, 80, 180, 255};
-constexpr Color kHostSeek{255, 190, 60, 255};
-constexpr Color kBloodFed{190, 110, 240, 255};
-constexpr Color kGravid{255, 60, 160, 255};
-constexpr Color kInfectious{255, 40, 40, 255};
 constexpr Color kDry{170, 170, 176, 255};
 
 // Discrete availability classes (D9). A continuous ramp over the run range
@@ -287,60 +104,11 @@ Color z_colormap(double t) {
     return lerp(Color{10, 26, 64, 255}, Color{82, 158, 255, 255}, t);
 }
 
-// Compact integer formatting so the info block never overflows.
-std::string fmt_count(int64_t v) {
-    char buf[48];
-    const double d = static_cast<double>(v);
-    if (v >= 1000000) {
-        std::snprintf(buf, sizeof(buf), "%.2fM", d / 1.0e6);
-    } else if (v >= 10000) {
-        std::snprintf(buf, sizeof(buf), "%.1fk", d / 1.0e3);
-    } else {
-        std::snprintf(buf, sizeof(buf), "%lld", static_cast<long long>(v));
-    }
-    return std::string(buf);
-}
-
-std::string date_iso(std::chrono::sys_days d) {
-    const std::chrono::year_month_day ymd{d};
-    char buf[32];
-    std::snprintf(buf, sizeof(buf), "%04d-%02u-%02u",
-                  static_cast<int>(ymd.year()),
-                  static_cast<unsigned>(ymd.month()),
-                  static_cast<unsigned>(ymd.day()));
-    return std::string(buf);
-}
-
-// Log/linear value → pixel row inside a plot rect (y0 = top).
-int plot_y(double v, double vmin, double vmax, int y0, int h, bool log_scale) {
-    if (h <= 0) return y0;
-    double lo = vmin;
-    double hi = vmax;
-    if (log_scale) {
-        lo = std::log10(std::max(1.0, lo));
-        hi = std::log10(std::max(10.0, hi));
-        if (hi - lo < 1.0e-9) hi = lo + 1.0;
-        v = std::log10(std::max(1.0, v));
-    } else {
-        if (hi - lo < 1.0e-9) hi = lo + 1.0;
-    }
-    const double t = std::clamp((v - lo) / (hi - lo), 0.0, 1.0);
-    // Keep the mark one pixel inside the box: a sample at the floor (v = 0 on
-    // a log axis) must not sit on the plot border, where it reads as clipped.
-    const int y = y0 + static_cast<int>(std::lround((1.0 - t) * h));
-    return std::clamp(y, y0 + 1, y0 + std::max(1, h - 1));
-}
 
 // ---------------------------------------------------------------------------
 // Panels
 // ---------------------------------------------------------------------------
 
-void draw_panel_frame(Canvas& cv, int x, int y, int w, int h,
-                      const std::string& title) {
-    cv.fill_rect(x, y, w, h, kPanel);
-    cv.stroke_rect(x, y, w, h, kPanelBorder);
-    cv.text(x + 6, y + 5, title, kTextDim, text_scale_fit(title, w - 12));
-}
 
 // Discrete S legend for the right column (D8/D9). The strip shows the eight
 // classes with their numeric bounds; the run's observed range is printed on
@@ -401,10 +169,6 @@ void draw_s_legend(Canvas& cv, int x, int y, int w, int h,
     }
 }
 
-// D3: fast, exact power of ten for the decade bounds.
-double dec_pow10(int d) {
-    return std::pow(10.0, static_cast<double>(d));
-}
 
 void draw_population(Canvas& cv, int x, int y, int w, int h,
                      const std::vector<DailyStats>& history,
@@ -623,27 +387,6 @@ void draw_forcers(Canvas& cv, int x, int y, int w, int h,
             Color{255, 140, 110, 255}, 2);
 }
 
-void draw_info(Canvas& cv, int x, int y, int w, int h,
-               const std::vector<std::pair<std::string, Color>>& lines) {
-    draw_panel_frame(cv, x, y, w, h, "info");
-    if (lines.empty()) return;
-    // Every metric line must fit, including on the 640x384 minimum canvas:
-    // the row pitch shrinks (never the list) and the glyph scale follows it.
-    const int n = static_cast<int>(lines.size());
-    const int title_h = 20;
-    // 8px glyphs need `lh >= 10`; the -26 reserves the panel border and one
-    // blank row at the bottom so the last metric never touches the frame.
-    const int lh = std::clamp((h - 26) / std::max(1, n), 10, 18);
-    const int scale = (lh >= 16) ? 2 : 1;
-    const int avail = w - 12;
-    int ty = y + 4 + title_h;
-    for (const auto& [text, color] : lines) {
-        const int sc = std::min(scale, text_scale_fit(text, avail));
-        cv.text(x + 6, ty, text, color, sc);
-        ty += lh;
-    }
-}
-
 void draw_legend(Canvas& cv, int x, int y, bool have_land_frac) {
     cv.text(x, y, "legend", kTextDim, 2);
     int cx = x + 104;
@@ -734,12 +477,10 @@ struct GifViz::Impl {
             fail("invalid canvas size");
             return;
         }
-        if (!GifBegin(&writer, cfg.path.c_str(), static_cast<uint32_t>(width),
-                      static_cast<uint32_t>(height), frame_delay(), 8, false)) {
+        if (!sink.open(cfg.path, width, height, frame_delay())) {
             fail("cannot open GIF for writing: " + cfg.path);
             return;
         }
-        writer_open = true;
         ok = true;
     }
 
@@ -757,17 +498,11 @@ struct GifViz::Impl {
             logged = true;
             std::fprintf(stderr, "abm_gif: %s\n", msg.c_str());
         }
-        if (writer_open) {
-            GifEnd(&writer);
-            writer_open = false;
-        }
+        sink.close();
     }
 
     void finish() {
-        if (writer_open) {
-            GifEnd(&writer);
-            writer_open = false;
-        }
+        sink.close();
     }
 
     // --- helpers ---------------------------------------------------------
@@ -816,8 +551,7 @@ struct GifViz::Impl {
     int width = 0;
     int height = 0;
     int frames = 0;
-    GifWriter writer{};
-    bool writer_open = false;
+    GifSink sink;
     std::unique_ptr<Canvas> canvas;
 
     // Running S range over the whole run (stable colour scale, plan 04 §2.2).
@@ -1729,10 +1463,8 @@ void GifViz::observe(const Engine& engine,
 
         im.draw(engine, history, day_index, total_days);
         if (!im.ok || !im.canvas) return;
-        if (!GifWriteFrame(&im.writer, im.canvas->data(),
-                           static_cast<uint32_t>(im.width),
-                           static_cast<uint32_t>(im.height), im.frame_delay(),
-                           8, false)) {
+        if (!im.sink.write_frame(im.canvas->data(), im.width, im.height,
+                                 im.frame_delay())) {
             im.fail("GifWriteFrame failed");
             return;
         }
