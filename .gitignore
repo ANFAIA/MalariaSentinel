@@ -69,9 +69,8 @@ compile_commands.json
 # marimo notebook cache
 mal-data-explorer/__marimo__/
 
-# opencode skill installer artifacts (not project code)
-#.agents/skills/
-#skills-lock.json
-
-# opencode agent working docs (live work, not repo code)
-.opencode/plan/
+# pi agent harness artifacts (npm package installs + tool caches)
+.pi/npm/
+.playwright-mcp/
+.pytest_cache/
+.ruff_cache/

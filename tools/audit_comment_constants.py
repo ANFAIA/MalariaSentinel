@@ -20,7 +20,7 @@ Two checks run over every comment/docstring line in the repo:
 Scope: the repository code. Artifacts are excluded BY PATH, never by bare
 directory name — a Python package called ``data`` (the loaders) must be
 scanned. The excluded top-level entries are ``docs/``, ``plans/``,
-``.opencode/``, ``data/``, ``runs/``, ``papers/`` and ``terrain/`` (repo
+``data/``, ``runs/``, ``papers/`` and ``terrain/`` (repo
 root only), plus caches and build output by name.
 
 Test files are scanned but counted separately: their fixtures legitimately
@@ -53,7 +53,7 @@ ALLOWLIST_PATH = Path(__file__).with_name("comment_audit_allowlist.txt")
 # Matched against the path RELATIVE to REPO, so any nested directory that
 # happens to be named "data" (e.g. mal_commonlib/data/loaders) is scanned.
 EXCLUDE_TOP = {
-    "docs", "plans", ".opencode", "data", "runs", "papers", "terrain",
+    "docs", "plans", "data", "runs", "papers", "terrain",
 }
 # Technical/cache directories, by name, anywhere.
 EXCLUDE_NAMES = {

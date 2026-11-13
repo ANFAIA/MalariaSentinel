@@ -31,7 +31,7 @@ upstream, not original MalariaSentinel code.
 
 | File | Role |
 | --- | --- |
-| `.pi/settings.json` | Declares `egm/skills` as a project skill directory. |
+| `.pi/settings.json` | Declares `egm/skills` as a project skill directory, plus the pinned pi packages (`pi-magic-context`, `pi-parallel-sessions`, `pi-subagents`). |
 | `.pi/APPEND_SYSTEM.md` | Tells every session to resolve `agents/`, `resources/`, `docs/` against `.pi/egm/`. |
 | `.pi/agents/egm-*.md` (10 files) | pi wrappers: frontmatter (`tools`, `prompt_mode`, `run_in_background`, `allowed_subagents`) + pointer to the persona in this bundle. |
 

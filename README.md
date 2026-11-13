@@ -19,7 +19,7 @@ MalariaSentinel/
   pyproject.toml              Workspace root (uv workspace)
   README.md                   This file
   AGENTS.md                   Agent guide: where to put new work
-  opencode.json               Agent harness configuration
+  .pi/                        pi harness config (settings, skills, agents, EGM bundle)
   .gitignore
 
   # ─── Python packages (UV workspace members) ────────────────────
@@ -29,11 +29,10 @@ MalariaSentinel/
   mal-execution/              Batch scripts, HPC/cloud automation (Hetzner, CESGA)
   mal-data-explorer/          Dataset visualization, mapping, bias analysis scripts
   social-networks/            Outreach content (videos, posts) for the project
-  agents/janus/               Multi-agent orchestrator (deepagents + gawt)
 
-  # ─── Agent infrastructure ──────────────────────────────────────
-  agents/                     Agent loops and infrastructure
-  .opencode/                  Per-project OpenCode agents and tools
+  # ─── Agent infrastructure (pi harness) ─────────────────────────
+  .pi/                        pi config: packages, skills (.pi/skills/), subagents
+                              (.pi/agents/), design-review bundle (.pi/egm/)
 
   # ─── Research & data content ───────────────────────────────────
   data/                       Datasets (ghana AOI, ghana_idit, colombia_vl, react, guf…)
@@ -57,7 +56,6 @@ MalariaSentinel/
 | `mal-core` | `mal-commonlib` | Stable, production-ready pipeline code (`malariasim` CLI lives here) |
 | `mal-execution` | `mal-core`, `mal-commonlib` | Batch scripts, schedulers, cloud/HPC automation |
 | `mal-data-explorer` | (none, scripts only) | Dataset visualization and bias analysis |
-| `agents/janus` | `mal-core` (via `malariasim` shell) | Multi-agent orchestration |
 
 **Nothing depends on the research packages.** When research code stabilizes, promote it to `mal-core` or `mal-commonlib`.
 

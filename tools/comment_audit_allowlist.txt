@@ -46,7 +46,7 @@
 
 # 10. Environment-variable interface switches (value is the documented
 #     control code of the env var, not a model constant).
-(COASTLINE_BUFFER_M ?= ?0|MAL_ABM_[A-Z_]*DEBUG ?= ?1|JANUS_NO_ASK_USER ?= ?1)
+(COASTLINE_BUFFER_M ?= ?0|MAL_ABM_[A-Z_]*DEBUG ?= ?1)
 
 # 11. Dataset class codes (JRC GSW class 1 = permanent water) and enum
 #     members defined in code (TENERAL, NIGHT, MALE, EGG, JRC_PERSISTENT):

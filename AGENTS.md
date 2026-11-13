@@ -1,4 +1,4 @@
-<!-- Protected file. Edits go through gitagent; user approves each change. -->
+<!-- Protected file. Edits require explicit user approval (project convention — pi has no edit-permission enforcement). -->
 
 # MalariaSentinel — Agent Guide
 
@@ -10,7 +10,7 @@
 
 - **Stack**: Python (uv workspace).
 - **Layout**: monorepo with 5 packages (see "Monorepo layout" below).
-- **Runtime**: OpenCode is the agent harness. Configuration lives in `opencode.json` at the project root.
+- **Runtime**: pi is the agent harness. Project configuration lives in `.pi/` (settings.json with pinned packages, subagents in `.pi/agents/`, skills in `.pi/skills/`, MCP in `.pi/mcp.json`); the EGM design-review bundle is vendored at `.pi/egm/`.
 
 ## How to build, test, run
 
@@ -52,7 +52,6 @@ uv run pytest -m full -v          # 10 scorers + LLM, 5 seeds, 90 days
 | `mal-execution/` | CLI entrypoints, batch jobs. | core + commonlib |
 | `mal-ghana-sim/` | Ghana spread simulation + U-Net surrogate (research). | commonlib |
 | `mal-data-explorer/` | Dataset visualisation, mapping, bias analysis. | — |
-| `agents/` | Agent loops and infrastructure. Not a runtime — OpenCode is. | — |
 | `data/`, `papers/`, `terrain/`, `runs/` | Datasets, papers, DEM tiles, experiment outputs (mostly gitignored). | — |
 
 **Dependency rule**: nothing depends on research/script packages. When research code stabilises, promote to `mal-core` or `mal-commonlib` and update `mal-execution` scripts to use the promoted modules.
@@ -67,7 +66,7 @@ The monorepo separates **production code** (the Centinela) from **experiments** 
 |---|---|---|---|
 | **Core (the Centinela)** | `mal-commonlib/`, `mal-core/`, `mal-execution/` | Stable, reusable code that makes up the SDSS. `mal-core` is empty at the start of the project and is populated by promoting stable parts from experiments. `mal-execution` holds CLI scripts that call into `mal-core` and `mal-commonlib`. | Receives code from experiments. |
 | **Experiments** | `mal-ghana-sim/`, `mal-data-explorer/` | Hypothesis-driven, replaceable work that explores one approach to one piece of the SDSS. `mal-ghana-sim` is a Ghana spread simulation + U-Net surrogate. `mal-data-explorer` is a dataset visualisation + bias-analysis sandbox. Both depend on `mal-commonlib` but NOT on each other and NOT on `mal-core`. | Each experiment either dies (gets archived) or **promotes** parts of itself into `mal-core` or `mal-commonlib` (see "Promotion flow" below). |
-| **Infrastructure** | `agents/`, `data/`, `papers/`, `terrain/`, `runs/` | Not part of the Centinela's runtime. The agent infrastructure (`agents/`), input data, research papers, terrain, and experiment outputs. | Never promoted. |
+| **Infrastructure** | `data/`, `papers/`, `terrain/`, `runs/` | Not part of the Centinela's runtime. Input data, research papers, terrain, and experiment outputs. | Never promoted. |
 
 **The `mal-core` directory is the goal of the project.** Every stable function in the Centinela should eventually live there or in `mal-commonlib`. Experiments exist to discover what should go into core, and to be deleted once their insight has been promoted.
 
@@ -99,41 +98,29 @@ Promotion moves stable, useful code from an experiment into the core tier. It is
 
 | Tool | Use it for | Notes |
 |---|---|---|
-| `webfetch` | Reading a URL the user points to or that you find. | Returns markdown by default. Prefer this over re-fetching source for web content. |
-| `websearch` | Finding current information outside the repo. | Default web search; Exa backend is optional (`OPENCODE_ENABLE_EXA=1`). |
-| `bash` | Running shell commands. **Git lives here.** | `git ps` for force-with-lease pushes. `git diff`, `git log`, `git status` are safe. |
-| `read`, `write`, `edit` | File I/O. | `edit` and `write` are `ask` on protected files (see below). |
-| `glob`, `grep` | Finding files and content. | glob for paths, grep for content. |
-| `task` | Delegating to specialised loops and subagents. Subagents get a brief, not the full conversation. **Multiple `task` calls in one message run in parallel** — use this to fan out independent subtasks. | Subagents get a brief, not the full conversation. |
-| `skill` | Loading a specialised skill on demand. | Skills live in `agents/skills/`. |
-| `todowrite` | Tracking multi-step work. | One list; exactly one item `in_progress` at a time. |
-| `question` | Asking the user when you need a decision. | Don't guess on irreversible choices. |
-| `mcp__gitagent__*` | **gawt v0.5.0 MCP** — multi-agent git isolation: sessions, agents, intents, file edits, inbox messaging. | Replaces the old gitagent CLI. Use `start_session` → `register_agent` → `edit_file`/`write_file`/`read_file` → `finalize_session`. Supervisor orchestrates; subagents use `edit_file`/`write_file` in their registered agent context. |
+| `read`, `write`, `edit` | File I/O. | Edits to protected files (below) need explicit user approval. |
+| `bash` | Running shell commands. **Git lives here.** | `git ps` for force-with-lease pushes. `git diff`, `git log`, `git status` are safe. Destructive commands (`rm -r*`, `sudo`) trigger a pi-sessions confirmation dialog the user must approve. |
+| `grep`, `find` | Finding content and files. | |
+| `web_search` | Current information outside the repo. | Bing-backed extension (`web-search.ts`); returns snippets + URLs, not full pages. |
+| `/skill:<name>` | Load a specialised skill on demand. | Skills live in `.pi/skills/` plus `.pi/egm/skills`. Most skills are manual-invocation only — ask the user to run `/skill:`. |
+| `Agent` | Delegating to a subagent (`subagent_type`). Subagents get a brief, not the full conversation; fresh context by default. **Multiple `Agent` calls in one message run in parallel.** | Subagent types live in `.pi/agents/*.md` (incl. the EGM reviewers). `steer_subagent` redirects a running agent; `get_subagent_result` fetches a background result. |
+| `SubagentWorkflow` | Deterministic multi-agent workflows (pipeline/parallel fan-out). | Only when the user explicitly opts into multi-agent scale. |
+| `ctx_search` / `ctx_memory` / `ctx_note` / `ctx_expand` / `ctx_reduce` | Magic Context: archive search, project memory, session notes, transcript expansion, desk cleanup. | From the `@cortexkit/pi-magic-context` package. |
+| `codemode` | Run JS that batches tool calls; also the bridge to MCP tools (e.g. playwright). | |
+| `search_graph`, `query_graph`, `trace_path`, `get_code_snippet`, … | codebase-memory knowledge graph (17 tools). | From `cbmem.ts`; requires the `codebase-memory-mcp` binary installed on the machine. |
 
-## Protected files (opencode-native `permission.edit: "ask"`)
+## Protected files (project convention — pi has no edit-permission enforcement)
 
 | Path | Why |
 |---|---|
 | `AGENTS.md` | This file — the agent's own instructions. |
 | `.gitignore` | Affects git tracking. |
-| `opencode.json` | Project-wide permissions and agent config. |
 | `data/` | Datasets. Prevents accidental edits. |
 
 **Rules**:
 - Every edit to a protected path is a real question. The user approves or denies. If denied, stop.
 - Don't retry with a different phrasing. Don't batch the change with another edit. Don't delegate the edit to a subagent to bypass the prompt.
-- Adding a new protected file = edit `opencode.json` and add `"<path>": "ask"` under `permission.edit`.
-
-## gawt MCP — which tool, when
-
-| Path | Use |
-|---|---|
-| `mcp__gitagent__start_session` | Start a gawt session for a feature. Creates a global worktree. |
-| `mcp__gitagent__register_agent` | Register a subagent in the current session. Returns `agent_id`. |
-| `mcp__gitagent__edit_file` / `write_file` / `read_file` / `delete_file` | File edits within an agent's isolated worktree. |
-| `mcp__gitagent__start_intent` / `repurpose` | Track what an agent is working on (semantic intent). |
-| `mcp__gitagent__send_message` / `check_inbox` | Inter-agent messaging within a session. |
-| `mcp__gitagent__finalize_session` | Commit all accepted work onto the target branch. |
+- Adding a new protected file = add the path to the table above and state it to the user.
 
 ## Where knowledge lives
 
@@ -141,7 +128,7 @@ Promotion moves stable, useful code from an experiment into the core tier. It is
 |---|---|
 | Procedural how-to (build, test, push, conventions) | This file (`AGENTS.md`). |
 | Project-specific durable facts | GitHub issues, milestones, and PR descriptions. |
-| Session working notes and summaries | The session's own context (auto-compacted by OpenCode). |
+| Session working notes and summaries | The session's own context (auto-compacted by pi / Magic Context). |
 
 ## Decision table: where does this go?
 
@@ -152,10 +139,10 @@ Promotion moves stable, useful code from an experiment into the core tier. It is
 | Run a Ghana-specific experiment | Put it in `mal-ghana-sim/` (experiment tier). | Don't run it inline in `mal-execution/`; that tier is for production. |
 | Run a dataset visualisation / bias analysis | Put it in `mal-data-explorer/`. | Don't put it in `mal-core/`; that's for reusable pipeline logic. |
 | Promote stable code from an experiment to core | Follow the "Promotion flow" above. | Don't copy-and-tweak — refactor + tests + delete the original. |
-| Ask a one-off question | Use the `question` tool. | Don't guess on irreversible choices. |
-| Delegate a multi-step task | Use `task` with a `subagent_type`. | Don't do it in this context if the work needs a fresh window. |
-| Execute N independent subtasks | Run them in one message: parallel `task` calls + parallel read/grep. | Don't serialise them across N turns. |
-| Edit a protected file | Ask the user (the `ask` prompt is the mechanism). | Don't try to bypass the `ask` prompt via delegation. |
+| Ask a one-off question | Ask directly in your reply. | Don't guess on irreversible choices. |
+| Delegate a multi-step task | Use `Agent` with a `subagent_type`. | Don't do it in this context if the work needs a fresh window. |
+| Execute N independent subtasks | Run them in one message: parallel `Agent` calls + parallel read/grep. | Don't serialise them across N turns. |
+| Edit a protected file | Ask the user explicitly (project convention — no tool enforcement). | Don't delegate the edit to bypass the ask. |
 | Push to remote after a rewrite | `git ps origin main` (force-with-lease). | Don't use `git push --force`. |
 
 ## Data format conventions
@@ -202,12 +189,12 @@ This prevents losing sight of the all-time best when iterating.
 
 | Layer | Owner | Lives in |
 |---|---|---|
-| Operational | OpenCode (this primary agent) | The current session's context window. |
-| Compaction | OpenCode (built-in) | Auto-summarised when the operational layer grows. |
+| Operational | pi (main session) | The current session's context window. |
+| Compaction | pi + Magic Context | Older turns compact into `<session-history>` (re-expand with `ctx_expand`, search with `ctx_search`). |
 
-**Discipline**: keep the operational layer compact — objective, plan, key decisions, references (paths, commit IDs, proposal IDs). Never paste multi-thousand-line tool outputs into the supervisor's prompt. Long outputs go to a summary.
+**Discipline**: keep the operational layer compact — objective, plan, key decisions, references (paths, commit IDs, proposal IDs). Never paste multi-thousand-line tool outputs into the main session's prompt. Long outputs go to a summary.
 
-**Subagents** see a brief, not the full conversation. If they need more context, they ask the supervisor.
+**Subagents** see a brief, not the full conversation. If they need more context, they ask the main session.
 
 ## Git push workflow
 
@@ -263,7 +250,7 @@ Every milestone decomposes into issues tracked on the **MalariaSentinel GitHub P
 
 ### How the agent manages the board
 
-The agent (supervisor) is responsible for keeping the board in sync with the session's work:
+The main session agent is responsible for keeping the board in sync with the session's work:
 
 1. **Entering a milestone**: read the open issues for the milestone from GitHub. Move the highest-priority unblocked issue to **In Progress**.
 2. **Working on an issue**: keep it in **In Progress** until all acceptance criteria pass. If a new blocker is discovered, add the `blocked` label, post a comment with the reason, and move to **Todo**.
@@ -273,15 +260,15 @@ The agent (supervisor) is responsible for keeping the board in sync with the ses
 
 **Discipline**: exactly one issue In Progress at a time. Never batch closes. Always reference the commit SHA in the closing comment so the board is traceable.
 
-## Specialised loops
+## Specialised subagents
 
-Invoke with `@<name>` or the `task` tool. Each subagent's prompt lives at `agents/loops/<name>.md`. Brief summary:
+Invoke with `Agent({subagent_type: "<name>"})` or an `@<name>` mention. Each subagent's prompt lives at `.pi/agents/<name>.md`. Brief summary:
 
-| Agent | Role | Auto-invoked by supervisor? |
+| Agent | Role | Auto-invoked by main session? |
 |---|---|---|
 | `test-fixer` | Iterate a check command until it exits 0. | `allow` |
 | `code-reviewer` | Review a diff; return structured findings. Read-only. | `ask` |
 | `doc-researcher` | Research documentation and code; returns a brief with sources. | `ask` |
 | `security-auditor` | OWASP-style audit. Read-only. | `ask` |
 
-The supervisor is the default primary agent (`default_agent: "supervisor"` in `opencode.json`). It owns the running context, decomposes work, delegates to loops and subagents, and integrates via the gawt MCP (`mcp__gitagent__*`) for isolated multi-agent edits. The supervisor's prompt (`.opencode/agents/supervisor.md`) is generic and reusable; project rules live here in `AGENTS.md`. Tab cycles between `supervisor` (default), `build` (single-tool ad-hoc), and `plan` (read-only review).
+There is no separate primary-agent switch: the pi main session IS the orchestrator (it owns the running context, decomposes work, and delegates to subagents). Project rules live here in `AGENTS.md`; pi subagent definitions live in `.pi/agents/`. The EGM design-review flow adds the `egm-*` Goldfish reviewer subagents and the synthesizer/orchestrator coordinators — see `.pi/egm/ORIGIN.md`.
