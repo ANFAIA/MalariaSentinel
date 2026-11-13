@@ -85,7 +85,6 @@ Respect the monorepo dependency rules:
 | `mal-core` | `mal-commonlib` |
 | `mal-execution` | `mal-core`, `mal-commonlib` |
 | `mal-data-explorer` | — (scripts only) |
-| `agents/janus` | `mal-core` (via the `malariasim` CLI) |
 
 Nothing depends on the research packages. When research code stabilizes, promote it into
 `mal-core` or `mal-commonlib` instead of importing across boundaries.

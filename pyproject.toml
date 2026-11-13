@@ -91,5 +91,4 @@ members = [
     "mal-execution",
     "mal-data-explorer",
     "social-networks",
-    "agents/janus",
 ]

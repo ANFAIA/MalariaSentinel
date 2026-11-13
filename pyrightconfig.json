@@ -6,8 +6,7 @@
     "mal-core/src",
     "mal-execution/src",
     "mal-execution/scripts",
-    "mal-data-explorer",
-    "agents/janus/src"
+    "mal-data-explorer"
   ],
   "exclude": [
     "**/__pycache__",

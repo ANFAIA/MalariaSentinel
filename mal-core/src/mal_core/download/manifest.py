@@ -14,10 +14,10 @@ log = logging.getLogger(__name__)
 
 
 def _find_repo_root() -> Path:
-    """Walk up from this file to find the repo root (has opencode.json or .git)."""
+    """Walk up from this file to find the repo root (has .git)."""
     p = Path(__file__).resolve().parent
     for _ in range(10):
-        if (p / "opencode.json").exists() or (p / ".git").exists():
+        if (p / ".git").exists():
             return p
         p = p.parent
     return Path(__file__).resolve().parents[4]
