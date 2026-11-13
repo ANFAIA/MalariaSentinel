@@ -56,7 +56,6 @@ MalariaSentinel/
 | `mal-core` | `mal-commonlib` | Stable, production-ready pipeline code (`malariasim` CLI lives here) |
 | `mal-execution` | `mal-core`, `mal-commonlib` | Batch scripts, schedulers, cloud/HPC automation |
 | `mal-data-explorer` | (none, scripts only) | Dataset visualization and bias analysis |
-| `agents/janus` | `mal-core` (via `malariasim` shell) | Multi-agent orchestration |
 
 **Nothing depends on the research packages.** When research code stabilizes, promote it to `mal-core` or `mal-commonlib`.
 
