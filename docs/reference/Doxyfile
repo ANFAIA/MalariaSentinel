@@ -1,0 +1,45 @@
+# Doxyfile — the C++ half of the generated technical reference.
+#
+# The input is deliberately NARROW: the six contract-defining headers of the
+# ABM engine, the only ones whose comments have been polished for
+# publication. The include tree holds about forty-five headers; publishing
+# the rest would produce a reference that is structurally complete and
+# semantically false — the same risk the Python side carries.
+#
+# Output lands in docs/reference/cpp/ so that Doxygen's index.html and its
+# underscore-prefixed directories cannot collide with pdoc's output in
+# docs/reference/python/ under the legacy Pages build.
+
+PROJECT_NAME           = "MalariaSentinel — C++ reference"
+PROJECT_BRIEF          = "The contract-defining headers of the ABM engine"
+
+OUTPUT_DIRECTORY       = docs/reference/cpp
+CREATE_SUBDIRS         = NO
+
+INPUT                  = mal-core/src/mal_core/abm/include/mal_abm_fast/wire.hpp \
+                         mal-core/src/mal_core/abm/include/mal_abm_fast/output_contract.hpp \
+                         mal-core/src/mal_core/abm/include/mal_abm_fast/habitat_availability.hpp \
+                         mal-core/src/mal_core/abm/include/mal_abm_fast/habitat_engine.hpp \
+                         mal-core/src/mal_core/abm/include/mal_abm_fast/coordinator.hpp \
+                         mal-core/src/mal_core/abm/include/mal_abm_fast/config.hpp
+RECURSIVE              = NO
+EXCLUDE_PATTERNS       = */third_party/*
+
+FILE_PATTERNS          = *.hpp
+EXTRACT_ALL            = YES
+EXTRACT_PRIVATE        = NO
+EXTRACT_STATIC         = YES
+HIDE_UNDOC_MEMBERS     = NO
+
+GENERATE_HTML          = YES
+GENERATE_LATEX         = NO
+GENERATE_TREEVIEW      = YES
+HAVE_DOT               = NO
+QUIET                  = YES
+WARNINGS               = YES
+WARN_IF_UNDOCUMENTED   = NO
+WARN_IF_DOC_ERROR      = YES
+
+PROJECT_NUMBER         =
+SOURCE_BROWSER         = NO
+ALPHABETICAL_INDEX     = NO
