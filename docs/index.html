@@ -639,6 +639,7 @@
         <a href="#configurador-abm" data-i18n="nav.configurator">Configurador</a>
         <a href="#hoja-de-ruta" data-i18n="nav.roadmap">Hoja de ruta</a>
         <a href="#colaborar" data-i18n="nav.collaborate">Colaborar</a>
+        <a href="documentacion.html" data-i18n="nav.docs">Documentación</a>
         <div class="lang-switch" role="group" aria-label="Language selector">
           <button class="lang-btn active" data-lang-btn="es">ES</button>
           <button class="lang-btn" data-lang-btn="en">EN</button>
@@ -660,6 +661,7 @@
         <a href="#arquitectura" class="mobile-nav-link" data-i18n="nav.architecture">Arquitectura Técnica</a>
         <a href="#configurador-abm" class="mobile-nav-link" data-i18n="nav.configurator_abm">Configurador ABM &amp; Emulador</a>
         <a href="#hoja-de-ruta" class="mobile-nav-link" data-i18n="nav.roadmap_long">Hoja de Ruta</a>
+        <a href="documentacion.html" class="mobile-nav-link" data-i18n="nav.docs">Documentación</a>
         <a href="#colaborar" class="mobile-nav-link" data-i18n="nav.how_collaborate">Cómo Colaborar</a>
         <div style="display: flex; align-items: center; gap: 12px; margin-top: 8px;">
           <div class="lang-switch" role="group" aria-label="Language selector">
@@ -709,7 +711,7 @@
 
           <div class="pipeline-block">
             <div class="pipeline-step-tag" data-i18n="pipeline.s2.tag">02 · Generación de Datos (Profesor)</div>
-            <div class="pipeline-step-name" data-i18n="pipeline.s2.name">Motor ABM en C++ + 14 Scorers</div>
+            <div class="pipeline-step-name" data-i18n="pipeline.s2.name">Motor ABM en C++ + 19 evaluadores</div>
             <div class="pipeline-step-desc" data-i18n="pipeline.s2.desc">Simulación estocástica precisa de millones de agentes generando pares de entrenamiento.</div>
           </div>
 
@@ -858,7 +860,7 @@
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
             </div>
             <h3 data-i18n="status.f1.title">Motor ABM en C++ de Alto Rendimiento</h3>
-            <p data-i18n="status.f1.desc">Consolidado en <code>mal-core</code>, simula dinámicas de ciclos gonotróficos y búsqueda de hospedadores con más de 261 tests en C++ y 14 evaluadores de calibración automatizados.</p>
+            <p data-i18n="status.f1.desc">Consolidado en <code>mal-core</code>, simula dinámicas de ciclos gonotróficos y búsqueda de hospedadores con más de 261 tests en C++ y 19 evaluadores de calibración (13 dimensiones + 6 gates).</p>
           </div>
 
           <div class="feature card">
@@ -941,8 +943,7 @@
                 <div class="form-group">
                   <label class="form-label" for="paramAoi" data-i18n="config.aoi.label">Área de Interés (--aoi)</label>
                   <select id="paramAoi" class="form-select">
-                    <option value="ghana" selected="" data-i18n="config.aoi.ghana">Ghana (Nacional predefinido · 9.466 celdas)</option>
-                    <option value="mozambique" data-i18n="config.aoi.moz">Mozambique (Nacional predefinido)</option>
+                    <option value="ghana" selected="" data-i18n="config.aoi.ghana">Ghana (Regional predefinido · 429.229 celdas)</option>
                     <option value="custom" data-i18n="config.aoi.custom">Personalizada (Nueva Región / Coordenadas BBOX)</option>
                   </select>
                 </div>
@@ -1218,7 +1219,7 @@
                       <div>
                         <label class="form-label" for="paramMinDensity" data-i18n="config.mindensity.label">Densidad Vectorial Mínima (--human-outbreak-min-density)</label>
                         <input type="number" id="paramMinDensity" class="form-input" value="0" min="0" max="1" step="0.05">
-                        <p class="form-help" data-i18n="config.mindensity.help">Disparador adaptativo: el brote espera a que la mejor celda viable alcance esta densidad normalizada de mosquitos (agentes/K_MAX). 0 = día exacto. Umbrales altos (≥0.5) pueden no dispararse nunca.</p>
+                        <p class="form-help" data-i18n="config.mindensity.help">Disparador adaptativo: el brote espera a que la mejor celda viable alcance esta densidad de mosquitos (adultos/km²). 0 = día exacto. Umbrales altos (≥0.5) pueden no dispararse nunca.</p>
                       </div>
                       <div>
                         <label class="form-label" for="paramClusterMaxCorePop" data-i18n="config.corepop.label">Tope Poblacional del Núcleo (--human-cluster-max-core-pop)</label>
@@ -1551,7 +1552,7 @@
             <span class="meta" data-i18n="roadmap.m1.meta">Hito 1 · Base</span>
             <div>
               <h3><span data-i18n="roadmap.m1.title">Consolidación del Núcleo Computacional</span> <span class="pill" style="margin-left: 8px; font-size: 10px;" data-i18n="roadmap.m1.tag">Completado</span></h3>
-              <p data-i18n="roadmap.m1.desc">Unificación de código en <code>mal-core</code>, motor C++ ABM optimizado, suite de 14 evaluadores de calibración (PR gate), pipelines de ingesta satelital (ERA5, CHIRPS, Sentinel-10m) y CLI <code>malariasim</code>.</p>
+              <p data-i18n="roadmap.m1.desc">Unificación de código en <code>mal-core</code>, motor C++ ABM optimizado, suite de 19 evaluadores de calibración (13 dimensiones + 6 gates), pipelines de ingesta satelital (ERA5, CHIRPS, Sentinel-10m) y CLI <code>malariasim</code>.</p>
             </div>
             <span class="pull meta" data-i18n="roadmap.m1.pull">Infraestructura</span>
           </article>
@@ -1707,6 +1708,7 @@
           <a href="#emulador-unet" style="color: var(--muted);" data-i18n="footer.nav.unet">U-Net</a>
           <a href="#hoja-de-ruta" style="color: var(--muted);" data-i18n="nav.roadmap">Hoja de ruta</a>
           <a href="#colaborar" style="color: var(--muted);" data-i18n="nav.collaborate">Colaborar</a>
+          <a href="documentacion.html" style="color: var(--muted);" data-i18n="nav.docs">Documentación</a>
         </div>
       </div>
     </div>
@@ -2579,6 +2581,7 @@
           'nav.configurator': 'Configurador',
           'nav.roadmap': 'Hoja de ruta',
           'nav.collaborate': 'Colaborar',
+          'nav.docs': 'Documentación',
           'nav.configurator_abm': 'Configurador ABM & Emulador',
           'nav.roadmap_long': 'Hoja de Ruta',
           'nav.how_collaborate': 'Cómo Colaborar',
@@ -2595,7 +2598,7 @@
           'pipeline.s1.name': 'Datos Satelitales e Hidrológicos',
           'pipeline.s1.desc': 'ERA5 (temperatura y vientos), CHIRPS (precipitación), Sentinel-10m DSwX y MERIT DEM.',
           'pipeline.s2.tag': '02 · Generación de Datos (Profesor)',
-          'pipeline.s2.name': 'Motor ABM en C++ + 14 Scorers',
+          'pipeline.s2.name': 'Motor ABM en C++ + 19 evaluadores',
           'pipeline.s2.desc': 'Simulación estocástica precisa de millones de agentes generando pares de entrenamiento.',
           'pipeline.s3.tag': '03 · Inferencia Operativa (Estudiante)',
           'pipeline.s3.name': 'Emulador U-Net & Asignación Óptima',
@@ -2635,7 +2638,7 @@
           'status.h2': 'Avances consolidados en el paquete mal-core.',
           'status.lead': 'Todo el sistema principal de simulación, ingesta y evaluación se encuentra ya centralizado en <code>mal-core</code>, preparado para ejecuciones reproducibles y calibración científica continua.',
           'status.f1.title': 'Motor ABM en C++ de Alto Rendimiento',
-          'status.f1.desc': 'Consolidado en <code>mal-core</code>, simula dinámicas de ciclos gonotróficos y búsqueda de hospedadores con más de 261 tests en C++ y 14 evaluadores de calibración automatizados.',
+          'status.f1.desc': 'Consolidado en <code>mal-core</code>, simula dinámicas de ciclos gonotróficos y búsqueda de hospedadores con más de 261 tests en C++ y 19 evaluadores de calibración (13 dimensiones + 6 gates).',
           'status.f2.title': 'Ingesta y Tensores Ambientales Diarios',
           'status.f2.desc': 'Pipeline robusto en <code>mal-commonlib</code> que procesa series climáticas CHIRPS (34 años), reanálisis ERA5, capas de agua superficial Sentinel-10m y elevación MERIT DEM.',
           'status.f3.title': 'Orquestación Modular & API REST',
@@ -2651,7 +2654,7 @@
           'config.p4.title': 'Calibración Rápida de Población de Vectores (30 días)', 'config.p4.desc': 'Simulación corta de 30 días para verificar dinámica de ciclo biológico sin malaria activa.',
           'config.p5.title': 'Generación de Dataset para Red Neuronal U-Net (Ensamble)', 'config.p5.desc': '10 rollouts paralelos con distintas semillas para generar pares de entrenamiento.',
           'config.more_options': '2. Más opciones',
-          'config.aoi.label': 'Área de Interés (--aoi)', 'config.aoi.ghana': 'Ghana (Nacional predefinido · 9.466 celdas)', 'config.aoi.moz': 'Mozambique (Nacional predefinido)', 'config.aoi.custom': 'Personalizada (Nueva Región / Coordenadas BBOX)',
+          'config.aoi.label': 'Área de Interés (--aoi)', 'config.aoi.ghana': 'Ghana (Regional predefinido · 429.229 celdas)', 'config.aoi.custom': 'Personalizada (Nueva Región / Coordenadas BBOX)',
           'config.slug.label': 'Identificador de la Región (slug)', 'config.slug.help': 'Identificador único en minúsculas sin espacios.',
           'config.bbox.label': 'Límites Geográficos (Bounding Box)', 'config.bbox.help': 'Formato WGS84 (EPSG:4326): <code>min_longitud, min_latitud, max_longitud, max_latitud</code>.',
           'config.days.label': 'Duración (--days)', 'config.days.30': '30 días (1 mes)', 'config.days.60': '60 días (2 meses)', 'config.days.90': '90 días (3 meses)', 'config.days.180': '180 días (6 meses)', 'config.days.365': '365 días (1 año)', 'config.days.731': '731 días (2 años)',
@@ -2683,7 +2686,7 @@
           'config.transsnap.label': 'Intervalo de Salida de Transmisión (--transmission-snapshot-every)',
           'config.mincellpop.label': 'Población Mínima por Celda (--human-min-cell-pop)', 'config.mincellpop.help': 'Población mínima para que una celda sea candidata a foco.',
           'config.clusterradius.label': 'Radio de Clúster (km) (--human-cluster-radius-km)', 'config.clusterradius.help': 'Modo brote concentrado: UN clúster espacial con los casos repartidos según población. 0 = focos independientes.',
-          'config.mindensity.label': 'Densidad Vectorial Mínima (--human-outbreak-min-density)', 'config.mindensity.help': 'Disparador adaptativo: el brote espera a que la mejor celda viable alcance esta densidad normalizada de mosquitos (agentes/K_MAX). 0 = día exacto. Umbrales altos (≥0.5) pueden no dispararse nunca.',
+          'config.mindensity.label': 'Densidad Vectorial Mínima (--human-outbreak-min-density)', 'config.mindensity.help': 'Disparador adaptativo: el brote espera a que la mejor celda viable alcance esta densidad de mosquitos (adultos/km²). 0 = día exacto. Umbrales altos (≥0.5) pueden no dispararse nunca.',
           'config.corepop.label': 'Tope Poblacional del Núcleo (--human-cluster-max-core-pop)', 'config.corepop.help': 'En modo clúster: celdas más densas no pueden ser núcleo (los vectores se diluyen, R≪1). 0 = sin tope.',
           'config.bio.title': 'Parámetros Biológicos de Transmisión',
           'config.betahv.label': 'Prob. Humano→Vector (--beta-hv)', 'config.betavh.label': 'Prob. Vector→Humano (--beta-vh)',
@@ -2730,7 +2733,7 @@
           'roadmap.lead': 'La secuencia de desarrollo responde a dependencias biológicas y computacionales. Las fechas y plazos se definirán progresivamente en función de la acogida y las contribuciones de la comunidad.',
           'roadmap.badge': '5 Hitos Secuenciales',
           'roadmap.m1.meta': 'Hito 1 · Base', 'roadmap.m1.title': 'Consolidación del Núcleo Computacional', 'roadmap.m1.tag': 'Completado',
-          'roadmap.m1.desc': 'Unificación de código en <code>mal-core</code>, motor C++ ABM optimizado, suite de 14 evaluadores de calibración (PR gate), pipelines de ingesta satelital (ERA5, CHIRPS, Sentinel-10m) y CLI <code>malariasim</code>.',
+          'roadmap.m1.desc': 'Unificación de código en <code>mal-core</code>, motor C++ ABM optimizado, suite de 19 evaluadores de calibración (13 dimensiones + 6 gates), pipelines de ingesta satelital (ERA5, CHIRPS, Sentinel-10m) y CLI <code>malariasim</code>.',
           'roadmap.m1.pull': 'Infraestructura',
           'roadmap.m2.meta': 'Hito 2 · Siguiente', 'roadmap.m2.title': 'Comportamiento Biológico Avanzado y Resistencia a Insecticidas', 'roadmap.m2.tag': 'En proceso',
           'roadmap.m2.desc': '• <strong>Soporte Multi-Especie de Vectores</strong>: Integración de 4 especies de <em>Anopheles</em> con óptimos térmicos y hábitats específicos.<br>• <strong>Resistencia a Insecticidas</strong>: Modelado genético y metabólico de resistencia a piretroides.<br>• <strong>Movilidad Espacial por Fases</strong>: Matrices de movilidad humana y ganadera diurna/nocturna.',
@@ -2777,6 +2780,7 @@
           'nav.configurator': 'Configurator',
           'nav.roadmap': 'Roadmap',
           'nav.collaborate': 'Collaborate',
+          'nav.docs': 'Documentation',
           'nav.configurator_abm': 'ABM Configurator & Emulator',
           'nav.roadmap_long': 'Roadmap',
           'nav.how_collaborate': 'How to Collaborate',
@@ -2793,7 +2797,7 @@
           'pipeline.s1.name': 'Satellite & Hydrological Data',
           'pipeline.s1.desc': 'ERA5 (temperature & winds), CHIRPS (precipitation), Sentinel-10m DSwX and MERIT DEM.',
           'pipeline.s2.tag': '02 · Data Generation (Teacher)',
-          'pipeline.s2.name': 'C++ ABM Engine + 14 Scorers',
+          'pipeline.s2.name': 'C++ ABM Engine + 19 Scorers',
           'pipeline.s2.desc': 'Accurate stochastic simulation of millions of agents generating training pairs.',
           'pipeline.s3.tag': '03 · Operational Inference (Student)',
           'pipeline.s3.name': 'U-Net Surrogate & Optimal Allocation',
@@ -2849,7 +2853,7 @@
           'config.p4.title': 'Fast Vector Population Calibration (30 days)', 'config.p4.desc': 'Short 30-day simulation to verify biological cycle dynamics without active malaria.',
           'config.p5.title': 'U-Net Neural Network Dataset Generation (Ensemble)', 'config.p5.desc': '10 parallel rollouts with different seeds to generate training pairs.',
           'config.more_options': '2. More options',
-          'config.aoi.label': 'Area of Interest (--aoi)', 'config.aoi.ghana': 'Ghana (Predefined National · 9,466 cells)', 'config.aoi.moz': 'Mozambique (Predefined National)', 'config.aoi.custom': 'Custom (New Region / BBOX Coordinates)',
+          'config.aoi.label': 'Area of Interest (--aoi)', 'config.aoi.ghana': 'Ghana (Predefined Regional · 429,229 cells)', 'config.aoi.custom': 'Custom (New Region / BBOX Coordinates)',
           'config.slug.label': 'Region Identifier (slug)', 'config.slug.help': 'Unique lowercase identifier without spaces.',
           'config.bbox.label': 'Geographic Bounds (Bounding Box)', 'config.bbox.help': 'WGS84 format (EPSG:4326): <code>min_lon, min_lat, max_lon, max_lat</code>.',
           'config.days.label': 'Duration (--days)', 'config.days.30': '30 days (1 month)', 'config.days.60': '60 days (2 months)', 'config.days.90': '90 days (3 months)', 'config.days.180': '180 days (6 months)', 'config.days.365': '365 days (1 year)', 'config.days.731': '731 days (2 years)',
@@ -2881,7 +2885,7 @@
           'config.transsnap.label': 'Transmission Output Interval (--transmission-snapshot-every)',
           'config.mincellpop.label': 'Minimum Cell Population (--human-min-cell-pop)', 'config.mincellpop.help': 'Minimum population for a cell to qualify as a candidate focus.',
           'config.clusterradius.label': 'Cluster Radius (km) (--human-cluster-radius-km)', 'config.clusterradius.help': 'Concentrated-outbreak mode: ONE spatial cluster with cases split by population. 0 = independent foci.',
-          'config.mindensity.label': 'Minimum Vector Density (--human-outbreak-min-density)', 'config.mindensity.help': 'Adaptive trigger: the outbreak waits until the best viable cell reaches this normalised mosquito density (agents/K_MAX). 0 = exact day. High thresholds (≥0.5) may never trigger.',
+          'config.mindensity.label': 'Minimum Vector Density (--human-outbreak-min-density)', 'config.mindensity.help': 'Adaptive trigger: the outbreak waits until the best viable cell reaches this mosquito density (adults/km²). 0 = exact day. High thresholds (≥0.5) may never trigger.',
           'config.corepop.label': 'Cluster Core Population Cap (--human-cluster-max-core-pop)', 'config.corepop.help': 'Cluster mode: denser cells cannot be cores (vectors dilute, R≪1). 0 = no cap.',
           'config.bio.title': 'Transmission Biological Parameters',
           'config.betahv.label': 'Human→Vector Prob. (--beta-hv)', 'config.betavh.label': 'Vector→Human Prob. (--beta-vh)',
@@ -2928,7 +2932,7 @@
           'roadmap.lead': 'The development sequence responds to biological and computational dependencies. Dates and timelines will be defined progressively based on community uptake and contributions.',
           'roadmap.badge': '5 Sequential Milestones',
           'roadmap.m1.meta': 'Milestone 1 · Foundation', 'roadmap.m1.title': 'Computational Core Consolidation', 'roadmap.m1.tag': 'Completed',
-          'roadmap.m1.desc': 'Code unification in <code>mal-core</code>, optimised C++ ABM engine, suite of 14 calibration scorers (PR gate), satellite ingestion pipelines (ERA5, CHIRPS, Sentinel-10m) and <code>malariasim</code> CLI.',
+          'roadmap.m1.desc': 'Code unification in <code>mal-core</code>, optimised C++ ABM engine, suite of 19 calibration scorers (13 dimensions + 6 gates), satellite ingestion pipelines (ERA5, CHIRPS, Sentinel-10m) and <code>malariasim</code> CLI.',
           'roadmap.m1.pull': 'Infrastructure',
           'roadmap.m2.meta': 'Milestone 2 · Next', 'roadmap.m2.title': 'Advanced Biological Behaviour & Insecticide Resistance', 'roadmap.m2.tag': 'In progress',
           'roadmap.m2.desc': '• <strong>Multi-Species Vector Support</strong>: Integration of 4 <em>Anopheles</em> species with differentiated thermal optima and habitats.<br>• <strong>Insecticide Resistance</strong>: Genetic and metabolic modelling of pyrethroid resistance.<br>• <strong>Phased Spatial Mobility</strong>: Diurnal/nocturnal human and livestock mobility matrices.',
