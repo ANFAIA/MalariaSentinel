@@ -69,7 +69,7 @@ Además: `feeding_success[si] = 1.0f` se fija siempre (`src/mosquito_submodel.cp
 | Q8 | Los escenarios sintéticos **ejercitan la cadena real** | El pipeline debe funcionar; los escenarios son el instrumento de validación |
 | Q8b | Alcance **(b)**: la individualización **sustituye** los mecanismos de comida y oviposición; sólo se reparan los que sobreviven (desarrollo larvaro, máquina gonotrófica, renovación de población) | Un solo modelo; sin trabajo duplicado |
 | Q10 | Las personas **se quedan en casa** (posición fija dentro de la celda, uniforme); la movilidad individual se pospone | El modelo de datos debe tener `home` y `current` (iguales ahora) |
-| Q11 | Movimiento **emergente y por especie**, ahora con la **cascada sensorial verificada** (activación 100 m · orientación olfativa 30–70 m · visual 25–72 cm · terminal 10–20 cm) y velocidad de vuelo medida (0,225–0,45 m/s) | Ni `host_flight_step_m` ni el kernel gaussiano sobreviven; el campo de atracción por celda desaparece |
+| Q11 | Movimiento **emergente y por especie**, con la **cascada sensorial documentada y su alcance por especie** (activación 100 m [P] · orientación olfativa 30–70 m [P] · visual 25–72 cm [M] · terminal 10–20 cm [M]) y velocidad de vuelo medida (0,225–0,45 m/s) | Ni `host_flight_step_m` ni el kernel gaussiano sobreviven; el campo de atracción por celda desaparece |
 | Q12 | Especie piloto: ***Anopheles coluzzii*** | Fila ya activa (`species.default_species`); no cambia el calibrador |
 | Q13 | **Mezcla de señales dependiente del estado gonotrófico**: hambrienta → hospedero; gravídica → hábitat de cría | El pack 05 pasa a ser requisito, no alternativa |
 | Q13b | **Acumulación de volumen sanguíneo**: una picadura no completa la sangre necesaria; la hembra sigue picando hasta un umbral | Nuevo parámetro de especie + cambio de la máquina gonotrófica |
@@ -80,6 +80,8 @@ Además: `feeding_success[si] = 1.0f` se fija siempre (`src/mosquito_submodel.cp
 | Q15 (M) | **Machos triviales pero configurados por especie**, con `male_ratio`, `insemination_prob` y un **diagnóstico de enjambre**; el apareamiento es un **encuentro espacial con la capacidad de los enjambres** (§5.7), con la hembra volando al enjambre y respaldo local | No se modelan enjambres como agentes; el ODD ya declara "no hay colectivos"; el apareamiento pasa de instantáneo a probabilidad por hembra **y por distancia** |
 | Q16 (E) | **Máquina de estados fisiológicos**: `gonotrophic_cycles` (reloj) + `blood_volume_accumulated` + `ovarian_stage` + `gonotrophic_arrest`; `age_days` sólo como diagnóstico | Sin evidencia medida de dependencia de la edad, `age_days` no puede ser variable de estado |
 | Q17 | **Época seca = "no hay criadero", no "mueren"**: la hembra gravídica sin criadero entra en `ARRESTED` | Requiere que la parada ovárica sea por especie (`coluzzii` sí estiva; `gambiae` s.s. no) |
+| Q18 | **Base temporal del movimiento = opción (a)**: paso macro por fase (el desplazamiento diario sigue anclado al MRR medido) + **micro-simulador local** (ticks de 1 s) cuando el mosquito entra en el radio olfativo | El motor no tiene hoy reloj de fase ni sub-pasos (`model_constants.yaml` no tiene duración de fase; el día es un único `for p < PHASE_WEIGHT_COUNT`), y la cascada abarca 4 décadas de escala (100 m → 10 cm) ⇒ un solo integrador no la representa. Opción (b) (tiempo continuo por eventos) es más fiel pero mucho más invasiva; (c) (integrador grueso + kernel de encuentro) es la más barata pero **anula el objetivo del §1** (trayectorias individuales) |
+| Q19 | **Individualización humana = opción (a)**: todas las personas son individuos con posición, estado y timers propios | El coste por persona (~58 B) implica 2–4 GB de estado por corrida a escala de país ⇒ **se optimiza después**, y **los escenarios sintéticos empiezan con poblaciones pequeñas** (10×10 / 100×100 celdas). Para conservar la opción de optimizar sin romper el contrato de observación, el `human_id` debe ser **determinista y estable** (`celda × slot + slot`) desde el primer día |
 
 ## 4. Modelo de datos humano
 
@@ -809,8 +811,10 @@ Consecuencias:
 |---|---|---|
 | W | Viento: ¿evento aparte o término del vector diario? | **(a) evento aparte** — ver §5.5 |
 | S | ¿Existe "olor de asentamiento"? | **no** — movimiento = exploración correlacionada + guiado de olor cercano (§5.1) |
-| P | Radio de percepción | **clave por especie** en `species.<fila>` con la cascada verificada: activación 100 m · olfativa 70 m (30 m en campo abierto) · visual 25–72 cm · terminal 10–20 cm (§5.1, §9.1) |
-| C | Correcciones de parámetro | **se adoptan** (`activity_weights`, salinidad 10,5 ppt, `egg_batch` ∝ volumen, `wind_self_speed_ms` 0,70), siempre con la cifra medida y su referencia; sin valor medido, no se cambia (§9.7) |
+| P | Radio de percepción | **clave por especie** en `species.<fila>` con la cascada documentada y su alcance por especie: activación 100 m · olfativa 70 m (30 m en campo abierto) · visual 25–72 cm · terminal 10–20 cm (§5.1, §9.1) |
+| C | Correcciones de parámetro | **se adoptan** (`activity_weights`, salinidad 10,5 ppt, `egg_batch` ∝ volumen), siempre con la cifra medida y su referencia; sin valor medido, no se cambia (§9.7) |
+| D1 | Base temporal del movimiento | **opción (a)**: paso macro por fase + micro-simulador local (§3, Q18; análisis en `individualization-and-movement-brief.goldfish-review.md` §6) |
+| D2 | Alcance de la individualización humana | **opción (a)**: todas las personas son individuos; se optimiza después y los escenarios empiezan con poblaciones pequeñas (§3, Q19) |
 
 ### 12.2 Resueltos por la investigación (machos y edad)
 
@@ -883,7 +887,118 @@ respaldo medido, no por preferencia.
 | — | Forma del kernel de dispersión local | Ninguna fuente de *coluzzii* distingue exponencial de half-Cauchy (sólo cuantiles FR50/FR90): la forma es decisión de diseño, no un dato |
 | — | 'Percepción' como 'radio' o 'sensibilidad' | La evidencia da **radios por tramo**; el parámetro 'cuánto pesa cada uno' en la decisión de picar queda como sensibilidad en el paquete sintético (E10) |
 
+### 12.5 D3, D4 y D5: opciones, implicaciones y qué se rompe en cada caso
+
+Las tres decisiones se toman juntas en el draft: las tres tocan el mismo insieme de
+contratos (estado acuático, COG de estado, aparición) y una de ellas puede determinar la
+forma de las otras dos.
+
+#### D3 — Qué significa la banda 1 del COG de estado (`adult_patch_count`)
+
+**Contexto verificado**
+
+- `wire.hpp:120–129`: dos bandas, `STATE_BAND_NAMES[2] = {"adult_patch_count", "adult_cell_count"}`;
+  contrato 4.0: conteos **crudos** por celda, sin `/K_MAX` ni recorte [0,1].
+- `mosquito_submodel.cpp:965–1004` (`update_patch_id`): el adulto se asigna al **parche
+  activado más próximo** dentro de `dispersal.snap_radius_m` (500 m), que **no** es la celda
+  en la que está ⇒ hoy las dos bandas difieren.
+- Los lectores leen **por nombre de banda** (`docs/specs/abm/spec.md` INV-12, INV-16): el
+  surrogate toma las 2 bandas (`training/dataset.py:20`, `VECTOR_CHANNELS = 2`) + 4 de
+  transmisión = 6 canales; `prediction/state_loader.py` apila 2 + 4.
+- Con la regla del §8 ("el parche se resuelve por posición") la banda 1 **coincide** con la
+  banda 2 ⇒ dos canales idénticos y un contrato que miente sobre lo que contiene.
+
+**Opciones**
+
+| | Qué pasa a responder la banda 1 | Implicaciones |
+|---|---|---|
+| **(a)** | **Afiliación reproductiva**: el adulto se cuenta en la celda de su cohorte de origen (o de su último sitio de oviposición) | Dos canales distintos y ambos útiles: "¿dónde va a criar?" frente a "¿dónde está?". El parche sobrevive con un significado preciso. La banda pasa a ser **derivada y con memoria** (cambia en oviposición/emergencia, no cada día) ⇒ deja de ser una foto diaria de la población. Contrato 5.0 (breaking) |
+| **(b)** | **Presión de búsqueda de hospedero**: hembras en `TENERAL`/`HOST_SEEKING` por celda | Es el canal que más predice el paso siguiente. Reintroduce la semántica que v4.0 retiró a propósito (`host_seeking_pressure` era el nombre viejo), pero **sin** la normalización por `K_MAX` que lo motivó ⇒ defendible. Obliga a renombrar la banda (el nombre actual describiría otra cosa) |
+| **(c)** | **Colapso honesto**: banda 1 deprecada; durante una versión de contrato se rellena con el valor de la banda 2; la 5.0 publica una sola banda + el artefacto individual | Lo más barato y lo más honesto. Se pierde "dónde se cría", recuperable del sidecar acuático (`*_aquatic.json`, `cohort_bank().write_diagnostics`). Los lectores sobreviven una versión |
+| **(d)** | **Añadir una banda** en vez de reutilizar: 5.0 con tres bandas (posición · afiliación reproductiva · hembras buscando) | Cambio **aditivo**, no semántico: menos riesgo de lectura equivocada. El surrogate pasa de 2+4 a 3+4 canales ⇒ `VECTOR_CHANNELS` 2→3 y reentrenamiento (de todos modos forzado) |
+
+**Coste común a las cuatro**: los checkpoints del surrogate no son reutilizables en ningún
+caso (memoria #195) y el golden byte-idéntico hay que regenerarlo. La elección debe hacerse
+por lo que el consumidor necesita, no por los checkpoints.
+
+#### D4 — Clave de la cohorte acuática
+
+**Contexto verificado**
+
+- `aquatic_cohort_bank.hpp`: `CohortKey` = (`patch_id`, `stage`, `instar`).
+- `aquatic_cohort_bank.cpp` (`larva_mortality_density`): agrega `larva_per_patch[patch]` y
+  calcula `p = s0·K/(K + α·N)` con **N = larvas de las 4 instars sumadas por parche** y
+  **K = `PatchState.k_habitat` = `K_ref × cell_area_km2 × S[i]`** (una cantidad de **área
+  de celda**).
+- `coordinator.cpp`: `PatchState` se construye **sólo para células candidatas** (parches del
+  gpkg ∪ células sobre el umbral de potencial), mientras que `S`/`K` existen para **todas**
+  las células.
+- §8 dice hoy: "los huevos heredan la posición exacta de la hembra" y "el parche se resuelve
+  por posición".
+
+**El problema**: si la clave pasa a ser la posición exacta, la agregación por parche/celda se
+desarma (cada sub-posición ve un N minúsculo) ⇒ **la dependencia de densidad se apaga en
+silencio**, la supervivencia larvaria se infla y el contrato de capacidad queda vacío; y una
+cohorte que cae en una célula no candidata se queda **sin** `PatchState` (ni temperatura, ni
+salinidad, ni `k_habitat`, ni racha de secas).
+
+**Opciones**
+
+| | Clave y contexto | Implicaciones |
+|---|---|---|
+| **(a)** | **Celda como clave, posición de la madre como payload**: la cohorte conserva `cell_id` como clave de agregación y guarda `(x, y)` de la madre como atributo (emergencia, reporte de oviposición, geometría de encuentro) | **Cero cambios de contrato**; la dependencia de densidad sigue funcionando sin tocar nada. La hipótesis queda explícita: dentro de una celda las larvas compiten como un único pool (heterogeneidad intra-celda invisible en la fase acuática: limitación documentada). El "cohorte con posición" del §8 se cumple a medias: posición exacta para la eclosión, ecología de la celda |
+| **(b)** | **Estado acuático por celda como contrato de primera clase**: promover el campo de hábitat (S, K, temperatura, salinidad, `dry_days`) a registro propio para **todas** las células; `PatchState` deja de portar el estado acuático y "patch" queda sólo como filtro de candidatas/siembra | La solución limpia: toda cohorte tiene contexto. Pero es el más grande de los tres: hay que renombrar "patch" en la ingesta (gpkg `hab_type`/`habitat_potential`), en el seeding, en el JSON de diagnóstico acuático y en el "activated" que hoy también gatilla la llegada a oviposición (`mosquito_submodel.cpp:690–700`); contrato de hábitat 3.0 → 5.0; trabajo de ingesta y registro |
+| **(c)** | **Servicio de consulta posición → celda**: arrays `S`/`K`/temperatura/salinidad/`dry_days` para todas las células, precomputados por día (que ya se calculan en `coordinator.cpp::update_habitat_day`), expuestos como una única función que consume todo proceso | Barato; un solo contrato de hábitat; el "patch" puede quedar como vista **derivada** ⇒ si se escriben las dos vistas pueden divergir: hay que elegir una como derivada y generarla |
+
+(a) y (c) son compatibles: (a) decide la clave, (c) decide cómo se consulta el contexto.
+
+#### D5 — Semántica de la capacidad de enjambre
+
+**Contexto verificado (con la aritmética)**
+
+- Diabaté 2011 (*gambiae* M, Mali, **[P]**): "per-male mating probability per night: 0,072
+  (SE 0,0095), i.e. ~7 % de los machos de un enjambre se aparean cada noche" y "una cópula
+  adicional por cada 14 machos adicionales"; 1 456 parejas en 70 enjambres (rango 0–93, moda
+  6) ⇒ con la regla `0,072·M` y una cópula por macho, la moda 6 implica un enjambre de ~83
+  machos, coherente con las modas de tamaño 100/180. Supuesto explícito del artículo: "cada
+  macho se aparea **como mucho una vez** por noche".
+- Ekechukwu 2019 (*coluzzii*, **[M]**): "un macho puede inseminar **~3 hembras** por noche";
+  "las hembras son en gran medida monándricas y visitan los enjambres **una vez en su vida**"
+  (fuente secundaria, [NO-VERIFICADO]); "**las hembras son claramente el sexo limitante**"
+  con "~7 % de los machos se empareja cada noche".
+- **Conflicto en la evidencia**: el propio extracto de Ekechukwu rotula "**los machos** son el
+  sexo limitante en el enjambre" mientras la cita dice "las hembras son claramente el sexo
+  limitante". De ahí depende toda la semántica.
+- El tope de 3 hembras/macho limita el **lado hembra**; el 0,072 limita el **lado macho**
+  (qué fracción de los machos se aparea). El §5.7.2 los mezclaba, y el tope de 3 nunca
+  acota si se compara con `0,072·M`.
+
+**Las dos lecturas, con números** (100 hembras, un enjambre de 100 machos):
+
+| Lectura | Regla | Resultado | Consistencia |
+|---|---|---|---|
+| **R1**: los machos limitan a la hembra | `p = min(1, 0,072 × M_alcance)` | `p = 1` ⇒ las 100 hembras se inseminan ⇒ hacen falta 100 cópulas con 7,2 machos ⇒ **14 hembras por macho** | **contradice** el tope de 3 de Ekechukwu |
+| **R2**: las hembras compiten por cupos | cupos = `3 × 0,072 × M` = 21,6; `p = 1 − exp(−cupos/competidoras)` | ~19 hembras inseminadas (7,2 machos × 3) | coherente con **las dos** mediciones |
+
+**Opciones de implementación**
+
+| | Mecanismo | Implicaciones |
+|---|---|---|
+| **(a)** | **Cupos + carrera** (R2): el enjambre ofrece `3 × 0,072 × M` cupos; las hembras no inseminadas al alcance los compiten; `p = 1 − exp(−cupos/competidoras)` | Respeta las dos cifras medidas. La fracción de hembras sin inseminar **depende de la densidad espacial** ⇒ la alarma de §5.7.2 discrimina de verdad. Coste: la **tasa de llegada de hembras al enjambre no está medida** ⇒ ese número sale del modelo (no de una medición) y arrastra el prior de `swarm_markers_per_km2` y de la regla de vuelo |
+| **(b)** | **Cupos + asignación determinista** (R2 con reparto por orden) | Sin aleatoriedad extra y tests más fáciles; introduce un orden artificial (quién llega primero) ⇒ el resultado depende del criterio de orden, que hay que fijar en la especificación para que sea reproducible e interpretable |
+| **(c)** | **Saturación por disponibilidad de machos** (R1): `p = min(1, 0,072 × M_alcance)` con el tope de 3 aplicado después como restricción | Más simple; el tope de 3 pasa a ser un recorte posterior (puede generar descartes); las hembras sin inseminar sólo aparecen **por ausencia de machos**, no por densidad ⇒ la alarma de enjambre apenas discrimina |
+| **(d)** | **Sin geometría de enjambre** (agregado puro): probabilidad por hembra a partir de la densidad de machos por celda | Lo más barato. El arquitecto escéptico señaló que el modelo espacial puede no cambiar ninguna salida epidemiológica ⇒ habría que **medirlo** (E13/E14 como test de equivalencia) antes de pagar su coste; se pierde el diagnóstico de enjambre |
+
+**Qué hay que decidir**: (i) la semántica (R1 vs R2), (ii) el reparto de cupos (carrera vs
+determinista), (iii) si se mantiene la geometría de enjambre (opción (d) = no).
+
 ## 13. Orden de ejecución previsto
+
+**Estrategia de entrega**: **un único PR** que se cierra cuando el plan entero esté
+ejecutado, con **commits** por paso (el PR es la unidad de revisión; el commit es la unidad
+de cambio). Cuando toque implementar, los cambios independientes se aplican en
+paralelo con subagentes sobre ramas de trabajo separadas, y se integran al final; el
+brief y el plan se redactan primero.
 
 0. **Arnés de escenarios sintéticos** (prerrequisito de todo lo demás): hook de siembra por
    individuo (x, y, sexo), override de población humana por celda, semilla por escenario y
@@ -929,9 +1044,13 @@ Cada paso es un PR (memoria #228/#233: nada directo a `main`).
 
 - **Coste computacional**: el tamaño de la población humana debe **derivarse del
   manifiesto** (`human_total`), no de una constante escrita a mano (el ODD habla de ~32 M;
-  la cifra real depende del AOI). Hay que decidir el muestreo (¿todos? ¿una fracción? ¿
-  materialización perezosa al ser mordido?) y el almacenamiento del estado individual: a
-  ~58 B por persona, la población completa son varios GB por corrida.
+  la cifra real depende del AOI). Con D2 = (a) (todas las personas son individuos), el estado
+  individual cuesta ~58 B por persona ⇒ **2–4 GB por corrida** a escala de país, más el
+  coste de ageing/timers diario (O(N) por día: 64 M × 30 d ≈ 2 000 M de actualizaciones,
+  trivial en C++). **Se optimiza después**: materializar sólo a los humanos que un mosquito
+  pica (o un muestreo estratificado con pesos) exige que el `human_id` sea **determinista y
+  estable** (`celda × slot + slot`) desde el primer día, o el contrato de observación se
+  rompe al cambiar la representación.
 - **Los checkpoints del surrogate** entrenados con bandas normalizadas ≤3.0 no son
   reutilizables (memoria #195).
 - **La línea base de calibración se desplaza**: el comparador "run anterior" deja de ser
