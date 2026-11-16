@@ -313,7 +313,9 @@ never a hand-maintained one.
     English, each in its own structure, sharing a stance rather than a template.
 *   Make hand-typed values impossible: parameter and contract tables generated
     from `model_constants.yaml` and a contracts file at build time, so a
-    renamed key fails the LaTeX build on its own.
+    renamed key fails the build on its own — at schema validation for a key
+    the configuration validator covers, and at the LaTeX build for a key the
+    schema tolerates.
 *   Run a warnings-only coherence review on pull requests: it reports
     incoherences between the documents and the implementation, and blocks
     nothing.
@@ -330,8 +332,10 @@ never a hand-maintained one.
     set, a human annotates, annotations become plans under `docs/plans/`, and
     applying a plan updates the part of the document it invalidates.
 *   Untrack `data/` from GitHub while keeping it usable locally: zip `data/`
-    to the repository's parent directory first, then `git rm -r --cached
-    data`; the next `malariasim download` rebuilds the manifest from nothing.
+    to the repository's parent directory first, then `git rm -r --cached --
+    data`; the next `malariasim download` rebuilds the upstream half of the
+    manifest from the registry, and the next `malariasim ingest` re-registers
+    the derived products (D8).
 
 ## Non-Goals
 
@@ -341,9 +345,11 @@ never a hand-maintained one.
     about the system's processes and algorithms, not a technical source of
     truth about its parts.
 *   **No automated gating of any kind.** No blocking check, no required status,
-    no presence rule, no waiver mechanism. The only automated failure is a
-    LaTeX build that cannot find a generated value — a property of the build,
-    not a judgement about the document.
+    no presence rule, no waiver mechanism. The only automated failures are a
+    configuration validation error — a renamed or removed key in
+    `model_constants.yaml` is rejected before the build starts — and a LaTeX
+    build that cannot find a generated value. Both are properties of the
+    build, not judgements about the document.
 *   **No code or test detail in the conceptual documents.** Pseudocode yes;
     call graphs and test names no. A code symbol may be named only if it is
     explained in prose at its first use.
@@ -435,9 +441,13 @@ Carried as open, not as decided:
 * **The flag-and-file contract generator (I2-B).** Whether it is built before
   or after the Doxygen and pdoc surfaces exist is not decided, and neither is
   whether it earns its maintenance cost.
-* **Where the coherence reviewer runs, and at what cost.** The warnings-only
-  regime needs a model, a token budget per pull request and a place to run; none
-  of the three is set, so the regime has no defined cost ceiling.
+* **When the author relies on the coherence reviewer.** The regime's mechanics
+  are decided in this plan (Stage 12): the workflow reads the model id from a
+  repository variable and the key from the `OPENROUTER_KEY` repository secret
+  — the path the project's LLM scorer already uses — and the token budget is
+  the workflow's own default. What remains open is not the mechanics but the
+  decision to rely on the reviewer, which Stage 12 turns into a recorded
+  measurement rather than a threshold.
 * **The exact content of the Stage 0 truth pass.** The stale claims are
   enumerated; the current text of the contract-defining headers is not fully
   audited, so the size of that change is unknown.
@@ -445,9 +455,6 @@ Carried as open, not as decided:
   its index is generated or hand-written, is undecided — and it needs its own
   ES/EN dictionaries, which is a translation maintenance question, not a
   documentation one.
-* **Whether `data/` untracking lands before or after the first document
-  exists.** The sequencing of Stage 9 against the first document is not
-  decided; its pre-work is now the zip backup (D8, option B).
 * **The first document's author.** The loop has an agent drafting and a human
   annotating; whether the first document is written by the author, by an agent,
   or by an agent under review is not stated, and it changes what the first
@@ -466,7 +473,9 @@ machines.
    template — the questions the document must answer. For `abm/` that template
    is `odd-2010-template.tex`, copied out of the gitignored cache together with
    the document. The document's structure is its own; the template records the
-   questions it was written to answer.
+   questions it was written to answer. Each of the six has its own stage in the
+   sequencing below: Stage 1 for `abm`, Stage 5 for the `download` pilot, and
+   Stages 6–9 for `ingest`, `scoring`, `training` and `prediction`.
 2. **The stance note** at `docs/concepts/` — one page stating how to ask the
    questions (S1–S10, stated in full in Appendix A of this plan): purpose before
    mechanism, every magnitude named with identity and units, choices named as
@@ -481,13 +490,21 @@ machines.
 4. **The value generator** — a script that reads
    `mal-core/config/model_constants.yaml` and a small contracts file, and emits
    LaTeX (`\input{generated/...}`) carrying parameter tables, contract tables
-   and per-key macros. The documents never type a number. A key renamed or
-   removed in YAML becomes an undefined control sequence and the LaTeX build
-   fails. This is the only automatic failure in the whole design, and it is a
-   property of the build, not a judgement about the document.
+   and per-key macros. The documents never type a number. Two failures follow
+   from that, both properties of the build rather than judgements about the
+   document: a key renamed or removed in `model_constants.yaml` is rejected by
+   the configuration validator
+   (`mal_core.config_validation.validate_model_config` — `extra="forbid"` at
+   every level, every key required) before the generator emits anything; and
+   a key the schema tolerates becomes an undefined control sequence only if a
+   document actually references it. The LaTeX-level guarantee is therefore
+   reachable for the keys a document uses, and is demonstrated at the first
+   stage where a document uses one.
 5. **CI: PDF build and publication** — a workflow compiles each document with
-   `latexmk -pdf` and commits the PDF back to the same branch (decision I1-A),
-   at a stable path such as `docs/concepts/abm/abm.pdf`, which the legacy
+   `latexmk -pdf` and commits the PDF back to the same branch (decision I1-A:
+   the PDF is compiled in CI and committed back to the branch), at the stable
+   path `docs/concepts/<phase>/<phase>.pdf` — the `latexmk` output is renamed
+   (`odd-2010-malariasentinel.pdf` becomes `abm.pdf`) — which the legacy
    `main:/docs` Pages build then publishes. The documentation page under `docs/`
    links each PDF and carries its own ES/EN dictionaries; one nav entry is
    added to the landing page. Fork PRs cannot receive the bot push, so their
@@ -502,19 +519,26 @@ machines.
    recomputable numbers (grid dimensions from `aois.yaml`); `latexmk -Werror`
    integrity; named `docs/...`, `papers/...`, `scripts/...` paths vs the tree;
    documented output files vs consumer globs; changed path → candidate
-   document; `% sources:` freshness. What stays human: process ordering,
+   document; `% sources:` freshness. Two of these signals already have
+   implementations in the repository — `tools/audit_comment_constants.py`
+   (model-constant values echoed inside comments and docstrings) and
+   `tools/check_no_constants.sh` (no model-constant literals in migrated
+   code) — and the reviewer cites them rather than re-implementing them.
+   What stays human: process ordering,
    formula-vs-code equivalence, implemented-vs-unimplemented statements,
    blast radius, provenance.
 7. **CI: generated technical reference** — after a comment-polish pass scoped
    to the contract-defining headers (`wire.hpp`, `output_contract.hpp`,
    `habitat_availability.hpp`, `habitat_engine.hpp`, `coordinator.hpp`,
    `config.hpp`), Doxygen generates the C++ reference and pdoc the Python one
-   (decision I2-A), into the namespaced directories `docs/reference/cpp/` and
+   (decision I2-A: Doxygen plus pdoc generation, scoped to the polished
+   headers), into the namespaced directories `docs/reference/cpp/` and
    `docs/reference/python/` so neither tool's `index.html` collides with the
    other's. One site entry, "Technical reference", links into both surfaces.
    The flag-and-file contract (CLI flags, YAML keys, input formats, output
    contracts — the interface that actually breaks) is a candidate for a small
-   purpose-built generator later (I2-B, still open).
+   purpose-built generator later (I2-B: the flag-and-file contract generator,
+   not decided — see Open Questions).
 
 ### Data flow
 
@@ -568,12 +592,24 @@ re-litigation of it.
 | 3 | **Per-stage question sets**: one subagent per stage reads that stage's material and returns its questions with citations (the ODD's discipline: read before asking) | a question set and a checklist per stage, each traceable to code/notes citations, stored as the stage's template beside its document |
 | 4 | **Value generator** + contracts file + first workflow | a build reproduces the generated tables byte-for-byte (`git diff --exit-code`) |
 | 5 | **Pilot `download`**: an agent drafts from the question set; a human annotates; annotations become a plan under `docs/plans/`; the plan's application updates the document | one non-ABM document written, read by someone without a code profile, revised once through the full loop |
-| 6 | **Publication**: one PDF published and linked once from the site; one "Technical reference" entry | a reader reaches both in ES and EN |
-| 7 | **Generated technical reference**: comment polish on the contract-defining headers, then Doxygen + pdoc generation into the namespaced directories | published, linked, and the flag/file contract documented |
-| 8 | **Warnings-only coherence review** on PRs; measure its false-positive rate over 20 PRs of history | a first-pass rate is known before anyone relies on it |
-| 9 | **`data/` untracking (option B)**: zip `data/` to the repository's parent directory and verify it (`unzip -t`); `git rm -r --cached data` (never `rm`) with a blanket `data/` ignore rule plus `!data/README.md`; update `data/README.md` for the new restore path | backup restores the tree; `git ls-files data/` shows only `data/README.md`; fresh clone → `uv sync` → `download` (manifest rebuilt from nothing) → ingest → `abm --days 1` passes |
+| 6 | **`ingest` document**: the loop of Stage 5 again — an agent drafts from the stage's question set, a human annotates, the annotations become a plan, the plan's application updates the document | the `ingest` document written, read by someone without a code profile, revised once through the full loop |
+| 7 | **`scoring` document**: the loop of Stage 5 again | the `scoring` document written, read by someone without a code profile, revised once through the full loop |
+| 8 | **`training` document**: the loop of Stage 5 again | the `training` document written, read by someone without a code profile, revised once through the full loop |
+| 9 | **`prediction` document**: the loop of Stage 5 again | the `prediction` document written, read by someone without a code profile, revised once through the full loop |
+| 10 | **Publication**: one PDF published and linked once from the site | a reader reaches the PDF from the site in ES and EN (the Technical reference is verified at Stage 11) |
+| 11 | **Generated technical reference**: comment polish on the contract-defining headers, then Doxygen + pdoc generation into the namespaced directories | published and linked; the flag/file contract documented *if I2-B is built* — if it is not, the stage records I2-B as deferred in the plan tracker and the exit condition holds |
+| 12 | **Warnings-only coherence review** on PRs; measure its first-pass false-positive rate over the last 20 merges on `main` (or all of them if fewer exist) | the measured rate is written down — findings versus confirmed false positives — before anyone relies on the reviewer; no threshold is set, by design (D3) |
+| 13 | **`data/` untracking (option B)**: zip `data/` to the repository's parent directory and verify it (`unzip -t`); `git rm -r --cached -- data` then `git add -- data/README.md` (never `rm`), with a `data/*` ignore rule plus a `!data/README.md` negation; update `data/README.md` for the new restore path | backup restores the tree; `git ls-files data/` shows only `data/README.md`; clean-room clone (with credentials) → `uv sync --all-packages` → `uv run malariasim download` (upstream half of the manifest rebuilt) → `uv run malariasim ingest` (derived half) → `abm --days 1` passes |
 
 ### Decisions that shape the architecture
+
+The labels used by the brainstorm's RFC brief — the `R1`–`R10` round-2
+requirements and the `I*`/`F*` open decisions — are historical and are not
+carried into this plan: every requirement they marked is stated here in full.
+The exception is the three that name decisions this plan still makes — I1-A
+(the PDF is compiled in CI and committed back to the branch), I2-A (Doxygen
+plus pdoc generation) and I2-B (the flag-and-file contract generator, not
+decided) — which are expanded in place wherever they appear.
 
 - **D1 — Generate facts, write semantics.** Any number, key, symbol or path in
   a conceptual document is emitted at build time; prose carries only what
@@ -585,12 +621,12 @@ re-litigation of it.
 - **D3 — Warnings only, no gates.** The mechanical signals above are inputs the
   reviewer may cite, not pass/fail tests. No anchor-existence check, no
   presence rule, no waiver trailer, no required status.
-- **D4 (superseded by R4) — The document changes as the plans land.** The
+- **D4 — The document changes as the plans land.** The
   clean ODD is the base for `docs/concepts/abm/`, and each application of a
   plan changes the part of the document it invalidates. No status macros, no
   per-section `\asbuilt{}`/`\target{}` metadata. Accepted cost: staleness
   relative to an in-flight plan is invisible to the reviewer; that signal
-  lives in the plan tracker, not in the document.
+  lives in the plan tracker (`docs/plans/in-process/`), not in the document.
 - **D5 — Ownership by use; no common substrate.** The stage that uses a piece
   of content documents it. Coherence is checked at the seams by adjacency.
   Repetition between stages is accepted: it is where drift becomes visible.
@@ -599,14 +635,27 @@ re-litigation of it.
   (author decision, 2026-11-16): they are marked untrusted instead of
   repaired, because they are scheduled for deletion.
 - **D7 — ODD first out of `.cache/`** (Stage 1), as a copy plus `git add`.
-- **D8 — `data/` is last** (Stage 9), and its removal is a safety problem
+- **D8 — `data/` is last** (Stage 13), and its removal is a safety problem
   before it is a git problem. Its pre-work is superseded by the author's
   option B (2026-11-16): one zip in the repository's parent directory, then
-  `git rm -r --cached data` — the manifest rebuilds on the next `download`,
-  so no relocation, no `MAL_DATA_ROOT`, no restore script.
+  `git rm -r --cached -- data` — so no relocation, no `MAL_DATA_ROOT`, no
+  restore script. The manifest rebuilds itself, in two halves: `download`
+  re-registers the upstream products from the downloader registry (datasets
+  whose credentials are absent are skipped, not failed, and leave the manifest
+  partial), and `ingest` re-registers the derived ones (`env_nc`, the habitat
+  gpkg, `host_static`, `mobility_*`) through
+  `mal-core/src/mal_core/ingest/_shared.py::register_dataset`.
 - **D9 — Experiment packages and any top-level system document remain the
   author's decision.** The cycle/DAG gap against Kelly et al. (2012) is
   recorded, not actioned.
+- **D10 — One stage per remaining document** (author decision, 2026-11-16).
+  This plan produces all six conceptual documents: `abm` (Stage 1) and the
+  `download` pilot (Stage 5) were already in it, and `ingest`, `scoring`,
+  `training` and `prediction` each get their own stage (Stages 6–9), so that
+  every spec's retirement can happen in the same commit that lands its
+  conceptual equivalent. The alternative — leaving the four to a later plan —
+  was rejected: it would leave the six-document goal unreachable and four
+  specs with no retirement path.
 
 --------------------------------------------------------------------------------
 
@@ -801,7 +850,7 @@ re-litigation of it.
     rejected ("coherence, not source of truth"). Seven of thirteen packs touch
     what the ABM document must say, so more than 40% of its mechanism sections
     would be knowingly false on publication day.
-*   **Reason for Rejection**: Rejected by author, 2026-11-16 (R4): the clean
+*   **Reason for Rejection**: Rejected by author, 2026-11-16: the clean
     ODD as-built is the base, and each application of a plan changes the part
     of the document it invalidates. The cost is stated: with no status markers
     and a warnings-only review, staleness relative to an in-flight plan is
@@ -833,11 +882,12 @@ re-litigation of it.
 
 ## Detailed Implementation
 
-One unified list, ordered by stage. Every file that the plan touches appears
-once, with what changes and why. Two of these files are protected by project
-convention and need explicit user approval when edited: `AGENTS.md` and
-`.gitignore` — each is flagged below. No code is specified here; signatures and
-schemas are described in prose.
+One unified list, ordered by stage — fourteen stages, fifty-three entries.
+Every file that the plan touches appears once, with what changes and why.
+Three of these files are protected by project convention and need explicit
+user approval when edited: `AGENTS.md`, `.gitignore` and `data/` — each is
+flagged below. No code is specified here; signatures and schemas are described
+in prose.
 
 ### Stage 0 — Truth pass (one commit, no new concepts)
 
@@ -846,10 +896,16 @@ schemas are described in prose.
 *   **Type / Scope**: Documentation index.
 *   **Proposed Changes**: Remove the six paths that do not exist
     (`specs/self_improve/`, `diagrams/`, and the four presentation/status
-    files). The exit condition is that no listed path is absent from the tree.
+    files), and replace the sentence that names `docs/specs/abm/spec.md` "the
+    single source of truth for engine data contracts" — together with the
+    instruction to "keep specs current when the contract they describe
+    changes" — with a pointer to the conceptual layer (`docs/concepts/<phase>/`).
+    The exit condition is that no listed path is absent from the tree.
 *   **Rationale**: This file is the entry point of the docs tree; a reader who
     follows it into nothing distrusts everything after it. Cheapest claim in
-    the stale-claims table to fix.
+    the stale-claims table to fix. The "single source of truth" sentence
+    cannot survive this plan: the spec it names is deleted by it, so the
+    claim would be dangling the moment the plan lands.
 
 #### 2. `AGENTS.md` (Modify — protected file, requires explicit user approval)
 
@@ -860,15 +916,18 @@ schemas are described in prose.
     `scorers/composite.py::DEFAULT_WEIGHTS`, and running a deleted pytest
     harness) to describe what actually exists: `COMPOSITE_WEIGHTS` in
     `mal-core/src/mal_core/scoring/registry.py`, `min_score`/`hard_floor` as
-    class attributes on `Scorer`, and no calibration pytest harness.
+    class attributes on `Scorer`, and no calibration pytest harness. The same
+    edit fixes the "How to build, test, run" block, which still points at the
+    deleted `mal-core/src/mal_core/abm/tests/calibration` directory.
     (b) Remove `mal-ghana-sim/` from the monorepo layout table and correct the
-    package count (five `pyproject.toml` files: `mal-commonlib`, `mal-core`,
-    `mal-execution`, `mal-data-explorer`, plus the undocumented
-    `social-networks/`).
-    (c) Add an explicit **untrusted-documents** note: `docs/specs/*` is
-    scheduled for deletion and is **not authoritative** — during the editing
-    sessions no agent may take a spec claim as true, and must verify any
-    spec-derived fact against the code before acting on it.
+    package count: five packages have a `pyproject.toml` (`mal-commonlib`,
+    `mal-core`, `mal-execution`, `mal-data-explorer` and `social-networks/`,
+    which the table does not document), and six `pyproject.toml` files exist
+    in the tree, the sixth being the workspace root.
+    (c) The **untrusted-documents** note already exists: `AGENTS.md` carries a
+    section stating that `docs/specs/*` is not authoritative and pending
+    deletion. Nothing is added — the stage verifies that the note still names
+    this plan's path and that no agent may take a spec claim as true.
 *   **Rationale**: `AGENTS.md` is the first file every agent reads; today it
     sends agents to edit three files that do not exist. It is also the
     baseline any future coherence review compares against — a lying baseline
@@ -907,23 +966,40 @@ Files: `mal-core/src/mal_core/abm/include/mal_abm_fast/output_contract.hpp`,
 `config.hpp`.
 
 *   **Type / Scope**: C++ headers (contract-defining; the polish scope for
-    Stage 7 starts here too).
+    Stage 11 starts here too).
 *   **Proposed Changes**: Correct the statements the code contradicts:
     `output_contract.hpp:3-5` still says band 1 = `adult_occupancy`, band 2 =
     `host_seeking_pressure` while the code writes
     `{"adult_patch_count","adult_cell_count"}`; the same header says the
-    sidecar lists `k_max` (retired at contract 4.0); `:71-73` cites
-    `docs/specs/abm/spec.md` as the authority for sidecar key order (the
-    authority this design deletes). Full audit of the six headers' prose
-    against the code — the "current text of the contract-defining headers is
-    not fully audited" open question is settled here.
+    sidecar lists `k_max` (retired at contract 4.0) and later in the same
+    file says it no longer does — that internal contradiction is resolved
+    here; `:75-76` cites `docs/specs/abm/spec.md` as the authority for sidecar
+    key order (the authority this design deletes). Full audit of the six
+    headers' prose against the code — the audit is performed by this stage,
+    and the open question closes when the stage completes.
 *   **Rationale**: These six headers are where the contract lives; they are
-    also the input to Stage 7's Doxygen build. Fixing content first means the
+    also the input to Stage 11's Doxygen build. Fixing content first means the
     generated reference is not structurally complete and semantically false.
+
+#### 10. `mal-core/src/mal_core/abm/src/output_contract.cpp` (Modify)
+
+*   **Type / Scope**: C++ source (the implementation of the output contract).
+*   **Proposed Changes**: Two comments cite `docs/specs/abm/spec.md` as the
+    authority — "The COG profile mirrors the output contract spec" and "The
+    keys are emitted in the order listed in `docs/specs/abm/spec.md` so the
+    byte-equal test is stable across engines". Replace both with the
+    authority that survives this plan (the generated contract table,
+    `docs/concepts/generated/contracts.tex`) or with the invariant stated
+    directly.
+*   **Rationale**: The specs this plan deletes are named as an authority in
+    the implementation, not only in the headers. Stage 0's exit condition is
+    "no stale claim remains in those files", and a claim in a `.cpp` is the
+    same class of drift as a claim in a `.hpp` — the coherence reviewer's
+    signal 6 (named paths vs the tree) would report it.
 
 ### Stage 1 — ODD out of `.cache/`
 
-#### 10. `docs/concepts/abm/odd-2010-malariasentinel.tex` (Create — copy, then `git add`)
+#### 11. `docs/concepts/abm/odd-2010-malariasentinel.tex` (Create — copy, then `git add`)
 
 *   **Type / Scope**: LaTeX source (the ABM conceptual document).
 *   **Proposed Changes**: Byte-for-byte copy of
@@ -936,7 +1012,7 @@ Files: `mal-core/src/mal_core/abm/include/mal_abm_fast/output_contract.hpp`,
     and reviewers cannot review changes to it. Verified 2026-11-16:
     `latexmk -pdf` on the unmodified file succeeds, 32 pages.
 
-#### 11. `docs/concepts/abm/odd-2010-template.tex` (Create — copy, then `git add`)
+#### 12. `docs/concepts/abm/odd-2010-template.tex` (Create — copy, then `git add`)
 
 *   **Type / Scope**: LaTeX template (the ABM stage's question set).
 *   **Proposed Changes**: Byte-for-byte copy of
@@ -948,7 +1024,7 @@ Files: `mal-core/src/mal_core/abm/include/mal_abm_fast/output_contract.hpp`,
     finds both. For `abm` the question set is the official ODD template — an
     external standard, not something to author.
 
-#### 12. `docs/concepts/abm/` build proof (no new file)
+#### 13. `docs/concepts/abm/` build proof (no new file)
 
 *   **Proposed Changes**: Run `latexmk -pdf odd-2010-malariasentinel.tex`
     unmodified in the tracked location; commit nothing else.
@@ -957,7 +1033,7 @@ Files: `mal-core/src/mal_core/abm/include/mal_abm_fast/output_contract.hpp`,
 
 ### Stage 2 — The two shared artefacts
 
-#### 13. `docs/concepts/README.md` (Create)
+#### 14. `docs/concepts/README.md` (Create)
 
 *   **Type / Scope**: Documentation (the stance note).
 *   **Proposed Changes**: "How to write a conceptual document": the stance
@@ -968,30 +1044,34 @@ Files: `mal-core/src/mal_core/abm/include/mal_abm_fast/output_contract.hpp`,
     negative purpose list, declaration of absences, evidence appendix), and
     the ODD as the worked example. Explicitly not a template: it fixes a
     stance and a method, never a section list.
-*   **Rationale**: The only shared writing instrument of the six documents
-    (R1). A writer who has never seen the ODD review reads this page and
-    knows how to ask.
+*   **Rationale**: The only shared writing instrument of the six documents.
+    A writer who has never seen the ODD review reads this page and knows how
+    to ask.
 
-#### 14. `.pi/skills/concept-doc/SKILL.md` (Create)
+#### 15. `.pi/skills/concept-doc/SKILL.md` (Create)
 
 *   **Type / Scope**: pi skill (project-level).
 *   **Proposed Changes**: A lightweight skill carrying the drafting
     operation: read the stage's question set, read the stance note, draft the
-    document from the material, cite every claim, generate every value. It is
-    the supported action for changing the question set itself.
-*   **Rationale**: R1: the note fixes the stance, the skill fixes the
-    operation; together they are the only two shared artefacts, and neither
-    prescribes a section list. Changing the question template becomes a
-    supported action rather than an ad-hoc edit.
+    document from the material, cite every claim, generate every value. It
+    opens with the YAML frontmatter every other skill in `.pi/skills/` has
+    (`name:`, `description:`), so that pi loads it; the description states
+    the trigger — drafting the conceptual document of one pipeline stage.
+    Changing the question set is a separate, supported operation (Stage 3's
+    subagent), not this skill's.
+*   **Rationale**: The note fixes the stance, the skill fixes the operation;
+    together they are the only two shared artefacts, and neither prescribes
+    a section list. The frontmatter is not cosmetic: without `name:` and
+    `description:` the skill is not discoverable by pi.
 
 ### Stage 3 — Per-stage question sets and checklists
 
 For each of the five non-ABM stages: one subagent reads that stage's material
 (code, specs, plans) and returns the stage's questions with citations, in the
 ODD's discipline of reading before asking. The `abm` question set already
-exists as `odd-2010-template.tex` (file 11) and is not re-authored.
+exists as `odd-2010-template.tex` (file 12) and is not re-authored.
 
-#### 15–19. `docs/concepts/<phase>/questions.md` (Create ×5)
+#### 16–20. `docs/concepts/<phase>/questions.md` (Create ×5)
 
 Files: `docs/concepts/download/questions.md`,
 `docs/concepts/ingest/questions.md`, `docs/concepts/scoring/questions.md`,
@@ -1002,101 +1082,132 @@ Files: `docs/concepts/download/questions.md`,
 *   **Proposed Changes**: Each file holds two parts: (a) the stage's question
     set — the questions its document must answer, every one traceable to a
     code/notes citation; (b) the stage's checklist — what "done" means for
-    that document (R5). Kept beside the stage's document, per the author's
+    that document. Kept beside the stage's document, per the author's
     directive that the template with the questions lives with the LaTeX.
     Format is Markdown: these are working inputs to the drafting operation,
     not published artefacts, so they need no LaTeX build.
-*   **Rationale**: I5 — no generic template; each stage gets the questions it
+*   **Rationale**: No generic template; each stage gets the questions it
     needs, found by reading that stage's material. The checklist is per stage
     and does not generalise the document's structure.
 
 ### Stage 4 — Value generator, contracts file, first workflow
 
-#### 20. `docs/concepts/contracts.yaml` (Create)
+#### 21. `docs/concepts/contracts.yaml` (Create)
 
 *   **Type / Scope**: Machine-readable contracts input (not a human document).
 *   **Proposed Changes**: A small file describing each output artefact:
-    artefact → producer stage → consumer stages → contract version →
-    compatibility rule → band/variable names → sentinel value. Content
-    sourced from the code (`STATE_BAND_NAMES` in `wire.hpp`, sidecar key
-    definitions in `output_contract.hpp`, `contracts.*` in
-    `model_constants.yaml`). It is read only by the generator (file 21); no
-    prose document cites it as authority — D2 gives the *generated table* the
-    authority, not this file.
-*   **Rationale**: D1/D2 need a machine-readable source for contract names and
-    versions so the generated contract table can win on contradiction. It is
-    a generator input, deliberately not a human-maintained spec: the rejected
-    alternative B was a *human document*; this is data feeding the build.
+    artefact → producer stage → consumer stages → compatibility rule →
+    band/variable names → sentinel value. **Contract versions are not
+    duplicated here**: they come from `model_constants.yaml:contracts.*`
+    (`env_nc`, `cogs_state`), which D2 makes the authority. The band names
+    and sidecar keys are read from the code (`STATE_BAND_NAMES` in
+    `wire.hpp`, sidecar key definitions in `output_contract.hpp`), and the
+    generator (file 22) cross-checks this file against those headers and
+    fails the build on a mismatch, so the file cannot drift silently. It is
+    read only by the generator; no prose document cites it as authority — D2
+    gives the *generated table* the authority, not this file.
+*   **Rationale**: D1/D2 need a machine-readable source for the names the
+    generated contract table carries, so that the table can win on
+    contradiction. It is a generator input, deliberately not a human-maintained
+    spec: the rejected alternative B was a *human document*; this is data
+    feeding the build. A version field duplicated from
+    `model_constants.yaml` would be a second source of truth with no defined
+    winner — the exact drift D2 exists to prevent.
 
-#### 21. `tools/gen_concepts_values.py` (Create)
+#### 22. `tools/gen_concepts_values.py` (Create)
 
 *   **Type / Scope**: Python script (build tool, not pipeline code).
-*   **Proposed Changes**: Reads `mal-core/config/model_constants.yaml` (via
-    the existing pydantic validation) and `docs/concepts/contracts.yaml`, and
-    emits LaTeX into `docs/concepts/generated/`: per-stage parameter tables
-    (name, meaning, unit, value, provenance tier), one contract table, and
-    per-key macros (`\mskey{<dotted.key>}` expands to the current value).
-    Deterministic output — same inputs, byte-identical files.
+*   **Proposed Changes**: Reads the configuration through the existing
+    validated loader — `mal_core.habitat.config.load_config()`, which runs
+    `mal_core.config_validation.validate_model_config` — and walks the
+    resulting dict; it does not parse the YAML a second time. The flat
+    dotted-key view the generator needs already exists in the repository:
+    `mal_core.habitat.config.dump_raw()` (with the C++ twin
+    `abm/src/config_dump.cpp`), the parity reference for the py⇄C++ check.
+    `dump_raw()` deliberately omits the py-only `wildlife` section and
+    reshapes the species rows, so the generator walks the validated config
+    directly and includes `wildlife` — the rule is stated here so no
+    implementer has to choose. It also reads `docs/concepts/contracts.yaml`
+    (file 21) and cross-checks it against the C++ headers, failing the build
+    on a mismatch. It emits LaTeX into `docs/concepts/generated/`: per-stage
+    parameter tables (name, value and unit), one contract table, and per-key
+    macros (`\mskey{<dotted.key>}` expands to the current value). The unit
+    is read from the convention the YAML already states in its header —
+    "Unidades entre [ ]", so every parameter carries `# [mm]`, `# [días]`,
+    `# [índice]` — and this entry makes that convention the generator's
+    contract. The *meaning* of a parameter and its provenance tier are prose
+    in the document, not generated values: they are judgements, and D1 only
+    forbids hand-typed numbers. Deterministic output — same inputs,
+    byte-identical files.
 *   **Rationale**: D1: any number, key or symbol in a document is emitted at
-    build time. A key renamed or removed in YAML becomes an undefined control
-    sequence and fails `latexmk`. This is the design's only automatic
-    failure, and it is a property of the build (see also signal 1: dotted keys
-    vs YAML with printed values).
+    build time. Two failures follow: a key renamed or removed in the YAML is
+    rejected by the configuration validator before the generator emits
+    anything, and a key the schema tolerates becomes an undefined control
+    sequence in a document that uses it, failing `latexmk`. Both are
+    properties of the build (see also signal 1: dotted keys vs YAML with
+    printed values, already implemented by
+    `tools/audit_comment_constants.py`).
 
-#### 22. `docs/concepts/generated/` (Create — directory of generated `.tex`)
+#### 23. `docs/concepts/generated/` (Create — directory of generated `.tex`)
 
 *   **Type / Scope**: Generated LaTeX fragments (`params-<phase>.tex`,
     `contracts.tex`).
-*   **Proposed Changes**: Output directory of file 23; committed so local and
+*   **Proposed Changes**: Output directory of file 21; committed so local and
     CI builds are identical and reviewable in the PR diff. Documents
     `\input{generated/...}` it; no document types a value by hand.
 *   **Rationale**: Stage 4's exit condition — a build reproduces these
     byte-for-byte (`git diff --exit-code` after regeneration).
 
-#### 23. `tools/build_concepts.sh` (Create)
+#### 24. `tools/build_concepts.sh` (Create)
 
 *   **Type / Scope**: Shell script (build entry point).
-*   **Proposed Changes**: Runs the generator (file 21), then `latexmk -pdf`
-    over every `.tex` under `docs/concepts/`, then regenerates and fails if
-    `git diff --exit-code` shows drift in `docs/concepts/generated/`. Same
-    command locally and in CI.
+*   **Proposed Changes**: Runs the generator (file 22), then `latexmk -pdf`
+    over the document sources only — `docs/concepts/<phase>/<phase>.tex`,
+    excluding the question templates (`odd-2010-template.tex` and any
+    `questions.md` sibling) and the generated fragments in
+    `docs/concepts/generated/`, which are `\input`, not documents — then
+    regenerates and fails if `git diff --exit-code` shows drift in
+    `docs/concepts/generated/`. Same command locally and in CI.
 *   **Rationale**: One build recipe, no divergence between a developer's
     machine and the workflow; the byte-for-byte exit condition is executable.
 
-#### 24. `.github/workflows/concepts.yml` (Create)
+#### 25. `.github/workflows/concepts.yml` (Create)
 
 *   **Type / Scope**: GitHub Actions workflow (the repository's first — there
     is no `.github/` directory today).
 *   **Proposed Changes**: On pull requests touching `docs/concepts/**`,
     `mal-core/config/model_constants.yaml`, or `docs/concepts/contracts.yaml`:
     run `tools/build_concepts.sh`, then compile each document and (on the PR
-    branch, decision I1-A) commit `docs/concepts/<phase>/<phase>.pdf` back to
-    the branch. PDF equality is checked on extracted text
+    branch, decision I1-A: the PDF is compiled in CI and committed back to
+    the branch) rename the `latexmk` output to
+    `docs/concepts/<phase>/<phase>.pdf` and commit it back to the branch. PDF
+    equality is checked on extracted text
     (`pdftotext -layout`), not on bytes, until determinism is measured. The
     bot push dismisses stale approvals under the current ruleset — a workflow
     design constraint, documented in the workflow header, not a blocker.
-*   **Rationale**: Stage 4 exit (first green run) and Stage 6 publication
+*   **Rationale**: Stage 4 exit (first green run) and Stage 10 publication
     (I1-A: CI commits the PDF so the legacy `main:/docs` Pages build publishes
     it at a stable path). Fork PRs cannot receive the push; their PDF appears
     after merge — accepted under the warnings-only regime.
 
 ### Stage 5 — Pilot `download`
 
-#### 25. `docs/concepts/download/download.tex` (Create)
+#### 26. `docs/concepts/download/download.tex` (Create)
 
 *   **Type / Scope**: LaTeX source (first non-ABM conceptual document).
 *   **Proposed Changes**: Drafted by an agent from
     `docs/concepts/download/questions.md` and the stance note; answers every
     question in the set in the stage's own structure; inputs/outputs are one
     section among others; all values come from `\input{generated/...}`; every
-    code symbol glossed at first use (R3); examples are described situations,
-    not code snippets (R10). Internal seam kept visible as a section: AOI
-    reduction happens after areal-fraction aggregation (R9).
+    code symbol is glossed at its first use; the examples are described
+    situations, not code snippets. The internal seam stays visible as a
+    section of the document: AOI reduction happens after areal-fraction
+    aggregation.
 *   **Rationale**: Stage 5 exit — one non-ABM document written, read by
     someone without a code profile, and revised once through the full loop.
     Pilot on the smallest stage, not the largest.
 
-#### 26. `docs/plans/in-process/<plan-name>.md` (Create — as annotations arrive)
+#### 27. `docs/plans/in-process/<plan-name>.md` (Create — as annotations arrive)
 
 *   **Type / Scope**: Plan files (existing directory and mechanism).
 *   **Proposed Changes**: Human annotations on the pilot document are
@@ -1104,42 +1215,143 @@ Files: `docs/concepts/download/questions.md`,
     code change required — the same mechanism that produced the 13
     `odd-fixes` packs. Applying a plan updates code and document in the same
     PR.
-*   **Rationale**: R2's loop, end to end. This is the main detection
+*   **Rationale**: The authoring loop, end to end. This is the main detection
     instrument under D3 (warnings-only): the human annotation step, with the
     annotations as the defect channel.
 
-### Stage 6 — Publication
+### Stage 6 — The `ingest` document
 
-#### 27. `docs/documentacion.html` (Create)
+The loop of Stage 5, one stage per remaining document (D10). Stage 3 already
+produced this stage's question set (`docs/concepts/ingest/questions.md`); this
+stage drafts the document, takes the human's annotations through the plan
+mechanism, and applies the plan's result back into the document.
+
+#### 28. `docs/concepts/ingest/ingest.tex` (Create)
+
+*   **Type / Scope**: LaTeX source (the `ingest` conceptual document).
+*   **Proposed Changes**: Drafted by an agent from
+    `docs/concepts/ingest/questions.md` and the stance note; answers every
+    question in the set in the stage's own structure; inputs and outputs are
+    one section among others; all values come from `\input{generated/...}`;
+    every code symbol is glossed at its first use; the examples are described
+    situations, not code snippets. The stage's internal seam stays visible:
+    `ingest` is where the spatial frame `(H,W)` is computed, and the document
+    says so where the frame is first used.
+*   **Rationale**: Stage 6 exit — the `ingest` document written, read by
+    someone without a code profile, and revised once through the full loop.
+    The stage also carries the retirement of `docs/specs/ingest/spec.md`, in
+    the same commit that lands the document's final form.
+
+### Stage 7 — The `scoring` document
+
+The loop of Stage 5 again, for the stage whose behaviour the scorer registry
+describes.
+
+#### 29. `docs/concepts/scoring/scoring.tex` (Create)
+
+*   **Type / Scope**: LaTeX source (the `scoring` conceptual document).
+*   **Proposed Changes**: Drafted by an agent from
+    `docs/concepts/scoring/questions.md` and the stance note; answers every
+    question in the set in the stage's own structure; all values come from
+    `\input{generated/...}`; every code symbol is glossed at its first use;
+    the examples are described situations. The stage's internal seam stays
+    visible: the composite is a geometric mean over its dimensions and the
+    gates are evaluated separately — the document says so where the composite
+    is first used.
+*   **Rationale**: Stage 7 exit — the `scoring` document written, read by
+    someone without a code profile, and revised once through the full loop.
+    The stage also carries the retirement of `docs/specs/scoring/spec.md`, in
+    the same commit that lands the document's final form.
+
+### Stage 8 — The `training` document
+
+The loop of Stage 5 again.
+
+#### 30. `docs/concepts/training/training.tex` (Create)
+
+*   **Type / Scope**: LaTeX source (the `training` conceptual document).
+*   **Proposed Changes**: Drafted by an agent from
+    `docs/concepts/training/questions.md` and the stance note; answers every
+    question in the set in the stage's own structure; all values come from
+    `\input{generated/...}`; every code symbol is glossed at its first use;
+    the examples are described situations. The stage's internal seam stays
+    visible: what the surrogate trains against, and what it cannot represent,
+    are stated where the surrogate is first used.
+*   **Rationale**: Stage 8 exit — the `training` document written, read by
+    someone without a code profile, and revised once through the full loop.
+    The stage also carries the retirement of `docs/specs/training/spec.md`, in
+    the same commit that lands the document's final form.
+
+### Stage 9 — The `prediction` document
+
+The loop of Stage 5 again, for the last of the six.
+
+#### 31. `docs/concepts/prediction/prediction.tex` (Create)
+
+*   **Type / Scope**: LaTeX source (the `prediction` conceptual document).
+*   **Proposed Changes**: Drafted by an agent from
+    `docs/concepts/prediction/questions.md` and the stance note; answers every
+    question in the set in the stage's own structure; all values come from
+    `\input{generated/...}`; every code symbol is glossed at its first use;
+    the examples are described situations. The stage's internal seam stays
+    visible: the prediction consumes the state bands the `abm` stage writes,
+    and the document says so where the consumption is first described.
+*   **Rationale**: Stage 9 exit — the `prediction` document written, read by
+    someone without a code profile, and revised once through the full loop.
+    The stage also carries the retirement of `docs/specs/prediction/spec.md`
+    and `docs/specs/_template.md`, in the same commit that lands the
+    document's final form.
+
+### Stage 10 — Publication
+
+#### 32. `docs/documentacion.html` (Create)
 
 *   **Type / Scope**: Site page (HTML, legacy Pages build).
 *   **Proposed Changes**: A separate documentation page under `docs/`, linked
-    from the site navigation, carrying its own ES/EN dictionaries (R6). It
-    lists the six conceptual documents with links to their committed PDFs
-    (`docs/concepts/<phase>/<phase>.pdf`), the stance note, and later the
-    technical reference. Generated docs index — never a hand-maintained one.
+    from the site navigation, carrying its own ES/EN dictionaries. It lists
+    the conceptual documents that exist, with links to their committed PDFs
+    (`docs/concepts/<phase>/<phase>.pdf`), plus the stance note; a document is
+    linked as it lands, and the technical reference is added at Stage 11.
+    Generated docs index — never a hand-maintained one.
 *   **Rationale**: The landing page has zero links to any document today; its
     navigation is five in-page anchors. Keeping the new page separate leaves
     the 200 KB `index.html` and its i18n dictionary untouched except for the
-    nav entry (file 28).
+    nav entry (file 33).
 
-#### 28. `docs/index.html` (Modify)
+#### 33. `docs/index.html` (Modify)
 
 *   **Type / Scope**: Site landing page (hand-written, ES-first).
-*   **Proposed Changes**: Two changes in one commit: (a) truth pass on its
-    three stale claims — "14 evaluadores" (reality: 13 composite dimensions +
-    6 gates), "agents/K_MAX" (retired at contract 4.0), "9.466 celdas"
-    (reality: 551 × 779 = 429,229 cells per the ODD); (b) add one nav entry
-    pointing at `documentacion.html` — desktop nav, mobile drawer, footer
-    row, and both `T.es`/`T.en` dictionaries, in the same edit.
+*   **Proposed Changes**: Two changes in one commit: (a) truth pass on the
+    stale claims, with the replacement copy fixed here so that no wording is
+    left to the implementer:
+    *   "Motor ABM en C++ + 14 Scorers", "14 evaluadores de calibración
+        automatizados" and "suite of 14 evaluadores de calibración (PR gate)"
+        become "19 evaluadores de calibración (13 dimensiones + 6 gates)" and
+        "19 calibration scorers (13 dimensions + 6 gates)". The "(PR gate)"
+        clause goes with them: the calibration pytest harness does not exist,
+        and D3 forbids a gate.
+    *   "densidad normalizada de mosquitos (agentes/K_MAX)" becomes "densidad
+        de mosquitos (adultos/km²)". `K_MAX` was retired at contract 4.0, and
+        the state bands are raw adult counts per 1 km² cell.
+    *   "Ghana (Nacional predefinido · 9.466 celdas)" becomes "Ghana (Nacional
+        predefinido · 429.229 celdas)" — 551 × 779 cells at 1 km resolution,
+        per the ODD.
+    *   The AOI option "Mozambique (Nacional predefinido)" is removed:
+        `aois.yaml` defines only `ghana` and `accra-coastal-test`.
+    Every one of these strings exists in both the inline HTML and the
+    `T.es`/`T.en` dictionaries, and `setLang()` overwrites the DOM from the
+    dictionaries at runtime — so the edit must touch the dictionaries, not
+    only the inline markup, or the rendered site keeps the false text.
+    (b) add one nav entry pointing at `documentacion.html` — desktop nav,
+    mobile drawer, footer row, and both dictionaries, in the same edit.
 *   **Rationale**: The site is the reader's entry point (CUJ 1) and today
     promises "documentación técnica accesible" while linking only GitHub. The
     four-edition rule (nav + drawer + footer + both dictionaries) is a
     property of this file's structure, not a choice.
 
-### Stage 7 — Generated technical reference
+### Stage 11 — Generated technical reference
 
-#### 29. The six contract-defining headers, comment-polished (Modify)
+#### 34. The six contract-defining headers, comment-polished (Modify)
 
 Files (already touched in Stage 0, content completed here):
 `wire.hpp`, `output_contract.hpp`, `habitat_availability.hpp`,
@@ -1148,55 +1360,69 @@ Files (already touched in Stage 0, content completed here):
 
 *   **Proposed Changes**: Convert file-header prose and trailing `//` member
     comments to forms Doxygen attaches (`///`, `/** */`, `///<`, `//!<`),
-    excluding `third_party/`, `font8x8_basic.hpp` and `tests/*.cpp` from the
-    build. Content was already corrected in Stage 0; this pass is mechanical
-    form conversion on the contract-defining headers only, not all 101 files.
+    excluding `third_party/` — which contains `font8x8_basic.hpp` — from the
+    build. The tests are not under the Doxygen `INPUT` (file 36), so they
+    need no exclusion. Content was already corrected in Stage 0; this pass
+    is mechanical form conversion on the contract-defining headers only —
+    the six headers listed here, not the whole tree.
 *   **Rationale**: I2-A: polish scoped to where the contract lives, before
     generation. Zero Doxygen directives exist today; trailing `//` is
     invisible to Doxygen; a generated document from current comments would be
     structurally complete and semantically false.
 
-#### 30. Python docstring corrections (Modify)
+#### 35. Python docstring corrections (Modify)
 
 Files: `mal-core/src/mal_core/scoring/llm_scorer.py` (says "10 deterministic
-scorers (D1..D10)"; registry has 13 composite + 6 gates),
-`mal-core/src/mal_core/scoring/config.py` (uses `D16_suitability_auc`; real
-name `D16_detection_coverage`), `mal-core/src/mal_core/habitat/constants.py`
-(documents constants the module raises `AttributeError` for),
+scorers (D1..D10)"; registry has 13 composite + 6 gates; and says the LLM is
+"invoked directly via `langchain_openai`", while the implementation posts to
+`LLM_BASE_URL` with `requests`),
+`mal-core/src/mal_core/scoring/config.py` (names `D16_suitability_auc` in a
+docstring example; the runtime name is `D16_detection_coverage`),
+`mal-core/src/mal_core/habitat/constants.py` (documents constants the module
+raises `AttributeError` for),
 `mal-commonlib/src/mal_commonlib/config.py` (`SimParams.r_of()` calls
 undefined `temp_suitability`; docstring cites `DESIGN.md`, which does not
 exist).
 
-*   **Proposed Changes**: Fix the four statements the code contradicts before
-    pdoc publishes them; remove or correct the dead `r_of()` path.
-*   **Rationale**: Same as file 31 — generation is cheap, truth is not.
-    Publishing autodoc as-is publishes four known-false statements.
+*   **Proposed Changes**: Fix the false statements these four files carry
+    before pdoc publishes them; remove or correct the dead `r_of()` path.
+*   **Rationale**: Same as file 29 — generation is cheap, truth is not.
+    Publishing autodoc as-is publishes at least five known-false statements
+    across four files.
 
-#### 31. `docs/reference/Doxyfile` (Create)
+#### 36. `docs/reference/Doxyfile` (Create)
 
 *   **Type / Scope**: Doxygen configuration.
-*   **Proposed Changes**: `INPUT = mal-core/src/mal_core/abm/include/`,
-    `RECURSIVE = YES`, `EXTRACT_ALL = YES`, `HAVE_DOT = NO`,
-    `GENERATE_LATEX = NO`, output to `docs/reference/cpp/`, excluding
-    `third_party/` and `tests/`.
-*   **Rationale**: I2-A. Namespaced output (R7) so Doxygen's `index.html` and
+*   **Proposed Changes**: `INPUT` is the six contract-defining headers only
+    (`wire.hpp`, `output_contract.hpp`, `habitat_availability.hpp`,
+    `habitat_engine.hpp`, `coordinator.hpp`, `config.hpp`, all under
+    `mal-core/src/mal_core/abm/include/mal_abm_fast/`), `RECURSIVE = NO`,
+    `EXTRACT_ALL = YES`, `HAVE_DOT = NO`, `GENERATE_LATEX = NO`, output to
+    `docs/reference/cpp/`, excluding `third_party/*`. The input is narrowed on
+    purpose: the include tree holds about forty-five headers, of which only
+    six are polished, and publishing the rest would produce a reference that
+    is structurally complete and semantically false — the risk this design
+    names for the Python side.
+*   **Rationale**: I2-A: Doxygen plus pdoc generation. Namespaced output so
+    Doxygen's `index.html` and
     `_`-prefixed directories cannot collide with pdoc's under the legacy
     Pages build. Greenfield today — no Doxyfile exists, so it will be done
     wrong by default unless specified.
 
-#### 32. `tools/build_reference.sh` (Create)
+#### 37. `tools/build_reference.sh` (Create)
 
 *   **Type / Scope**: Shell script (reference generation entry point).
-*   **Proposed Changes**: Runs Doxygen with file 33, runs pdoc over
+*   **Proposed Changes**: Runs Doxygen with file 31, runs pdoc over
     `mal_core` and `mal_commonlib` into `docs/reference/python/`, and emits a
-    generated index page linking both surfaces plus the flag/file contract
-    (I2-B, if built — see Open Questions; the script stubs it either way).
-    Same command locally and in CI.
+    generated index page linking both surfaces. The flag/file contract is
+    included only if I2-B is built (see Open Questions); the script stubs
+    the section either way, so the stage's exit condition holds in both
+    cases. Same command locally and in CI.
 *   **Rationale**: One recipe for both generators; output lands somewhere
     greppable, which is the condition under which the reference has a real
     consumer (agents, IDE).
 
-#### 33. `.github/workflows/concepts.yml` (Modify — extend)
+#### 38. `.github/workflows/concepts.yml` (Modify — extend)
 
 *   **Proposed Changes**: Add a job on pushes to `main` touching
     `mal-core/src/mal_core/abm/include/**` or `mal-*/src/**/*.py`: run
@@ -1206,9 +1432,9 @@ exist).
     Pages build, which compiles nothing; committing is the only topology that
     works without a Pages migration (rejected this phase).
 
-### Stage 8 — Warnings-only coherence review
+### Stage 12 — Warnings-only coherence review
 
-#### 34. `.github/workflows/coherence-review.yml` (Create)
+#### 39. `.github/workflows/coherence-review.yml` (Create)
 
 *   **Type / Scope**: GitHub Actions workflow (PR-triggered).
 *   **Proposed Changes**: On pull requests: extract the mechanical signals
@@ -1217,21 +1443,32 @@ exist).
     `model_constants.yaml:contracts.*`; recomputable numbers from
     `aois.yaml`; `latexmk -Werror`; named `docs/…`, `papers/…`, `scripts/…`
     paths vs the tree; documented outputs vs consumer globs; changed path →
-    candidate document; `% sources:` freshness), assemble diff + affected
-    stage documents + in-process plans, and hand them to an LLM reviewer that
-    posts a PR comment naming the passage that no longer matches the code,
-    quoting both. `continue-on-error: true`; the check is never required.
-    Fork PRs (no secrets): mechanical signals still run, the LLM step reports
-    "semantic check skipped (fork)" in the comment. Secret-absence resolves
-    as `neutral`, never `failure`. Bot-loop guard: the workflow does not
-    trigger on its own comment pushes.
+    candidate document; `% sources:` freshness; and the two guards the
+    repository already ships — `tools/audit_comment_constants.py` and
+    `tools/check_no_constants.sh`), assemble diff + affected stage documents
+    + in-process plans, and hand them to an LLM reviewer that posts a PR
+    comment naming the passage that no longer matches the code, quoting
+    both. The model id comes from a repository variable and the key from the
+    `OPENROUTER_KEY` repository secret — the path the project's LLM scorer
+    already uses (`mal-core/src/mal_core/scoring/llm_scorer.py`); the
+    workflow's own default token budget applies. `continue-on-error: true`;
+    the check is never required. Fork PRs (no secrets): the mechanical
+    signals still run, the LLM step reports "semantic check skipped (fork)"
+    in the comment, and the workflow exits 0 — a missing secret is not a
+    failure and not a gate. Bot-loop guard: the workflow does not trigger on
+    its own comment pushes.
 *   **Rationale**: D3: warnings only, no gates — no anchor-existence check,
     no presence rule, no waiver trailer, no required status. The mechanical
     signals are inputs the reviewer may cite, not pass/fail tests. Exit
-    condition: false-positive rate measured over 20 PRs of history before
-    anyone relies on it.
+    condition: the first-pass false-positive rate is measured over the last
+    20 merges on `main` — or all of them if the repository has fewer — and
+    written down before anyone relies on the reviewer. A *false positive* is
+    a finding the author confirms does not correspond to a real incoherence.
+    No threshold is set on that number: under D3 the reviewer never blocks,
+    and the number informs the author's decision to rely on it rather than
+    gating it.
 
-#### 35. `.github/concepts-review-prompt.md` (Create)
+#### 40. `.github/concepts-review-prompt.md` (Create)
 
 *   **Type / Scope**: Reviewer prompt (workflow input, not a document).
 *   **Proposed Changes**: The standing instructions for the LLM reviewer:
@@ -1247,131 +1484,202 @@ exist).
     change merged with no document touch — the prompt is where that
     responsibility is stated.
 
-### Stage 9 — `data/` untracking (last step, after the backup is proven)
+### Stage 13 — `data/` untracking (last step, after the backup is proven)
 
-The author's decision (2026-11-16) supersedes the D8 pre-work: the manifest is
-rebuilt automatically by the next `malariasim download`, so there is no
-manifest relocation, no `MAL_DATA_ROOT`, no restore script and no offline-copy
-inventory. The safety net is one zip archive in the repository's parent
-directory, written and verified before anything is untracked.
+The author's decision (2026-11-16) supersedes the D8 pre-work: the manifest
+rebuilds itself, in two halves — `download` re-registers the upstream products
+from the downloader registry, `ingest` re-registers the derived ones — so
+there is no manifest relocation, no `MAL_DATA_ROOT`, no restore script and no
+offline-copy inventory. The safety net is one zip archive in the repository's
+parent directory, written and verified before anything is untracked.
 
-#### 36. `../MalariaSentinel-data-backup-<YYYY-MM-DD>.zip` (Create — outside the repository)
+#### 41. `../MalariaSentinel-data-backup-<YYYY-MM-DD>.zip` (Create — outside the repository)
 
 *   **Type / Scope**: Backup archive (parent directory of the repository, never
     inside it — a tracked or ignored in-tree archive is not a backup).
 *   **Proposed Changes**: `zip -r` the whole `data/` tree (tracked and ignored
     files alike: the 4 GB of downloaded products and the 16 small tracked
-    files), then verify with `unzip -t` and write the archive's `sha256`
-    next to it. The archive's path and checksum are recorded in
-    `data/README.md` (file 39).
+    files), then verify with `unzip -t` and write the archive's `sha256` in a
+    single file beside it — a checksum for one archive, not an inventory of
+    the tree. The archive's path and checksum are recorded in
+    `data/README.md` (file 44).
 *   **Rationale**: Git is not a backup for the ignored 4 GB — history contains
     none of it — and the tracked 16 files are not recoverable from a
     `git rm --cached` if the working copy is lost. One verified zip is the
     cheapest real safety net: it restores exactly what was there, including
-    the files `download` does not regenerate (`moua_2016.pdf`, the seven
-    `data/maps/*.png` renderings, the `eml.xml`/`meta.xml` sidecars).
+    the four kinds of material that `download` does not regenerate (the
+    `moua_2016.pdf` paper, the `data/maps/*.png` renderings — which the
+    explorer, not `download`, produces — and the `eml.xml`/`meta.xml`
+    sidecars).
 
-#### 37. `.gitignore` (Modify — protected file, requires explicit user approval)
+#### 42. `.gitignore` (Modify — protected file, requires explicit user approval)
 
 *   **Type / Scope**: Ignore rules.
-*   **Proposed Changes**: Replace the current per-directory `data/` entries
-    (`data/ghana/`, `data/accra-coastal-test/`, the `data/**` globs) with one
-    blanket `data/` rule plus a `!data/README.md` negation, so the documentation
-    stays tracked and everything else under `data/` does not.
+*   **Proposed Changes**: Replace the six current `data/` rules
+    (`data/**/*.txt` and `data/**/*.zip` at `.gitignore:10-11`,
+    `data/pasteur_anopheles.zip` and `data/occurrence.txt` at `:12-13`,
+    `data/ghana/` at `:20`, `data/accra-coastal-test/` at `:22`) with
+    `data/*` plus a `!data/README.md` negation. The form matters: git does
+    not descend into an excluded directory, so a `!data/README.md` negation
+    under a blanket `data/` rule is inert — `data/*` is what lets the
+    negation re-include the file. The same edit corrects the two stale
+    comments in the file: `.gitignore:8` advertises
+    `scripts/restore_data.py` and `:19` mentions `scripts/build_2year_nc.py`,
+    and no `scripts/` directory exists in the repository. It also adds the
+    LaTeX build artefacts (`*.aux`, `*.log`, `*.fls`, `*.fdb_latexmk`,
+    `*.out`, `*.toc`) under `docs/concepts/` and `docs/reference/` to the
+    ignore rules, so the committed tree carries no build noise.
 *   **Rationale**: The untracking rule itself. Protected file: the change needs
     the user's explicit approval, and it is the step where a mistake loses the
-    local copy — which is why the zip exists and is verified first.
+    local copy — which is why the zip exists and is verified first. The two
+    stale comments are corrected here rather than in Stage 0 because this
+    entry already rewrites the `data/` rules and `.gitignore` is not in
+    Stage 0's scope — and the coherence reviewer's signal 6 (named paths vs
+    the tree) would report them.
 
-#### 38. `git rm -r --cached data` (index operation — not a file)
+#### 43. `git rm -r --cached data` (index operation — not a file)
 
 *   **Type / Scope**: Git index.
-*   **Proposed Changes**: `git rm -r --cached data` (never `rm`): the files stay
-    in the working tree, they leave the index. After this, `git ls-files data/`
-    shows only `data/README.md`.
+*   **Proposed Changes**: Two steps, in order: `git rm -r --cached -- data`
+    (never `rm`) removes the tree from the index while the working tree is
+    untouched; then `git add -- data/README.md` re-adds the one file that
+    stays tracked. The second step is not optional: the pathspec `data`
+    covers `data/README.md` as well, so without it the README leaves the
+    index too, and the exit condition cannot hold. After this,
+    `git ls-files data/` shows only `data/README.md`.
 *   **Rationale**: The index is what makes `data/` travel to GitHub. Removing it
     from the index, with the working tree untouched, is the whole of
     "untracking" — `rm` would destroy the local copy the zip was made from.
+    The re-add keeps the documentation that explains the tree inside the
+    tree it describes.
 
-#### 39. `data/README.md` (Modify)
+#### 44. `data/README.md` (Modify)
 
 *   **Type / Scope**: Data documentation (the only tracked file under `data/`).
 *   **Proposed Changes**: Document the backup archive's path and checksum, the
-    re-download path (`malariasim download --aoi <aoi>` rebuilds
-    `data/<aoi>/manifest.json` from the registry and re-registers every
-    dataset), what is *not* regenerated by that command (the paper, the map
-    renderings, the sidecars) and therefore depends on the zip, and the licence
-    constraints that govern re-hosting (ODbL share-alike on `host_static.nc`,
-    `mobility_*.csr`, wildlife proxy; CC BY-NC 4.0 on `guf/` and `colombia_vl/`).
-*   **Rationale**: The manifest is rebuilt by the downloader, so the only
-    surviving loss is the material the downloader never produced — and the file
-    that survives untracking is the one that must say so.
+    re-download path (`uv run malariasim download --aoi <aoi>` re-registers
+    the upstream datasets from the registry, and `uv run malariasim ingest`
+    re-registers the derived products), what is *not* regenerated by those
+    commands (the paper, the map renderings, the sidecars) and therefore
+    depends on the zip, and the fact that a dataset whose credentials are
+    absent is **skipped** rather than failed — so the manifest comes back
+    partial until the credentials are in place. The citation
+    "(spec: `docs/specs/data/spec.md`)" is removed, because this plan deletes
+    that spec. No new licence claim is written: the licence record already in
+    this file and in `docs/licenses.md` §3 (with
+    `mal_commonlib.data.licenses.KNOWN_LICENSES` as the machine authority)
+    stays as it is — `env`, `habitat`, `host_static` and `mobility_*` are
+    derived products with compound, inherited licences, not ODbL per se.
+*   **Rationale**: The manifest is rebuilt by the downloader and the ingester,
+    so the only surviving loss is the material neither produced — and the file
+    that survives untracking is the one that must say so. Restating the
+    licences here would create a third copy of a record that already has a
+    machine authority, which is the drift class this plan exists to remove.
 
 ### Spec retirement (distributed across stages, not a stage)
 
-#### 40–47. `docs/specs/<phase>/spec.md` and `docs/specs/_template.md` (Delete — one per stage)
+#### 45–53. `docs/specs/<phase>/spec.md` and `docs/specs/_template.md` (Delete — one per stage)
 
-Files: `download/spec.md` (with Stage 5), `data/spec.md` (its manifest schema
-lands in the `download` document per D5), `ingest/spec.md`,
-`commonlib/spec.md` (spatial frame lands in the stage that first needs
-`(H,W)`), `abm/spec.md` (after Stage 1's document is current), `scoring/spec.md`,
-`training/spec.md`, `prediction/spec.md`, and `_template.md` with the last
-one.
+Nine files, one per stage plus the template: `download/spec.md` (with Stage
+5), `data/spec.md` (its AOI product and manifest schema land in the
+`download` document per D5), `ingest/spec.md` (Stage 6),
+`commonlib/spec.md` (the spatial frame — AOI, `Scale`, `cells_per_side`,
+grid, CRS — lands in `ingest`, the first stage that needs `(H,W)`), and
+`abm/spec.md` (after Stage 1's document is current), `scoring/spec.md` (Stage
+7), `training/spec.md` (Stage 8), `prediction/spec.md` (Stage 9), and
+`_template.md` with the last one.
 
 *   **Proposed Changes**: Each spec is deleted in the same commit that lands its
     conceptual equivalent — section-level cut-over: the change that adds §X
     deletes §X. No file-level coexistence window where two authorities
-    describe the same contract.
+    describe the same contract. Before a spec is deleted, its runnable
+    assertions are either migrated — into the coherence reviewer's mechanical
+    signals or into `tests/` — or explicitly recorded as dropped in the plan
+    tracker (`docs/plans/in-process/`); `docs/specs/abm/spec.md` alone
+    contains checks such as `assert cv.startswith('2.')`,
+    `assert len(dims) == 13 and len(gates) == 6` and a `H = W = 128` grep,
+    and deleting them without a decision would lose machine signal.
 *   **Rationale**: Brief goal — retire stage by stage with no information
     loss: semantics move to the conceptual document, values to the generated
-    tables. File-level retirement would guarantee two authorities for months
-    (structural F7), so retirement is distributed, not batched.
+    tables. File-level retirement would guarantee two authorities for months,
+    so retirement is distributed, not batched. D10 gives every stage a
+    document, so every spec has the commit in which it can be retired.
 
 ### Verification Plan
 
 *   **Stage 0**: `find`-based check that every path named in
     `docs/README.md` and `AGENTS.md` exists; `AGENTS.md` states that
-    `docs/specs/*` is untrusted and pending deletion (the three spec claims
-    above are deliberately left standing — this design does not repair them);
-    each of the six headers' contract statements diffed against
-    `STATE_BAND_NAMES`/sidecar definitions in code.
+    `docs/specs/*` is untrusted and pending deletion (already true — the
+    stage verifies it, and the three spec claims above are deliberately left
+    standing — this design does not repair them); each of the six headers'
+    contract statements diffed against `STATE_BAND_NAMES`/sidecar
+    definitions in code; `output_contract.cpp` cites no deleted spec.
 *   **Stage 1**: `latexmk -pdf` on the tracked unmodified `.tex` exits 0 and
-    produces a 32-page PDF (verified 2026-11-16; re-run after the copy).
+    produces a 32-page PDF. The source build was verified on 2026-11-16
+    (32 pages, in `.cache/odd-latex/`); the tracked copy is re-verified here.
 *   **Stage 2**: A reader who has never seen the ODD review uses the stance
     note to answer one sample question set (manual, exit condition of Stage
     2).
 *   **Stage 3**: Every question in each `questions.md` carries at least one
     `file:line` citation; spot-check 5 per stage against the cited lines.
 *   **Stage 4**: Run `tools/build_concepts.sh` twice; second run leaves
-    `git diff --exit-code` clean on `docs/concepts/generated/`. Rename one key
-    in `model_constants.yaml` in a scratch branch and confirm `latexmk` fails
-    with an undefined control sequence — the design's only automatic failure,
-    demonstrated on demand.
+    `git diff --exit-code` clean on `docs/concepts/generated/`. Then, in a
+    scratch branch, rename one key in `model_constants.yaml` and confirm the
+    generator fails at configuration validation with a `ConfigError` — the
+    schema-level automatic failure. The LaTeX-level failure is demonstrated
+    at Stage 5, where a document actually uses a generated macro: delete that
+    macro from the generated fragments and confirm `latexmk` fails with an
+    undefined control sequence.
 *   **Stage 5**: `docs/concepts/download/download.tex` compiles; a reader
     without a code profile answers the pilot checklist (CUJ 1); the document
-    is revised once through the annotation → plan → PR loop (CUJ 4, CUJ 5).
-*   **Stage 6**: From `malariasentinel.com` in both ES and EN, a reader
-    reaches the `download` PDF in ≤2 clicks (CUJ 1); the three stale claims in
-    `index.html` are gone.
-*   **Stage 7**: `tools/build_reference.sh` exits 0; `docs/reference/cpp/`
+    is revised once through the annotation → plan → commit loop (CUJ 4,
+    CUJ 5); the LaTeX-level automatic failure is demonstrated here (delete a
+    generated macro the document uses → `latexmk` fails).
+*   **Stages 6–9**: the same three checks per document — the
+    `docs/concepts/<phase>/<phase>.tex` of the stage compiles, a reader
+    without a code profile answers its checklist, and the document is revised
+    once through the annotation → plan → commit loop — and the spec of the
+    stage is deleted in the same commit that lands the document's final form.
+*   **Stage 10**: From `malariasentinel.com` in both ES and EN, a reader
+    reaches the `download` PDF in ≤2 clicks (CUJ 1); the stale claims in
+    `index.html` are gone from the rendered page in both languages — the
+    inline markup *and* the `T.es`/`T.en` dictionaries, since `setLang()`
+    overwrites the DOM from the dictionaries at runtime.
+*   **Stage 11**: `tools/build_reference.sh` exits 0; `docs/reference/cpp/`
     and `docs/reference/python/` are both present with their own
-    `index.html`; grep confirms no `k_max`/two-band statement remains in the
-    six headers; the flag/file contract page lists every CLI flag from
-    `_introspect_flags`.
-*   **Stage 8**: Run the reviewer over 20 historical PRs; record findings vs
-    false positives; exit when a first-pass false-positive rate is known. A
-    PR that changes only a comment under `mal_core/<stage>/` must produce no
-    required-document signal (there is no presence rule — this asserts the
-    absence of one, by design).
-*   **Stage 9**: The zip exists in the repository's parent directory and
+    `index.html`; a check over the six headers confirms that no *live*
+    `k_max` key and no two-band statement remains — the retirement notes that
+    mention the removed `k_max` are legitimate and must not trip the check;
+    and, if I2-B is built, the flag/file contract page lists every flag of
+    the compiled ABM binary that `_introspect_flags` scrapes
+    (`mal-core/src/mal_core/abm/wrapper.py`), stating that the `malariasim`
+    Typer CLI is outside that scope.
+*   **Stage 12**: Run the reviewer over the last 20 merges on `main` (or all
+    of them if the repository has fewer — its PR history is unverified, as
+    the repository has no `.github/` directory today); record findings versus
+    confirmed false positives; the stage closes when the measured
+    first-pass rate is written down — no threshold is set on it. A PR that
+    changes only a comment under `mal_core/<stage>/` must produce no
+    incoherence finding from the LLM reviewer (there is no presence rule, so
+    this asserts a behaviour, not the absence of a mechanism).
+*   **Stage 13**: The zip exists in the repository's parent directory and
     passes `unzip -t`; `git ls-files data/` shows only `data/README.md` while
-    the working tree still holds every file; clean-room clone → `uv sync
-    --all-packages` → `malariasim download` (which rebuilds
-    `data/<aoi>/manifest.json` from the registry, from nothing) → ingest →
+    the working tree still holds every file; clean-room clone →
+    `uv sync --all-packages` → `uv run malariasim download` (which rebuilds
+    the upstream half of `data/<aoi>/manifest.json` from the registry, from
+    nothing) → `uv run malariasim ingest` (the derived half) →
     `abm --days 1` passes; restoring the zip over the clone reproduces the
-    pre-untracking tree.
+    pre-untracking tree. The download step requires the dataset credentials
+    (`~/.cdsapirc` or `CDSAPI_RC`, `EARTHDATA_TOKEN`, Earth Engine
+    credentials): a dataset whose credentials are absent is skipped rather
+    than failed, and the manifest comes back partial — so the check runs with
+    credentials, or asserts only the upstream half it can reach.
 *   **Static analysis / linting**: unchanged — this design adds no production
-    code; the only new Python (file 21) follows the repo's existing
-    conventions and is exercised by its own exit conditions above.
+    code; the only new Python (file 22) follows the repo's existing
+    conventions and is exercised by its own exit conditions above. Note that
+    `tools/format.sh` covers the four packages only, so the new script under
+    `tools/` is outside the repository's own lint scope; it is formatted by
+    hand against the same `ruff` rules.
 
 --------------------------------------------------------------------------------
 
