@@ -1,0 +1,1197 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[english]{babel}
+\usepackage[margin=2.3cm]{geometry}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{amsmath,amssymb}
+\usepackage{listings}
+\usepackage[hidelinks]{hyperref}
+\newcommand{\code}[1]{\texttt{#1}}
+\input{../generated/macros.tex}
+
+\title{The \emph{scoring} stage of the MalariaSentinel pipeline\\[3pt]
+\large A conceptual description of how a finished simulation is turned into a scorecard}
+\author{MalariaSentinel conceptual-documentation layer}
+\date{}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+The \emph{scoring} stage runs after an agent-based-model execution has finished and
+answers one question: \emph{is this simulation behaving like the malaria
+entomology it is meant to emulate, and did my last change make it better or
+worse?} It does so by reading the artifacts of a \emph{finished} run --- the
+state COGs, the cohort and aquatic logs, the transmission log --- and by
+comparing what it finds against bands taken from the entomological
+literature. Its output is a single JSON file, the \emph{scorecard}, written
+inside the run directory. The scorecard carries a weighted geometric mean
+over the composite dimensions, a set of binary engineering gates reported
+apart from that mean, and an explicit list of what could not be evaluated and
+why. This document describes what the stage measures, how it computes what it
+computes, what it deliberately does not do, and where the current code and the
+current description of the system disagree.
+\end{abstract}
+
+\section{Purpose, and what the stage is not for}
+
+\subsection{The question the stage answers}
+
+The stage exists to answer a comparison question about a \emph{finished} run.
+The registry module states the intent in its own opening paragraph: the
+weights it carries ``reflect validation value for the question
+\emph{is the system good?}'', and the weights are set so that external
+validation and core biology dominate while engineering invariants are demoted
+to gates rather than counted as dimensions
+(\code{mal-core/src/mal\_core/scoring/registry.py:1-18}). Concretely, the
+stage answers two coupled questions:
+
+\begin{enumerate}
+\item \emph{Is this run in the right biological neighbourhood?} Each
+      dimension asks one narrow, checkable question --- do adult lifespans
+      fall in the field-observed window, does the aquatic population have
+      the stage structure implied by development durations, does the adult
+      population spread as far as mark--recapture studies say it should ---
+      and returns a number between zero and one.
+\item \emph{Did my change help?} Because every dimension is measured the same
+      way on every run, two scorecards are comparable, and the feedback step
+      can report the change in the composite and the dimensions that moved
+      backwards.
+\end{enumerate}
+
+``Having answered it'' means: a scorecard exists, inside the run directory,
+with one entry per registered scorer stating what was measured, what the
+target was, whether the dimension passed, and --- for everything that could
+not be measured --- why not
+(\code{mal-core/src/mal\_core/scoring/runner.py:120-146}). A scorecard that
+reports nothing but skips is a valid, and honest, answer: it says the run
+could not be evaluated, and which artifacts were missing.
+
+\subsection{The negative purpose}
+
+The stage is \emph{not}:
+
+\begin{itemize}
+\item \textbf{A re-run.} The stage neither executes nor re-parameterises the
+      model. Its only contract with the simulation is one method per scorer,
+      which receives a run directory and a context dictionary and returns a
+      result
+      (\code{mal-core/src/mal\_core/scoring/scorers/base.py:78-79}).
+      Producing the run is the ABM stage's job.
+\item \textbf{A decision gate.} The \code{score} command computes the
+      scorecard, writes it and prints a summary; it does not fail the run
+      and does not block anything downstream
+      (\code{mal-core/src/mal\_core/cli.py:409-463}). Nothing in the working
+      tree reads the composite and refuses to proceed. The verdict label is
+      a human-readable reading of the number, not an enforced criterion.
+      The one non-zero exit in the command is an argument error and has
+      nothing to do with the verdict: a missing \code{--run-dir} prints a
+      message and raises \code{typer.Exit(code=1)}
+      (\code{mal-core/src/mal\_core/cli.py:448-450}); once the run directory
+      has been supplied, the command always writes the scorecard and exits
+      zero (\code{cli.py:455-463}).
+\item \textbf{A place where the language model decides.} The LLM judge's
+      verdict is \emph{advisory}: it can only add an optional key to the
+      scorecard, and it can never change the composite or the verdict
+      (\code{mal-core/src/mal\_core/scoring/runner.py:135-142}).
+\item \textbf{The old calibration harness.} There is no pytest calibration
+      harness in the tree: no \code{calibration/} directory, no
+      \code{thresholds.yaml}, no diff-versus-best tracker. The harness and
+      its duplicated scorers were deleted, and the base module says so
+      (\code{mal-core/src/mal\_core/scoring/scorers/base.py:1-6}). The
+      thresholds that used to live there are now inlined in each scorer
+      module, or read from the shared model configuration where they belong
+      to the model.
+\item \textbf{A producer of runs.} Two sibling commands exist that do
+      produce a run before scoring --- \code{validate-detections} and
+      \code{validate-cases} --- but they belong to the measurement
+      campaigns described in \S\ref{sec:campaigns}, not to the stage itself.
+\end{itemize}
+
+\subsection{How to read this document}
+
+The stance note (\code{docs/concepts/README.md}) asks for three things this
+document tries to do consistently. First, every magnitude is named with its
+identity and its units, and every number is either generated from the shared
+model configuration or written here with its \emph{provenance tier} stated.
+Second, choices are named as choices: the AOI slug, the weights, the radius,
+the horizons --- each is something a reader can vary. Third, every claim
+resolves to a file and a line a reviewer can open, and where the code does
+not settle a question the document says so rather than guessing.
+
+The provenance tiers used throughout are:
+
+\begin{longtable}{@{}p{2.6cm}p{11.4cm}@{}}
+\toprule
+Tier & Meaning \\
+\midrule
+\endhead
+\textbf{Model definition} & The value is part of the model's definition and
+lives in the shared configuration file
+(\code{mal-core/config/model\_constants.yaml}); it is written here through the
+generated macro \code{\string\mskey} and can be changed by changing the
+model. \\
+\textbf{Literature-anchored} & The value is a band or a target taken from
+published field or semi-field work; it lives as a literal in the scorer
+module, with the source named in that module's docstring. \\
+\textbf{Engineering prior} & The value is a choice made by the implementer
+to make a check computable (sampling caps, floors, tie tolerances). It has
+no literature anchor and is not derived from the model. \\
+\textbf{Scenario default} & The value is a default that only holds for one
+particular AOI, campaign or run configuration; it is stated in the scorer
+that uses it. \\
+\bottomrule
+\end{longtable}
+
+Values that fall into the first tier are never typed by hand in this
+document: they are pulled in through the generated macros. Values in the
+other three tiers are literals in the code, and the evidence appendix lists
+them all with the file and line where each one is read.
+
+The tier is a classification made by \emph{this document}, not a fact read
+from the code. Every value that is not pulled from the shared configuration
+is a plain literal in its scorer module, and the code draws no distinction
+between a value that is a scenario default and one that is an engineering
+prior --- both are bare literals of the same kind
+(\code{d16\_detection\_coverage.py:43-45},
+\code{d4\_stability.py:56-66}). Where a value could sit in either of those
+two tiers, the tier given below is this document's judgement, and a reviewer
+should read it as such.
+
+\input{../generated/contracts.tex}
+
+\section{The scorecard: the stage's one output}
+
+\subsection{What goes in}
+
+The stage's input is \emph{one directory}: the output directory of a
+finished ABM run
+(\code{mal-core/src/mal\_core/scoring/runner.py:3-7}). The runner refuses a
+path that is not a directory
+(\code{mal-core/src/mal\_core/scoring/runner.py:66-67}). Alongside the
+directory the caller may supply an AOI slug, a scoring configuration file,
+and three name filters
+(\code{mal-core/src/mal\_core/scoring/runner.py:54-63}).
+
+The directory is not read by a fixed manifest; it is \emph{discovered} by
+globbing, with a documented fallback chain per artifact class
+(\code{mal-core/src/mal\_core/scoring/scorers/base.py:82-161}):
+
+\begin{longtable}{@{}p{3.4cm}p{8.6cm}p{3.2cm}@{}}
+\toprule
+Artifact & How it is found & Primary consumers \\
+\midrule
+\endhead
+State COGs (one per snapshot) & \code{*\_day*.tif} excluding any name
+containing \code{transmission}; failing that \code{state\_day*.tif}, then
+\code{state\_seed*.tif}, then a single \code{state.tif}
+(\code{base.py:89-102}) & D1, D5, D8, D15, D16, D21, G6, G24 \\
+Cohort log (adult counts per day) & \code{*\_cohort.json}, then
+\code{cohort.json}, then \code{cohort\_seed*.json}
+(\code{base.py:116-125}) & D2, D3, D4, D16 (extinction check) \\
+Aquatic logs (larval stages per day) & \code{*\_day*\_aquatic.json}, falling
+back to the summary \code{*\_aquatic.json}
+(\code{base.py:128-139}) & D11, D15 \\
+Run summary (contract version, AOI, grid) & the first \code{*.json} in the
+directory that is not named like a cohort/aquatic/day/scorecard file and
+that carries a \code{contract\_version} or \code{aoi\_slug} key
+(\code{base.py:142-161}) & the context; D16, D21, D25 \\
+Transmission log (daily incidence) & \code{*\_transmission\_daily.json}
+(\code{d25\_cases\_ghana.py:135}) & D25 \\
+\end{longtable}
+
+Three artifacts are read but are \emph{not} in the run directory. They are the
+AOI's own data, resolved by convention: the runner substitutes the AOI slug
+into repository-relative glob patterns and takes the first existing hit
+(\code{base.py:204-223}). The occurrence table
+(\code{data/\{aoi\}/\{aoi\}\_occurrence.txt}) feeds D16
+(\code{d16\_detection\_coverage.py:47-50}); the host grid
+(\code{data/\{aoi\}/\{aoi\}\_host\_static.nc}) feeds G12
+(\code{gates.py:161-164}); the urban class raster
+(\code{data/\{aoi\}/\{aoi\}\_urban\_class.tif}) feeds G24
+(\code{gates.py:255-265}). One scorer downloads its own data: D25 fetches a
+pinned DHIMS-II CSV (URL and SHA-256 fixed in the module) into
+\code{data/ghana/scoring/} when the file is absent or its checksum does not
+match (\code{d25\_cases\_ghana.py:39-77}).
+
+\subsection{What comes out}
+
+The output is one file, \code{scorecard.json}, written \emph{inside} the run
+directory (\code{mal-core/src/mal\_core/scoring/runner.py:120-146}). Its keys
+are:
+
+\begin{longtable}{@{}p{3.6cm}p{11.4cm}@{}}
+\toprule
+Key & Content \\
+\midrule
+\endhead
+\code{run\_dir} & The scored directory, as given. \\
+\code{aoi} & The AOI slug, or \code{null} when none was supplied. \\
+\code{composite} & The weighted geometric mean over the contributing composite
+dimensions, rounded to four decimals. \\
+\code{verdict} & One of \code{VIABLE}, \code{BORDERLINE},
+\code{REGRESSED}, \code{COLLAPSED}: a label on the composite. \\
+\code{scores} & One entry per scorer that was run, holding its score, the
+measured value, the target string, its diagnostics, its pass flag and its
+status. \\
+\code{composite\_dimensions} & The dimensions that contributed to the
+composite, each with its score and its weight. \\
+\code{gates} & The gates that ran, each with the same entry shape. \\
+\code{skipped} & A map from scorer name to the reason it was not evaluated. \\
+\code{timestamp} & The UTC ISO-8601 instant the card was written. \\
+\code{verdict\_llm} & Present only when the language-model judge succeeded;
+absent otherwise. \\
+\bottomrule
+\end{longtable}
+
+\subsection{Who consumes it, and under what contract}
+
+The scorecard is written for a human and for the feedback step. The
+composite is rounded to four decimals, so a consumer that needs to compare
+two runs should compare the stored values rather than recompute from the
+raw diagnostics. There are three consumers in the tree:
+
+\begin{itemize}
+\item The command-line summary, which prints the composite and verdict, one
+      line per composite dimension (marked \code{LOW} when the dimension did
+      not reach its own threshold), the gates, and the skips
+      (\code{runner.py:149-177}).
+\item The feedback renderer, which turns a scorecard --- optionally against a
+      baseline scorecard --- into a Markdown report
+      (\code{mal-core/src/mal\_core/scoring/feedback.py:16-53}).
+\item The language-model judge, which is handed the finished scorecard
+      exactly as it will be written to disk
+      (\code{mal-core/src/mal\_core/scoring/runner.py:135-142}).
+\end{itemize}
+
+No other stage of the pipeline reads the scorecard. The downstream stages
+consume the run's own artifacts --- the state COG and the sidecar, under
+contract \mskey{contracts.cogs_state} --- not the scorecard. That is worth
+saying plainly: \emph{the scorecard is a report about a run, not an input to
+the next stage}.
+
+\section{The registry: how a scorer is declared}
+
+\subsection{The scorer contract}
+
+Every scorer in the stage is a subclass of the abstract base class
+\code{Scorer}
+(\code{mal-core/src/mal\_core/scoring/scorers/base.py:56-79}). A scorer
+declares a name, a kind, a description, a minimum score, a hard floor and a
+manual flag, and implements one method,
+\code{score(run\_dir, ctx) -> ScorerResult}
+(\code{mal-core/src/mal\_core/scoring/scorers/base.py:78-79}):
+
+\begin{longtable}{@{}p{2.9cm}p{11.1cm}@{}}
+\toprule
+Member & Meaning \\
+\midrule
+\endhead
+\code{name} & The registry key, e.g. \code{D2\_survival}: the name used on the
+command line, in the configuration file and in the scorecard. \\
+\code{kind} & Either \code{"composite"} or \code{"gate"}. The kind decides
+whether the result enters the composite or is reported apart from it. \\
+\code{description} & One line of prose, shown by \code{malariasim score
+--list} (\code{mal-core/src/mal\_core/cli.py:440-446}). \\
+\code{min\_score} & The threshold the scorer compares its own score against
+to set its \emph{passed} flag. \\
+\code{hard\_floor} & A second declared threshold. It is declared by eleven
+dimensions and read by no code in the package (see
+\S\ref{sec:absences}). \\
+\code{manual} & Marks a scorer that must never run by default because it
+needs per-AOI data (\code{base.py:72-76}). \\
+\end{longtable}
+
+The result type carries six fields (\code{base.py:26-43}): the \code{score}
+that would enter the composite, the \code{value} measured in its own units, a
+human-readable \code{target} band, free-form \code{diagnostics}, the
+\code{passed} flag and the \code{status}, which is either \code{ok} or
+\code{skipped}. A skipped result is built by a dedicated factory that zeroes
+the score and the value, clears \code{passed} and records the reason in
+\code{diagnostics["skipped\_reason"]} (\code{base.py:45-54}).
+
+\subsection{The registry is code, not a data file}
+
+\code{build\_registry()} instantiates every scorer and gate in the package
+and returns a mapping from name to a frozen record holding the class and its
+kind (\code{mal-core/src/mal\_core/scoring/registry.py:47-51},
+\code{registry.py:79-104}). There is no registry file on disk, so a scorer
+cannot be declared in one place and implemented in another, and the registry
+cannot drift out of date with respect to the code.
+
+Adding a scorer therefore takes three steps, and all three are needed:
+
+\begin{enumerate}
+\item write the module under \code{mal-core/src/mal\_core/scoring/scorers/}
+      with a \code{Scorer} subclass; the package's export surface is
+      \code{scorers/\_\_init\_\_.py:1-47};
+\item instantiate it in \code{build\_registry()} (\code{registry.py:80-100});
+\item if it is a composite dimension, give it a weight in
+      \code{COMPOSITE\_WEIGHTS} (\code{registry.py:53-67}).
+\end{enumerate}
+
+A scorer that is registered but given no weight still runs, because the
+configuration falls back to a weight of one
+(\code{mal-core/src/mal\_core/scoring/config.py:30-31}); the listing, however,
+reads the weight table directly and would show it with weight zero
+(\code{registry.py:116}).
+
+\subsection{Weights, and why they are what they are}
+
+The weight table is the single source of truth for the composite:
+
+\input{../generated/params-scoring.tex}
+
+The registry's opening paragraph states the reasoning: the weights reflect
+validation value for the question \emph{is the system good?}, so external
+validation and core biology dominate, while engineering invariants are
+demoted to gates rather than weighted into the biology
+(\code{registry.py:1-6}). The two heaviest dimensions are the
+detection-coverage dimension and the adult-survival dimension; the
+one-weight family is the set of occupancy, spatial-autocorrelation,
+aquatic-stage, habitat-persistence, washout and dispersal dimensions.
+
+\subsection{Enabling, disabling, filtering}
+
+By default every scorer that is \emph{not} manual is enabled
+(\code{config.py:34-48}). A configuration file may enable or disable a
+scorer and override a weight; its shape is a \code{scorers} mapping whose
+entries carry \code{enabled} and \code{weight} keys
+(\code{config.py:80-89}).
+
+The command line is applied on top of the file in this order: \code{--enable}
+first, then the configuration file, then \code{--only} (intersect with the
+enabled set) and \code{--skip} (subtract from it)
+(\code{config.py:51-95}). An unknown scorer name raises a
+\code{ValueError} naming the offending string (\code{config.py:68-72}); the
+command-line lists are comma-separated (\code{cli.py:452-454}).
+
+The \emph{manual} flag is the stage's honesty mechanism for AOI-dependent
+scorers: a manual scorer needs per-AOI data that not every AOI has --- an
+occurrence table, an urban-class raster, a case series --- so it stays out
+of the default set until an operator who knows the data is there activates
+it explicitly (\code{base.py:72-76}). Three scorers carry the flag: the
+detection-coverage dimension
+(\code{d16\_detection\_coverage.py:60}), the reported-cases dimension
+(\code{d25\_cases\_ghana.py:184}) and the urban-ratio gate
+(\code{gates.py:259}).
+
+\section{Order of operations, and what that order decides}
+
+The runner executes a fixed sequence
+(\code{mal-core/src/mal\_core/scoring/runner.py:54-146}):
+
+\begin{enumerate}
+\item \textbf{Validate the run directory.} A path that is not a directory
+      raises \code{NotADirectoryError} before anything else happens
+      (\code{runner.py:66-67}).
+\item \textbf{Resolve the configuration.} The file, \code{--only},
+      \code{--skip} and \code{--enable} are folded into one enabled set and
+      one weight map (\code{runner.py:68-76}).
+\item \textbf{Build the registry and the context.} The context carries the
+      AOI slug, the run summary metadata and the run directory path
+      (\code{runner.py:78-82}, \code{runner.py:34-40}).
+\item \textbf{Execute the scorers, in alphabetical order of their names}
+      (\code{runner.py:84}). Each call is wrapped in a \code{try} block and
+      an exception becomes a skipped entry carrying the exception text
+      (\code{runner.py:96-98}); the code states the reason --- a broken
+      scorer must not sink the run.
+\item \textbf{Triage the results into three buckets}: skipped results go to
+      \code{skipped}, composite results to the composite map, gate results
+      to \code{gates} (\code{runner.py:99-106}). A scorer that was enabled
+      but not run because configuration disabled it is also recorded in
+      \code{skipped}, with a different reason (\code{runner.py:86-93}).
+\item \textbf{Compute the composite} over the composite map
+      (\code{runner.py:108-118}).
+\item \textbf{Label the verdict} from the composite (\code{runner.py:24-31}).
+\item \textbf{Call the optional judge}, attaching its reply only if it
+      succeeded (\code{runner.py:135-142}).
+\item \textbf{Write the scorecard} into the run directory
+      (\code{runner.py:144-146}).
+\end{enumerate}
+
+\subsection{Consequences worth stating}
+
+\begin{itemize}
+\item \textbf{A skipped dimension shrinks the composite's meaning; it does
+      not punish it.} A dimension that cannot be measured removes itself
+      from both the numerator and the weight sum (\code{runner.py:112-118}).
+      Adding a dimension therefore narrows what a composite covers without
+      invalidating older composites --- and two scorecards computed over
+      different dimension sets are not directly comparable.
+\item \textbf{A crashing scorer is invisible in the composite.} Because the
+      exception is converted into a skip, a systematic failure in one
+      dimension appears as a missing dimension rather than as a low score.
+      The reason string in \code{skipped} is the only trace.
+\item \textbf{Gates are computed but cannot affect the composite.} The two
+      maps are disjoint by construction (\code{runner.py:103-106}).
+\item \textbf{The judge cannot affect anything.} It is called after the
+      composite and the verdict are final, and its reply is attached under a
+      separate key (\code{runner.py:135-142}).
+\item \textbf{Writing happens last.} A judge failure is absorbed inside the
+      judge module, so the scorecard is written either way
+      (\code{llm\_scorer.py:359-368}).
+\item \textbf{Ordering is alphabetical, not dependency-aware.} Scorers do
+      not depend on one another; their only shared inputs are the files on
+      disk.
+\end{itemize}
+
+\section{The composite: one number from many}
+\label{sec:composite}
+
+\subsection{The formula}
+
+The composite is a \emph{weighted geometric mean} over the composite
+dimensions that produced an \emph{ok} result
+(\code{mal-core/src/mal\_core/scoring/runner.py:108-118}):
+
+\begin{equation}
+C = \exp\!\left( \frac{ \sum_i w_i \ln s_i }{ \sum_i w_i } \right),
+\qquad s_i \in (0,1],
+\quad w_i = \texttt{weight\_of}(\text{name}_i)
+\end{equation}
+
+The weight of a dimension comes from the configuration, which falls back to
+the registry table and then to one (\code{config.py:30-31}).
+
+The geometric mean is the right shape for this job, and its properties are
+the stage's failure semantics. Because $\ln s \to -\infty$ as $s \to 0$:
+
+\begin{itemize}
+\item \textbf{One zero collapses everything.} The composite is computed only
+      when \emph{all} contributing scores are strictly positive; otherwise it
+      is zero (\code{runner.py:111}). A run in which one dimension collapsed
+      is a run whose composite is zero, which is the intended reading: a
+      collapsed dimension is not something to be averaged away.
+\item \textbf{No contributing dimension also gives zero}
+      (\code{runner.py:110-111}). A consumer must therefore distinguish
+      \emph{the model scored zero} from \emph{nothing could be scored} by
+      reading \code{composite\_dimensions} and \code{skipped}.
+\item \textbf{Low dimensions dominate high ones.} A single dimension far
+      below the others pulls the composite well under the arithmetic mean,
+      because the geometric mean is dominated by its smallest term. The
+      composite is as much a statement about the worst dimension as about
+      the average one.
+\end{itemize}
+
+\subsection{What a dimension's score means}
+
+Each dimension returns a number in $[0,1]$ answering a question of the form
+\emph{how far is this measurement from the expected band?}. Six shapes
+occur among the thirteen, and they are not interchangeable --- a score of
+one means something slightly different in each of them:
+
+\begin{itemize}
+\item \textbf{Plateau and falloff.} The score is one inside an accepted band
+      and decays as a Gaussian away from it --- for example the occupancy
+      dimension (\code{d1\_habitat\_occupancy.py:62-66}) and the incidence
+      dimension (\code{d3\_eip.py:54-57}).
+\item \textbf{Plateau and falloff, averaged over two bands.} The dimension
+      computes one such quantity per band and averages the two ---
+      \code{d4\_stability.py:56-68},
+      \code{d11\_aquatic\_structure.py:90-105},
+      \code{d21\_dispersal\_kernel.py:115-126}.
+\item \textbf{Gaussian without a plateau.} The survival dimension has no
+      band branch: its score is an unconditional Gaussian centred on a mean
+      lifespan of $11$ days with a width of $4$ days
+      (\code{d2\_survival.py:55}), so the score is one only at exactly
+      $11$ days, and the ends of the stated $8$--$15$ day window do not
+      score one.
+\item \textbf{Ratio against a target.} The score is the measured quantity
+      divided by its target, and is one when the target is met --- the
+      coupling dimension divides the correlation by $0.50$ and caps at one
+      (\code{d8\_coupling.py:54}), the detection-coverage dimension divides
+      the coverage by its target (\code{d16\_detection\_coverage.py:128}).
+\item \textbf{Geometric mean of three sub-scores.} The persistence
+      dimension combines its survival, no-extinction and expansion
+      sub-scores by a geometric mean
+      (\code{d15\_persistence.py:123-126}).
+\item \textbf{Weighted sum of boolean checks.} The score is the sum of the
+      weights of the checks that hold --- the two contract dimensions
+      (\code{d19\_pool\_persistence.py:126-134},
+      \code{d20\_washout\_response.py:65-73}).
+\end{itemize}
+
+A dimension score is therefore neither a probability nor a percentage: it is
+\emph{the degree to which one measurement of one run matches an expected
+band}, and it is interpretable only together with the \code{value} and
+\code{target} fields that accompany it.
+
+\subsection{The minimum score, the hard floor, and the pass flag}
+
+\code{min\_score} is a per-dimension declaration: the scorer compares its
+own score against it and sets the \emph{passed} flag (\code{base.py:70}; for
+example \code{d2\_survival.py:64}). The generated table above lists, for
+each dimension, its weight, its minimum score and its hard floor.
+
+The pattern is not universal, and two exceptions are worth naming. The
+coupling dimension never compares its score against its declared minimum
+score at all: it declares \code{min\_score = 0.4}
+(\code{d8\_coupling.py:25}) but sets its flag from the raw correlation
+instead, \code{passed = r >= 0.30} (\code{d8\_coupling.py:60}), so its
+declared minimum score is inert. The two contract dimensions set their
+flags from a literal $0.70$ rather than from \code{min\_score}
+(\code{d19\_pool\_persistence.py:144},
+\code{d20\_washout\_response.py:83}); there the literal coincides with the
+declared minimum score, so the difference has no behavioural effect.
+
+One consequence is worth stating explicitly: \emph{a dimension that fails
+its minimum score still enters the composite}. The runner puts a dimension
+into the composite map whenever its status is \emph{ok}, regardless of
+whether it passed (\code{runner.py:100-106}). The pass flag is a reporting
+convenience --- the command-line summary prints such a dimension as
+\code{LOW} (\code{runner.py:157-163}) --- not an exclusion.
+
+\code{hard\_floor} is declared by eleven of the composite dimensions and is
+never read anywhere in the package. It is a dormant declaration; see
+\S\ref{sec:absences}.
+
+\subsection{The verdict}
+
+The verdict is a label attached to the composite, computed by comparing the
+composite against three thresholds in order (\code{runner.py:24-31}):
+
+\begin{longtable}{@{}p{4.4cm}p{4.4cm}@{}}
+\toprule
+Composite at or above & Label \\
+\midrule
+\endhead
+$0.70$ & \code{VIABLE} \\
+$0.50$ & \code{BORDERLINE} \\
+$0.30$ & \code{REGRESSED} \\
+(below all of the above) & \code{COLLAPSED} \\
+\end{longtable}
+
+The verdict is \emph{not} a gate: it fails nothing and is counted nowhere. It
+exists to be read by a human.
+
+\section{Gates: binary invariants, reported apart}
+
+\subsection{What makes something a gate}
+
+A gate is a scorer whose kind is \code{"gate"}
+(\code{mal-core/src/mal\_core/scoring/scorers/base.py:56-64}). Gates check
+data hygiene and input validity, not biology. Three properties distinguish
+them from composite dimensions, and each is visible in the code:
+
+\begin{itemize}
+\item \textbf{They never enter the composite.} The runner routes results by
+      kind (\code{runner.py:103-106}), and the gate classes declare a weight
+      of zero (\code{gates.py:44}, \code{:85}, \code{:121}, \code{:152},
+      \code{:202}, \code{:257}).
+\item \textbf{A failure is a warning, not a penalty.} The gate module's
+      docstring says it: a failed gate is a visible warning in the scorecard
+      but never changes the composite (\code{gates.py:1-7}).
+\item \textbf{Missing data is a skip, not a failure.} Every gate returns a
+      skipped result when its artefacts are absent, on the stated principle
+      that missing data is not a data-integrity failure (\code{gates.py:50-51},
+      \code{:91-95}, \code{:127-131}, \code{:158-169}, \code{:213-216},
+      \code{:266-273}). A skipped gate appears in \code{skipped}, not in
+      \code{gates}.
+\end{itemize}
+
+\subsection{The six gates}
+
+\begin{longtable}{@{}p{2.4cm}p{5.2cm}p{6.4cm}@{}}
+\toprule
+Gate & What it checks & Rule and units \\
+\midrule
+\endhead
+\code{G6\_data\_valid} & Every band value of every state COG is finite and
+non-negative & Fraction of valid values over all bands of all state files;
+the gate passes only at a perfect fraction. Above 48 state files a uniform
+sample of 48 is taken, the full sweep being a test concern
+(\code{gates.py:52-54}). \\
+\code{G7\_determinism} & Per-seed state files are byte-identical & Files
+grouped by the seed token in the filename; every group with two or more
+members is compared by MD5; the score is one when no group mismatches
+(\code{gates.py:89-113}). \\
+\code{G10\_perf} & Wall time of the run & Read from \code{wall\_s} in
+\code{run\_metadata.json}; the gate passes at or below 30 s, and the score
+decays as $30/w$ otherwise (\code{gates.py:125-144}). \\
+\code{G12\_host\_input} & The input human grid total matches a census
+reference & Total of the \code{human} variable of the AOI's host raster,
+excluding the NoData sentinel \mskey{ingest.nodata_sentinel}, divided by a
+reference total that defaults to $27\,000\,000$ and can be overridden
+through the context; the gate passes when the ratio lies in $[0.8, 1.2]$
+(\code{gates.py:156-194}). \\
+\code{G14\_mobility} & Mobility origin--destination matrices are
+row-stochastic & Each \code{.csr} file next to the run directory (or in its
+parent, or in a sibling \code{hosts} directory) is read as a sparse matrix;
+the fraction of rows whose values sum to one within a tolerance of $0.01$ is
+computed per file, the minimum over files is the score, and the gate passes
+at or above $0.99$ (\code{gates.py:206-245}). \\
+\code{G24\_urban\_ratio} & Urban cells carry less adult density than rural
+ones & Mean adult density over urban-class $30$ cells divided by the mean
+over rural-class $50$ cells of the final state; the gate passes at or below
+$0.7$ (\code{gates.py:261-303}). The gate is \emph{manual}: it needs the
+AOI's urban-class raster. \\
+\end{longtable}
+
+\subsection{Why the data-validity rule is finite and non-negative}
+
+Under contract \mskey{contracts.cogs_state} the two state bands are raw
+per-cell adult counts --- \code{adult\_patch\_count} and
+\code{adult\_cell\_count} (\code{mal-core/src/mal\_core/abm/src/main.cpp:386-390},
+and the contract table above) --- so a value above one is an ordinary adult
+count and not by itself an error. The rule the gate enforces is therefore
+\emph{finite and $\geq 0$} (\code{gates.py:35-40}): it rejects non-finite
+values, the NoData sentinel and negative values, and passes only when
+every value of every band of every sampled state file is valid
+(\code{gates.py:52-54}).
+
+What the code does \emph{not} record is the history of that rule. The
+gate's docstring asserts that the contract changed and that the earlier
+$[0,1]$ envelope no longer applies (\code{gates.py:35-40}); the tree shows
+only the current contract version, so that assertion cannot be checked
+against the code and is reported here as the module's own account of its
+motivation.
+
+This has a consequence for the dimensions that read the same bands, stated
+in \S\ref{sec:dimensions}.
+
+\section{The thirteen composite dimensions}
+\label{sec:dimensions}
+
+\subsection{What each one measures}
+
+\begin{longtable}{@{}p{2.5cm}p{3.4cm}p{1.9cm}p{3.3cm}p{2.9cm}@{}}
+\toprule
+Dimension & Quantity & Artefact & Units and target band & Tier (this document's
+classification) \\
+\midrule
+\endhead
+\code{D1\_habitat\_occupancy} & Fraction of habitat cells holding at least
+one adult in the final snapshot & final state COG, bands 1 and 2 &
+dimensionless; band $0.20$--$0.70$; Gaussian falloff around $0.45$ of width
+$0.15$ & literature-anchored (Bogh 2004; Ndenga 2011) \\
+\code{D2\_survival} & Mean adult lifespan implied by the steady-state daily
+adult survival rate & cohort log & days; window $8$--$15$ d; Gaussian around
+$11$ d of width $4$ d, with no plateau at the ends of the window &
+literature-anchored (Saarman 2019; Midega 2007) \\
+\code{D3\_eip} & Fraction of infected mosquitoes whose extrinsic incubation
+period has completed, at day 30 & cohort log & dimensionless; band
+$0.20$--$0.50$; Gaussian around $0.35$ of width $0.15$ &
+literature-anchored (Mordecai 2013) \\
+\code{D4\_stability} & Adult population trajectory: collapse ratio and
+explosion ratio & cohort log & ratio to the day-0 adult count; collapse band
+$0.10$--$0.80$, explosion at or below $5\times$; the score is the mean of
+the two sub-scores & engineering prior \\
+\code{D5\_morans} & Moran's $I$ of the occupied cells of the final snapshot,
+queen contiguity, on active pixels only & final state COG, band 1 &
+dimensionless; band $0.20$--$0.85$; Gaussian around $0.5$ of width $0.25$ &
+literature-anchored (spatial clustering of larval habitats) \\
+\code{D8\_coupling} & Pearson correlation between the two state bands over
+the cells where band 1 is positive & final state COG, bands 1 and 2 &
+correlation coefficient; target $r \geq 0.30$; the score is $r/0.50$ capped
+at one & engineering prior \\
+\code{D11\_aquatic\_structure} & Mean larval share and mean pupal share of
+the aquatic population over the last 30 aquatic files & per-day aquatic
+JSONs & dimensionless; larva band $0.65$--$0.90$, pupa band $0.02$--$0.15$;
+the score is the mean of the two sub-scores & literature-anchored (Bayoh \&
+Lindsay 2003; Ouedraogo 2024) \\
+\code{D15\_persistence} & Long-horizon persistence: survival against the
+population peak, absence of extinction, spatial expansion & per-day aquatic
+JSONs plus state COGs & dimensionless; three sub-scores combined by a
+geometric mean & engineering prior \\
+\code{D16\_detection\_coverage} & Fraction of the AOI's real detection spots
+that the simulated population reached & final state COG plus the AOI's
+occurrence table & dimensionless; target at or above $0.50$ at a radius of
+$5$ km, with sensitivity radii of $2$, $5$ and $10$ km reported in the
+diagnostics & scenario default (launch-and-measure) \\
+\code{D19\_pool\_persistence} & Whether the proxy-habitat model keeps
+pluvial availability alive after a rain pulse and keeps a positive dry-season
+floor & \emph{nothing from the run} (\S\ref{sec:contractdims}) &
+dimensionless; four checks worth $0.3$, $0.2$, $0.2$ and $0.3$ & model
+definition \\
+\code{D20\_washout\_response} & Whether heavy rain produces a washout of
+aquatic cohorts with the expected shape & \emph{nothing from the run}
+(\S\ref{sec:contractdims}) & dimensionless flush fraction; four checks worth
+$0.3$, $0.3$, $0.2$ and $0.2$ & model definition \\
+\code{D21\_dispersal\_kernel} & Median and 90th percentile of the
+displacement of the adult population from the seeding centroid & state COGs
+at the first snapshot and at the latest snapshot at or before day 30 &
+kilometres; median band $0.15$--$0.70$ km, 90th-percentile band
+$0.70$--$3.00$ km; the score is the mean of the two sub-scores &
+literature-anchored (Costantini 1996; Thomas 2013; Midega 2007) \\
+\code{D25\_cases\_ghana} & Correlation between the simulated monthly
+incidence climatology and the observed reported-cases climatology &
+transmission daily log plus the pinned DHIMS-II table & correlation
+coefficient; target $r \geq 0.60$ & literature-anchored (Seidu 2026) \\
+\end{longtable}
+
+\subsection{How a measurement becomes a score}
+
+The table above states the band each dimension compares against. The
+mechanisms differ, and the difference is the difference between the six
+shapes listed in \S\ref{sec:composite}: a plateau-and-falloff (D1, D3, D5,
+D25), the same shape averaged over two bands (D4, D11, D21), a Gaussian
+without a plateau (D2), a ratio against a target (D8, D16), a geometric
+mean of three sub-scores (D15), and a weighted sum of boolean checks
+(D19, D20).
+
+Two behaviours change what a score means and are worth stating separately:
+
+\begin{itemize}
+\item \textbf{D3 skips rather than punishes a degenerate run.} If the
+      completed-EIP fraction is constant across the cohort log --- the state
+      of a run made without the transmission module --- the dimension
+      reports a skip (\code{d3\_eip.py:44-50}).
+\item \textbf{D16 distinguishes extinction from zero coverage.} A run whose
+      final state has no occupied cell scores zero, carrying an
+      \emph{extinct} diagnostic when the cohort log shows zero adults at the
+      last day (\code{d16\_detection\_coverage.py:102-117},
+      \code{:145-157}).
+\end{itemize}
+
+\subsection{Where the state bands are read, and the mismatch that is there}
+
+Three dimensions read the two bands of the state COG, and their docstrings
+describe them in the vocabulary of an \emph{earlier} contract: band 1 as
+adult density, band 2 as aquatic-capable habitat or host-seeking pressure
+(\code{d1\_habitat\_occupancy.py:3-5}, \code{d5\_morans.py:1-4},
+\code{d8\_coupling.py:1-6}). Under contract 4.0 both bands are raw
+per-cell adult counts: band 1 counts the adults associated with their patch
+after dispersal, band 2 counts the adults at their current position
+(\code{mal-core/src/mal\_core/abm/src/main.cpp:386-390}).
+
+The consequence is stated plainly rather than smoothed over: \emph{as
+implemented today, these three dimensions threshold, count or correlate
+adult counts, not habitat suitability}.
+
+\begin{itemize}
+\item \textbf{D1} divides the number of cells where band 1 is positive by
+      the number of cells where band 2 is positive
+      (\code{d1\_habitat\_occupancy.py:51-61}). With both bands being adult
+      counts, this is the share of adult-holding cells that also hold adults
+      under a second, differently-defined count; the scorer's own skip
+      condition fires when band 2 has no positive cell at all
+      (\code{d1\_habitat\_occupancy.py:58-59}).
+\item \textbf{D5} computes Moran's $I$ on band 1
+      (\code{d5\_morans.py:70-71}), which is the spatial autocorrelation of
+      adult presence --- a meaningful quantity, but not the habitat
+      clustering quantity the docstring names.
+\item \textbf{D8} correlates band 1 against band 2 on the cells where band 1
+      is positive (\code{d8\_coupling.py:32-47}), that is, it measures how
+      strongly the two adult-count definitions agree. Because both are
+      counts of the same population under two spatial definitions, a strong
+      positive correlation is expected by construction, and the dimension
+      cannot fail for the reason it was written to test.
+\end{itemize}
+
+This is a defect in the measurement layer, not in the contract. It is
+recorded here as an open item (\S\ref{sec:absences}) rather than papered
+over. A consumer reading a D1, D5 or D8 score from a contract-4.0 run should
+read it as a statement about adult counts, and should not read it as a
+statement about habitat suitability.
+
+\subsection{Two dimensions that score the model contract instead of the run}
+\label{sec:contractdims}
+
+D19 and D20 accept a run directory and a context and then ignore both
+(\code{d19\_pool\_persistence.py:51-71},
+\code{d20\_washout\_response.py:41-63}). They exercise the habitat
+contract's own rules and check them against thresholds. The two differ in
+how they do it: D19 writes the pluvial availability recursion out inline,
+as a scalar step on a single cell (\code{d19\_pool\_persistence.py:65-71}),
+whereas D20 imports and calls the shared washout-fraction function
+(\code{d20\_washout\_response.py:20}, \code{:46}, \code{:51}, \code{:56},
+\code{:61}) --- so D20 exercises the shipped implementation, while D19
+exercises a transcription of the recursion written inside the scorer. The
+constants they
+use are the shared model constants: the pluvial rain scale is
+\mskey{pluvial.rain_scale_mm} and the drying memory is
+\mskey{pluvial.dry_memory_days}, the washout threshold is
+\mskey{aquatic_stress.wash_threshold_mm} and the washout cap is
+\mskey{aquatic_stress.wash_fraction_max}
+(\code{d19\_pool\_persistence.py:28-29},
+\code{d20\_washout\_response.py:24-25}).
+
+Their scenarios are fixed. D19 applies a $30$ mm pulse on three consecutive
+days and then ten dry days, with an activation floor of $0.05$
+(\code{d19\_pool\_persistence.py:78-90}); D20 evaluates the washout rule at
+$30$, $40$, $50$ and $80$ mm (\code{d20\_washout\_response.py:45-63}).
+
+Their provenance is therefore \emph{model definition}: they assert that the
+contract's own rules still behave as the contract says. Their practical
+effect on the composite is that two of the thirteen dimensions are
+insensitive to the run being scored --- they can only contribute their full
+weight or collapse it, and they contribute the same value to every run.
+
+\section{The AOI convention: explicit in, resolved by convention}
+
+\subsection{The slug is never inferred}
+
+The AOI slug reaches a scorer only through an explicit \code{--aoi} on the
+command line (\code{mal-core/src/mal\_core/cli.py:413}), which the runner
+copies into the context (\code{runner.py:34-40}). A scorer that needs the
+slug asks for it through \code{require\_aoi()}, which returns \code{None}
+rather than guessing (\code{scorers/base.py:164-172}). The reason is in the
+code: run outputs may live in any user-chosen directory, so guessing the
+AOI from paths or from run metadata is forbidden by convention.
+
+This diverges from the command-line help text, which says the AOI is
+auto-detected from run metadata if omitted (\code{cli.py:413}). The code is
+authoritative; the help text is wrong, and it is listed in
+\S\ref{sec:absences}.
+
+\subsection{Where per-AOI inputs come from}
+
+The \emph{slug} is explicit; the \emph{path} to that AOI's data is resolved
+by convention --- repository-relative glob patterns with
+\texttt{\{aoi\}} substituted, first existing hit wins
+(\code{scorers/base.py:204-223}). The patterns in use are those in the
+artefact table above: the occurrence table for D16, the host grid for G12
+and the urban-class raster for G24. D25 is the exception: its dataset is a
+fixed, pinned public file rather than something the AOI provides. The
+scorer downloads it on demand into \code{data/ghana/scoring/} and refuses
+to use a copy whose SHA-256 checksum does not match the pinned value
+(\code{d25\_cases\_ghana.py:39-77}); it also refuses any AOI other than
+Ghana, because the table covers three of Ghana's regions
+(\code{d25\_cases\_ghana.py:192-197}).
+
+\subsection{The grid transform, and why it is not trivial}
+
+Two dimensions (D16, D21) need to convert between grid cells and
+longitude/latitude. The helper \code{grid\_transform()} trusts the
+GeoTIFF's own affine when the grid is north-up (the off-diagonal terms
+vanish), and otherwise falls back to the \code{transform} field of the run
+summary JSON (\code{scorers/base.py:175-201}). The helper's own docstring
+gives its reason: the engine's state COGs have historically stored a
+garbled affine, with GDAL ordering fed to an affine constructor
+(\code{scorers/base.py:175-182}). That historical claim is the module's
+account of itself --- no code in the tree records the past behaviour, and
+the current writer does not show it --- so it is reported here as an
+assertion, not as a verified fact. When neither source yields a
+usable transform, both dimensions skip rather than guess
+(\code{d16\_detection\_coverage.py:79-81},
+\code{d21\_dispersal\_kernel.py:71-73}).
+
+\section{The optional judge: a qualitative reading, not evidence of the same
+kind}
+
+\subsection{What it does}
+
+The judge posts the finished scorecard JSON to a chat-completions endpoint
+on OpenRouter together with a bundled system prompt, and validates the
+reply against a schema (\code{mal-core/src/mal\_core/scoring/llm\_scorer.py:74-95}).
+The schema requires a verdict from a four-value vocabulary, a composite
+estimate in $[0,1]$, and lists of concerns, recommendations and literature
+grounding (\code{llm\_scorer.py:82-103}).
+
+\subsection{Why it is not the same kind of evidence as a deterministic scorer}
+
+\begin{itemize}
+\item \textbf{It cannot gate anything.} The runner calls it after the
+      composite and the verdict are already computed, and attaches its reply
+      only under the optional key \code{verdict\_llm}; if the call fails the
+      key is omitted entirely (\code{runner.py:135-142}). The deterministic
+      composite and verdict are unaffected in every path.
+\item \textbf{It can be absent.} Three failure paths --- no API key, a
+      schema-validation failure, any transport or other exception --- all
+      produce a fallback dictionary carrying \code{verdict="unknown"} and a
+      human-readable reason, and no exception escapes to the caller
+      (\code{llm\_scorer.py:222-254}, \code{:296-308}, \code{:359-368}). The
+      scorecard is written either way.
+\item \textbf{It is reproducible only in the caching sense.} It is run at
+      temperature zero and the request is content-hashed and cached on disk,
+      so repeated runs over an unchanged scorecard are free and return the
+      same answer (\code{llm\_scorer.py:111-131}, \code{:296-303},
+      \code{:319-321}). The answer is still the output of a third-party
+      model on a prompt, not a function of the run.
+\item \textbf{It is judging a stale description of the scorecard.} The
+      bundled prompt still describes a ten-dimension scorecard and reads
+      band 1 as larval habitat saturated at one and band 2 as a normalised
+      adult density (\code{scoring/prompts/llm\_verdict.md:3-4},
+      \code{:71-79}), whereas the registry now holds thirteen composite
+      dimensions and the state bands are raw adult counts. The judge's
+      context is therefore partly wrong.
+\end{itemize}
+
+\subsection{How it is kept cheap}
+
+The request payload --- the scorecard JSON plus the model identifier --- is
+hashed with SHA-256, and the verdict is cached under a content-addressed
+file in a cache directory (\code{llm\_scorer.py:111-131},
+\code{:177-187}). The cache is best-effort: a failed write is swallowed
+(\code{llm\_scorer.py:208-222}). The API key is read from the environment or
+from a \code{.env} file walked up from the package directory
+(\code{llm\_scorer.py:134-174}). The default model identifier, the base URL
+and the per-request timeout are module constants
+(\code{llm\_scorer.py:44-52}).
+
+\section{Measurement campaigns: the two commands that build a run first}
+\label{sec:campaigns}
+
+\subsection{Detection coverage}
+
+The \code{validate-detections} command seeds mosquitoes at the AOI's real
+detection points, runs the model for a year by default, and then scores
+with the detection-coverage dimension explicitly enabled
+(\code{mal-core/src/mal\_core/cli.py:466-556}, \code{:551-555}). The
+occurrence table is read with the shared loader, which deduplicates the
+detection spots (\code{scorers/base.py:233-254}). The dimension then asks
+how many of those spots the simulated population actually reached: a spot
+counts as covered when at least one occupied cell lies within the radius of
+the spot in the final snapshot (\code{d16\_detection\_coverage.py:87-126}).
+
+\subsection{Reported cases}
+
+The \code{validate-cases} command runs a multi-year simulation with a
+uniform seeding across candidate patches and the whole vector pool
+initially infected, discards a warm-up, and then scores with the
+reported-cases dimension explicitly enabled
+(\code{cli.py:559-639}, \code{:633-638}). The dimension compares the
+simulated calendar-month climatology against the observed one; when the
+simulation's last twelve blocks fall in a single calendar year that the
+dataset also covers, the comparison is made year by year, otherwise it falls
+back to the pooled climatology (\code{d25\_cases\_ghana.py:216-246}).
+
+Both campaigns exist because their dimensions are only meaningful for a run
+constructed in that particular way; scoring an arbitrary run with them
+would measure the wrong thing.
+
+\subsection{The feedback report}
+
+The feedback step renders a Markdown report from a scorecard: the composite
+and its verdict, the failed gates, the skipped scorers, the three weakest
+dimensions, and --- when a baseline scorecard is supplied --- the composite
+delta and the dimensions that regressed by more than $0.05$
+(\code{mal-core/src/mal\_core/scoring/feedback.py:16-53}). The command line
+re-scores the run directory and, optionally, a baseline directory, and
+prints the report (\code{cli.py:841-861}).
+
+\subsection{A worked situation}
+
+An operator has changed a parameter in the model, produced a new run
+directory, and wants to know whether the change helped. The operator asks
+for a scorecard of the new run, and of an older baseline run, and then asks
+for feedback with the baseline attached. What happens is: the new run is
+scored dimension by dimension; the composite is a weighted geometric mean
+over the dimensions that could be measured; the verdict label follows from
+the composite; any dimension whose artefacts were absent appears in the
+skipped list with a reason instead of dragging the composite down; the
+feedback report then lists the three weakest dimensions and names any
+dimension whose score fell by more than $0.05$ relative to the baseline. The
+operator sees whether the change moved the weakest part of the model rather
+than merely moving the average.
+
+\section{Declarations of absences}
+\label{sec:absences}
+
+\subsection{What is not implemented}
+
+\begin{itemize}
+\item \textbf{There is no pytest calibration harness in this tree.} No
+      \code{calibration/} directory, no threshold table, no
+      diff-versus-best tracker: the stage's base module states that the old
+      harness and its duplicated scorers were deleted, and the thresholds it
+      used to hold now live inside the scorer modules or, where they belong
+      to the model, in the shared configuration
+      (\code{mal-core/src/mal\_core/scoring/scorers/base.py:1-6}).
+\item \textbf{The composite does not gate anything.} No code in the tree
+      consumes the composite or the verdict as a promotion criterion; the
+      \code{score} command computes, writes and prints, and stops
+      (\code{mal-core/src/mal\_core/cli.py:409-463}). Its only non-zero exit
+      is the missing-\code{--run-dir} argument error
+      (\code{mal-core/src/mal\_core/cli.py:448-450}), which is unrelated to
+      the verdict. Whether an external process is meant to use the verdict
+      is not settled by the code.
+\item \textbf{The judge has no mechanical effect.} Its output is an optional
+      key (\code{runner.py:135-142}).
+\end{itemize}
+
+\subsection{What is declared but dormant}
+
+Three class attributes are declared and read by no code in the package:
+
+\begin{longtable}{@{}p{3.2cm}p{4.4cm}p{6.4cm}@{}}
+\toprule
+Attribute & Declared by & Status \\
+\midrule
+\endhead
+\code{weight} & every scorer (\code{base.py:68}) & The runner asks the
+configuration for the weight, never the class (\code{runner.py:112},
+\code{config.py:30-31}), and the listing also reads the registry table
+(\code{registry.py:116}). The class values agree with the table today, so
+nothing is wrong now, but there are two sources of truth and no rule about
+which wins when they disagree. \\
+\code{hard\_floor} & eleven composite dimensions & Never read anywhere in
+the package. Its intended role is not settled by the code. \\
+\code{aoi\_generalizable} & five of the six gates (\code{gates.py:46},
+\code{:87}, \code{:123}, \code{:154}, \code{:204}) & Never read
+anywhere in the package. The sixth gate, the urban-ratio gate, declares no
+such attribute at all; it carries \code{manual = True}
+(\code{gates.py:259}) instead. \\
+\end{longtable}
+
+Two further items deserve a mention. The Mann--Whitney area helper
+\code{auc\_rank()} is defined in the base module (\code{base.py:257-285})
+and called by no dimension --- a leftover of the retired occurrence-AUC
+scorers. The observation loader \code{load\_occurrence\_spots()}
+(\code{base.py:233-254}) is \emph{not} a leftover: it is used by the
+detection-coverage dimension (\code{d16\_detection\_coverage.py:83}) and by
+the detection campaign command (\code{cli.py:497-512}), so it is part of
+the stage's contract.
+
+Two dimensions (D19, D20) never inspect the run they are asked to score;
+they score the habitat contract in isolation and contribute to the
+composite as if they were measurements of the run
+(\S\ref{sec:contractdims}). Their thresholds are also written literally
+instead of being taken from the declared minimum score: both compare their
+score against a literal $0.70$ (\code{d19\_pool\_persistence.py:144},
+\code{d20\_washout\_response.py:83}), which coincides with their declared
+minimum score but breaks the uniform pattern.
+
+The judge is prompted against a stale description of the scorecard: the
+bundled prompt describes ten dimensions and pre-contract band semantics
+(\code{scoring/prompts/llm\_verdict.md:3-4}, \code{:71-79}). The module's
+docstrings, by contrast, agree with its implementation: they describe a
+direct HTTP call with no agent harness and no agent loop
+(\code{llm\_scorer.py:16-19}), and the entry point's docstring says it
+posts a JSON payload to the OpenRouter \code{chat/completions} endpoint
+with \code{requests} and parses the reply into a \code{Verdict}
+(\code{llm\_scorer.py:269-277}) --- which is what the code does
+(\code{llm\_scorer.py:330-353}).
+
+Finally, the command-line help text for \code{--aoi} promises an automatic
+detection that the code forbids (\code{cli.py:413} against
+\code{scorers/base.py:164-172}).
+
+\section{What is not answered by the code}
+
+The following questions were posed for this stage and the implementation does
+not settle them. They are listed so that a reader does not mistake silence
+for a decision.
+
+\begin{enumerate}
+\item \textbf{What do the state bands mean, as the scorers read them?} The
+      engine writes two raw adult-count bands, and three dimensions read
+      them with the vocabulary of a retired contract
+      (\S\ref{sec:dimensions}). Whether those three dimensions should be
+      re-specified or retired is not decided by the code.
+\item \textbf{What is \code{hard\_floor} for?} It is declared and never read.
+      Whether it is meant to be a hard rejection threshold, a reporting band,
+      or residue of the deleted harness is not decided by the code.
+\item \textbf{Which weight source is canonical?} The registry table and the
+      class attribute agree today; the code does not say what happens when
+      they do not.
+\item \textbf{Is the composite meant to be a promotion criterion?} Nothing in
+      the tree enforces it.
+\item \textbf{Is the judge's prompt an in-flight fix or a settled
+      description?} It disagrees with the current scorecard.
+\item \textbf{Should the contract-testing dimensions belong in the
+      composite?} Two of the thirteen dimensions score the model contract
+      rather than the run, and their presence narrows what the composite
+      means.
+\end{enumerate}
+
+\section{Evidence appendix}
+
+\subsection{Implementation notes a replicator would need}
+
+\begin{itemize}
+\item Artefacts are found by filename pattern, not by a manifest. A run that
+      names its snapshots differently is scored as an empty run, and every
+      dimension skips.
+\item The state-COG fallback chain is ordered, and the first pattern that
+      matches wins: per-day snapshots, then per-seed snapshots, then a
+      single final raster (\code{scorers/base.py:89-102}).
+\item The run summary is the first JSON file in the directory whose content
+      carries a contract version or an AOI slug, excluding files whose names
+      carry \emph{cohort}, \emph{aquatic}, \emph{day} or \emph{scorecard}
+      (\code{scorers/base.py:142-161}).
+\item A dimension that raises is recorded as skipped with the exception text,
+      and the composite is unaffected (\code{runner.py:96-98}).
+\item Scores are rounded to four decimals by each scorer before they enter
+      the composite (each scorer's return statement); the composite itself
+      is rounded to four decimals when it is written into the scorecard
+      (\code{runner.py:123}).
+\item The NoData sentinel is not a literal in the scoring code: it is read
+      from the shared habitat configuration (\code{scorers/base.py:21-22}),
+      where it is \mskey{ingest.nodata_sentinel}.
+\end{itemize}
+
+\subsection{Provenance of the numbers in this stage}
+
+\begin{itemize}
+\item \textbf{Model definition.} The pluvial rain scale and drying memory,
+      the washout threshold and cap
+      (\code{d19\_pool\_persistence.py:28-29},
+      \code{d20\_washout\_response.py:24-25}), and the NoData sentinel are
+      read from the shared model configuration through its loader.
+\item \textbf{Literature-anchored.} The occupancy bands (Bogh 2004; Ndenga
+      2011), the lifespan window (Saarman 2019; Midega 2007), the incubation
+      window (Mordecai 2013), the aquatic stage ratios (Bayoh \& Lindsay
+      2003; Ouedraogo 2024), the dispersal percentiles (Costantini 1996;
+      Thomas 2013; Midega 2007) and the reported-cases target (Seidu 2026)
+      are literals inside the scorer modules, and each module's docstring
+      names the source. The registry module's docstring lists anchors for
+      eight of the thirteen dimensions only --- D1, D2, D3, D11, D16, D19,
+      D21 and D25 (\code{registry.py:7-18}) --- and of those, only D21's
+      anchor names a file under the repository's \code{papers/} directory.
+      D4, D5, D8, D15 and D20 have no anchor in that docstring; the anchors
+      they do carry are in their own modules (D5 cites Tokarz \& Novak 2018
+      and Bissett 2026, D19 cites Bøgh 2004 and Ndenga 2011, which differ
+      from the registry's own anchor for D19 --- Depinay 2004 and Ward 2015
+      --- \code{registry.py:13-14}). The registry's opening line, that all
+      papers live in \code{papers/}, is a statement about the repository,
+      not a citation list.
+\item \textbf{Engineering prior.} Numbers with no literature behind them,
+      written straight into the scorer: the activation floor and pulse of
+      D19, the sampling cap of G6, the wall-time target of G10, the
+      reference population of G12, the tolerance and pass fraction of G14,
+      the urban-ratio limit of G24, the coverage radii of D16.
+\item \textbf{Scenario default.} The choices the two campaigns make: the
+      detection campaign's run length, the number of simulated years and
+      the warm-up of the reported-cases campaign (\code{cli.py:466-556},
+      \code{cli.py:559-639}).
+
+The assignment of a given literal to the engineering-prior tier or to the
+scenario-default tier is this document's classification and not something
+the code makes: both kinds of value are plain literals in the module that
+uses them, with no marker distinguishing them
+(\code{d16\_detection\_coverage.py:43-45},
+\code{d4\_stability.py:56-66}).
+\end{itemize}
+
+\subsection{What this document's numbers are}
+
+Every value in the generated tables --- the composite weights, the minimum
+scores, the hard floors, the gate descriptions and the output contracts ---
+comes from \code{docs/concepts/generated/params-scoring.tex} and
+\code{docs/concepts/generated/contracts.tex}, which are emitted at build
+time from the model configuration and the contract registry.
+
+Every other number in this document is a literal inside a scorer module,
+cited to the file and line where it is written. These are \emph{readings of
+the tree}: they are verified against the source as quoted, they are not
+generated, and they will silently go stale if the scorer literals change
+without this document being updated. That is the price of literals living
+outside the shared configuration, and it is stated here so that a reader
+knows which numbers to re-check when a scorer changes.
+
+\subsection{What is verified and what is not}
+
+\begin{itemize}
+\item \textbf{Verified by reading the source.} Every behavioural claim above
+      resolves to a file and a line a reviewer can open: the order of
+      operations, the composite formula and its degenerate cases, the gate
+      semantics, the treatment of failures and skips, the judge's
+      non-gating status, the artefact discovery patterns, the AOI convention
+      and the dormant declarations.
+\item \textbf{Not verified by execution.} This document reports the output of
+      no real scoring run. No composite value, no dimension score and no
+      gate outcome is asserted here, because no delivered run artefact set
+      was measured for this document; any number that would have required
+      such a measurement is therefore absent.
+\item \textbf{Known to be stale in the implementation.} The judge's prompt,
+      the command-line help text for the AOI option, and the band semantics
+      that three dimensions still assume.
+\end{itemize}
+
+\end{document}
