@@ -5,27 +5,53 @@ __pycache__/
 .venv/
 .python-version
 
-# Heavy datasets (re-downloadable via scripts/restore_data.py)
-#   DwC occurrence files + raw archives (kept out: ~80 MB of text + zips)
-data/**/*.txt
+# Heavy datasets (re-downloadable via `malariasim download --aoi <aoi>`)
+#   The payloads stay out of the index; the small figures and the metadata
+#   that describe them stay in. The negations come first, so that the rules
+#   for the heavy formats win over them. The negation of a directory needs
+#   the parent to be un-ignored, hence data/* and not data/.
+data/*
+!data/README.md
+!data/*/
+!data/**/*.md
+!data/**/*.xml
+!data/**/*.png
+!data/**/*.pdf
+data/**/*.nc
+data/**/*.tif
+data/**/*.tif.aux.xml
 data/**/*.zip
-data/pasteur_anopheles.zip
-data/occurrence.txt
+data/**/*.txt
+data/**/*.csv
+data/**/*.gpkg
+data/**/*.csr
+data/**/*.shp
+data/**/*.dbf
+data/**/*.prj
+data/**/*.json
+data/**/*.npy
+data/**/*.npz
+data/**/*.pt
+data/**/*.h5
+data/**/*.hdf5
 #   SRTM / DEM rasters (kept out: ~480 MB of .tif)
 terrain/**/*.tif
 runs/layers/*.tif
 runs/layers/*.zip
-
-#   Large env NetCDF files (regenerable via scripts/build_2year_nc.py)
-data/ghana/
-#   accra-coastal-test e2e data (re-downloadable .nc/.tif/.gpkg; 12 MB)
-data/accra-coastal-test/
 
 # Experiment artifacts (regenerable from the pipeline)
 runs/
 *.pt
 *.npz
 *.log
+
+# LaTeX build artefacts (the PDFs are compiled and committed by CI)
+*.aux
+*.fls
+*.fdb_latexmk
+*.out
+*.toc
+*.synctex.gz
 
 
 # macOS

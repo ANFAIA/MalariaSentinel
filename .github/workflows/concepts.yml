@@ -3,7 +3,9 @@
 # The PDFs are compiled in CI and committed back to the branch (decision
 # I1-A), because the legacy `main:/docs` GitHub Pages build publishes
 # whatever is committed and compiles nothing. The published path is
-# docs/concepts/<phase>/<phase>.pdf.
+# docs/concepts/<phase>/<phase>.pdf. The technical reference (Doxygen over
+# the contract-defining headers, pdoc over the Python packages) is built and
+# committed the same way, under docs/reference/.
 #
 # TWO CONSTRAINTS, stated here because they are properties of this
 # repository's ruleset, not of the documents:
@@ -24,23 +26,33 @@ on:
   pull_request:
     paths:
       - "docs/concepts/**"
+      - "docs/reference/**"
       - "mal-core/config/model_constants.yaml"
+      - "mal-core/src/mal_core/abm/include/**"
+      - "mal-core/src/**/*.py"
+      - "mal-commonlib/src/**/*.py"
       - "tools/gen_concepts_values.py"
       - "tools/build_concepts.sh"
+      - "tools/build_reference.sh"
       - ".github/workflows/concepts.yml"
   push:
     branches: [main]
     paths:
       - "docs/concepts/**"
+      - "docs/reference/**"
       - "mal-core/config/model_constants.yaml"
+      - "mal-core/src/mal_core/abm/include/**"
+      - "mal-core/src/**/*.py"
+      - "mal-commonlib/src/**/*.py"
       - "tools/gen_concepts_values.py"
       - "tools/build_concepts.sh"
+      - "tools/build_reference.sh"
 
 permissions:
   contents: write
 
 jobs:
-  build:
+  documents:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -79,7 +91,21 @@ jobs:
             echo "::warning::the extracted text of a PDF changed between two builds"
           fi
 
+      - name: Upload the PDFs for the reviewer
+        # On a pull request the PDFs are not committed back (the branch
+        # belongs to a human, and a bot push dismisses their approval), so
+        # the reviewer gets them as an artefact.
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: conceptual-pdfs
+          path: docs/concepts/*/*.pdf
+          if-no-files-found: error
+
       - name: Commit the PDFs back to the branch
+        # Only on a push to main: on a pull request, GITHUB_REF_NAME is
+        # "<number>/merge", which is not a branch to push to.
+        if: github.event_name == 'push'
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
@@ -90,4 +116,36 @@ jobs:
             exit 0
           fi
           git commit -m "docs(concepts): rebuild the conceptual PDFs [skip ci]"
+          git push "HEAD:refs/heads/${GITHUB_REF_NAME}"
+
+  reference:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install doxygen
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends doxygen
+
+      - uses: astral-sh/setup-uv@v5
+
+      - name: Install the Python workspace
+        run: uv sync --all-packages
+
+      - name: Build the reference
+        run: tools/build_reference.sh
+
+      - name: Commit the reference back to the branch
+        if: github.event_name == 'push'
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/reference
+          if git diff --cached --quiet; then
+            echo "the reference did not change"
+            exit 0
+          fi
+          git commit -m "docs(concepts): rebuild the technical reference [skip ci]"
           git push "HEAD:refs/heads/${GITHUB_REF_NAME}"

@@ -133,7 +133,7 @@ inline const char* species_name(SpeciesId id) {
 }
 
 /// One vector per species; each row sums to 1.0 (plan 02 §8 calibration).
-/// Loaded BY NAME from model_constants.yaml (species.<name>.weights),
+/// Loaded BY NAME from model_constants.yaml (`species.<name>.weights`),
 /// pre-transformed at load time to ZoneId order.
 inline std::array<float, kNumZoneId> default_species_weights(SpeciesId s) {
     const auto& rows = load_config().species.rows;

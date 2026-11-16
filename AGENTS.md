@@ -37,26 +37,24 @@ malariasim download --aoi ghana --datasets era5 --outputs wind_6hourly --years 2
 # Validate data completeness
 uv run python -c "from mal_core.download.manifest import validate_completeness; print(validate_completeness('ghana'))"
 
-# Run the calibration scorers (Phase 1+2: 10 scorers + LLM verdict)
-cd mal-core/src/mal_core/abm/tests/calibration
-uv run pytest -m fast -v          # 10 scorers, 1 seed, 30 days (PR gate)
-uv run pytest -m full -v          # 10 scorers + LLM, 5 seeds, 90 days
+# Run the scoring unit tests
+cd mal-core && uv run pytest tests -k scoring -v
 ```
 
 ## Monorepo layout
 
 | Package | Role | Internal deps |
 |---|---|---|
-| `mal-commonlib/` | Shared config, paths, data utilities. | — |
-| `mal-core/` | Stable pipeline logic (promoted from research). | commonlib |
+| `mal-commonlib/` | Shared config, paths, data utilities and the dataset loaders. | — |
+| `mal-core/` | The pipeline: download, ingest, ABM, scoring, training, prediction. | commonlib |
 | `mal-execution/` | CLI entrypoints, batch jobs. | core + commonlib |
-| `mal-ghana-sim/` | Ghana spread simulation + U-Net surrogate (research). | commonlib |
 | `mal-data-explorer/` | Dataset visualisation, mapping, bias analysis. | — |
+| `social-networks/` | Experiment: a social-network agent, outside the pipeline. | — |
 | `data/`, `papers/`, `terrain/`, `runs/` | Datasets, papers, DEM tiles, experiment outputs (mostly gitignored). | — |
 
 **Dependency rule**: nothing depends on research/script packages. When research code stabilises, promote to `mal-core` or `mal-commonlib` and update `mal-execution` scripts to use the promoted modules.
 
-**Naming**: branches/PRs use `common/`, `core/`, `exec/`, `sim/`, `data/`, `docs/`. Python modules use `mal_commonlib.*`, `mal_core.*`, `mal_cli.*`, `mal_ghana_sim.*`.
+**Naming**: branches/PRs use `common/`, `core/`, `exec/`, `sim/`, `data/`, `docs/`. Python modules use `mal_commonlib.*`, `mal_core.*`, `mal_cli.*`.
 
 ## Experiments vs core
 
@@ -65,14 +63,14 @@ The monorepo separates **production code** (the Centinela) from **experiments** 
 | Tier | Packages | Purpose | Promotion? |
 |---|---|---|---|
 | **Core (the Centinela)** | `mal-commonlib/`, `mal-core/`, `mal-execution/` | Stable, reusable code that makes up the SDSS. `mal-core` is empty at the start of the project and is populated by promoting stable parts from experiments. `mal-execution` holds CLI scripts that call into `mal-core` and `mal-commonlib`. | Receives code from experiments. |
-| **Experiments** | `mal-ghana-sim/`, `mal-data-explorer/` | Hypothesis-driven, replaceable work that explores one approach to one piece of the SDSS. `mal-ghana-sim` is a Ghana spread simulation + U-Net surrogate. `mal-data-explorer` is a dataset visualisation + bias-analysis sandbox. Both depend on `mal-commonlib` but NOT on each other and NOT on `mal-core`. | Each experiment either dies (gets archived) or **promotes** parts of itself into `mal-core` or `mal-commonlib` (see "Promotion flow" below). |
+| **Experiments** | `social-networks/`, `mal-data-explorer/` | Hypothesis-driven, replaceable work that explores one approach to one piece of the SDSS. `social-networks/` is a social-network agent experiment. `mal-data-explorer` is a dataset visualisation + bias-analysis sandbox. Both depend on `mal-commonlib` but NOT on each other and NOT on `mal-core`. | Each experiment either dies (gets archived) or **promotes** parts of itself into `mal-core` or `mal-commonlib` (see "Promotion flow" below). |
 | **Infrastructure** | `data/`, `papers/`, `terrain/`, `runs/` | Not part of the Centinela's runtime. Input data, research papers, terrain, and experiment outputs. | Never promoted. |
 
 **The `mal-core` directory is the goal of the project.** Every stable function in the Centinela should eventually live there or in `mal-commonlib`. Experiments exist to discover what should go into core, and to be deleted once their insight has been promoted.
 
 **Naming tells you which tier a package is in**:
 - `mal-core`, `mal-commonlib`, `mal-execution` → core tier.
-- `mal-<topic>-sim`, `mal-<topic>-explorer` → experiment tier. New experiments follow this pattern.
+- `mal-<topic>-explorer` → experiment tier. New experiments follow this pattern.
 
 ## Promotion flow
 
@@ -176,9 +174,9 @@ brief that has been drafted is listed as a drafted plan, not as a design.
 
 | If you want to… | Do this | Not this |
 |---|---|---|
-| Add a stable helper (reusable, no domain) | Put it in `mal-commonlib/`. | Don't put it in `mal-ghana-sim/` (experiment) or `mal-core/` if it's not stable yet. |
+| Add a stable helper (reusable, no domain) | Put it in `mal-commonlib/`. | Don't put it in `social-networks/` (experiment) or `mal-core/` if it's not stable yet. |
 | Add a CLI script | Put it in `mal-execution/scripts/`. | Don't put a batch job in `mal-core/` (core is library, not scripts). |
-| Run a Ghana-specific experiment | Put it in `mal-ghana-sim/` (experiment tier). | Don't run it inline in `mal-execution/`; that tier is for production. |
+| Run a Ghana-specific experiment | Put it in `mal-data-explorer/` or `social-networks/` (experiment tier). | Don't run it inline in `mal-execution/`; that tier is for production. |
 | Run a dataset visualisation / bias analysis | Put it in `mal-data-explorer/`. | Don't put it in `mal-core/`; that's for reusable pipeline logic. |
 | Promote stable code from an experiment to core | Follow the "Promotion flow" above. | Don't copy-and-tweak — refactor + tests + delete the original. |
 | Ask a one-off question | Ask directly in your reply. | Don't guess on irreversible choices. |
@@ -203,29 +201,35 @@ The manifest (`data/<aoi>/manifest.json`) is the **single source of truth** for 
 
 **Adding a new dataset**: create loader module with `DOWNLOADER` dict → register in `registry.py` → run `malariasim download` → mark `required_for_abm` if ABM needs it. See `docs/specs/data/spec.md` §6.3.
 
-## Calibration framework conventions
+## Scoring framework conventions
 
 When adding a new biological feature (gonotrophic cycle, host-seeking,
 reproduction, etc.) that affects adult survival, EIP, or population
 dynamics:
 
-1. **Check if an existing scorer covers the new feature.** If not,
-   create a new scorer in `mal-core/src/mal_core/abm/tests/calibration/scorers/`.
-2. **Register the scorer** in `thresholds.yaml` with `min_score`,
-   `max_delta`, and `hard_floor`.
-3. **Add the scorer to the composite** by adding its weight to
-   `scorers/composite.py::DEFAULT_WEIGHTS`.
-4. **Run the calibration tests** before proposing:
-   `cd mal-core/src/mal_core/abm/tests/calibration && uv run pytest -m fast -v`
-5. **The diff report** shows if the new feature improved or regressed
-   the composite vs the previous run AND vs the best historical run.
+1. **Check if an existing scorer covers the new feature.** If not, create
+   a new scorer in `mal-core/src/mal_core/scoring/scorers/`, subclassing
+   `Scorer` (`scorers/base.py`).
+2. **Declare it on the class**: `name`, `kind` (`"composite"` or
+   `"gate"`), `description`, `min_score` and `hard_floor` are class
+   attributes of `Scorer`. Register the instance in
+   `mal-core/src/mal_core/scoring/registry.py::build_registry`, and add
+   its weight to `COMPOSITE_WEIGHTS` (same file). A gate also has to be
+   listed in `GATES`: gates are evaluated separately and never enter the
+   composite.
+3. **Run the scoring tests**:
+   `cd mal-core && uv run pytest tests -k scoring -v`.
+   There is NO calibration pytest harness with `fast`/`full` markers: it
+   was removed in 2026-10, and the scorers' unit tests live in
+   `mal-core/tests/`.
 
 Scorer naming: `D<id>_<name>.py` where `<id>` is the next number (D17, D18, ...).
 The composite handles variable dimensions automatically via the geometric mean.
 
-Delta comparison: every scorecard is compared against both the **previous run**
-(immediate delta) and the **best historical run** (all-time best composite).
-This prevents losing sight of the all-time best when iterating.
+Delta comparison: a scorecard can be compared against a baseline run with
+`--baseline <run-dir>` (`cli.py`), which reports the composite delta and the
+dimensions that regressed by more than 0.05. Nothing tracks the best
+historical run automatically: the baseline is the one the caller names.
 
 ## Context architecture
 
