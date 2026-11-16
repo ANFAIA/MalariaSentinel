@@ -49,6 +49,9 @@ for phase in "${PHASES[@]}"; do
   out="$(basename "${src%.tex}")"
   if [ "$out" != "$phase" ]; then
     cp "$dir/$out.pdf" "$dir/$phase.pdf"
+    # Only the published name is kept: two PDFs of the same document in the
+    # same directory is one too many for a reader and for git.
+    rm -f "$dir/$out.pdf"
   fi
   echo "    -> $dir/$phase.pdf"
 done
