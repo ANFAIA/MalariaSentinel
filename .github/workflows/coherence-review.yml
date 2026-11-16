@@ -1,0 +1,157 @@
+# Warnings-only coherence review.
+#
+# An ADVISOR, never a gate: the workflow reports incoherences between the
+# conceptual documents and the implementation as a pull-request comment. It
+# never blocks, never rejects, never requires a document to change, and it is
+# never a required check. `continue-on-error: true` everywhere: a missing
+# secret, a model error or an empty finding set is a normal outcome.
+#
+# The model id comes from the repository variable CONCEPTS_REVIEW_MODEL and
+# the key from the repository secret OPENROUTER_KEY — the path the project's
+# own LLM scorer already uses (mal-core/src/mal_core/scoring/llm_scorer.py).
+# A fork pull request has no secrets: the mechanical signals still run, the
+# semantic step reports that it was skipped, and the workflow exits 0.
+name: coherence-review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Collect the mechanical signals
+        id: signals
+        run: |
+          {
+            echo "### Changed files"
+            git diff --name-only "origin/${{ github.base_ref }}...HEAD" || true
+            echo
+            echo "### Mechanical signals (inputs the reviewer may cite, not findings)"
+            uv run --with pyyaml python tools/coherence_signals.py \
+              --changed $(git diff --name-only "origin/${{ github.base_ref }}...HEAD" | tr '\n' ' ') || true
+          } > "$RUNNER_TEMP/signals.md"
+          cat "$RUNNER_TEMP/signals.md"
+
+      - name: Collect the documents and the diff
+        id: material
+        run: |
+          {
+            echo "## The pull request's diff"
+            git diff "origin/${{ github.base_ref }}...HEAD" || true
+            echo
+            echo "## The conceptual documents"
+            for doc in docs/concepts/*/*.tex; do
+              [ -e "$doc" ] || continue
+              case "$doc" in *odd-2010-template.tex) continue;; esac
+              echo
+              echo "### $doc"
+              cat "$doc"
+            done
+            echo
+            echo "## The in-process plans"
+            for plan in docs/plans/in-process/*.md; do
+              [ -e "$plan" ] || continue
+              echo
+              echo "### $plan"
+              head -60 "$plan"
+            done
+          } > "$RUNNER_TEMP/material.md"
+          wc -c "$RUNNER_TEMP/material.md"
+
+      - name: The semantic review (skipped without a secret)
+        id: semantic
+        env:
+          OPENROUTER_KEY: ${{ secrets.OPENROUTER_KEY }}
+          MODEL: ${{ vars.CONCEPTS_REVIEW_MODEL }}
+        run: |
+          set -euo pipefail
+          if [ -z "${OPENROUTER_KEY:-}" ]; then
+            echo "semantic check skipped (no secret on this pull request)"
+            echo "skipped=secret" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ -z "${MODEL:-}" ]; then
+            echo "semantic check skipped (CONCEPTS_REVIEW_MODEL is not set)"
+            echo "skipped=model" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "skipped=no" >> "$GITHUB_OUTPUT"
+          pip install --quiet requests
+          python - <<'PY' > "$RUNNER_TEMP/comment.md"
+          import json, os, pathlib, urllib.request
+
+          material = pathlib.Path(os.environ["RUNNER_TEMP"]) / "material.md"
+          prompt = pathlib.Path(".github/concepts-review-prompt.md").read_text()
+          key = os.environ["OPENROUTER_KEY"]
+          model = os.environ["MODEL"]
+          body = json.dumps({
+              "model": model,
+              "messages": [
+                  {"role": "system", "content": prompt},
+                  {"role": "user", "content": material.read_text()},
+              ],
+          }).encode()
+          req = urllib.request.Request(
+              "https://openrouter.ai/api/v1/chat/completions",
+              data=body,
+              headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
+          )
+          try:
+              with urllib.request.urlopen(req, timeout=600) as resp:
+                  data = json.load(resp)
+              print(data["choices"][0]["message"]["content"])
+          except Exception as exc:  # a model error is not a failure
+              print(f"Semantic check skipped (the model call failed: {exc}).")
+          PY
+          head -c 2000 "$RUNNER_TEMP/comment.md"
+
+      - name: Post the comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const body = fs.readFileSync(`${process.env.RUNNER_TEMP}/comment.md`, 'utf8');
+            if (!body.trim()) {
+              core.info('nothing to comment');
+              return;
+            }
+            // Bot-loop guard: never comment on a comment.
+            const actor = context.payload.actor?.login || '';
+            if (actor.endsWith('[bot]')) {
+              core.info('skipping: the pull request was opened by a bot');
+              return;
+            }
+            const marker = '<!-- coherence-review -->';
+            const text = `${marker}\n${body}\n`;
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const previous = comments.find(c => c.body && c.body.startsWith(marker));
+            if (previous) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: previous.id,
+                body: text,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: text,
+              });
+            }
