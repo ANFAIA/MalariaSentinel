@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT
 // env_reader.cpp — read the daily env NetCDF into a flat DailyEnvBands
 // struct (the legacy 4-band COG reader `read_env_tif` was removed — the
-// env input contract is NC-only; see docs/specs/abm/spec.md INV-6).
+// env input contract is NC-only: the reader accepts a daily env NetCDF
+// and nothing else).
 
 #include "env_reader.hpp"
 

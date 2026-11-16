@@ -1,21 +1,23 @@
-// SPDX-License-Identifier: MIT
-// habitat_availability.hpp — the single number (0..1) that determines
-// whether mosquitoes CAN breed in a cell right now. Contract v3.0.
-//
-//   habitat_potential : static per-cell amplitude, six habitat types
-//   update_z_step     : one-day pluvial recursion (rain-driven)
-//   species_accuracy  : daily accuracy, affinity × potential × availability
-//   k_habitat         : absolute per-cell capacity in individual-equivalents
-//
-// Legacy foreword (plan 01 §7): what was removed is what didn't belong —
-// the pool water balance in mm and its constants, the TWI gate, the
-// urban mm floor, and the urban capacity clamp K_eff. Rain only enters the
-// pluvial reservoir as a forcing; total water is not reconstructed.
-//
-// The urban persistent supply premise (user-fixed): leaks, seepage,
-// drainage and human water storage support small dry-season breeding
-// supply, represented by urban.beta_urban × lc_built (a proxy, not
-// a measurement, not a forced depth).
+/**
+ * SPDX-License-Identifier: MIT
+ * habitat_availability.hpp — the single number (0..1) that determines
+ * whether mosquitoes CAN breed in a cell right now. Contract v3.0.
+ *
+ *   habitat_potential : static per-cell amplitude, six habitat types
+ *   update_z_step     : one-day pluvial recursion (rain-driven)
+ *   species_accuracy  : daily accuracy, affinity × potential × availability
+ *   k_habitat         : absolute per-cell capacity in individual-equivalents
+ *
+ * Legacy foreword (plan 01 §7): what was removed is what didn't belong —
+ * the pool water balance in mm and its constants, the TWI gate, the
+ * urban mm floor, and the urban capacity clamp K_eff. Rain only enters the
+ * pluvial reservoir as a forcing; total water is not reconstructed.
+ *
+ * The urban persistent supply premise (user-fixed): leaks, seepage,
+ * drainage and human water storage support small dry-season breeding
+ * supply, represented by urban.beta_urban × lc_built (a proxy, not
+ * a measurement, not a forced depth).
+ */
 #pragma once
 
 #include "mal_abm_fast/config.hpp"
@@ -28,11 +30,13 @@
 
 namespace mal_abm_fast {
 
-// -- constants ----------------------------------------------------------------
-//
-// Single source: mal-core/config/model_constants.yaml (plan constants-yaml
-// §4). All inline accessors below go through the load_config() singleton;
-// there are NO compiled defaults left in this header.
+/**
+ * -- constants ----------------------------------------------------------------
+ *
+ * Single source: mal-core/config/model_constants.yaml (plan constants-yaml
+ * §4). All inline accessors below go through the load_config() singleton;
+ * there are NO compiled defaults left in this header.
+ */
 
 
 /// Static bundle of features read from the env contract (v3.0 planes).
@@ -105,7 +109,9 @@ inline float update_z_step(float z, float rain_mm, float delta_days) {
     return std::clamp(z_dry + (1.0f - z_dry) * fill, 0.0f, 1.0f);
 }
 
-// -- species affinities -------------------------------------------------------
+/**
+ * -- species affinities -------------------------------------------------------
+ */
 
 /// Species affinity w[s, g]; each row sums to 1. Anchored on 1.0 × the
 /// plant list (order, habitat-preference context; plan 02 §8).
@@ -150,7 +156,9 @@ inline std::array<float, kNumZoneId> default_species_weights() {
     return out;
 }
 
-// -- the day formula ----------------------------------------------------------
+/**
+ * -- the day formula ----------------------------------------------------------
+ */
 
 /// Static sum_k w[g] * H[*, g] * A[*, k] accuracy: persistent habitats ride
 /// at capacity.persistent_availability (A = that constant whenever their

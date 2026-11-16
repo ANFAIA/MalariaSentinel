@@ -1,21 +1,23 @@
-// SPDX-License-Identifier: MIT
-// config.hpp — single model-constants source for the C++ engine
-// (plan constants-yaml §4). mal-core/config/model_constants.yaml is the
-// ONLY source of shared py⇄C++ parameters. The loader:
-//
-//   * parses a PLAIN YAML SUBSET with a hand-written micro-parser
-//     (no yaml-cpp dependency; see config.cc SupportedSubsetData rules);
-//   * fails LOUDLY: missing keys are reported as a COMPLETE list,
-//     unknown keys (typos) are an error, wrong types are an error,
-//     duplicate keys inside the file are an error;
-//   * embeds NO default for any model key — the YAML is the source;
-//   * pre-transforms species weight rows by habitat NAME → ZoneId once
-//     at load time (the day-loop consumes a plain std::array);
-//   * derives num_persistent from habitat_types.dynamics (no
-//     "the first three are persistent" positional rule).
-//
-// singleton: load_config() reads once per process (env
-// MAL_MODEL_CONSTANTS overrides the default search).
+/**
+ * SPDX-License-Identifier: MIT
+ * config.hpp — single model-constants source for the C++ engine
+ * (plan constants-yaml §4). mal-core/config/model_constants.yaml is the
+ * ONLY source of shared py⇄C++ parameters. The loader:
+ *
+ *   * parses a PLAIN YAML SUBSET with a hand-written micro-parser
+ *     (no yaml-cpp dependency; see config.cc SupportedSubsetData rules);
+ *   * fails LOUDLY: missing keys are reported as a COMPLETE list,
+ *     unknown keys (typos) are an error, wrong types are an error,
+ *     duplicate keys inside the file are an error;
+ *   * embeds NO default for any model key — the YAML is the source;
+ *   * pre-transforms species weight rows by habitat NAME → ZoneId once
+ *     at load time (the day-loop consumes a plain std::array);
+ *   * derives num_persistent from habitat_types.dynamics (no
+ *     "the first three are persistent" positional rule).
+ *
+ * singleton: load_config() reads once per process (env
+ * MAL_MODEL_CONSTANTS overrides the default search).
+ */
 #pragma once
 
 #include <array>
@@ -39,10 +41,10 @@ struct ContractsCfg {
 };
 
 struct HabitatCfg {
-    std::vector<std::string> types;                 // frozen order (py API)
-    std::map<std::string, std::string> dynamics;    // persistent | pluvial
-    size_t num_persistent = 0;                      // DERIVED at load
-    std::array<bool, kNumZoneId> persistent_zone{}; // ZoneId→dynamics==persistent
+    std::vector<std::string> types;                 ///< frozen order (py API)
+    std::map<std::string, std::string> dynamics;    ///< persistent | pluvial
+    size_t num_persistent = 0;                      ///< DERIVED at load
+    std::array<bool, kNumZoneId> persistent_zone{}; ///< ZoneId→dynamics==persistent
     double activation_min_engine = 0.0;
     double candidate_min_engine = 0.0;
 };
@@ -70,10 +72,10 @@ struct UrbanCfg {
 
 struct SpeciesRow {
     std::string name;
-    std::array<double, kNumZoneId> weights{};   // name→ZoneId pre-transform
-    // v2 extension (plan v2 §1): behavioural physiological block.
-    std::array<double, 4> activity_weights{};   // [DAY, EVENING, NIGHT, DAWN] Σ=1
-    std::array<double, 5> pref{};               // HostType order (human, cattle,
+    std::array<double, kNumZoneId> weights{};   ///< name→ZoneId pre-transform
+    /// v2 extension (plan v2 §1): behavioural physiological block.
+    std::array<double, 4> activity_weights{};   ///< [DAY, EVENING, NIGHT, DAWN] Σ=1
+    std::array<double, 5> pref{};               ///< HostType order (human, cattle,
                                                 //  goat, sheep, wildlife→OTHER)
     double salinity_opt_ppt = 0.0;
     double salinity_hi_tol_ppt = 0.0;
@@ -84,8 +86,8 @@ struct SpeciesRow {
 
 struct SpeciesCfg {
     std::string default_species;
-    double k_ref = 0.0;                         // [ind·km⁻²·d⁻¹]
-    std::map<std::string, SpeciesRow> rows;     // named rows, by NAME
+    double k_ref = 0.0;                         ///< [ind·km⁻²·d⁻¹]
+    std::map<std::string, SpeciesRow> rows;     ///< named rows, by NAME
     std::array<double, kNumZoneId> neutral_weights{};
 };
 
@@ -102,12 +104,12 @@ struct IngestCfg {
     double nodata_sentinel = 0.0;
     int nodata_sentinel_int = 0;
     double residential_from_indoor_frac = 0.0;
-    // Width of the coastal band that keeps its JRC water (historical name:
-    // it no longer dilates the land mask; see coastline.py sea_mask()).
+    /// Width of the coastal band that keeps its JRC water (historical name:
+    /// it no longer dilates the land mask; see coastline.py sea_mask()).
     double coastline_buffer_m = 0.0;
-    // GSHHG resolution code for the coastline artifact: c/l/i/h/f.
+    /// GSHHG resolution code for the coastline artifact: c/l/i/h/f.
     std::string coastline_resolution = "f";
-    // Land fraction below which an AOI cell counts as water.
+    /// Land fraction below which an AOI cell counts as water.
     double sea_water_floor = 0.05;
     double cell_size_hint_m = 0.0;
     double candidate_min_ingest = 0.0;
@@ -222,7 +224,7 @@ struct ModelConfig {
     int version = 0;
     ContractsCfg contracts;
     HabitatCfg habitat_types;
-    HabitatCfg habitat;   // activation/candidate thresholds
+    HabitatCfg habitat;   ///< activation/candidate thresholds
     PluvialCfg pluvial;
     AquaticStressCfg aquatic_stress;
     UrbanCfg urban;

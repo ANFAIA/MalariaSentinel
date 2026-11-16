@@ -24,7 +24,7 @@ struct DailyEnvBands {
     std::vector<float> air_temp_c;   // deg C (2 m daily mean)
     // Static habitat features (h*w, single plane):
     std::vector<float> jrc_persistent;     // JRC fraction of >=80%-occurrence watert
-    std::vector<float> lc_built;           // ESA WorldCover built-up fraction
+    std::vector<float> lc_built;           // Google Dynamic World built-up fraction
     std::vector<float> lc_wetland;         // wetland+mangrove fraction
     std::vector<float> lc_open_plus_water; // open/low-veg + bare + water fraction
     std::vector<float> lc_crop;            // cropland fraction

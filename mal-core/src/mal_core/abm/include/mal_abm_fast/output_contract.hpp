@@ -1,17 +1,22 @@
-// SPDX-License-Identifier: MIT
-// output_contract.hpp — 2-band state COG writer + sidecar JSON writer.
-//
-// The state COG is a 2-band GeoTIFF (band 1 = adult_occupancy, band 2 =
-// host_seeking_pressure), tiled, deflate-compressed, 128x128 blocks, with
-// `nodata = NODATA_SENTINEL()`. The sidecar JSON is a small
-// metadata file written next to the .tif (e.g.
-// `ghana_regional_2024_06_seed0001.json` for the COG
-// `ghana_regional_2024_06_seed0001.tif`).
-//
-// The sidecar is the F1.e parity test's primary input — it lists
-// `contract_version`, `generator_version`, `band_names`, `nodata`,
-// `k_max`, etc. Two engines producing the same state COG bytes for
-// the same inputs must also produce byte-equal sidecars.
+/**
+ * SPDX-License-Identifier: MIT
+ * output_contract.hpp — 2-band state COG writer + sidecar JSON writer.
+ *
+ * The state COG is a 2-band GeoTIFF (band 1 = adult_patch_count, band 2 =
+ * adult_cell_count), tiled, deflate-compressed, 128x128 blocks, with
+ * `nodata = NODATA_SENTINEL()`. The band names are the single source of
+ * truth in wire.hpp (STATE_BAND_NAMES); the values are raw per-cell adult
+ * counts — no capacity normalisation. The sidecar JSON is a small
+ * metadata file written next to the .tif (e.g.
+ * `ghana_regional_2024_06_seed0001.json` for the COG
+ * `ghana_regional_2024_06_seed0001.tif`).
+ *
+ * The sidecar is the F1.e parity test's primary input — it lists
+ * `contract_version`, `generator_version`, `band_names`, `nodata`, etc.
+ * (the `k_max` key was retired with contract 4.0). Two engines producing
+ * the same state COG bytes for the same inputs must also produce
+ * byte-equal sidecars.
+ */
 #pragma once
 
 #include <array>
@@ -23,27 +28,27 @@
 
 namespace mal_abm_fast {
 
-// The metadata blob written into the sidecar JSON. Every field is
-// required; the writer must emit them in this exact order (the
-// `band_names` are pinned by the parity test). The retired `k_max`
-// key removed with contract 4.0 (bands are raw adult counts).
-//
-// F1.c `n_rollouts` and `rollout_index` (default 1 / 0): added in
-// the F1.c `--n-rollouts` change. The single-rollout case
-// (n_rollouts=1, rollout_index=0) is the legacy behaviour: the
-// fields are written but always read as 1 / 0, so the v1.0 sidecars
-// from F1.b are bit-compatible with v1.1 *except* for the two
-// added keys and the `contract_version` bump (1.0 -> 1.1).
+/// The metadata blob written into the sidecar JSON. Every field is
+/// required; the writer must emit them in this exact order (the
+/// `band_names` are pinned by the parity test). The retired `k_max`
+/// key removed with contract 4.0 (bands are raw adult counts).
+///
+/// F1.c `n_rollouts` and `rollout_index` (default 1 / 0): added in
+/// the F1.c `--n-rollouts` change. The single-rollout case
+/// (n_rollouts=1, rollout_index=0) is the legacy behaviour: the
+/// fields are written but always read as 1 / 0, so the v1.0 sidecars
+/// from F1.b are bit-compatible with v1.1 *except* for the two
+/// added keys and the `contract_version` bump (1.0 -> 1.1).
 struct StateCogMetadata {
-    std::string                 crs;                // EPSG string ("EPSG:4326")
-    std::array<double, 6>       transform;          // GDAL affine 6-tuple
-    std::string                 aoi_slug;           // matches AOI.slug
-    std::string                 scale;              // matches AOI.scale
+    std::string                 crs;                ///< EPSG string ("EPSG:4326")
+    std::array<double, 6>       transform;          ///< GDAL affine 6-tuple
+    std::string                 aoi_slug;           ///< matches AOI.slug
+    std::string                 scale;              ///< matches AOI.scale
     int32_t                     year  = 0;
     int32_t                     month = 0;
     int32_t                     seed  = 0;
-    int32_t                     n_rollouts     = 1;  // F1.c
-    int32_t                     rollout_index  = 0;  // F1.c (0-indexed)
+    int32_t                     n_rollouts     = 1;  ///< F1.c
+    int32_t                     rollout_index  = 0;  ///< F1.c (0-indexed)
     std::string                 generator_version = GENERATOR_VERSION;
     std::string                 abm_params_hash   = "sha256:pending";
     std::string                 contract_version  = CONTRACT_VERSION();
@@ -55,37 +60,38 @@ struct StateCogMetadata {
     int32_t                     w = 0;
 };
 
-// Write the 2-band state COG. The implementation subagent uses GDAL
-// (GTiff driver) with:
-//   * tiled = true
-//   * compress = deflate
-//   * blockxsize = blockysize = 128
-//   * nodata = NODATA_SENTINEL()
-//   * band descriptions = band_names[0], band_names[1]
-//
-// Returns the .tif path on success. Throws std::runtime_error on
-// GDAL failure.
+/// Write the 2-band state COG. The implementation subagent uses GDAL
+/// (GTiff driver) with:
+///   * tiled = true
+///   * compress = deflate
+///   * blockxsize = blockysize = 128
+///   * nodata = NODATA_SENTINEL()
+///   * band descriptions = band_names[0], band_names[1]
+///
+/// Returns the .tif path on success. Throws std::runtime_error on
+/// GDAL failure.
 void write_state_cog(const std::string& path,
                      const DensityGrid& density,
                      const SuitabilityGrid& suit,
                      const StateCogMetadata& meta);
 
-// Write the sidecar JSON (e.g. `<tif_path>.json` for a `.tif` path).
-// The keys in the JSON are the parity test's contract; the
-// implementation must emit them in the order listed in
-// docs/specs/abm/spec.md.
+/// Write the sidecar JSON (e.g. `<tif_path>.json` for a `.tif` path).
+/// The keys in the JSON are the parity test's contract: the writer emits
+/// them in the fixed order below (the order is part of the contract, so
+/// that two engines produce byte-equal sidecars). The contract version
+/// itself comes from model_constants.yaml (contracts.cogs_state).
 void write_state_sidecar(const std::string& tif_path,
                          const StateCogMetadata& meta);
 
-// Path of the sidecar written next to a state COG: `.tif` -> `.json`
-// (case-insensitive), otherwise `<path>.json`. Exposed so the CLI can
-// refuse an `--emit-transmission-log` path that would be overwritten by
-// the state sidecar (task-06 decision 5).
+/// Path of the sidecar written next to a state COG: `.tif` -> `.json`
+/// (case-insensitive), otherwise `<path>.json`. Exposed so the CLI can
+/// refuse an `--emit-transmission-log` path that would be overwritten by
+/// the state sidecar (task-06 decision 5).
 std::string state_sidecar_path(const std::string& tif_path);
 
-// Every JSON file the engine reserves next to a state COG: the metadata
-// sidecar plus the `_aquatic.json` and `_foci.json` diagnostics. The CLI
-// rejects a transmission log that would overwrite any of them.
+/// Every JSON file the engine reserves next to a state COG: the metadata
+/// sidecar plus the `_aquatic.json` and `_foci.json` diagnostics. The CLI
+/// rejects a transmission log that would overwrite any of them.
 std::vector<std::string> state_reserved_sidecars(const std::string& tif_path);
 
 }  // namespace mal_abm_fast
