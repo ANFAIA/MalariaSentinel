@@ -1,14 +1,14 @@
 # Brief — Individualización de personas y rediseño del movimiento de mosquitos
 
-> **Estado**: borrador de diseño (2026-11), **revisión 2**. Cuatro bloques de
-> investigación cerrados: fisiología de la sangre (§6), dossier de *Anopheles coluzzii*
-> (§9), **cascada sensorial y navegación** (§5) y **machos + estado fisiológico de la
-> hembra** (§5.6, §6.4 bis, §8.1, §12.2). Toda la evidencia está en `papers/`:
-> **84 extractos** en `papers/anopheles-dynamics/` (61 nuevos en esta ronda) y filas 32–88 de
-> `papers/REFERENCES.md`. Las decisiones que aún faltan del usuario están en §12.
-> de la sangre y dossier de *Anopheles coluzzii*) están incorporados en §6 y §9; su deuda
-> de evidencia queda en `papers/` (30 extractos nuevos, filas 32–61 de
-> `papers/REFERENCES.md`). Las decisiones que aún faltan del usuario están listadas en §12.
+> **Estado**: borrador de diseño (2026-11), **revisión 2**, corregida tras la revisión
+> Goldfish de 8 revisores (informe: `individualization-and-movement-brief.goldfish-review.md`).
+> Bloques de investigación cerrados: fisiología de la sangre (§6), dossier de *Anopheles
+> coluzzii* (§9), **cascada sensorial y navegación** (§5) y **machos + estado fisiológico de
+> la hembra** (§5.6, §6.4 bis, §8.1). Toda la evidencia está en `papers/`:
+> **84 extractos** en `papers/anopheles-dynamics/` y **filas 32–88** de
+> `papers/REFERENCES.md` (30 extractos nuevos en la ronda de fisiología de la sangre, §6;
+> 11 en el dossier de la especie, §9; el resto en las rondas de cascada sensorial, machos y
+> estado fisiológico, §5 y §8). Las decisiones que aún faltan del usuario están en §12.
 >
 > **Alcance**: sustituye a los packs ODD 02, 03, 04 y partes de 05/08/10/11
 > (`docs/plans/in-process/odd-fixes/`). Es un plan de **cambio de modelo**, no un ajuste:
@@ -53,7 +53,7 @@ Tres fallos con **causa raíz compartida** (el modelo razona en celdas de 1 km):
    500 m** (`host_flight_step_m`) redondeado al entero (`src/host_seeking.cpp:307`, `lround`):
    con objetivo diagonal el desplazamiento es 0,354 celdas y **se pierde**. La atracción
    decae con `exp(-d/300)`, de modo que la propia celda siempre gana si tiene ganado: la
-   mosquito come pollos (1 117/celda en la franja costera) y nunca llega a la gente
+   mosquito come pollos (1 117 por celda de 1 km en la franja costera — **cifra sin fuente ni fecha en el repositorio: pendiente**) y nunca llega a la gente
    (a 1,0–2,8 km). Consecuencia: `pref.human = 0.99` nunca llega a aplicarse.
 3. **No hay malaria.** Sin picaduras no hay `infectious_meals`; `S_H` = 40 255 susceptibles
    no se mueve.
@@ -112,7 +112,7 @@ alcances decrecientes**, y la parte más larga del proceso es *exploración*, no
 | activación | **100 m** | CO₂ (pulsado) | despegue o paso de reposo a búsqueda activa; **sin vector** hacia la fuente (53 % vs 39 % control) | [P] *gambiae* s.s., túnel de semicampo (Lorenz 2013) |
 | orientación olfativa | **70 m** (mezcla + CO₂) · **50 m** (sólo CO₂: 65 % vs 36 %) | volátiles cutáneos + CO₂ | anemotaxis optomotora contra el viento; *casting* transversal si se pierde la pluma | [P] *gambiae* s.s., semicampo (Lorenz 2013) |
 | orientación olfativa **en campo abierto** | **30 m** (olor humano: 57 % vs 51 %); **el CO₂ solo no da dirección**; nada más allá de 30 m | olor humano | la turbulencia disuelve la pluma antes | [P] *arabiensis* (Lorenz 2013) |
-| aproximación visual | **25–72 cm** (radio del modelo ocular: 39 cm para un blanco grande horizontal, 72 cm vertical, 25 cm pequeño horizontal) | contraste de silueta, **habilitado por olor** | vector visual hacia formas grandes/oscuras | [M]-modelo *coluzzii* (Carnaghi 2024) |
+| aproximación visual | **25–72 cm** (radio del modelo ocular: 39 cm para un blanco grande horizontal, 72 cm vertical, 25 cm pequeño horizontal) | contraste de silueta, **habilitado por olor** | vector visual hacia formas grandes/oscuras | [M]-modelo *coluzzii* (Carnaghi 2023/2024; extracto `carnaghi-2023-coluzzii-visual-thermal-landing-targets.md`) |
 | respuesta visual medida | **9,8 % → 43,4 %** (baldosa negra) y **6,8 % → 24,1 %** (transparente) al añadir olor; giro a **0–15 cm** de la superficie (giro medio 5,4 ± 0,85 cm) | olor + CO₂ | aproximación final | [M] *coluzzii* (Hawkes & Gibson 2016) |
 | aterrizaje | **radio terminal 10–20 cm** (mínimo de velocidad medido) | calor + humedad + olor | aterrizaje ∝ **área** calentada (⅛ y ¼ dan ~2–2,5× menos que ½; **no hay regla dura del 50 %**) | [M] *coluzzii* (Carnaghi 2021/2024); [P] el "15 cm" de *gambiae* s.s. (Spitzen 2013) |
 | sensorialidad del CO₂ | umbral del ORN maxilar **≤350–400 ppm**; rastrea pulsos **600→4 800 ppm sin saturar** | CO₂ | detección por incremento, no por nivel | [M] *coluzzii* (Majeed 2017) |
@@ -145,8 +145,8 @@ Es **fidelidad al sitio de enjambre**, no atracción por personas.
 |---|---|---|---|
 | exploración | sin estímulo | paseo aleatorio correlacionado + *casting* transversal al viento | fuera de la pluma (Cummins 2012; Lorenz 2013) |
 | rastreo de pluma | contacto con un filamento de olor | anemotaxis optomotora contra el viento; temporizador de memoria olfativa que dispara *casting* si se pierde | [P] *gambiae* s.s. (Spitzen 2013); el "casting" de 2 s del resumen de Gemini **no se ha podido verificar** ⇒ **[EP]**; el dato accesible más próximo son 300 ms en *Aedes* (Dekker & Cardé 2011, sólo resumen) |
-| aproximación | ≤1 m (radio del modelo ocular) | vector visual a silueta, **sólo si el estado olfativo está encendido** | [M] *coluzzii* (Hawkes & Gibson 2016; Carnaghi 2024) |
-| contacto | 10–20 cm | aterrizaje condicionado a calor + humedad + olor | [M] *coluzzii* (Carnaghi 2021) |
+| aproximación | ≤0,72 m (radio del modelo ocular: 0,39 m objetivo grande horizontal, 0,72 m vertical, 0,25 m pequeño horizontal) | vector visual a silueta, **sólo si el estado olfativo está encendido** | [M] *coluzzii* (Hawkes & Gibson 2016; Carnaghi 2023) |
+| contacto | 10–20 cm | aterrizaje condicionado a calor + humedad + olor | [M] *coluzzii* (Carnaghi 2023/2024) |
 
 ### 5.3 Cinemática de vuelo (medida en *coluzzii*)
 
@@ -174,7 +174,7 @@ con decaimiento exponencial, y estos son los cambios que la evidencia impone:
 | `host_seeking.detect_range_m` | **2000 m** | el mosquito puede "detectar" un hospedero a 2 km ⇒ **se sustituye** por el radio de activación por especie (100 m) y el radio olfativo (30–70 m) |
 | `species.<fila>.host_seeking_scale_m` | **300 m** | decaimiento exponencial de un campo continuo: lo que la física de la pluma **no** permite (§5.1) |
 | `dispersal.host_flight_step_m` | **500 m** (éste es el paso que usa el motor en la pasada por fases, `mosquito_submodel.cpp:832-836`; `host_seeking.approach_step_m` = 50 m es el otro) | pasa a derivarse de la **velocidad de vuelo medida** (0,225–0,45 m/s) × tiempo de vuelo de la fase ⇒ el desplazamiento deja de ser un múltiplo del tamaño de celda |
-| `host_seeking.oviposition.scale_m` / `detect_range_m` | 50 m / 2000 m | mismo problema en la búsqueda de criadero: el radio de detección debe salir de la evidencia (movimiento real hacia el agua) |
+| `oviposition.scale_m` / `oviposition.detect_range_m` | 50 m / 2000 m | mismo problema en la búsqueda de criadero: el radio de detección debe salir de la evidencia (movimiento real hacia el agua) |
 
 El `HostAttraction` deja de ser "celda con más gente": pasa a ser **hospederos
 individuales** con distancia continua, y la "atracción" se sustituye por un
@@ -312,13 +312,22 @@ Se mantienen los machos como **agregado**, pero el apareamiento se modela como u
 
 ```
 # por noche, por fase EVENING (dentro de la ventana de enjambre)
-capacidad_de_enjambre(m, n) = 0.072 · N_machos_en_el_enjambre(m, n)   # Diabaté 2011
-                             ≤ 3 · N_machos_en_el_enjambre(m, n)        # Ekechukwu 2019
-oferta_cercana(c, n) = Σ_{m: |c − m| ≤ alcance} capacidad_de_enjambre(m, n)
-p(inseminada | hembra en c) = 1 − exp(−oferta_cercana(c, n))            # limitada a 1
+capacidad_de_enjambre(m, n) = min(0.072 · N_machos(m, n), 3 · N_machos(m, n))  # Diabaté 2011 / Ekechukwu 2019
+machos_disponibles(c, n)   = Σ_{m: |c − m| ≤ alcance} N_machos(m, n)          # machos *presentes* al alcance
+hembras_competidoras(c, n) = hembras no inseminadas presentes en el alcance     # las que compiten
+p(inseminada | hembra, noche) = 1 − exp(− 0.072 · machos_disponibles(c, n)
+                                     / max(1, hembras_competidoras(c, n)))   # limitada a 1
 ```
 
-Y el **sistema de seguridad** que evita tu modo de fallo:
+**Semántica** (corregida tras la revisión): el 0,072 es la **fracción de machos del enjambre
+que se aparea esa noche** (Diabaté 2011), es decir una **capacidad**; el tope de 3 hembras
+por macho y noche (Ekechukwu 2019) acota por macho. Ninguno de los dos es una probabilidad
+por hembra: la probabilidad de que **una** hembra quede inseminada depende de cuántos machos
+hay al alcance y de cuántas hembras compiten por ellos, y por eso la expresión divide por
+las competidoras (con el tope `min(1, …)`).
+
+Y el **sistema de seguridad** que evita el modo de fallo (hembras sin inseminar por falta
+de enjambre accesible):
 
 - **La hembra vuela al enjambre.** Si una hembra no está inseminada y hay un enjambre
   dentro de su alcance de vuelo, la regla de movimiento de esa noche la lleva hacia él
@@ -369,7 +378,7 @@ de `papers/REFERENCES.md`).
 | Hallazgo | Valor | Fuente | Estado |
 |---|---|---|---|
 | Volumen ingerido por comida | **~3 µL** de media; 3–4 µL para *Anopheles*; 2,5 µL para *Aedes* | `takken-2024-adult-anopheles-gambiae-behaviour-review.md`, `konopka-2026-coordinated-mosquito-biting-human-skin.md` | [P] review/*Aedes*; **no hay medición en µL de *coluzzii* ni del complejo en Ghana** |
-| Comida por sorbo | bomba cibial 38,94 ± 9,45 µm³ en *Anopheles* vs 4,77 ± 1,29 en *Aedes*; caudal 12,7 ± 1,7 nl/s (*An. sinensis*) | `ha-2015-feeding-pump-organs-anopheles-sinensis-aedes-togoi.md`, `lee-2016-liquid-feeding-aedes-togoi-anopheles-sinensis.md` | [M] anatomía ⇒ comida mayor por sorbo |
+| Comida por sorbo | **volumen de la bomba**, no de sangre: cibial 38,94 ± 9,45 µm³ en *Anopheles* vs 4,77 ± 1,29 en *Aedes*; caudal 12,7 ± 1,7 nl/s (*An. sinensis*) | `ha-2015-feeding-pump-organs-anopheles-sinensis-aedes-togoi.md`, `lee-2016-liquid-feeding-aedes-togoi-anopheles-sinensis.md` | [M] anatomía ⇒ **inferencia [EP]**: "comida mayor por sorbo" (el artículo no reporta volumen de sangre ingerida) |
 | Umbral de fin de búsqueda de hospedero | **2,5 µL** en *Aedes* (con menos, sigue buscando) | `klowden-lea-1978-blood-meal-size-continued-host-seeking-aedes.md`, `johnson-2023-blood-meal-size-feeding-frequency-aedes-midgut.md` | [P] *Aedes*; depende de edad y tamaño (`xue-edman-scott-1995-…md`) |
 | Umbral de inicio de oviposición | **no reportado en *Anopheles***; el único umbral publicado (0,25 cal de lípido) es de *A. albimanus* y mide reservas, no volumen | `briegel-horler-1993-multiple-blood-meals-reproductive-strategy-anopheles.md` | [EP] |
 | Hembras pre-gravíd | necesitan **dos comidas** para madurar ovarios; la primera comida inicia una vitelogénesis limitada | `charlwood-2003-mate-or-a-meal-pre-gravid-anopheles-gambiae.md`, `briegel-horler-1993-…md`, `takken-2024-…md` | [P] *gambiae* s.l. (São Tomé) |
@@ -387,12 +396,12 @@ de `papers/REFERENCES.md`).
 | clave | valor | estado | nota |
 |---|---|---|---|
 | `blood_meal_size_ul` | **3,0 µL** media; rango 1,5–4,0 µL (lognormal, σ = prior) | [P] | sin distribución reportada en la literatura |
-| `blood_meal_target_ul` | **~3,0 µL** (una comida completa) | **[EP]** | ningún estudio reporta el umbral en *Anopheles* |
+| `blood_meal_target_ul` | **6,0 µL** (dos comidas de 3,0 µL) | **[EP]** | ningún estudio reporta el umbral en *Anopheles*; 6,0 µL es el valor coherente con la necesidad de **dos comidas** en pre-gravíd (*charlwood-2003*); 3,0 µL para los ciclos siguientes |
 | `meal_size_min_ul` | **2,5 µL** | [P] *Aedes* | para *Anopheles*, prior |
 | `probing_success_rate` | 0,465 (lab) … 0,71–0,99 (campo con/sin ITN) | [M] *gambiae* lab | **sustituye** a `feeding_success_rate` |
-| `meals_per_cycle_mean` | **0,15** central (11–26 % medido) | [P] | depende del estado de ITN (18,9 % → 9,1 %) |
+| `meals_per_cycle_mean` | **0,15** central = nº medio de **comidas adicionales** por ciclo (la fracción medida 11–26 % es de hembras **con** multicomida, no un recuento de comidas) | [P] | depende del estado de ITN (18,9 % → 9,1 %) |
 | `first_cycle_target_ul` | > `blood_meal_target_ul` (estado `PRE_GRAVID` propio) | [P] | el primer ciclo es multi-comida por definición |
-| `egg_batch` | **proporcional al volumen acumulado** (MBITES), no `binomial(240, 0,5)` fijo | [M] modelo | con tope `egg_batch_max` |
+| `egg_batch` | **proporcional al volumen acumulado** (MBITES), no `binomial(240, 0,5)` fijo | [M] modelo | con tope `egg_batch_max`. **Ojo**: el bloque actual valida la invariante `0 < min <= mean <= max <= n` (`config_validation.py:582`), que un lote proporcional al volumen no puede cumplir ⇒ hay que **redefinir el bloque**, no cambiar un valor |
 
 ### 6.3 Cambios en la máquina de estados
 
@@ -459,13 +468,19 @@ refractaria medida.
 | 72 h | suprimida | *A. gambiae*; *A. aegypti* máximo a las 24 h; *A. stephensi* recuperada a las 72 h | [P] Uehara 2026 |
 
 Además, la **amplitud EAG olfativa** (respuesta a sudor humano y a indol) es
-significativamente **menor** en el grupo alimentado que en el control (etapas I–IV)
-(Takken 2001) ⇒ la supresión es **olfactiva**, no sólo de la conducta de aterrizaje.
+significativamente **menor** en el grupo alimentado que en el control **en el estadio IV de
+Christophers**; en los estadios I–III no hay diferencia respecto al control (Takken 2001) ⇒
+la atenuación olfativa es **específica del estadio IV**, no una propiedad de toda la
+ventana postprandial.
 
-**Consecuencia para el motor**: el motor actual deja a la hembra en búsqueda de
-hospedero ~2,5 d (0,5 d de descanso + 2 d de maduración) tras la comida, y ~4,5 d en
-el primer ciclo ⇒ **ya es coherente con la ventana medida de 40–72 h**. Lo que hay que
-añadir es la ventana **explícitamente** (clave `blood_meal_refractory_days`), para que
+**Consecuencia para el motor**: la puerta está **cerrada por completo hasta 24 h** y se
+reabre progresivamente (7 % a las 40 h, 27 % a las 48 h, 68 % a las 72 h); la conclusión
+del artículo es *"inhibition … for a period of at least 40 h"*. Por tanto
+`blood_meal_refractory_days` representa la **supresión completa** (1–1,5 d), **no** una
+ventana de supresión de 40–72 h: a las 48 h la hembra ya responde al 27 % del nivel
+control. El motor actual la deja en búsqueda ~2,5 d tras la comida (0,5 d de descanso + 2 d
+de maduración) ⇒ es **más conservador que la medida**, no "coherente" con ella. Lo que hay
+que añadir es la ventana **explícitamente** (clave `blood_meal_refractory_days`), para que
 la multipicadura dentro de la misma noche y la ventana refractaria no se confundan.
 
 **No verificado** (y no se implementa): la reacción de las opsinas visuales a la sangre, y la reactivación por período seco. No hay ninguna fuente leída que lo
@@ -517,7 +532,7 @@ es aplazar**:
 
 | hecho | valor | especie | evidencia |
 |---|---|---|---|
-| Parada ovárica al inicio de la estación seca | **19,23–68,64 %** de las hembras alimentadas **no superan la etapa 2 de Christophers** | *A. coluzzii* | **[M]** Mamai 2026 |
+| Parada ovárica al inicio de la estación seca | por especie: *coluzzii* **19,23–34,85 %**, *arabiensis* 40,09–48,98 %, *gambiae* s.s. 68,12–68,64 % de las hembras alimentadas **no superan la etapa 2 de Christophers** (el rango agregado 19,23–68,64 % es de las tres especies en los dos sitios) | *A. coluzzii* (sólo su fila) | **[M]** Mamai 2026; en *coluzzii* el arresto es **estacional** (p = 0,004 / 0,018), en *gambiae*/*arabiensis* no hay variación estacional significativa |
 | Ranking de especie | *coluzzii* **65,15–80,77 %** > *arabiensis* 51,02–59,91 % > *gambiae* 31,36–31,88 % | | **[M]** Mamai 2026 |
 | La parada no es sólo ovárica | incluye **oviposición suprimida incluso con huevos plenamente formados** | *A. coluzzii* | **[M]** Mamai 2026 (citando Yaro 2012) |
 | Respuesta de oviposición (hþmbras que ponen tras 3 d con agua) | **70 % → 20 %** | *gambiae* s.s. M-form | [P] Yaro 2012 |
@@ -545,7 +560,7 @@ es aplazar**:
 
 ## 9. Parámetros de la especie piloto (*Anopheles coluzzii*)
 
-DossierInvestigado el 2026-11; 11 extractos nuevos creados en
+Dossier investigado el 2026-11; 11 extractos nuevos creados en
 `papers/anopheles-dynamics/`. Estado: **[M]** medido en *coluzzii* · **[P]** proxy de
 *gambiae* s.l. o congenere · **[EP]** engineering prior del YAML (sin respaldo) ·
 **[NR]** no reportado.
@@ -583,7 +598,7 @@ DossierInvestigado el 2026-11; 11 extractos nuevos creados en
 | Zona sur de Ghana | *coluzzii* 41 % / *gambiae* 31 % / *funestus* 28 %; **coluzzii exclusivo en la zona costera** | `osae-2015-diversity-resistance-vector-competence-southern-ghana.md` | [M] |
 | Antropofilia | HBI ≈ 1 (*funestus*); coluzzii esencialmente antropofágico | `osae-2015-…md` | [M] indirecto (sin HBI numérico para coluzzii) |
 | Perfil horario (coluzzii) | EE 25,5 % · LE 48,0 % · EM 26,5 % (bins 18–22 / 22–04 / 04–06) | `akuoko-2024-…md` | [M] |
-| ⇒ `activity_weights` derivada | **[0.00, 0.191, 0.676, 0.133]** (DAY no medido) | derivado | [M] + residuo declarado |
+| ⇒ `activity_weights` derivada | **[0.00, 0.191, 0.676, 0.133]** (DAY no medido) | derivado | **[EP] (perfil [M] Akuoko 2024)** — la redistribución a las fases del motor es una transformación, no una medición; regla: `w_fase ∝ fracción_de_picaduras_de_la_fase × actividad_de_la_fase`, con `w_DAY = 0` por falta de dato (efecto colateral: la actividad diurna desaparece) |
 | Tasa de picaduras por noche | [NR] en coluzzii; a ≈ 1/ciclo gonotrófico ≈ 0,33–0,40/día | `biting-rate-eip-gonotrophic-parameters-reference.md` | [P] |
 | Tamaño de puesta | **111,67 ± 5,36** huevos/hembra (susceptible), 93,33 ± 10,77 (resistente) | `nkahe-2020-coluzzii-fitness-cost-life-traits.md` | [M] colonia de Camerún — **contradice `egg_batch_n: 240`** del YAML |
 | Ciclo gonotrófico | 2–3 d (campo); 2,65 d por defecto del motor; intervalo de oviposición 3 d | `biting-rate-eip-…md`, `nkahe-2020-…md` | [P] |
@@ -612,10 +627,10 @@ DossierInvestigado el 2026-11; 11 extractos nuevos creados en
 | `salinity_opt_ppt` | 0.0 | **respaldado** (preferencia de oviposición por dulce; criaderos con mediana 0,8 ppt) |
 | `salinity_hi_tol_ppt` | 30.0 | **ambiguo y mal escalado**: sólo es defendible leído como ~30 %SW (≈10,5 ppt); leído como ppt excede la eclosión (0 % a 10,5 ppt), la LC50 larvaria (6,7–8,9 ppt) y la LC50 aguda (13,0 ppt) ⇒ **renombrar clave/unidad** |
 | `salinity_slope` | 0.08 (vs 0,12 de *gambiae*) | dirección correcta (razón medida 1,26×, no 1,5×); **magnitud [EP]** (no hay curva medida) |
-| `host_seeking_scale_m` | 300.0 | mecanismo respaldado (Giraldo 2023), **valor [EP]**: la evidencia sensorial da ~10 m |
+| `host_seeking_scale_m` | 300.0 | **mecanismo NO respaldado** (§5.4: el decaimiento exponencial de un campo continuo es incompatible con la estructura intermitente de la pluma; Giraldo 2023 respalda gradiente de olor a corta distancia, no un campo de 300 m) ⇒ **retirar** |
 | `host_seeking_radius_m` | 1500.0 | **[EP] sin base alguna** ⇒ el mayor hueco de la fila; se renombra como alcance de exploración |
 | `dispersal.adult_sigma_m` / `adult_max_m` | 450 m / 2 000 m | coherentes con la literatura y por debajo del FR90 de *coluzzii* (902–2 606 m): **conservadores pero defendibles** |
-| `dispersal.adult_prob_day` | **0,05/día** | ⇒ el **95 %** de los mosquitos no se mueve ningún día (la cifra 0,10 que circulaba en documentos era errónea) |
+| `dispersal.adult_prob_day` | **0,05/día** | ⇒ el **95 %** de los mosquitos no se mueve ningún día (la cifra 0,10 que circulaba en documentos era errónea); **valor [EP]**, sin fuente publicada |
 | `dispersal.wind_self_speed_ms` | 1,0 m/s | **15–50 % por encima** de la velocidad medida (0,66–0,87 m/s) |
 | `dispersal.host_flight_step_m` | 500 m | contradice la capacidad medida (486–695 m/día) y desaparece con la ley nueva |
 | `egg_batch_n` (fuera de la fila) | 240 (rango 30–170) | **sin respaldo**: la medida es 94–112 huevos por puesta |
@@ -625,17 +640,17 @@ DossierInvestigado el 2026-11; 11 extractos nuevos creados en
 | clave | unidades | valor *coluzzii* | estado | nota |
 |---|---|---|---|---|
 | `daily_move_capacity_m` | m | 590 (rango 486–695) | [M] | sustituye `adult_sigma_m`; el kernel (exponencial vs half-Cauchy) queda como decisión de forma, no de valor |
-| `exploration_range_m` | m | 500–700 | [M]/[P] | alcance de exploración; **no** un radio de atracción |
+| `exploration_range_m` | m | 500–700 | [M] (rango 486–695, MRR *coluzzii*) | alcance de exploración; **no** un radio de atracción. El 350 m/día de *gambiae* s.l. es [P] y no se mezcla en la misma fila |
 | `co2_activation_radius_m` | m | 100 | [P] *gambiae* s.s. | radio de activación (sin dirección) |
 | `olfactory_radius_m` | m | 70 (semicampo) / 30 (campo abierto) | [P] | radio de orientación; para un AOI abierto se queda en 30 |
 | `visual_radius_m` | m | 0,25–0,72 | [M]-modelo | radio visual *coluzzii* |
 | `terminal_radius_m` | m | 0,10–0,20 | [M] | radio de aterrizaje |
 | `flight_speed_ms` (hembra) | m/s | 0,225–0,45 | [M] | velocidad en busca; **no** la del enjambre |
 | `male_ratio` | fracción | 0,5 | [EP] | razón de sexes al nacer (ODD: "neutral default") |
-| `insemination_prob` | fracción | 0,95 | [EP] | probabilidad por hembra de quedar inseminada |
+| `insemination_prob` | fracción | 0,95 | [EP] | **respaldo local** (§5.7.2) cuando la hembra no alcanza ningún enjambre; el mecanismo principal es el espacial, no esta probabilidad por hembra |
 | `sperm_store_days` | días | 90 | [EP] | ventana de fertilidad tras la inseminación |
-| `blood_meal_refractory_days` | días | 2,0 (3,0 en el primer ciclo) | [P] | ventana postprandial sin búsqueda de hospedero |
-| `gonotrophic_arrest_prob_dry` | fracción | 0,45 (proxy) / 0,40 (*coluzzii* medido) | [P]/[M] | parada ovárica en época seca |
+| `blood_meal_refractory_days` | días | 1,0–1,5 (supresión completa; recuperación 7 % a 40 h → 68 % a 72 h) | [P] *gambiae* | ventana **cerrada por completo**; no es una ventana de supresión de 40–72 h (§6.4 bis) |
+| `gonotrophic_arrest_prob_dry` | fracción | 0,19–0,35 para *coluzzii* (rango medido); el valor por defecto se elige dentro del rango | [M] (rango) / [EP] (valor por defecto) | parada ovárica en época seca. **Por especie**: *coluzzii* 19,23–34,85 %, *arabiensis* 40,09–48,98 %, *gambiae* s.s. 68,12–68,64 % (Mamai 2026) |
 | `swarm_pairing_prob_night` | fracción | 0,072 | [P] | fracción de machos del enjambre que se aparea cada noche |
 | `male_females_per_night_max` | hembras/macho/noche | 3 | [M] | capacidad de un macho |
 | `swarm_duration_min` | min | 28,3 | [P] | duración media del enjambre |
@@ -644,13 +659,13 @@ DossierInvestigado el 2026-11; 11 extractos nuevos creados en
 | `swarm_nn_median_m` | m | 10 | [P] | distancia mediana entre enjambres (define la densidad del campo) |
 | `male_daily_survival` | 1/día | 0,773 | [M] | **el YAML aplica 0,87 a ambos sexos** |
 | `swarm_markers_per_km2` | km⁻² | — | **[EP]** | único número libre: se calibra en el escenario E13 |
-| `flight_speed_ms` | m/s | 0,66–0,87 | [M] | sustituye `wind_self_speed_ms` (1,0) |
+| `swarm_flight_speed_ms` | m/s | 0,66–0,87 | [M] | velocidad del macho **en enjambre**; no sustituye a `wind_self_speed_ms` (1,0), que es velocidad de vuelo propio en dispersión |
 | `blood_meal_size_ul` | µL | 3,0 (rango 1,5–4,0) | [P] | volumen por picadura (review *gambiae*; sin dato en Ghana) |
-| `blood_meal_target_ul` | µL | ~3,0 | **[EP]** | umbral de inicio de oviposición (**sin valor publicado**) |
+| `blood_meal_target_ul` | µL | 6,0 (primer ciclo) / 3,0 (siguientes) | **[EP]** | umbral de inicio de oviposición (**sin valor publicado**); 6,0 µL por la necesidad de dos comidas en pre-gravíd |
 | `meal_size_min_ul` | µL | 2,5 | [P] *Aedes* | por debajo, la hembra sigue buscando |
 | `probing_success_rate` | fracción | 0,465–0,99 | [M] *gambiae* lab | sustituye a `feeding_success_rate` (0,825, sin consumidor) |
-| `meals_per_cycle_mean` | comidas/ciclo | 0,15 (11–26 % medido) | [P] | depende del estado de ITN |
-| `activity_weights` (corregida) | fracción | [0.00, 0.191, 0.676, 0.133] | [M] | ver §9.4 |
+| `meals_per_cycle_mean` | comidas/ciclo | 0,15 = nº medio de comidas **adicionales** por ciclo (11–26 % medido = fracción de hembras con multicomida) | [P] | depende del estado de ITN |
+| `activity_weights` (corregida) | fracción | [0.00, 0.191, 0.676, 0.133] | **[EP] (perfil [M])** | ver §9.4 |
 | `salinity_hi_tol_ppt` (renombrada) | ppt | 10,5 (fisiológico) / 2,3 (campo IQR) | [M] | separar "tope fisiológico" de "rango de campo" |
 
 ### 9.6 Huecos (no reemplazables por proxy)
@@ -662,7 +677,7 @@ DossierInvestigado el 2026-11; 11 extractos nuevos creados en
    disponibles; elegir cola pesada infla la colonización a >2 km.
 3. **Alcance de detección de hospedero en *coluzzii***: **no existe ninguna medición
    publicada** ⇒ los radios de activación (100 m) y de orientación olfativa
-   (30–70 m) son **proxy de *gambiae* s.s./*arabiensis*** y slo se pueden declarar como
+   (30–70 m) son **proxy de *gambiae* s.s./*arabiensis*** y sólo se pueden declarar como
    tales; los únicos radios de *coluzzii* son los **visuales** (25–72 cm, modelo ocular).
 4. **Tasa de picaduras por noche** (HBR) de *coluzzii* en Ghana: sin dato.
 5. **Curva de desarrollo larvaro vs T** para *coluzzii*: no existe ⇒ proxy *gambiae* s.s.,
@@ -689,7 +704,7 @@ sigue sin respaldo y se marca como tal; **no se "mejora" con un número inventad
 
 | clave | actual | nuevo | fuente (`papers/`) | tier | acción |
 |---|---|---|---|---|---|
-| `species.coluzzii.activity_weights` | [0.02, 0.10, 0.80, 0.08] | **[0.00, 0.191, 0.676, 0.133]** | `akuoko-2024-biting-behaviour-ghana.md` (perfil horario propio de *coluzzii*, redistribuido a las fases del motor) | [M] | **cambiar** (DAY = 0, no medido) |
+| `species.coluzzii.activity_weights` | [0.02, 0.10, 0.80, 0.08] | **[0.00, 0.191, 0.676, 0.133]** | `akuoko-2024-biting-behaviour-ghana.md` (perfil horario propio de *coluzzii*, redistribuido a las fases del motor) | **[EP] (perfil [M])** | **cambiar** (DAY = 0, no medido ⇒ la actividad diurna se elimina: con `adult_prob_day` 0,05 la dispersión efectiva baja de 5 %/día a 2,5 %/día) |
 | `species.coluzzii.salinity_hi_tol_ppt` | 30.0 | **10,5** (con la clave renombrada a la unidad real: ppt, no %SW) | `nwaefuna-2019-…md` (eclosión 0,4 % a 10,5 ppt; LC50 larvaria 6,7–8,9 ppt; LC50 aguda 13,0 ppt) | [M] | **cambiar + renombrar** |
 | `species.coluzzii.salinity_slope` | 0.08 | — | no hay curva medida | [EP] | **mantener** (marcado como prior) |
 | `species.coluzzii.salinity_opt_ppt` | 0.0 | — | preferencia por agua dulce | [M] | mantener |
@@ -697,35 +712,41 @@ sigue sin respaldo y se marca como tal; **no se "mejora" con un número inventad
 | `species.coluzzii.pref.human` | 0.99 | — | HBI ≈ 1 | [M] | mantener; el reparto con fauna sigue [EP] |
 | `species.coluzzii.host_seeking_radius_m` | 1500.0 | — | sin base | — | **retirar** (§5.3) |
 | `species.coluzzii.host_seeking_scale_m` | 300.0 | — | decaimiento exponencial de un campo continuo | — | **retirar** (§5.3) |
-| `species.coluzzii.*` (resto de filas) | 1500 / 300 | — | ídem | — | **retirar en todas las filas** |
+| `species.*.host_seeking_radius_m` / `host_seeking_scale_m` (resto de filas) | 1500 / 300 (`arabiensis`: 1500 / **120**) | — | ídem | — | **retirar en todas las filas**. Ojo: `host_seeking_scale_m` **también** pondera el kernel de siembra (`seeding.hpp`) ⇒ retirarla cambia la distribución inicial de la población |
 | `gonotrophic.egg_batch_n` | 240 | — | el draw `binomial(240, p)` + recorte [30,170] es [EP] | [EP] | **sustituir por lote ∝ volumen** (MBITES) |
-| `gonotrophic.egg_batch_max` | 170 | **112** (media medida) con tope de seguridad | `nkahe-2020-coluzzii-fitness-cost-life-traits.md` (111,67 ± 5,36 huevos; 93,33 ± 10,77 en resistente) | [M] | **cambiar** |
+| `gonotrophic.egg_batch_max` | 170 | **no puede bajar de `egg_batch_mean` (120)**: la invariante `0 < min <= mean <= max <= n` (`config_validation.py:582`, test `test_config_validation.py:553`) hace que `max = 112` **rechace el arranque del CLI** | `nkahe-2020-coluzzii-fitness-cost-life-traits.md` (111,67 ± 5,36 huevos; 93,33 ± 10,77 en resistente) | [M] | **cambiar el bloque**: el lote ∝ volumen invalida la invariante ⇒ hay que redefinir `egg_batch_mean`/`min`/`max`/`n` **y** la validación, no un único valor |
 | `dispersal.adult_sigma_m` | 450.0 | → `daily_move_capacity_m` = **590** (rango 486–695) | `wickramasooriya-2026-coluzzii-mrr-saotome-principe.md` | [M] | **renombrar + cambiar** |
-| `dispersal.adult_prob_day` | 0.05 | 0.05 | ya corregido (el 0,10 de documentos antiguos era erróneo) | [M] | mantener |
-| `dispersal.wind_self_speed_ms` | 1.0 | **0,70** (0,66–0,87) | `vielma-2026-…md` (enjambre) | [M]/**[P]** | **cambiar** (a confirmar con la velocidad de la hembra en busca, en investigación) |
-| `dispersal.wind_flight_hours` | 4.0 | revisar contra el rango medido 2–9 h | `huestis-2019-…md` | [M] | **revisar** (el 4,0 es prior) |
+| `dispersal.adult_prob_day` | 0.05 | 0.05 | ya corregido (el 0,10 de documentos antiguos era erróneo) | **[EP]** | mantener (sin fuente publicada) |
+| `dispersal.wind_self_speed_ms` | 1.0 | — (no importar la cifra del enjambre) | `vielma-2026-…md` mide la velocidad del **macho en enjambre**, que no es velocidad de dispersión | [NR] | **no cambiar con esta cifra**: mantener 1,0 como [EP] hasta tener velocidad de vuelo propio en dispersión |
+| `dispersal.wind_flight_hours` | 4.0 | revisar contra el rango medido 2–9 h | `huestis-2019-…md` | [EP] | **revisar** (el 4,0 es prior; el rango medido es 2–9 h) |
 | `dispersal.wind_survival` | 0.85 | — | `sanogo-2021-high-altitude-survival.md` no da fracción | [EP] | **mantener** (marcado) |
 | `dispersal.host_flight_step_m` | 500.0 | — | contradice la capacidad medida | — | **retirar** (ley nueva) |
-| `host_seeking.detect_range_m` | 2000.0 | → radio de activación por especie (≤100 m) | pendiente de verificación (§9.1) | [P] | **cambiar** |
-| `host_seeking.approach_step_m` | 50.0 | → velocidad × tiempo de fase | pendiente | [M] | **cambiar** |
-| `host_seeking.starvation_days` | 7 | 7 | coherente | — | mantener (pero **exige** el reloj propio, §6.3-7) |
+| `dispersal.snap_radius_m` | 500.0 | — | el parche se resuelve por **posición**, no por proximidad | — | **retirar** o dejar sin efecto (§8) |
+| `oviposition.scale_m` | 50.0 | — | mismo problema que `host_seeking_scale_m`: decaimiento de un campo continuo | — | **retirar** (radio de detección por especie) |
+| `oviposition.detect_range_m` | 2000.0 | → radio de oviposición por especie | pendiente | [EP] | **cambiar** (§5.4) |
+| `oviposition.step_m` | 50.0 | → velocidad × tiempo de fase | pendiente | [EP] | **cambiar** (depende de D1) |
+| `host_seeking.detect_range_m` | 2000.0 | → `species.<fila>.co2_activation_radius_m` (100 m, [P] *gambiae* s.s.) | §9.5 | [P] | **cambiar** |
+| `host_seeking.approach_step_m` | 50.0 | — (depende de la base temporal, D1) | pendiente | [EP] | **cambiar** |
+| `host_seeking.starvation_days` | 7 | 7 | coherente | [EP] | mantener (pero **exige** el reloj propio, §6.3-7) |
 | `host_seeking.indoor_attraction_add` / `urbanicity_add` | 0.72 / 0.2 | — | sin fuente | [EP] | **mantener** (marcado) |
 | `gonotrophic.feeding_success_rate` | 0.825 | → `probing_success_rate` (por especie) | `choumet-2012-…md` (0,465 lab), `hauser-2019-…md` (0,71–0,99 campo) | [M]/**[P]** | **sustituir** (§6.3-5) |
-| `adults.daily_mort_basal` (sexo masculino) | 0,87 (ambos sexos) | **0,773** para machos | `epopa-2017-male-coluzzii-mrr-bana-burkina-faso.md` | [M] | **cambiar** (rama por sexo) |
+| `adults.male_daily_survival` (clave **nueva**) | — | **0,773** | `epopa-2017-male-coluzzii-mrr-bana-burkina-faso.md` | [M] | **crear**: la clave actual `adults.daily_mort_basal` es la supervivencia diaria de **ambos sexos** (0,87), no una rama por sexo |
 | `mating.swarm_pairing_prob_night` (nuevo bloque) | — | 0,072 | `diabate-2011-gambiae-swarms-mating-success-mali.md` | [P] | **crear** |
 | `mating.male_females_per_night_max` | — | 3 | `ekechukwu-2019-coluzzii-sperm-transfer-monandry.md` | [M] | **crear** |
 | `mating.swarm_duration_min` | — | 28,3 | `bimbile-somda-2018-arabiensis-swarming-mating-burkina-faso.md` | [P] | **crear** |
-| `mating.swarm_start_min_after_sunset` | — | 5 | `diabate-2011-` + '…' + `md` | [P] | **crear** |
-| `mating.swarm_nn_median_m` | — | 10 | `diabate-2011-` + '…' + `md` | [P] | **crear** |
-| `mating.swarm_markers_per_km2` | — | **[EP]** | sin fuente | [EP] | **crear, calibrar en E13** |
-| `mating.rain_suppresses_swarming` | — | bool (0 parejas por enjambre en ago–sep) | `bimbile-somda-2018-` + '…' + `md` | [P] | **crear** |
+| `mating.swarm_start_min_after_sunset` | — | 5 | `diabate-2011-gambiae-swarms-mating-success-mali.md` | [P] | **crear** |
+| `mating.swarm_nn_median_m` | — | 10 | `diabate-2011-gambiae-swarms-mating-success-mali.md` | [P] | **crear** |
+| `mating.swarm_markers_per_km2` | — | — (se calibra **fuera** del test; E13 lo fija explícitamente) | sin fuente | **[EP]** | **crear, calibrar en E13** |
+| `mating.rain_suppresses_swarming` | — | bool (0 parejas por enjambre en ago–sep) | `bimbile-somda-2018-arabiensis-swarming-mating-burkina-faso.md` | [P] | **crear** |
 | `mating.female_swarm_attraction_m` | — | **[EP]** | sin fuente | [EP] | **crear** |
 
 ## 10. Escenarios sintéticos (paquete de verificación)
 
 Estructura acordada:
 - **Ejercitan la cadena real**: alimentar → ovipositar → eclosionar → alimentar.
-- **Expectativas teóricas calculadas a mano** (no extraídas del propio modelo), de modo que
+- **Expectativas calculadas a mano** (no extraídas del propio modelo) **para lo que tiene
+  forma cerrada**, e **invariantes + bandas de tolerancia pre-registradas** para lo que
+  depende de la ley de movimiento (que no tiene forma analítica): de modo que
   el test pueda fallar primero. Ejemplo de forma: con 200 personas, 10 hembras, alcance de
   contacto R y `probing_success_rate` p, el número esperado de comidas por noche es
   `10 · p · P(dentro de R)` y la distribución entre personas es binomial con esa media.
@@ -746,10 +767,10 @@ Catálogo propuesto (con la expectativa teórica que cada uno debe satisfacer):
 | E8 | Dos hembras, dos personas | cada una pica a la que le toca por ruleta de `pref` y distancia; **no** hay "celda ganadora" |
 | E9 | Hembra infecciosa con varias comidas | varias picaduras infecciosas; probabilidad de infectar a >1 persona (evidencia genética 3/8, 6/9) |
 | E10 | Sensibilidad a los radios de percepción (activación 50/100/200 m · olfativa 10/30/70 m · visual 0,25/0,72 m) | cuantifica el peso de cada tramo de la cascada; los valores por defecto son los **verificados** |
-| E11 | Ventana postprandial | tras la comida, la hembra **no** vuelve a buscar en 40–72 h (Takken 2001); el motor debe reproducirlo |
-| E12 | Parada ovárica en época seca | con racha de días secos, la fracción de hembras alimentadas que **no** supera la etapa 2 de Christophers debe ser la medida (19–69 % en *coluzzii*) |
-| E13 | Machos y oferta de apareamiento | con 100 hembras y 100 machos recién-emergidos en una aldea de 1 km², la **oferta** (0,072 × males por enjambre × número de enjambres) debe ser ≥ la **demanda** (hembras nuevas); y el número de hembras adultas sin inseminar tras 3 noches debe ser 0 |
-| E14 | Machos sin hembra | en una celda con hembra(s) y sin enjambre, la hembra debe **volar al enjambre más cercano** (regla de movimiento al atardecer) y no quedarse sin fecundar |
+| E11 | Ventana postprandial | la puerta está **cerrada por completo hasta 24 h** y se reabre progresivamente (7 % a las 40 h, 27 % a las 48 h, 68 % a las 72 h) (Takken 2001): el motor no debe permitir una comida antes de `blood_meal_refractory_days` y sí debe permitirla después |
+| E12 | Parada ovárica en época seca | con racha de días secos, la fracción de hembras alimentadas que **no** supera la etapa 2 de Christophers debe ser la medida (**19,23–34,85 %** en *coluzzii*; el rango agregado de las tres especies es 19,23–68,64 %) |
+| E13 | Machos y oferta de apareamiento | el escenario **fija** `swarm_markers_per_km2` (valor explícito en el test, no una constante libre) y **reporta** el resultado: con 100 hembras y 100 machos recién-emergidos en una aldea de 1 km², la **oferta** (0,072 × machos por enjambre × número de enjambres) debe ser ≥ la **demanda** (hembras nuevas); y el número de hembras adultas sin inseminar tras 3 noches debe ser 0 |
+| E14 | Machos presentes pero sin enjambre formado | una hembra en una celda con machos **recién emergidos** (antes de su primera ventana de enjambre) **no** debe inseminarse, y el diagnóstico debe emitir la alarma `hembras_sin_inseminar`; la hembra debe **volar al enjambre más cercano** cuando exista |
 
 **Escenarios adoptados** (adversarios del modelo, deben fallar si el modelo es correcto):
 - mosquito con gente en la celda pero a 2 km → **no** debe picar (regresión del "celda
@@ -833,8 +854,9 @@ dice la evidencia de cada una:
   clasificación abdominal de campo (Sella 1–2 alimentada, 3–5 semi-grávida, 6–7
   gravídica).
 - Ganamos: es exactamente lo que mide la literatura de campo; encaja con la multivisita
-  (pre-gravídica → alimentada → gravídica), con la ventana postprandial (40–72 h sin
-  respuesta) y con la parada ovárica de época seca (19–69 % de *coluzzii*).
+  (pre-gravídica → alimentada → gravídica), con la ventana postprandial (supresión
+  completa hasta 24 h; recuperación progresiva del 7 % al 68 % entre 40 y 72 h) y con la
+  parada ovárica de época seca (19,23–34,85 % en *coluzzii*).
 - Perdemos: no ordena a los individuos dentro de un estado (dos hembras "gravídicas" no se
   distinguen), y **duplica** parte de la máquina gonotrófica que ya existe.
 
@@ -859,13 +881,20 @@ respaldo medido, no por preferencia.
 |---|---|---|
 | — | Cohorte con hémbras 'coluzzii' y 'gambiae' s.s. en el mismo AOI | La decisión de aestivar es **por especie** (§8.1); el motor tendrá que mezclar reglas si el AOI tiene ambas |
 | — | Forma del kernel de dispersión local | Ninguna fuente de *coluzzii* distingue exponencial de half-Cauchy (sólo cuantiles FR50/FR90): la forma es decisión de diseño, no un dato |
-| — | 'Percepción' como 'radio' ó 'sensibilidad' | La evidencia da **radios por tramo**; el parámetro 'cuánto pesa cada uno' en la decisión de picar queda como sensibilidad en el paquete sintético (E10) |
+| — | 'Percepción' como 'radio' o 'sensibilidad' | La evidencia da **radios por tramo**; el parámetro 'cuánto pesa cada uno' en la decisión de picar queda como sensibilidad en el paquete sintético (E10) |
 
 ## 13. Orden de ejecución previsto
 
+0. **Arnés de escenarios sintéticos** (prerrequisito de todo lo demás): hook de siembra por
+   individuo (x, y, sexo), override de población humana por celda, semilla por escenario y
+   ruta de ejecución que **no** pase por el modo manifiesto (`run_abm_from_manifest` valida
+   completitud contra el catálogo de ingesta). Reutiliza el generador de fixtures existente
+   (`tests/fixtures/make_golden_fixtures.py`, AOI 8×8) extendido a 10×10. Sin este paso,
+   E1–E14 no son ejecutables y el resto del plan no tiene termómetro.
 1. **Verificación sintética mínima** (escenarios E1–E2 con la cadena actual, marcando los
    fallos esperados) — sin tocar el motor. Es el termómetro: todo lo que sigue se mide
-   contra él.
+   contra él. Es un **script**, no un test con aserciones que fallan: escribe
+   observado-vs-esperado en `runs/_check_current/` y termina con código 0.
 2. **Individuos humanos** + ledger por individuo + picadura con `probing_success_rate`
    (sustituyendo a `feeding_success_rate`, que el motor ni siquiera consulta).
 3. **Acumulación de volumen sanguíneo** + multipicadura + umbral gonotrófico + estado
@@ -878,24 +907,31 @@ respaldo medido, no por preferencia.
 5. **Estado fisiológico**: `ovarian_stage`, `gonotrophic_arrest` (estación seca) y la
    semántica de parche seco = "no hay criadero", no "mueren" (§8.1).
 6. **Cohortes con posición de la madre** (parches por posición) y semántica de parche seco.
-7. **Machos triviales pero configurados**: `male_ratio`, `insemination_prob`, ventana de
-   apareamiento al atardecer, **capacidad de enjambre espacial** (marcadores derivados del
-   patron de asentamiento, 0,072 × machos, ≤3 hembras/macho/noche), regla de movimiento de
-   la hembra hacia el enjambre + **diagnóstico de enjambre** (oferta vs demanda, hembras
-   sin inseminar). Escenarios E13/E14 como puerta de entrada (§5.7).
-   apareamiento al atardecer + **diagnóstico de enjambre** (machos por celda y noche).
+7. **Machos triviales pero configurados**: `male_ratio`, `insemination_prob` (respaldo
+   local), ventana de apareamiento al atardecer, **capacidad de enjambre espacial**
+   (marcadores derivados del patrón de asentamiento, 0,072 × machos, ≤3 hembras/macho/
+   noche), regla de movimiento de la hembra hacia el enjambre + **diagnóstico de enjambre**
+   (oferta vs demanda, hembras sin inseminar). Escenarios E13/E14 como puerta de entrada
+   (§5.7).
 8. **Escenarios E3–E14 completos** con expectativas calculadas a mano.
 9. **Recalibración**: los scorers D-xx se desplazan (más picaduras ⇒ más transmisión;
-   maduración retardada ⇒ menos oviposiciones por día-hembra; parada en época seca ⇒
-  Crash en la producción larvaria). Hay que definir la política de comparación, porque
-   "el run anterior" deja de ser comparable.
+   maduración retardada ⇒ menos oviposiciones por día-hembra; parada en época seca ⇒ caída
+   en la producción larvaria). **La política de comparación hay que crearla**: hoy el
+   comparador "run anterior" no tiene referente — el marco de scoring de este checkout
+   (`mal-core/src/mal_core/scoring/`: `registry.py`, `scorers/base.py`, `runner.py`) escribe
+   un `scorecard.json` por corrida y **no** guarda historial ni `max_delta`. Hace falta un
+   registro de corridas con clave de comparabilidad (`constants_sha256` + versión de
+   contrato) y una corrida de referencia fijada.
 
 Cada paso es un PR (memoria #228/#233: nada directo a `main`).
 
 ## 14. Riesgos
 
-- **Coste computacional**: 64 M de individuos humanos en Ghana; hay que decidir el
-  muestreo (¿todos? ¿una fracción?) y el almacenamiento del estado individual.
+- **Coste computacional**: el tamaño de la población humana debe **derivarse del
+  manifiesto** (`human_total`), no de una constante escrita a mano (el ODD habla de ~32 M;
+  la cifra real depende del AOI). Hay que decidir el muestreo (¿todos? ¿una fracción? ¿
+  materialización perezosa al ser mordido?) y el almacenamiento del estado individual: a
+  ~58 B por persona, la población completa son varios GB por corrida.
 - **Los checkpoints del surrogate** entrenados con bandas normalizadas ≤3.0 no son
   reutilizables (memoria #195).
 - **La línea base de calibración se desplaza**: el comparador "run anterior" deja de ser
@@ -914,8 +950,10 @@ Cada paso es un PR (memoria #228/#233: nada directo a `main`).
   *gambiae* s.s.; *coluzzii* es la especie de la franja costera y de las aldeas costeras; y
   *gambiae* s.s. **no estiva** (Dao 2014) ⇒ la semántica de época seca es **por especie**.
 - **La parada ovárica de estación seca es la mayor incertidumbre nueva**: el rango medido
-  en *coluzzii* es enorme (19,23–68,64 %) y depende del sitio; el motor tendrá que
-  elegir un valor por especie y por hábitat, y esa elección es un prior inevitable.
+  es **por especie** (*coluzzii* 19,23–34,85 %; *arabiensis* 40,09–48,98 %; *gambiae* s.s.
+  68,12–68,64 %) y **estacional** en *coluzzii* (p = 0,004 / 0,018), no en las otras dos;
+  el motor tendrá que elegir un valor por especie y por hábitat, y esa elección es un prior
+  inevitable.
 - **El viento como evento aparte** no se ha tocado todavía: la decisión W = a deja el
   canal `dispersal.wind_*` como estaba, y sus parámetros (`wind_flight_hours` 4,0,
   `wind_survival` 0,85) siguen siendo [EP].
