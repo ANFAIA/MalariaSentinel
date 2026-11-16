@@ -122,6 +122,30 @@ Promotion moves stable, useful code from an experiment into the core tier. It is
 - Don't retry with a different phrasing. Don't batch the change with another edit. Don't delegate the edit to a subagent to bypass the prompt.
 - Adding a new protected file = add the path to the table above and state it to the user.
 
+## Untrusted documents
+
+`docs/specs/*` is **not authoritative**: it is scheduled for deletion by the
+conceptual-documentation plan (`docs/plans/in-process/per-stage-conceptual-documentation.md`).
+Several of its claims are already contradicted by the code. During any editing
+session, do not take a spec claim as true — verify it against the code before
+acting on it, and prefer `docs/concepts/` (once it exists) as the reference.
+
+## Working artefacts and cleanup
+
+At the end of each EGM phase (and of any multi-step design work), clean the
+working files before reporting done:
+
+- The definitive plan is the only artefact that survives. It lives in
+  `docs/plans/in-process/<plan>.md` and moves to `docs/plans/completed/` when it
+  is implemented.
+- Delete the phase's secondary material once the plan is written: the brief's
+  companion files (`*.decisions.md`, `*.odd-method.md`, `*.raw.md`), the
+  intermediate drafts, the working copies. Anything that must not be lost goes
+  into the plan's appendices or into git history first — do not delete a file
+  whose content is not yet captured somewhere durable.
+- A design RFC under `docs/designs/` is the *brief*; the plan is the *work*.
+  Both may exist, but only one of them is the artefact being executed.
+
 ## Where knowledge lives
 
 | What | Where |
@@ -197,6 +221,16 @@ This prevents losing sight of the all-time best when iterating.
 **Subagents** see a brief, not the full conversation. If they need more context, they ask the main session.
 
 ## Git push workflow
+
+### Pull requests are the user's, not the agent's
+
+**Never open a pull request from an agent session.** Work on a feature branch,
+commit and push it; the user opens the pull request, with all of the branch's
+changes, when they decide to. A PR opened by an agent splits the branch's
+history across two artefacts and leaves the branch littered with the working
+files of the phase — which the user then has to clean by hand.
+
+### Force-push
 
 When local history was rewritten (`reset`, `rebase`, `amend`), a plain `git push` refuses with "non-fast-forward". Use `git ps` — a global alias for `push --force-with-lease`:
 

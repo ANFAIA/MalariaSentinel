@@ -4,25 +4,34 @@
 RFC — 2026-11-16
 
 This file is the reviewable copy of the concepts brief for team feedback.
-The formal design document produced by the drafting step replaces it at this
-path.
+It is the *design*; the executable artefact derived from it is the plan at
+docs/plans/in-process/per-stage-conceptual-documentation.md, which moves to
+docs/plans/completed/ when it is implemented.
+
+The brief's working copy and its three companions were consumed by the
+drafting step and deleted from the tree afterwards; their surviving content
+(the stance S1–S10 and the devices that transfer) is reproduced in the
+plan's Appendix A, and the full companions remain in the git history at
+commit 75dc50c.
 
 All paths below are relative to the repository root:
 
-  Working copy of this brief ..... concepts_brief.md
-  Companion: decisions ........... concepts_brief.decisions.md
-  Companion: ODD method note ..... concepts_brief.odd-method.md
-  Companion: raw review findings . concepts_brief.raw.md
+  Working copy of this brief ..... concepts_brief.md             (deleted; git 75dc50c)
+  Companion: decisions ........... concepts_brief.decisions.md  (deleted; git 75dc50c)
+  Companion: ODD method note ..... concepts_brief.odd-method.md   (deleted; stance now in the plan's Appendix A)
+  Companion: raw review findings . concepts_brief.raw.md         (deleted; git 75dc50c)
 -->
 
 
 * **Author:** david-fm
 * **Date:** 2026-11-16
 * **Mode:** brainstorm output (upstream of a formal design document)
-* **Raw review:** `concepts_brief.raw.md` — 7 Goldfish lenses, 103 findings, 10 premise corrections
+* **Raw review:** the 7 Goldfish lenses' 103 raw findings — consumed by the
+    drafting step; the file was deleted afterwards and survives in the git
+    history at commit `75dc50c`.
 
-> **Read these three companions before drafting.** This brief is the entry
-> point; the details behind it live beside it and are part of the input.
+> **The three companions were consumed and deleted.** They were part of the
+> input to the drafting step, not part of the deliverable:
 >
 > 1. `concepts_brief.decisions.md` — every open decision (I1–I6, R1–R10) with
 >    its options, its implications and its residual risk, and the recorded
@@ -30,21 +39,28 @@ All paths below are relative to the repository root:
 > 2. `concepts_brief.odd-method.md` — the investigation of the ODD as a
 >    questioning method: the stance (S1–S10) that the new layer shares, the
 >    devices that transfer, and the gaps in the ODD format itself, with
->    citations into the reference document.
+>    citations into the reference document. **Its content now lives in the
+>    plan's Appendix A.**
 > 3. `concepts_brief.raw.md` — the 103 raw findings of the 7 review lenses,
 >    for anyone who wants to audit what the analysis rests on.
+>
+> All three were deleted from the tree once the plan was written (author
+> directive, 2026-11-16: at the end of each phase only the definitive plan
+> remains). They remain recoverable in the git history at commit `75dc50c`.
 >
 > **Intake notes for the drafting step.** This brief is the context file; the
 > section "Alternatives Considered" below is the source for the design document's
 > own "Alternatives Considered", and "Key Decisions & Staging for Next Steps" is
 > the source for its Technical Plan. The decisions table at the end of this file
-> points into `concepts_brief.decisions.md` for the options behind each one.
+> points into `concepts_brief.decisions.md` for the options behind each one
+> (deleted after the drafting step; recoverable in the git history at commit
+> `75dc50c`).
 >
 > The RFC copy of this brief is published at
 > `docs/designs/per-stage-conceptual-documentation.md`, registered in
-> `docs/designs/SITEMAP.md`. The formal design document produced by the drafting
-> step is written to that same path, replacing the RFC; the RFC remains in the
-> git history and in the pull request that published it.
+> `docs/designs/SITEMAP.md`. The plan produced by the drafting step is
+> `docs/plans/in-process/per-stage-conceptual-documentation.md`; it is the
+> artefact being executed, and this RFC is its design context.
 
 ## Overview
 
@@ -283,8 +299,8 @@ never a hand-maintained one.
   distinguished from choice; every constant carrying a provenance tier; state
   distinguished from derived from cache; absences declared; ordering written
   where order matters, with consequences; outputs given with their consumption
-  contract; an evidence appendix. Stated in full in
-  `concepts_brief.odd-method.md`.
+  contract; an evidence appendix. Stated in full in the plan's Appendix A
+  (`docs/plans/in-process/per-stage-conceptual-documentation.md`).
 - Ownership by use: each stage documents what it uses, in its own style;
   coherence checked at the seams by adjacency, between a stage's outputs and
   the next stage's inputs.
@@ -361,7 +377,7 @@ never a hand-maintained one.
   formatting convention with a 100% pass rate — the spec system rebuilt with
   more pages. Adopted instead: per-stage question sets found per stage, in the
   ODD's own discipline of reading the material before asking, with the shared
-  *stance* (S1-S10, in `concepts_brief.odd-method.md`) as the common instrument
+  *stance* (S1-S10, in the plan's Appendix A) as the common instrument
   and the section list free.
 - **A seventh `shared/` substrate document, an ownership matrix, or `\input`
   fragments.** Rejected by author, 2026-11-16: the owner of each piece of
@@ -559,8 +575,8 @@ Carried into the design document as open, not as decided:
 |---|---|---|
 | I1 | PDF topology under legacy Pages | **A: CI commits the PDF to the branch** (decided 2026-11-16) / B: publish as release assets / C: migrate Pages to a build workflow |
 | I2 | Technical-docs toolchain | **A: Doxygen + pdoc, after a polish pass on the contract-defining headers only** (decided 2026-11-16); B: custom generator for the flag/file contract as a later complement / C: defer |
-| I3 | Document skeleton | **Decided 2026-11-16: option C** — free-form per typology, no shared section list; what is shared is the *stance* (S1–S10 in `concepts_brief.odd-method.md`), not a table of contents |
-| R1–R10 | The round-2 question set (stance in writing + skill; agent-drafts/human-reviews loop; anchors explained inline; ODD as evolving base; per-stage checklist; separate documentation page; namespaced reference dirs; `scoring` documented in full; six documents with `ingest` sub-stages as sections; examples as described situations) | **All decided 2026-11-16** — see `concepts_brief.decisions.md` |
+| I3 | Document skeleton | **Decided 2026-11-16: option C** — free-form per typology, no shared section list; what is shared is the *stance* (S1–S10, in the plan's Appendix A), not a table of contents |
+| R1–R10 | The round-2 question set (stance in writing + skill; agent-drafts/human-reviews loop; anchors explained inline; ODD as evolving base; per-stage checklist; separate documentation page; namespaced reference dirs; `scoring` documented in full; six documents with `ingest` sub-stages as sections; examples as described situations) | **All decided 2026-11-16** — see the options in `concepts_brief.decisions.md` (deleted; git history `75dc50c`) and the resulting decisions D1–D9 in the plan |
 | I4 | Ownership of shared content | **Decided 2026-11-16: ownership by use** — the stage that uses it documents it; coherence checked at the seams by adjacency; no substrate, no matrix, no seventh document |
 | I5 | Six-way template set | **Decided 2026-11-16: no generic template** — each stage gets its own questions; per-stage question sets derived by a subagent that reads the material, in the ODD's own discipline |
 | I6 | Owner of the cycle/DAG gap | **Dropped 2026-11-16** — a question about the system, not the documentation; no ABM modification and no generalisation is on the table |
