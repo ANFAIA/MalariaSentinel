@@ -1,0 +1,1553 @@
+\documentclass[11pt,a4paper]{article} \usepackage[utf8]{inputenc} \usepackage[T1]{fontenc}
+\usepackage[english]{babel} \usepackage[margin=2.3cm]{geometry} \usepackage{xcolor}
+\usepackage{booktabs} \usepackage{longtable} \usepackage{array} \usepackage{amsmath,amssymb}
+\usepackage{listings} \usepackage[hidelinks]{hyperref} \newcommand{\code}[1]{\texttt{#1}}
+\input{../generated/macros.tex}
+
+\begin{document} \newcommand{\src}[1]{\code{#1}}
+
+\title{The \emph{ingest} stage:\\ turning downloaded layers into the environment the engine can
+read} \author{MalariaSentinel conceptual documentation} \date{}
+
+\begin{abstract} \noindent The \emph{ingest} stage is the transform layer of the MalariaSentinel
+pipeline. It takes raw, downloaded, provider-native layers --- rainfall, air temperature,
+permanent-surface water, land cover, a coastline, and a family of host-density layers --- and
+turns them into the four artefacts the C++ simulation engine consumes: a daily environment
+NetCDF, a static habitat-patch GeoPackage, a static host grid, and three mobility operators. It
+does not fetch data on the environment path, it does not simulate, and it does not score. This
+document explains what the stage computes, in what order, on which grid, and what its numbers
+mean and do not mean. Every constant quoted here is generated from the shared constants file or
+from the generated tables; every behavioural claim carries a file-and-line citation.
+\end{abstract}
+
+\tableofcontents
+
+\bigskip \noindent\textbf{Notation.} Symbols used in this document are named on first use, with
+the code symbol that implements them in parentheses, e.g.\ the static habitat potential $H[i,g]$
+(\code{static\_potential} in \src{mal-core/src/mal\_core/habitat/potential.py:50}). File
+citations are given as \src{path:line} or \src{path:line--line} and can be checked by opening
+the file at that line.
+
+\section{Purpose, and the boundary of the purpose} \label{sec:purpose}
+
+\subsection{What question the stage answers}
+
+The engine that simulates malaria transmission needs, for every cell of a fixed grid and for
+every day of the simulated period, a small set of numbers it can read without interpreting
+satellite imagery or provider formats:
+
+\begin{itemize}
+\item how much rain fell, and how warm it was, on each day; \item how much standing-water
+breeding habitat each cell statically offers, expressed as an index in $[0,1]$ per habitat type;
+\item which cells are candidate breeding patches at all; \item where the people are, where the
+livestock are, and how each of those two populations moves between cells.
+\end{itemize}
+
+The \emph{ingest} stage answers exactly that question, on the AOI's own grid, and nothing wider.
+It is a transform with a fixed output contract: given an area of interest and the raw products
+registered for it, it emits a self-describing set of files on disk and registers them in the
+central manifest. The three public builders are \code{build\_env\_tensor} (the daily environment
+NetCDF and the habitat GeoPackage), \code{build\_host\_dataset} (the static host grid) and
+\code{build\_mobility\_dataset} (the three origin--destination operators)
+\src{mal-core/src/mal\_core/ingest/\_\_init\_\_.py:1--10}.
+
+\subsection{What would count as the stage having answered it}
+
+The stage has answered its question when, for one AOI, the following are all true:
+
+\begin{enumerate}
+\item the environment NetCDF exists, carries the daily channels and the static planes on one
+grid, and declares its contract version (\S\ref{sec:envnc}); 
+\item the habitat GeoPackage exists
+and enumerates the candidate cells with their per-type potential and their grid identity
+(\S\ref{sec:gpkg}); 
+\item the host grid exists with one plane per host layer, all on the same
+grid (\S\ref{sec:hosts}); 
+\item the mobility operators exist and are row-stochastic
+(\S\ref{sec:mobility}); 
+\item every one of those artefacts is registered in the AOI manifest
+under its own key (\S\ref{sec:manifest}).
+\end{enumerate}
+
+\subsection{What the stage is explicitly \emph{not} for}
+
+This list is a filter, not a courtesy. If a reader is looking for the following, it is
+elsewhere.
+
+\begin{itemize}
+\item \textbf{It is not the download stage.} The environment path fetches nothing: it resolves
+already-downloaded files through the manifest (\S\ref{sec:envinputs}). The host and mobility
+path \emph{does} fetch, through the provider loaders it calls directly
+(\S\ref{sec:hostdownloads}) --- an asymmetry the stage does not hide. 
+\item \textbf{It is not
+the simulator.} No mosquito is drawn and no day is stepped. The dynamic parts of the habitat
+model --- the two temporal responses, the daily accuracy, the daily capacity --- are computed by
+the engine, every day, from the static planes this stage writes (\S\ref{sec:dynamic}). 
+\item
+\textbf{It is not the scorer, the trainer or the predictor.} The generated contract table
+(\S\ref{sec:contracts}) lists \code{scoring}, \code{prediction} and \code{abm} as consumers of
+the environment NetCDF. 
+\item \textbf{It is not a measurement device.} The habitat numbers this
+stage produces are indices of relative offer: not pool counts, not water depths, not volumes,
+not probabilities (\S\ref{sec:hnot}). 
+\item \textbf{It is not a terrain analysis.} No digital
+elevation model, no topographic wetness index, no catchment computation, no millimetre water
+balance (\S\ref{sec:absences}). 
+\item \textbf{It does not choose a species}; which affinity row
+applies is decided downstream.
+\end{itemize}
+
+\section{Entry points, artefacts, and the manifest keys they claim} \label{sec:entry}
+
+\subsection{Entry points}
+
+The stage is reached in two ways.
+
+\begin{description}
+\item[The command line.] \code{malariasim ingest} is a subcommand with the options \code{--aoi},
+\code{--year}, \code{--month}, \code{--output-dir}, \code{--data-dir} and \code{--what}
+\src{mal-core/src/mal\_core/cli.py:198--206}. The switch \code{--what} selects which of the
+three builders runs; \code{all} is the default \src{mal-core/src/mal\_core/cli.py:196--239}.
+\item[Python.] The three builders are importable and independent
+\src{mal-core/src/mal\_core/ingest/\_\_init\_\_.py:1--10}. The only dependency between them is
+that the mobility builder reads the host grid the host builder wrote (\S\ref{sec:mobility}).
+\end{description}
+
+\subsection{Artefacts and their manifest keys}
+
+The identity of every artefact this stage produces is its manifest key. Those keys live in
+exactly one table, the ingest-artefact table (\code{INGEST\_ARTIFACTS}), which is the only new
+table in the dataset catalogue \src{mal-core/src/mal\_core/download/catalog.py:55--92}.
+
+\begin{center}
+\small
+\begin{longtable}{@{}llllr@{}}
+\toprule
+Manifest key & Producer & On-disk name & Format & Required for the engine \\
+\midrule
+\endhead
+\code{env} & \code{build\_env\_tensor} & \code{<aoi>\_regional\_<y0>\_<y1>\_env.nc} & NetCDF &
+yes \\ \code{habitat} & \code{build\_env\_tensor} & \code{<aoi>\_habitat\_patches.gpkg} &
+GeoPackage & yes \\ \code{host\_static} & \code{build\_host\_dataset} &
+\code{<aoi>\_host\_static.nc} & NetCDF & yes \\ \code{host\_manifest} &
+\code{build\_host\_dataset} & \code{host\_manifest.json} & JSON & no \\ \code{mobility\_day} &
+\code{build\_mobility\_dataset} & \code{<aoi>\_mobility\_day.csr} & CSR binary & yes \\
+\code{mobility\_night} & \code{build\_mobility\_dataset} & \code{<aoi>\_mobility\_night.csr} &
+CSR binary & yes \\ \code{livestock\_mobility} & \code{build\_mobility\_dataset} &
+\code{<aoi>\_livestock\_mobility.csr} & CSR binary & yes \\ \code{mobility\_manifest} &
+\code{build\_mobility\_dataset} & \code{mobility\_manifest.json} & JSON & no \\
+\bottomrule
+\end{longtable}
+\end{center}
+
+\smallskip \noindent The \emph{required for the engine} column is the catalogue's own
+declaration \src{mal-core/src/mal\_core/download/catalog.py:55--92}. It is worth noting that the
+\emph{manifest entry} written for the environment NetCDF and the habitat GeoPackage does
+\emph{not} carry that flag: those two registrations do not pass \code{required\_for\_abm}
+\src{mal-core/src/mal\_core/ingest/env.py:147--162},
+\src{mal-core/src/mal\_core/ingest/env.py:174--187}, and the manifest writer therefore stores
+the default \code{False} \src{mal-core/src/mal\_core/download/manifest.py:118--189}. The
+verified manifest for Ghana shows \code{required\_for\_abm: false} on both entries while the
+host grid and the mobility operators carry \code{true}. The completeness check the engine
+performs before it runs (\S\ref{sec:seam}) therefore does not police the environment artefacts
+on this flag.
+
+\subsection{Where the CLI puts things, and where the manifest says they are}
+
+The CLI's defaults for the three builders are not mutually consistent, and the inconsistency is
+observable rather than theoretical. The environment builder is called with the output directory
+serving as \emph{both} input directory and output directory, and with the data root taken as the
+parent of that directory \src{mal-core/src/mal\_core/cli.py:221--222}. The host builder is
+called with the output directory only \src{mal-core/src/mal\_core/cli.py:225}. The mobility
+builder is called with its output hard-wired to the conventional \code{data/<aoi>} directory
+\src{mal-core/src/mal\_core/cli.py:233}. Meanwhile the host builder registers its artefact with
+the default data root, not with the directory it wrote to
+\src{mal-core/src/mal\_core/ingest/hosts.py:219--240}.
+
+The consequence, stated as a described situation: an operator runs the documented command
+\code{malariasim ingest --aoi ghana --what env} with the default output directory. The
+environment builder looks for the manifest in its own output directory rather than in the AOI's
+data directory, and the build fails immediately with a missing-required-input error naming the
+download command that would fix it \src{mal-core/src/mal\_core/ingest/daily\_nc.py:186--190},
+\src{mal-core/src/mal\_core/download/catalog.py:176--268}. A run that does succeed can leave the
+NetCDF in one directory, the host grid in another, and the manifest entries naming files that
+are not where the manifest says they are --- which the completeness validator reports as missing
+\src{mal-core/src/mal\_core/download/manifest.py:192--245}.
+
+\section{The spatial frame} \label{sec:frame}
+
+\subsection{The area of interest is one of the frame's two owners}
+
+The artefacts this stage writes live on one grid, and that grid has two owners rather than one:
+the environment NetCDF's shape is inherited from the rainfall file the builder reads first, and
+only the habitat GeoPackage's shape comes from the area-of-interest record (both computations
+are set out below). The record is a bounding box, a coordinate reference system, a nominal
+ground resolution in metres, and a scale label
+\src{mal-commonlib/src/mal\_commonlib/aoi.py:64--95}. The registry that supplies those values
+for each slug is a single YAML file \src{mal-commonlib/src/mal\_commonlib/aois.yaml:16--23}; for
+the Ghana slug it declares a bounding box of $[-3.5, 4.5, 1.5, 11.5]$, a geographic CRS, a
+nominal resolution of 1000 metres, declared literally in the registry
+\src{mal-commonlib/src/mal\_commonlib/aois.yaml:20} (the same magnitude as
+\mskey{ingest.cell_size_hint_m}, but an independent literal: the AOI record never reads the
+constants file), and a regional scale. \mskey{ingest.cell_size_hint_m} is a different number
+with a different role --- the fallback cell size used when the rainfall NetCDF carries no
+\code{resolution\_m} attribute
+\src{mal-core/src/mal\_core/ingest/daily\_nc.py:243--247}.
+
+The grid size is derived, not declared: the metric extent of the bounding box is divided by the
+nominal resolution and rounded up to whole cells
+\src{mal-commonlib/src/mal\_commonlib/aoi.py:195--199}. The metric extent is itself an
+approximation --- degrees are converted to metres at the bounding-box centroid latitude
+\src{mal-commonlib/src/mal\_commonlib/aoi.py:154--171}. So the frame is defined in metres but
+\emph{written} in the CRS's own units, and for a geographic CRS those units are degrees.
+
+\subsection{Two owners of the grid shape}
+
+There are two computations of the grid height and width in this stage, and they must agree.
+
+\begin{enumerate}
+\item The environment NetCDF takes its shape from the file it reads first, the rainfall NetCDF:
+\code{n\_days, h, w = rainfall\_raw.shape} \src{mal-core/src/mal\_core/ingest/daily\_nc.py:203}.
+The rainfall file was written by the download stage, already reduced to the AOI grid. 
+\item The
+habitat GeoPackage takes its shape from the AOI record: \code{h, w = aoi.cells\_per\_side()}
+\src{mal-core/src/mal\_core/ingest/env.py:69}, and the static planes are re-read from the NetCDF
+with a shape assertion against that same \code{cells\_per\_side()}
+\src{mal-core/src/mal\_core/ingest/env.py:42--44}.
+\end{enumerate}
+
+The link between the two is that assertion: if the NetCDF's statics do not have the shape the
+AOI record implies, the GeoPackage build raises
+\src{mal-core/src/mal\_core/ingest/env.py:43--44}. Nothing, however, checks that the rainfall
+file the environment builder read was itself built on \emph{this} AOI's grid; the frame is thus
+owned jointly by the download stage and the AOI record, with only a shape check between them
+(\S\ref{sec:open} question 13).
+
+\subsection{What the coordinates in the environment NetCDF actually are}
+
+The NetCDF inherits the coordinate vectors of the rainfall file
+\src{mal-core/src/mal\_core/ingest/daily\_nc.py:200--201}. Whether those vectors carry real
+coordinates or merely cell indices depends on how the source file was written, and the stage
+does not decide.
+
+The builder adds CF-1.8 two-dimensional latitude and longitude variables and a grid-mapping
+variable only under a condition: that the median absolute spacing of both axes is a positive
+number of degrees below \mskey{ingest.grid_degrees_step_max}
+\src{mal-core/src/mal\_core/ingest/daily\_nc.py:467--494}. Verified on the real Ghana inputs,
+the rainfall file declares dimensions \code{y} and \code{x} with no coordinate variables, so the
+inherited axes are integer cell indices; the median spacing is therefore one cell, which does
+not satisfy the condition, and the latitude, longitude and \code{crs} variables are not written.
+The committed NetCDF \code{data/ghana/ghana\_regional\_2024\_2024\_env.nc} confirms this: its
+variables are the two daily channels, the five static planes, and the \code{time}, \code{y} and
+\code{x} coordinates, with no \code{lat}, \code{lon} or \code{crs} variable and no coordinate
+reference system of any kind. In other words, in the delivered artefact the environment NetCDF
+is a bare array; the geolocation is supplied to the engine separately, as the bounding box,
+resolution and scale of the AOI forwarded on the command line
+\src{mal-core/src/mal\_core/abm/wrapper.py:199--202}.
+
+\subsection{Cell area is an approximation, and the magnitude is stated}
+
+The engine needs the ground area of a cell to turn a dimensionless accuracy into an absolute
+capacity. Both the Python reference module and the C++ engine compute it with the same
+equirectangular approximation: the north--south side is taken to be exactly the nominal
+resolution, and the east--west side is that resolution times the cosine of the latitude
+\src{mal-core/src/mal\_core/habitat/capacity.py:39--46},
+\src{mal-core/src/mal\_core/abm/include/mal\_abm\_fast/habitat\_availability.hpp:188--194}. The
+engine applies it per grid row, at the row's centre latitude
+\src{mal-core/src/mal\_core/abm/src/coordinator.cpp:130--134}.
+
+This is an approximation and it is biased. The true area of a cell of the grid actually written
+--- a bounding box in degrees, cut into a whole number of cells --- differs from the
+approximation for two reasons: the cell count is rounded up, so the cell edges do not fall on
+whole kilometres; and the north--south extent of the written grid is a constant number of
+degrees rather than a constant number of metres. The code computes the approximation only: the
+size of the difference for the Ghana box was measured outside the codebase during the
+preparation of this document --- roughly eight tenths of a percent, with the approximation the
+smaller of the two --- and it is listed under ``Not verified, and not claimed''
+(\S\ref{sec:appendix}); it is not a fact this codebase asserts. Because both the Python module
+and the C++ engine use the same formula, the two mirrors agree with each other exactly; the
+discrepancy is a small systematic bias in every capacity number, proportional to cell area, not
+a disagreement between implementations.
+
+The Python module states the factor explicitly: edge cells clipped by the AOI bounding box are
+not area-corrected, and per-row accuracy is a documented sensitivity extension
+\src{mal-core/src/mal\_core/habitat/capacity.py:1--14}.
+
+\section{Inputs: what is required, what is optional, and how it is resolved}
+\label{sec:envinputs}
+
+\subsection{The environment path is manifest-only}
+
+The environment builder declares its entire dataset knowledge as a table of slots, each
+identified by a manifest key \src{mal-core/src/mal\_core/ingest/daily\_nc.py:87--98}. Resolution
+goes through the catalogue, which reads the AOI's manifest (\code{manifest.json}) and treats it
+as the single source of truth \src{mal-core/src/mal\_core/download/catalog.py:176--268}. There
+is no conventional-filename fallback inside the consumer: a dataset that was never registered
+does not exist as far as this stage is concerned
+\src{mal-core/src/mal\_core/download/manifest.py:58--68}.
+
+\begin{center}
+\small
+\begin{longtable}{@{}lll@{}}
+\toprule
+Slot & Manifest key & Requirement \\
+\midrule
+\endhead
+\code{rainfall} & \code{chirps\_rainfall\_daily} & required \\ \code{air\_temp} &
+\code{era5\_air\_temp\_daily} & required \\ \code{jrc\_features} & \code{jrc\_habitat\_features}
+& required \\ \code{wc\_fractions} & \code{dw\_class\_fractions} & required \\ \code{land\_mask}
+& \code{coastline\_land\_mask} & optional \\ \code{host\_static} & \code{host\_static} &
+optional \\ \code{salinity} & \code{smap\_salinity} & optional \\
+\bottomrule
+\end{longtable}
+\end{center}
+
+\smallskip \noindent A missing required slot is a hard error that names the download command
+that would produce it \src{mal-core/src/mal\_core/download/catalog.py:255--263}. A manifest
+entry that exists but whose file is missing on disk is also a hard error --- a stale manifest is
+never tolerated silently \src{mal-core/src/mal\_core/download/manifest.py:108--114}. A missing
+optional slot yields \code{None}, and the corresponding behaviour is skipped.
+
+\subsection{The declared \code{host\_static} slot is dead}
+
+The environment builder declares an optional dependency on the host grid
+\src{mal-core/src/mal\_core/ingest/daily\_nc.py:96}, and then never reads it: the resolved value
+is not referenced anywhere in the builder body
+\src{mal-core/src/mal\_core/ingest/daily\_nc.py:186--260}. Its only real consumer is the
+mobility builder, which reads the host grid as a file (\S\ref{sec:mobility}). The declaration is
+a dead dependency, recorded here rather than hidden (\S\ref{sec:open} question 12).
+
+\subsection{What each input is, natively, and what the reduction costs}
+
+The following table is the stage's input inventory. Native resolution and provider are
+properties of the download stage's loaders; the target resolution is always the AOI grid of
+\S\ref{sec:frame}.
+
+\begin{center}
+\small
+\begin{center}
+\small
+\begin{longtable}{@{}p{3.0cm}p{2.4cm}p{2.0cm}p{1.9cm}p{5.7cm}@{}}
+\toprule
+Input & Provider & Native & Target & Units; what the reduction loses \\
+\midrule
+\endhead
+\code{chirps\_rainfall\_daily} & CHIRPS v2.0 & $0.05^\circ$, daily & AOI grid
+  & mm/day. Nearest-neighbour reprojection
+\src{mal-commonlib/src/mal\_commonlib/data/loaders/chirps.py:230--242}. Loses the sub-cell
+structure of each day. \\ \code{era5\_air\_temp\_daily} & ERA5-Land & $0.1^\circ$, daily & AOI
+grid
+  & $\!{}^\circ$C daily mean 2\,m air temperature
+\src{mal-commonlib/src/mal\_commonlib/data/loaders/era5.py:107}. Loses the sub-cell gradient. \\
+\code{jrc\_habitat\_features} & JRC GSW v1.4 & 30\,m & AOI grid
+  & Fraction in $[0,1]$ of the cell's pixels with water occurrence at least
+80\,\%; the fraction, not the retired binary mask
+\src{mal-commonlib/src/mal\_commonlib/data/loaders/jrc\_gsw.py:7--12}. Loses the position of the
+water inside the cell. \\ \code{dw\_class\_fractions} & Dynamic World V1 & 10\,m, sampled 100\,m
+& AOI grid
+  & Four areal fractions in $[0,1]$: built, flooded vegetation, crops, and
+open-plus-water \src{mal-commonlib/src/mal\_commonlib/data/loaders/dynamic\_world.py:94--103};
+per year a modal label reduced to an areal fraction
+\src{mal-commonlib/src/mal\_commonlib/data/loaders/dynamic\_world.py:273--334}. Loses the
+arrangement of classes inside the cell. \\ \code{coastline\_land\_mask} & GSHHG full & polygon &
+AOI grid
+  & Land fraction in $[0,1]$ per cell
+\src{mal-commonlib/src/mal\_commonlib/data/loaders/coastline.py:1--40}. Loses the shape of the
+shoreline inside the cell. \\ \code{smap\_salinity} & SMAP RSS L3 & monthly & AOI grid, bilinear
+  & Practical salinity units; reprojected onto the environment grid by the
+ingest stage itself \src{mal-core/src/mal\_core/ingest/daily\_nc.py:550--578}. \\
+\bottomrule
+\end{longtable}
+\end{center}
+\end{center}
+
+\smallskip \noindent Two inputs are resampled by the ingest stage itself. The coastline
+GeoTIFF is read and resampled bilinearly when its shape differs from the environment grid
+\src{mal-core/src/mal\_core/ingest/daily\_nc.py:126--148}, and the monthly salinity field is
+reprojected onto the environment grid, one month at a time, with a bilinear resampling
+\src{mal-core/src/mal\_core/ingest/daily\_nc.py:550--578}. Everything else arrives already on
+the AOI grid.
+
+\subsection{The host and mobility path downloads} \label{sec:hostdownloads}
+
+The host builder does not go through the manifest. It calls the provider loaders directly:
+WorldPop population \src{mal-core/src/mal\_core/ingest/hosts.py:74}, GLW4 livestock
+\src{mal-core/src/mal\_core/ingest/hosts.py:92}, GHS-SMOD urban class
+\src{mal-core/src/mal\_core/ingest/hosts.py:111}, Overture building footprints
+\src{mal-core/src/mal\_core/ingest/hosts.py:146}, and the derived wildlife host proxy
+\src{mal-core/src/mal\_core/ingest/hosts.py:169}. Each of those loaders fetches from its
+provider when its cache is cold. So a ``run ingest'' on a machine with an empty cache performs
+network transfers on the host path, and performs none on the environment path. The retired
+specification's claim that ingest never downloads holds only for the environment path
+(\S\ref{sec:open} question 1).
+
+\section{The environment build: order of operations and its consequences} \label{sec:order}
+
+\subsection{The order, as pseudocode}
+
+\begin{verbatim}
+build_daily_env_nc(aoi, data_dir, output_dir):
+  resolve the four required slots and the three optional slots
+    through the manifest; a missing required slot is fatal
+
+  rain  <- open(rainfall file)          # (time, y, x); gives h, w and the time axis
+  fill the rainfall NoData per day from the nearest always-valid cell
+  clamp negative rainfall to zero
+
+  if a coastline file is available:
+      land_frac   <- read it, resampled to (h, w)
+      dist        <- distance to land, in metres
+      ocean_mask  <- (land_frac < sea_water_floor) AND (dist > coast_band_m)
+      set rainfall to zero on the ocean mask
+  else:
+      print a warning; the saltwater filter is skipped
+
+  temp <- open(air temperature file)
+  raise unless the temperature series covers every day of the rain axis
+  re-index the temperature onto the rain axis
+  set temperature to zero on the ocean mask
+
+  read the five static planes; average a multi-year stack over its year axis
+  zero all five static planes on the ocean mask
+  print the coastline census
+
+  H        <- static_potential(five planes)
+  H_total  <- total_potential(H)
+  census the cells whose H_total exceeds the ingest floor; raise if empty
+
+  if a salinity file is available:
+      reproject each month onto the grid; broadcast each month onto its days
+
+  assemble the dataset: 2 daily channels, 5 static planes, optional land_frac
+    and salinity_ppt; set the global attributes
+  add CF latitude/longitude/crs variables if the axes are a degree grid
+  write the NetCDF
+
+  (in build_env_tensor) re-read the static planes out of the NetCDF that was
+    just written, derive the habitat GeoPackage from them, register both
+    artefacts in the manifest
+\end{verbatim}
+
+\subsection{The order as a table}
+
+\begin{center}
+\small
+\begin{longtable}{@{}p{0.6cm}p{4.4cm}p{3.4cm}p{5.4cm}@{}}
+\toprule
+\# & Step & Actor & Why here \\
+\midrule
+\endhead
+1 & resolve slots & ingest & every later step needs a path; the manifest is the only identity \\
+2 & read rainfall & ingest & fixes the time axis, the day count and the grid shape \\ 3 & fill
+rainfall NoData & ingest & must precede the ocean mask, which reads the same array \\ 4 &
+coastline and open-sea mask & ingest & needed before the statics are zeroed and before
+temperature is masked \\ 5 & read and re-index temperature & ingest & the rain axis is already
+fixed, so the coverage check is possible \\ 6 & mask temperature on the ocean & ingest & follows
+the mask's construction \\ 7 & assemble the static planes & ingest & the multi-year average must
+precede the mask application \\ 8 & zero the statics on the ocean & ingest & the mask exists;
+the statics are the last thing touched \\ 9 & censuses & ingest & an auditable record of what
+the mask did \\ 10 & compute $H$ and the candidate census & ingest & needs the final statics \\
+11 & salinity broadcast & ingest & after the mask, so the broadcast is a value on the final grid
+\\ 12 & assemble, georeference, write & ingest & one write; the file is the contract \\ 13 &
+derive the GeoPackage & ingest & from the file just written, so the two cannot disagree \\
+\bottomrule
+\end{longtable}
+\end{center}
+
+\subsection{Consequences worth stating}
+
+\begin{enumerate}
+\item \textbf{The rainfall axis owns the time axis.} The temperature series is re-indexed onto
+it, so the environment NetCDF's days are exactly the rainfall file's days, and a temperature
+file that does not cover them is a loud failure rather than a silent broadcast
+\src{mal-core/src/mal\_core/ingest/daily\_nc.py:262--284}. The retired path, in which an annual
+temperature raster was broadcast across every day, no longer exists
+\src{mal-core/src/mal\_core/ingest/daily\_nc.py:257--261}. 
+\item \textbf{The absence of the
+coastline artefact degrades the build instead of failing it.} The saltwater filter is skipped
+with a printed note, and the static planes keep their open-ocean cells
+\src{mal-core/src/mal\_core/ingest/daily\_nc.py:357--362}. The stated purpose of that filter is
+precisely to stop open-ocean cells from becoming breeding candidates
+\src{mal-core/src/mal\_core/ingest/daily\_nc.py:327--339} (\S\ref{sec:open} question 11). 
+\item
+\textbf{The GeoPackage cannot disagree with the NetCDF's statics.} The GeoPackage is derived by
+re-reading the static planes out of the NetCDF that was written first
+\src{mal-core/src/mal\_core/ingest/env.py:143--173}. The consequence runs the other way too: the
+GeoPackage's candidate set is computed from the already-filtered statics, so it inherits the
+ocean mask. 
+\item \textbf{Order of the two censuses.} The coastline census is printed before the
+candidate census \src{mal-core/src/mal\_core/ingest/daily\_nc.py:364--387}, so a reader of the
+log sees how many cells the mask removed before seeing how many candidates survived.
+\end{enumerate}
+
+\section{The two daily channels} \label{sec:channels}
+
+\subsection{Rainfall: units, donor fill, and the assumption behind it}
+
+The rainfall channel is CHIRPS v2.0 daily precipitation, in millimetres per day
+\src{mal-core/src/mal\_core/ingest/daily\_nc.py:406--408}. Its NoData handling is a spatial
+donor fill, applied per day.
+
+A cell is \emph{eligible} to donate when its fraction of NoData days over the whole series is
+below \mskey{ingest.fill_frac_valid_max}
+\src{mal-core/src/mal\_core/ingest/daily\_nc.py:209--212}. For every day, each NoData pixel is
+replaced by the value of the spatially nearest eligible cell, found by a Euclidean distance
+transform over the eligible mask \src{mal-core/src/mal\_core/ingest/daily\_nc.py:213--220}. If
+no cell is eligible at all, the NoData becomes zero
+\src{mal-core/src/mal\_core/ingest/daily\_nc.py:221--222}. Negative precipitation, which some
+gauge products report, is clamped to zero \src{mal-core/src/mal\_core/ingest/daily\_nc.py:223}.
+
+The assumption the code makes and does not test is that the nearest eligible cell is a plausible
+donor for that day. The choice is a \emph{choice}: a temporal interpolation would have been the
+alternative. The stage does not record which cells were filled beyond a count in the build
+summary \src{mal-core/src/mal\_core/ingest/daily\_nc.py:504--514}.
+
+\subsection{Air temperature: units, coverage, and the zero sentinel}
+
+The temperature channel is the ERA5-Land daily mean 2\,m air temperature, in degrees Celsius
+\src{mal-core/src/mal\_core/ingest/daily\_nc.py:409--411}. The name of the channel says what it
+measures: the retired annual \code{water\_temp\_c} stack is not read
+\src{mal-core/src/mal\_core/ingest/daily\_nc.py:8--11}.
+
+The series must contain every day of the rainfall axis. The check is explicit, the error message
+names the first absent day, and the remedy names the download command
+\src{mal-core/src/mal\_core/ingest/daily\_nc.py:270--278}. The re-indexing is done by an
+explicit day lookup rather than by positional slicing, so a non-contiguous or misaligned
+temperature axis does not silently shift the series
+\src{mal-core/src/mal\_core/ingest/daily\_nc.py:279--284}.
+
+Open-sea cells receive a temperature of exactly zero, not a missing value, and the reason is
+recorded in the code: zero is the convention the engine's climate layer and the renderer already
+understand, whereas a missing value would be imputed from neighbouring land cells at load time
+and would quietly turn sea pixels into plausible land temperatures
+\src{mal-core/src/mal\_core/ingest/daily\_nc.py:285--293}. The engine's reader converts the
+sentinel to a genuine missing value on load
+\src{mal-core/src/mal\_core/abm/src/env\_reader.cpp:207--216}, and the climate layer then
+imputes it once, across every day \src{mal-core/src/mal\_core/abm/src/climate.cpp:167--177}. The
+two behaviours are complementary: the \emph{builder} writes a zero, and the \emph{reader}
+refuses to treat a large negative value as a temperature.
+
+\subsection{The time span, and why the whole series is kept}
+
+The NetCDF covers the whole daily series available at build time, not only the simulated window,
+and the file name carries the first and last year of the rainfall axis
+\src{mal-core/src/mal\_core/ingest/daily\_nc.py:465--466}. The justification is stated in the
+module's own preamble: the days before the simulation start are the causal warm-up window over
+which the engine integrates the pluvial state
+\src{mal-core/src/mal\_core/ingest/daily\_nc.py:33--40}. The engine performs that integration
+over the bands that precede the simulation start
+\src{mal-core/src/mal\_core/abm/src/coordinator.cpp:73--90}. A consequence follows: the number
+of days in the file is an input to the warm-up, and truncating the file would change the initial
+state of every cell.
+
+\section{The static planes, the coastal band, and the ocean mask} \label{sec:statics}
+
+\subsection{How the static planes are assembled}
+
+Five static planes are read: the permanent-water fraction from the JRC product, and four
+land-cover areal fractions from Dynamic World
+\src{mal-core/src/mal\_core/ingest/daily\_nc.py:317--325}. A plane that is missing from its file
+raises an error listing the variables actually present
+\src{mal-core/src/mal\_core/ingest/daily\_nc.py:300--304}; a plane whose shape is not the
+environment grid raises as well \src{mal-core/src/mal\_core/ingest/daily\_nc.py:310--313}.
+
+A three-dimensional variable is a multi-year stack, and it is averaged over its year axis into a
+single plane \src{mal-core/src/mal\_core/ingest/daily\_nc.py:305--309}. The Dynamic World loader
+writes one frame per year, each being that year's modal-label composite reduced to areal
+fractions \src{mal-commonlib/src/mal\_commonlib/data/loaders/dynamic\_world.py:336--409}; the
+ingest builder averages those per-year planes. The consequence is that a multi-year run's static
+potential is the mean of the years' fractions, not the fraction of the modal year --- a
+deliberate smoothing, and a named choice rather than a default.
+
+NaN in a static plane becomes zero \src{mal-core/src/mal\_core/ingest/daily\_nc.py:314}. The
+rationale is recorded in the habitat module: absence of land-cover evidence is not a wet signal
+\src{mal-core/src/mal\_core/habitat/potential.py:31--34}.
+
+\subsection{The open-sea rule, stated as a formula}
+
+A cell is open sea when it is water by land fraction \emph{and} farther than the coastal band
+from land:
+
+\begin{equation}
+\text{open sea}(i) \;\iff\; \text{land\_frac}(i) < \text{sea\_water\_floor} \;\wedge\;
+\text{dist\_to\_land}(i) > \text{coast\_band\_m}
+\end{equation}
+
+\noindent with \text{sea\_water\_floor} $= \mskey{ingest.sea_water_floor}$ and
+\text{coast\_band\_m} $= \mskey{ingest.coastline_buffer_m}$ metres by default
+\src{mal-core/src/mal\_core/ingest/daily\_nc.py:57--69}. The equation is the rule for a
+\emph{positive} band; the zero band is a different branch of the loader's \code{sea\_mask} and
+is stated below. The band is a \emph{distance query},
+not a mask dilation: the code records that a former dilation moved the coast kilometres inland
+\src{mal-core/src/mal\_core/ingest/daily\_nc.py:64--67}. The band width can be overridden for an
+experiment through an environment variable, and a negative value disables the filter altogether
+\src{mal-core/src/mal\_core/ingest/daily\_nc.py:240--250}.
+
+A band of zero is not the equation above read with \text{coast\_band\_m} $= 0$: the loader
+returns the water-only mask when the band is zero or negative, so only the land fraction
+decides \src{mal-commonlib/src/mal\_commonlib/data/loaders/coastline.py:292--294}. A
+\emph{negative} band disables the filter outright instead, because the builder then computes no
+mask at all \src{mal-core/src/mal\_core/ingest/daily\_nc.py:249--253}: the rainfall, the
+temperature and the five static planes keep their open-ocean values.
+
+\subsection{What the rule does, and why}
+
+On open sea, the stage sets the rainfall to zero, the temperature to zero, and \emph{all five}
+static planes to zero \src{mal-core/src/mal\_core/ingest/daily\_nc.py:252--253},
+\src{mal-core/src/mal\_core/ingest/daily\_nc.py:291--293},
+\src{mal-core/src/mal\_core/ingest/daily\_nc.py:340--347}. The reason is recorded at the point
+of the code that does it: Dynamic World reports its water class at one over the ocean, so
+without the filter every ocean cell would carry a positive total potential and would enter the
+candidate set \src{mal-core/src/mal\_core/ingest/daily\_nc.py:327--339}.
+
+The coastal band keeps its statics. Lagoons, estuaries and river mouths are real breeding
+habitat for these species, and the band is where the satellite imagery shows the shallow plume
+\src{mal-core/src/mal\_core/ingest/daily\_nc.py:330--332}. So the choice is a named one: a
+distance threshold on the open-ocean class, with the near-shore band deliberately retained.
+
+\subsection{The censuses, and what they make auditable}
+
+Two one-line censuses are printed. The saltwater filter line reports the before and after sums
+of the permanent-water plane and of the open-plus-water plane, together with the number of cells
+kept \src{mal-core/src/mal\_core/ingest/daily\_nc.py:349--356}. The coastline census reports the
+number of cells that are land (more than half land), mixed, coastal water, and open sea
+\src{mal-core/src/mal\_core/ingest/daily\_nc.py:364--374}. Together they let a reader confirm,
+from the log alone, what the mask did.
+
+\subsection{The optional salinity channel}
+
+When the salinity slot resolves, a monthly sea-surface-salinity field is reprojected onto the
+environment grid and each month is copied onto every day of that month
+\src{mal-core/src/mal\_core/ingest/daily\_nc.py:389--401}. Land and no-data cells stay missing
+in the source and become zero, the freshwater value
+\src{mal-core/src/mal\_core/ingest/daily\_nc.py:550--557},
+\src{mal-core/src/mal\_core/ingest/daily\_nc.py:401}. The variable is written with units of
+practical salinity units \src{mal-core/src/mal\_core/ingest/daily\_nc.py:452--457}.
+
+The channel is optional in the contract in both directions: its absence is normal, and the
+engine reads an environment NetCDF without it as ``no salinity data'' and treats the cells as
+freshwater \src{mal-core/src/mal\_core/abm/src/env\_reader.cpp:254--272}. When it is present it
+acts as a hard gate: a patch whose salinity reaches the species' high tolerance cannot breed,
+regardless of its accuracy \src{mal-core/src/mal\_core/abm/src/coordinator.cpp:221--225}.
+
+\section{The habitat model} \label{sec:habitat}
+
+\subsection{Six habitat types, two temporal classes}
+
+The habitat types are frozen in the shared constants file, together with the temporal class of
+each \src{mal-core/config/model\_constants.yaml:12--21}. The ordered list is
+\mskey{habitat_types.types}, and the temporal class of each is a named constant:
+\mskey{habitat_types.dynamics.surface_persistent},
+\mskey{habitat_types.dynamics.wetland_persistent} and
+\mskey{habitat_types.dynamics.urban_persistent} are
+\mskey{habitat_types.dynamics.surface_persistent}-class persistent habitats;
+\mskey{habitat_types.dynamics.wetland_pluvial}, \mskey{habitat_types.dynamics.open_pluvial} and
+\mskey{habitat_types.dynamics.crop_pluvial} are pluvial.
+
+The validator enforces two invariants on this list. The dynamics keys must be exactly the type
+list \src{mal-core/src/mal\_core/config\_validation.py:379--382}, and every species' affinity
+row must carry a weight for exactly those types and sum to one
+\src{mal-core/src/mal\_core/config\_validation.py:395--416}. A third invariant is specific: the
+\code{wetland\_pluvial} weight must be zero in every row, because the engine has no zone for
+that type and a non-zero weight would be silently dropped on the C++ side
+\src{mal-core/src/mal\_core/config\_validation.py:417--423}.
+
+\subsection{The static potential $H[i,g]$}
+
+The static potential is a pure function of the five feature planes, computed in one place
+\src{mal-core/src/mal\_core/habitat/potential.py:50--80}. Writing $P$ for the permanent-water
+fraction, $V$ for the flooded-vegetation fraction, $U$ for the built fraction, $O$ for the
+open-plus-water fraction and $C$ for the crop fraction, the six values are
+
+\begin{align}
+H_{\text{surface\_persistent}} &= P, & H_{\text{wetland\_persistent}} &= V, &
+H_{\text{urban\_persistent}} &= \beta_{\text{urban}}\, U, \\ H_{\text{wetland\_pluvial}} &= V, &
+H_{\text{open\_pluvial}} &= O + \delta_{\text{built}}\, U, & H_{\text{crop\_pluvial}} &= C,
+\end{align}
+
+\noindent where $\beta_{\text{urban}} = \mskey{urban.beta_urban}$ and $\delta_{\text{built}} =
+\mskey{urban.rain_pools_built_damage}$ \src{mal-core/src/mal\_core/habitat/potential.py:44--49}.
+Every value is clipped to $[0,1]$, and a missing feature is an error rather than a zero
+\src{mal-core/src/mal\_core/habitat/potential.py:96--103}. The total is the sum of the six,
+clipped again to $[0,1]$ \src{mal-core/src/mal\_core/habitat/potential.py:82--90}.
+
+Two design decisions are recorded in the module's own preamble and are worth repeating. The
+urban persistent contribution is not gated by the permanent-water fraction or by rainfall: a
+cell with built cover and no recorded water keeps a small persistent offer through the dry
+season \src{mal-core/src/mal\_core/habitat/potential.py:29--31}. And there is no weighting
+matrix: the earlier linear-weight design was dropped, and resurrecting it would require a new
+decision \src{mal-core/src/mal\_core/habitat/potential.py:34--36}.
+
+\subsection{What the numbers are not} \label{sec:hnot}
+
+$H$ is an \emph{index of relative offer} in $[0,1]$. It is not a measured pool count, not a
+water depth, not a water volume, and not a probability that a given cell contains a given number
+of larvae. The habitat module says so in its own preamble
+\src{mal-core/src/mal\_core/habitat/potential.py:6--12}, and the contract table repeats it. The
+consequences for a reader are:
+
+\begin{itemize}
+\item $H$ is dimensionless and has no units. It can be compared between cells of the same grid
+and between runs of the same AOI; it cannot be read as ``this cell has this much water''. 
+\item
+The total is a \emph{sum over types}, so it is only meaningful as an index of overall offer. It
+is used as such: as the candidate filter and as the oviposition-attraction amplitude. 
+\item The
+urban and open-pluvial contributions are scaled by two engineering constants, so the index is a
+construct, not a measurement. Their provenance is declared in \S\ref{sec:provenance}.
+\end{itemize}
+
+\subsection{The two temporal responses are computed by the engine, not here} \label{sec:dynamic}
+
+The habitat model has two shared temporal responses $A[i,k,t]$, indexed by the temporal class
+$k$ of the habitat type:
+
+\begin{itemize}
+\item \textbf{persistent}: $A$ is the constant \mskey{capacity.persistent_availability} on every
+day \src{mal-core/src/mal\_core/habitat/availability.py:5--9}. The persistent offer is
+deliberately insensitive to drought; that is a documented minimum-viable-product limitation, not
+an oversight \src{mal-core/src/mal\_core/habitat/availability.py:5--9}. 
+\item \textbf{pluvial}:
+$A$ is a state $z[i,t] \in [0,1]$ integrated day by day from the rainfall channel this stage
+writes,
+    \begin{equation}
+z_{\text{dry}} = z \,\exp\!\left(-\Delta t / \tau_{\text{dry}}\right), \qquad z = z_{\text{dry}}
++ (1 - z_{\text{dry}})\bigl(1 - \exp(-r / r_{\text{scale}})\bigr),
+    \end{equation}
+with $\tau_{\text{dry}} = \mskey{pluvial.dry_memory_days}$, $r_{\text{scale}} =
+\mskey{pluvial.rain_scale_mm}$ and $\Delta t = \mskey{pluvial.delta_days}$
+\src{mal-core/src/mal\_core/habitat/availability.py:38--56}. The C++ mirror is the same
+recursion
+\src{mal-core/src/mal\_core/abm/include/mal\_abm\_fast/habitat\_availability.hpp:98--113}, and
+the engine calls it once per cell per day
+\src{mal-core/src/mal\_core/abm/src/coordinator.cpp:119--125}.
+\end{itemize}
+
+The Python availability module is a reference mirror, and it has \emph{no production consumer
+at all}: the only modules that import it are two test modules
+\src{mal-core/tests/test\_scoring\_pools.py:25},
+\src{mal-core/tests/test\_habitat\_python\_contract.py:19--25}. The calibration scorer that
+exercises the pluvial recursion does not import it either --- it imports the capacity module
+and re-implements the $z$ step in place
+\src{mal-core/src/mal\_core/scoring/scorers/d19\_pool\_persistence.py:23--24},
+\src{mal-core/src/mal\_core/scoring/scorers/d19\_pool\_persistence.py:66--72}. The live
+integration is the C++ code in the coordinator
+\src{mal-core/src/mal\_core/habitat/availability.py:1--30}. The consequence for this document is
+worth stating plainly: \emph{the ingest stage writes the forcing for $A$; it does not write $A$
+itself}.
+
+\subsection{$S$ and $K$ are computed by the engine, not here}
+
+The daily accuracy and the daily capacity are engine quantities:
+
+\begin{equation}
+S[i,s,t] = \operatorname{clip}\Bigl(\sum_g w[s,g]\, H[i,g]\, A[i,k(g),t],\; 0,\; 1\Bigr), \qquad
+K[i,s,t] = k_{\text{ref}} \cdot \text{cell\_area\_km}^2[i] \cdot \max(0, S[i,s,t]).
+\end{equation}
+
+\noindent The engine computes them per cell per day
+\src{mal-core/src/mal\_core/abm/src/coordinator.cpp:129--149},
+\src{mal-core/src/mal\_core/abm/include/mal\_abm\_fast/habitat\_availability.hpp:159--185}, with
+$k_{\text{ref}} = \mskey{species.k_ref}$, an absolute per-cell capacity in individuals per day
+per square kilometre \src{mal-core/config/model\_constants.yaml:47--52}.
+
+The Python reference module computes $S$ and $K$ for the scorer path with a \emph{different}
+capacity constant, a diagnostic one, explicitly documented as not being the engine's
+\src{mal-core/src/mal\_core/habitat/capacity.py:26--30}. The two are different concepts and must
+not be read as one number; the tombstone module that used to hold shared constants repeats the
+distinction \src{mal-core/src/mal\_core/habitat/constants.py:1--16}. The reader who wants the
+capacity that the simulation actually uses should take $k_{\text{ref}} = \mskey{species.k_ref}$
+and the formula above (\S\ref{sec:open} question 9).
+
+\subsection{The Python and C++ potentials do not compute the same set}
+
+The two implementations agree on the five living values but not on the \emph{set} of types.
+
+\begin{itemize}
+\item Python produces six habitat types, including \code{wetland\_pluvial}, whose value is the
+flooded-vegetation fraction again \src{mal-core/src/mal\_core/habitat/potential.py:71--79}. Its
+total therefore adds the flooded-vegetation fraction a second time. 
+\item The engine produces
+six \emph{zones}, one of which is a permanently zero forest zone, and has no
+\code{wetland\_pluvial} zone at all
+\src{mal-core/src/mal\_core/abm/include/mal\_abm\_fast/habitat\_availability.hpp:56--85},
+\src{mal-core/src/mal\_core/abm/include/mal\_abm\_fast/zone\_id.hpp:13--21}. Its total does not
+include the second flooded-vegetation term
+\src{mal-core/src/mal\_core/abm/include/mal\_abm\_fast/habitat\_availability.hpp:87--96}.
+\end{itemize}
+
+The consequence is a bounded but real difference between the two totals: the Python total
+exceeds the engine's by at most the flooded-vegetation fraction, which is at most one. The
+quantity $S$ is unaffected, because the \code{wetland\_pluvial} affinity is zero in every
+species row and the validator enforces it
+\src{mal-core/src/mal\_core/config\_validation.py:417--423}. What is affected is the amplitude
+written into the GeoPackage and the count printed by the ingest census --- both of which use the
+Python total (\S\ref{sec:open} question 2).
+
+\subsection{Three candidate floors, with three different roles}
+
+\begin{center}
+\small
+\begin{longtable}{@{}p{3.3cm}p{2.4cm}p{8.0cm}@{}}
+\toprule
+Floor & Value & Role \\
+\midrule
+\endhead
+Ingest census & \mskey{ingest.candidate_min_ingest}
+  & The threshold above which a cell is counted as a candidate in the
+environment build; an empty count is a hard error
+\src{mal-core/src/mal\_core/ingest/daily\_nc.py:376--387}. \\ GeoPackage membership & $0$
+  & The threshold above which a cell is written into the GeoPackage as a
+point feature \src{mal-core/src/mal\_core/ingest/env.py:70}. \\ Engine floor &
+\mskey{habitat.candidate_min_engine}
+  & The threshold below which the engine drops a patch from the GeoPackage,
+and the threshold at which the engine admits a cell into its own candidate union
+\src{mal-core/src/mal\_core/abm/src/habitat\_engine.cpp:214--219},
+\src{mal-core/src/mal\_core/abm/src/coordinator.cpp:169--175}. \\
+\bottomrule
+\end{longtable}
+\end{center}
+
+\smallskip \noindent The constants file states that the ingest floor and the engine floor have
+different roles and are deliberately not mirrors of each other
+\src{mal-core/config/model\_constants.yaml:151--153}. The three thresholds are therefore not
+three copies of one number, and a reader comparing the ingest census with the engine's candidate
+count must not expect them to agree (\S\ref{sec:open} question 10).
+
+\section{The habitat GeoPackage, field by field} \label{sec:gpkg}
+
+\subsection{What is written}
+
+The GeoPackage holds one Point feature per candidate cell, positioned at the cell centre in the
+AOI's coordinate reference system \src{mal-core/src/mal\_core/ingest/env.py:69--73},
+\src{mal-core/src/mal\_core/ingest/env.py:99--103}. The columns are:
+
+\begin{center}
+\small
+\begin{longtable}{@{}p{3.5cm}p{9.4cm}@{}}
+\toprule
+Column & Meaning \\
+\midrule
+\endhead
+\code{hab\_type} & The dominant habitat type: the argument maximum of the six potential values
+at that cell \src{mal-core/src/mal\_core/ingest/env.py:81--85}. \\ \code{dynamics} & The
+temporal class of that dominant type, written as the string \code{persistent} or \code{pluvial}
+\src{mal-core/src/mal\_core/ingest/env.py:86--90}. \\ \code{habitat\_potential} & The clipped
+total potential of the cell, the amplitude used for oviposition attraction
+\src{mal-core/src/mal\_core/ingest/env.py:91}. \\ \code{row}, \code{col} & The grid identity of
+the cell, the pair the engine indexes by \src{mal-core/src/mal\_core/ingest/env.py:92--93}. \\
+\code{aoi\_slug} & The slug of the area the file belongs to
+\src{mal-core/src/mal\_core/ingest/env.py:94}. \\ \code{hab\_<type>} & One column per habitat
+type, carrying that type's per-cell potential \src{mal-core/src/mal\_core/ingest/env.py:96--97}.
+\\
+\end{longtable}
+\end{center}
+
+\smallskip \noindent There are deliberately no empty beacon columns: the retired
+\code{twi\_value} and \code{urban\_capacity\_factor} columns are gone
+\src{mal-core/src/mal\_core/ingest/env.py:60--62}.
+
+\subsection{What the engine actually reads}
+
+The engine resolves the fields \code{hab\_type}, \code{habitat\_potential}, \code{dynamics},
+\code{row} and \code{col} \src{mal-core/src/mal\_core/abm/src/habitat\_engine.cpp:165--171}. It
+accepts any feature regardless of \code{hab\_type} --- viability is decided on potential, not on
+the label \src{mal-core/src/mal\_core/abm/src/habitat\_engine.cpp:190--192}. It does \emph{not}
+read the \code{hab\_<type>} columns: it recomputes the potential from the environment NetCDF's
+static planes \src{mal-core/src/mal\_core/abm/src/climate.cpp:196--215},
+\src{mal-core/src/mal\_core/abm/include/mal\_abm\_fast/habitat\_availability.hpp:56--85}. The
+Python-side potential in the GeoPackage and the C++-side potential are therefore two
+implementations of the same idea, differing as described in \S\ref{sec:habitat}. The module
+preamble's claim that the C++ parser requires the H columns
+\src{mal-core/src/mal\_core/ingest/env.py:60--62} is contradicted by the reader, and the reader
+wins.
+
+\subsection{Verified on the delivered Ghana file}
+
+Reading \code{data/ghana/ghana\_habitat\_patches.gpkg} with a geospatial reader gives 382\,127
+Point features on the 779 by 551 Ghana grid --- 89\,\% of the cells. The \code{hab\_type}
+distribution is \code{open\_pluvial} 326\,608, \code{urban\_persistent} 26\,696,
+\code{surface\_persistent} 15\,069, \code{crop\_pluvial} 13\,316 and \code{wetland\_persistent}
+438; the \code{dynamics} column splits 339\,924 \code{pluvial} and 42\,203 \code{persistent}.
+The amplitude ranges from $3\times10^{-6}$ to one, with a median near 0.725. The count agrees
+with the \code{n\_candidate\_cells} attribute of the environment NetCDF, so the census and the
+GeoPackage agree in that run.
+
+The dominance of \code{open\_pluvial} is a direct consequence of the Dynamic World mapping: the
+open-plus-water plane includes the water class, so nearly every non-ocean cell carries some
+open-pluvial potential.
+
+\subsection{The delivered file was produced by the pre-fix implementation}
+
+The delivered artefacts do not satisfy the open-sea rule this document describes, because they
+were produced by an earlier implementation of the builder. The delivered environment NetCDF
+carries no \code{land\_frac} plane, although the builder writes one whenever the coastline
+slot resolves \src{mal-core/src/mal\_core/ingest/daily\_nc.py:443--447}; and the stored
+coastline artefact \code{data/ghana/ghana\_land\_mask.tif} is a binary $\{0,1\}$ mask, whereas
+the current loader returns a per-cell land fraction
+\src{mal-commonlib/src/mal\_commonlib/data/loaders/coastline.py:297--330}. Applying the
+current rule to the stored statics marks 45\,674 cells open sea, all of them present in the
+GeoPackage, and would reduce the candidate count from 382\,127 to 336\,453. The feature count,
+the type distribution and the amplitudes verified above are therefore that earlier
+implementation's, not the current builder's (\S\ref{sec:open} question 19).
+
+\subsection{Two disclosed defects}
+
+\begin{description}
+\item[No version on the file.] The GeoPackage carries neither a contract version nor a generator
+version. The writer writes no metadata \src{mal-core/src/mal\_core/ingest/env.py:99--105}, and
+the delivered file has no \code{gpkg\_metadata} table at all. Only the environment NetCDF is
+versioned (\S\ref{sec:envnc}). A reader of the GeoPackage has no way to tell which mapping
+produced it (\S\ref{sec:open} question 3). 
+\item[The \code{dynamics} column is a string and is
+read as an integer.] The writer emits \code{persistent} or \code{pluvial}
+\src{mal-core/src/mal\_core/ingest/env.py:86--90}; the reader fetches the field with an integer
+accessor \src{mal-core/src/mal\_core/abm/src/habitat\_engine.cpp:220}, which on a string field
+yields zero. The engine's per-patch dynamics flag is therefore always zero, including for
+pluvial patches. The field is diagnostic only, so the simulation is unaffected and the
+diagnostic is wrong (\S\ref{sec:open} question 4).
+\end{description}
+
+\section{The environment NetCDF contract} \label{sec:envnc}
+
+\subsection{Variables, dimensions, attributes, encoding}
+
+\begin{center}
+\small
+\begin{longtable}{@{}p{3.4cm}p{2.6cm}p{2.4cm}p{8.0cm}@{}}
+\toprule
+Variable & Dimensions & Units & Role \\
+\midrule
+\endhead
+\code{rainfall} & (time, y, x) & mm/day & The daily precipitation forcing \\ \code{air\_temp\_c}
+& (time, y, x) & degC & The daily thermal forcing \\ \code{jrc\_persistent} & (y, x) & 1 &
+Permanent-surface-water fraction \\ \code{lc\_built} & (y, x) & 1 & Built areal fraction \\
+\code{lc\_wetland} & (y, x) & 1 & Flooded-vegetation areal fraction \\
+\code{lc\_open\_plus\_water} & (y, x) & 1 & Open-plus-water areal fraction \\ \code{lc\_crop} &
+(y, x) & 1 & Crop areal fraction \\ \code{land\_frac} & (y, x) & 1 & Optional display basemap;
+not part of the habitat feature bundle \\ \code{salinity\_ppt} & (time, y, x) & psu & Optional
+monthly-broadcast salinity \\
+\end{longtable}
+\end{center}
+
+\smallskip \noindent The five static planes are two-dimensional and are never broadcast onto the
+time axis; the two daily channels never enter the static planes
+\src{mal-core/src/mal\_core/ingest/daily\_nc.py:404--431}. The global attributes are the
+conventions string, the title, the AOI slug, the scale, the contract version, the generator
+version and the candidate count \src{mal-core/src/mal\_core/ingest/daily\_nc.py:433--441}. Every
+variable is written as 32-bit float with deflate compression at the configured level
+\src{mal-core/src/mal\_core/ingest/daily\_nc.py:459--463}.
+
+\subsection{The contract version}
+
+The contract version is the generated constant \mskey{contracts.env_nc}, read from the shared
+constants file \src{mal-core/src/mal\_core/ingest/daily\_nc.py:53} and written into the
+attribute \src{mal-core/src/mal\_core/ingest/daily\_nc.py:438}. The validator requires the value
+to have the form \emph{major.minor} \src{mal-core/src/mal\_core/config\_validation.py:368--373}.
+The state contract, \mskey{contracts.cogs_state}, is a different contract belonging to the
+simulation stage and is not written by this stage.
+
+The generator version is \emph{not} generated. It is a literal string in the builder
+\src{mal-core/src/mal\_core/ingest/daily\_nc.py:439} and has no key in the constants file. This
+document therefore quotes it as a reading of the code rather than through the normal mechanism
+(\S\ref{sec:open} question 8).
+
+\subsection{NoData convention}
+
+The pipeline-wide NoData sentinel is \mskey{ingest.nodata_sentinel}
+\src{mal-core/src/mal\_core/ingest/daily\_nc.py:55}. The environment NetCDF does not write an
+explicit fill value: the encoding block sets the data type and the compression only
+\src{mal-core/src/mal\_core/ingest/daily\_nc.py:459--463}, and what lands in the file is the
+writer's default NaN fill for 32-bit floats. The delivered Ghana file confirms it: every
+variable carries \code{\_FillValue = NaNf}. The sentinel is used \emph{during} the build, to
+detect rainfall NoData \src{mal-core/src/mal\_core/ingest/daily\_nc.py:209}, and is not stored.
+
+\subsection{Verified on the delivered Ghana file}
+
+The file \code{data/ghana/ghana\_regional\_2024\_2024\_env.nc} has the two daily channels with
+shape 366 by 779 by 551 in 32-bit float, the five static planes with shape 779 by 551 in 32-bit
+float, and exactly these global attributes: \code{Conventions: CF-1.8}, a title,
+\code{aoi\_slug: ghana}, \code{scale: regional}, \code{contract\_version: 3.0},
+\code{generator\_version: proxy-habitat-v1-0.1.0} and \code{n\_candidate\_cells: 382127}. It
+carries no \code{land\_frac} plane and no \code{salinity\_ppt} plane, and no coordinate
+reference system (\S\ref{sec:frame}). The absence of the \code{land\_frac} plane is not a
+property of the file's contents that the builder would choose: the builder writes that plane
+whenever the coastline slot resolves
+\src{mal-core/src/mal\_core/ingest/daily\_nc.py:443--447}. Its absence shows that the
+delivered file was produced by the pre-fix implementation, together with the habitat
+GeoPackage (\S\ref{sec:gpkg}, \S\ref{sec:open} question 18).
+
+\section{Hosts, buildings and the wildlife proxy} \label{sec:hosts}
+
+\subsection{The nine planes}
+
+The host grid is a two-dimensional NetCDF on the same AOI grid, with one plane per host layer
+\src{mal-core/src/mal\_core/ingest/hosts.py:186--213}. The layers are: human population; five
+livestock species --- cattle, goats, sheep, pigs and chickens
+\src{mal-core/src/mal\_core/ingest/hosts.py:33}; the urban class; the building fraction; and the
+wildlife host proxy. A companion JSON file carries per-variable statistics and the grid
+specification \src{mal-core/src/mal\_core/ingest/hosts.py:208--214}.
+
+\subsection{The aggregation rules, and what each one loses}
+
+\begin{center}
+\small
+\begin{longtable}{@{}p{3.0cm}p{2.2cm}p{9.3cm}@{}}
+\toprule
+Layer & Rule & What the rule means and what it costs \\
+\midrule
+\endhead
+Human population & sum
+  & A count-preserving aggregation onto the AOI grid
+\src{mal-core/src/mal\_core/ingest/hosts.py:75--88}. The number in a cell is a population count.
+\\ Livestock (five species) & sum
+  & The source product is a \emph{density} in heads per square kilometre
+\src{mal-commonlib/src/mal\_commonlib/data/loaders/glw.py:13--16},
+\src{mal-commonlib/src/mal\_commonlib/data/loaders/glw.py:224--227}; summing densities yields a
+sum of densities, \emph{not} a head count. The engine consumes these numbers as counts, which is
+a stated inconsistency worth carrying in mind. \\ Urban class & nearest
+  & A categorical layer, so it is resampled by nearest neighbour
+\src{mal-core/src/mal\_core/ingest/hosts.py:112--120}, then reclassified: thirty stays thirty
+(urban), twenty to twenty-nine becomes fifty (rural), zero to nineteen becomes twenty (water)
+\src{mal-core/src/mal\_core/ingest/hosts.py:122--128}. The reclassification is \emph{inverted}
+with respect to the product it reclassifies (\S\ref{sec:urbanclass}). \\ Building fraction & sum
+  & The source is a per-cell presence of building footprint centroids, at
+one where any centroid falls in the cell
+\src{mal-commonlib/src/mal\_commonlib/data/loaders/buildings.py:187--189}; the quantity is
+therefore a centroid-presence indicator, not an area fraction. \\ Wildlife host proxy & nearest
+  & A categorical suitability surface, resampled by nearest neighbour
+\src{mal-core/src/mal\_core/ingest/hosts.py:170--178}. \\
+\end{longtable}
+\end{center}
+
+\subsection{The urban class is inverted with respect to the product} \label{sec:urbanclass}
+
+The reclassification above does not match the GHS-SMOD product it reclassifies. In the R2023A
+scheme the codes are 30 for an urban centre, 21, 22 and 23 for urban clusters of low, medium
+and high density, 11, 12 and 13 for rural low, medium and high density, and 10 for water; the
+loader's own comment reads the scheme the other way round, calling 20--29 rural
+\src{mal-commonlib/src/mal\_commonlib/data/loaders/ghsl.py:76--79}, and the reclassification
+follows that reading. The consequence is that the product's urban clusters become ``rural''
+(fifty) and its rural classes become ``water'' (twenty); only the urban centre (thirty) and
+the water class (ten) keep the right label.
+
+The delivered Ghana host grid shows the inversion. Its \code{urban\_class} plane carries
+415\,992 cells labelled twenty, 9\,434 labelled fifty and 3\,803 labelled thirty, while the
+source product's own classes on the same grid are 30: 3\,803 cells, 23: 1\,990, 22: 594,
+21: 6\,850, 13: 7\,457, 12: 51\,101, 11: 299\,511, 10: 57\,490 and 0: 433. The engine maps
+the class to an indoor fraction with a threshold of forty, so that anything at or below forty
+is urban \src{mal-core/src/mal\_core/abm/src/host\_landscape.cpp:111--118}. Every one of the
+415\,992 cells labelled twenty is therefore read by the engine as urban: they are the product's
+rural cells (358\,069 of them) together with its water cells, and they make up roughly
+97\,\% of the area of interest, while the 9\,434 genuine urban clusters are read as rural. The
+urban/rural signal is inverted over the area of interest (\S\ref{sec:open} question 17).
+
+\subsection{The three silent-ish degradations}
+
+If the urban-class loader fails, every cell becomes the rural default
+\src{mal-core/src/mal\_core/ingest/hosts.py:133--136}. If the building loader fails, the
+fraction becomes 0.6 in urban cells and 0.1 elsewhere
+\src{mal-core/src/mal\_core/ingest/hosts.py:156--159}. If the wildlife loader fails, the proxy
+becomes a constant 0.3 everywhere \src{mal-core/src/mal\_core/ingest/hosts.py:180--182}. Each
+degradation is announced on the standard error stream, and each substitutes a constant for a
+real layer. The three constants are literals in the module rather than constants-file keys, so
+this document quotes them as readings of the code (\S\ref{sec:open} question 8).
+
+The two builder flags make the same substitutions deliberately: skipping the buildings layer
+uses the urban heuristic \src{mal-core/src/mal\_core/ingest/hosts.py:141}, and skipping the
+wildlife layer uses the constant \src{mal-core/src/mal\_core/ingest/hosts.py:164}.
+
+\section{Mobility operators} \label{sec:mobility}
+
+\subsection{The model}
+
+The mobility builder reads the host grid back from disk and builds three row-stochastic
+origin--destination operators on a gravity model
+\src{mal-core/src/mal\_core/ingest/mobility.py:37--74}. For an origin cell $i$ and a destination
+cell $j$,
+
+\begin{equation}
+P(i \to j) \;\propto\; H(j)\, \exp\!\left(-\beta\, d(i,j)\right),
+\end{equation}
+
+\noindent where $H$ is the destination's attractiveness, $d$ the distance between cell centres
+in kilometres, and $\beta$ the friction parameter. Rows are normalised to sum to one, entries
+below a sparsity threshold are dropped, and the kept entries are renormalised
+\src{mal-commonlib/src/mal\_commonlib/data/mobility.py:21--60}. A row with no surviving entry is
+given a self-loop of one, so nobody has nowhere to go
+\src{mal-commonlib/src/mal\_commonlib/data/mobility.py:100--120}.
+
+Human attractiveness is the human population, with the NoData sentinel mapped to zero
+\src{mal-core/src/mal\_core/ingest/mobility.py:75--78}. Livestock attractiveness is the sum of
+the five livestock planes, again with the sentinel mapped to zero
+\src{mal-core/src/mal\_core/ingest/mobility.py:81--89}.
+
+\subsection{The three operators and their parameters}
+
+\begin{center}
+\small
+\begin{longtable}{@{}p{3.6cm}p{3.0cm}p{3.0cm}p{5.0cm}@{}}
+\toprule
+Operator & Attractiveness & Friction & Cutoff \\
+\midrule
+\endhead
+\code{<aoi>\_mobility\_day.csr} & human population & $\beta_{\text{day}}$
+  & \code{max\_distance\_km} \\
+\code{<aoi>\_mobility\_night.csr} & human population & $\beta_{\text{night}}$
+  & \code{max\_distance\_km} \\
+\code{<aoi>\_livestock\_mobility.csr} & sum of the five livestock planes
+  & $\beta_{\text{livestock}}$ & \code{max\_distance\_km} \\
+\end{longtable}
+\end{center}
+
+\smallskip \noindent The six parameters are \code{cell\_size\_km}, \code{beta\_day},
+\code{beta\_night}, \code{beta\_livestock}, \code{max\_distance\_km} and
+\code{sparsity\_threshold}, and they are \emph{defaults in the function signature}, not
+constants-file keys \src{mal-core/src/mal\_core/ingest/mobility.py:37--48}. Their values are
+therefore quoted in \S\ref{sec:literals} as readings of the code. The three friction parameters
+are a named choice: a higher value keeps a population closer to home, and the daytime value is
+an order of magnitude smaller than the night-time value, which is the intended diurnal pattern.
+
+The hard distance cutoff is implemented as a disk of candidate offsets around each origin
+\src{mal-commonlib/src/mal\_commonlib/data/mobility.py:70--80}, so no pair beyond the cutoff can
+ever receive probability. The matrices are built and written one at a time so that peak memory
+stays at roughly one matrix \src{mal-core/src/mal\_core/ingest/mobility.py:84--102}.
+
+\subsection{The identity fallback}
+
+If the AOI has no livestock at all --- the summed livestock planes are zero --- the livestock
+operator degenerates to the identity \src{mal-core/src/mal\_core/ingest/mobility.py:108--118}.
+The file is still written and still registered, so the engine's optional flag can be set without
+a special case.
+
+\subsection{The companion manifest}
+
+A JSON file records the grid dimensions, the cell size, all six parameters, the number of
+non-zeros per file, the human and livestock totals and the build time
+\src{mal-core/src/mal\_core/ingest/mobility.py:121--138}. It is a record of how the operators
+were made, not a contract.
+
+\section{Manifest integration} \label{sec:manifest}
+
+\subsection{How the stage writes to the manifest}
+
+Every artefact is registered through one shared helper
+\src{mal-core/src/mal\_core/ingest/\_shared.py:7--33}, which delegates to the manifest writer
+\src{mal-core/src/mal\_core/download/manifest.py:118--189}. The entry records the type, the
+format, the \code{required\_for\_abm} flag, the file name, an optional variable list, an
+optional period, a \code{+}-joined compound licence identifier and a literal attribution line
+\src{mal-core/src/mal\_core/download/manifest.py:151--180}. The manifest's
+\code{expected\_files} list is rebuilt from scratch on every write, as the union of every
+declared file of every entry \src{mal-core/src/mal\_core/download/manifest.py:181--184}.
+
+There are eight registrations: two from the environment builder
+\src{mal-core/src/mal\_core/ingest/env.py:147--162},
+\src{mal-core/src/mal\_core/ingest/env.py:174--187}, two from the host builder
+\src{mal-core/src/mal\_core/ingest/hosts.py:219--240}, and four from the mobility builder
+\src{mal-core/src/mal\_core/ingest/mobility.py:141--161}.
+
+\subsection{The year key, and what it means for a multi-year file}
+
+The environment NetCDF physically spans several years --- its name carries the first and last
+year of the rainfall axis --- but it is registered under a single year key, the year the CLI was
+given \src{mal-core/src/mal\_core/ingest/daily\_nc.py:465--466},
+\src{mal-core/src/mal\_core/ingest/env.py:148}. The manifest writer stores a year-keyed file
+under \code{files[str(year)]} and an unkeyed one under \code{files[dataset\_name]}
+\src{mal-core/src/mal\_core/download/manifest.py:176--179}.
+
+The consequence, as a described situation: the simulation wrapper resolves the environment
+artefact \emph{with} a year \src{mal-core/src/mal\_core/abm/wrapper.py:137--141}. If the ingest
+run was told about one year and the simulation is asked for another, the resolution fails ---
+even though the file on disk contains the requested year's days. If a manifest entry is per-year
+keyed and lacks the requested year, the resolution raises rather than silently picking another
+year \src{mal-core/src/mal\_core/download/manifest.py:91--98}. The habitat GeoPackage is
+registered under a year key too, but is resolved without one, so the fallback to the first
+declared file applies \src{mal-core/src/mal\_core/abm/wrapper.py:142--146} (\S\ref{sec:open}
+question 7).
+
+\subsection{The declared variable list does not match the file}
+
+The environment NetCDF's registered variable list is derived from the built file's own variable
+list \src{mal-core/src/mal\_core/ingest/daily\_nc.py:498--503}, and the delivered manifest
+matches the delivered file exactly. The habitat GeoPackage's registered list does not. It is
+constructed from the \emph{feature plane} names
+\src{mal-core/src/mal\_core/ingest/env.py:183--185}, while the file itself carries one
+\code{hab\_<habitat type>} column per habitat type
+\src{mal-core/src/mal\_core/ingest/env.py:96--97}, plus the \code{dynamics} and \code{aoi\_slug}
+columns, which the registration omits.
+
+Verified on the delivered artefacts: the manifest advertises the habitat entry's variables as
+\code{hab\_type}, \code{habitat\_potential}, \code{row}, \code{col},
+\code{hab\_jrc\_persistent}, \code{hab\_lc\_built}, \code{hab\_lc\_wetland},
+\code{hab\_lc\_open\_plus\_water} and \code{hab\_lc\_crop}, while the file carries
+\code{hab\_surface\_persistent}, \code{hab\_wetland\_persistent}, \code{hab\_urban\_persistent},
+\code{hab\_wetland\_pluvial}, \code{hab\_open\_pluvial}, \code{hab\_crop\_pluvial},
+\code{dynamics} and \code{aoi\_slug}. Five advertised names are not in the file and eight present
+names are not advertised (\S\ref{sec:open} question 5).
+
+\section{The seam with the simulation} \label{sec:seam}
+
+\subsection{What the engine resolves}
+
+Before running, the wrapper requires that every file declared in the manifest exists
+\src{mal-core/src/mal\_core/abm/wrapper.py:112--121}. It then resolves seven paths: the
+environment NetCDF with a year, the habitat GeoPackage, the host grid, the wind field, and the
+three mobility operators \src{mal-core/src/mal\_core/abm/wrapper.py:137--165}. The wind field is
+\emph{not} produced by this stage --- it comes from the download stage directly
+\src{mal-core/src/mal\_core/abm/wrapper.py:149--152}. The environment NetCDF and the habitat
+GeoPackage are the only two hard requirements; the rest are passed to the engine as flags when
+they resolve \src{mal-core/src/mal\_core/abm/wrapper.py:166--178},
+\src{mal-core/src/mal\_core/abm/wrapper.py:210--222}.
+
+\subsection{What the engine does with the environment NetCDF}
+
+The engine reads the two daily channels and the five static planes
+\src{mal-core/src/mal\_core/abm/src/env\_reader.cpp:204--246}. The optional \code{land\_frac}
+plane is a display basemap and is explicitly not part of the habitat feature bundle
+\src{mal-core/src/mal\_core/abm/src/climate.cpp:211--213}. The optional \code{salinity\_ppt}
+plane's absence means ``no salinity data'': the reader simply leaves the salinity vector empty
+\src{mal-core/src/mal\_core/abm/src/env\_reader.cpp:254--272}, and the accessor then returns
+the configured freshwater anchor \mskey{aquatic_stages.salinity_missing_psu}
+\src{mal-core/src/mal\_core/abm/src/climate.cpp:149--158}. A static plane
+whose size does not match the grid is silently treated as zero, with a printed note
+\src{mal-core/src/mal\_core/abm/src/climate.cpp:196--205}. When the static planes are absent
+altogether, the engine prints its own complaint about the environment NetCDF's contract version
+\src{mal-core/src/mal\_core/abm/src/coordinator.cpp:66--70}.
+
+\subsection{How the engine forms its candidate set}
+
+The engine's patch set is the \emph{union} of two sources: the patches read from the GeoPackage,
+and every cell whose recomputed total potential passes the engine's floor
+\src{mal-core/src/mal\_core/abm/src/coordinator.cpp:161--175}. The GeoPackage is thus a
+conservative starting set rather than the authoritative one, and the two candidate counts need
+not agree (\S\ref{sec:open} question 10).
+
+Each patch's daily state is then computed from the recomputed potential, the current pluvial
+state and the salinity channel \src{mal-core/src/mal\_core/abm/src/coordinator.cpp:207--226}. A
+patch is activated when its accuracy reaches \mskey{habitat.activation_min_engine}, and is
+deactivated regardless of accuracy when its salinity reaches the species' high tolerance.
+
+\subsection{What the engine recomputes}
+
+The engine recomputes the potential, the two temporal responses, the daily accuracy and the
+daily capacity from the static planes and the rainfall channel, every day (\S\ref{sec:dynamic}).
+It therefore consumes the ingest artefacts as \emph{static structure plus forcing}: the grid,
+the candidate cells, the amplitudes, and the daily rainfall and temperature. Everything dynamic
+about habitat is downstream.
+
+\section{Declaration of absences} \label{sec:absences}
+
+The following are \emph{not} done by this stage, and a reader looking for them should not find
+them:
+
+\begin{itemize}
+\item \textbf{No terrain}: no digital elevation model, no topographic wetness index, no
+catchment ratio, no slope, no drainage \src{mal-core/src/mal\_core/ingest/daily\_nc.py:36--40}.
+\item \textbf{No millimetre water balance}: no pool depth, no storage volume, no evaporation
+term, no per-cell aquatic solver. 
+\item \textbf{No annual temperature-suitability surface}; the
+retired channel and its broadcast path are gone
+\src{mal-core/src/mal\_core/ingest/daily\_nc.py:8--11}. 
+\item \textbf{No vegetation-index
+channel} \src{mal-core/src/mal\_core/ingest/daily\_nc.py:36--40}. 
+\item \textbf{No alpha or
+theta weighting matrix} between potential and accuracy
+\src{mal-core/src/mal\_core/habitat/potential.py:34--36}. 
+\item \textbf{No species selection};
+the potentials written are species-independent. 
+\item \textbf{No capacity computation}: $S$ and
+$K$ are engine quantities (\S\ref{sec:dynamic}). 
+\item \textbf{No climatology, no trend
+analysis, no gap interpolation} other than the rainfall donor fill
+\src{mal-core/src/mal\_core/ingest/daily\_nc.py:206--223}. 
+\item \textbf{No per-cell water-body
+enumeration}; the representation is a cell-level index, not a catalogue of ponds. 
+\item
+\textbf{No wind product}; it comes from the download stage
+\src{mal-core/src/mal\_core/abm/wrapper.py:149--152}.
+\end{itemize}
+
+\section{Provenance of every constant used here} \label{sec:provenance}
+
+\begin{center}
+\small
+\begin{longtable}{@{}p{4.4cm}p{3.0cm}p{7.6cm}@{}}
+\toprule
+Constant & Tier & Basis \\
+\midrule
+\endhead
+\mskey{contracts.env_nc} & model definition & The contract string the environment NetCDF
+declares; validated for form \src{mal-core/src/mal\_core/config\_validation.py:368--373}. \\
+\mskey{ingest.nodata_sentinel} & engineering prior & The pipeline-wide NoData value; frozen so
+that the C++ and Python readers agree \src{mal-core/config/model\_constants.yaml:137}. \\
+\mskey{ingest.coastline_buffer_m} & engineering prior & Width of the coastal band; a choice,
+tunable per run by an environment variable
+\src{mal-core/src/mal\_core/ingest/daily\_nc.py:240--242}. \\ \mskey{ingest.sea_water_floor} &
+engineering prior & Land fraction below which a cell counts as water
+\src{mal-core/config/model\_constants.yaml:148}. \\ \mskey{ingest.candidate_min_ingest} &
+engineering prior & The census floor; a guard against an empty static field, not a biological
+threshold \src{mal-core/config/model\_constants.yaml:151--153}. \\
+\mskey{ingest.fill_frac_valid_max} & engineering prior & The NoData fraction above which a cell
+may no longer donate \src{mal-core/config/model\_constants.yaml:155}. \\
+\mskey{ingest.grid_degrees_step_max} & engineering prior & The condition under which CF latitude
+and longitude variables are written \src{mal-core/config/model\_constants.yaml:159}. \\
+\mskey{ingest.nc_compression_level} & engineering prior & File-format configuration, not a model
+quantity \src{mal-core/config/model\_constants.yaml:160}. \\ \mskey{ingest.cell_size_hint_m} &
+engineering prior & Fallback cell size when the rainfall file carries no resolution attribute
+\src{mal-core/src/mal\_core/ingest/daily\_nc.py:243--247}. \\ \mskey{urban.beta_urban} &
+engineering prior & Scales the built fraction into the urban persistent potential; no
+measurement or literature anchor is recorded for it
+\src{mal-core/config/model\_constants.yaml:43}. \\ \mskey{urban.rain_pools_built_damage} &
+engineering prior & Adds a rain-pool contribution on the built surface to the open-pluvial
+potential; likewise unanchored \src{mal-core/config/model\_constants.yaml:44}. \\
+\mskey{capacity.persistent_availability} & model definition & The constant persistent response;
+deliberately drought-insensitive \src{mal-core/config/model\_constants.yaml:129}. \\
+\mskey{pluvial.rain_scale_mm} & engineering prior & The rainfall scale of the pluvial recharge
+\src{mal-core/config/model\_constants.yaml:29}. \\ \mskey{pluvial.dry_memory_days} & engineering
+prior & The drying memory of the pluvial state \src{mal-core/config/model\_constants.yaml:30}.
+\\ \mskey{pluvial.delta_days} & model definition & The one-day integration step
+\src{mal-core/config/model\_constants.yaml:31}. \\ \mskey{pluvial.cold_start_z} & model
+definition & The state before the first simulated day
+\src{mal-core/config/model\_constants.yaml:32}. \\ \mskey{species.k_ref} & engineering prior &
+The engine's per-cell capacity scale \src{mal-core/config/model\_constants.yaml:51}. \\
+\mskey{habitat.candidate_min_engine} & engineering prior & The engine's candidate floor
+\src{mal-core/config/model\_constants.yaml:25}. \\ \mskey{habitat.activation_min_engine} &
+engineering prior & The daily activation threshold
+\src{mal-core/config/model\_constants.yaml:24}. \\
+\end{longtable}
+\end{center}
+
+\smallskip \noindent Two tiers appear nowhere in this stage's own constants, and their absence
+is worth noting: there is no \emph{measured} constant and no \emph{literature-anchored} constant
+in the ingest block. Every number above is either a contract string or an engineering choice.
+The species affinity rows, which are the closest thing to an anchored set, live per species and
+are validated to sum to one \src{mal-core/src/mal\_core/config\_validation.py:413--416}; for the
+default species row \mskey{species.default_species} the weights are
+\mskey{species.coluzzii.weights.surface_persistent},
+\mskey{species.coluzzii.weights.wetland_persistent},
+\mskey{species.coluzzii.weights.urban_persistent},
+\mskey{species.coluzzii.weights.wetland_pluvial}, \mskey{species.coluzzii.weights.open_pluvial}
+and \mskey{species.coluzzii.weights.crop_pluvial}. Note that the coordinator that computes the
+live accuracy uses the species-neutral row, not the default species row
+\src{mal-core/src/mal\_core/abm/src/coordinator.cpp:117},
+\src{mal-core/src/mal\_core/abm/include/mal\_abm\_fast/habitat\_availability.hpp:146--156}.
+
+\section{The generated parameter and contract tables} \label{sec:contracts}
+
+The constants of the namespaces this stage draws on, as generated from the shared constants
+file, with the production files that act on each one:
+
+\input{../generated/params-ingest.tex}
+
+\smallskip \noindent The table is not a list of what this stage reads: its last column, the
+``Read by'' column, is the answer to that question. The column is scanned from the two access
+patterns the configuration actually uses --- the Python \code{model\_constant("section",
+"key")} call and the C++ loader's \code{L.key(node, "section", "key")} ---
+\src{tools/gen\_concepts\_values.py:197--218}. A cell that reads \emph{(loaded, never used)}
+means that the key reaches the engine's configuration struct and that nothing acts on it: there
+are exactly four such constants in the whole configuration,
+\code{ingest.land\_mask\_threshold}, \code{ingest.min\_dilation\_radius\_cells},
+\code{ingest.ocean\_mask\_threshold} and \code{contracts.env\_nc}. For the three \code{ingest}
+thresholds no production code reads them at all, so the values they carry are inert. For
+\code{contracts.env\_nc} the verdict is about the engine side --- the engine's loader reads it
+into the configuration struct
+\src{mal-core/src/mal\_core/abm/src/config.cc:496--497} and no engine code acts on it --- while
+the Python builder reads the same key through the constants dictionary and writes it into the
+environment NetCDF's contract attribute
+\src{mal-core/src/mal\_core/ingest/daily\_nc.py:53},
+\src{mal-core/src/mal\_core/ingest/daily\_nc.py:438}; that access pattern is not one the
+scanner matches. The remaining rows name constants that belong to the stage's namespaces but
+are read elsewhere: the download stage's loaders (\code{wildlife.*},
+\code{ingest.coastline\_resolution}, \code{ingest.valid\_count\_epsilon},
+\code{ingest.nodata\_sentinel\_int}), the C++ \code{host\_landscape}
+(\code{ingest.residential\_from\_indoor\_frac}), and the engine's configuration and geodesy
+(\code{contracts.cogs\_state}, \code{geodesy.*}).
+
+\medskip \noindent The output contracts, as generated from the contract definition:
+
+\input{../generated/contracts.tex}
+
+\section{What is not answered, and what is not implemented} \label{sec:open}
+
+The following are open, and are recorded here rather than left as silent omissions. Each is a
+question a reader is entitled to ask and the code does not settle.
+
+\begin{enumerate}
+\item \textbf{The host path downloads; the environment path does not.} Is the asymmetry
+intended? (\S\ref{sec:hostdownloads}.) 
+\item \textbf{There are two different totals of the
+habitat potential} --- the Python one and the engine's. Which is the intended definition, and
+which should the GeoPackage's amplitude use? (\S\ref{sec:habitat}.) 
+\item \textbf{The GeoPackage
+carries no version.} Should a contract version be stamped on it? (\S\ref{sec:gpkg}.) 
+\item
+\textbf{The \code{dynamics} column is written as a string and read as an integer}, so the
+engine's per-patch flag is always zero. (\S\ref{sec:gpkg}.) 
+\item \textbf{The manifest's habitat
+variable list does not match the file}. (\S\ref{sec:manifest}.) 
+\item \textbf{The command-line
+defaults place files and manifest entries in different directories}. (\S\ref{sec:entry}.) 
+\item
+\textbf{The environment NetCDF is registered under one year key although it spans several
+years}. (\S\ref{sec:manifest}.) 
+\item \textbf{Some numbers are code literals and not
+constants-file keys} and cannot be generated today. (\S\ref{sec:literals}.) 
+\item \textbf{There
+are two capacity scales in the codebase}, the engine's and the Python diagnostic one.
+(\S\ref{sec:dynamic}.) 
+\item \textbf{The three candidate floors have distinct roles}, but
+nothing prevents the GeoPackage from carrying patches the engine immediately drops.
+(\S\ref{sec:habitat}.) 
+\item \textbf{The open-sea filter degrades silently} when the coastline
+artefact is missing. (\S\ref{sec:statics}.) 
+\item \textbf{The declared \code{host\_static} slot
+is never read} by the environment builder. (\S\ref{sec:envinputs}.) 
+\item \textbf{The frame has
+two owners}, reconciled only by a shape assertion on the GeoPackage path. (\S\ref{sec:frame}.)
+\item \textbf{The cell-area factor is an approximation} whose size is stated rather than
+corrected. (\S\ref{sec:frame}.) 
+\item \textbf{The wind product is not produced here}; it comes
+from the download stage. (\S\ref{sec:seam}.) 
+\item \textbf{Whether the static planes should
+follow the run year} is not settled: multi-year land cover is averaged. (\S\ref{sec:statics}.)
+\item \textbf{The urban-class reclassification is inverted} with respect to the GHS-SMOD product
+it reclassifies, so the engine reads the area of interest as mostly urban when it is mostly
+rural. (\S\ref{sec:hosts}.)
+\item \textbf{The delivered environment NetCDF was produced by the pre-fix implementation},
+which is why it carries no \code{land\_frac} plane. (\S\ref{sec:envnc}.)
+\item \textbf{The delivered GeoPackage's candidate set includes open-sea cells} that the
+current open-sea rule would remove. (\S\ref{sec:gpkg}.)
+\end{enumerate}
+
+\section{Evidence appendix} \label{sec:appendix}
+
+\subsection{Implementation notes a replicator needs}
+
+\begin{enumerate}
+\item \textbf{The frame is set by the rainfall file}, so a replicator who changes the AOI must
+rebuild that file on the new grid (\S\ref{sec:frame}). 
+\item \textbf{The environment NetCDF is
+written before the GeoPackage}, and the GeoPackage is derived from the file that was written, so
+the candidate set can only be reproduced by reproducing the statics first (\S\ref{sec:order}).
+\item \textbf{The NoData fill is spatial, not temporal}: changing it means changing the
+algorithm at \src{mal-core/src/mal\_core/ingest/daily\_nc.py:206--223}, not a parameter. 
+\item
+\textbf{Open sea is a distance query, not a dilation}, and the distance is computed from the
+land-fraction plane \src{mal-commonlib/src/mal\_commonlib/data/loaders/coastline.py:246--261}.
+\item \textbf{The coastal band can be overridden per run} through the
+\code{COASTLINE\_BUFFER\_M} environment variable; a negative value disables the filter
+\src{mal-core/src/mal\_core/ingest/daily\_nc.py:240--250}. 
+\item \textbf{The temperature channel
+is re-indexed by day, not by position} (\S\ref{sec:channels}). 
+\item \textbf{Static planes are
+averaged over a year axis} when the source file has one (\S\ref{sec:statics}). 
+\item \textbf{The
+GeoPackage's point geometry is the cell centre}, not the cell polygon (\S\ref{sec:gpkg}). 
+\item
+\textbf{The mobility matrices are compressed sparse row} and are read by a loader that validates
+the row sums within a stated tolerance
+\src{mal-commonlib/src/mal\_commonlib/data/mobility.py:38--40}. 
+\item \textbf{The engine does
+not need the \code{hab\_<type>} columns}, so removing them from the writer would not change the
+simulation (\S\ref{sec:gpkg}).
+\end{enumerate}
+
+\subsection{Numbers that could not be generated} \label{sec:literals}
+
+The following values are literals in the source and have no key in the shared constants file.
+They are quoted in this document as readings of the code, and are the ones a reviewer should
+check against the cited lines.
+
+\begin{center}
+\small
+\begin{longtable}{@{}p{4.6cm}p{2.4cm}p{8.0cm}@{}}
+\toprule
+Literal & Value & Where \\
+\midrule
+\endhead
+Generator version & \code{proxy-habitat-v1-0.1.0}
+  & \src{mal-core/src/mal\_core/ingest/daily\_nc.py:439} \\
+Host fallback, urban building fraction & $0.6$
+  & \src{mal-core/src/mal\_core/ingest/hosts.py:141},
+\src{mal-core/src/mal\_core/ingest/hosts.py:159} \\ Host fallback, rural building fraction &
+$0.1$
+  & \src{mal-core/src/mal\_core/ingest/hosts.py:141},
+\src{mal-core/src/mal\_core/ingest/hosts.py:159} \\ Host fallback, wildlife proxy & $0.3$
+  & \src{mal-core/src/mal\_core/ingest/hosts.py:164},
+\src{mal-core/src/mal\_core/ingest/hosts.py:182} \\ Host fallback, urban class & $50$ (rural)
+  & \src{mal-core/src/mal\_core/ingest/hosts.py:133--136} \\
+Mobility cell size & $1.0$ km
+  & \src{mal-core/src/mal\_core/ingest/mobility.py:42} \\
+Mobility daytime friction & $0.05$
+  & \src{mal-core/src/mal\_core/ingest/mobility.py:43} \\
+Mobility night-time friction & $0.5$
+  & \src{mal-core/src/mal\_core/ingest/mobility.py:44} \\
+Mobility livestock friction & $0.1$
+  & \src{mal-core/src/mal\_core/ingest/mobility.py:45} \\
+Mobility distance cutoff & $50.0$ km
+  & \src{mal-core/src/mal\_core/ingest/mobility.py:46} \\
+Mobility sparsity threshold & $5\times10^{-4}$
+  & \src{mal-core/src/mal\_core/ingest/mobility.py:47} \\
+Python diagnostic capacity constant & $0.143 \times 9.3 \times 10^{6}$
+  & \src{mal-core/src/mal\_core/habitat/capacity.py:30} \\
+WorldPop product year & $2019$
+  & \src{mal-core/src/mal\_core/ingest/hosts.py:40} \\
+\end{longtable}
+\end{center}
+
+\subsection{What is verified, and what is not}
+
+\emph{Verified against the delivered artefacts} (read directly from the files in
+\code{data/ghana/}):
+
+\begin{itemize}
+\item the environment NetCDF's variables, shapes, dtypes, global attributes, fill value and
+absence of any coordinate reference system; 
+\item the GeoPackage's feature count, column set,
+column types, the dominant-type and dynamics distributions and the amplitude range; 
+\item the
+manifest entries for the environment NetCDF, the habitat GeoPackage, the host grid and the
+mobility artefacts, including the mismatch between the habitat entry's declared variables and
+the file's actual columns, and the absence of the required-for-engine flag on the first two;
+\item the input files' own variable lists and attributes, including the absence of coordinate
+variables in the rainfall and temperature files and the Dynamic World class mapping recorded in
+the file's attributes.
+\end{itemize}
+
+\emph{Verified against the source}: every behavioural claim in this document, by reading the
+cited lines.
+
+\emph{Not verified, and not claimed}:
+
+\begin{itemize}
+\item that the numbers in the delivered artefacts were produced by the current code --- they were
+produced by the pre-fix implementation, as \S\ref{sec:gpkg} and \S\ref{sec:envnc} state; 
+\item the exact magnitude of the
+cell-area bias, which was measured outside the codebase for the Ghana box during the
+preparation of this document and is reported in \S\ref{sec:frame} as an order of magnitude
+rather than as a generated constant;
+\item the downstream behaviour of the engine on the delivered files, which is a question for the
+simulation stage's document; 
+\item whether the delivered manifest entries were produced by the
+registration calls in this document, given the required-for-engine flag discrepancy noted in
+\S\ref{sec:entry}.
+\end{itemize}
+
+\subsection{What the artefacts must not be used for}
+
+\begin{itemize} 
+\item The habitat potential must not be read as a pool count, a depth, a volume
+or a probability (\S\ref{sec:hnot}). 
+\item The livestock planes must not be read as head counts,
+and the building fraction must not be read as an area fraction (\S\ref{sec:hosts}). 
+\item The
+candidate count printed by the ingest build must not be read as the engine's candidate count
+(\S\ref{sec:habitat}). 
+\item The \code{dynamics} column of the GeoPackage must not be read as a
+faithful round trip into the engine (\S\ref{sec:gpkg}). 
+\item The environment NetCDF's
+coordinates must not be read as geographic coordinates without checking the file
+(\S\ref{sec:frame}).
+\end{itemize}
+
+\end{document}
