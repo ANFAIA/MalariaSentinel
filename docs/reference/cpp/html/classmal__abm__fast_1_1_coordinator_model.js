@@ -1,0 +1,28 @@
+var classmal__abm__fast_1_1_coordinator_model =
+[
+    [ "JetView", "structmal__abm__fast_1_1_coordinator_model_1_1_jet_view.html", "structmal__abm__fast_1_1_coordinator_model_1_1_jet_view" ],
+    [ "CoordinatorModel", "classmal__abm__fast_1_1_coordinator_model.html#ab1fc504f23c6ff28f3456bf509d3455a", null ],
+    [ "CoordinatorModel", "classmal__abm__fast_1_1_coordinator_model.html#a3185dde8caecb568ba6067a4da8e4a3e", null ],
+    [ "activate_patches", "classmal__abm__fast_1_1_coordinator_model.html#a9f85265e4ad94a76ab1bbb6755085cfd", null ],
+    [ "aggregate_density", "classmal__abm__fast_1_1_coordinator_model.html#a52f6f7288a6f5909fc7bfdda747e5745", null ],
+    [ "aoi", "classmal__abm__fast_1_1_coordinator_model.html#a14a67d9344d6939f408b3b099873412f", null ],
+    [ "build_seed_instructions", "classmal__abm__fast_1_1_coordinator_model.html#ac5d83ff604d8febd3c41806d5398719f", null ],
+    [ "build_uniform_seed_instructions", "classmal__abm__fast_1_1_coordinator_model.html#a333b17c0d06604e39d86837e7aca97e8", null ],
+    [ "climate", "classmal__abm__fast_1_1_coordinator_model.html#a61562a0709446035509015757486556c", null ],
+    [ "current_date", "classmal__abm__fast_1_1_coordinator_model.html#afbb16b94ab57c4d389c1fb82216ddf8e", null ],
+    [ "current_date", "classmal__abm__fast_1_1_coordinator_model.html#aff25a95ac7d1adb238f693da80772e3e", null ],
+    [ "habitat", "classmal__abm__fast_1_1_coordinator_model.html#a7afbd92d98057236794e4aa77f87063b", null ],
+    [ "J_view", "classmal__abm__fast_1_1_coordinator_model.html#a66887c7194c3c5af93d16947f3114f83", null ],
+    [ "patch_states_today", "classmal__abm__fast_1_1_coordinator_model.html#aa663a2f2e0693e0d1048c319cfd05f76", null ],
+    [ "rng", "classmal__abm__fast_1_1_coordinator_model.html#a427efb4062db83f0f3724b8a2b931bb9", null ],
+    [ "salinity_hi_tol_ppt", "classmal__abm__fast_1_1_coordinator_model.html#a257d0b7ca52aa8c0e03a4388d3d082a8", null ],
+    [ "set_climate_day", "classmal__abm__fast_1_1_coordinator_model.html#aebb07bcdd296461faff445f51463a4b3", null ],
+    [ "set_host_landscape", "classmal__abm__fast_1_1_coordinator_model.html#a7b9c22d23fd8cdb099fc053c309f82ef", null ],
+    [ "set_salinity_hi_tol_ppt", "classmal__abm__fast_1_1_coordinator_model.html#a219f286b24997c9524fe18aaedf01ada", null ],
+    [ "suitability_grid", "classmal__abm__fast_1_1_coordinator_model.html#ae988f49162d76bccea008b7eb901c7af", null ],
+    [ "to_dataframe", "classmal__abm__fast_1_1_coordinator_model.html#a303b05f578cd9b78136a9761c4faa5f5", null ],
+    [ "update_habitat_day", "classmal__abm__fast_1_1_coordinator_model.html#a58f0dda85f550ba5082fdf12ddb369dd", null ],
+    [ "warm_up_pluvial", "classmal__abm__fast_1_1_coordinator_model.html#a68531c6df8567304beb928ffd7ef4eda", null ],
+    [ "write_state_cog", "classmal__abm__fast_1_1_coordinator_model.html#ab543b5f8d7e00c28641f23661919c685", null ],
+    [ "z_grid", "classmal__abm__fast_1_1_coordinator_model.html#a3908c74ee7a1f64b98cd9c8f291b43a6", null ]
+];
