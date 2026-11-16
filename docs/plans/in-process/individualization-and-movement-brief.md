@@ -813,8 +813,11 @@ Consecuencias:
 | S | ¿Existe "olor de asentamiento"? | **no** — movimiento = exploración correlacionada + guiado de olor cercano (§5.1) |
 | P | Radio de percepción | **clave por especie** en `species.<fila>` con la cascada documentada y su alcance por especie: activación 100 m · olfativa 70 m (30 m en campo abierto) · visual 25–72 cm · terminal 10–20 cm (§5.1, §9.1) |
 | C | Correcciones de parámetro | **se adoptan** (`activity_weights`, salinidad 10,5 ppt, `egg_batch` ∝ volumen), siempre con la cifra medida y su referencia; sin valor medido, no se cambia (§9.7) |
-| D1 | Base temporal del movimiento | **opción (a)**: paso macro por fase + micro-simulador local (§3, Q18; análisis en `individualization-and-movement-brief.goldfish-review.md` §6) |
+| D1 | Base temporal del movimiento | **opción (a)**: paso macro por fase + micro-simulador local (§3, Q18) |
 | D2 | Alcance de la individualización humana | **opción (a)**: todas las personas son individuos; se optimiza después y los escenarios empiezan con poblaciones pequeñas (§3, Q19) |
+| D3 | Significado de la banda 1 del COG de estado | **(c) colapso honesto**: banda 1 deprecada (valores = copia de la banda 2, deprecación declarada en el sidecar) y una versión mayor posterior publica **una sola** banda + el artefacto individual (§12.5, Q20). Con "parche por posición" las dos bandas serían idénticas, y publicar una banda con dos nombres distintos es peor que publicar una banda con su nombre correcto |
+| D4 | Clave de la cohorte acuática | **pendiente** — (a) celda-clave + posición de la madre como payload vs (b) estado acuático por celda como contrato de primera clase (§12.5, Q21). (a) no cambia el comportamiento acuático; (b) elimina la ruta de error "no PatchState" y habilita la competencia sub-celda, a cambio de renombrar "patch" en toda la cadena y de un bump de contrato |
+| D5 | Semántica de la capacidad de enjambre | **(a) cupos + carrera**: cupos = `3 × 0,072 × M` por enjambre y noche; `p = 1 − exp(−cupos/hembras_competidoras)` (§12.5, Q22). Es la única lectura que respeta **las dos** mediciones (0,072 limita el lado macho; ≤3 hembras/macho limita el lado hembra), y hace que la fracción de hembras sin inseminar dependa de la densidad espacial ⇒ la alarma de §5.7.2 discrimina |
 
 ### 12.2 Resueltos por la investigación (machos y edad)
 
@@ -991,6 +994,107 @@ salinidad, ni `k_habitat`, ni racha de secas).
 
 **Qué hay que decidir**: (i) la semántica (R1 vs R2), (ii) el reparto de cupos (carrera vs
 determinista), (iii) si se mantiene la geometría de enjambre (opción (d) = no).
+
+**Decisión (Q22): (a) cupos + carrera.** Los cupos del enjambre son
+`3 × 0,072 × M` (21,6 con 100 machos); las hembras no inseminadas dentro del alcance los
+compiten y `p = 1 − exp(−cupos/competidoras)`. La fracción de hembras sin inseminar
+resultante es una **salida** del modelo (depende de la densidad espacial y del prior de
+`swarm_markers_per_km2`), no un valor fijado a mano ⇒ es lo que hace útil la alarma de
+§5.7.2.
+
+#### D4 — Qué cambia exactamente con (b), y qué deuda deja (a)
+
+**Decisión (Q21): pendiente.** El análisis se desarrolla aquí porque es la decisión con
+más radio de impacto y la que más fácilmente se subestima.
+
+**Lo que "patch" significa hoy, exactamente** (verificado):
+
+- `coordinator.cpp:156-236` (`to_dataframe`): los candidatos son la **unión** de las
+  células del gpkg y las células cuyo potencial estático ≥ `habitat_candidate_min_engine`.
+  **Sólo esas células** reciben un `PatchState` (`wire.hpp:179-194`) con el estado acuático
+  del día: `rain_d`, `temp_d`, `salinity_ppt`, `habitat_avail`, `habitat_dry_days`,
+  `k_habitat`.
+- Los datos por celda **ya existen** para todas las células (`K_cell_[idx]`,
+  `dry_days_[idx]`, `climate_->rain_at(r,c)`); lo que hoy se materializa es sólo el
+  subconjunto de candidatas.
+- `patch_id` es un id sintético por celda candidata (del gpkg si está, si no un contador).
+  `oviposition_seeking.cpp:36-52` filtra por `activated` y usa el potencial del gpkg, con
+  **fallback** a `ps.habitat_avail` si el patch no está en el gpkg ⇒ ya hoy hay **dos
+  fuentes** de "potencial".
+- `aquatic_cohort_bank.cpp:308` lanza `runtime_error` si una cohorte cae en una célula sin
+  `PatchState` ("has no PatchState for today — cannot resolve capacity").
+
+**(a) Celda-clave + posición de la madre como payload — qué cambia**
+
+- El **comportamiento acuático no cambia**: la cohorte sigue teniendo la celda como clave y
+  la competencia sigue siendo por celda (1 km²). Es el comportamiento de hoy.
+- Lo nuevo: la cohorte guarda el `(x, y)` exacto de la madre ⇒ **los adultos nuevos
+  emergen donde puso los huevos la madre**, no en el centro de la celda (que es lo que pide
+  el §1 del brief).
+- No hay bump de contrato de hábitat; `patch_id` sigue significando lo que significa; el
+  sidecar acuático sólo gana campos.
+
+**Deuda que genera (a)** — cuatro cosas concretas:
+
+1. **La celda sigue siendo la unidad de competencia**: todas las larvas de un km² compiten
+   como un único grupo ⇒ **la sensibilidad al tamaño de celda permanece** (un artefacto
+   clásico de ABM). Con los alcances medidos (486–695 m/día), la heterogeneidad real es
+   más fina que 1 km².
+2. **Deuda de vocabulario**: "patch" sigue queriendo decir "celda candidata", mientras que
+   el lado de adultos ya no tiene parche (Q20 = c) ⇒ dos vocabularios conviviendo.
+3. **Deuda de contrato menor**: `patch_id` sigue en el sidecar acuático y en el banco de
+   cohortes, y convive con una noción de parche que en el gpkg es de otra granularidad.
+4. **La ruta de error sigue viva**: `aquatic_cohort_bank.cpp:308` puede seguir lanzando si
+   una celda con cohorte deja de ser candidata.
+
+**(b) Estado acuático por celda como contrato de primera clase — qué cambia**
+
+- `PatchState` pasa a ser un registro **por celda para todas las células** del AOI, y
+  "patch" deja de ser un contenedor de información para pasar a ser un **filtro de
+  elegibilidad** (booleano). El campo de hábitat diario pasa a ser un contrato de primera
+  clase.
+- Lo que hay que tocar, en el código: `coordinator.cpp` (materializar el estado de todas
+  las celdas en vez de las candidatas), `oviposition_seeking.cpp` (filtrar por el nuevo
+  booleano de elegibilidad en vez de por `activated`), `aquatic_cohort_bank.cpp` (la clave
+  y el `patch_id` → `cell_id`), `mosquito_submodel.cpp` (`update_patch_id` → afiliación por celda), el sidecar JSON acuático (`patch_id` → `cell_id`), y el nombre del tipo en todo
+  el C++ (~15 puntos de uso).
+- Lo que hay que tocar, fuera del motor: el contrato de hábitat 3.0 → 5.0 (los contratos de
+  estado y de entorno se versionan por separado, memoria #195), el gpkg (su papel se
+  reduce a potencial estático + tipo por celda candidata) y la **unificación de las dos
+  fuentes de potencial** que hoy conviven, y el test de paridad Python/C++
+  (`test_habitat_python_contract`), que hay que extender al nuevo registro.
+- Coste computacional: despreciable (5 525 celdas × ~40 B ≈ 220 kB por día; los campos ya
+  se calculan para todas las celdas).
+- Lo que compra: (i) **ninguna celda puede quedarse sin contexto** ⇒ la ruta de error
+  `aquatic_cohort_bank.cpp:308` desaparece por construcción; (ii) vocabulario honesto;
+  (iii) es la **precondición de la competencia sub-celda**: si algún día se quiere que dos
+  hembras a 50 m dentro de la misma celda no compitan como un único pool, (b) es la base
+  sobre la que se puede añadir una clave más fina; (a) no lo es.
+- Lo que cuesta: un bump de contrato y un renombrado en toda la cadena, en el mismo PR
+  donde ya se mueven el COG de estado, la capa humana y el ledger ⇒ radio de impacto
+  mayor.
+
+**La diferencia, en una frase**: con (a) el modelo sigue siendo, en la fase acuática, un
+modelo de charcos de 1 km² (con memoria de dónde puso los huevos la madre); con (b) el
+modelo pasa a tener un **estado acuático por celda**, y "charco" deja de ser una categoría
+del mundo y pasa a ser un filtro.
+
+#### D3 — Detalle operativo de la deprecación (Q20 = c)
+
+- **4.1 (MINOR)**: la banda 1 `adult_patch_count` **se mantiene** en el shape (los
+  lectores por nombre siguen funcionando y el surrogate conserva sus 2 canales ⇒ se puede
+  reentrenar sin cambio de forma), pero sus valores pasan a ser la **copia de la banda 2** y
+  el sidecar lo declara: `"deprecated_bands": ["adult_patch_count"]` con nota de que la
+  afiliación reproductiva ya no se publica.
+- **5.0 (MAJOR)**: se publica **una sola banda** (`adult_count`, la de posición) más el
+  sidecar nuevo con las estadísticas por individuo. `VECTOR_CHANNELS` 2→1 en
+  `training/dataset.py`, actualización de `prediction/state_loader.py` y del golden del COG
+  de estado.
+- Lo que **no** se pierde: la información de "dónde se cría" sigue en el sidecar acuático
+  (`*_aquatic.json`, con sus cohortes y patch ids) y en el artefacto individual nuevo; y el
+  `patch_id` sigue vivo en el lado acuático (ver D4), de modo que nada se descarta por
+  prisa.
+
 
 ## 13. Orden de ejecución previsto
 
