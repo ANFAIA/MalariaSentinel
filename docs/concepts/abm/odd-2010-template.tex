@@ -1,0 +1,382 @@
+% =====================================================================
+% ODD protocol LaTeX template — version 2010 (first update)
+%
+% Structure and questions below are taken from the OFFICIAL template
+% supplement of:
+%   Grimm V., Berger U., DeAngelis D.L., Polhill J.G., Giske J.,
+%   Railsback S.F. (2010) "The ODD protocol: A review and first update."
+%   Ecological Modelling 221(23): 2760-2768.
+%   DOI: 10.1016/j.ecolmodel.2010.08.019
+%   Green OA PDF of the paper + template supplement:
+%   http://www.agsm.edu.au/bobm/teaching/SimSS/ODD_protocol.pdf
+%
+% How to use this template:
+%   - Replace every "\textit{[...]}"" placeholder with your answer.
+%   - Delete every shaded "Question" block before submission
+%     (official rule: "Questions and explanations should, of course,
+%     be deleted then." — ODD template supplement, 2010).
+%   - The % comments carry the official explanations/rules; they do
+%     not appear in the PDF. Keep them while drafting.
+%   - The 7 element titles and their numbering (1-7) must be used
+%     exactly as given.
+% =====================================================================
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[english]{babel}
+\usepackage{geometry}
+\geometry{margin=2.5cm}
+\usepackage{xcolor}
+\usepackage{mdframed}
+
+% Style for the official ODD questions (delete blocks before submission)
+\definecolor{oddquestioncolor}{gray}{0.35}
+\newmdenv[linewidth=0.5pt,linecolor=gray!50,backgroundcolor=gray!8,
+  innertopmargin=6pt,innerbottommargin=6pt,leftmargin=8pt,
+  rightmargin=8pt,splittopskip=6pt]{oddquestion}
+\newenvironment{question}
+  {\begin{oddquestion}\small\itshape\color{oddquestioncolor}%
+   \textbf{Question (delete this box before submission):}\par\smallskip}
+  {\end{oddquestion}}
+
+\title{ODD model description\thanks{Template following the ODD protocol
+(Overview, Design concepts, Details) of Grimm et al. (2006, 2010).}}
+\author{Author names}
+\date{}
+
+\begin{document}
+\maketitle
+
+% Opening sentence required by the official template (keep it):
+The model description follows the ODD (Overview, Design concepts,
+Details) protocol for describing individual- and agent-based models
+(Grimm et al.\ 2006, 2010).
+
+% =====================================================================
+% CATEGORY: Overview  (comment only — categories are not part of the
+% ODD document itself; only the seven numbered elements are)
+% =====================================================================
+
+\section{Purpose}
+\begin{question}
+What is the purpose of the model?
+\end{question}
+\textit{[State concisely the overall objective(s) for which the model was
+developed. Describe only what the model is to be used for, not how it
+works. Make this paragraph independent of any purpose statement in the
+article's introduction: ODD must be complete and understandable by
+itself. If one purpose is to expand from basic principles to richer
+representation of real-world scenarios, state this explicitly.]}
+
+% =====================================================================
+
+\section{Entities, state variables, and scales}
+\begin{question}
+What kinds of entities are in the model? By what state variables, or
+attributes, are these entities characterized? What are the temporal and
+spatial resolutions and extents of the model?
+\end{question}
+\textit{[Describe: (a) entities — typically agents/individuals (with
+their types), spatial units such as grid cells, the overall environment,
+and collectives; (b) state variables/attributes for each entity type,
+with units where applicable. State variables must be low-level and
+elementary: they cannot be calculated from other state variables
+(distance to a site, e.g., is NOT a state variable if positions are).
+A useful test: if you had to stop the model and re-start it later in
+exactly the same state, what information would you have to save?
+(c) temporal and spatial resolution and extent, specifying what the
+model's units represent in reality, e.g.: "One time step represents one
+year and simulations were run for 100 years. One grid cell represents
+1 ha and the model landscape comprised 1,000 x 1,000 ha; i.e., 10,000
+square kilometers."]}
+% Official explanation (2010 supplement): entities are distinct objects
+% or actors that behave as a unit and interact; agents may include
+% identity number, age, sex, location, size, weight, energy reserves,
+% behavioral strategy, etc. State variables may change over time (weight)
+% or remain constant (sex, species parameters).
+
+% =====================================================================
+
+\section{Process overview and scheduling}
+\begin{question}
+Who (i.e., what entity) does what, and in what order? When are state
+variables updated? How is time modeled, as discrete steps or as a
+continuum over which both continuous processes and discrete events can
+occur?
+\end{question}
+\textit{[Describe the schedule in pseudo-code, in every detail, so that
+the model can be re-implemented from this code; ideally the pseudo-code
+corresponds fully to the actual code. List only the self-explanatory
+names of processes here ('update habitat', 'move', 'grow', ...); these
+names become the titles of the submodels described in Element 7.
+Specify, for each process: which entity performs it, the order among
+processes, and the order among the entities performing one process
+(random, fixed, size-sorted, ... — ordering can strongly affect results).
+State whether updating is asynchronous (new value assigned immediately)
+or synchronous (values stored and updated at once for all agents), and
+how time is modeled if not already clear from Element 2.]}
+
+% =====================================================================
+% CATEGORY: Design concepts
+% =====================================================================
+
+\section{Design concepts}
+\begin{question}
+There are eleven design concepts, discussed by Railsback (2001) and
+Grimm \& Railsback (2005, Ch.~5), summarized via the questions of each
+concept below.
+\end{question}
+% Official rule (2010 supplement): unused concepts can be omitted from
+% the ODD description. If an important concept underlying the model's
+% design is NOT part of ODD, give it a short name, clearly announce it
+% as a design concept not included in the ODD protocol, and present it
+% at the END of this element.
+% The "Design concepts" element does not describe the model per se (it
+% is not needed to replicate it) but is a checklist ensuring that
+% important design decisions are made consciously and made known to
+% readers.
+
+\subsection{Basic principles}
+\begin{question}
+Which general concepts, theories, hypotheses, or modeling approaches
+are underlying the model's design? Explain the relationship between
+these basic principles, the complexity expanded in this model, and the
+purpose of the study. How were they taken into account? Are they used
+at the level of submodels (e.g., decisions on land use, or foraging
+theory), or is their scope the system level (e.g., intermediate
+disturbance hypotheses)? Will the model provide insights about the
+basic principles themselves, i.e., their scope, their usefulness in
+real-world scenarios, validation, or modification? Does the model use
+new, or previously developed, theory for agent traits from which system
+dynamics emerge?
+\end{question}
+\textit{[Answer here.]}
+
+\subsection{Emergence}
+\begin{question}
+What key results or outputs of the model are modeled as emerging from
+the adaptive traits, or behaviors, of individuals? In other words, what
+model results are expected to vary in complex and perhaps unpredictable
+ways when particular characteristics of individuals or their environment
+change? Are there other results that are more tightly imposed by model
+rules and hence less dependent on what individuals do, and hence
+'built in' rather than emergent results?
+\end{question}
+\textit{[Answer here.]}
+
+\subsection{Adaptation}
+\begin{question}
+What adaptive traits do the individuals have? What rules do they have
+for making decisions or changing behavior in response to changes in
+themselves or their environment? Do these traits explicitly seek to
+increase some measure of individual success regarding its objectives
+(e.g., ``move to the cell providing fastest growth rate'', where growth
+is assumed to be an indicator of success)? Or do they instead simply
+cause individuals to reproduce observed behaviors (e.g., ``go uphill
+70\% of the time'') that are implicitly assumed to indirectly convey
+success or fitness?
+\end{question}
+\textit{[Answer here.]}
+
+\subsection{Objectives}
+\begin{question}
+If adaptive traits explicitly act to increase some measure of the
+individual's success at meeting some objective, what exactly is that
+objective and how is it measured? When individuals make decisions by
+ranking alternatives, what criteria do they use? Synonyms for
+'objectives' are 'fitness' for organisms assumed to have adaptive traits
+evolved to provide reproductive success, 'utility' for economic reward
+in social models, or simply 'success criteria'. (The objective of agents
+that are members of a team, social insects, organs of an organism, or
+cells in a tissue may refer to the team, colony or organism, not to
+themselves.)
+\end{question}
+\textit{[Answer here.]}
+
+\subsection{Learning}
+\begin{question}
+Many individuals or agents (but also organizations and institutions)
+change their adaptive traits over time as a consequence of their
+experience. If so, how?
+\end{question}
+\textit{[Answer here.]}
+
+\subsection{Prediction}
+\begin{question}
+Prediction is fundamental to successful decision-making; if an agent's
+adaptive traits or learning procedures are based on estimating future
+consequences of decisions, how do agents predict the future conditions
+(either environmental or internal) they will experience? If appropriate,
+what internal models are agents assumed to use to estimate future
+conditions or consequences of their decisions? What tacit or hidden
+predictions are implied in these internal model assumptions?
+\end{question}
+\textit{[Answer here.]}
+
+\subsection{Sensing}
+\begin{question}
+What internal and environmental state variables are individuals assumed
+to sense and consider in their decisions? What state variables of which
+other individuals and entities can an individual perceive; for example,
+signals that another individual may intentionally or unintentionally
+send? Sensing is often assumed to be local, but can happen through
+networks or can even be assumed to be global. If agents sense each other
+through social networks, is the structure of the network imposed or
+emergent? Are the mechanisms by which agents obtain information modeled
+explicitly, or are individuals simply assumed to know these variables?
+\end{question}
+\textit{[Answer here.]}
+
+\subsection{Interaction}
+\begin{question}
+What kinds of interactions among agents are assumed? Are there direct
+interactions in which individuals encounter and affect others, or are
+interactions indirect, e.g., via competition for a mediating resource?
+If the interactions involve communication, how are such communications
+represented?
+\end{question}
+\textit{[Answer here.]}
+
+\subsection{Stochasticity}
+\begin{question}
+What processes are modeled by assuming they are random or partly random?
+Is stochasticity used, for example, to reproduce variability in
+processes for which it is unimportant to model the actual causes of the
+variability? Is it used to cause model events or behaviors to occur with
+a specified frequency?
+\end{question}
+\textit{[Answer here.]}
+
+\subsection{Collectives}
+\begin{question}
+Do the individuals form or belong to aggregations that affect, and are
+affected by, the individuals? Such collectives can be an important
+intermediate level of organization in an ABM; examples include social
+groups, fish schools and bird flocks, and human networks and
+organizations. How are collectives represented? Is a particular
+collective an emergent property of the individuals, such as a flock of
+birds that assembles as a result of individual behaviors, or is the
+collective simply a definition by the modeler, such as the set of
+individuals with certain properties, defined as a separate kind of
+entity with its own state variables and traits?
+\end{question}
+\textit{[Answer here.]}
+
+\subsection{Observation}
+\begin{question}
+What data are collected from the ABM for testing, understanding, and
+analyzing it, and how and when are they collected? Are all output data
+freely used, or are only certain data sampled and used, to imitate what
+can be observed in an empirical study (``Virtual Ecologist'' approach;
+Zurell et al.\ 2010)?
+\end{question}
+\textit{[Answer here.]}
+
+% =====================================================================
+% CATEGORY: Details
+% =====================================================================
+
+\section{Initialization}
+\begin{question}
+What is the initial state of the model world, i.e., at time $t = 0$ of
+a simulation run? In detail, how many entities of what type are there
+initially, and what are the exact values of their state variables (or
+how were they set stochastically)? Is initialization always the same, or
+is it allowed to vary among simulations? Are the initial values chosen
+arbitrarily or based on data? References to those data should be
+provided.
+\end{question}
+\textit{[Answer here.]}% Official explanation: model results cannot be accurately replicated
+% unless the initial conditions are known; different analyses can depend
+% quite differently on initial conditions.
+
+% =====================================================================
+
+\section{Input data}
+\begin{question}
+Does the model use input from external sources such as data files or
+other models to represent processes that change over time?
+\end{question}
+\textit{[If the model does NOT use input data, you MUST nevertheless
+include this element with the exact statement: ``The model does not use
+input data to represent time-varying processes.'' Otherwise describe
+each input: what it represents, its units, its source, how it was or can
+be obtained, any preparation methods, and uncertainties/biases. If input
+was generated by another model, document how.]}
+% Official note: 'Input data' does NOT refer to parameter values or
+% initial values of state variables (those go to Elements 5 and 7).
+
+% =====================================================================
+
+\section{Submodels}
+\begin{question}
+What, in detail, are the submodels that represent the processes listed
+in `Process overview and scheduling'? What are the model parameters,
+their dimensions, and reference values? How were submodels designed or
+chosen, and how were they parameterized and then tested?
+\end{question}
+% Official rules: present the factual description first — equation(s)
+% and algorithms — clearly separated from additional information
+% (origin of the submodel, why it was chosen, parameterization).
+% Parameter definitions, units and values should be presented in
+% TABLES. Justification should include references to relevant
+% literature and evidence of independent implementation, testing,
+% calibration and analysis of submodels.
+
+\subsection{Submodel 1: \textit{[name matching a process of Element 3]}}
+\textit{[Equations / algorithms first, then origin and rationale,
+parameter table:]}
+
+\begin{center}
+\begin{tabular}{lllll}
+\textbf{Parameter} & \textbf{Meaning} & \textbf{Unit} & \textbf{Value} & \textbf{Source} \\
+\hline
+ & & & & \\
+ & & & &
+\end{tabular}
+\end{center}
+
+\subsection{Submodel 2: \textit{[name]}}
+\textit{[As above. Add one subsection per submodel listed in Element 3.]}
+
+% Official closing note: ODD-based model descriptions consist of the
+% seven elements above; in most cases a "Simulation experiments" (or
+% model analysis) section should FOLLOW the model description.
+
+% \section{Simulation experiments} % uncomment if needed
+% \textit{[Describe the simulation experiments/analyses performed with
+% the model: scenarios, treatments, replication, outputs measured.]}
+
+\begin{thebibliography}{9}
+\bibitem{Grimm2006}
+Grimm, V., Berger, U., Bastiansen, F., et al. (2006)
+A standard protocol for describing individual-based and agent-based models.
+\emph{Ecological Modelling}, 198, 115--126.
+DOI: 10.1016/j.ecolmodel.2006.04.023
+
+\bibitem{Grimm2010}
+Grimm, V., Berger, U., DeAngelis, D.L., Polhill, J.G., Giske, J.,
+Railsback, S.F. (2010)
+The ODD protocol: A review and first update.
+\emph{Ecological Modelling}, 221(23), 2760--2768.
+DOI: 10.1016/j.ecolmodel.2010.08.019
+
+\bibitem{Railsback2001}
+Railsback, S.F. (2001)
+Conceptual design and simulation analysis of individual-based models.
+In: \emph{Proceedings of the Third International Symposium on Tools and
+Methods of Competitive Engineering}, Delft University Press, pp.~1099--1112.
+
+\bibitem{GrimmRailsback2005}
+Grimm, V. and Railsback, S.F. (2005)
+\emph{Individual-Based Modeling and Ecology}. Princeton University Press,
+Princeton, NJ.
+
+\bibitem{Zurell2010}
+Zurell, D., Jeltsch, F. and Grimm, V. (2010)
+Ecological modelling and data availability: do we really need all of
+these? \emph{Journal of Applied Ecology}, 47, 623--626.
+\end{thebibliography}
+
+\end{document}

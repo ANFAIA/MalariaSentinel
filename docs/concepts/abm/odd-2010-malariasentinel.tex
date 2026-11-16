@@ -1,0 +1,2227 @@
+% =====================================================================
+% ODD 2010 model description — MalariaSentinel vector ABM (mal_abm_fast)
+%
+% Structure follows the official ODD 2010 template (Grimm et al. 2010,
+% Ecological Modelling 221:2760-2768), seven numbered elements.
+% The shaded "Question" boxes of the template have been removed, as the
+% official instructions require for a submitted description.
+%
+% Source of truth for this description: the repository source tree read
+% on 2026-10-28 (HEAD 5e28644 plus working-tree modifications present on
+% that date). Parameter values: mal-core/config/model_constants.yaml,
+% schema version 2. State contract 4.0; env-NC contract 3.0.
+% =====================================================================
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[english]{babel}
+\usepackage{geometry}
+\geometry{margin=2.3cm}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{amsmath,amssymb}
+\usepackage{listings}
+\usepackage{fancyhdr}
+\usepackage{microtype}
+\usepackage{etoolbox}
+
+% The generated parameter table carries a superscript minus in a unit
+% annotation (psu^-1), which inputenc does not define by itself.
+\DeclareUnicodeCharacter{207B}{\ensuremath{-}}
+
+% -- generated values --------------------------------------------------------
+% Every model constant quoted in this document is emitted by the generator
+% from mal-core/config/model_constants.yaml. A key that no longer exists
+% makes \mskey fail the build.
+\input{../generated/macros.tex}
+
+
+\AtBeginEnvironment{longtable}{\footnotesize}
+\usepackage[hidelinks]{hyperref}
+
+% -- code / parameter names ------------------------------------------------
+\newcommand{\code}[1]{\path{#1}}
+\newcommand{\bcode}[1]{\code{#1}}
+
+% -- pseudo-code style -----------------------------------------------------
+\lstset{
+  basicstyle=\ttfamily\footnotesize,
+  columns=fullflexible,
+  keepspaces=true,
+  breaklines=true,
+  frame=single,
+  framesep=3pt,
+  xleftmargin=2pt,
+  xrightmargin=2pt,
+  aboveskip=6pt,
+  belowskip=6pt,
+  showstringspaces=false
+}
+
+% -- headers ---------------------------------------------------------------
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\footnotesize ODD 2010 --- MalariaSentinel vector ABM}
+\fancyhead[R]{\footnotesize \code{mal_abm_fast}}
+\fancyfoot[C]{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+\setlength{\parskip}{0.35em}
+\setlength{\emergencystretch}{3em}
+\renewcommand{\arraystretch}{1.14}
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
+
+\title{ODD model description of the MalariaSentinel\\
+Anopheles--malaria agent-based model\\[2pt]
+\large (\code{mal_abm_fast}, state contract 4.0, env-NC contract 3.0)}
+\author{David Fl\'orez-Mazuera\\MalariaSentinel project}
+\date{28 October 2026}
+
+\begin{document}
+\maketitle
+
+The model description follows the ODD (Overview, Design concepts,
+Details) protocol for describing individual- and agent-based models
+(Grimm et al.\ 2006, 2010).
+
+\subsection*{Scope and provenance of this description}
+
+This document describes the vector agent-based model \code{mal_abm_fast}
+as implemented in the repository \emph{MalariaSentinel} on 28 October
+2026 (source tree at \code{HEAD 5e28644}, including the working-tree
+modifications present on that date). It describes the model, not its
+command-line interface; the executable and its flags are documented in
+the repository. All model constants are read at run time from
+\code{mal-core/config/model_constants.yaml} (schema version 2), which is
+the single source for both the Python and the C++ sides. No model
+constant has a compiled default: a missing or unknown key aborts the run.
+The state output contract is version 4.0 and the environmental NetCDF
+input contract is version 3.0; the generator string is
+\code{proxy_habitat_v1}. The engine identifies itself as version 0.1.0.
+
+The seven numbered elements below are the ODD 2010 elements, with their
+official titles. Appendix~A records implementation details that matter
+for exact replication but are not part of the protocol. Appendix~B
+records provenance, versioning, and testing status. Throughout, a
+``parameter'' is a fixed model constant, while a ``state variable'' is
+what would have to be saved to restart a run exactly.
+
+\subsection*{Notation}
+
+\begin{center}
+\small
+\begin{tabular}{@{}ll@{}}
+\toprule
+Symbol & Meaning \\
+\midrule
+$d$ & simulation day index, 0-based; one step is one day \\
+$i$ or $(r,c)$ & grid cell (row $r$, column $c$) \\
+$p$ & habitat patch; in the current implementation one patch per candidate cell \\
+$g$ & habitat type; configured types and engine slots differ (Section~7.1) \\
+$k$ & aquatic stage (egg, larva instar 1--4, pupa) \\
+$T_{i,d}$ & daily mean air temperature at cell $i$ ($^\circ$C) \\
+$R_{i,d}$ & daily rainfall at cell $i$ (mm\,d$^{-1}$) \\
+$\sigma_{i,d}$ & water salinity at cell $i$ (psu; 0 = freshwater) \\
+$H_{i,g}$ & static habitat potential of type $g$ in cell $i$, in $[0,1]$ \\
+$w_g$ & species affinity weight for habitat type $g$ \\
+$z_{i,d}$ & pluvial (rain-driven) habitat state, in $[0,1]$ \\
+$S_{i,d}$ & daily habitat availability (``accuracy'' in the code), in $[0,1]$ \\
+$K_{i,d}$ & daily larval capacity of cell $i$ (individuals) \\
+$N_{p,k,d}$ & number of immatures in cohort $(p,k)$ \\
+$p_d$ & adult daily survival probability \\
+$E$ & extrinsic incubation progress (degree-days) \\
+$H_j$ & number of humans in cell $j$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+% =====================================================================
+\section{Purpose}
+
+The model is a daily, spatially explicit simulator of \emph{Anopheles}
+population dynamics and malaria transmission over a regional
+area of interest (AOI). It has three intended uses.
+
+\begin{enumerate}
+\item \textbf{Ground-truth generator for a surrogate model.} The engine
+  produces the state fields (adult counts per cell, human infection
+  fields) that train, validate, and stress-test a U-Net surrogate of the
+  vector dynamics. The ABM is the reference process; the surrogate is an
+  approximation to be fitted to it.
+\item \textbf{Simulation engine of a calibration and scoring pipeline.}
+  The engine is run under alternative climate, habitat, host, and
+  seeding configurations; the outputs are scored against patterns and
+  against the surrogate. The purpose is comparative and
+  pattern-oriented, not the production of an official forecast.
+\item \textbf{Mechanistic scenario analysis.} The model is used to ask
+  where and when a vector population can establish, how the aquatic
+  stages respond to rainfall and temperature, how host distribution and
+  daily human mobility reshape biting risk, and whether a seeded human
+  outbreak can start a transmission chain.
+\end{enumerate}
+
+The model expands an earlier thin-slice formulation into a richer
+representation of the same system: individual adult mosquitoes with a
+gonotrophic cycle, cohort-based aquatic stages with thermal development
+and density-dependent mortality, static remote-sensing habitat proxies
+with a rain-driven pluvial response, a spatial host landscape with
+phase-specific human mobility, and a Ross--Macdonald-type SEIR--SEI
+transmission layer. The expansion is deliberate ``from basic principles
+to richer representation'': each added layer is a mechanism that the
+thin slice either omitted or aggregated.
+
+The model is \emph{not} intended for the following, and the current code
+does not implement them: vector control (insecticide-treated nets,
+indoor residual spraying, larviciding), drugs or vaccination, mosquito
+genetics or insecticide resistance, evolution or learning, human
+demography (births, deaths, migration of the SEIR population), water
+balance or depth-resolved hydrology, or sub-daily mosquito flight.
+Human movement is represented only as a change in the effective host
+distribution for biting, not as movement of the infection compartments.
+A single mosquito species is active per run (the default is
+\emph{An.\ coluzzii}); parameter rows for six species exist, of which
+two (\emph{An.\ melas}, \emph{An.\ stephensi}) are dormant.
+
+The patterns that the project intends to use when judging whether the
+model is realistic enough for these purposes are seasonal adult
+abundance, the persistence and spatial location of adult foci, the
+fraction of vectors that become infectious, and the timing and location
+of a seeded human outbreak. These patterns are calibration targets, not
+outputs that the model is forced to reproduce: the current parameter set
+is a set of literature values and explicit engineering priors. The
+project states that a formal calibration to Ghanaian field data has not
+yet been completed. The code records no fit provenance for any
+parameter, so it can neither confirm nor refute that statement; it is
+reported here as a project claim, not as a model fact
+(Appendix~B.4).
+
+% =====================================================================
+\section{Entities, state variables, and scales}
+
+\subsection*{2.1 Entities}
+
+\begin{description}
+\item[Adult mosquitoes (individual agents).] The only true individuals in
+  the model. Each adult has a unique identity, a position, a sex, a
+  species identity, a transmission state, and (for females) a
+  gonotrophic state. Adults are stored in a structure-of-arrays (SoA)
+  layout; dead agents are removed by swapping the last live agent into
+  the vacated slot. Population size is not fixed; it is bounded only by
+  the optional operational \code{--max-population} guard, which aborts a
+  run rather than imposing a biological ceiling.
+
+\item[Aquatic immatures (cohorts, not individuals).] Eggs, larvae
+  (instars L1--L4), and pupae are not individual agents. They are
+  aggregated as one cohort per (patch, stage, instar) with an integer
+  count and a development fraction. A cohort is a bookkeeping
+  super-individual, not an entity that can be identified or tracked.
+
+\item[Habitat patches (modeler-defined spatial units).] A patch is a
+  candidate breeding cell. The patch set is the union of the features in
+  the habitat GeoPackage (one point per candidate cell) and any grid cell
+  whose static total potential clears the engine floor
+  (\code{candidate_min_engine} = \mskey{habitat.candidate_min_engine}).
+  Three counts must be kept apart. In the delivered Ghana 2024 product
+  the GeoPackage holds 382,127 point features; 368,761 of those features
+  have \code{habitat_potential} at or above the floor; and 370,061 grid
+  cells have a static total potential at or above the floor. The
+  operational patch set is the \emph{union} of all GeoPackage cells and
+  all floor cells (\code{coordinator.cpp:156-174}), so it is at least
+  382,127 cells; in the delivered
+  product the floor cells are a subset of the GeoPackage cells and the
+  union is exactly 382,127 cells. The three numbers are readings of the
+  delivered artefacts, not model constants
+  (Appendix~B.4).
+  Each patch has a stable \code{patch_id}, a cell $(r,c)$, a static
+  amplitude, and (diagnostic only) a dominant habitat type.
+
+\item[Grid cells and the environment.] The AOI is a regular grid of
+  1\,km$^2$ cells in EPSG:4326. Cells carry the daily rainfall, air
+  temperature and (optional) salinity, the five static habitat planes,
+  the pluvial state $z$, a dry-day counter, and the daily capacity $K$.
+  The default Ghana AOI is 551 columns $\times$ 779 rows $=429{,}229$
+  cells.
+
+\item[Human hosts (compartments, not agents).] Humans are not
+  individuals. Each cell carries susceptible, exposed, infectious, and
+  recovered \emph{counts}, plus three discrete age-of-infection cohort
+  queues (exposed, infectious, recovered). The human population is
+  constant during a run. In the delivered Ghana product the host grid
+  integrates to about 32.0 million persons over the bounding box (which
+  includes neighbouring land and sea, not only Ghana).
+
+\item[Host-landscape cells.] Each cell carries counts of humans, cattle,
+  goats, sheep, pigs, and chickens, a wildlife proxy, a building
+  fraction, an indoor fraction, a residential fraction, and a binary
+  urbanicity. These are attributes of the environment, not agents.
+
+\item[Collectives.] There are no emergent collectives: no herds, swarms,
+  households, or social groups. ``Patch'', ``cohort'', ``grid cell'', and
+  ``phase-specific host grid'' are modeler-defined aggregates.
+\end{description}
+
+\subsection*{2.2 State variables}
+
+Table~\ref{tab:state} lists the state variables. The test applied is the
+one recommended by the protocol: if the model were stopped and restarted,
+which values would have to be saved? The answer is the union of the rows
+marked ``state'', plus the random-number-generator states. Rows whose note
+begins ``derived'' or ``forcing'' are not independent state: they are
+computed each day from the state, the static inputs, or the day's
+environmental forcing, and they are listed because the engine exposes them
+and because their units matter for replication. (The engine does not
+currently implement a checkpoint writer; the list is the conceptual
+restart state.)
+
+\begin{longtable}{@{}L{2.9cm}L{5.6cm}L{6.5cm}@{}}
+\caption{State variables by entity type. Counts are integers unless
+stated; ``persons'' and ``individuals'' are absolute counts, not
+densities.}\label{tab:state}\\
+\toprule
+\textbf{Entity} & \textbf{State variable} & \textbf{Unit, range, and notes} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Entity} & \textbf{State variable} & \textbf{Unit, range, and notes} \\
+\midrule
+\endhead
+\bottomrule
+\endlastfoot
+Adult mosquito & \code{uid} & integer; stable for life \\
+ & \code{patch_id} & integer; patch association, not necessarily the current cell \\
+ & \code{row}, \code{col} & cell index; current position \\
+ & \code{lon}, \code{lat} & decimal degrees, EPSG:4326; current position \\
+ & \code{sex} & 0 = male, 1 = female; fixed at emergence \\
+ & \code{stage} & always 1 (adult) for live agents; immatures are cohorts \\
+ & \code{vector_state} & 0 = susceptible, 1 = exposed, 2 = infectious \\
+ & \code{parasite_eip_progress} & degree-days $\ge 0$; meaningful for adult females \\
+ & \code{gonotrophic_state} & enum; live subset is TENERAL, MATE\_SEEKING, HOST\_SEEKING, BLOOD\_FED, RESTING, EGG\_MATURING, GRAVID, OVIPOSITION\_SEEKING, OVIPOSITING \\
+ & \code{gonotrophic_timer} & days in the current gonotrophic state \\
+ & \code{gonotrophic_cycles} & completed cycles; distinguishes first from later cycles \\
+ & \code{feeding_success} & daily flag: 1 if fed today, 0 otherwise; reset each day (not restart state) \\
+ & \code{species_id} & 0--5; one active species per run \\
+ & \code{last_patch_update_row/col} & cache used to skip the patch-snap scan; not biological \\
+Aquatic cohort & \code{patch_id} & integer \\
+ & \code{stage} & EGG, LARVA, PUPA \\
+ & \code{larval_instar} & 1--4 for LARVA; 0 otherwise \\
+ & \code{development} & fraction of the current stage completed, $[0,1]$ \\
+ & \code{count} & individuals; integer $\ge 0$ \\
+ & \code{mean_age_days} & days; diagnostic counter, incremented only on days when the cohort's patch is active, so it does not advance while the patch is frozen and is not a running age (\code{aquatic_cohort_bank.cpp:346-367}) \\
+Habitat patch & \code{activated} & derived: $S\ge$ activation floor and salinity below the species' high tolerance \\
+ & \code{habitat_avail} ($S$) & derived: $[0,1]$; species-neutral daily availability \\
+ & \code{k_habitat} ($K$) & derived: individuals; absolute Beverton--Holt capacity \\
+ & \code{habitat_dry_days} & days since $S$ last fell below the activation floor \\
+ & \code{rain_d}, \code{temp_d}, \code{salinity_ppt} & forcing: mm\,d$^{-1}$, $^\circ$C, psu; copied from the cell \\
+Grid cell & $z$ & state: $[0,1]$; pluvial state \\
+ & $H_{i,g}$ & static input: five planes in $[0,1]$: JRC, built, wetland, open+water, crop \\
+ & \code{dry_days} & state: integer; consecutive days with $S<$ activation floor \\
+ & $K$ & derived: individuals; same value exposed through the patch state \\
+ & rainfall, air temperature, salinity & forcing: mm\,d$^{-1}$, $^\circ$C, psu; daily \\
+Human grid & $S_H,E_H,I_H,R_H$ & persons per cell; $R_H$ is zero when immunity is disabled \\
+ & population & static input: persons per cell; constant \\
+ & incidence & daily output: new $E_H$ per day, persons \\
+ & prevalence & derived: $I_H/$population, dimensionless \\
+ & exposed cohorts & persons by day since exposure; 12 bins \\
+ & infectious cohorts & persons by day since onset; 20 bins \\
+ & recovered cohorts & persons by day since recovery; 180 bins if immunity is on \\
+Host cell & humans, cattle, goats, sheep, pigs, chickens & animals or persons per cell \\
+ & wildlife proxy & index in $[0,1]$; 0 when no data \\
+ & building fraction, indoor fraction, residential fraction & $[0,1]$ \\
+ & urbanicity, urban class & 1 = urban / 0 = rural; GHS-SMOD class code \\
+\end{longtable}
+
+\subsection*{2.3 Temporal and spatial resolution and extent}
+
+\textbf{Time.} One time step is one day. The engine accepts 1 to 731
+daily steps in a single invocation; the delivered Ghana environmental
+product covers 366 days (2024). Time is discrete: there is no continuous
+clock and no event queue. Within a day the processes run in a fixed
+order (Element~3). The four daily activity phases (DAY 06:00--18:00,
+EVENING 18:00--21:00, NIGHT 21:00--05:00, DAWN 05:00--06:00) are labels
+used to build phase-specific host landscapes during the host-seeking
+pass; they are not sub-steps of an hourly clock. The only genuinely
+sub-daily input is the optional 6-hourly wind field, which is queried at
+one fixed hour per day (\mskey{dispersal.flight_hour}:00) when windborne migration is active.
+
+\textbf{Space.} One grid cell represents 1\,km$^2$ on the ground, in
+EPSG:4326. Widths are converted with the cosine of the AOI centroid
+latitude; cell area for capacity is computed row by row as
+$10^{-6}\,(\mskey{ingest.cell_size_hint_m})^2\cos(\phi_i)$\,km$^2$ (about 0.99\,km$^2$ at 8$^\circ$N).
+The default Ghana AOI spans 5$^\circ$ of longitude by 7$^\circ$ of
+latitude, giving 551 $\times$ 779 cells (a bounding box of about
+428,600\,km$^2$, which includes sea and neighbouring land; it is not the
+land area of Ghana). The model has no sub-cell geometry: a host, a
+patch, and an adult are all located at a cell, with continuous
+lon/lat carried for dispersal and wind displacement.
+
+\textbf{Biological resolution.} Adults are individuals. Immatures are
+cohorts. Humans are compartments. Hosts are counts. This mixture is
+deliberate: the questions asked are about adult vector abundance and
+spatial foci, for which individual adults matter, while the immature
+stages are numerous and their individual identities are irrelevant to
+the questions.
+
+\textbf{Extent.} The model is regional, not global. The default AOI is
+Ghana; any AOI with a matching manifest and habitat product can be run.
+The environmental extent is the AOI bounding box; the biological extent
+is the set of candidate patches within it. Adults can disperse outside
+the candidate patch set but not outside the AOI grid: positions are
+clamped to the grid at the cell-snapping step.
+
+% =====================================================================
+\section{Process overview and scheduling}
+
+Time is modelled as a sequence of discrete daily updates. The order of
+processes within a day is fixed and is the same in every run. The order
+of entities within a process is deterministic given the random seed, but
+it is \emph{not} a random permutation: adults are visited in SoA index
+order, and removals use swap-with-last, which changes the index of the
+agent moved into the vacated slot. Cohorts are visited in the order of
+the cohort vector, which is the order of creation and is rebuilt after
+compaction. Patches are emitted in row-major $(r,c)$ order.
+
+The daily schedule is given below in pseudo-code. Names in
+\textsc{small caps} are the processes that become the submodels of
+Element~7.
+
+\begin{lstlisting}
+for d = 0 .. D-1:
+    climate.set_day(d)                       # select the daily band
+    UPDATE HABITAT                           # all cells, row-major
+        z <- f(z, rain_d); S <- f(H, w, z); K <- k_ref * area * S
+        dry_days <- update(S); patch_states <- build_patch_states()
+    mosquito.advance_day(patch_states):
+        ADVANCE AQUATIC STAGES               # cohort bank
+            desiccation -> washout -> egg/pupa mortality
+            -> larval density mortality -> development + promotion
+        EMERGE ADULTS                        # pupae with dev >= 1
+        bite_ledger.reset_day()
+        for each adult female in SoA order:
+            RUN GONOTROPHIC CYCLE            # one state transition
+            if HOST_APPROACH: move toward host (if hosts loaded)
+            if HOST_SEEKING: increment starvation timer; die at \mskey{host_seeking.starvation_days} d
+            SEEK OVIPOSITION SITE AND OVIPOSIT
+            SEEK HOSTS AND FEED              # non-phase-aware fallback
+        if effective hosts loaded:           # phase-aware pass
+            for phase in DAY, EVENING, NIGHT, DAWN:
+                if species active in phase:
+                    sample H_eff(day, phase) for humans and livestock
+                    for each HOST_SEEKING female in SoA order:
+                        move one step toward best host cell
+                        SEEK HOSTS AND FEED
+        DISPERSE ADULTS                      # wind first, then Gaussian
+        snap every adult to nearest active patch within \mskey{dispersal.snap_radius_m} m
+        SURVIVE ADULTS                       # daily survival draw
+    if transmission enabled:
+        aggregate adult counts; check and trigger human outbreak
+        advance vector EIP                   # exposed females only
+        advance human SEIR from today's bites
+        record daily statistics
+    date <- date + 1 day
+\end{lstlisting}
+
+Table~\ref{tab:sched} states, for each process, which entity performs it,
+in what order the entities are visited, and whether updates are
+asynchronous (a new value is visible immediately to later entities in the
+same process) or synchronous (values are collected and applied
+together).
+
+\begin{longtable}{@{}L{4.0cm}L{3.0cm}L{4.4cm}L{3.6cm}@{}}
+\caption{Process order within one simulated day.}\label{tab:sched}\\
+\toprule
+\textbf{Process} & \textbf{Performed by} & \textbf{Entity order} & \textbf{Update mode} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Process} & \textbf{Performed by} & \textbf{Entity order} & \textbf{Update mode} \\
+\midrule
+\endhead
+\bottomrule
+\endlastfoot
+Update habitat & coordinator, all cells & row-major $(r,c)$ & synchronous within a cell; cells independent \\
+Advance aquatic stages & cohort bank & cohort-vector order & asynchronous: each cohort is updated in place \\
+Emerge adults & pupae with dev $\ge1$ & cohort-vector order & synchronous event list, applied after the scan \\
+Gonotrophic transition & adult females & SoA index order & asynchronous; a state change is visible in the same iteration \\
+Oviposition seeking and laying & gravid females & SoA index order & asynchronous; eggs are added immediately \\
+Host seeking and feeding & host-seeking females & SoA index order, then phase order & asynchronous; a fed female is skipped in later phases \\
+Dispersal & all adults & SoA index order & asynchronous; positions updated in place \\
+Patch snap & all adults & SoA index order & asynchronous; nearest active patch within \mskey{dispersal.snap_radius_m}\,m \\
+Adult survival & all adults & reverse SoA index order & asynchronous; survivors are compacted by swap-with-last \\
+Transmission & vector females and human cells & SoA index order; cells row-major & vector EIP then human SEIR; human cohorts shifted per cell \\
+\end{longtable}
+
+Several consequences of this schedule are worth stating explicitly
+because they affect results.
+
+\begin{enumerate}
+\item \textbf{No within-day feedback from adults to habitat.} The habitat
+  state $S$ and capacity $K$ are computed once, from the day's rainfall
+  and the static planes, before any mosquito acts. Adults and immatures
+  cannot change $S$ or $K$ during the day. The only feedback is indirect
+  and delayed: adults lay eggs, and the resulting larvae experience next
+  day's $K$.
+\item \textbf{Aquatic promotions do not cascade.} Development is
+  accumulated for every cohort first; promotions are then applied. A
+  cohort that reaches the end of the egg stage today becomes an L1
+  cohort and does not also advance through L1 on the same day.
+\item \textbf{A female can oviposit and feed on the same day.} The
+  gonotrophic transition runs first; a female that reaches
+  OVIPOSITING lays eggs and is reset to HOST\_SEEKING; the host-seeking
+  block then runs in the same iteration (or, in the phase-aware path, in
+  the phase pass later in the same day). She can therefore take a blood
+  meal on the day she lays.
+\item \textbf{A female can make several feeding attempts in one day.} In
+  the phase-aware path the pass re-examines every female that is still
+  in HOST\_SEEKING in each active phase, and each phase makes one
+  host-selection attempt (one uniform draw over the attraction field).
+  With the four default phases active, a female that does not feed can
+  make up to four attempts in a day. Once she reaches BLOOD\_FED she
+  leaves HOST\_SEEKING and is skipped by the remaining phases. The
+  single-phase fallback path makes one attempt per female per day.
+\item \textbf{Death is applied immediately.} When a female starves or an
+  adult fails its survival draw, the last live agent is swapped into its
+  slot and the live range shrinks. This changes the order in which the
+  remaining agents are visited, but the order remains deterministic for
+  a given seed.
+\item \textbf{Transmission is a separate block after the mosquito day.}
+  The vector EIP and the human SEIR update therefore use the adult
+  positions and the bite ledger \emph{after} dispersal, patch snapping,
+  and adult mortality. A mosquito that died today does not contribute to
+  today's transmission update, but the bites it recorded before dying
+  remain in the ledger.
+\end{enumerate}
+
+The model is stochastic but reproducible: for a given source state, a
+given environmental input, and a given master seed, the sequence of
+draws is fixed. The seed structure is described in Element~5 and
+Appendix~A.
+
+% =====================================================================
+\section{Design concepts}
+
+The eleven design concepts are treated as a checklist. Two of them,
+learning and prediction, are not implemented; they are declared here
+rather than silently omitted, so that a reader does not have to infer
+their absence. The model is rule-based: the adaptive traits are fixed
+species traits and fixed behavioural rules, not optimized strategies.
+
+\subsection{Basic principles}
+
+The model is built on five principles.
+
+\begin{enumerate}
+\item \textbf{Individual-based ecology.} System-level dynamics (population
+  growth, spatial spread, transmission) are expected to emerge from the
+  fates of individual adults and from the environment they experience
+  (Grimm \& Railsback 2005). Adults are the only individuals; the
+  immature stages are aggregated because their individual identities are
+  not needed for the questions asked.
+\item \textbf{Metabolic and thermal physiology.} Development of eggs,
+  larvae, and pupae, adult survival, egg production, and the extrinsic
+  incubation period are temperature-dependent. The functional forms are
+  taken from the mosquito thermal-biology literature: Brière-1 curves for
+  eggs and pupae, a quadratic curve for larvae (Bayoh \& Lindsay 2003;
+  Mordecai et al.\ 2013), a Gaussian survival curve around an optimum,
+  and a degree-day EIP.
+\item \textbf{Ross--Macdonald transmission.} The transmission layer
+  decomposes vectorial capacity into bites on humans, the probability of
+  infection per bite in each direction, vector survival, and the
+  extrinsic incubation period (Macdonald 1957; Smith \& McKenzie 2004).
+  It is spatialized: every quantity is a per-cell field, and the bite
+  process is explicit rather than a mean biting rate.
+\item \textbf{Open remote-sensing proxies instead of a hydrological
+  model.} Breeding habitat is represented by static potential planes
+  derived from open satellite products (JRC Global Surface Water and
+  Dynamic World land cover), multiplied by a rain-driven pluvial state.
+  There is no digital elevation model, no flow accumulation, no water
+  balance in millimetres, and no depth or volume. This is a deliberate
+  structural choice: the available open data support a presence and
+  areal-fraction proxy, not a measured water budget.
+\item \textbf{Pattern-oriented modelling as the validation strategy.} The
+  model is judged by whether it reproduces a set of observed patterns at
+  the individual and system levels (seasonal abundance, focus
+  persistence, infectious fraction, outbreak timing), not by fitting a
+  single aggregate curve. The patterns are listed in Element~1.
+\end{enumerate}
+
+The model uses prior theory (thermal curves, Ross--Macdonald) at the
+submodel level and a system-level construction of its own (static
+potential $\times$ pluvial availability, phase-specific host landscape,
+bite-ledger transmission). It is not designed to test one of these
+theories against another; it is a synthetic laboratory in which their
+combined consequences can be examined.
+
+\subsection{Emergence}
+
+The results expected to emerge from individual behaviour and spatial
+heterogeneity are: the seasonal trajectory of adult abundance; the
+location, size, and persistence of adult foci; local extinction and
+re colonization; the age and gonotrophic structure of the female
+population; the fraction of vectors that become infectious; the
+probability and timing of a human outbreak after seeding; and the
+sensitivity of all of these to rainfall, temperature, habitat, and host
+distribution.
+
+Other results are tightly imposed by the rules and are therefore
+``built in'' rather than emergent: the shape of the thermal development
+and survival curves, the absolute capacity field $K$, the force of
+infection given a bite field, the host preference ordering, and the
+dispersal kernel. A change in those parameters changes the results
+directly; it is not mediated by individual adaptation.
+
+\subsection{Adaptation}
+
+Adults have no learning and no strategic choice. Their ``adaptive
+traits'' are fixed rules:
+
+\begin{itemize}
+\item a gonotrophic state machine that alternates host seeking, blood
+  feeding, egg maturation, and oviposition;
+\item host selection by a stochastic roulette over an attraction field
+  that combines host counts, species host preferences, indoor and urban
+  modifiers, and exponential distance decay;
+\item directed movement toward the strongest currently sensed host cell
+  and toward the strongest currently sensed breeding cell;
+\item skip-oviposition: a gravid female that cannot find an acceptable
+  breeding site within \mskey{oviposition.timeout_days} days abandons the
+  batch and returns to host seeking;
+\item starvation: a female that cannot find a host within
+  \mskey{host_seeking.starvation_days} days dies;
+\item local dispersal and, when a wind field is supplied, windborne
+  migration by gravid females.
+\end{itemize}
+
+These rules cause individuals to reproduce observed behaviours
+(``move toward the strongest plume'', ``lay in the nearest acceptable
+patch'') rather than to maximize an explicit measure of success. The
+traits are species parameters; they do not change within a run or across
+generations.
+
+\subsection{Objectives}
+
+The model has no explicit objective function and no ranking of
+alternatives by expected fitness. The implicit objective of an adult
+female is to survive and reproduce: find a host, obtain a blood meal,
+mature eggs, and lay them in a suitable patch. The criteria used in the
+two ``decisions'' are:
+
+\begin{itemize}
+\item \textbf{Host choice:} the attraction $A_j$ of a cell (Equation~17),
+  which increases with the number and preferred type of hosts and
+  decreases exponentially with distance. The female does not evaluate
+  the expected number of offspring, the risk of being killed, or the
+  quality of the blood meal.
+\item \textbf{Oviposition choice:} the attraction
+  $H^{\text{total}}_p e^{-d_p/\mskey{oviposition.scale_m}}$ of an active
+  patch (Equation~16). The
+  female does not forecast larval survival, competition, or future
+  drying.
+\end{itemize}
+
+The concept is included to make this explicit: the model is
+rule-based, not objective-driven. Any fitness-like quantity (for
+example, the approximate effective reproduction number reported in the
+transmission log) is a \emph{diagnostic} computed from the emergent
+output, not an objective that agents maximize.
+
+\subsection{Learning}
+
+Not implemented. Individuals do not change their behavioural rules with
+experience; there is no within-run learning, no memory of past hosts or
+breeding sites, and no evolutionary updating of parameters. The only
+state that accumulates with experience is the gonotrophic cycle counter
+(which distinguishes the first, slower egg maturation from later ones)
+and the EIP clock (which is physiological, not cognitive).
+
+\subsection{Prediction}
+
+Not implemented. Agents do not estimate future environmental or internal
+conditions. Movement is a response to the current attraction field; a
+female does not anticipate where hosts will be at the next phase, where
+rain will fall, or whether a breeding site will still be wet when her
+eggs hatch. The EIP progress is a physiological accumulator, not a
+prediction.
+
+\subsection{Sensing}
+
+Sensing is local and perfect within a radius:
+
+\begin{itemize}
+\item \textbf{Hosts:} a female computes an attraction field over cells
+  within \mskey{species.coluzzii.host_seeking_radius_m}\,m (the species
+  attraction radius) and, for directed
+  movement, detects the best host cell within
+  \mskey{host_seeking.detect_range_m}\,m (the engine
+  detection range). The field uses the true host counts (or the
+  phase-specific effective counts when mobility is loaded). There is no
+  perceptual error, no occlusion, and no memory.
+\item \textbf{Breeding sites:} a gravid female detects active patches
+  within \mskey{oviposition.detect_range_m}\,m, with attraction equal to
+  the patch's static
+  potential times an exponential decay with a \mskey{oviposition.scale_m}\,m
+  scale.
+\item \textbf{Environment:} temperature, rainfall, and salinity are
+  experienced at the cell; the aquatic stages use the cell temperature
+  of their patch. There is no sensing of conspecifics, no pheromone or
+  sound signalling, and no social network.
+\item \textbf{Hosts' perception:} humans and livestock do not perceive or
+  respond to mosquitoes. Host counts are a static (or phase-mobile)
+  resource; they are not depleted by biting.
+\end{itemize}
+
+\subsection{Interaction}
+
+The model has three kinds of interaction:
+
+\begin{enumerate}
+\item \textbf{Indirect competition among larvae.} All larvae in a patch
+  share the same daily capacity $K_{p,d}$; survival declines with the
+  total larval count $N_p$ through a Beverton--Holt function
+  (Equation~9). This is exploitation competition for a shared,
+  unmodelled resource, represented as a density-dependent survival
+  penalty.
+\item \textbf{Vector--host contact.} A feeding female bites one host in
+  the selected cell. The interaction is one-sided: the host does not
+  respond, does not become aware, and does not change behaviour. The bite
+  is recorded in a ledger and can infect the vector (human to vector) or
+  the human (vector to human).
+\item \textbf{Shared attraction.} Adults do not deplete hosts, so there
+  is no direct exploitation competition among adults. They interact
+  indirectly through the shared attraction field: a cell with many hosts
+  attracts many females, and the resulting bites are concentrated there.
+\end{enumerate}
+
+There is no direct mosquito--mosquito interaction, no competition for
+mating (mating is instantaneous and not modelled), no communication, and
+no human behavioural response. Human mobility changes the effective host
+distribution and therefore the interaction surface, but it does not
+change the infection compartments (Appendix~A.12).
+
+\subsection{Stochasticity}
+
+Stochasticity is used where the model does not represent the causal
+details of a process, and to produce demographic variability in a
+finite population. The stochastic draws are:
+
+\begin{itemize}
+\item sex at emergence and at seeding: Bernoulli(0.5);
+\item adult daily survival: Bernoulli($p_d$) per adult;
+\item local dispersal: two independent normal draws per dispersing adult,
+  clipped to a circle;
+\item windborne migration: Bernoulli(\mskey{dispersal.wind_migration_prob})
+  per eligible female per day,
+  then Bernoulli(\mskey{dispersal.wind_survival}) survival;
+\item egg batch: Binomial(\mskey{gonotrophic.egg_batch_n},
+  $\mskey{thermal.efd_max_eggs_per_day}\,m_{\text{EFD}}(T)$) per
+  oviposition;
+\item egg and pupa mortality: Binomial($N$, $m_k$) per cohort per day;
+\item larval survival: Binomial($N$, $p_L$) per larval cohort per day;
+\item washout: Binomial($N$, $f(R)$) per cohort on heavy-rain days;
+\item host selection: one uniform draw per female per feeding attempt,
+  used in a weighted roulette over attraction scores;
+\item human infection: Binomial($\operatorname{round}(S_H)$, $\lambda_H$)
+  per cell per day, with a deterministic fallback $S_H\lambda_H$ when
+  $\operatorname{round}(S_H)=0$; human cohort transitions are
+  deterministic shifts of the
+  queues;
+\item phase-specific human and livestock movement: a multinomial flow
+  per origin cell, per phase, per day;
+\item outbreak focus selection and, in random-viable mode, the choice of
+  seeding patches: uniform draws without replacement;
+\item host-weighted seeding: a weighted roulette without replacement.
+\end{itemize}
+
+The stochasticity is demographic and behavioural, not
+``measurement noise''. Environmental variability enters through the
+input series (rainfall, temperature, salinity, wind), not through a
+random weather generator. The model is not run as an ensemble by
+default: one rollout is one trajectory. Multiple rollouts are obtained
+by running the engine with different master seeds; each rollout is an
+independent trajectory from the same initial conditions and the same
+environmental forcing.
+
+A reproducibility caveat is important for replication: the three
+aquatic mortality processes (washout, egg/pupa mortality, larval
+density mortality) do not use the rollout's random stream. Each uses a
+separate \code{std::mt19937_64} re-seeded every day with a fixed
+constant (\mskey{rng.aquatic_seed_washout}, \mskey{rng.aquatic_seed_stage_mortality}, and
+\mskey{rng.aquatic_seed_larva_mortality}, respectively). Their draws are therefore a
+deterministic function of cohort order and cohort counts, identical
+across rollouts with the same state. The adult, host-selection, and
+transmission draws do use the rollout stream. See Appendix~A.5.
+
+\subsection{Collectives}
+
+No collectives are represented. The model has no herds, swarms, schools,
+households, villages, or social groups as entities. A ``patch'' is a
+modeler-defined cell; a ``cohort'' is a bookkeeping aggregate of
+immatures; a ``grid cell'' is a modeler-defined spatial unit; a
+``phase-specific host grid'' is a derived field. None of these is an
+emergent aggregation of individuals with its own state and behaviour.
+The adult population of a cell is an output aggregate, not an entity.
+
+\subsection{Observation}
+
+The model is observed at full state: every adult, every cohort, and
+every cell is known to the observer. There is no sampling, no detection
+error, and no virtual ecologist. The observation layer is:
+
+\begin{itemize}
+\item \textbf{State COG} (GeoTIFF, float32, 2 bands, NoData $-9999$):
+  band 1 \code{adult_patch_count} (adults associated with each cell via
+  their patch, after dispersal), band 2 \code{adult_cell_count} (adults
+  at their current position). Both are raw counts of all adults, males
+  included; there is no normalization by capacity.
+\item \textbf{State sidecar} (JSON): CRS, affine transform, AOI slug,
+  scale, start year and month, seed, rollout index and count, generator
+  version, contract version, band names, NoData, and grid dimensions.
+\item \textbf{Transmission COG} (optional, 4 bands, float32): human
+  prevalence, human incidence per person, infectious vector pressure
+  (infectious bites delivered per cell per day), and a binary active-focus
+  band (prevalence at or above the focus threshold, or any incidence).
+\item \textbf{Aquatic diagnostics} (JSON): total aquatic count, counts by
+  stage and instar, top ten patches by count, and mean development by
+  stage.
+\item \textbf{Cohort log} (JSON, optional): daily adult, larva, egg, and pupa
+  counts, emergence and death counts, and the legacy \code{eip_frac} field (Appendix~A.8).
+\item \textbf{Transmission log} (JSON, optional): daily human and vector
+  compartment counts, bites on humans, infectious bites, and an
+  approximate $R_{\text{eff}}$.
+\item \textbf{Foci log} (JSON, optional): the cells, cases, cell
+  population, mosquito density, and truncation flag of the seeded
+  outbreak.
+\item \textbf{Animated GIF} (optional): a diagnostic rendering of the
+  live state, including individual adults.
+\end{itemize}
+
+The state is written at the end of the requested horizon and, optionally,
+every $N$ days. The sidecar's year and month are the run's start date,
+not the date of the snapshot; the number of elapsed days is implicit in
+the file name and the snapshot schedule. The observation is at cell
+resolution and daily; the only individual-level visual output is the
+optional GIF, which is diagnostic and not part of the data contract.
+
+% =====================================================================
+\section{Initialization}
+
+\subsection*{5.1 State at time $t=0$}
+
+A run starts on the first day of the requested year and month. Before
+the first call to \code{step()}, the following holds.
+
+\begin{itemize}
+\item The environment is loaded: daily rainfall and air temperature for
+  the requested horizon (plus any warm-up bands), the five static habitat
+  planes, and optional salinity. The active day is the first simulation
+  band.
+\item The coordinate and capacity fields are \emph{not} yet computed:
+  $z=0$ in every cell, the dry-day counters are 0, and $K=0$. They are
+  filled by the first \code{update_habitat_day()} call, which consumes
+  the first day's rainfall. The pluvial state at the first mosquito
+  update is therefore the response to the start date's rain, not the
+  cold-start zero.
+\item The patch states are not yet built. In the default detection-based
+  modes, the first \code{to_dataframe()} call in \code{step()} builds the
+  candidate union and assigns stable patch identifiers; the uniform mode
+  builds the day-0 union during construction.
+\item The adult and aquatic populations are those produced by the
+  seeding mode (Section~5.2).
+\item The human compartments are initialized from the host grid
+  (Section~5.3).
+\item No wind field, mobility schedule, or transmission model is active
+  unless the corresponding input was supplied or the transmission flag
+  was set.
+\end{itemize}
+
+If \code{--warmup-bands} $n>0$ is supplied, the pluvial recursion is
+integrated over the $n$ environmental bands immediately preceding the
+start band, starting from $z=0$ at the cold end, before the simulation
+begins. This is a causal warm-up: it uses real preceding rainfall, not a
+synthetic fixed window. The default is $n=0$ (cold start).
+
+\subsection*{5.2 Mosquito seeding}
+
+The engine supports four seeding modes. The default is
+\code{random-viable}.
+
+\begin{longtable}{@{}L{2.3cm}L{3.3cm}L{4.1cm}L{4.9cm}@{}}
+\caption{Seeding modes and their initial populations. Counts are per
+selected patch unless stated.}\label{tab:seed}\\
+\toprule
+\textbf{Mode} & \textbf{Selection} & \textbf{Adults} & \textbf{Immatures} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Mode} & \textbf{Selection} & \textbf{Adults} & \textbf{Immatures} \\
+\midrule
+\endhead
+\bottomrule
+\endlastfoot
+\code{random-viable} (default) & 3 patches drawn uniformly without replacement from the viable set (gpkg potential $\ge\mskey{habitat.candidate_min_engine}$) & 50 per patch & 30 per patch, distributed over stages \\
+\code{uniform} & every candidate cell of the day-0 union & 30 per patch & 270 per patch, distributed over stages \\
+\code{explicit} & user-supplied points; nearest viable patch within 5\,km; points with no patch in range are dropped & 50 per point (fixed by the parser) & 30 per point (fixed by the parser) \\
+\code{host-weighted} & 3 patches sampled without replacement with weight $\sum_j \text{host score}_j e^{-d_{pj}/s_s}$ within 5\,km, $s_s$ the species plume scale (\mskey{species.coluzzii.host_seeking_scale_m}\,m for the default species) & 50 per patch & 30 per patch \\
+\end{longtable}
+
+Every seeded adult is created with \code{stage}=1, a sex drawn
+Bernoulli(0.5), gonotrophic state TENERAL, vector state SUSCEPTIBLE,
+EIP progress 0, zero completed cycles, and the cell-centre lon/lat of its
+patch. Adults are immediately able to disperse, but a TENERAL female
+must pass through MATE\_SEEKING before she can seek a host: her first
+blood meal occurs on the second daily update after seeding (or later, if
+no host is found).
+
+The immature count of a detection-seeded patch is distributed as
+follows. The integer allocation is computed from the requested count
+$n$ as
+\[
+n_{\text{pupa}}=\max(1,\lfloor0.05n\rfloor),\quad
+n_{L4}=\max(1,\lfloor0.15n\rfloor),\quad
+n_{L3}=n_{L2}=\lfloor0.25n\rfloor,\quad
+n_{L1}=\lfloor0.20n\rfloor,
+\]
+and the remainder is eggs. The pre-set development fractions are 0.58
+for pupae, 0.47 for L4, 0.38 for L3, 0.29 for L2, 0.20 for L1, and 0.00
+for eggs. These fractions are fractions of the current stage, not ages;
+they stagger the first emergence wave instead of releasing all immatures
+at once. For the default $n=30$ the allocation is 5 eggs, 6 L1, 7 L2,
+7 L3, 4 L4, and 1 pupa; for the uniform $n=270$ it is 29 eggs, 54 L1,
+67 L2, 67 L3, 40 L4, and 13 pupae. The small-$n$ rounding is therefore
+visible: the nominal 10/20/25/25/15/5 percentages become 16.7/20/23.3/
+23.3/13.3/3.3 at $n=30$.
+
+If the candidate set is empty, or if no seeding instruction is produced
+(no viable patch, no host within range in host-weighted mode, no
+detection point in range in explicit mode), the population starts empty.
+An empty population cannot produce a new generation, because there are
+no adults to lay eggs; the run then reports zero vectors throughout.
+
+\subsection*{5.3 Humans, transmission, hosts, mobility, and wind}
+
+\textbf{Human compartments.} The human population of each cell is the
+value of the \code{human} variable in the host NetCDF (WorldPop counts
+aggregated to the 1\,km cell). If no host file is supplied but
+transmission is enabled, every cell is assigned one person. The initial
+compartments are $S_H=$ population and $E_H=I_H=R_H=0$, except in the
+legacy \code{uniform-legacy} seeding mode, where a fraction
+\code{initial_human_prevalence} $=\mskey{transmission.initial_human_prevalence}$ of each cell is infectious and is
+spread evenly over the 20 infectious cohort bins. The human population
+does not change during the run.
+
+\textbf{Outbreak seeding.} If transmission is enabled and the human
+seeding mode is \code{random-viable} (the default), the model waits until
+the configured outbreak day (default 0). It first checks that the maximum
+cell density reaches \code{human_outbreak_min_density} (default 0, which
+disables the gate), then looks for a cell with population greater than or equal to
+\code{human_min_cell_pop} (default 50; the test is
+\code{population_ >= min_pop}, \code{human_state.cpp:112}) and vector presence in its
+$3\times3$ neighbourhood (in cluster mode, at least
+\code{human_outbreak_min_density}). It seeds
+\code{human_outbreak_foci} (default 3) foci of
+\code{human_outbreak_cases} (default 50) infectious humans, truncated by
+the susceptible population of each cell. If no cell qualifies, it retries
+on the next day. In cluster mode (a positive cluster radius), it seeds
+one cluster instead: the highest-population qualifying core cell, with
+cases split across the Chebyshev neighbourhood in proportion to
+population times $(0.05+\text{local density})$. The \code{explicit} mode
+uses user coordinates instead of the viability search; \code{none} and
+\code{uniform-legacy} do not seed at trigger time. The default vector
+seeding fraction is \mskey{transmission.initial_vector_infected_frac}; if it is positive, that fraction of adult females
+is created already INFECTIOUS with EIP progress at the threshold.
+
+\textbf{Host landscape.} If a host file is supplied, the per-cell human
+and livestock counts, building fraction, indoor fraction, and urbanicity
+are loaded. If it is not supplied, there is no host landscape, no host
+seeking, and the fallback feeding rule is used (Section~7.6). The host
+landscape is static except for the phase-specific redistribution by
+mobility.
+
+\textbf{Mobility.} If human and/or livestock origin--destination matrices
+are present, the phase-specific effective host grids are built; if they
+are absent, everyone stays in their residential cell. The phase-aware
+host-seeking pass requires mobility data: without them, the single-phase
+residential fallback is used.
+
+\textbf{Wind.} If a wind field is supplied, windborne migration is active
+in the months and at the hour described in Section~7.7; otherwise it is
+off. The delivered Ghana product has no wind field in the manifest, so
+wind migration is off by default.
+
+\textbf{Transmission.} The transmission layer is off unless
+\code{--enable-transmission} is set. When it is off, the bite ledger is
+still maintained (it is cheap) but no EIP, human infection, or
+transmission output is produced.
+
+\subsection*{5.4 Randomness and reproducibility}
+
+The master seed is \code{--seed} (default 1). Rollout $i$ uses
+$\text{seed}+i$. From that stream the engine derives, in order, the
+coordinator seed (first state word), one uniform draw, the submodel seed
+(second state word), and, if transmission is enabled, the transmission
+seed (a further state word plus one uniform draw). The coordinator stream is
+used for seeding selection; the submodel stream is used for all daily
+adult, host-selection, and egg-batch draws; the transmission stream is
+used for outbreak and human binomial draws. The phase-specific host
+flows use a named substream derived by splitmix64 from the day, phase,
+and host type, so they do not consume the main stream. As noted in
+Section~4.9, the three aquatic mortality processes use fixed daily seeds
+and are independent of the rollout seed.
+
+Two runs with the same seed, the same inputs, and the same binary produce
+byte-identical state outputs. Two runs with different seeds share the
+environmental forcing but differ in seeding selection and in every
+stochastic draw. Initialization is never varied by a random environment:
+the climate and habitat inputs are fixed files.
+
+\subsection*{5.5 What is data-based and what is a scenario choice}
+
+The environmental drivers, the static habitat planes, the host counts,
+the building fraction, the urban class, and the optional mobility and
+wind fields are data-based. The initial mosquito counts, the number of
+detection patches, the detection radius, the outbreak size, and the
+cluster radius are scenario choices, not estimates. The model constants
+are literature values or explicit engineering priors, as recorded in the
+constants file and in the parameter tables of Element~7. The project states
+that no parameter has been fitted to Ghanaian mosquito abundance in the
+current release; the code records no fit provenance, so this is a project
+statement rather than a code-verifiable fact
+(Appendix~B.4).
+
+% =====================================================================
+\section{Input data}
+
+The model uses input data to represent time-varying and spatially varying
+processes. It does \emph{not} use input data for parameter values or for
+initial state variables: those are the subject of Elements~5 and~7. All
+inputs are prepared by the project's ingest stage from openly available
+products and are read as files at run time; the engine does not download
+data and does not call another model.
+
+\begin{longtable}{@{}L{2.4cm}L{3.2cm}L{2.6cm}L{2.6cm}L{3.2cm}@{}}
+\caption{Input data. ``1 km'' means the AOI grid cell; the native
+resolution of the source is given in the preparation column.}\label{tab:input}\\
+\toprule
+\textbf{Input} & \textbf{Variable} & \textbf{Units and resolution} & \textbf{Source} & \textbf{Preparation and uncertainty} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Input} & \textbf{Variable} & \textbf{Units and resolution} & \textbf{Source} & \textbf{Preparation and uncertainty} \\
+\midrule
+\endhead
+\bottomrule
+\endlastfoot
+Daily rainfall & \bcode{rainfall} & mm\,d$^{-1}$; 1 km, daily & CHIRPS v2.0 (UCSB Climate Hazards Center), native 0.05$^\circ$ ($\sim$5\,km) & Nearest-neighbour reprojection to the AOI grid; NoData filled from the nearest valid cell for that day; open sea set to 0; negative values clipped. A 5\,km product cannot resolve local convective cells; daily totals are smeared over the 1\,km grid. \\
+Daily air temperature & \bcode{air_temp_c} & $^\circ$C; 1 km, daily mean & ERA5-Land 2\,m temperature, native $\sim$9\,km & Bilinear reprojection; open sea set to 0; finite values below $-900$ treated as NoData and replaced by an eight-neighbour wavefront imputation from land. Daily means, not diurnal cycles. \\
+Permanent surface water & \bcode{jrc_persistent} & fraction $[0,1]$; 1 km, static & JRC Global Surface Water v1.4, native 30\,m & Fraction of pixels with $\ge80\%$ occurrence, averaged to 1\,km; open-sea cells zeroed, coastal lagoons and river mouths inside the configured coastal band retained (\mskey{ingest.coastline_buffer_m}\,m in the current constants; the tree records no value for the setting used when the delivered NC was built, so it is unknown whether the delivered product used this band). Occurrence is not depth, volume, or breeding suitability. \\
+Built land & \bcode{lc_built} & fraction $[0,1]$; 1 km, static & Dynamic World V1 (Google), native 10\,m & Per-year mode-of-year label composite, then areal fraction per 1\,km cell (average resampling); mean over available years. Label 6. Mode-of-year can lose episodic construction. \\
+Wetland & \bcode{lc_wetland} & fraction $[0,1]$; 1 km, static & Dynamic World V1 & Areal fraction of label 3 (flooded vegetation) only; mangroves are not separately represented. Tidal and deciduous pixels can be assigned to trees in the mode composite. \\
+Open land and water & \bcode{lc_open_plus_water} & fraction $[0,1]$; 1 km, static & Dynamic World V1 & Areal fraction of labels 2 (grass), 5 (shrub), 7 (bare), and 0 (water). In the engine, open habitat adds $\mskey{urban.rain_pools_built_damage}\times$ built land to represent rain pools on sealed surfaces. \\
+Cropland & \bcode{lc_crop} & fraction $[0,1]$; 1 km, static & Dynamic World V1 & Areal fraction of label 4. \\
+Salinity & \bcode{salinity_ppt} & psu; 1 km, daily, optional & SMAP monthly sea-surface salinity & Monthly field broadcast to days; missing values and negatives set to 0 (freshwater). Absent from the delivered Ghana product, so every cell is freshwater there. \\
+Habitat patches & \bcode{habitat_potential}, \bcode{hab_type}, \bcode{row}, \bcode{col} & points; 1 km & Derived from JRC and Dynamic World by ingest & 382,127 point features in the Ghana 2024 product, one per grid cell with any static habitat potential; 368,761 of the features are at or above the \mskey{habitat.candidate_min_engine} engine floor, and 370,061 grid cells clear that floor on their static total potential. The engine's patch set is the union of the file's cells and the floor cells, i.e.\ 382,127 cells in this product. The amplitude is the sum of the six $H$ values, capped at 1. \\
+Human population & \bcode{human} & persons per cell; 1 km, static & WorldPop 2020 constrained counts & Sum-preserving aggregation from $\sim$100\,m to 1\,km. A modelled count, not a census; about 32.0 million persons in the delivered bounding box. \\
+Livestock & \bcode{cattle}, \bcode{goats}, \bcode{sheep}, \bcode{pigs}, \bcode{chickens} & animals per cell; 1 km, static & FAO GLW4-2020 & Sum-preserving aggregation from $\sim$10\,km. About 3.5\,M cattle, 14.8\,M goats, 8.6\,M sheep, 2.7\,M pigs, and 121\,M chickens in the delivered grid. \\
+Urban class & \bcode{urban_class} & class code; 1 km, static & GHS-SMOD R2023A & Nearest-neighbour aggregation. The engine's binary rule treats class $\le40$ as urban (indoor fraction \mskey{host_seeking.indoor_fraction_urban}, urbanicity 1) and $>40$ as rural (\mskey{host_seeking.indoor_fraction_rural}, 0). \\
+Building fraction & \bcode{building_fraction} & $[0,1]$; 1 km, static & Overture Maps / OpenStreetMap & Sum-preserving aggregation. Used only to derive the residential fraction. \\
+Wildlife proxy & \bcode{wildlife_host_proxy} & index $[0,1]$; 1 km, static & Dynamic World class suitability, JRC water, remoteness & Weighted combination \mskey{wildlife.weights.habitat} habitat suitability, \mskey{wildlife.weights.water} water, \mskey{wildlife.weights.remoteness} remoteness. A proxy for wild-host availability, not a count. \\
+Human mobility & \bcode{*_mobility_day.csr}, \bcode{*_mobility_night.csr} & row-stochastic fractions; cell-to-cell & Built by ingest from population and attractiveness & Sparse origin--destination matrices; no within-run update. Absent $\Rightarrow$ identity (everyone at home). \\
+Livestock mobility & \bcode{*_livestock_mobility.csr} & row-stochastic fractions; cell-to-cell & Built by ingest & One seasonal matrix reused for all phases except NIGHT (identity). \\
+Wind & \bcode{u100}, \bcode{v100} & m\,s$^{-1}$; 6-hourly, optional & ERA5 & Nearest-neighbour spatial lookup and linear temporal interpolation; queried at one hour per day. Absent from the delivered Ghana product. \\
+\end{longtable}
+
+\textbf{Uncertainties and biases.} The habitat layers are proxies, not
+measurements of breeding sites. JRC occurrence records where water was
+observed, not how deep or how long it persists; the 80\% threshold turns
+a continuous occurrence field into a persistent-water mask. Dynamic
+World's mode-of-year composite removes within-year phenology and can
+misclassify tidal wetlands and mangrove margins. CHIRPS at 5\,km and
+ERA5-Land at 9\,km cannot resolve the local rain cells and temperature
+gradients that drive pool filling and larval development at the 1\,km
+scale; the model's daily series are therefore smoother than the real
+drivers. WorldPop and GLW4 are modelled surfaces with their own
+uncertainty, and the 1\,km aggregation mixes residential and
+non-residential land. The static habitat planes do not change within a
+year, so the model cannot represent land-cover change, irrigation
+expansion, or the seasonal drying of a specific pool beyond the shared
+pluvial state. The optional salinity field is monthly and absent from the
+delivered product, so coastal brackish habitat is effectively freshwater
+in the default Ghana runs. Open-sea cells are not excluded from the
+open+water static plane, and their air temperature is the 0.0 sentinel
+rather than NoData; they therefore act as cold, non-developing habitat
+rather than being masked out (Appendix~A.14). The coastal band applied when the delivered product was built is not
+recorded in the tree, so it cannot be verified from the repository whether
+the delivered JRC mask used the current buffer. These limitations are
+structural, not numerical: more compute does not remove them.
+
+% =====================================================================
+\section{Submodels}
+
+The submodels below correspond one-to-one to the processes listed in
+Element~3. For each, the factual description (equations and algorithm)
+comes first, followed by the origin and rationale, and then a table of
+parameters with units, reference values, and provenance. All values are
+read from \code{model_constants.yaml}; the tables quote that file. A
+value marked \emph{engineering prior} has no measurement or fit behind
+it: it is a design choice made to keep the model runnable in the absence
+of local data. A value marked \emph{literature anchor} is a published
+value or a published functional form, but it has not been re-fitted to
+Ghanaian data for this model.
+
+The model has been tested for software correctness (unit tests, golden
+fixtures, and a Python--C++ parity check of the constants file) but not
+validated against field observations. The distinction matters: a passing test suite says that
+the code does what this document says, not that the parameter values are
+right for a particular district. Appendix~B summarises the test and
+calibration status.
+
+\subsection{Update habitat availability and capacity}
+
+For every cell, once per day and before any mosquito acts, the model
+updates the pluvial state from the day's rainfall,
+\begin{equation}\label{eq:z}
+z_{i,d}=z^{\text{dry}}_{i,d}+\left(1-z^{\text{dry}}_{i,d}\right)
+\left(1-e^{-R_{i,d}/\rho}\right),\qquad
+z^{\text{dry}}_{i,d}=z_{i,d-1}\,e^{-\Delta/\tau},
+\end{equation}
+where $\rho$ is the rainfall scale (\mskey{pluvial.rain_scale_mm}\,mm), $\tau$ the dry-memory time constant
+(\mskey{pluvial.dry_memory_days}\,d), and $\Delta=\mskey{pluvial.delta_days}$\,d.
+
+\textbf{Two vocabularies for habitat types.} The configuration file and
+the Python contract layer name six habitat types ---
+\mskey{habitat_types.types} --- of which three are persistent and three
+pluvial (\code{habitat_types.dynamics}). The engine carries six static
+slots of its own, in the fixed order surface, urban, wetland, open,
+crop, forest, and the forest slot is identically zero
+(\code{habitat_availability.hpp:55-85}; \code{zone_id.hpp:13-21}). The
+engine maps five of the six configured types onto those slots by name:
+\code{surface_persistent} onto the surface slot,
+\code{urban_persistent} onto the urban slot,
+\code{wetland_persistent} onto the wetland slot,
+\code{open_pluvial} onto the open slot and \code{crop_pluvial} onto
+the crop slot (\code{config.cc:472-483}). The configured type
+\code{wetland_pluvial} has no engine slot: in the engine the wetland
+potential enters once, through the persistent wetland slot. The Python
+mirror is different: it defines six potentials, with
+$H_{\text{wetland\_pluvial}}=W$, so the wetland fraction is counted
+twice there (\code{mal_core/habitat/potential.py:74}). The two
+implementations do not agree on the number of habitat types; the
+engine's behaviour is what the rest of this section describes.
+
+The static potential of the engine's slots is assembled from the five
+environmental planes
+($J$ = JRC persistent fraction, $B$ = built fraction, $W$ = wetland
+fraction, $O$ = open+water fraction, $C$ = crop fraction):
+\begin{equation}\label{eq:H}
+H_{i,g}=\begin{cases}
+\min(1,\max(0,J_i)), & g=\text{surface},\\
+\min(1,\mskey{urban.beta_urban}\,B_i), & g=\text{urban},\\
+\min(1,\max(0,W_i)), & g=\text{wetland},\\
+\min(1,\max(0,O_i)+\mskey{urban.rain_pools_built_damage}\,B_i), & g=\text{open},\\
+\min(1,\max(0,C_i)), & g=\text{crop},\\
+0, & g=\text{forest}.
+\end{cases}
+\end{equation}
+The daily availability is a weighted sum of the static potential, with
+persistent types at full availability and pluvial types at $z$:
+\begin{equation}\label{eq:S}
+S_{i,d}=\min\left(1,\sum_g w_g H_{i,g}A_{g,d}\right),\qquad
+A_{g,d}=\begin{cases}1,&g\text{ persistent},\\ z_{i,d},&g\text{ pluvial}.\end{cases}
+\end{equation}
+The persistent/pluvial split is not positional: it is read from the
+configured dynamics of each type by name and mapped onto the engine's
+slots, so the surface, urban and wetland slots are persistent and the
+open and crop slots are pluvial; the forest slot has no configured type
+and is always zero.
+The absolute daily capacity is
+\begin{equation}\label{eq:K}
+K_{i,d}=k_{\text{ref}}\,a_i\,S_{i,d},\qquad
+a_i=10^{-6}\,(\mskey{ingest.cell_size_hint_m})^2\cos\phi_i,
+\end{equation}
+with $k_{\text{ref}}=\mskey{species.k_ref}$ and $\phi_i$ the latitude of
+the cell. A cell is an active patch when
+$S_{i,d}\ge S_{\text{act}}=\mskey{habitat.activation_min_engine}$ and its salinity is below the active
+species' high tolerance; otherwise it is inactive. Separately, a dry-day
+counter $D_{i,d}$ is reset to zero on days when $S_{i,d}\ge S_{\text{act}}$
+and incremented otherwise; it drives desiccation in the aquatic submodel.
+The counter therefore tracks $S$, not the salinity gate: a cell that is
+deactivated by salinity can still have $D_{i,d}=0$. The candidate patch
+union is the habitat GeoPackage plus any cell whose static total
+potential clears \mskey{habitat.candidate_min_engine}; the engine's total
+potential is the sum over its five non-zero slots, so the wetland
+fraction enters it once; patches are emitted in row-major order with
+stable identifiers.
+
+\begin{longtable}{@{}L{3.3cm}L{4.4cm}L{1.6cm}L{1.6cm}L{3.6cm}@{}}
+\caption{Parameters of the habitat update.}\label{tab:habparams}\\
+\toprule
+\textbf{Parameter} & \textbf{Meaning} & \textbf{Unit} & \textbf{Value} & \textbf{Provenance} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Parameter} & \textbf{Meaning} & \textbf{Unit} & \textbf{Value} & \textbf{Provenance} \\
+\midrule
+\endhead
+\bottomrule
+\endlastfoot
+\code{rain_scale_mm} & rainfall scale $\rho$ of the pluvial fill & mm & \mskey{pluvial.rain_scale_mm} & engineering prior, aligned with the d19/d20 scorers \\
+\code{dry_memory_days} & dry-memory time constant $\tau$ & d & \mskey{pluvial.dry_memory_days} & engineering prior \\
+\code{delta_days} & daily step $\Delta$ & d & \mskey{pluvial.delta_days} & model definition \\
+\code{cold_start_z} & initial pluvial state & -- & \mskey{pluvial.cold_start_z} & model definition \\
+\code{activation_min_engine} & $S_{\text{act}}$, active-patch floor & -- & \mskey{habitat.activation_min_engine} & engineering prior \\
+\code{candidate_min_engine} & engine patch-set floor & -- & \mskey{habitat.candidate_min_engine} & engineering prior \\
+\code{beta_urban} & coefficient of built land in $H_{\text{urban}}$ & -- & \mskey{urban.beta_urban} & engineering prior; unchanged from the deployed calibration \\
+\code{rain_pools_built_damage} & built-land term added to $H_{\text{open}}$ & -- & \mskey{urban.rain_pools_built_damage} & engineering prior \\
+\code{persistent_availability} & $A$ for persistent types & -- & \mskey{capacity.persistent_availability} & model definition \\
+\code{k_ref} & capacity scale & ind.\,km$^{-2}$ & \mskey{species.k_ref} & engineering prior; see Appendix~A.9 on the unit annotation \\
+\code{cell_size_hint_m} & default AOI cell size & m & \mskey{ingest.cell_size_hint_m} & model definition \\
+\end{longtable}
+
+\textbf{Origin and rationale.} The submodel replaces the retired pool
+hydrology (water balance in millimetres, topographic wetness index, urban
+floor, capacity clamp). The replacement is deliberately simpler: the
+open products support a static areal fraction and a rain-driven
+availability, not a measured water depth. The urban term encodes the
+premise that leaks, seepage, drainage, and human water storage maintain
+some dry-season breeding supply in built-up areas; it is a proxy, not a
+measurement. The pluvial state is shared by all pluvial habitat types;
+the model does not maintain a separate water balance per type.
+
+\textbf{Behaviour on the delivered landscape.} Evaluating
+Equations~\eqref{eq:H}--\eqref{eq:K} directly on the Ghana 2024 static
+planes gives a useful characterization of the initial habitat. With the
+species-neutral weights of Appendix~A.1, 11.0\% of cells are above the
+\mskey{habitat.activation_min_engine} activation floor at $z=0$
+(persistent supply only), and 82.9\% are
+above it at $z=1$; the mean capacity rises from 0.61 to 10.4 individuals
+per cell, with a maximum of about 32 at $z=1$. These numbers are computed
+from the delivered planes and the equations above; they are not the
+result of an engine run, they are readings of the delivered artefact
+(Appendix~B.4), and they will change with a different AOI
+or year.
+
+\subsection{Advance aquatic stages}
+
+Immatures live in cohorts indexed by (patch, stage, instar). Each cohort
+has a count $N$ and a development fraction $x\in[0,1)$ relative to its
+current stage. Development is temperature-dependent. For eggs and pupae
+the rate is Brière-1; for larvae it is quadratic:
+\begin{equation}\label{eq:thermal}
+r_{\text{egg/pupa}}(T)=a\,T\,(T-T_L)\sqrt{T_H-T},\qquad
+r_{\text{larva}}(T)=a\,(T-T_L)(T_H-T),
+\end{equation}
+for $T_L<T<T_H$ and zero otherwise, clipped to $[0,1]$ per day. Each
+active-patch cohort accumulates
+\begin{equation}\label{eq:dev}
+x_{k,d}=x_{k,d-1}+r_k(T_{p,d});
+\end{equation}
+a cohort with $x\ge1$ is promoted to the next instar or stage, and its
+development is reset to zero. Promotions are collected first and applied
+after the scan, so they do not cascade within a day. Cohorts on inactive
+patches do not develop; their development is frozen.
+
+Larval survival is density-dependent and shared by all four instars of a
+patch. With $N_p$ the total larval count of the patch before mortality,
+\begin{equation}\label{eq:BH}
+p_L=\begin{cases}
+S_0\,\dfrac{K_{p,d}}{K_{p,d}+\alpha N_p}, & K_{p,d}>0,\\[6pt]
+0, & K_{p,d}=0,
+\end{cases}
+\qquad p_L\leftarrow p_L\,s(\sigma_{p,d}),
+\end{equation}
+where $S_0=\mskey{aquatic_stages.larva_bh_s0}$ and $\alpha=\mskey{aquatic_stages.larva_bh_alpha}$. If the patch has zero capacity, all
+larvae of that patch die on that day; eggs and pupae are not touched by
+this operation. The salinity multiplier is
+\begin{equation}\label{eq:sal}
+s(\sigma)=\begin{cases}
+1, & \sigma\le\sigma_{\text{opt}},\\
+\left(1-\dfrac{\sigma-\sigma_{\text{opt}}}{\sigma_{\text{hi}}-\sigma_{\text{opt}}}\right)
+e^{-b(\sigma-\sigma_{\text{opt}})}, & \sigma_{\text{opt}}<\sigma<\sigma_{\text{hi}},\\
+0, & \sigma\ge\sigma_{\text{hi}}.
+\end{cases}
+\end{equation}
+Eggs and pupae have constant daily mortality; washout and desiccation are
+applied before development:
+\begin{equation}\label{eq:stress}
+m_{\text{des}}(D)=\begin{cases}0,&D\le\mskey{aquatic_stress.desicc_grace_days},\\ \mskey{aquatic_stress.desicc_base_daily}\left(1-e^{-\mskey{aquatic_stress.desicc_ramp_decay}(D-\mskey{aquatic_stress.desicc_grace_days})}\right),&D>\mskey{aquatic_stress.desicc_grace_days},\end{cases}
+\qquad
+f(R)=\begin{cases}0,&R<\mskey{aquatic_stress.wash_threshold_mm},\\ \min\left(\mskey{aquatic_stress.wash_fraction_max},\,\mskey{aquatic_stress.wash_fraction_max}\,\dfrac{R-\mskey{aquatic_stress.wash_threshold_mm}}{\mskey{aquatic_stress.wash_threshold_mm}}\right),&R\ge\mskey{aquatic_stress.wash_threshold_mm}.\end{cases}
+\end{equation}
+Desiccation applies only to eggs and to larvae in instars L1--L2
+(\code{vulnerable_instar_max}=\mskey{aquatic_stress.vulnerable_instar_max}); L3, L4, and pupae are not desiccated.
+Washout applies to all aquatic stages when daily rainfall reaches the
+\mskey{aquatic_stress.wash_threshold_mm}\,mm threshold; the flushed fraction is binomial. The daily order is:
+desiccation, washout, egg/pupa mortality, larval density mortality,
+development and promotion, compaction.
+
+\begin{longtable}{@{}L{4.2cm}L{4.0cm}L{1.4cm}L{1.4cm}L{3.4cm}@{}}
+\caption{Parameters of the aquatic-stage submodel.}\label{tab:aquaparams}\\
+\toprule
+\textbf{Parameter} & \textbf{Meaning} & \textbf{Unit} & \textbf{Value} & \textbf{Provenance} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Parameter} & \textbf{Meaning} & \textbf{Unit} & \textbf{Value} & \textbf{Provenance} \\
+\midrule
+\endhead
+\bottomrule
+\endlastfoot
+\code{egg_development_tmin_c} & $T_L$, egg Brière-1 & $^\circ$C & \mskey{thermal.egg_development_tmin_c} & fit limit on Bayoh \& Lindsay (2003) \\
+\code{egg_development_tmax_c} & $T_H$, egg Brière-1 & $^\circ$C & \mskey{thermal.egg_development_tmax_c} & fit limit \\
+\code{egg_development_scale} & $a$, egg & d$^{-1}$\,$^\circ$C$^{-2.5}$ & \mskey{thermal.egg_development_scale} & fit to Bayoh \& Lindsay (2003) \\
+\code{larva_development_tmin_c} & $T_L$, larva quadratic & $^\circ$C & \mskey{thermal.larva_development_tmin_c} & fit limit \\
+\code{larva_development_tmax_c} & $T_H$, larva quadratic & $^\circ$C & \mskey{thermal.larva_development_tmax_c} & fit limit \\
+\code{larva_development_scale} & $a$, larva & d$^{-1}$\,$^\circ$C$^{-2}$ & \mskey{thermal.larva_development_scale} & calibrated on Bayoh \& Lindsay (2003); validated on Agyekum (2022) and Ou\'edraogo (2024) per the constants file \\
+\code{pupa_development_tmin_c} & $T_L$, pupa Brière-1 & $^\circ$C & \mskey{thermal.pupa_development_tmin_c} & fit limit \\
+\code{pupa_development_tmax_c} & $T_H$, pupa Brière-1 & $^\circ$C & \mskey{thermal.pupa_development_tmax_c} & fit limit \\
+\code{pupa_development_scale} & $a$, pupa & d$^{-1}$\,$^\circ$C$^{-2.5}$ & \mskey{thermal.pupa_development_scale} & fit to Bayoh \& Lindsay (2003) \\
+\code{egg_daily_mort} & daily egg mortality & d$^{-1}$ & \mskey{aquatic_stages.egg_daily_mort} & engineering prior; the constants file notes that Depinay (2004) implies about 0.01 \\
+\code{pupa_daily_mort} & daily pupa mortality & d$^{-1}$ & \mskey{aquatic_stages.pupa_daily_mort} & engineering prior \\
+\code{larva_bh_s0} & zero-density larval survival $S_0$ & -- & \mskey{aquatic_stages.larva_bh_s0} & engineering prior \\
+\code{larva_bh_alpha} & competition coefficient $\alpha$ & -- & \mskey{aquatic_stages.larva_bh_alpha} & engineering prior; CLI-overridable \\
+\code{last_larval_instar} & last larval instar & instar & \mskey{aquatic_stages.last_larval_instar} & model definition \\
+\code{desicc_grace_days} & desiccation grace period & d & \mskey{aquatic_stress.desicc_grace_days} & engineering prior \\
+\code{desicc_base_daily} & desiccation ceiling & d$^{-1}$ & \mskey{aquatic_stress.desicc_base_daily} & engineering prior \\
+\code{desicc_ramp_decay} & desiccation ramp & d$^{-1}$ & \mskey{aquatic_stress.desicc_ramp_decay} & engineering prior \\
+\code{wash_threshold_mm} & washout threshold & mm & \mskey{aquatic_stress.wash_threshold_mm} & engineering prior \\
+\code{wash_fraction_max} & maximum washed fraction & -- & \mskey{aquatic_stress.wash_fraction_max} & engineering prior \\
+\code{vulnerable_instar_max} & last desiccation-vulnerable instar & instar & \mskey{aquatic_stress.vulnerable_instar_max} & model definition \\
+\code{salinity_missing_psu} & salinity used when data are absent & psu & \mskey{aquatic_stages.salinity_missing_psu} & model definition (freshwater) \\
+\code{salinity_opt_ppt}, \code{salinity_hi_tol_ppt}, \code{salinity_slope} & species salinity response & psu, psu, psu$^{-1}$ & \mskey{species.coluzzii.salinity_opt_ppt}, \mskey{species.coluzzii.salinity_hi_tol_ppt}, \mskey{species.coluzzii.salinity_slope} & \emph{An.\ coluzzii} row; literature-anchored but not locally fitted \\
+\code{aquatic_seed_washout}, \code{aquatic_seed_stage_mortality}, \code{aquatic_seed_larva_mortality} & fixed daily RNG seeds & -- & \mskey{rng.aquatic_seed_washout}, \mskey{rng.aquatic_seed_stage_mortality}, \mskey{rng.aquatic_seed_larva_mortality} & reproducibility constants \\
+\end{longtable}
+
+\textbf{Origin and rationale.} The cohort formulation keeps the immature
+stages cheap while preserving their temperature-dependent timing and
+their density-dependent loss. The thermal curves are the standard
+mosquito development forms; the values are fitted to laboratory
+development data, not to Ghanaian field populations. The Beverton--Holt
+form is a standard compensatory survival function: at low density,
+survival approaches $S_0$; at high density, survival declines
+hyperbolically, with half of the density-dependent loss at
+$N_p=K/\alpha=20K$. The desiccation and washout stressors are the
+retained biological stresses of the retired pool model, re-driven by the
+new habitat state. The salinity multiplier is an independent gate: it
+multiplies larval survival, so brackish water reduces, and above the
+high tolerance eliminates, larval survival for a freshwater-adapted
+species.
+
+\textbf{Consequences worth stating.} At 25$^\circ$C, the rates give
+about 1.1\,d for eggs, 4.4\,d per larval instar (17.8\,d for four
+instars), and 1\,d for pupae, i.e.\ roughly 20\,d from egg to adult;
+colder and hotter temperatures lengthen the larval stage because the
+quadratic curve peaks at 25$^\circ$C. A dry patch with $S$ below the
+activation floor freezes development but does not automatically kill
+L3, L4, or pupae; those cohorts persist until the patch reactivates or
+until a day with $K=0$ removes the larvae. Eggs and L1--L2 are the
+stages exposed to desiccation, consistent with the configured
+vulnerability window.
+
+\subsection{Emerge adults}
+
+When a pupa cohort reaches $x\ge1$ in the promotion pass, its count is
+converted to adults in a synchronous event list applied after the cohort
+scan. Each new adult is assigned a sex by a Bernoulli(0.5) draw, the
+gonotrophic state TENERAL, vector state SUSCEPTIBLE, EIP progress 0, zero
+gonotrophic cycles, and the cell centre of its patch. The new adults are
+appended to the SoA and are subject to adult survival in the same day's
+survival pass. There are no parameters specific to this submodel beyond
+the 0.5 sex ratio.
+
+\textbf{Rationale.} Emergence is the only route by which the adult
+population grows; there is no immigration and no adult release except
+the initial seeding and, optionally, windborne migration. The 0.5 sex
+ratio is a neutral default; it is not a fitted value.
+
+\subsection{Run the gonotrophic cycle}
+
+Each adult female advances one step of a deterministic state machine on
+each daily update:
+\begin{center}
+\small
+TENERAL $\to$ MATE\_SEEKING $\to$ HOST\_SEEKING $\to$ BLOOD\_FED
+$\to$ RESTING $\to$ EGG\_MATURING $\to$ GRAVID
+$\to$ OVIPOSITION\_SEEKING $\to$ OVIPOSITING $\to$ HOST\_SEEKING.
+\end{center}
+Mating is instantaneous (MATE\_SEEKING lasts one update). The female
+remains in HOST\_SEEKING until the host-seeking submodel gives her a
+blood meal. After feeding, BLOOD\_FED lasts one daily update (the
+configured \mskey{gonotrophic.resting_duration_days}\,d is rounded down to zero completed days), then RESTING
+lasts one update, and EGG\_MATURING lasts
+$\lceil\mskey{gonotrophic.first_cycle_days}\rceil=\mskey{gonotrophic.first_cycle_days}$ days on the
+first cycle and $\lceil\mskey{gonotrophic.cycle_duration_days}\rceil=\mskey{gonotrophic.cycle_duration_days}$ days on later cycles. GRAVID lasts one
+update; OVIPOSITION\_SEEKING is resolved by the oviposition submodel;
+OVIPOSITING resets the female to HOST\_SEEKING after laying. In the
+absence of delays, the interval from a blood meal to the next oviposition
+is therefore about 5 days for later cycles and about 7 days for the first
+cycle. The two states HOST\_APPROACH and PROBING exist in the enum and in
+the transition function but are not entered by the current feeding code;
+the female goes directly from HOST\_SEEKING to BLOOD\_FED when a host is
+found (Appendix~A.2).
+
+The egg batch is drawn at oviposition:
+\begin{equation}\label{eq:eggs}
+n_{\text{eggs}}\sim\text{Binomial}\left(\mskey{gonotrophic.egg_batch_n},\;\mskey{thermal.efd_max_eggs_per_day}\,m_{\text{EFD}}(T)\right),
+\qquad \mskey{gonotrophic.egg_batch_min}\le n_{\text{eggs}}\le\mskey{gonotrophic.egg_batch_max},
+\end{equation}
+with the thermal modifier
+\begin{equation}\label{eq:efd}
+\text{EFD}(T)=\mskey{thermal.efd_max_eggs_per_day}\,\frac{(T-\mskey{thermal.efd_tmin_c})(\mskey{thermal.efd_tmax_c}-T)}{(\mskey{thermal.efd_tmax_c}-\mskey{thermal.efd_tmin_c})^2/4},\qquad
+m_{\text{EFD}}(T)=\frac{\text{EFD}(T)}{\text{EFD}(\mskey{thermal.efd_topt_c})},
+\end{equation}
+zero outside $[\mskey{thermal.efd_tmin_c},\mskey{thermal.efd_tmax_c}]$\,$^\circ$C and clipped to $[0,1]$. At
+\mskey{thermal.efd_topt_c}$^\circ$C the mean batch is \mskey{gonotrophic.egg_batch_mean} eggs (binomial standard deviation
+7.75). At the thermal thresholds the modifier is zero, so the binomial
+draws zero and the batch is raised to the \mskey{gonotrophic.egg_batch_min}-egg floor: the floor, not
+the thermal response, sets the minimum batch at extreme temperatures.
+
+\begin{longtable}{@{}L{3.3cm}L{4.4cm}L{1.4cm}L{1.5cm}L{3.9cm}@{}}
+\caption{Parameters of the gonotrophic submodel.}\label{tab:gonoparams}\\
+\toprule
+\textbf{Parameter} & \textbf{Meaning} & \textbf{Unit} & \textbf{Value} & \textbf{Provenance} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Parameter} & \textbf{Meaning} & \textbf{Unit} & \textbf{Value} & \textbf{Provenance} \\
+\midrule
+\endhead
+\bottomrule
+\endlastfoot
+\code{cycle_duration_days} & egg maturation, later cycles & d & \mskey{gonotrophic.cycle_duration_days} & engineering prior; rounded up to 2 \\
+\code{first_cycle_days} & egg maturation, first cycle & d & \mskey{gonotrophic.first_cycle_days} & engineering prior; rounded up to 4 \\
+\code{feeding_success_rate} & PROBING $\to$ BLOOD\_FED & -- & \mskey{gonotrophic.feeding_success_rate} & literature anchor; \emph{not consumed at run time} (Appendix~A.2) \\
+\code{egg_batch_mean} & mean of the binomial draw & eggs & \mskey{gonotrophic.egg_batch_mean} & engineering prior \\
+\code{egg_batch_n} & trials of the binomial draw & trials & \mskey{gonotrophic.egg_batch_n} & engineering prior \\
+\code{egg_batch_min} & lower clamp & eggs & \mskey{gonotrophic.egg_batch_min} & engineering prior \\
+\code{egg_batch_max} & upper clamp & eggs & \mskey{gonotrophic.egg_batch_max} & engineering prior \\
+\code{resting_duration_days} & post-feed rest & d & \mskey{gonotrophic.resting_duration_days} & engineering prior; rounded down, one update \\
+\code{efd_max_eggs_per_day} & EFD scale & eggs female$^{-1}$ d$^{-1}$ & \mskey{thermal.efd_max_eggs_per_day} & calibration scale, not absolute EFD \\
+\code{efd_tmin_c}, \code{efd_tmax_c}, \code{efd_topt_c} & EFD thresholds and optimum & $^\circ$C & \mskey{thermal.efd_tmin_c}, \mskey{thermal.efd_tmax_c}, \mskey{thermal.efd_topt_c} & Mordecai et al.\ (2013) form \\
+\end{longtable}
+
+\textbf{Origin and rationale.} The gonotrophic cycle is the reproductive
+clock of the model. The state machine makes the female's current
+behaviour depend on her recent blood meal, which is the minimum needed to
+couple biting, egg production, and habitat quality. The first cycle is
+slower than later ones, reflecting the initial maturation of the
+reproductive system. The batch size is a binomial draw rather than a
+fixed mean so that individual females vary; the thermal modifier ties
+fecundity to the same per-patch temperature that drives development and
+survival. The clamp keeps a batch within a plausible range but, as noted,
+it also imposes a 30-egg minimum when the thermal modifier is zero.
+
+\subsection{Seek an oviposition site and oviposit}
+
+A female in OVIPOSITION\_SEEKING looks for active patches within
+\mskey{oviposition.detect_range_m}\,m and scores them by
+\begin{equation}\label{eq:ovip}
+A_p=H^{\text{tot}}_p\,e^{-d_p/\mskey{oviposition.scale_m}\,\text{m}},
+\end{equation}
+where $H^{\text{tot}}_p$ is the patch's static potential (the GeoPackage
+amplitude, or the cell's $S$ when the patch is not in the GeoPackage).
+The best-scoring patch is accepted only if $A_p>\mskey{oviposition.min_attraction}$; otherwise the
+female has no target. If a target exists, she takes one step of
+\mskey{oviposition.step_m}\,m toward it, snaps to a cell, and checks whether her new cell is an active
+patch. If it is, she enters OVIPOSITING and lays; if not, she remains in
+OVIPOSITION\_SEEKING and increments her search timer. If no target is
+found, she stays in place and increments the timer. After
+\mskey{oviposition.timeout_days} days without
+laying, she abandons the batch, returns to HOST\_SEEKING, and does not
+lay. When she lays, the eggs are added to the patch identifier she holds
+at that moment, and the engine re-snaps her to the nearest \emph{active}
+patch within \mskey{dispersal.snap_radius_m}\,m of her cell before laying; if no active patch is in
+range, she keeps her previous patch association and the eggs go there
+(\code{mosquito_submodel.cpp:704,726};
+\code{mosquito_submodel.cpp:965-1006}). The patch that was originally
+detected is therefore not necessarily the one that receives the eggs.
+
+\begin{longtable}{@{}L{3.3cm}L{4.8cm}L{1.5cm}L{1.5cm}L{3.4cm}@{}}
+\caption{Parameters of the oviposition submodel.}\label{tab:oviparams}\\
+\toprule
+\textbf{Parameter} & \textbf{Meaning} & \textbf{Unit} & \textbf{Value} & \textbf{Provenance} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Parameter} & \textbf{Meaning} & \textbf{Unit} & \textbf{Value} & \textbf{Provenance} \\
+\midrule
+\endhead
+\bottomrule
+\endlastfoot
+\code{scale_m} & plume decay scale & m & \mskey{oviposition.scale_m} & engineering prior; mechanism after Okal (2013) \\
+\code{detect_range_m} & detection radius & m & \mskey{oviposition.detect_range_m} & engineering prior \\
+\code{step_m} & daily step toward site & m & \mskey{oviposition.step_m} & engineering prior \\
+\code{min_attraction} & acceptance threshold & -- & \mskey{oviposition.min_attraction} & engineering prior \\
+\code{timeout_days} & skip-oviposition timeout & d & \mskey{oviposition.timeout_days} & engineering prior \\
+\end{longtable}
+
+\textbf{Origin and rationale.} Gravid females are not assumed to lay
+randomly: they follow a decaying plume toward habitat. The \mskey{oviposition.scale_m}\,m decay
+makes the choice strongly local; the \mskey{oviposition.detect_range_m}\,m detection radius lets a
+female find a site across a few cells, and the \mskey{oviposition.step_m}\,m daily step means
+that a distant site takes several days to reach. The timeout implements
+skip-oviposition: a female without a suitable site resorbs or retains
+eggs rather than laying in a hostile cell. The acceptance threshold
+prevents a female from chasing a negligible potential.
+
+\textbf{Consequence of the timeout.} A female walks at most \mskey{oviposition.step_m}\,m per day
+for \mskey{oviposition.timeout_days} days before abandoning the batch, so the effective reachable radius
+is about 350\,m, not the \mskey{oviposition.detect_range_m}\,m detection radius. A site detected between
+350\,m and 2\,km can only be reached if the female is displaced by local
+dispersal or wind while she is searching. The detection radius is
+therefore an upper bound on perception, not on successful location.
+
+\subsection{Seek hosts and feed}
+
+Host seeking has two implementations, selected by the inputs. If a host
+landscape is loaded and a mobility schedule is present, the engine runs
+the \emph{phase-aware} path: for each of the four daily phases it builds
+a phase-specific effective host landscape and lets every female still in
+HOST\_SEEKING search and feed. If a host landscape is loaded but no
+mobility schedule is present, it runs a single-phase residential path. If
+no host landscape is loaded, it uses a deterministic fallback in which
+every HOST\_SEEKING female takes a HUMAN blood meal at her current cell.
+
+\textbf{Attraction.} For a female at cell $i$, the attraction of a host
+cell $j$ within the species radius is
+\begin{equation}\label{eq:attraction}
+A_j=\left(\sum_k N_{jk}\pi_k\right)
+\left(1+\mskey{host_seeking.indoor_attraction_add}\,I_j\right)\left(1+\mskey{host_seeking.urbanicity_add}\,U_j\right)
+e^{-d_j/s_s},
+\end{equation}
+where $N_{jk}$ is the count of host type $k$ in cell $j$, $\pi_k$ the
+species preference for that type, $I_j$ the cell's indoor fraction, $U_j$
+its urbanicity (1 urban, 0 rural), $d_j$ the centre-to-centre distance,
+and $s_s$ the species plume scale (\mskey{species.coluzzii.host_seeking_scale_m}\,m for \emph{An.\ coluzzii};
+\mskey{species.arabiensis.host_seeking_scale_m}\,m for \emph{An.\ arabiensis}). Pigs are weighted as cattle and
+chickens as the ``other'' (wildlife) class. The preference row of
+\emph{An.\ coluzzii} is human \mskey{species.coluzzii.pref.human}, cattle \mskey{species.coluzzii.pref.cattle}, goat \mskey{species.coluzzii.pref.goat}, sheep \mskey{species.coluzzii.pref.sheep},
+wildlife \mskey{species.coluzzii.pref.wildlife}; the other species rows are in the constants file.
+
+\textbf{Effective hosts.} With mobility data, the residential host counts
+are redistributed by a row-stochastic origin--destination matrix,
+\begin{equation}\label{eq:heff}
+H^{\text{eff}}_j(d,\phi)=\sum_i P_{ij}(\phi)\,H^{\text{res}}_i,
+\end{equation}
+realized stochastically each day and phase by a multinomial flow per
+origin cell (with stochastic rounding of fractional populations). Humans
+and cattle are moved; goats, sheep, pigs, and chickens remain at their
+residential cells. The human day matrix is used for DAY, EVENING, and
+DAWN; the night matrix for NIGHT. The livestock day matrix is used for
+all phases except NIGHT, where the identity is used. When no mobility
+data are present, the effective grid is the residential grid.
+
+\textbf{Phase pass.} For each phase whose species activity weight exceeds
+0.001 (with the default row, all four phases qualify), the engine samples
+the human and livestock effective grids once and shares them across all
+females. For each female still in HOST\_SEEKING, in SoA order, it:
+(i) finds the best host cell within \mskey{host_seeking.detect_range_m}\,m whose attraction exceeds
+0.5 and takes one step of \mskey{dispersal.host_flight_step_m}\,m toward it (if no such cell, she does not
+move); (ii) recomputes the attraction field within
+\mskey{species.coluzzii.host_seeking_radius_m}\,m at her new
+position; (iii) selects one cell by a roulette proportional to
+attraction; (iv) if a cell is selected, feeds with certainty, sets
+BLOOD\_FED, records the meal at the selected host cell, and uses the
+dominant host type of that cell as the host type. A female that feeds in
+an early phase is skipped by later phases. A female that does not feed
+remains in HOST\_SEEKING and may try again in the next phase.
+
+\textbf{Starvation.} The HOST\_SEEKING timer is incremented once per daily
+update. A female that reaches \mskey{host_seeking.starvation_days} days without a blood meal dies. The timer
+is reset when she feeds and when she returns from oviposition.
+
+\textbf{Transmission hazard on a bite.} If the female is SUSCEPTIBLE, the
+host is HUMAN, and transmission is enabled, the bite infects her with
+probability
+\begin{equation}\label{eq:pinf}
+P_{\text{inf}}=\beta_{hv}\,p^{\text{prev}}_j,
+\end{equation}
+where $j$ is the host cell and $p^{\text{prev}}_j$ is its infectious
+fraction $I_H(j)/H_j$ \emph{as of the end of the previous day}: the human
+grid keeps one daily prevalence field, written at the end of each SEIR
+update, and the bite reads the value left there by the last update
+(\code{mosquito_submodel.cpp:105,111};
+\code{human_state.hpp:106};\code{human_state.cpp:330}). The hazard is
+therefore lagged by one day relative to the bites recorded on the same
+day. When the stored value is zero the code draws no random number at
+all. On success she becomes EXPOSED with EIP
+progress 0.
+
+\begin{longtable}{@{}L{5.2cm}L{3.3cm}L{1.2cm}L{1.3cm}L{3.3cm}@{}}
+\caption{Parameters of the host-seeking submodel.}\label{tab:hostparams}\\
+\toprule
+\textbf{Parameter} & \textbf{Meaning} & \textbf{Unit} & \textbf{Value} & \textbf{Provenance} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Parameter} & \textbf{Meaning} & \textbf{Unit} & \textbf{Value} & \textbf{Provenance} \\
+\midrule
+\endhead
+\bottomrule
+\endlastfoot
+\bcode{host_seeking.starvation_days} & maximum days without a host & d & \mskey{host_seeking.starvation_days} & engineering prior \\
+\bcode{host_seeking.indoor_attraction_add} & indoor modifier coefficient & -- & \mskey{host_seeking.indoor_attraction_add} & engineering prior; no recorded source \\
+\bcode{host_seeking.urbanicity_add} & urban modifier coefficient & -- & \mskey{host_seeking.urbanicity_add} & engineering prior \\
+\bcode{host_seeking.indoor_fraction_urban} & indoor fraction, urban class & -- & \mskey{host_seeking.indoor_fraction_urban} & literature anchor for \emph{An.\ gambiae} endophily \\
+\bcode{host_seeking.indoor_fraction_rural} & indoor fraction, rural class & -- & \mskey{host_seeking.indoor_fraction_rural} & literature anchor \\
+\bcode{host_seeking.detect_range_m} & directed-movement detection range & m & \mskey{host_seeking.detect_range_m} & engineering prior \\
+\bcode{host_seeking.approach_step_m} & HOST\_APPROACH step & m & \mskey{host_seeking.approach_step_m} & engineering prior; path not entered \\
+\bcode{species.<row>.host_seeking_scale_m} & plume decay $s_s$ & m & \mskey{species.coluzzii.host_seeking_scale_m} (\mskey{species.arabiensis.host_seeking_scale_m} for \emph{arabiensis}) & engineering prior; mechanism recorded as Giraldo (2023) \\
+\bcode{species.<row>.host_seeking_radius_m} & attraction-field radius & m & \mskey{species.coluzzii.host_seeking_radius_m} & engineering prior; no local plume measurement \\
+\bcode{dispersal.host_flight_step_m} & directed flight step per phase & m & \mskey{dispersal.host_flight_step_m} & engineering prior \\
+\bcode{species.<row>.activity_weights} & phase activity weights [DAY, EVENING, NIGHT, DAWN] & -- & \mskey{species.coluzzii.activity_weights} & \emph{An.\ coluzzii} row; engineering prior with a nocturnal shape \\
+\bcode{kPhaseActivityEpsilon} & phase gate & -- & 0.001 & model definition \\
+\bcode{species.<row>.pref} & host preference $\pi_k$ & -- & \mskey{species.coluzzii.pref.human}, \mskey{species.coluzzii.pref.cattle}, \mskey{species.coluzzii.pref.goat}, \mskey{species.coluzzii.pref.sheep}, \mskey{species.coluzzii.pref.wildlife} & \emph{An.\ coluzzii} row; model attraction weights, not observed HBI \\
+\end{longtable}
+
+\textbf{Origin and rationale.} The attraction field is a minimal
+representation of host odour and CO$_2$ plumes: host abundance, species
+preference, indoor/urban concentration, and exponential distance decay.
+It is not a plume-transport model; the decay scale is a prior, not a
+measurement. The phase pass exists because human and livestock hosts move
+during the day, so the same mosquito experiences a different host
+landscape at night and at midday. The multinomial flow preserves the
+total host count and introduces realistic day-to-day variation in who is
+where. The fallback without a host landscape is deliberately crude: it
+guarantees a blood meal at the current cell so that a run without host
+data still produces a gonotrophic cycle and eggs. It should not be used
+for a quantitative host-partitioning analysis.
+
+\textbf{Consequences worth stating.} With a \mskey{dispersal.host_flight_step_m}\,m step in each of four
+active phases, a female can move up to 2\,km per day toward hosts,
+independently of the local dispersal kernel; the phase weights gate
+activity but are not used as probabilities, so the 0.02 daytime weight
+still produces a full daytime search-and-feed opportunity (Appendix~A.4).
+Because the host type is the \emph{dominant} host of the selected cell,
+and the selected cell is chosen by total attraction, the realized host
+partition is not a direct draw from $\pi_k$; in a mixed cell, the most
+attractive host type dominates the recorded bites.
+
+\subsection{Disperse adults}
+
+Every adult makes a local dispersal draw once per day. With probability
+\mskey{dispersal.adult_prob_day} it moves by an isotropic Gaussian offset,
+\begin{equation}\label{eq:disp}
+(\Delta x,\Delta y)\sim\mathcal{N}(0,\sigma^2),\qquad
+\sigma=\mskey{dispersal.adult_sigma_m}\,\text{m},
+\end{equation}
+clipped to a circle of radius \mskey{dispersal.adult_max_m}\,m and converted to degrees with
+the cosine of the local latitude. Otherwise it stays. The draw is
+independent of sex, age, and gonotrophic state.
+
+If a wind field is supplied, gravid females and females in
+OVIPOSITION\_SEEKING may additionally migrate by wind. The wind path is
+active only in the months July--October and December--March, and only at
+the flight hour (\mskey{dispersal.flight_hour}:00). For each eligible female, with probability \mskey{dispersal.wind_migration_prob},
+the model reads the wind vector at her position and the current day/hour
+and displaces her downwind by
+\begin{equation}\label{eq:wind}
+\Delta=\left(|\mathbf{u}|+\mskey{dispersal.wind_self_speed_ms}\,\text{m s}^{-1}\right)\cdot \mskey{dispersal.wind_flight_hours}\,\text{h},
+\end{equation}
+where $|\mathbf{u}|$ is the wind speed and the \mskey{dispersal.wind_self_speed_ms}\,m\,s$^{-1}$ is the
+female's own flight speed. She survives the flight with probability \mskey{dispersal.wind_survival};
+on survival she is placed at the destination and reset to
+OVIPOSITION\_SEEKING; on failure she is removed. If the wind speed is at
+most 0.1\,m\,s$^{-1}$, the displacement is zero but the survival draw and
+the state reset still occur. Local dispersal is applied afterwards, so a
+wind-migrated female can also make a local jump on the same day. Lon/lat
+may leave the AOI during wind displacement; the cell index is clamped to
+the AOI border at the next snap.
+
+After dispersal, every adult is snapped to the nearest active patch
+within \mskey{dispersal.snap_radius_m}\,m. If no active patch is within that radius, the previous
+patch association is kept. The snap is skipped when the adult's
+$(r,c)$ has not changed since the previous day (a cache in
+\code{update_patch_id}), so a stationary adult keeps its previous
+association even if that patch has since deactivated; the association is
+recomputed when the adult changes cell. The patch association is what
+band~1 of the state output counts; band~2 counts the current cell.
+
+\begin{longtable}{@{}L{3.4cm}L{4.5cm}L{1.4cm}L{1.5cm}L{3.8cm}@{}}
+\caption{Parameters of the dispersal submodel.}\label{tab:dispparams}\\
+\toprule
+\textbf{Parameter} & \textbf{Meaning} & \textbf{Unit} & \textbf{Value} & \textbf{Provenance} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Parameter} & \textbf{Meaning} & \textbf{Unit} & \textbf{Value} & \textbf{Provenance} \\
+\midrule
+\endhead
+\bottomrule
+\endlastfoot
+\code{adult_prob_day} & daily local dispersal probability & d$^{-1}$ & \mskey{dispersal.adult_prob_day} & engineering prior \\
+\code{adult_sigma_m} & Gaussian scale $\sigma$ & m & \mskey{dispersal.adult_sigma_m} & prior inside the 350--650\,m\,d$^{-1}$ range recorded as Costantini (1996); not the midpoint \\
+\code{adult_max_m} & clip radius & m & \mskey{dispersal.adult_max_m} & compromise between the p95 values recorded as Thomas (2013) \\
+\code{wind_migration_prob} & daily wind-migration probability & d$^{-1}$ & \mskey{dispersal.wind_migration_prob} & engineering prior \\
+\code{wind_flight_hours} & flight duration & h & \mskey{dispersal.wind_flight_hours} & engineering prior; mechanism recorded as Huestis (2019) and Faiman (2020) \\
+\code{wind_survival} & survival during wind flight & -- & \mskey{dispersal.wind_survival} & engineering prior; mechanism recorded as Sanogo (2021) \\
+\code{wind_self_speed_ms} & own flight speed & m\,s$^{-1}$ & \mskey{dispersal.wind_self_speed_ms} & engineering prior \\
+\code{flight_hour} & hour used for the wind lookup & h & \mskey{dispersal.flight_hour} & model definition \\
+\code{snap_radius_m} & patch-snap radius & m & \mskey{dispersal.snap_radius_m} & engineering prior \\
+\code{night_start_hour}, \code{night_end_hour} & night window for wind flight & h & \mskey{dispersal.night_start_hour}, \mskey{dispersal.night_end_hour} & model definition \\
+\end{longtable}
+
+\textbf{Origin and rationale.} Local dispersal is a diffusion
+approximation: most adults stay, a minority make a Gaussian jump, and the
+tail is clipped to avoid implausible long jumps. The scale is within the
+range of mark--release--recapture estimates for \emph{An.\ gambiae}
+complex populations, but the value is a prior, not a local estimate. The
+wind path represents the well-documented long-distance transport of
+mosquitoes in the Sahel; it is optional because it requires a wind field
+and is not part of the delivered Ghana product. The \mskey{dispersal.snap_radius_m}\,m snap reflects
+the resolution of the habitat product: an adult between two patches is
+associated with the nearest active one, not with the nearest cell.
+
+\subsection{Survive adults}
+
+Each adult draws a uniform random number and survives with probability
+\begin{equation}\label{eq:survival}
+p_d(T)=\mskey{adults.daily_mort_basal}\,\exp\left(-\frac{(T-\mskey{adults.opt_c})^2}{2\cdot\mskey{adults.sigma_c}^2}\right),
+\end{equation}
+clamped to $[\mskey{adults.mort_floor},\mskey{adults.mort_cap}]$. The temperature $T$ is that of
+the adult's \emph{current cell}: the engine builds a cell-indexed
+temperature grid from the patch states and looks it up at the adult's
+$(r,c)$ (\code{mosquito_submodel.cpp:1104-1153}). An adult whose cell is
+not in that table --- it is not a candidate patch --- gets the bare basal
+value \mskey{adults.daily_mort_basal} with no Gaussian term, and the clamp
+leaves that value unchanged. The survival draw is independent of sex,
+age, gonotrophic
+state, and infection state; there is no senescence, no insecticide, and
+no host-defense mortality. The function is named
+\code{daily_mort_basal} in the constants file, but the value \mskey{adults.daily_mort_basal} is a
+daily \emph{survival} probability, as the file itself warns.
+
+\begin{longtable}{@{}L{3.4cm}L{4.6cm}L{1.4cm}L{1.5cm}L{3.7cm}@{}}
+\caption{Parameters of the adult-survival submodel.}\label{tab:survparams}\\
+\toprule
+\textbf{Parameter} & \textbf{Meaning} & \textbf{Unit} & \textbf{Value} & \textbf{Provenance} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Parameter} & \textbf{Meaning} & \textbf{Unit} & \textbf{Value} & \textbf{Provenance} \\
+\midrule
+\endhead
+\bottomrule
+\endlastfoot
+\code{daily_mort_basal} & basal daily survival & d$^{-1}$ & \mskey{adults.daily_mort_basal} & literature anchor recorded as Lardeux; see Appendix~A.10 \\
+\code{opt_c} & thermal optimum & $^\circ$C & \mskey{adults.opt_c} & literature anchor \\
+\code{sigma_c} & thermal width & $^\circ$C & \mskey{adults.sigma_c} & literature anchor \\
+\code{mort_cap} & upper clamp of $p_d$ & -- & \mskey{adults.mort_cap} & $\le$ basal, so dormant for the current value \\
+\code{mort_floor} & lower clamp of $p_d$ & -- & \mskey{adults.mort_floor} & binds only outside about 12.1--37.9$^\circ$C \\
+\end{longtable}
+
+\textbf{Origin and rationale.} The Gaussian form encodes a thermal
+optimum with a broad tolerance: survival is highest at 25$^\circ$C
+and declines symmetrically away from it. The basal value implies a mean
+adult lifetime of $-1/\ln(\mskey{adults.daily_mort_basal})=7.2$\,d at the optimum; at the lower end
+of the Ghana temperature field (about 21$^\circ$C) it is 0.84
+(5.8\,d), and at the upper end (about 36.9$^\circ$C) it is 0.64
+(2.2\,d). Because the Gaussian factor is at most 1 and the basal value is
+0.87, the \mskey{adults.mort_cap} cap can never bind; the \mskey{adults.mort_floor} floor binds only below about 12.1$^\circ$C or above about 37.9$^\circ$C, which the delivered
+Ghana daily means do not reach. The cap is therefore dormant in the
+current calibration, and the floor is dormant in Ghana 2024.
+
+\subsection{Transmit parasites}
+
+The transmission layer is a spatial Ross--Macdonald SEIR--SEI model. It
+is active only when \code{--enable-transmission} is set.
+
+\textbf{Vector EIP.} For each adult female in state EXPOSED, the model
+adds the day's degree-day increment at her current cell,
+\begin{equation}\label{eq:eip}
+E\leftarrow E+\max(0,T-\mskey{eip.base_c}),
+\end{equation}
+and changes her to INFECTIOUS when $E\ge\mskey{eip.threshold_gd}$ degree-days. At
+25$^\circ$C this takes 12.2 days; at 30$^\circ$C, 7.9 days; at
+21$^\circ$C, 22 days. The EIP block runs after the mosquito day, so a
+female infected by today's bite accrues today's degree-days.
+
+\textbf{Vector infection.} A susceptible female that takes a blood meal
+on a human is infected with probability given by
+Equation~\eqref{eq:pinf}; the prevalence read at the host cell is the
+one of the previous day. On
+success she becomes EXPOSED with $E=0$.
+
+\textbf{Human force of infection.} The bite ledger aggregates, per cell,
+the infectious bites delivered to humans during the day. The force of
+infection on the human population of cell $j$ is
+\begin{equation}\label{eq:foi}
+\lambda_j=1-\exp\left(-\mskey{transmission.beta_vh}\frac{B^{\text{inf}}_j}{H_j}\right),
+\end{equation}
+and the number of new exposures is
+\begin{equation}\label{eq:newexp}
+E^{\text{new}}_j\sim\text{Binomial}\left(\operatorname{round}(S_j),\lambda_j\right),
+\end{equation}
+with a deterministic fallback $E^{\text{new}}_j=S_j\lambda_j$ when
+$\operatorname{round}(S_j)=0$, and
+clamped to the susceptible count. The new exposures enter the exposed
+cohort queue at age zero. The queue is shifted by one day per update:
+a cohort exposed on day $d$ becomes infectious on day $d+\mskey{transmission.human_incubation_days}$ and recovers
+on day $d+\mskey{transmission.human_infectious_days}$ after onset. With immunity disabled (the default), recovery
+returns the cohort directly to $S_H$ (an SIS-like human model) and $R_H$
+stays zero; with immunity enabled, recovered cohorts spend \mskey{transmission.human_immunity_days} days in
+$R_H$ before returning to $S_H$.
+
+\textbf{Outbreak seeding.} The seeding rule is described in
+Section~5.3. Two timing details matter. First, the outbreak is checked
+after the mosquito day, so the seeded infectious humans are present only
+after that day's bites; they can infect vectors from the next day onward.
+Second, the check is retried daily until a qualifying cell exists, so a
+run can spend many days with zero human infections while the vector
+population is still too sparse or too far from a settlement.
+
+\textbf{Observation.} The transmission COG (optional) writes human
+prevalence, per-person incidence, infectious vector pressure (infectious
+bites per cell per day), and a binary active-focus band. The focus band is
+1 when prevalence is at or above 0.01 or incidence is positive; the
+threshold is an output classification, not a model rate.
+
+\begin{longtable}{@{}L{3.4cm}L{4.5cm}L{1.4cm}L{1.5cm}L{3.8cm}@{}}
+\caption{Parameters of the transmission submodel.}\label{tab:txparams}\\
+\toprule
+\textbf{Parameter} & \textbf{Meaning} & \textbf{Unit} & \textbf{Value} & \textbf{Provenance} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Parameter} & \textbf{Meaning} & \textbf{Unit} & \textbf{Value} & \textbf{Provenance} \\
+\midrule
+\endhead
+\bottomrule
+\endlastfoot
+\bcode{beta_hv} & human-to-vector probability per bite on an infectious human & -- & \mskey{transmission.beta_hv} & literature anchor; not locally fitted \\
+\bcode{beta_vh} & vector-to-human probability per infectious bite & -- & \mskey{transmission.beta_vh} & literature anchor; not locally fitted \\
+\bcode{human_incubation_days} & $E_H\to I_H$ & d & \mskey{transmission.human_incubation_days} & literature anchor \\
+\bcode{human_infectious_days} & $I_H\to R_H$ (or $S_H$) & d & \mskey{transmission.human_infectious_days} & literature anchor \\
+\bcode{human_immunity_days} & $R_H\to S_H$ when immunity is on & d & \mskey{transmission.human_immunity_days} & literature anchor; immunity off by default \\
+\bcode{initial_human_prevalence} & initial infectious fraction, uniform-legacy only & -- & \mskey{transmission.initial_human_prevalence} & scenario default \\
+\bcode{initial_vector_infected_frac} & initial infectious fraction of adult females & -- & \mskey{transmission.initial_vector_infected_frac} & scenario default \\
+\bcode{eip.base_c} & EIP base temperature & $^\circ$C & \mskey{eip.base_c} & degree-day formulation \\
+\bcode{eip.threshold_gd} & EIP threshold & degree-days & \mskey{eip.threshold_gd} & degree-day formulation \\
+\bcode{human_outbreak_day} & first day the outbreak may seed & d & 0 & scenario default \\
+\bcode{human_outbreak_foci} & number of foci & -- & 3 & scenario default \\
+\bcode{human_outbreak_cases} & cases per focus (total in cluster mode) & persons & 50 & scenario default \\
+\bcode{human_min_cell_pop} & minimum cell population for a focus & persons & 50 & scenario default \\
+\bcode{human_outbreak_min_density} & adaptive density gate & adults\,cell$^{-1}$ & 0 (any positive) & scenario default \\
+\bcode{human_cluster_radius_km} & cluster radius; 0 = independent foci & km & 0 & scenario default \\
+\bcode{human_cluster_max_core_pop} & core population cap; 0 = none & persons & 0 & scenario default \\
+\bcode{focus_threshold} & prevalence threshold of the active-focus band & -- & 0.01 & output classification \\
+\end{longtable}
+
+\textbf{Origin and rationale.} The model is the standard
+Ross--Macdonald structure, spatialized and driven by explicit bites
+rather than by a mean biting rate. The advantage is that every infection
+event is traceable to a cell and a host type; the cost is that the
+transmission parameters are per bite, and the bite process is itself
+driven by the host-seeking submodel. The human durations are fixed, not
+exponential, so the model avoids the dwell-time distortion of a Markov
+SEIR. The default is an SIS-like human model: without immunity, a
+recovered human is immediately susceptible again, which is a strong
+assumption for a population with repeated exposure. The \mskey{transmission.initial_human_prevalence} initial
+prevalence is used only in the legacy uniform mode; the default
+random-viable mode starts with no human infections and seeds a focal
+outbreak when vectors are present.
+
+% =====================================================================
+\appendix
+
+\section{Implementation notes for replicators}
+
+The notes below record behaviours of the current code that are not
+apparent from the protocol-level description and that matter for exact
+replication or for interpreting a run. They are factual descriptions of
+the source tree, not recommendations. File and function names refer to
+the engine under \code{mal-core/src/mal_core/abm/}.
+
+\begin{enumerate}
+\item \textbf{The habitat update uses the species-neutral affinity row.}
+  \bcode{CoordinatorModel::update_habitat_day()} and
+  \code{to_dataframe()} call \code{default_species_weights()} with no
+  argument, which returns the neutral row (surface \mskey{species.neutral.weights.surface_persistent}, wetland \mskey{species.neutral.weights.wetland_persistent},
+  urban \mskey{species.neutral.weights.urban_persistent}, wetland pluvial \mskey{species.neutral.weights.wetland_pluvial}, open \mskey{species.neutral.weights.open_pluvial}, crop \mskey{species.neutral.weights.crop_pluvial}), not the active
+  species' row. The per-species \code{species.<name>.weights} rows are
+  loaded and exposed by \bcode{default_species_weights(SpeciesId)} but
+  are not consumed by the habitat update. Consequently $S$ and $K$ are
+  species-neutral in the current release; the species affects salinity,
+  host preference, phase activity, and plume scale, but not the habitat
+  offer.
+
+\item \textbf{Feeding success is not stochastic, and two states are
+  unreachable.} \bcode{gonotrophic.feeding_success_rate} (0.825) is
+  loaded and stored in \code{GonotrophicParams}, but no code path draws
+  it. A female that finds a host feeds with certainty. The states
+  HOST\_APPROACH and PROBING are defined and handled in the state
+  function, but the feeding code goes directly from HOST\_SEEKING to
+  BLOOD\_FED, so the HOST\_APPROACH block and the PROBING case are never
+  entered.
+
+\item \textbf{There are no hourly host-seeking sub-steps.} The header
+  \bcode{multirate_scheduler.hpp} describes 12 nightly hourly sub-steps,
+  and \code{MosquitoSubmodel} holds a \code{MultirateDayState} member, but
+  that member is never advanced. Host seeking is a single daily loop plus
+  the four-phase pass described in Section~7.6.
+
+\item \textbf{The phase activity weights gate, but do not weight, the
+  phase pass.} \code{phase_active()} returns true when the species
+  activity weight exceeds 0.001. With the default weights
+  (0.02, 0.10, 0.80, 0.08) all four phases are active, and each phase
+  gives a full search-and-feed opportunity. The weights are not used as
+  probabilities, so the model has substantial daytime host seeking
+  despite the nocturnal shape of the row.
+
+\item \textbf{The three aquatic mortality streams are fixed and
+  re-seeded daily.} \code{washout()}, \code{stage_mortality()}, and
+  \bcode{larva_mortality_density()} each construct a fresh
+  \code{std::mt19937_64} with a constant seed (\mskey{rng.aquatic_seed_washout}, \mskey{rng.aquatic_seed_stage_mortality}, \mskey{rng.aquatic_seed_larva_mortality}) on every
+  call. Their draws depend on cohort order and counts but not on the
+  rollout seed, and the same random sequence is reused every day. This is
+  a deliberate reproducibility choice, but it means that two rollouts
+  differ only in adult, host-selection, and transmission draws, not in
+  the aquatic mortality draws.
+
+\item \textbf{The GeoPackage \code{dynamics} column is a string, but the
+  loader reads an integer.} The delivered Ghana file stores
+  \code{dynamics} as a string (the habitat type's dynamic label), while
+  \bcode{HabitatEngine::load_from_gpkg()} calls \code{GetIntField()} on
+  it. The field is therefore 0 for every patch. It is diagnostic only:
+  the coordinator's persistent/pluvial split comes from
+  \code{habitat_types.dynamics} in the constants file, not from the
+  patch record.
+
+\item \textbf{The sidecar's \code{abm_params_hash} is a placeholder.}
+  The state sidecar writes \code{"sha256:pending"} for this key; it is
+  not a computed hash of the parameters. A consumer that relies on it to
+  prove parameter identity will be misled.
+
+\item \textbf{The cohort log's \code{eip_frac} is not an EIP fraction.}
+  In \bcode{MosquitoSubmodel::advance_day()}, the field is set to
+  \code{n_adults / n_alive} after the day's mortality, i.e.\ the adult
+  fraction of the live population (which is always 1 when no immatures
+  are in the SoA). The true EIP state is in \code{vector_state} and
+  \bcode{parasite_eip_progress}, and the transmission log reports the
+  vector compartments correctly.
+
+\item \textbf{\code{k_ref} is annotated with a per-day unit but is
+  consumed as a standing capacity.} The constants file labels
+  \code{species.k_ref} as ind\,km$^{-2}$\,d$^{-1}$, but
+  Equation~\eqref{eq:K} multiplies it by area and $S$ and the result is
+  used directly as $K$ in the Beverton--Holt expression, where it must be
+  a count. The implemented meaning is individuals per cell; no per-day
+  dimension cancels. The unit annotation should be read as a provenance
+  note, not as a dimensional statement.
+
+\item \textbf{\code{daily_mort_basal} is a survival probability.} The
+  key name says ``mortality'', but \mskey{adults.daily_mort_basal} is the daily probability of
+  surviving, as the constants file's own comment warns. Equation
+  \eqref{eq:survival} uses it as a survival multiplier.
+
+\item \textbf{The round-robin submodel constructor is not used by the
+  engine.} That overload (an integer patch count plus two integer counts)
+  seeds every adult at row 0, column 0, and lon/lat 0, and seeds
+  immatures as five equal egg cohorts. The engine always uses the
+  instruction constructor, which carries the cell centre and the staged
+  immature distribution. The round-robin path survives for tests and
+  legacy callers; a run through the engine never uses it.
+
+\item \textbf{Mobility moves hosts, not infections.} The phase-specific
+  effective host grids redistribute humans and cattle for attraction and
+  biting, but the human SEIR compartments remain at the residential
+  cells. A bite recorded at a destination cell therefore applies its
+  force of infection to the residential population of that cell. This is
+  a structural assumption, not a bug in the queue update, but it means
+  that the model does not represent the infection of a commuter at the
+  commuter's home cell.
+
+\item \textbf{\code{--max-population} is an operational abort, not a
+  biological ceiling.} When set to a positive value, the engine throws and
+  aborts the run if the live adult count exceeds it. It does not reserve
+  memory, cap births, or alter the dynamics.
+
+\item \textbf{Open water and open sea are not separated by the habitat
+  planes.} The \code{lc_open_plus_water} plane includes Dynamic World's
+  water class (label 0), and the ingest saltwater filter zeroes only the
+  JRC persistent plane. An open-sea cell can therefore be a candidate
+  patch with $H_{\text{open}}=1$, $S\approx0.40$ at $z=1$, and $K>0$. Its
+  air temperature is the 0.0 sentinel (a finite value, so
+  \code{impute_temp_nans} does not touch it), so aquatic development is
+  zero and adults there survive at the \mskey{adults.mort_floor} floor. The \code{land_frac}
+  plane, when present, is used by the diagnostic GIF basemap but is not
+  part of the habitat feature bundle and does not gate the habitat update.
+  In the delivered Ghana product a Gulf of Guinea cell (row 745, column
+  275) has \code{jrc_persistent}=0, \code{lc_open_plus_water}=1,
+  $H_{\text{total}}=1$, and a GeoPackage feature with potential 1.0,
+  confirming its membership in the candidate set.
+\end{enumerate}
+
+% =====================================================================
+\section{Provenance, versioning, and testing status}
+
+\subsection*{B.1 Constants and contracts}
+
+All model constants are in \bcode{mal-core/config/model_constants.yaml}
+(schema version \mskey{version}). The file is parsed by a strict loader: every key is
+mandatory, unknown keys are an error, wrong types are an error, and there
+are no compiled defaults. The Python side reads the same file through a
+validated loader, and a parity test compares the Python dump of every key
+with the C++ dump of the same file, so a key added on one side without the
+other fails loudly \emph{for the constants file}. The state output
+contract is version \mskey{contracts.cogs_state}
+(the two bands are raw adult counts, the \code{k_max} key is retired,
+and the band names are \bcode{adult_patch_count} and
+\code{adult_cell_count}); the environmental NetCDF contract is version
+\mskey{contracts.env_nc} (daily rainfall and air temperature, five static habitat planes,
+optional salinity). The two contracts are versioned independently. A
+change to a frozen key requires a version bump and a contract review.
+
+Two divergences between the Python habitat mirror and the engine must be
+recorded, because they break the assumption that one implementation
+mirrors the other. First, \bcode{mal_core/habitat/capacity.py:30}
+hardcodes \code{K_REF_DIAG_PER_KM2} $=0.143\times9.3\times10^{6}$ as
+the capacity scale, where the engine uses \code{species.k_ref}
+$=\mskey{species.k_ref}$ (\code{habitat_availability.hpp:191-193}); the two
+are not the same quantity, and the Python one is not read from the
+constants file at all. Second, \code{capacity.species_accuracy} defaults
+to the \emph{coluzzii} weight row, while the engine's habitat update uses
+the \emph{neutral} row (\code{coordinator.cpp:117}). The Python habitat
+module is therefore a diagnostic implementation, not a parity reference
+for the engine's behaviour.
+
+\subsection*{B.2 Software testing}
+
+The engine has C++ GoogleTest suites for climate reading, the
+coordinator, dispersal, EIP, the engine facade, the env reader, the
+gonotrophic cycle, and the effective host landscape; the Python side has
+tests for the wrapper, the runner, the output contract, and the habitat
+contract, plus golden fixtures that pin the per-day outputs of a small
+synthetic scenario. The Python--C++ parity that does exist compares the
+two loaders of the constants file. There is \emph{no} parity test of the
+habitat implementation: the Python habitat tests
+(\bcode{mal-core/tests/test_habitat_python_contract.py}) are
+self-contained, they pin the Python diagnostic capacity constant and the
+coluzzii weight row (\bcode{...:181-208}), and they never compare the
+Python output with the engine's; the C++ counterpart named in that
+module's docstring (\code{test_habitat_availability.cpp}) is not in the
+tree. These tests establish that the code does
+what this document says on the tested inputs. They do not establish that
+the parameter values are biologically correct for a particular district.
+
+\subsection*{B.3 Calibration and validation status}
+
+The current parameter set is a mixture of literature values and explicit
+engineering priors. The project states that no parameter has been fitted
+to Ghanaian adult abundance, trap catches, sporozoite rates, or
+incidence in this release. The code records no fit provenance for any
+parameter, so this is a project statement that the code can neither
+confirm nor refute (Appendix~B.4).
+The model is used as a synthetic ground truth and as a scenario
+laboratory; its outputs should be read as conditional consequences of the
+stated rules and inputs, not as predictions of observed malaria. The
+patterns listed in Element~1 are the intended calibration targets for a
+future cycle. Until that cycle is done, the most defensible use of the
+model is comparative: how do outputs change when an input or a prior is
+changed, and which mechanisms are responsible?
+
+% =====================================================================
+\subsection*{B.4 Values that are readings of the tree}
+
+Every model constant quoted in this document comes from the generated
+macros, that is, from \code{mal-core/config/model_constants.yaml}
+through \code{docs/concepts/generated/macros.tex}. The magnitudes below
+have no key in that file. They are readings of the code or of a delivered
+artefact, and they are listed here so that a reader can tell them apart
+from the generated values.
+
+\begin{itemize}
+\item \textbf{Grid geometry of the delivered product.} 551 columns by
+  779 rows, 429{,}229 cells, a bounding box of about 428{,}600\,km$^2$
+  and about 0.99\,km$^2$ per cell at 8$^{\circ}$N: read from the shape
+  and the geolocation of
+  \code{data/ghana/ghana_regional_2024_2024_env.nc}.
+\item \textbf{Habitat patch counts.} 382{,}127 point features in
+  \code{data/ghana/ghana_habitat_patches.gpkg}; 368{,}761 of them
+  with \code{habitat_potential} at or above 0.01; and 370{,}061 grid
+  cells whose static total potential, computed with the engine's five
+  non-zero slots, is at or above 0.01. The first two are read from the
+  GeoPackage, the third is computed from the static planes of the
+  environmental NetCDF.
+\item \textbf{Population and livestock of the delivered grid.}
+  32{,}048{,}206 humans, 3{,}457{,}920 cattle, 14{,}807{,}556 goats,
+  8{,}591{,}670 sheep, 2{,}691{,}326 pigs and 121{,}353{,}624 chickens:
+  read from \code{data/ghana/}.
+\item \textbf{Habitat characterization of the delivered landscape.} The
+  11.0\% and 82.9\% of cells above the activation floor at $z=0$ and
+  $z=1$, and the mean capacities of 0.61 and 10.4 individuals per cell
+  with a maximum of about 32: computed from the static planes of the
+  environmental NetCDF with the equations of Section~7.1. They are not
+  the output of an engine run.
+\item \textbf{Engine constants with no key.} The Bernoulli(0.5) sex
+  ratio at emergence; the seeding counts (50 adults and 30 immatures
+  per selected patch, 3 foci of 50 cases, a minimum cell population of
+  50, a focus prevalence threshold of 0.01); the stage-allocation
+  fractions of the seeded immatures (0.05, 0.15, 0.25, 0.20) and the
+  0.05 density term of the cluster seeding rule; the 0.5 attraction gate of
+  the directed host flight; the phase gate
+  \code{kPhaseActivityEpsilon} $=0.001$; the 0.1\,m\,s$^{-1}$ wind-speed
+  threshold below which a wind displacement is zero; the 80\% occurrence
+  threshold of the JRC product; the accepted range of 1 to 731 daily
+  steps and the 366-day delivered horizon; the 5\,km radii of the
+  explicit and host-weighted seeding modes; and the clock windows of the
+  four activity phases.
+\item \textbf{Statements the code cannot settle.} Whether a formal
+  calibration to Ghanaian field data has been completed, and whether any
+  parameter has been fitted to field observations. No fit provenance is
+  recorded anywhere in the code, so these remain project statements
+  (Element~1 and Section~B.3).
+\end{itemize}
+
+% =====================================================================
+\section{Generated parameter table}
+
+The complete table of the model's constants, generated from
+\code{mal-core/config/model_constants.yaml} by
+\code{tools/gen_concepts_values.py}. The per-submodel tables of
+Element~7 select the entries that matter for each submodel and add their
+provenance.
+
+% The generated table declares four unwrapped columns; the preamble is
+% widened here to four wrapping columns instead of editing the generated
+% file.
+\begingroup
+% The generated table has four unwrapped columns whose keys and file
+% paths have no natural break point. The preamble is widened here, the
+% path macro is made breakable and the table is set one size smaller,
+% instead of editing the generated file.
+\AtBeginEnvironment{longtable}{\scriptsize}
+\setlength{\tabcolsep}{3pt}
+\ExplSyntaxOn
+\NewDocumentCommand{\brkpath}{m}
+  {
+    \group_begin:
+    \tl_set:Nn \l_tmpa_tl {#1}
+    \tl_replace_all:Nnn \l_tmpa_tl { / } {/ \allowbreak}
+    \tl_replace_all:Nnn \l_tmpa_tl { \_ } {\_ \allowbreak}
+    \tl_replace_all:Nnn \l_tmpa_tl { - } {- \allowbreak}
+    \group_end:
+  }
+\ExplSyntaxOff
+\renewcommand{\code}[1]{\texttt{\brkpath{#1}}}
+\makeatletter
+\let\origlongtableat\LT@array
+\def\LT@array[#1]#2{\origlongtableat[#1]{@{}L{3.9cm}L{1.6cm}L{2.0cm}L{8.4cm}@{}}}
+\makeatother
+\input{../generated/params-abm.tex}
+\endgroup
+
+% =====================================================================
+\begin{thebibliography}{99}
+
+\bibitem{Bayoh2003}
+Bayoh, M.N. and Lindsay, S.W. (2003)
+Effect of temperature on the development of the aquatic stages of
+\emph{Anopheles gambiae} sensu stricto.
+\emph{Bulletin of Entomological Research}, 93, 375--381.
+
+\bibitem{Brown2022}
+Brown, C.F., Brumby, S.P., Guzder-Williams, B., et al. (2022)
+Dynamic World, near real-time global 10\,m land use land cover mapping.
+\emph{Scientific Data}, 9, 251.
+DOI: 10.1038/s41597-022-01307-4.
+
+\bibitem{Funk2014}
+Funk, C.C., Peterson, P.J., Landsfeld, M.F., et al. (2014)
+A quasi-global precipitation time series for drought monitoring.
+\emph{U.S. Geological Survey Data Series} 832, 4\,p.
+Data: UCSB Climate Hazards Center, CHIRPS-2.0.
+
+\bibitem{Grimm2006}
+Grimm, V., Berger, U., Bastiansen, F., et al. (2006)
+A standard protocol for describing individual-based and agent-based models.
+\emph{Ecological Modelling}, 198, 115--126.
+DOI: 10.1016/j.ecolmodel.2006.04.023.
+
+\bibitem{Grimm2010}
+Grimm, V., Berger, U., DeAngelis, D.L., Polhill, J.G., Giske, J. and
+Railsback, S.F. (2010)
+The ODD protocol: a review and first update.
+\emph{Ecological Modelling}, 221(23), 2760--2768.
+DOI: 10.1016/j.ecolmodel.2010.08.019.
+
+\bibitem{GrimmRailsback2005}
+Grimm, V. and Railsback, S.F. (2005)
+\emph{Individual-Based Modeling and Ecology}.
+Princeton University Press, Princeton, NJ.
+
+\bibitem{Huestis2019}
+Huestis, D.L., Dao, A., Diallo, M., et al. (2019)
+Windborne long-distance migration of malaria mosquitoes in the Sahel.
+\emph{Nature}, 574, 404--408.
+
+\bibitem{Lloyd2019}
+Lloyd, C.T., Chamberlain, H., Kerr, D., et al. (2019)
+Global spatio-temporally harmonised datasets for producing high-resolution
+gridded population distribution datasets.
+\emph{Big Earth Data}, 3, 108--139.
+
+\bibitem{Macdonald1957}
+Macdonald, G. (1957)
+\emph{The Epidemiology and Control of Malaria}.
+Oxford University Press, London.
+
+\bibitem{Mordecai2013}
+Mordecai, E.A., Paaijmans, K.P., Johnson, L.R., et al. (2013)
+Optimal temperature for malaria transmission is dramatically lower than
+previously predicted.
+\emph{Ecology Letters}, 16, 22--30.
+
+\bibitem{Munoz2021}
+Mu\~noz-Sabater, J., Dutra, E., Agust\'i-Panareda, A., et al. (2021)
+ERA5-Land: a state-of-the-art global reanalysis dataset for land
+applications.
+\emph{Earth System Science Data}, 13, 4349--4383.
+
+\bibitem{Pekel2016}
+Pekel, J.-F., Cottam, A., Gorelick, N. and Belward, A.S. (2016)
+High-resolution mapping of global surface water and its long-term changes.
+\emph{Nature}, 540, 418--422.
+
+\bibitem{Railsback2001}
+Railsback, S.F. (2001)
+Conceptual design and simulation analysis of individual-based models.
+In: \emph{Proceedings of the Third International Symposium on Tools and
+Methods of Competitive Engineering}, Delft University Press, pp.~1099--1112.
+
+\bibitem{Schiavina2023}
+Schiavina, M., Pesaresi, M. and Melchiorri, M. (2023)
+GHS-SMOD R2023A: GHSL settlement model grid.
+European Commission, Joint Research Centre (JRC), Ispra.
+
+\bibitem{Smith2004}
+Smith, D.L. and McKenzie, F.E. (2004)
+Statics and dynamics of malaria infection in \emph{Anopheles} mosquitoes.
+\emph{Malaria Journal}, 3, 13.
+
+\bibitem{Wessel1996}
+Wessel, P. and Smith, W.H.F. (1996)
+A global, self-consistent, hierarchical, high-resolution shoreline database.
+\emph{Journal of Geophysical Research}, 101(B4), 8741--8743.
+
+\bibitem{Zurell2010}
+Zurell, D., Jeltsch, F. and Grimm, V. (2010)
+Ecological modelling and data availability: do we really need all of these?
+\emph{Journal of Applied Ecology}, 47, 623--626.
+
+\end{thebibliography}
+
+\vspace{1em}
+\noindent\footnotesize
+\textbf{Provenance note.} Several comments in
+\code{model_constants.yaml} cite author--year anchors without a full
+bibliographic record in the repository (for example Costantini 1996 and
+Thomas 2013 for the dispersal priors, Faiman 2020 and Sanogo 2021 for wind
+flight, Okal 2013 for the oviposition plume, Giraldo 2023 for the host
+plume, and Lardeux for the adult survival curve). They are reported in
+the tables as provenance labels, not as verified references. The numerical
+values remain engineering priors or literature anchors as marked; none
+has been re-fitted to Ghanaian data for this release.
+
+\end{document}
