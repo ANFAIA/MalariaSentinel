@@ -130,21 +130,39 @@ Several of its claims are already contradicted by the code. During any editing
 session, do not take a spec claim as true — verify it against the code before
 acting on it, and prefer `docs/concepts/` (once it exists) as the reference.
 
-## Working artefacts and cleanup
+## The EGM flow: every artefact is temporary except the draft
 
-At the end of each EGM phase (and of any multi-step design work), clean the
-working files before reporting done:
+**This applies whenever the EGM skills are used** (`egm-brainstorm`,
+`egm-draft`, and the Goldfish reviewers behind them).
 
-- The definitive plan is the only artefact that survives. It lives in
-  `docs/plans/in-process/<plan>.md` and moves to `docs/plans/completed/` when it
-  is implemented.
-- Delete the phase's secondary material once the plan is written: the brief's
-  companion files (`*.decisions.md`, `*.odd-method.md`, `*.raw.md`), the
-  intermediate drafts, the working copies. Anything that must not be lost goes
-  into the plan's appendices or into git history first — do not delete a file
-  whose content is not yet captured somewhere durable.
-- A design RFC under `docs/designs/` is the *brief*; the plan is the *work*.
-  Both may exist, but only one of them is the artefact being executed.
+The EGM flow is: **brainstorm → RFC brief → drafted plan → implementation.**
+
+| Artefact | Where it lives | Lifetime |
+|---|---|---|
+| The brainstorm brief and its companions (`*.decisions.md`, `*.odd-method.md`, `*.raw.md`) | working directory | **Temporary.** Consumed by the drafting step; deleted once the draft is written. |
+| The RFC brief | `docs/designs/<feature>.md` | **Temporary.** It is the input to the drafting step, not the deliverable. When the draft exists, the brief is deleted — it survives in the git history. |
+| **The draft (the plan)** | `docs/plans/in-process/<feature>.md` | **The only durable artefact.** It stays in `in-process/` until it is executed, and moves to `docs/plans/completed/<feature>.md` when the EGM process finishes. |
+
+Rules:
+
+1. **The draft is the deliverable.** It must be self-contained: everything it
+   needs (the analysis, the alternatives, the decisions, the stance) goes into
+   it — as sections or appendices. It must not link to a brief that is about to
+   be deleted.
+2. **Delete the brief once the draft is written.** Two documents stating the
+   same thing with different wording is the failure mode this rule exists to
+   prevent: the second one is never updated, and the two drift apart. When
+   they disagree, an agent cannot tell which is current.
+3. **Move the plan when the process ends.** In-process while it is being
+   executed; `completed/` once it is done. `docs/plans/in-process/` means
+   "being executed", `docs/plans/completed/` means "executed" — never leave a
+   finished plan in `in-process/`.
+4. **Nothing else survives.** The review reports, the intermediate drafts, the
+   working copies: delete them. Before deleting, make sure the content that
+   matters is in the plan (appendices) or already in the git history.
+
+`docs/designs/SITEMAP.md` is the registry for briefs in that directory; a
+brief that has been drafted is listed as a drafted plan, not as a design.
 
 ## Where knowledge lives
 

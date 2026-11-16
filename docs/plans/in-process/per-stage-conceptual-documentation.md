@@ -3,8 +3,10 @@
 *   **Author:** david-fm
 *   **Status:** Plan (in process)
 *   **Date:** 2026-11-16
-*   **Design context:** `docs/designs/per-stage-conceptual-documentation.md`
-    (the RFC brief this plan was drafted from).
+*   **Origin:** the EGM brainstorm's RFC brief
+    (`docs/designs/per-stage-conceptual-documentation.md`), deleted when this
+    plan was written — its content is absorbed here; the original survives in
+    the git history at commit `75dc50c`.
 
 --------------------------------------------------------------------------------
 
@@ -126,6 +128,181 @@ authoring for five documents that currently have no named reader. That cost is
 accepted by the author and recorded here so a later reversal is a decision, not
 a discovery.
 
+## Analysis
+
+The analysis below comes from the EGM brainstorm that produced this plan (7
+review lenses, 103 findings). It is the reasoning the plan is built on; the
+RFC brief it came from was deleted when this plan was written (git history:
+`75dc50c`).
+
+### The four contradictions the lenses shaped the design around
+
+**1. Authority versus maintenance.** A formal PDF with a date and a pinned
+commit is trusted *more* than a spec, not less. Nine of the thirteen odd-fixes
+packs rewrite what the ABM document must say — pack 10 states the state COG is
+"Wrong!! Must be individuals (array) + aquatic cohort", pack 05 says
+`update_habitat_day()` applies default species weights instead of the active
+species row. Writing the ABM document as-built publishes a document that is
+knowingly false in its two most expensive sections; writing it to the post-pack
+target makes it an authority over the code, which the author explicitly
+rejected ("coherence, not source of truth").
+*Resolution adopted, then superseded:* per-section status — `\asbuilt{<sha>}`
+versus `\target{PACK-05}` — plus a mandatory dated "Pending decisions"
+section. **D4 replaced this** (2026-11-16): no status macros, no per-section
+metadata; the clean ODD is the base and each applied plan changes the part of
+the document it invalidates. The cost is recorded in D4.
+
+**2. Verifiability versus abstraction.** The prose the author wants carries
+semantics. The values the specs carried — band names, the `-9999.0` sentinel,
+`contract_version`, sidecar keys — are exactly the class an LLM reviewer
+misses and a `grep` catches. Deleting them and replacing them with prose leaves
+nothing mechanical.
+*Resolution adopted:* generate the facts, write the semantics (D1). Parameter
+tables and contract tables are emitted at build time from `model_constants.yaml`
+and a small contracts file into `\input{generated/...}`; a renamed or removed
+key becomes an undefined control sequence and **fails the LaTeX build**. No LLM
+is in that path and it cannot be faked.
+
+**3. Automation versus judgement.** All seven lenses rejected letting an LLM
+block a merge on prose judgement: it is unfalsifiable, it gives an agent merge
+authority over the maintainer, fork PRs get no secrets so the check no-ops
+exactly where unfamiliar code arrives, and a bot push dismisses stale approvals
+under the current ruleset. The project already answered this in the opposite
+direction for a near-identical design: `scoring/spec.md` INV-12 requires the LLM
+verdict to be non-gating, and `AGENTS.md` classifies reviewing subagents as
+`ask`, not `allow`.
+*Resolution adopted (author's revision, 2026-11-16):* **warnings only, no gates
+of any kind** (D3). The review system is an advisor that reports incoherences
+between the formal conceptual documents and the implementation; it never blocks,
+never rejects, and never imposes structure on the documents. Consequently there
+is no deterministic checker tier either: no anchor-existence check, no presence
+rule, no `Coherence-Waiver:` trailer, no required status. The mechanical signals
+below survive as *warning sources* (inputs the reviewer may cite), not as
+pass/fail gates. The single build-time guarantee that survives is the one that
+constrains nothing about document design: values and tables are **generated**
+from `model_constants.yaml` at build time, so a renamed key fails the LaTeX
+build on its own, without any checker deciding what a document may say.
+
+**4. Scope versus cost.** The measured cost is prose, not toolchain: `latexmk`
+and `pdflatex` are already installed, the ODD preamble is 15 standard packages,
+builds take seconds. The cost is 5,400–7,100 LaTeX lines against 2,253 Markdown
+lines today, and an estimated 7.5–20 person-days of authoring for five documents
+that currently have no named reader. The site publishes a *different* taxonomy
+(three stages: ingestion → ABM → U-Net), and the same quantity is stated three
+ways (14 scorers on the site, 10 in `AGENTS.md`, 13 dimensions + 6 gates in
+`abm/spec.md`).
+*Not resolved here: this is the one request the lenses make to reduce scope.
+See Alternatives Considered, "Tier the corpus" (Alternative G).*
+
+### The ideal final result
+
+State it as a property, not a task: **no number, symbol, key or path in a
+conceptual document is typed by hand, and a document that contradicts the
+repository cannot compile.** Everything else — the prose describing purpose,
+processes, equations and consequences — is written once and survives renames,
+because it names no code. Under that rule the maintenance question stops being
+"who keeps the docs in sync" and becomes "who writes the prose once".
+
+### Mechanical signals available to the reviewer (advisory inputs, not gates)
+
+Both lenses that built this list independently arrived at the same set. Under
+the author's revision these are **sources the reviewer may cite**, not checks
+that decide the outcome:
+
+1. Dotted keys cited in a document versus `model_constants.yaml` and their
+   printed values.
+2. `\code{...}` identifiers versus Python symbols and
+   `include/mal_abm_fast/*.hpp`.
+3. Contract versions in a document versus `model_constants.yaml:contracts.*`.
+4. Derived numbers that recompute — grid dimensions and cell area from
+   `aois.yaml` (Ghana bbox `[-3.5, 4.5, 1.5, 11.5]`, 1,000 m) plus the geodesy
+   constants. The ODD's 551 × 779 cell count is one such number, and the site's
+   "9.466 celdas" is another that does not match it.
+5. `latexmk -Werror`: undefined references or citations, unresolved `\eqref`.
+6. `docs/...`, `papers/...`, `scripts/...` paths named in a document or comment
+   versus the tree. This one alone would have caught the whole stale-claims
+   table above.
+7. Documented output files for a stage versus the consumer globs that read
+   them.
+8. Changed path → candidate document, for single-stage paths.
+9. Freshness: a document declaring `% sources:` globs whose hashes no longer
+   match.
+
+What stays human: process ordering, formula-versus-code equivalence,
+implemented-versus-unimplemented statements, blast radius of a shared config
+key, and provenance.
+
+Two consequences of dropping the gate tier, stated plainly. First, the only
+*guaranteed* protection left is generated values (a key rename breaks the LaTeX
+build); every other class of drift becomes a warning a human may or may not
+read, so the review must be surfaced where a human actually looks — the PR
+comment and, if the reviewer wants persistence, a dated ledger file. Second, the
+absence of a presence rule means a stage change can be merged with no document
+touch at all and no signal; the only mitigation left is the reviewer's own
+coverage of the diff.
+
+### The orphan problem, and where the lenses disagreed
+
+Of ~62 non-test modules in `mal-core/src`, ~44 belong to one stage and ~12 are
+cross-cutting. Four obligations have no stage to live in, and today they live in
+the specs that are being deleted:
+
+| Obligation | Owner today | Why it cannot be split |
+|---|---|---|
+| AOI data product — naming, manifest schema, catalog, completeness | `docs/specs/data/spec.md` | read and written by all six stages |
+| Spatial frame — AOI, `Scale`, `cells_per_side`, 1 km grid, CRS | `docs/specs/commonlib/spec.md` §4.1 | pins `(H,W)` for every raster in every stage |
+| Habitat theory — `S`, `K`, Beverton-Holt, salinity, aquatic stress | `mal_core/habitat/` (Python) mirrored in `habitat_availability.hpp` | computed by ingest, executed by abm, read for parity by scoring |
+| Parameter provenance — units, literature anchors, prior status | `model_constants.yaml` + changelog | every document that prints a value becomes another copy |
+
+**Resolved by the author (2026-11-16): no common substrate** (D5). The owner of
+each piece of content is the stage that *uses* it; the manifest schema into
+`download`, the spatial frame into the stage that first needs `(H, W)`, the
+habitat theory into `ingest` (which computes H) and `abm` (which applies S and
+K), parameter provenance into the stage whose process each constant drives. The
+coherence mechanism is **adjacency**: the ABM document describes what the ABM
+produces and the next stage's document describes what it takes as input, so a
+discrepancy is visible where the two meet — with no central artefact and no
+ownership matrix. Repetition between stages is accepted, not hunted: the same
+fact written from two stages' points of view is where the drift shows up.
+
+Two further structural objections, which the plan absorbs silently:
+
+- **`scoring` is not a chain stage.** It consumes the ABM output and produces a
+  scorecard for a human or CI; nothing downstream reads it. It is an evaluation
+  harness beside the chain.
+- **The reference framework is a cycle; the pipeline is a DAG.** Kelly et al.
+  (2012) states its key elements verbatim as "(iii) application/intervention
+  outcomes re-entered back into the SDSS as a cyclical input; and importantly
+  (iv), expert knowledge, integrated throughout all stages of the SDSS process"
+  (`papers/spatial-analysis/MalariaEliminationWithSpatialDecisionSupportSystems.md:304-307`).
+  Whether the current pipeline closes that loop is a question about the system,
+  not about the documentation. The author has ruled that no ABM modification and
+  no generalisation to other systems is on the table, so this is recorded, not
+  actioned (D9).
+
+### The technical-docs half rests on a premise that does not hold
+
+There is no pybind11 in the project (verified: only inside `.venv` third-party
+packages). `wrapper.py` shells out to the compiled binary and parses `--help`.
+The real Python↔C++ interface is four things: CLI flags, `model_constants.yaml`
+keys, input file formats (NetCDF, GeoPackage, CSR) and output contracts (COG +
+sidecar). A Doxygen↔Breathe bridge would document ~40 internal headers that no
+Python caller touches, and would miss the interface that actually breaks. The
+generated reference must document the flag and file contract, not the C++ class
+hierarchy.
+
+Comment quality is the other blocker: there are zero Doxygen directives in the
+C++ tree, trailing `//` comments are invisible to Doxygen, several headers still
+state the retired two-band / `k_max` contract, and the Python docstrings would
+publish at least four statements the code contradicts. Generated docs from
+current comments would be structurally complete and semantically false.
+
+"Same visual style as the site" is not achievable for generated pages: Doxygen
+and Sphinx each ship their own `index.html`, CSS and collision-prone `_`-
+directories. The workable target is one site entry ("Technical reference") that
+links into a visually separate generated surface, with a generated docs index —
+never a hand-maintained one.
+
 ## Goals
 
 *   Retire `docs/specs/` stage by stage as each conceptual equivalent lands,
@@ -191,6 +368,90 @@ a discovery.
     cycle/DAG gap against Kelly et al. (2012) is recorded, not actioned.
 
 --------------------------------------------------------------------------------
+
+## Critical User Journeys
+
+The users of this design are the people who read, write and check these
+documents, and the newcomer the documents exist for.
+
+### CUJ 1 — A newcomer understands the pipeline without reading code
+
+* **Given**: someone arrives at `malariasentinel.com` and follows the
+  documentation link.
+* **When**: they open the conceptual document of one stage.
+* **Then**: they can say what that stage consumes, what it produces and why it
+  behaves as it does, without opening a source file — every code symbol the
+  document names is explained where it is first used.
+
+### CUJ 2 — An agent drafts a stage document
+
+* **Given**: a stage with an agreed question set, and the stance note that
+  governs how the questions are asked.
+* **When**: the drafting skill runs for that stage.
+* **Then**: a LaTeX document exists that answers every question in the set, in
+  the stage's own structure, with its values generated from
+  `model_constants.yaml` and its code claims cited; and it compiles.
+
+### CUJ 3 — A reviewer finds a divergence
+
+* **Given**: a pull request that changes the behaviour of a stage covered by a
+  conceptual document.
+* **When**: the pull request is opened.
+* **Then**: a comment names the specific passage of the document that no longer
+  matches the code, quoting both; the pull request is not blocked.
+
+### CUJ 4 — A defect found while reading a document becomes a plan
+
+* **Given**: a reviewer annotating a draft document with a defect.
+* **When**: the annotations are distilled into a plan.
+* **Then**: a plan file exists that names the document section it invalidates
+  and the code change required — the same mechanism that produced the 13
+  `odd-fixes` packs.
+
+### CUJ 5 — A plan lands and the document follows
+
+* **Given**: a plan applied to the code.
+* **When**: that plan's commit is pushed.
+* **Then**: the part of the document the plan named is updated in the same
+  commit, so the document never describes a state the code has already left.
+
+### CUJ 6 — A maintainer retires a spec
+
+* **Given**: a stage whose conceptual document covers what its spec covered.
+* **When**: the spec is deleted.
+* **Then**: no information is lost — the conceptual document carries the
+  semantics and the generated tables carry the values, and the manifest and
+  contract versions are checked at build time.
+
+## Open Questions
+
+Carried as open, not as decided:
+
+* **PDF determinism under I1-A.** CI compiles the PDF and commits it back to the
+  branch. Byte-identical output needs a fixed `SOURCE_DATE_EPOCH` and a
+  reproducible TeX toolchain; until that is measured, the equality check has to
+  run on extracted text (`pdftotext -layout`), not on bytes. The size of the
+  binary churn in history is unmeasured.
+* **The flag-and-file contract generator (I2-B).** Whether it is built before
+  or after the Doxygen and pdoc surfaces exist is not decided, and neither is
+  whether it earns its maintenance cost.
+* **Where the coherence reviewer runs, and at what cost.** The warnings-only
+  regime needs a model, a token budget per pull request and a place to run; none
+  of the three is set, so the regime has no defined cost ceiling.
+* **The exact content of the Stage 0 truth pass.** The stale claims are
+  enumerated; the current text of the contract-defining headers is not fully
+  audited, so the size of that change is unknown.
+* **The documentation page under `docs/`.** How it is structured, and whether
+  its index is generated or hand-written, is undecided — and it needs its own
+  ES/EN dictionaries, which is a translation maintenance question, not a
+  documentation one.
+* **Whether `data/` untracking lands before or after the first document
+  exists.** The sequencing of Stage 9 against the first document is not
+  decided; its pre-work is now the zip backup (D8, option B).
+* **The first document's author.** The loop has an agent drafting and a human
+  annotating; whether the first document is written by the author, by an agent,
+  or by an agent under review is not stated, and it changes what the first
+  review round looks like.
 
 ## Technical Plan (Architecture)
 
