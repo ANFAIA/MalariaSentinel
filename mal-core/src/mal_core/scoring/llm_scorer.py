@@ -1,14 +1,22 @@
-"""LLM scorer — qualitative verdict on a 10-dimension calibration report.
+"""LLM scorer — qualitative verdict on a calibration report.
 
 This module is the calibration framework's "qualitative judge". After the
-10 deterministic scorers (D1..D10) run on an ABM rollout, the same report
-(JSON) is sent to a small LLM via the OpenRouter chat/completions API.
+deterministic scorers registered in :mod:`mal_core.scoring.registry` run on
+an ABM rollout, the same report (JSON) is sent to a small LLM via the
+OpenRouter chat/completions API.
 The LLM returns a structured :class:`Verdict` (viable / borderline /
 regressed / collapsed) plus a list of concerns, recommendations, and
 literature grounding.
 
-The LLM is invoked directly via :mod:`langchain_openai` — there is no
-agent harness and no agent loop. The scorer
+The scorer set is not fixed here: the composite dimensions and the gates
+live in :mod:`mal_core.scoring.registry` (``COMPOSITE_WEIGHTS`` and
+``GATES``); the registry is the single source of truth for which scorers
+exist and which of them are weighted.
+
+The LLM is called directly over HTTP: the module posts a JSON payload to
+the chat/completions endpoint at :data:`LLM_BASE_URL` with :mod:`requests`
+and parses the reply into :class:`Verdict` — there is no agent harness and
+no agent loop. The scorer
 runs in ~1-3 seconds, is deterministic at temperature 0, and is
 content-hash-cached so repeated runs against the same report are free.
 
@@ -264,17 +272,18 @@ def score_with_llm(
     1. Computes a content hash of the report + model id.
     2. Checks the cache and returns a cached verdict if one exists.
     3. Resolves the ``OPENROUTER_KEY``.
-    4. Calls the OpenRouter ``chat/completions`` endpoint via
-       :class:`langchain_openai.ChatOpenAI` with
-       ``with_structured_output(Verdict)``.
+    4. Posts a JSON payload to the OpenRouter ``chat/completions`` endpoint
+       (:data:`LLM_BASE_URL`) with :mod:`requests`, then parses the reply
+       into a :class:`Verdict`.
     5. Caches the verdict and returns it.
     6. On any failure, returns :func:`deterministic_fallback`.
 
     Args:
         report: The calibration report dict. Typically contains
-            ``experiment``, ``scores`` (D1..D10), ``composite``, etc.
+            ``experiment``, ``scores`` (one entry per registered scorer),
+            ``composite``, etc.
         model: The model id to use. Defaults to
-            :data:`LLM_MODEL_DEFAULT` (``"minimax-m3"``).
+            :data:`LLM_MODEL_DEFAULT`.
         cache_dir: Override the cache directory. Defaults to
             ``.cache/llm_verdicts`` under the current working directory.
         timeout_s: Per-request timeout in seconds.

@@ -1,12 +1,13 @@
 """DEPRECATED shim — constants migrate to mal-core/config/model_constants.yaml.
 
-DELETED at plan constantes-yaml paso 8: NOTHING lives here any more.
+DELETED at the constants-yaml migration: NOTHING lives here any more.
 This module raises for every attribute: new code must read
-``mal_core.habitat.config`` (CONFIG singleton) — the YAML is the single
-source of shared py⇄C++ model constants.
+``mal_core.habitat.config`` (CONFIG singleton) — ``mal-core/config/
+model_constants.yaml`` is the single source of shared py⇄C++ model
+constants.
 
-The engine-side k_ref (species.k_ref, ind·km⁻¹·d⁻¹) and the py-diagnostic
-K_REF_DIAG_PER_KM2 are different concepts (plan §9.1); the diagnostic
+The engine-side k_ref (species.k_ref, ind·km⁻²·d⁻¹) and the py-diagnostic
+K_REF_DIAG_PER_KM2 are different concepts; the diagnostic
 constant lives in ``mal_core.habitat.capacity``.
 """
 from __future__ import annotations

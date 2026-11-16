@@ -57,9 +57,11 @@ def resolve_dataset_file(
 
     Resolution semantics:
 
-    * No manifest entry for ``dataset_name`` → ``None``. The caller should
-      fall back to conventional-filename discovery (legacy tmp dirs,
-      sandboxes, downloads not yet registered).
+    * No manifest entry for ``dataset_name`` → ``None``. There is NO
+      conventional-filename fallback here: the manifest is the single
+      source of truth, and a dataset that was never registered does not
+      exist as far as the pipeline is concerned. (The one-off migration of
+      legacy directories is ``register_existing``.)
     * Entry exists but the declared file is missing on disk →
       ``FileNotFoundError`` (``strict=True``, default). A stale manifest is
       an error, never a silent fallback. ``strict=False`` returns the

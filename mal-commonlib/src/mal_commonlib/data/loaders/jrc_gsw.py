@@ -76,6 +76,11 @@ _MIN_YEAR: int = 1984
 _MAX_YEAR: int = 2021
 
 _NODATA_OUT_SCALAR = float(model_constant("ingest", "nodata_sentinel"))
+# The floor on the valid-pixel count, from the same configuration the
+# other loaders read (ingest.valid_count_epsilon). It used to be a literal
+# in this file, which made the value configurable in one place and
+# hard-coded in another.
+_VALID_COUNT_EPSILON = float(model_constant("ingest", "valid_count_epsilon"))
 
 
 def _ensure_cache_dir(cache_dir: pathlib.Path | None) -> pathlib.Path:
@@ -236,7 +241,7 @@ def _load_jrc_gsw_pc(
     else:
         water_frac = np.where(
             valid_count > 0,
-            water_count / np.maximum(valid_count, 1e-9),
+            water_count / np.maximum(valid_count, _VALID_COUNT_EPSILON),
             _NODATA_OUT_SCALAR,
         )
         out = water_frac.astype(np.float32)

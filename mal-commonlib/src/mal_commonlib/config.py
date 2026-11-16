@@ -1,6 +1,9 @@
-"""Configuration: AOI, grid, paths, v1 parameters, weights, randomization ranges.
+"""Configuration: AOI, grid, paths, v1 parameters, randomization ranges.
 
-All values come from DESIGN.md (rev 4, APPROVED). Tunable knobs live here.
+This module is the single place where the legacy v1 rollout knobs live.
+The shared py⇄C++ model constants have their own source of truth in
+``mal-core/config/model_constants.yaml``; the AOI registry lives in
+``mal_commonlib.aoi`` (``aois.yaml``).
 """
 from __future__ import annotations
 
@@ -73,6 +76,13 @@ class SimParams:
     water_thresh: float = WATER_THRESH
 
     def r_of(self, T):
+        """Legacy temperature-scaled reproduction rate.
+
+        Dead path: the module-level ``temp_suitability`` helper it calls
+        was removed with the retired annual temperature-suitability
+        channel, so calling this raises ``NameError``. Kept only as a
+        marker of the old contract — no caller in the repository uses it.
+        """
         return self.r_max * temp_suitability(T)
 
 

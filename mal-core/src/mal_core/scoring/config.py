@@ -8,7 +8,7 @@ YAML shape::
     scorers:
       D5_morans:
         enabled: false
-      D16_suitability_auc:
+      D16_detection_coverage:
         weight: 5.0
 """
 from __future__ import annotations
