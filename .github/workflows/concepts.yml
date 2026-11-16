@@ -1,0 +1,93 @@
+# Conceptual documents: build, and publish the PDFs back to the branch.
+#
+# The PDFs are compiled in CI and committed back to the branch (decision
+# I1-A), because the legacy `main:/docs` GitHub Pages build publishes
+# whatever is committed and compiles nothing. The published path is
+# docs/concepts/<phase>/<phase>.pdf.
+#
+# TWO CONSTRAINTS, stated here because they are properties of this
+# repository's ruleset, not of the documents:
+#
+# 1. A bot push dismisses stale approvals under the current ruleset. The
+#    PDF commit therefore counts as a new push, and a reviewer who
+#    approved the source may have to approve again.
+# 2. Fork pull requests cannot receive the bot push (no write token), so
+#    their PDF appears only after the merge. Accepted under the
+#    warnings-only regime (D3): this workflow never blocks a merge.
+#
+# The build fails only on a build failure: a LaTeX error, a generated value
+# that no longer exists, or a drift between the committed generated
+# fragments and a fresh generation. It never judges the prose.
+name: concepts
+
+on:
+  pull_request:
+    paths:
+      - "docs/concepts/**"
+      - "mal-core/config/model_constants.yaml"
+      - "tools/gen_concepts_values.py"
+      - "tools/build_concepts.sh"
+      - ".github/workflows/concepts.yml"
+  push:
+    branches: [main]
+    paths:
+      - "docs/concepts/**"
+      - "mal-core/config/model_constants.yaml"
+      - "tools/gen_concepts_values.py"
+      - "tools/build_concepts.sh"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install TeX and poppler
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            latexmk texlive-latex-recommended texlive-latex-extra \
+            texlive-fonts-recommended texlive-science poppler-utils
+
+      - uses: astral-sh/setup-uv@v5
+
+      - name: Install the Python workspace
+        run: uv sync --all-packages
+
+      - name: Build the documents
+        run: tools/build_concepts.sh
+
+      - name: Check the PDF's text determinism (not its bytes)
+        # pdfTeX embeds a creation date and a trailer id, so two builds of
+        # the same source differ byte-wise. The extracted text must not.
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/text-before /tmp/text-after
+          for pdf in docs/concepts/*/*.pdf; do
+            [ -e "$pdf" ] || continue
+            pdftotext -layout "$pdf" "/tmp/text-before/$(basename "$pdf").txt"
+          done
+          tools/build_concepts.sh >/dev/null
+          for pdf in docs/concepts/*/*.pdf; do
+            [ -e "$pdf" ] || continue
+            pdftotext -layout "$pdf" "/tmp/text-after/$(basename "$pdf").txt"
+          done
+          if ! diff -r -q /tmp/text-before /tmp/text-after; then
+            echo "::warning::the extracted text of a PDF changed between two builds"
+          fi
+
+      - name: Commit the PDFs back to the branch
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/concepts/*/*.pdf
+          if git diff --cached --quiet; then
+            echo "no PDF changed"
+            exit 0
+          fi
+          git commit -m "docs(concepts): rebuild the conceptual PDFs [skip ci]"
+          git push "HEAD:refs/heads/${GITHUB_REF_NAME}"
