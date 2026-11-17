@@ -56,7 +56,18 @@ for phase in "${PHASES[@]}"; do
   # logs an error and still produces a PDF, and latexmk exits 0. The
   # build must FAIL when a document references a value the configuration
   # no longer has.
-  (cd "$dir" && latexmk -pdf -interaction=nonstopmode -halt-on-error "$(basename "$src")" >/dev/null)
+  # The output is kept, not thrown away: when the build fails, the
+  # error is in that output, and a CI log that hides it costs a whole
+  # round trip to find. latexmk's exit code alone says "it failed",
+  # not why.
+  log="$(mktemp)"
+  if ! (cd "$dir" && latexmk -pdf -interaction=nonstopmode -halt-on-error "$(basename "$src")" >"$log" 2>&1); then
+    echo "build_concepts: $src failed to compile" >&2
+    tail -n 60 "$log" >&2
+    rm -f "$log"
+    exit 12
+  fi
+  rm -f "$log"
   out="$(basename "${src%.tex}")"
   if [ "$out" != "$phase" ]; then
     cp "$dir/$out.pdf" "$dir/$phase.pdf"
