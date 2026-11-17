@@ -10,8 +10,8 @@ loader plugins in `mal-commonlib/src/mal_commonlib/data/loaders/`, the
 consumer side (`mal-core/src/mal_core/ingest/daily_nc.py`,
 `mal-core/src/mal_core/abm/wrapper.py`), the AOI registry
 (`mal-commonlib/src/mal_commonlib/aois.yaml`) and the constants file
-(`mal-core/config/model_constants.yaml`). The retired specs
-(`docs/specs/download/spec.md`, `docs/specs/data/spec.md`) were used only as
+(`mal-core/config/model_constants.yaml`). The retired download and data specifications (their audit trail is now
+`docs/plans/in-process/spec-retirement-ledger.md`) were used only as
 material: several of their claims are already contradicted by the code, so
 every question below is anchored on code, and where the two disagree the
 question says so. The stance the document must answer is the one in
@@ -40,7 +40,7 @@ count as it having answered it? What is explicitly *not* its job?**
 
 - Citation: `mal-core/src/mal_core/cli.py:157-193` (`download` subcommand),
   `mal-core/src/mal_core/cli.py:809-841` (`datasets` subcommand),
-  `mal-core/src/mal_core/download/__init__.py:1-30` (public re-exports).
+  `mal-core/src/mal_core/download/__init__.py:1-27` (public re-exports).
 - Answer: the CLI subcommand `malariasim download --aoi … [--datasets …]
   [--outputs …] [--years …] [--months …] [--output-dir …]`, the inspection
   command `malariasim datasets --aoi … [--missing]`, and the Python API
@@ -66,7 +66,7 @@ download and register if absent) actually implemented?**
 - Citation: repository-wide search finds no `load_or_download` symbol;
   the closest code is `mal-core/src/mal_core/download/catalog.py:155-268`
   (manifest-only resolution) and
-  `mal-core/src/mal_core/download/runner.py:69-282` (download + register).
+  `mal-core/src/mal_core/download/runner.py:69-278` (download + register).
 - Answer: **no**. The loaders in `mal_commonlib.data.loaders` always fetch
   from the provider; the manifest is only *written* by the runner and *read*
   by consumers. The convention described in `AGENTS.md` ("Load-or-download
@@ -315,7 +315,7 @@ you?**
 **22. What is the exact order of operations for one dataset, and what are
 the consequences of that order?**
 
-- Citation: `mal-core/src/mal_core/download/runner.py:69-282`.
+- Citation: `mal-core/src/mal_core/download/runner.py:69-278`.
 - Answer: (1) select loaders by name; (2) auth gate per loader — a missing
   credential skips the **whole loader**, not the output;
 (3) per output: filter by `--outputs` and by the ABM profile; (4) branch on
@@ -392,7 +392,7 @@ the consumer?**
 
 **28. What does the writer do, and what does it refuse to do?**
 
-- Citation: `mal-core/src/mal_core/download/writer.py:12-58`.
+- Citation: `mal-core/src/mal_core/download/writer.py:12-53`.
 - Answer: `save_product` infers `nc` for a `Dataset` and `tif` otherwise,
   writes GeoTIFF via the `rio` accessor and NetCDF via `xarray`, and raises
   `ValueError` for a 3-D `DataArray` sent to the TIF writer. It is the
@@ -401,7 +401,7 @@ the consumer?**
 **29. What happens to a dataset whose loader raises, and what does the
 runner return overall?**
 
-- Citation: `mal-core/src/mal_core/download/runner.py:265-282`.
+- Citation: `mal-core/src/mal_core/download/runner.py:265-278`.
 - Answer: the exception is caught per loader, logged, and reported as
   `{"status": "error", "error": str(e)}`; the run continues with the next
   loader and the CLI prints one status line per dataset. The summary is
@@ -527,7 +527,7 @@ warning?**
   (passed to `update_dataset`),
   `mal-core/src/mal_core/download/manifest.py:166-172` (stored on the
   entry; `None` leaves an existing value untouched),
-  `mal-core/src/mal_core/download/runner.py:284-290` (`warn_manifest_limits`,
+  `mal-core/src/mal_core/download/runner.py:272-274` (`warn_manifest_limits`,
   wrapped so a warning never breaks a download),
   `mal-commonlib/src/mal_commonlib/data/licenses.py:25-146`
   (`KNOWN_LICENSES`, `collect_limits`, `warn_limits`, `warn_manifest_limits`).
@@ -692,7 +692,7 @@ can check each of the following against the cited file:
     constants are either cited as module constants or moved to the
     constants file, and the choice is stated.
 17. **Every claim carries a file-and-line citation**, and no citation
-    points at `docs/specs/` as authority.
+    points at a retired specification as authority.
 18. **The declaration of absences is present** (Q44) and the document does
     not claim a load-or-download API, a `--all` flag, or a reduction
     configuration that the code does not have.
