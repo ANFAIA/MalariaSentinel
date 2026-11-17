@@ -143,6 +143,24 @@ The nine hand-written specifications under `docs/specs/` were retired in
 favour of these documents. What each of their assertions became is recorded
 in `docs/plans/in-process/spec-retirement-ledger.md`.
 
+Two reviews run on every pull request, and both are advisors: they comment,
+they never block, and they never require a file to change.
+
+| review | what it asks | where it is described |
+|---|---|---|
+| the coherence review | does a document still match the code it describes? | `docs/concepts/coherence-review.md` |
+| the agentic review | is the change documented, and does the documentation still say what the code does? | `docs/concepts/agentic-review.md` |
+
+The agentic review runs three language-model reviewers over the pull request
+(one lens each: documentation, structure, claims) with read-only tools. It
+authenticates with OIDC: the run exchanges the identity token that GitHub
+issues it for an access token that lasts an hour, so the repository stores no
+credential at all; without that exchange the review is skipped and the pull
+request is unaffected. A change that alters the shape of a stage — a default,
+a contract, a channel list, an input or an output — must change the document
+that states it in the same pull request: the mechanical gates cannot see it,
+and the agentic review only reports it.
+
 ## The EGM flow: every artefact is temporary except the draft
 
 **This applies whenever the EGM skills are used** (`egm-brainstorm`,
