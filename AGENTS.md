@@ -52,6 +52,10 @@ cd mal-core && uv run pytest tests -k scoring -v
 | `social-networks/` | Experiment: a social-network agent, outside the pipeline. | — |
 | `data/`, `papers/`, `terrain/`, `runs/` | Datasets, papers, DEM tiles, experiment outputs (mostly gitignored). | — |
 
+The workspace root's `pyproject.toml` is the sixth one: it declares the
+workspace (`[tool.uv.workspace]`, five members), the shared dependency set and
+the sync profiles; each package below has its own.
+
 **Dependency rule**: nothing depends on research/script packages. When research code stabilises, promote to `mal-core` or `mal-commonlib` and update `mal-execution` scripts to use the promoted modules.
 
 **Naming**: branches/PRs use `common/`, `core/`, `exec/`, `sim/`, `data/`, `docs/`. Python modules use `mal_commonlib.*`, `mal_core.*`, `mal_cli.*`.
@@ -120,13 +124,24 @@ Promotion moves stable, useful code from an experiment into the core tier. It is
 - Don't retry with a different phrasing. Don't batch the change with another edit. Don't delegate the edit to a subagent to bypass the prompt.
 - Adding a new protected file = add the path to the table above and state it to the user.
 
-## Untrusted documents
+## The documentation layer
 
-`docs/specs/*` is **not authoritative**: it is scheduled for deletion by the
-conceptual-documentation plan (`docs/plans/in-process/per-stage-conceptual-documentation.md`).
-Several of its claims are already contradicted by the code. During any editing
-session, do not take a spec claim as true — verify it against the code before
-acting on it, and prefer `docs/concepts/` (once it exists) as the reference.
+The conceptual documents under `docs/concepts/` are the reference for what
+each stage of the pipeline does: one document per stage (`download`,
+`ingest`, `abm`, `scoring`, `training`, `prediction`), each with its question
+set beside it, and `docs/concepts/README.md` as the stance note that governs
+how they are written.
+
+Every value a document states is generated from the code
+(`tools/gen_concepts_values.py`): a value the code changes breaks the
+document's build instead of making the document quietly wrong. Each document
+states its own precedence rule — values from `model_constants.yaml`, contract
+names and versions from the generated contract table, semantics from the
+document — and where two of them disagree, the lower authority is the bug.
+
+The nine hand-written specifications under `docs/specs/` were retired in
+favour of these documents. What each of their assertions became is recorded
+in `docs/plans/in-process/spec-retirement-ledger.md`.
 
 ## The EGM flow: every artefact is temporary except the draft
 
@@ -169,6 +184,7 @@ brief that has been drafted is listed as a drafted plan, not as a design.
 | Procedural how-to (build, test, push, conventions) | This file (`AGENTS.md`). |
 | Project-specific durable facts | GitHub issues, milestones, and PR descriptions. |
 | Session working notes and summaries | The session's own context (auto-compacted by pi / Magic Context). |
+| What a stage of the pipeline does | `docs/concepts/<stage>/` — the conceptual document and its question set. |
 
 ## Decision table: where does this go?
 
@@ -187,19 +203,19 @@ brief that has been drafted is listed as a drafted plan, not as a design.
 
 ## Data format conventions
 
-The manifest (`data/<aoi>/manifest.json`) is the **single source of truth** for an AOI's data inventory. Full spec: `docs/specs/data/spec.md`.
+The manifest (`data/<aoi>/manifest.json`) is the **single source of truth** for an AOI's data inventory. The schema and the naming conventions are described in `docs/concepts/download/download.tex`; the code that owns them is `mal-core/src/mal_core/download/manifest.py` and `mal-core/tests/test_manifest.py`.
 
 **Standard naming**:
 - Time-series: `<aoi>_<product>_<year>.<ext>` (one file per year)
 - Static: `<aoi>_<product>.<ext>` (one file per AOI)
 
-**DOWNLOADER dict**: every loader module exports a `DOWNLOADER` dict with `name`, `outputs` (callable map), and `manifest_keys` (output→manifest key map). See `docs/specs/download/spec.md`.
+**DOWNLOADER dict**: every loader module exports a `DOWNLOADER` dict with `name`, `outputs` (callable map), and `manifest_keys` (output→manifest key map). See `docs/concepts/download/download.tex` and `mal-core/tests/test_download_contract.py`.
 
-**Load-or-download API**: public functions (`load_<dataset>_<product>`) check manifest → load if exists → download+register if missing. Never hardcode paths; resolve from manifest.
+**Loading is not downloading**: the loaders in `mal_commonlib.data.loaders` always fetch from the provider; there is no `load_or_download` symbol. The manifest is *written* by the download runner and *read* by the consumers. Never hardcode paths; resolve them from the manifest.
 
 **ABM manifest mode**: `run_abm_from_manifest()` reads manifest, validates completeness, resolves paths, calls C++ binary. Run `malariasim abm --aoi <aoi>` directly (CLI subcommand per stage).
 
-**Adding a new dataset**: create loader module with `DOWNLOADER` dict → register in `registry.py` → run `malariasim download` → mark `required_for_abm` if ABM needs it. See `docs/specs/data/spec.md` §6.3.
+**Adding a new dataset**: create loader module with `DOWNLOADER` dict → register in `registry.py` → run `malariasim download` → mark `required_for_abm` if ABM needs it. See `docs/concepts/download/download.tex` (the registry and the loader table) and `mal-core/src/mal_core/download/registry.py`.
 
 ## Scoring framework conventions
 
