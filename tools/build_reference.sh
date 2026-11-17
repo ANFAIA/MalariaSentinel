@@ -26,6 +26,10 @@ fi
 
 echo "==> Doxygen (the contract-defining headers)"
 mkdir -p docs/reference/cpp
+# Doxygen's HTML output is the whole directory: a stale file from a
+# previous build (a renamed class, a page that no longer exists) would
+# otherwise stay published.
+find docs/reference/cpp -mindepth 1 -delete
 doxygen docs/reference/Doxyfile
 
 echo "==> pdoc (the Python packages)"

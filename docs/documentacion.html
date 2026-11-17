@@ -63,21 +63,29 @@
   <h2 data-i18n="how">Cómo se escriben</h2>
   <p data-i18n="howBody">La nota de postura (<code>docs/concepts/README.md</code>) fija cómo se pregunta, no una lista de secciones: cada documento tiene su propia estructura. El conjunto de preguntas de cada etapa vive junto a su documento. La revisión de coherencia avisa, pero nunca bloquea.</p>
 
+  <h2 data-i18n="elsewhere">Otros documentos</h2>
+  <ul class="docs">
+    <li>
+      <div class="stage" data-i18n="referenceTitle">Referencia técnica</div>
+      <div class="meta" data-i18n="referenceBody">La API de C++ y Python, generada del código: <a href="reference/index.html">reference/index.html</a>.</div>
+    </li>
+    <li>
+      <div class="stage" data-i18n="stanceTitle">Nota de postura</div>
+      <div class="meta" data-i18n="stanceBody">Cómo se escribe y se revisa cada documento: <a href="https://github.com/ANFAIA/MalariaSentinel/blob/main/docs/concepts/README.md">docs/concepts/README.md</a>.</div>
+    </li>
+    <li>
+      <div class="stage" data-i18n="reviewTitle">Revisión de coherencia</div>
+      <div class="meta" data-i18n="reviewBody">Qué vigila el revisor y qué se ha medido: <a href="https://github.com/ANFAIA/MalariaSentinel/blob/main/docs/concepts/coherence-review.md">docs/concepts/coherence-review.md</a>.</div>
+    </li>
+  </ul>
+
   <footer>
     <span data-i18n="footer">MalariaSentinel · <a href="index.html">Volver al inicio</a></span>
   </footer>
 </main>
 
+<script src="concepts/generated/stages.js"></script>
 <script>
-  const STAGES = [
-    { slug: 'download', stage: 'download', pdf: 'concepts/download/download.pdf' },
-    { slug: 'ingest',   stage: 'ingest',   pdf: 'concepts/ingest/ingest.pdf' },
-    { slug: 'abm',      stage: 'abm',      pdf: 'concepts/abm/abm.pdf' },
-    { slug: 'scoring',  stage: 'scoring',  pdf: 'concepts/scoring/scoring.pdf' },
-    { slug: 'training', stage: 'training', pdf: 'concepts/training/training.pdf' },
-    { slug: 'prediction', stage: 'prediction', pdf: 'concepts/prediction/prediction.pdf' }
-  ];
-
   const T = {
     es: {
       title: 'Documentación conceptual',
@@ -85,6 +93,13 @@
       stages: 'Documentos por etapa',
       how: 'Cómo se escriben',
       howBody: 'La nota de postura (<code>docs/concepts/README.md</code>) fija cómo se pregunta, no una lista de secciones: cada documento tiene su propia estructura. El conjunto de preguntas de cada etapa vive junto a su documento. La revisión de coherencia avisa, pero nunca bloquea.',
+      elsewhere: 'Otros documentos',
+      referenceTitle: 'Referencia técnica',
+      referenceBody: 'La API de C++ y Python, generada del código: <a href="reference/index.html">reference/index.html</a>.',
+      stanceTitle: 'Nota de postura',
+      stanceBody: 'Cómo se escribe y se revisa cada documento: <a href="https://github.com/ANFAIA/MalariaSentinel/blob/main/docs/concepts/README.md">docs/concepts/README.md</a>.',
+      reviewTitle: 'Revisión de coherencia',
+      reviewBody: 'Qué vigila el revisor y qué se ha medido: <a href="https://github.com/ANFAIA/MalariaSentinel/blob/main/docs/concepts/coherence-review.md">docs/concepts/coherence-review.md</a>.',
       footer: 'MalariaSentinel · <a href="index.html">Volver al inicio</a>',
       desc: {
         download: 'De dónde vienen los datos, con qué formato, cómo se transforman y en qué se convierten.',
@@ -101,6 +116,13 @@
       stages: 'Documents by stage',
       how: 'How they are written',
       howBody: 'The stance note (<code>docs/concepts/README.md</code>) fixes how to ask, not a section list: every document has its own structure. Each stage\'s question set lives beside its document. The coherence review warns, but never blocks.',
+      elsewhere: 'Other documents',
+      referenceTitle: 'Technical reference',
+      referenceBody: 'The C++ and Python API, generated from the code: <a href="reference/index.html">reference/index.html</a>.',
+      stanceTitle: 'Stance note',
+      stanceBody: 'How every document is written and reviewed: <a href="https://github.com/ANFAIA/MalariaSentinel/blob/main/docs/concepts/README.md">docs/concepts/README.md</a>.',
+      reviewTitle: 'Coherence review',
+      reviewBody: 'What the reviewer watches and what has been measured: <a href="https://github.com/ANFAIA/MalariaSentinel/blob/main/docs/concepts/coherence-review.md">docs/concepts/coherence-review.md</a>.',
       footer: 'MalariaSentinel · <a href="index.html">Back to the start</a>',
       desc: {
         download: 'Where the data comes from, in what format, how it is transformed and what it becomes.',
@@ -129,7 +151,7 @@
       li.innerHTML =
         '<div class="stage"><code>' + s.stage + '</code></div>' +
         '<div class="meta">' + t.desc[s.slug] + '</div>' +
-        '<div><a href="' + s.pdf + '">PDF</a> · <a href="https://github.com/ANFAIA/MalariaSentinel/tree/main/docs/concepts/' + s.slug + '">source</a></div>';
+        '<div><a href="' + s.pdf + '">PDF</a> · <a href="' + s.source + '">source</a> · <a href="https://github.com/ANFAIA/MalariaSentinel/tree/main/docs/concepts/' + s.slug + '">repo</a></div>';
       list.appendChild(li);
     });
     document.getElementById('btn-es').setAttribute('aria-pressed', String(lang === 'es'));

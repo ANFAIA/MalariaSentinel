@@ -14,6 +14,9 @@ PROJECT_NAME           = "MalariaSentinel — C++ reference"
 PROJECT_BRIEF          = "The contract-defining headers of the ABM engine"
 
 OUTPUT_DIRECTORY       = docs/reference/cpp
+# The reference's own index must sit next to the Python one, under the name
+# the index page links to: docs/reference/cpp/index.html.
+HTML_OUTPUT            = .
 CREATE_SUBDIRS         = NO
 
 INPUT                  = mal-core/src/mal_core/abm/include/mal_abm_fast/wire.hpp \
