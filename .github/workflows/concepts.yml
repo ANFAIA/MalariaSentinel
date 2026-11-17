@@ -129,7 +129,7 @@ jobs:
             exit 0
           fi
           git commit -m "docs(concepts): rebuild the conceptual PDFs [skip ci]"
-          git push "HEAD:refs/heads/${GITHUB_REF_NAME}"
+          git push origin "HEAD:refs/heads/${GITHUB_REF_NAME}"
 
   reference:
     runs-on: ubuntu-latest
@@ -161,4 +161,4 @@ jobs:
             exit 0
           fi
           git commit -m "docs(concepts): rebuild the technical reference [skip ci]"
-          git push "HEAD:refs/heads/${GITHUB_REF_NAME}"
+          git push origin "HEAD:refs/heads/${GITHUB_REF_NAME}"
