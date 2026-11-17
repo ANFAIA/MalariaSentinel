@@ -1,5 +1,11 @@
 \documentclass[11pt,a4paper]{article}
 \usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+% Latin Modern: a scalable Type 1 font. With T1 and the default
+% Computer Modern, TeX asks for the EC fonts, and when the Type 1 EC
+% ones (cm-super) are missing it falls back to bitmaps -- and
+% microtype's font expansion cannot work with a bitmap font, so the
+% build fails on a TeX Live without cm-super.
 \usepackage[T1]{fontenc}
 \usepackage[english]{babel}
 \usepackage[margin=2.3cm]{geometry}

@@ -62,7 +62,15 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             latexmk texlive-latex-recommended texlive-latex-extra \
-            texlive-fonts-recommended texlive-science poppler-utils
+            texlive-fonts-recommended texlive-science poppler-utils \
+            lmodern
+          # `lmodern` is not in texlive-latex-recommended: the documents
+          # ask for it explicitly. With T1 encoding and the default
+          # Computer Modern, TeX asks for the EC fonts, and this
+          # distribution ships only their sources, so pdfTeX falls back
+          # to bitmaps -- and microtype's font expansion cannot work with
+          # a bitmap font ("auto expansion is only possible with
+          # scalable fonts"), which is how the ODD failed to build.
 
       - uses: astral-sh/setup-uv@v5
 
