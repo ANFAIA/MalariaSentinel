@@ -72,23 +72,28 @@ jobs:
       - name: Build the documents
         run: tools/build_concepts.sh
 
-      - name: Check the PDF's text determinism (not its bytes)
-        # pdfTeX embeds a creation date and a trailer id, so two builds of
-        # the same source differ byte-wise. The extracted text must not.
+      - name: Check the PDF's determinism (its bytes, not only its text)
+        # The build fixes SOURCE_DATE_EPOCH, so two builds of the same
+        # source are byte-identical — a stronger claim than the extracted
+        # text being equal, and the one the commit-back step depends on:
+        # a rebuild that differs by a timestamp would commit a difference
+        # that carries no information.
         run: |
           set -euo pipefail
-          mkdir -p /tmp/text-before /tmp/text-after
+          mkdir -p /tmp/pdf-before /tmp/pdf-after
           for pdf in docs/concepts/*/*.pdf; do
             [ -e "$pdf" ] || continue
-            pdftotext -layout "$pdf" "/tmp/text-before/$(basename "$pdf").txt"
+            pdftotext -layout "$pdf" "/tmp/pdf-before/$(basename "$pdf").txt"
+            cp "$pdf" "/tmp/pdf-before/$(basename "$pdf").pdf"
           done
           tools/build_concepts.sh >/dev/null
           for pdf in docs/concepts/*/*.pdf; do
             [ -e "$pdf" ] || continue
-            pdftotext -layout "$pdf" "/tmp/text-after/$(basename "$pdf").txt"
+            pdftotext -layout "$pdf" "/tmp/pdf-after/$(basename "$pdf").txt"
+            cp "$pdf" "/tmp/pdf-after/$(basename "$pdf").pdf"
           done
-          if ! diff -r -q /tmp/text-before /tmp/text-after; then
-            echo "::warning::the extracted text of a PDF changed between two builds"
+          if ! diff -r -q /tmp/pdf-before /tmp/pdf-after; then
+            echo "::warning::a PDF changed between two builds of the same source"
           fi
 
       - name: Upload the PDFs for the reviewer
