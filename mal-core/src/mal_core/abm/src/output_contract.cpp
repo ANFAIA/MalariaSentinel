@@ -11,7 +11,7 @@
 // 128x128 blocks, band descriptions = the state band names).
 //
 // `write_state_sidecar` writes a JSON sidecar next to the .tif, with
-// the 14 keys the F1.e parity test pins. The keys are emitted in the
+// fifteen keys. The keys are emitted in the
 // fixed order of the writer below so the byte-equal test is stable
 // across engines.
 #include "output_contract.hpp"

@@ -74,16 +74,10 @@ class SimParams:
     r_max: float = R_MAX
     mu: float = MU
     water_thresh: float = WATER_THRESH
-
-    def r_of(self, T):
-        """Legacy temperature-scaled reproduction rate.
-
-        Dead path: the module-level ``temp_suitability`` helper it calls
-        was removed with the retired annual temperature-suitability
-        channel, so calling this raises ``NameError``. Kept only as a
-        marker of the old contract — no caller in the repository uses it.
-        """
-        return self.r_max * temp_suitability(T)
+    # The legacy temperature-scaled reproduction rate (r_of) was removed
+    # here: it called a module-level helper that the retired annual
+    # temperature-suitability channel took with it, so it raised NameError
+    # for every caller. No caller in the repository used it.
 
 
 # Randomization ranges for training rollouts (Stage 4)
