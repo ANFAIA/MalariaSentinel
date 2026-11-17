@@ -37,6 +37,10 @@
 % from mal-core/config/model_constants.yaml. A key that no longer exists
 % makes \mskey fail the build.
 \input{../generated/macros.tex}
+% The values that live in the code (module constants, function defaults) are
+% emitted by the same generator, under the second macro family. An unknown
+% key makes \codeconst fail the build.
+\input{../generated/code-macros.tex}
 
 
 \AtBeginEnvironment{longtable}{\footnotesize}
@@ -108,6 +112,28 @@ for exact replication but are not part of the protocol. Appendix~B
 records provenance, versioning, and testing status. Throughout, a
 ``parameter'' is a fixed model constant, while a ``state variable'' is
 what would have to be saved to restart a run exactly.
+
+\subsection*{Sources of truth and their precedence}
+
+This description quotes three kinds of authority, and they do not carry
+the same weight. \textbf{Values} --- every number that is a model
+constant --- come from \code{mal-core/config/model_constants.yaml} and
+reach this document through the generated macros and the generated
+parameter table at the end of this document; where the text here and the constants file
+disagree, the constants file wins and this text is the defect.
+\textbf{Contract values and names} --- the version strings, the band
+names, and the key names of the state sidecar and of the environmental
+NetCDF --- come from the generated contract table, which is derived from
+the code that writes them; where the text here and that table disagree,
+the table wins and this text is the defect. \textbf{Semantics} --- what
+a state variable means, which process a submodel implements, what a
+formula stands for --- are owned by this document; where the text here
+and the code disagree, this text is the defect, because the code is the
+model and the description is a description of it. On every contradiction
+the lower authority is the bug and the higher one is corrected. Each of
+these rules is stated by the document that owns that content, so this
+document states the rule for its own content and there is no shared page
+that arbitrates between the documents.
 
 \subsection*{Notation}
 
@@ -316,7 +342,7 @@ Habitat patch & \code{activated} & derived: $S\ge$ activation floor and salinity
  & \code{habitat_dry_days} & days since $S$ last fell below the activation floor \\
  & \code{rain_d}, \code{temp_d}, \code{salinity_ppt} & forcing: mm\,d$^{-1}$, $^\circ$C, psu; copied from the cell \\
 Grid cell & $z$ & state: $[0,1]$; pluvial state \\
- & $H_{i,g}$ & static input: five planes in $[0,1]$: JRC, built, wetland, open+water, crop \\
+ & $H_{i,g}$ & static input: \codeconst{ingest.env_static_planes} planes in $[0,1]$: JRC, built, wetland, open+water, crop \\
  & \code{dry_days} & state: integer; consecutive days with $S<$ activation floor \\
  & $K$ & derived: individuals; same value exposed through the patch state \\
  & rainfall, air temperature, salinity & forcing: mm\,d$^{-1}$, $^\circ$C, psu; daily \\
@@ -324,9 +350,9 @@ Human grid & $S_H,E_H,I_H,R_H$ & persons per cell; $R_H$ is zero when immunity i
  & population & static input: persons per cell; constant \\
  & incidence & daily output: new $E_H$ per day, persons \\
  & prevalence & derived: $I_H/$population, dimensionless \\
- & exposed cohorts & persons by day since exposure; 12 bins \\
- & infectious cohorts & persons by day since onset; 20 bins \\
- & recovered cohorts & persons by day since recovery; 180 bins if immunity is on \\
+ & exposed cohorts & persons by day since exposure; \mskey{transmission.human_incubation_days} bins \\
+ & infectious cohorts & persons by day since onset; \mskey{transmission.human_infectious_days} bins \\
+ & recovered cohorts & persons by day since recovery; \mskey{transmission.human_immunity_days} bins if immunity is on \\
 Host cell & humans, cattle, goats, sheep, pigs, chickens & animals or persons per cell \\
  & wildlife proxy & index in $[0,1]$; 0 when no data \\
  & building fraction, indoor fraction, residential fraction & $[0,1]$ \\
@@ -770,14 +796,30 @@ every cell is known to the observer. There is no sampling, no detection
 error, and no virtual ecologist. The observation layer is:
 
 \begin{itemize}
-\item \textbf{State COG} (GeoTIFF, float32, 2 bands, NoData $-9999$):
+\item \textbf{State COG} (GeoTIFF, float32, 2 bands, NoData $\mskey{ingest.nodata_sentinel}$):
   band 1 \code{adult_patch_count} (adults associated with each cell via
   their patch, after dispersal), band 2 \code{adult_cell_count} (adults
   at their current position). Both are raw counts of all adults, males
   included; there is no normalization by capacity.
-\item \textbf{State sidecar} (JSON): CRS, affine transform, AOI slug,
-  scale, start year and month, seed, rollout index and count, generator
-  version, contract version, band names, NoData, and grid dimensions.
+\item \textbf{State sidecar} (JSON): fifteen keys, written in the
+  emission order of \code{write_state_sidecar}
+  (\code{output_contract.cpp:248-271}) ---
+  \code{crs} (the EPSG string of the AOI grid),
+  \code{transform} (the six-element GDAL affine tuple),
+  \code{aoi\_slug} (the AOI identifier),
+  \code{scale} (the AOI scale),
+  \code{year} and \code{month} (the run's start date),
+  \code{seed},
+  \code{n\_rollouts} (how many rollouts the run has) and
+  \code{rollout\_index} (which one this is, zero-based),
+  \code{generator\_version},
+  \code{abm\_params\_hash} (a placeholder: the code writes
+  \code{"sha256:pending"}, not a computed hash --- Appendix~A),
+  \code{contract\_version},
+  \code{band\_names} (the two state band names),
+  \code{nodata} (the NoData sentinel of the COG), and
+  \code{shape} (a three-element array $[2, h, w]$: the number of bands,
+  the number of rows, and the number of columns).
 \item \textbf{Transmission COG} (optional, 4 bands, float32): human
   prevalence, human incidence per person, infectious vector pressure
   (infectious bites delivered per cell per day), and a binary active-focus
@@ -908,7 +950,7 @@ transmission is enabled, every cell is assigned one person. The initial
 compartments are $S_H=$ population and $E_H=I_H=R_H=0$, except in the
 legacy \code{uniform-legacy} seeding mode, where a fraction
 \code{initial_human_prevalence} $=\mskey{transmission.initial_human_prevalence}$ of each cell is infectious and is
-spread evenly over the 20 infectious cohort bins. The human population
+spread evenly over the \mskey{transmission.human_infectious_days} infectious cohort bins. The human population
 does not change during the run.
 
 \textbf{Outbreak seeding.} If transmission is enabled and the human
@@ -1015,7 +1057,7 @@ resolution of the source is given in the preparation column.}\label{tab:input}\\
 \endlastfoot
 Daily rainfall & \bcode{rainfall} & mm\,d$^{-1}$; 1 km, daily & CHIRPS v2.0 (UCSB Climate Hazards Center), native 0.05$^\circ$ ($\sim$5\,km) & Nearest-neighbour reprojection to the AOI grid; NoData filled from the nearest valid cell for that day; open sea set to 0; negative values clipped. A 5\,km product cannot resolve local convective cells; daily totals are smeared over the 1\,km grid. \\
 Daily air temperature & \bcode{air_temp_c} & $^\circ$C; 1 km, daily mean & ERA5-Land 2\,m temperature, native $\sim$9\,km & Bilinear reprojection; open sea set to 0; finite values below $-900$ treated as NoData and replaced by an eight-neighbour wavefront imputation from land. Daily means, not diurnal cycles. \\
-Permanent surface water & \bcode{jrc_persistent} & fraction $[0,1]$; 1 km, static & JRC Global Surface Water v1.4, native 30\,m & Fraction of pixels with $\ge80\%$ occurrence, averaged to 1\,km; open-sea cells zeroed, coastal lagoons and river mouths inside the configured coastal band retained (\mskey{ingest.coastline_buffer_m}\,m in the current constants; the tree records no value for the setting used when the delivered NC was built, so it is unknown whether the delivered product used this band). Occurrence is not depth, volume, or breeding suitability. \\
+Permanent surface water & \bcode{jrc_persistent} & fraction $[0,1]$; 1 km, static & JRC Global Surface Water v1.4, native 30\,m & Fraction of pixels with $\ge\codeconst{ingest.jrc_occurrence_threshold_pct}\%$ occurrence, averaged to 1\,km; open-sea cells zeroed, coastal lagoons and river mouths inside the configured coastal band retained (\mskey{ingest.coastline_buffer_m}\,m in the current constants; the tree records no value for the setting used when the delivered NC was built, so it is unknown whether the delivered product used this band). Occurrence is not depth, volume, or breeding suitability. \\
 Built land & \bcode{lc_built} & fraction $[0,1]$; 1 km, static & Dynamic World V1 (Google), native 10\,m & Per-year mode-of-year label composite, then areal fraction per 1\,km cell (average resampling); mean over available years. Label 6. Mode-of-year can lose episodic construction. \\
 Wetland & \bcode{lc_wetland} & fraction $[0,1]$; 1 km, static & Dynamic World V1 & Areal fraction of label 3 (flooded vegetation) only; mangroves are not separately represented. Tidal and deciduous pixels can be assigned to trees in the mode composite. \\
 Open land and water & \bcode{lc_open_plus_water} & fraction $[0,1]$; 1 km, static & Dynamic World V1 & Areal fraction of labels 2 (grass), 5 (shrub), 7 (bare), and 0 (water). In the engine, open habitat adds $\mskey{urban.rain_pools_built_damage}\times$ built land to represent rain pools on sealed surfaces. \\
@@ -1034,7 +1076,7 @@ Wind & \bcode{u100}, \bcode{v100} & m\,s$^{-1}$; 6-hourly, optional & ERA5 & Nea
 
 \textbf{Uncertainties and biases.} The habitat layers are proxies, not
 measurements of breeding sites. JRC occurrence records where water was
-observed, not how deep or how long it persists; the 80\% threshold turns
+observed, not how deep or how long it persists; the \codeconst{ingest.jrc_occurrence_threshold_pct}\% threshold turns
 a continuous occurrence field into a persistent-water mask. Dynamic
 World's mode-of-year composite removes within-year phenology and can
 misclassify tidal wetlands and mangrove margins. CHIRPS at 5\,km and
@@ -1410,7 +1452,7 @@ reproductive system. The batch size is a binomial draw rather than a
 fixed mean so that individual females vary; the thermal modifier ties
 fecundity to the same per-patch temperature that drives development and
 survival. The clamp keeps a batch within a plausible range but, as noted,
-it also imposes a 30-egg minimum when the thermal modifier is zero.
+it also imposes a \mskey{gonotrophic.egg_batch_min}-egg minimum when the thermal modifier is zero.
 
 \subsection{Seek an oviposition site and oviposit}
 
@@ -1479,7 +1521,9 @@ landscape is loaded and a mobility schedule is present, the engine runs
 the \emph{phase-aware} path: for each of the four daily phases it builds
 a phase-specific effective host landscape and lets every female still in
 HOST\_SEEKING search and feed. If a host landscape is loaded but no
-mobility schedule is present, it runs a single-phase residential path. If
+mobility schedule is present, it runs a single-phase residential path, in
+which every HOST\_SEEKING female makes exactly one host-selection
+attempt per day. If
 no host landscape is loaded, it uses a deterministic fallback in which
 every HOST\_SEEKING female takes a HUMAN blood meal at her current cell.
 
@@ -1525,7 +1569,13 @@ attraction; (iv) if a cell is selected, feeds with certainty, sets
 BLOOD\_FED, records the meal at the selected host cell, and uses the
 dominant host type of that cell as the host type. A female that feeds in
 an early phase is skipped by later phases. A female that does not feed
-remains in HOST\_SEEKING and may try again in the next phase.
+remains in HOST\_SEEKING and may try again in the next phase. No random
+number is consumed when the attraction field is empty: the selection
+returns nothing, the attempt is still counted, and the female stays in
+HOST\_SEEKING. The same holds when the total attraction is zero, in which
+case the first cell of the field is taken without a draw; that branch is
+unreachable in practice, because a cell whose attraction is zero is
+dropped when the field is built.
 
 \textbf{Starvation.} The HOST\_SEEKING timer is incremented once per daily
 update. A female that reaches \mskey{host_seeking.starvation_days} days without a blood meal dies. The timer
@@ -1591,8 +1641,8 @@ for a quantitative host-partitioning analysis.
 \textbf{Consequences worth stating.} With a \mskey{dispersal.host_flight_step_m}\,m step in each of four
 active phases, a female can move up to 2\,km per day toward hosts,
 independently of the local dispersal kernel; the phase weights gate
-activity but are not used as probabilities, so the 0.02 daytime weight
-still produces a full daytime search-and-feed opportunity (Appendix~A.4).
+activity but are not used as probabilities, so the daytime weight of
+\mskey{species.coluzzii.activity_weights} still produces a full daytime search-and-feed opportunity (Appendix~A.4).
 Because the host type is the \emph{dominant} host of the selected cell,
 and the selected cell is chosen by total attraction, the realized host
 partition is not a direct draw from $\pi_k$; in a mixed cell, the most
@@ -1847,7 +1897,7 @@ the engine under \code{mal-core/src/mal_core/abm/}.
   offer.
 
 \item \textbf{Feeding success is not stochastic, and two states are
-  unreachable.} \bcode{gonotrophic.feeding_success_rate} (0.825) is
+  unreachable.} \bcode{gonotrophic.feeding_success_rate} (\mskey{gonotrophic.feeding_success_rate}) is
   loaded and stored in \code{GonotrophicParams}, but no code path draws
   it. A female that finds a host feeds with certainty. The states
   HOST\_APPROACH and PROBING are defined and handled in the state
@@ -1864,7 +1914,7 @@ the engine under \code{mal-core/src/mal_core/abm/}.
 \item \textbf{The phase activity weights gate, but do not weight, the
   phase pass.} \code{phase_active()} returns true when the species
   activity weight exceeds 0.001. With the default weights
-  (0.02, 0.10, 0.80, 0.08) all four phases are active, and each phase
+  (\mskey{species.coluzzii.activity_weights}) all four phases are active, and each phase
   gives a full search-and-feed opportunity. The weights are not used as
   probabilities, so the model has substantial daytime host seeking
   despite the nocturnal shape of the row.
@@ -1976,8 +2026,9 @@ change to a frozen key requires a version bump and a contract review.
 Two divergences between the Python habitat mirror and the engine must be
 recorded, because they break the assumption that one implementation
 mirrors the other. First, \bcode{mal_core/habitat/capacity.py:30}
-hardcodes \code{K_REF_DIAG_PER_KM2} $=0.143\times9.3\times10^{6}$ as
-the capacity scale, where the engine uses \code{species.k_ref}
+hardcodes \code{K\_REF\_DIAG\_PER\_KM2} $=\codeconst{ingest.k_ref_diag_per_km2}$
+as
+the capacity scale, where the engine uses \code{species.k\_ref}
 $=\mskey{species.k_ref}$ (\code{habitat_availability.hpp:191-193}); the two
 are not the same quantity, and the Python one is not read from the
 constants file at all. Second, \code{capacity.species_accuracy} defaults

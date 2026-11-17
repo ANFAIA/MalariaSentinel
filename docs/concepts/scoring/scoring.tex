@@ -12,6 +12,7 @@
 \usepackage[hidelinks]{hyperref}
 \newcommand{\code}[1]{\texttt{#1}}
 \input{../generated/macros.tex}
+\input{../generated/code-macros.tex}
 
 \title{The \emph{scoring} stage of the MalariaSentinel pipeline\\[3pt]
 \large A conceptual description of how a finished simulation is turned into a scorecard}
@@ -161,6 +162,27 @@ prior --- both are bare literals of the same kind
 \code{d4\_stability.py:56-66}). Where a value could sit in either of those
 two tiers, the tier given below is this document's judgement, and a reviewer
 should read it as such.
+
+\subsection{Which authority wins when two of them disagree}
+
+This document owns the content of the \emph{scoring} stage, so it states
+the precedence rule that governs that content. There are three authorities.
+\emph{Values} --- a number the stage uses --- belong to the shared model
+configuration (\code{mal-core/config/model\_constants.yaml}) and to the code
+that implements the stage; where a value is a model constant, the
+configuration wins. \emph{Contract values and names} --- a version string, a
+band name, a sentinel --- belong to the generated contract table reproduced
+in this document, and that table wins. \emph{Semantics} --- what a number
+means, which artifact it is read from, what the stage does and does not do
+--- belong to this document, and this document wins. On a contradiction
+between two authorities, the lower authority is the bug: a value the
+configuration states and the code implements differently is fixed in the
+code, a contract value the table states and the code implements differently
+is fixed in the code, and a meaning this document states and the code
+implements differently is fixed here. The rule is stated here, in the
+document that owns the content, and not on a page shared with other stages,
+because a shared page would leave a reader of this document without the rule
+that governs it.
 
 \input{../generated/contracts.tex}
 
@@ -497,13 +519,16 @@ one means something slightly different in each of them:
       \code{d21\_dispersal\_kernel.py:115-126}.
 \item \textbf{Gaussian without a plateau.} The survival dimension has no
       band branch: its score is an unconditional Gaussian centred on a mean
-      lifespan of $11$ days with a width of $4$ days
+      lifespan of $\codeconst{scoring.d2_lifetime_centre}$ days with a width
+      of $\codeconst{scoring.d2_lifetime_width}$ days
       (\code{d2\_survival.py:55}), so the score is one only at exactly
-      $11$ days, and the ends of the stated $8$--$15$ day window do not
-      score one.
+      $\codeconst{scoring.d2_lifetime_centre}$ days, and the ends of the
+      stated $\codeconst{scoring.d2_window_min}$--$\codeconst{scoring.d2_window_max}$
+      day window do not score one.
 \item \textbf{Ratio against a target.} The score is the measured quantity
       divided by its target, and is one when the target is met --- the
-      coupling dimension divides the correlation by $0.50$ and caps at one
+      coupling dimension divides the correlation by
+      $\codeconst{scoring.d8_score_divisor}$ and caps at one
       (\code{d8\_coupling.py:54}), the detection-coverage dimension divides
       the coverage by its target (\code{d16\_detection\_coverage.py:128}).
 \item \textbf{Geometric mean of three sub-scores.} The persistence
@@ -530,14 +555,16 @@ each dimension, its weight, its minimum score and its hard floor.
 
 The pattern is not universal, and two exceptions are worth naming. The
 coupling dimension never compares its score against its declared minimum
-score at all: it declares \code{min\_score = 0.4}
+score at all: it declares \code{min\_score = }\codeconst{scoring.d8_min_score}
 (\code{d8\_coupling.py:25}) but sets its flag from the raw correlation
-instead, \code{passed = r >= 0.30} (\code{d8\_coupling.py:60}), so its
+instead, \code{passed = r >= }\codeconst{scoring.d8_pass_threshold}
+(\code{d8\_coupling.py:60}), so its
 declared minimum score is inert. The two contract dimensions set their
-flags from a literal $0.70$ rather than from \code{min\_score}
+flags from a literal of their own rather than from \code{min\_score}
 (\code{d19\_pool\_persistence.py:144},
 \code{d20\_washout\_response.py:83}); there the literal coincides with the
-declared minimum score, so the difference has no behavioural effect.
+declared minimum score listed in the generated table above, so the
+difference has no behavioural effect.
 
 One consequence is worth stating explicitly: \emph{a dimension that fails
 its minimum score still enters the composite}. The runner puts a dimension
@@ -560,9 +587,9 @@ composite against three thresholds in order (\code{runner.py:24-31}):
 Composite at or above & Label \\
 \midrule
 \endhead
-$0.70$ & \code{VIABLE} \\
-$0.50$ & \code{BORDERLINE} \\
-$0.30$ & \code{REGRESSED} \\
+$\codeconst{scoring.verdict_viable}$ & \code{VIABLE} \\
+$\codeconst{scoring.verdict_borderline}$ & \code{BORDERLINE} \\
+$\codeconst{scoring.verdict_regressed}$ & \code{REGRESSED} \\
 (below all of the above) & \code{COLLAPSED} \\
 \end{longtable}
 
@@ -603,32 +630,40 @@ Gate & What it checks & Rule and units \\
 \endhead
 \code{G6\_data\_valid} & Every band value of every state COG is finite and
 non-negative & Fraction of valid values over all bands of all state files;
-the gate passes only at a perfect fraction. Above 48 state files a uniform
-sample of 48 is taken, the full sweep being a test concern
+the gate passes only at a perfect fraction. Above
+\codeconst{scoring.gate_sample_files} state files a uniform
+sample of \codeconst{scoring.gate_sample_files} is taken, the full sweep
+being a test concern
 (\code{gates.py:52-54}). \\
 \code{G7\_determinism} & Per-seed state files are byte-identical & Files
 grouped by the seed token in the filename; every group with two or more
 members is compared by MD5; the score is one when no group mismatches
 (\code{gates.py:89-113}). \\
 \code{G10\_perf} & Wall time of the run & Read from \code{wall\_s} in
-\code{run\_metadata.json}; the gate passes at or below 30 s, and the score
-decays as $30/w$ otherwise (\code{gates.py:125-144}). \\
+\code{run\_metadata.json}; the gate passes at or below
+\codeconst{scoring.gate_wall_time_limit_s} s, and the score
+decays as $\codeconst{scoring.gate_wall_time_limit_s}/w$ otherwise (\code{gates.py:125-144}). \\
 \code{G12\_host\_input} & The input human grid total matches a census
 reference & Total of the \code{human} variable of the AOI's host raster,
 excluding the NoData sentinel \mskey{ingest.nodata_sentinel}, divided by a
-reference total that defaults to $27\,000\,000$ and can be overridden
-through the context; the gate passes when the ratio lies in $[0.8, 1.2]$
+reference total that defaults to $\codeconst{scoring.gate_census_reference}$
+and can be overridden
+through the context; the gate passes when the ratio lies in
+$[\codeconst{scoring.gate_ratio_band_min}, \codeconst{scoring.gate_ratio_band_max}]$
 (\code{gates.py:156-194}). \\
 \code{G14\_mobility} & Mobility origin--destination matrices are
 row-stochastic & Each \code{.csr} file next to the run directory (or in its
 parent, or in a sibling \code{hosts} directory) is read as a sparse matrix;
-the fraction of rows whose values sum to one within a tolerance of $0.01$ is
+the fraction of rows whose values sum to one within a tolerance of
+$\codeconst{scoring.gate_row_sum_tolerance}$ is
 computed per file, the minimum over files is the score, and the gate passes
-at or above $0.99$ (\code{gates.py:206-245}). \\
+at or above $\codeconst{scoring.gate_row_sum_threshold}$ (\code{gates.py:206-245}). \\
 \code{G24\_urban\_ratio} & Urban cells carry less adult density than rural
-ones & Mean adult density over urban-class $30$ cells divided by the mean
-over rural-class $50$ cells of the final state; the gate passes at or below
-$0.7$ (\code{gates.py:261-303}). The gate is \emph{manual}: it needs the
+ones & Mean adult density over urban-class $\codeconst{scoring.gate_urban_class}$
+cells divided by the mean
+over rural-class $\codeconst{scoring.gate_rural_class}$ cells of the final
+state; the gate passes at or below
+$\codeconst{scoring.gate_urban_ratio_max}$ (\code{gates.py:261-303}). The gate is \emph{manual}: it needs the
 AOI's urban-class raster. \\
 \end{longtable}
 
@@ -667,31 +702,31 @@ classification) \\
 \endhead
 \code{D1\_habitat\_occupancy} & Fraction of habitat cells holding at least
 one adult in the final snapshot & final state COG, bands 1 and 2 &
-dimensionless; band $0.20$--$0.70$; Gaussian falloff around $0.45$ of width
-$0.15$ & literature-anchored (Bogh 2004; Ndenga 2011) \\
+dimensionless; band $\codeconst{scoring.d1_band_min}$--$\codeconst{scoring.d1_band_max}$; Gaussian falloff around $\codeconst{scoring.d1_center}$ of width
+$\codeconst{scoring.d1_sigma}$ & literature-anchored (Bogh 2004; Ndenga 2011) \\
 \code{D2\_survival} & Mean adult lifespan implied by the steady-state daily
-adult survival rate & cohort log & days; window $8$--$15$ d; Gaussian around
-$11$ d of width $4$ d, with no plateau at the ends of the window &
+adult survival rate & cohort log & days; window $\codeconst{scoring.d2_window_min}$--$\codeconst{scoring.d2_window_max}$ d; Gaussian around
+$\codeconst{scoring.d2_lifetime_centre}$ d of width $\codeconst{scoring.d2_lifetime_width}$ d, with no plateau at the ends of the window &
 literature-anchored (Saarman 2019; Midega 2007) \\
 \code{D3\_eip} & Fraction of infected mosquitoes whose extrinsic incubation
-period has completed, at day 30 & cohort log & dimensionless; band
-$0.20$--$0.50$; Gaussian around $0.35$ of width $0.15$ &
+period has completed, at day $\codeconst{scoring.d3_day}$ & cohort log & dimensionless; band
+$\codeconst{scoring.d3_band_min}$--$\codeconst{scoring.d3_band_max}$; Gaussian around $\codeconst{scoring.d3_center}$ of width $\codeconst{scoring.d3_sigma}$ &
 literature-anchored (Mordecai 2013) \\
 \code{D4\_stability} & Adult population trajectory: collapse ratio and
 explosion ratio & cohort log & ratio to the day-0 adult count; collapse band
-$0.10$--$0.80$, explosion at or below $5\times$; the score is the mean of
+$\codeconst{scoring.d4_collapse_min}$--$\codeconst{scoring.d4_collapse_max}$, explosion at or below $\codeconst{scoring.d4_explosion_max}\times$; the score is the mean of
 the two sub-scores & engineering prior \\
 \code{D5\_morans} & Moran's $I$ of the occupied cells of the final snapshot,
 queen contiguity, on active pixels only & final state COG, band 1 &
-dimensionless; band $0.20$--$0.85$; Gaussian around $0.5$ of width $0.25$ &
+dimensionless; band $\codeconst{scoring.d5_band_min}$--$\codeconst{scoring.d5_band_max}$; Gaussian around $\codeconst{scoring.d5_center}$ of width $\codeconst{scoring.d5_sigma}$ &
 literature-anchored (spatial clustering of larval habitats) \\
 \code{D8\_coupling} & Pearson correlation between the two state bands over
 the cells where band 1 is positive & final state COG, bands 1 and 2 &
-correlation coefficient; target $r \geq 0.30$; the score is $r/0.50$ capped
+correlation coefficient; target $r \geq \codeconst{scoring.d8_pass_threshold}$; the score is $r/\codeconst{scoring.d8_score_divisor}$ capped
 at one & engineering prior \\
 \code{D11\_aquatic\_structure} & Mean larval share and mean pupal share of
 the aquatic population over the last 30 aquatic files & per-day aquatic
-JSONs & dimensionless; larva band $0.65$--$0.90$, pupa band $0.02$--$0.15$;
+JSONs & dimensionless; larva band $\codeconst{scoring.d11_larva_band_min}$--$\codeconst{scoring.d11_larva_band_max}$, pupa band $\codeconst{scoring.d11_pupa_band_min}$--$\codeconst{scoring.d11_pupa_band_max}$;
 the score is the mean of the two sub-scores & literature-anchored (Bayoh \&
 Lindsay 2003; Ouedraogo 2024) \\
 \code{D15\_persistence} & Long-horizon persistence: survival against the
@@ -700,28 +735,38 @@ JSONs plus state COGs & dimensionless; three sub-scores combined by a
 geometric mean & engineering prior \\
 \code{D16\_detection\_coverage} & Fraction of the AOI's real detection spots
 that the simulated population reached & final state COG plus the AOI's
-occurrence table & dimensionless; target at or above $0.50$ at a radius of
-$5$ km, with sensitivity radii of $2$, $5$ and $10$ km reported in the
+occurrence table & dimensionless; target at or above $\codeconst{scoring.d16_coverage_target}$ at a radius of
+$\codeconst{scoring.d16_radius_km_default}$ km, with sensitivity radii of
+$\codeconst{scoring.d16_sensitivity_radius_near_km}$,
+$\codeconst{scoring.d16_sensitivity_radius_mid_km}$ and
+$\codeconst{scoring.d16_sensitivity_radius_far_km}$ km reported in the
 diagnostics & scenario default (launch-and-measure) \\
 \code{D19\_pool\_persistence} & Whether the proxy-habitat model keeps
 pluvial availability alive after a rain pulse and keeps a positive dry-season
 floor & \emph{nothing from the run} (\S\ref{sec:contractdims}) &
-dimensionless; four checks worth $0.3$, $0.2$, $0.2$ and $0.3$ & model
+dimensionless; four checks worth $\codeconst{scoring.d19_check_persistence_weight}$,
+$\codeconst{scoring.d19_check_drying_weight}$,
+$\codeconst{scoring.d19_check_monotone_weight}$ and
+$\codeconst{scoring.d19_check_floor_weight}$ & model
 definition \\
 \code{D20\_washout\_response} & Whether heavy rain produces a washout of
 aquatic cohorts with the expected shape & \emph{nothing from the run}
 (\S\ref{sec:contractdims}) & dimensionless flush fraction; four checks worth
-$0.3$, $0.3$, $0.2$ and $0.2$ & model definition \\
+$\codeconst{scoring.d20_check_washout_weight}$,
+$\codeconst{scoring.d20_check_no_washout_weight}$,
+$\codeconst{scoring.d20_check_cap_weight}$ and
+$\codeconst{scoring.d20_check_threshold_weight}$ & model definition \\
 \code{D21\_dispersal\_kernel} & Median and 90th percentile of the
 displacement of the adult population from the seeding centroid & state COGs
-at the first snapshot and at the latest snapshot at or before day 30 &
-kilometres; median band $0.15$--$0.70$ km, 90th-percentile band
-$0.70$--$3.00$ km; the score is the mean of the two sub-scores &
+at the first snapshot and at the latest snapshot at or before day
+$\codeconst{scoring.d21_horizon_day}$ &
+kilometres; median band $\codeconst{scoring.d21_p50_band_min}$--$\codeconst{scoring.d21_p50_band_max}$ km, 90th-percentile band
+$\codeconst{scoring.d21_p90_band_min}$--$\codeconst{scoring.d21_p90_band_max}$ km; the score is the mean of the two sub-scores &
 literature-anchored (Costantini 1996; Thomas 2013; Midega 2007) \\
 \code{D25\_cases\_ghana} & Correlation between the simulated monthly
 incidence climatology and the observed reported-cases climatology &
 transmission daily log plus the pinned DHIMS-II table & correlation
-coefficient; target $r \geq 0.60$ & literature-anchored (Seidu 2026) \\
+coefficient; target $r \geq \codeconst{scoring.d25_r_target}$ & literature-anchored (Seidu 2026) \\
 \end{longtable}
 
 \subsection{How a measurement becomes a score}
@@ -811,10 +856,17 @@ use are the shared model constants: the pluvial rain scale is
 (\code{d19\_pool\_persistence.py:28-29},
 \code{d20\_washout\_response.py:24-25}).
 
-Their scenarios are fixed. D19 applies a $30$ mm pulse on three consecutive
-days and then ten dry days, with an activation floor of $0.05$
+Their scenarios are fixed. D19 applies a
+$\codeconst{scoring.d19_rain_pulse_mm}$ mm pulse on
+\codeconst{scoring.d19_pulse_days} consecutive
+days and then \codeconst{scoring.d19_dry_days} dry days, with an activation
+floor of $\codeconst{scoring.d19_activation_floor}$
 (\code{d19\_pool\_persistence.py:78-90}); D20 evaluates the washout rule at
-$30$, $40$, $50$ and $80$ mm (\code{d20\_washout\_response.py:45-63}).
+$\codeconst{scoring.d20_no_washout_probe_mm}$,
+$\mskey{aquatic_stress.wash_threshold_mm}$,
+$\codeconst{scoring.d20_washout_probe_mm}$ and
+$\codeconst{scoring.d20_cap_probe_mm}$ mm
+(\code{d20\_washout\_response.py:45-63}).
 
 Their provenance is therefore \emph{model definition}: they assert that the
 contract's own rules still behave as the contract says. Their practical
@@ -960,7 +1012,8 @@ would measure the wrong thing.
 The feedback step renders a Markdown report from a scorecard: the composite
 and its verdict, the failed gates, the skipped scorers, the three weakest
 dimensions, and --- when a baseline scorecard is supplied --- the composite
-delta and the dimensions that regressed by more than $0.05$
+delta and the dimensions that regressed by more than
+$\lvert\codeconst{scoring.regression_threshold}\rvert$
 (\code{mal-core/src/mal\_core/scoring/feedback.py:16-53}). The command line
 re-scores the run directory and, optionally, a baseline directory, and
 prints the report (\code{cli.py:841-861}).
@@ -976,7 +1029,9 @@ over the dimensions that could be measured; the verdict label follows from
 the composite; any dimension whose artefacts were absent appears in the
 skipped list with a reason instead of dragging the composite down; the
 feedback report then lists the three weakest dimensions and names any
-dimension whose score fell by more than $0.05$ relative to the baseline. The
+dimension whose score fell by more than
+$\lvert\codeconst{scoring.regression_threshold}\rvert$ relative to the
+baseline. The
 operator sees whether the change moved the weakest part of the model rather
 than merely moving the average.
 
@@ -1043,7 +1098,8 @@ they score the habitat contract in isolation and contribute to the
 composite as if they were measurements of the run
 (\S\ref{sec:contractdims}). Their thresholds are also written literally
 instead of being taken from the declared minimum score: both compare their
-score against a literal $0.70$ (\code{d19\_pool\_persistence.py:144},
+score against a literal of their own, equal to the minimum score the
+generated table lists for them (\code{d19\_pool\_persistence.py:144},
 \code{d20\_washout\_response.py:83}), which coincides with their declared
 minimum score but breaks the uniform pattern.
 

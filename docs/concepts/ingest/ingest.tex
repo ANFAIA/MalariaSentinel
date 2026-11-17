@@ -3,6 +3,7 @@
 \usepackage{booktabs} \usepackage{longtable} \usepackage{array} \usepackage{amsmath,amssymb}
 \usepackage{listings} \usepackage[hidelinks]{hyperref} \newcommand{\code}[1]{\texttt{#1}}
 \input{../generated/macros.tex}
+\input{../generated/code-macros.tex}
 
 \begin{document} \newcommand{\src}[1]{\code{#1}}
 
@@ -97,6 +98,24 @@ balance (\S\ref{sec:absences}).
 applies is decided downstream.
 \end{itemize}
 
+\subsection{Which authority governs which statement} \label{sec:authority}
+
+This document owns the description of the \emph{ingest} stage, and it settles its own authority
+questions; there is no shared page that arbitrates on its behalf. Three authorities apply, and
+each governs a different kind of claim. \emph{Values} --- the numbers the pipeline uses --- are
+governed by the shared constants file \code{mal-core/config/model\_constants.yaml}, and are
+quoted here through generated macros that read it; a value with no constants-file key, because it lives in the code
+instead, is quoted through the generated code-constant macros, which read the implementation
+itself. \emph{Contract values and names} --- the contract version, the manifest keys, the
+artefact names --- are governed by the generated contract and parameter tables
+(\S\ref{sec:contracts}), which are scanned from the code rather than restated by hand.
+\emph{Semantics} --- what a number means, in what order the steps run, what a step deliberately
+does not do --- are governed by this document, because this document is the one that owns the
+ingest content. Where two of these disagree, the lower authority is the bug: the constants file
+and the code are not adjusted to fit a sentence, and the sentence is corrected. That is also why
+the numbers this document quotes are generated macros rather than literals, and why a value the
+code changes makes this document's build fail instead of making the document lie.
+
 \section{Entry points, artefacts, and the manifest keys they claim} \label{sec:entry}
 
 \subsection{Entry points}
@@ -185,14 +204,18 @@ are set out below). The record is a bounding box, a coordinate reference system,
 ground resolution in metres, and a scale label
 \src{mal-commonlib/src/mal\_commonlib/aoi.py:64--95}. The registry that supplies those values
 for each slug is a single YAML file \src{mal-commonlib/src/mal\_commonlib/aois.yaml:16--23}; for
-the Ghana slug it declares a bounding box of $[-3.5, 4.5, 1.5, 11.5]$, a geographic CRS, a
-nominal resolution of 1000 metres, declared literally in the registry
-\src{mal-commonlib/src/mal\_commonlib/aois.yaml:20} (the same magnitude as
-\mskey{ingest.cell_size_hint_m}, but an independent literal: the AOI record never reads the
-constants file), and a regional scale. \mskey{ingest.cell_size_hint_m} is a different number
-with a different role --- the fallback cell size used when the rainfall NetCDF carries no
-\code{resolution\_m} attribute
-\src{mal-core/src/mal\_core/ingest/daily\_nc.py:243--247}.
+the Ghana slug it declares a bounding box of
+$[\codeconst{ingest.bbox_west}, \codeconst{ingest.bbox_south},
+\codeconst{ingest.bbox_east}, \codeconst{ingest.bbox_north}]$, a geographic CRS, a
+nominal resolution of \codeconst{ingest.cell_size_m} metres, and a regional scale. The
+bounding box and the resolution are declared literally in the registry
+\src{mal-commonlib/src/mal\_commonlib/aois.yaml:18--20}, and are quoted here through the
+generated code-constant macros, which read the registry itself. The resolution
+\codeconst{ingest.cell_size_m} is the AOI record's own nominal ground resolution; it is a
+different quantity from \mskey{ingest.cell_size_hint_m}, which is the fallback cell size used
+when the rainfall NetCDF carries no \code{resolution\_m} attribute
+\src{mal-core/src/mal\_core/ingest/daily\_nc.py:243--247}. The two have the same magnitude
+today, but they are independent literals: the AOI record never reads the constants file.
 
 The grid size is derived, not declared: the metric extent of the bounding box is divided by the
 nominal resolution and rounded up to whole cells
@@ -238,7 +261,8 @@ the rainfall file declares dimensions \code{y} and \code{x} with no coordinate v
 inherited axes are integer cell indices; the median spacing is therefore one cell, which does
 not satisfy the condition, and the latitude, longitude and \code{crs} variables are not written.
 The committed NetCDF \code{data/ghana/ghana\_regional\_2024\_2024\_env.nc} confirms this: its
-variables are the two daily channels, the five static planes, and the \code{time}, \code{y} and
+variables are the \codeconst{ingest.env_daily_channels} daily channels, the
+\codeconst{ingest.env_static_planes} static planes, and the \code{time}, \code{y} and
 \code{x} coordinates, with no \code{lat}, \code{lon} or \code{crs} variable and no coordinate
 reference system of any kind. In other words, in the delivered artefact the environment NetCDF
 is a bare array; the geolocation is supplied to the engine separately, as the bounding box,
@@ -319,41 +343,39 @@ a dead dependency, recorded here rather than hidden (\S\ref{sec:open} question 1
 
 \subsection{What each input is, natively, and what the reduction costs}
 
-The following table is the stage's input inventory. Native resolution and provider are
-properties of the download stage's loaders; the target resolution is always the AOI grid of
-\S\ref{sec:frame}.
+The following table is the stage's input inventory. The native resolution at which each
+provider publishes its product is a property of the download stage's loaders and is tabulated
+in the generated table of the loaders' native grids (\S\ref{sec:contracts}); it is not restated
+here. The target resolution is always the AOI grid of \S\ref{sec:frame}.
 
 \begin{center}
 \small
 \begin{center}
 \small
-\begin{longtable}{@{}p{3.0cm}p{2.4cm}p{2.0cm}p{1.9cm}p{5.7cm}@{}}
+\begin{longtable}{@{}p{3.0cm}p{2.8cm}p{1.9cm}p{6.9cm}@{}}
 \toprule
-Input & Provider & Native & Target & Units; what the reduction loses \\
+Input & Provider & Target & Units; what the reduction loses \\
 \midrule
 \endhead
-\code{chirps\_rainfall\_daily} & CHIRPS v2.0 & $0.05^\circ$, daily & AOI grid
+\code{chirps\_rainfall\_daily} & CHIRPS v2.0 & AOI grid
   & mm/day. Nearest-neighbour reprojection
 \src{mal-commonlib/src/mal\_commonlib/data/loaders/chirps.py:230--242}. Loses the sub-cell
-structure of each day. \\ \code{era5\_air\_temp\_daily} & ERA5-Land & $0.1^\circ$, daily & AOI
-grid
+structure of each day. \\ \code{era5\_air\_temp\_daily} & ERA5-Land & AOI grid
   & $\!{}^\circ$C daily mean 2\,m air temperature
 \src{mal-commonlib/src/mal\_commonlib/data/loaders/era5.py:107}. Loses the sub-cell gradient. \\
-\code{jrc\_habitat\_features} & JRC GSW v1.4 & 30\,m & AOI grid
+\code{jrc\_habitat\_features} & JRC GSW v1.4 & AOI grid
   & Fraction in $[0,1]$ of the cell's pixels with water occurrence at least
-80\,\%; the fraction, not the retired binary mask
+\codeconst{ingest.jrc_occurrence_threshold_pct}\,\%; the fraction, not the retired binary mask
 \src{mal-commonlib/src/mal\_commonlib/data/loaders/jrc\_gsw.py:7--12}. Loses the position of the
-water inside the cell. \\ \code{dw\_class\_fractions} & Dynamic World V1 & 10\,m, sampled 100\,m
-& AOI grid
+water inside the cell. \\ \code{dw\_class\_fractions} & Dynamic World V1 & AOI grid
   & Four areal fractions in $[0,1]$: built, flooded vegetation, crops, and
 open-plus-water \src{mal-commonlib/src/mal\_commonlib/data/loaders/dynamic\_world.py:94--103};
 per year a modal label reduced to an areal fraction
 \src{mal-commonlib/src/mal\_commonlib/data/loaders/dynamic\_world.py:273--334}. Loses the
-arrangement of classes inside the cell. \\ \code{coastline\_land\_mask} & GSHHG full & polygon &
-AOI grid
+arrangement of classes inside the cell. \\ \code{coastline\_land\_mask} & GSHHG full & AOI grid
   & Land fraction in $[0,1]$ per cell
 \src{mal-commonlib/src/mal\_commonlib/data/loaders/coastline.py:1--40}. Loses the shape of the
-shoreline inside the cell. \\ \code{smap\_salinity} & SMAP RSS L3 & monthly & AOI grid, bilinear
+shoreline inside the cell. \\ \code{smap\_salinity} & SMAP RSS L3 (monthly) & AOI grid, bilinear
   & Practical salinity units; reprojected onto the environment grid by the
 ingest stage itself \src{mal-core/src/mal\_core/ingest/daily\_nc.py:550--578}. \\
 \bottomrule
@@ -407,8 +429,8 @@ build_daily_env_nc(aoi, data_dir, output_dir):
   re-index the temperature onto the rain axis
   set temperature to zero on the ocean mask
 
-  read the five static planes; average a multi-year stack over its year axis
-  zero all five static planes on the ocean mask
+  read the static planes; average a multi-year stack over its year axis
+  zero all static planes on the ocean mask
   print the coastline census
 
   H        <- static_potential(five planes)
@@ -418,7 +440,7 @@ build_daily_env_nc(aoi, data_dir, output_dir):
   if a salinity file is available:
       reproject each month onto the grid; broadcast each month onto its days
 
-  assemble the dataset: 2 daily channels, 5 static planes, optional land_frac
+  assemble the dataset: the daily channels, the static planes, optional land_frac
     and salinity_ppt; set the global attributes
   add CF latitude/longitude/crs variables if the axes are a degree grid
   write the NetCDF
@@ -427,6 +449,11 @@ build_daily_env_nc(aoi, data_dir, output_dir):
     just written, derive the habitat GeoPackage from them, register both
     artefacts in the manifest
 \end{verbatim}
+
+\smallskip \noindent The dataset assembled by the last step is the one the NetCDF contract
+states: \codeconst{ingest.env_daily_channels} daily channels and
+\codeconst{ingest.env_static_planes} static planes, plus the optional \code{land\_frac} and
+\code{salinity\_ppt} variables \src{mal-core/src/mal\_core/ingest/daily\_nc.py:404--431}.
 
 \subsection{The order as a table}
 
@@ -544,7 +571,8 @@ state of every cell.
 
 \subsection{How the static planes are assembled}
 
-Five static planes are read: the permanent-water fraction from the JRC product, and four
+The \codeconst{ingest.env_static_planes} static planes are read: the permanent-water
+fraction from the JRC product, and four
 land-cover areal fractions from Dynamic World
 \src{mal-core/src/mal\_core/ingest/daily\_nc.py:317--325}. A plane that is missing from its file
 raises an error listing the variables actually present
@@ -588,12 +616,13 @@ returns the water-only mask when the band is zero or negative, so only the land 
 decides \src{mal-commonlib/src/mal\_commonlib/data/loaders/coastline.py:292--294}. A
 \emph{negative} band disables the filter outright instead, because the builder then computes no
 mask at all \src{mal-core/src/mal\_core/ingest/daily\_nc.py:249--253}: the rainfall, the
-temperature and the five static planes keep their open-ocean values.
+temperature and the \codeconst{ingest.env_static_planes} static planes keep their open-ocean
+values.
 
 \subsection{What the rule does, and why}
 
-On open sea, the stage sets the rainfall to zero, the temperature to zero, and \emph{all five}
-static planes to zero \src{mal-core/src/mal\_core/ingest/daily\_nc.py:252--253},
+On open sea, the stage sets the rainfall to zero, the temperature to zero, and \emph{all} the
+\codeconst{ingest.env_static_planes} static planes to zero \src{mal-core/src/mal\_core/ingest/daily\_nc.py:252--253},
 \src{mal-core/src/mal\_core/ingest/daily\_nc.py:291--293},
 \src{mal-core/src/mal\_core/ingest/daily\_nc.py:340--347}. The reason is recorded at the point
 of the code that does it: Dynamic World reports its water class at one over the ocean, so
@@ -654,7 +683,8 @@ that type and a non-zero weight would be silently dropped on the C++ side
 
 \subsection{The static potential $H[i,g]$}
 
-The static potential is a pure function of the five feature planes, computed in one place
+The static potential is a pure function of the \codeconst{ingest.env_static_planes} feature
+planes, computed in one place
 \src{mal-core/src/mal\_core/habitat/potential.py:50--80}. Writing $P$ for the permanent-water
 fraction, $V$ for the flooded-vegetation fraction, $U$ for the built fraction, $O$ for the
 open-plus-water fraction and $C$ for the crop fraction, the six values are
@@ -752,7 +782,8 @@ $k_{\text{ref}} = \mskey{species.k_ref}$, an absolute per-cell capacity in indiv
 per square kilometre \src{mal-core/config/model\_constants.yaml:47--52}.
 
 The Python reference module computes $S$ and $K$ for the scorer path with a \emph{different}
-capacity constant, a diagnostic one, explicitly documented as not being the engine's
+capacity constant, a diagnostic one, explicitly documented as not being the engine's:
+\codeconst{ingest.k_ref_diag_per_km2} individuals per square kilometre per day
 \src{mal-core/src/mal\_core/habitat/capacity.py:26--30}. The two are different concepts and must
 not be read as one number; the tombstone module that used to hold shared constants repeats the
 distinction \src{mal-core/src/mal\_core/habitat/constants.py:1--16}. The reader who wants the
@@ -930,8 +961,9 @@ monthly-broadcast salinity \\
 \end{longtable}
 \end{center}
 
-\smallskip \noindent The five static planes are two-dimensional and are never broadcast onto the
-time axis; the two daily channels never enter the static planes
+\smallskip \noindent The \codeconst{ingest.env_static_planes} static planes are
+two-dimensional and are never broadcast onto the time axis; the
+\codeconst{ingest.env_daily_channels} daily channels never enter the static planes
 \src{mal-core/src/mal\_core/ingest/daily\_nc.py:404--431}. The global attributes are the
 conventions string, the title, the AOI slug, the scale, the contract version, the generator
 version and the candidate count \src{mal-core/src/mal\_core/ingest/daily\_nc.py:433--441}. Every
@@ -965,8 +997,8 @@ detect rainfall NoData \src{mal-core/src/mal\_core/ingest/daily\_nc.py:209}, and
 \subsection{Verified on the delivered Ghana file}
 
 The file \code{data/ghana/ghana\_regional\_2024\_2024\_env.nc} has the two daily channels with
-shape 366 by 779 by 551 in 32-bit float, the five static planes with shape 779 by 551 in 32-bit
-float, and exactly these global attributes: \code{Conventions: CF-1.8}, a title,
+shape 366 by 779 by 551 in 32-bit float, the \codeconst{ingest.env_static_planes} static
+planes with shape 779 by 551 in 32-bit float, and exactly these global attributes: \code{Conventions: CF-1.8}, a title,
 \code{aoi\_slug: ghana}, \code{scale: regional}, \code{contract\_version: 3.0},
 \code{generator\_version: proxy-habitat-v1-0.1.0} and \code{n\_candidate\_cells: 382127}. It
 carries no \code{land\_frac} plane and no \code{salinity\_ppt} plane, and no coordinate
@@ -1007,8 +1039,10 @@ Human population & sum
 sum of densities, \emph{not} a head count. The engine consumes these numbers as counts, which is
 a stated inconsistency worth carrying in mind. \\ Urban class & nearest
   & A categorical layer, so it is resampled by nearest neighbour
-\src{mal-core/src/mal\_core/ingest/hosts.py:112--120}, then reclassified: thirty stays thirty
-(urban), twenty to twenty-nine becomes fifty (rural), zero to nineteen becomes twenty (water)
+\src{mal-core/src/mal\_core/ingest/hosts.py:112--120}, then reclassified:
+\codeconst{ingest.urban_class_urban} stays \codeconst{ingest.urban_class_urban} (urban),
+twenty to twenty-nine becomes \codeconst{ingest.urban_class_rural} (rural), zero to nineteen
+becomes \codeconst{ingest.urban_class_water} (water)
 \src{mal-core/src/mal\_core/ingest/hosts.py:122--128}. The reclassification is \emph{inverted}
 with respect to the product it reclassifies (\S\ref{sec:urbanclass}). \\ Building fraction & sum
   & The source is a per-cell presence of building footprint centroids, at
@@ -1045,13 +1079,17 @@ urban/rural signal is inverted over the area of interest (\S\ref{sec:open} quest
 \subsection{The three silent-ish degradations}
 
 If the urban-class loader fails, every cell becomes the rural default
+\codeconst{ingest.urban_class_rural}
 \src{mal-core/src/mal\_core/ingest/hosts.py:133--136}. If the building loader fails, the
-fraction becomes 0.6 in urban cells and 0.1 elsewhere
+fraction becomes \codeconst{ingest.fallback_building_urban} in urban cells and
+\codeconst{ingest.fallback_building_rural} elsewhere
 \src{mal-core/src/mal\_core/ingest/hosts.py:156--159}. If the wildlife loader fails, the proxy
-becomes a constant 0.3 everywhere \src{mal-core/src/mal\_core/ingest/hosts.py:180--182}. Each
+becomes a constant \codeconst{ingest.fallback_wildlife_proxy} everywhere
+\src{mal-core/src/mal\_core/ingest/hosts.py:180--182}. Each
 degradation is announced on the standard error stream, and each substitutes a constant for a
 real layer. The three constants are literals in the module rather than constants-file keys, so
-this document quotes them as readings of the code (\S\ref{sec:open} question 8).
+this document quotes them through the generated code-constant macros, which read the module
+itself (\S\ref{sec:open} question 8).
 
 The two builder flags make the same substitutions deliberately: skipping the buildings layer
 uses the urban heuristic \src{mal-core/src/mal\_core/ingest/hosts.py:141}, and skipping the
@@ -1104,9 +1142,16 @@ Operator & Attractiveness & Friction & Cutoff \\
 \code{beta\_night}, \code{beta\_livestock}, \code{max\_distance\_km} and
 \code{sparsity\_threshold}, and they are \emph{defaults in the function signature}, not
 constants-file keys \src{mal-core/src/mal\_core/ingest/mobility.py:37--48}. Their values are
-therefore quoted in \S\ref{sec:literals} as readings of the code. The three friction parameters
-are a named choice: a higher value keeps a population closer to home, and the daytime value is
-an order of magnitude smaller than the night-time value, which is the intended diurnal pattern.
+quoted through the generated code-constant macros, which read the signature itself:
+\codeconst{ingest.mobility_cell_size_km} km for the cell size,
+\codeconst{ingest.mobility_beta_day} for the daytime friction,
+\codeconst{ingest.mobility_beta_night} for the night-time friction,
+\codeconst{ingest.mobility_beta_livestock} for the livestock friction,
+\codeconst{ingest.mobility_max_distance_km} km for the distance cutoff and
+\codeconst{ingest.mobility_sparsity_threshold} for the sparsity threshold. The three friction
+parameters are a named choice: a higher value keeps a population closer to home, and the
+daytime value is an order of magnitude smaller than the night-time value, which is the intended
+diurnal pattern.
 
 The hard distance cutoff is implemented as a disk of candidate offsets around each origin
 \src{mal-commonlib/src/mal\_commonlib/data/mobility.py:70--80}, so no pair beyond the cutoff can
@@ -1201,7 +1246,8 @@ they resolve \src{mal-core/src/mal\_core/abm/wrapper.py:166--178},
 
 \subsection{What the engine does with the environment NetCDF}
 
-The engine reads the two daily channels and the five static planes
+The engine reads the \codeconst{ingest.env_daily_channels} daily channels and the
+\codeconst{ingest.env_static_planes} static planes
 \src{mal-core/src/mal\_core/abm/src/env\_reader.cpp:204--246}. The optional \code{land\_frac}
 plane is a display basemap and is explicitly not part of the habitat feature bundle
 \src{mal-core/src/mal\_core/abm/src/climate.cpp:211--213}. The optional \code{salinity\_ppt}
@@ -1339,7 +1385,15 @@ file, with the production files that act on each one:
 
 \input{../generated/params-ingest.tex}
 
-\smallskip \noindent The table is not a list of what this stage reads: its last column, the
+\smallskip \noindent The generated file carries two tables. The first is the parameters table
+above; the second tabulates the native grid at which each loader publishes its product,
+together with the product or epoch it comes from and the loader's source file. The input
+inventory of \S\ref{sec:envinputs} takes its native resolutions from that second table rather
+than restating them here. A loader whose code states no such resolution has an empty cell
+rather than a hand-typed one.
+
+\smallskip \noindent The parameters table is not a list of what this stage reads: its last
+column, the
 ``Read by'' column, is the answer to that question. The column is scanned from the two access
 patterns the configuration actually uses --- the Python \code{model\_constant("section",
 "key")} call and the C++ loader's \code{L.key(node, "section", "key")} ---
@@ -1391,7 +1445,8 @@ defaults place files and manifest entries in different directories}. (\S\ref{sec
 \textbf{The environment NetCDF is registered under one year key although it spans several
 years}. (\S\ref{sec:manifest}.) 
 \item \textbf{Some numbers are code literals and not
-constants-file keys} and cannot be generated today. (\S\ref{sec:literals}.) 
+constants-file keys}, and are generated by the code-constant family rather than by the
+constants file. (\S\ref{sec:literals}.) 
 \item \textbf{There
 are two capacity scales in the codebase}, the engine's and the Python diagnostic one.
 (\S\ref{sec:dynamic}.) 
@@ -1452,46 +1507,30 @@ not need the \code{hab\_<type>} columns}, so removing them from the writer would
 simulation (\S\ref{sec:gpkg}).
 \end{enumerate}
 
-\subsection{Numbers that could not be generated} \label{sec:literals}
+\subsection{Values that cannot be generated} \label{sec:literals}
 
-The following values are literals in the source and have no key in the shared constants file.
-They are quoted in this document as readings of the code, and are the ones a reviewer should
-check against the cited lines.
+The values below are literals in the source, or belong to a provider's own specification, and
+they have no key either in the shared constants file or in the generated code-constant table.
+They are quoted in this document as readings of the code or of the provider, and they are the
+ones a reviewer should check against the cited lines. Every other number this document quotes
+is a generated macro.
 
 \begin{center}
 \small
-\begin{longtable}{@{}p{4.6cm}p{2.4cm}p{8.0cm}@{}}
+\begin{longtable}{@{}p{4.6cm}p{2.6cm}p{7.8cm}@{}}
 \toprule
-Literal & Value & Where \\
+Value & Reading & Where \\
 \midrule
 \endhead
 Generator version & \code{proxy-habitat-v1-0.1.0}
   & \src{mal-core/src/mal\_core/ingest/daily\_nc.py:439} \\
-Host fallback, urban building fraction & $0.6$
-  & \src{mal-core/src/mal\_core/ingest/hosts.py:141},
-\src{mal-core/src/mal\_core/ingest/hosts.py:159} \\ Host fallback, rural building fraction &
-$0.1$
-  & \src{mal-core/src/mal\_core/ingest/hosts.py:141},
-\src{mal-core/src/mal\_core/ingest/hosts.py:159} \\ Host fallback, wildlife proxy & $0.3$
-  & \src{mal-core/src/mal\_core/ingest/hosts.py:164},
-\src{mal-core/src/mal\_core/ingest/hosts.py:182} \\ Host fallback, urban class & $50$ (rural)
-  & \src{mal-core/src/mal\_core/ingest/hosts.py:133--136} \\
-Mobility cell size & $1.0$ km
-  & \src{mal-core/src/mal\_core/ingest/mobility.py:42} \\
-Mobility daytime friction & $0.05$
-  & \src{mal-core/src/mal\_core/ingest/mobility.py:43} \\
-Mobility night-time friction & $0.5$
-  & \src{mal-core/src/mal\_core/ingest/mobility.py:44} \\
-Mobility livestock friction & $0.1$
-  & \src{mal-core/src/mal\_core/ingest/mobility.py:45} \\
-Mobility distance cutoff & $50.0$ km
-  & \src{mal-core/src/mal\_core/ingest/mobility.py:46} \\
-Mobility sparsity threshold & $5\times10^{-4}$
-  & \src{mal-core/src/mal\_core/ingest/mobility.py:47} \\
-Python diagnostic capacity constant & $0.143 \times 9.3 \times 10^{6}$
-  & \src{mal-core/src/mal\_core/habitat/capacity.py:30} \\
+GHS-SMOD urban class scheme & codes $10$--$30$
+  & \src{mal-commonlib/src/mal\_commonlib/data/loaders/ghsl.py:76--79} \\
+Engine indoor-fraction threshold & $40$
+  & \src{mal-core/src/mal\_core/abm/src/host\_landscape.cpp:111--118} \\
 WorldPop product year & $2019$
   & \src{mal-core/src/mal\_core/ingest/hosts.py:40} \\
+\bottomrule
 \end{longtable}
 \end{center}
 

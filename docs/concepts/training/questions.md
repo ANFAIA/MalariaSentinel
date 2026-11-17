@@ -11,10 +11,11 @@ before writing these questions was: `mal-core/src/mal_core/training/`
 env_loader.py}`, the ABM state-output contract
 (`mal-core/src/mal_core/abm/include/mal_abm_fast/wire.hpp`,
 `mal-core/src/mal_core/abm/src/output_contract.cpp`), the existing pytest file
-`mal-core/tests/test_training_pipeline.py`, and `docs/specs/training/spec.md`
-as *material only* — that spec is being retired and several of its claims are
-contradicted by the code (it is cited below only where it happens to agree, and
-every discrepancy is flagged explicitly). Numbers quoted in this file are the
+`mal-core/tests/test_training_pipeline.py`, and the retired training
+specification (its audit trail is now `docs/plans/in-process/spec-retirement-ledger.md`) as *material only* —
+several of that specification's claims are contradicted by the code (it is cited
+below only where it happens to agree, and every discrepancy is flagged
+explicitly). Numbers quoted in this file are the
 values the code actually uses; the document must generate them from the
 configuration, not type them.
 
@@ -50,9 +51,10 @@ configuration, not type them.
    Answer: one simulated day — the pairs are the two consecutive daily
    snapshots present in the run directory, so the surrogate learns a one-day
    transition.
-   Note: `docs/specs/training/spec.md:66` (INV-6) claims a fixed 7-day step
-   (`state_t → state_{t+7}`); the code pairs consecutive days. The spec is
-   wrong here.
+   Note: the retired training specification (INV-6) claimed a fixed 7-day
+   step (`state_t → state_{t+7}`); the code pairs consecutive days
+   (`mal-core/src/mal_core/training/dataset.py:136-141`). The specification was
+   wrong here — the audit trail is `docs/plans/in-process/spec-retirement-ledger.md`.
 
 4. **What can the surrogate not represent, and where is that stated?**
    Citation: `mal-core/src/mal_core/training/model.py:1-5`; the structural
@@ -91,9 +93,10 @@ configuration, not type them.
    counts are equal or greater).
    Answer: the daily state snapshots of the ABM run, plus (optionally) the
    daily transmission snapshots, discovered by globbing `run_dir`.
-   Note: `docs/specs/training/spec.md:68` (INV-7) describes a narrower glob
+   Note: the retired training specification (INV-7) described a narrower glob
    (`state_seed*_day*.{npy,tif}`) and band-name-based reading; the code globs
-   more loosely and reads bands positionally.
+   more loosely and reads bands positionally
+   (`mal-core/src/mal_core/training/dataset.py:92-97`).
 
 8. **What are the ABM's own file-name conventions that this discovery relies
    on?**
@@ -132,10 +135,11 @@ configuration, not type them.
     rollout (seed) contributes tiles to both splits, and adjacent tiles on
     either side of the boundary are spatially adjacent — the validation set is
     not independent of the training set in the usual sense.
-    Note: `docs/specs/training/spec.md:70` (INV-8) states the same rule but
-    describes it as "west of 0° longitude"; the code splits at the raster's
-    mid-column, which is a geographic statement only if the raster happens to
-    straddle the prime meridian.
+    Note: the retired training specification (INV-8) stated the same rule but
+    described it as "west of 0° longitude"; the code splits at the raster's
+    mid-column (`mal-core/src/mal_core/training/dataset.py:129-151`), which is a
+    geographic statement only if the raster happens to straddle the prime
+    meridian.
 
 12. **Are there any further defences against train/val leakage or overfitting?**
     Citation: `mal-core/src/mal_core/training/dataset.py:149-155` (the only
@@ -195,10 +199,10 @@ configuration, not type them.
     Answer: no — one environmental snapshot serves every training pair, even
     though the real rainfall plane is daily. The surrogate therefore cannot
     learn the effect of a rainfall event on the next day's state.
-    Note: `docs/specs/training/spec.md:149` (the "env zero-fill" known
-    limitation) is stale: the zero-fill still exists as a *fallback*
-    (`dataset.py:249`), but with `--env-path` supplied the real planes are
-    used.
+    Note: the "env zero-fill" known limitation of the retired training
+    specification is stale: the zero-fill still exists as a *fallback*
+    (`dataset.py:246-249`), but with `--env-path` supplied the real planes are
+    used (`dataset.py:66-88`).
 
 17. **Does the training environmental channel order match the one the
     prediction stage uses at inference?**
@@ -285,19 +289,20 @@ configuration, not type them.
     Answer: a sigmoid-smoothed Dice over the whole batch and the whole tile,
     with temperature 0.5 and a decision threshold of 0.5 — which, under
     contract 4.0, means "one adult or more in the cell".
-    Note: `docs/specs/training/spec.md:76` (INV-4) states `tau=0.1,
-    thresh=0.01` and `:80` states `eval_dice(thresh=0.01)`. The code uses
-    `tau=0.5, thresh=0.5` — the spec is stale on both.
+    Note: the retired training specification stated `tau=0.1, thresh=0.01`
+    (INV-4) and `eval_dice(thresh=0.01)`. The code uses `tau=0.5, thresh=0.5`
+    (`mal-core/src/mal_core/training/model.py:63`) — the specification was stale
+    on both.
 
 25. **How is the validation metric defined, and in what units is its
     threshold?**
-    Citation: `mal-core/src/mal_core/training/model.py:86-96` (hard Dice on
+    Citation: `mal-core/src/mal_core/training/model.py:86-95` (hard Dice on
     channel 0 with `thresh = 0.5`, i.e. cells with at least one adult).
     Answer: hard Dice on the first channel at 0.5 adults per cell, averaged
     over the validation batches.
-    Note: `docs/specs/training/spec.md:80` claims `thresh=0.01`, which under
-    contract 4.0 raw counts would mean a fraction of an adult; the code is
-    the authority.
+    Note: the retired training specification claimed `thresh=0.01`, which
+    under contract 4.0 raw counts would mean a fraction of an adult; the code
+    (`mal-core/src/mal_core/training/model.py:86`) is the authority.
 
 26. **What does the metric not measure?**
     Citation: `mal-core/src/mal_core/training/model.py:80` and
@@ -315,7 +320,7 @@ configuration, not type them.
     (the sigmoid is applied inside the loss, not on the output).
     Answer: the network emits unbounded real numbers; a "predicted adult
     count" can therefore come out negative or fractional. Nothing clamps it,
-    in training or at inference (`mal-core/src/mal_core/training/wrapper.py:107`
+    in training or at inference (`mal-core/src/mal_core/training/wrapper.py:106`
     returns the raw float32 array).
 
 ### D. Optimisation, and what stands in for early stopping
@@ -344,8 +349,9 @@ configuration, not type them.
     least** the best seen so far (so ties also overwrite), and unconditionally
     at the first epoch. Because the loop never stops, "best" is a running
     maximum over all epochs, not an early-stopped model.
-    Note: `docs/specs/training/spec.md:82` (INV-12) says "strictly greater";
-    the comparison is `>=`.
+    Note: the retired training specification (INV-12) said "strictly greater";
+    the comparison is `>=`
+    (`mal-core/src/mal_core/training/trainer.py:85-91`).
 
 31. **What is reported to the operator during and after training?**
     Citation: `mal-core/src/mal_core/training/trainer.py:84` (per-epoch line
@@ -547,19 +553,21 @@ configuration, not type them.
     `mal-execution/scripts/train_unet_subsample.py`,
     `mal-execution/scripts/validate_unet.py`.
     Answer: **open** — these scripts were not read line by line for this
-    question set; they are noted here because `docs/specs/training/spec.md:120-124`
-    describes them (and describes `train_unet_subsample.py` as using "an older
-    import path"), which needs checking before the document claims anything
-    about them.
+    question set; they are noted here because the retired training
+    specification described them (and described `train_unet_subsample.py` as
+    using "an older import path"), which needs checking before the document
+    claims anything about them.
 
 50. **Are the retired spec's claims safe to reuse?**
-    Citation: `docs/specs/training/spec.md:76` (`tau=0.1, thresh=0.01`),
-    `:80` (`eval_dice` threshold 0.01), `:66` (7-day step), `:68` (narrow
-    glob), `:149` (env zero-fill as a known limitation), `:82` ("strictly
-    greater" Dice).
+    Citation: `mal-core/src/mal_core/training/model.py:63` (`tau=0.5,
+    thresh=0.5`), `:86` (`eval_dice` threshold 0.5),
+    `dataset.py:136-141` (consecutive-day pairs), `dataset.py:92-97` (the
+    discovery glob), `dataset.py:66-88` (the env is loaded when a path is
+    given), `trainer.py:85-91` (the ">= best" comparison).
     Answer: no — five of its invariants are contradicted by the code as cited
     above. The document must be written against the code, and must not cite
-    the spec as authority.
+    the retired specification as authority. The full audit trail is
+    `docs/plans/in-process/spec-retirement-ledger.md`.
 
 ---
 
@@ -622,9 +630,9 @@ configuration, not type them.
       literals in the code. (Q47)
 - [ ] The absence of a calibration harness for this stage, in contrast with the
       ABM's, is stated explicitly. (Q46)
-- [ ] No claim in the document is sourced from `docs/specs/training/spec.md`;
-      where the spec is quoted, it is only to mark a contradiction with the
-      code. (Q50)
+- [ ] No claim in the document is sourced from the retired training
+      specification; where it is mentioned, it is only to mark a contradiction
+      with the code. (Q50)
 - [ ] Every value that appears in the document is generated from
       `model_constants.yaml` or a generated contract table, with the
       training-stage constants added to the generation source (today they are
@@ -661,8 +669,9 @@ configuration, not type them.
 9. **Q49** — The three standalone scripts under `mal-execution/scripts/`
    (`train_unet.py`, `train_unet_subsample.py`, `validate_unet.py`) were not
    read for this question set. Whether they duplicate, diverge from, or
-   contradict the packaged trainer is unverified; `docs/specs/training/spec.md:120-124`
-   describes them but that spec is not authoritative.
+   contradict the packaged trainer is unverified; the retired training
+   specification described them but it is not authoritative (its audit trail
+   is `docs/plans/in-process/spec-retirement-ledger.md`).
 10. **Q45** — The set of uses the surrogate must not be put to (long-horizon
     projection, intervention planning, anything requiring the mechanisms the
     rollouts did not exhibit) is inferred from the code's one-step, one-call

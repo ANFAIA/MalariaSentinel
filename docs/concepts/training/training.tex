@@ -15,26 +15,30 @@
 \newcommand{\code}[1]{\texttt{#1}}
 \newcommand{\codex}[1]{\texttt{#1}}
 \input{../generated/macros.tex}
+\input{../generated/code-macros.tex}
 
 % ---------------------------------------------------------------------------
-% Values that do not live in mal-core/config/model_constants.yaml and are not
-% emitted by tools/gen_concepts_values.py.  Every one of them is a literal in
-% the source of the training package; each is listed, with its file and line,
-% in the evidence appendix ("Code literals used in this document").  They are
-% written as macros here so that the body of the document never contains a
-% hand-typed number.
+% Values that do not live in mal-core/config/model_constants.yaml.  Every one
+% of them is a literal in the source of the training package; each is listed,
+% with its file and line, in the evidence appendix ("Code literals used in
+% this document").  tools/gen_concepts_values.py reads them out of the code
+% text and emits them as \codeconst{...} macros in
+% docs/concepts/generated/code-macros.tex, so that a value the code changes
+% makes this document fail to build instead of making it lie.  The macros
+% below are short aliases for those generated macros; the body of the
+% document never contains a hand-typed number.
 % ---------------------------------------------------------------------------
-\newcommand{\PatchSize}{128}
-\newcommand{\EnvChannels}{4}
-\newcommand{\VectorChannels}{2}
-\newcommand{\TransChannels}{4}
-\newcommand{\DiceWeight}{0.5}
-\newcommand{\DiceTau}{0.5}
-\newcommand{\DiceThresh}{0.5}
-\newcommand{\DiceEps}{\ensuremath{10^{-6}}}
-\newcommand{\SubSeed}{42}
-\newcommand{\CkptPeriod}{10}
-\newcommand{\PoolMult}{16}
+\newcommand{\PatchSize}{\codeconst{training.patch_size}}
+\newcommand{\EnvChannels}{\codeconst{training.env_channels}}
+\newcommand{\VectorChannels}{\codeconst{training.vector_channels}}
+\newcommand{\TransChannels}{\codeconst{training.transmission_channels}}
+\newcommand{\DiceWeight}{\codeconst{training.dice_weight}}
+\newcommand{\DiceTau}{\codeconst{training.dice_tau}}
+\newcommand{\DiceThresh}{\codeconst{training.dice_thresh}}
+\newcommand{\DiceEps}{\ensuremath{\text{\codeconst{training.dice_eps}}}}
+\newcommand{\SubSeed}{\codeconst{training.sub_seed}}
+\newcommand{\CkptPeriod}{\codeconst{training.ckpt_period}}
+\newcommand{\PoolMult}{\codeconst{training.pad_multiple}}
 \newcommand{\StateContract}{\mskey{contracts.cogs_state}}
 \newcommand{\EnvContract}{\mskey{contracts.env_nc}}
 
@@ -162,6 +166,25 @@ who knows them will read the rest of this document correctly.
       nothing more.
 \end{itemize}
 
+\subsection{Which source wins when they disagree}
+
+This document draws its values from three sources, and they do not carry equal
+authority. \textbf{Values} --- the numbers that enter a computation --- are
+governed by the shared configuration file
+(\codex{mal-core/\allowbreak{}config/\allowbreak{}model\_\allowbreak{}constants.yaml}), and that file wins.
+\textbf{Contract values and names} --- version strings, band names, artefact
+names --- are governed by the generated contract table, and that table wins.
+\textbf{Semantics} --- what the numbers mean, and how the stage behaves --- are
+governed by this document, because this document owns the training stage's
+prose, and this document wins. When two of these sources contradict each
+other, the one with the lower authority is the bug: a value that disagrees
+with the configuration file is an error in the configuration file or in the
+code that reads it, a contract name that disagrees with the generated table
+is an error in one of them, and a sentence here that disagrees with the code
+is an error in the sentence. The rule is stated in this document rather than
+on a shared page because the training stage's authority belongs to this
+document, and no other document speaks for it.
+
 % ===========================================================================
 \section{The surrogate, introduced}
 
@@ -222,7 +245,9 @@ With transmission enabled --- the default --- this is a ten-channel input and a
 six-channel target; without it, six in and two out. The module's own
 docstring still advertises the older six-in/two-out shape
 (\codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}training/\allowbreak{}model.py:1-5}), and the constructor's
-default arguments are still six and two
+default arguments are still the \codex{in\_\allowbreak{}channels} and
+\codex{out\_\allowbreak{}channels} values recorded in the generated parameter
+table of Section~\ref{sec:architecture}
 (\codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}training/\allowbreak{}model.py:29-30}); the training loop
 overrides both from the data, so the docstring is stale but harmless in the
 training path. It is \emph{not} harmless in the standalone validation script,
@@ -293,7 +318,7 @@ Symbol & Code name & Meaning \\
 \(D_\mathrm{train}, D_\mathrm{val}\) & \codex{RolloutDataset} & The two splits, each a list of tile records (\codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}training/\allowbreak{}dataset.py:99-170}). \\
 \(\mathrm{MSE}\) & \codex{F.mse\_\allowbreak{}loss} & The mean squared error over \emph{all} channels (\codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}training/\allowbreak{}model.py:79}). \\
 \(\mathrm{Dice}_{\mathrm{soft}}\) & \codex{soft\_\allowbreak{}dice\_\allowbreak{}loss} & The sigmoid-smoothed Dice on the first channel (\codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}training/\allowbreak{}model.py:63-74}). \\
-\(\mathrm{Dice}_{\mathrm{hard}}\) & \codex{eval\_\allowbreak{}dice} & The hard Dice on the first channel at a fixed count threshold (\codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}training/\allowbreak{}model.py:86-96}). \\
+\(\mathrm{Dice}_{\mathrm{hard}}\) & \codex{eval\_\allowbreak{}dice} & The hard Dice on the first channel at a fixed count threshold (\codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}training/\allowbreak{}model.py:86-95}). \\
 \bottomrule
 \end{longtable}
 \end{center}
@@ -345,7 +370,7 @@ The generated contract table below places this stage among the consumers of
 the ABM's state output.
 
 \begin{landscape}
-{\tiny\setlength{\tabcolsep}{3pt}\setlength{\LTleft}{0pt}\setlength{\LTright}{0pt}
+{\tiny\setlength{\tabcolsep}{3pt}\setlength{\LTleft}{0pt}\setlength{\LTright}{0pt}%
 \input{../generated/contracts.tex}}
 \end{landscape}
 
@@ -382,8 +407,8 @@ The manifest carries seven keys and no more
 Key & Value & Meaning \\
 \midrule
 \codex{name} & the output directory's own name & The model is named after its directory, so two training runs into differently named directories yield two differently named models. \\
-\codex{version} & \codex{1.0} & The model's own version; the registry keys models as \codex{name@version}. \\
-\codex{contract\_\allowbreak{}version} & \codex{1.1} & The \emph{prediction} contract version, written as a hard-coded literal by the trainer (\codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}training/\allowbreak{}trainer.py:99}); it is not the ABM state contract, and it is not read from the registry --- the registry's own default of \codex{1.1} is only a fallback for manifests that omit the key (\codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}prediction/\allowbreak{}registry.py:24-31}). \\
+\codex{version} & \codex{\codeconst{prediction.manifest_version}} & The model's own version; the registry keys models as \codex{name@version}. \\
+\codex{contract\_\allowbreak{}version} & \codex{\codeconst{prediction.contract_version_manifest}} & The \emph{prediction} contract version, written as a hard-coded literal by the trainer (\codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}training/\allowbreak{}trainer.py:99}); it is not the ABM state contract, and it is not read from the registry --- the registry's own default of \codex{\codeconst{prediction.contract_version_manifest}} is only a fallback for manifests that omit the key (\codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}prediction/\allowbreak{}registry.py:24-31}). \\
 \codex{in\_\allowbreak{}channels} & read off the data & Number of input channels the network was built with. \\
 \codex{out\_\allowbreak{}channels} & read off the data & Number of output channels. \\
 \codex{checkpoint} & \codex{best\_\allowbreak{}model.pt} & Which of the three checkpoints the registry should load. \\
@@ -753,6 +778,7 @@ the best one observed.
 
 % ===========================================================================
 \section{The architecture and the loss}
+\label{sec:architecture}
 
 \subsection{Architecture}
 
@@ -760,13 +786,14 @@ The network is a standard U-Net with four resolution levels
 (\codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}training/\allowbreak{}model.py:28-46}).
 
 \begin{itemize}
-\item \textbf{Encoder.} Four stages, with widths \(32, 64, 128, 256\). Each
+\item \textbf{Encoder.} Four stages, with the widths recorded in the
+      generated parameter table below. Each
       stage is a \emph{double convolution block}: a \(3\times3\) convolution
       without bias, batch normalisation, a ReLU, and then the same three
       operations again (\codex{model.py:14-25}). A \(2\times2\) max-pool
       halves the resolution between stages (\codex{model.py:37}).
 \item \textbf{Bottleneck.} A double convolution block of double the last
-      width, i.e.\ 512 channels, at the coarsest resolution
+      encoder width, at the coarsest resolution
       (\codex{model.py:38}).
 \item \textbf{Decoder.} For each width in reverse order, a transposed
       convolution with stride two upsamples, the corresponding encoder
@@ -841,7 +868,7 @@ a cosmetic one.
 
 The validation metric is a \emph{hard} Dice on the same channel, using a
 strict comparison against the same threshold
-(\codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}training/\allowbreak{}model.py:86-96}), averaged over the
+(\codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}training/\allowbreak{}model.py:86-95}), averaged over the
 validation batches (\codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}training/\allowbreak{}trainer.py:75-82}).
 
 It is important to be clear about what this number characterises. It is
@@ -971,7 +998,9 @@ The wrapper's constructor performs the load eagerly, in four steps
       unknown, they are inferred from the tensors themselves: the first
       encoder convolution's weight tensor carries the input width, and the
       head's weight tensor carries the output width
-      (\codex{wrapper.py:51-59}). Fixed fallbacks of six and two apply if even
+      (\codex{wrapper.py:51-59}). Fixed fallbacks of
+      \codeconst{training.fallback_in_channels} and
+      \codeconst{training.fallback_out_channels} apply if even
       those tensors are absent.
 \item \textbf{Rebuild and load.} The network is constructed with the
       resolved counts and the weights are loaded with a strict
@@ -1137,7 +1166,7 @@ easy to mistake for the harness that does not exist.
 
 \begin{itemize}
 \item \codex{mal-execution/\allowbreak{}scripts/\allowbreak{}validate\_\allowbreak{}unet.py} contains a hard-coded
-      acceptance threshold of \(0.6\) on the validation Dice, prints a
+      acceptance threshold on the validation Dice (a Dice of 0.6), prints a
       pass/fail verdict and writes it to a text file
       (\codex{mal-execution/\allowbreak{}scripts/\allowbreak{}validate\_\allowbreak{}unet.py:47-57}). It is a
       standalone script, not reachable from the command line, not part of the
@@ -1265,8 +1294,13 @@ Three sources, in increasing order of authority for this stage:
       file contains no key that mentions the training stage, the surrogate,
       the network, the loss or the number of epochs --- this was checked by
       searching that file --- so these numbers have no single source of truth
-      and are duplicated in this document only through the macros declared at
-      the top of this source file.
+      in the shared configuration file. They are read out of the code text by
+      \codex{tools/\allowbreak{}gen\_\allowbreak{}concepts\_\allowbreak{}values.py} and emitted as
+      \codex{\textbackslash codeconst} macros in
+      \codex{docs/\allowbreak{}concepts/\allowbreak{}generated/\allowbreak{}code-macros.tex}, each carrying the
+      file and line it was read from; the macros declared at the top of this
+      source file are short aliases for them, so an unknown key makes this
+      document fail to build rather than print a stale number.
 \end{enumerate}
 
 \subsection{Code literals used in this document}

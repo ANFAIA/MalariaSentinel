@@ -15,9 +15,8 @@ constants file `mal-core/config/model_constants.yaml` and its validator
 subcommand of `mal-core/src/mal_core/cli.py`, the consumer side
 (`mal-core/src/mal_core/abm/wrapper.py` and the C++ engine under
 `mal-core/src/mal_core/abm/`), and the AOI registry
-(`mal-commonlib/src/mal_commonlib/aois.yaml`, `aoi.py`). The retired specs
-(`docs/specs/ingest/spec.md`, `docs/specs/data/spec.md`,
-`docs/specs/commonlib/spec.md`) were used only as material: several of their
+(`mal-commonlib/src/mal_commonlib/aois.yaml`, `aoi.py`). The retired ingest, data and commonlib specifications (their audit trail is
+now `docs/plans/in-process/spec-retirement-ledger.md`) were used only as material: several of their
 claims are already contradicted by the code, so every question below is
 anchored on code, and where the two disagree the question says so. The stance
 the document must answer is the one in `docs/concepts/README.md` (S1–S10);
@@ -96,7 +95,7 @@ manifest keys does it claim for them?**
   functions directly, and those loaders fetch from their providers
   (WorldPop, GLW4, GHSL, Overture, and the derived wildlife proxy). The
   retired spec's claim that "ingest never downloads"
-  (`docs/specs/ingest/spec.md:190`, INV-17) holds only for the env path.
+  (`mal-core/src/mal_core/ingest/daily_nc.py`, INV-17) holds only for the env path.
   → part (c).
 
 ### The spatial frame
@@ -535,7 +534,7 @@ is the GeoPackage versioned?**
   (fields resolved: `hab_type`, `habitat_potential`, `dynamics`, `row`,
   `col`), `:186-226` (the read loop: `hab_type` is accepted but **not used
   as a filter**; `potential` is clamped and floored),
-  `mal-core/src/mal_core/abm/src/wire.hpp:203-217` (`HabitatPatch`: the
+  `mal-core/src/mal_core/abm/include/mal_abm_fast/wire.hpp:234-245` (`HabitatPatch`: the
   per-type H features are "carried at the coordinator level … not here"),
   versus `mal-core/src/mal_core/ingest/env.py:56-60` (the claim that "the
   C++ gpkg parser requires the H columns"), and
@@ -1080,7 +1079,7 @@ can check each of the following against the cited file:
 27. **The order of operations is given as pseudocode plus a table**, with
     the three places where the order changes the result (Q47).
 28. **Every claim carries a file-and-line citation**, and no citation
-    points at `docs/specs/` as authority.
+    points at a retired specification as authority.
 
 ---
 

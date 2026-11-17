@@ -10,10 +10,11 @@ FastAPI surface in `mal-core/src/mal_core/server.py`, the surrogate wrapper
 `mal-core/src/mal_core/training/wrapper.py` and its trainer/dataset, the
 upstream artefacts the stage consumes (the ABM state COG and its sidecar in
 `mal-core/src/mal_core/abm/`, the transmission COG, and the ingest env
-NetCDF), and `docs/specs/prediction/spec.md` — which is being retired and was
-used **only as material**: every claim below is cited to code, and where code
-and spec disagree the code wins (the spec's own drift table is itself
-inaccurate in several rows). Questions are numbered; each carries at least
+NetCDF), and the retired prediction specification (its audit trail is now
+`docs/plans/in-process/spec-retirement-ledger.md`) — which was retired and was used **only as
+material**: every claim below is cited to code, and where code and the
+specification disagree the code wins (that specification's own drift table was
+itself inaccurate in several rows). Questions are numbered; each carries at least
 one `path:line` citation a reviewer can open. Where the code answers the
 question unambiguously, an `Answer:` line records that answer so the drafter
 can check the document against the code instead of re-deriving it. Questions
@@ -68,7 +69,7 @@ command).
 Answer: within the repository the only consumers are the sidecar readers
 (the `status` CLI command and the FastAPI status/risk endpoints). No map,
 dashboard or intervention-planning consumer exists in the tree — the claim in
-`docs/specs/prediction/spec.md:38-42` about "maps, dashboards, intervention
+the retired prediction specification about "maps, dashboards, intervention
 planning" is aspirational, not implemented.
 
 ### A2. Inputs: what the stage consumes
@@ -431,23 +432,24 @@ Answer: the stage is covered by an end-to-end shape test that uses the
 **dummy** model; there is no test that a real checkpoint is loaded and
 inferred correctly, none that exercises the national/continental
 aggregators, and none that asserts the output's band names or sidecar
-version. `docs/specs/prediction/spec.md:180-200` lists a "drift check" that
-is not part of the test suite.
+version. The retired prediction specification listed a "drift check" that was
+not part of the test suite; the contract facts it listed are now pinned by
+`mal-core/tests/test_spec_retirement_prediction.py`.
 
 **Q39. Which spec claims are contradicted by the code (so the document must
 not repeat them)?**
-Citation: `docs/specs/prediction/spec.md:83` (`in_channels=5`) vs
-`mal-core/src/mal_core/prediction/registry.py:28` (`in_channels=10`);
-`docs/specs/prediction/spec.md:88` (`load_abm_state` returns `(2,H,W)`) vs
+Citation: `mal-core/src/mal_core/prediction/registry.py:28` (`in_channels=10`,
+`out_channels=6`) — the retired specification said `in_channels=5`;
 `mal-core/src/mal_core/prediction/state_loader.py:36` (`C=6` with
-transmission); `docs/specs/prediction/spec.md:96` (day clamped to `[7,360]`)
-vs `state_loader.py:50` (`[1,730]`); `docs/specs/prediction/spec.md:118`
-(band description `["risk"]`, single band) vs
-`mal-core/src/mal_core/prediction/predictor.py:30-41`;
-`docs/specs/prediction/spec.md:132` (`nodata=-9999.0` hardcoded) vs
-`predictor.py:121` (read from config); `docs/specs/prediction/spec.md:79`
-("`AOI_CATALOGUE`" as a source of truth) — no such symbol exists in
-`aggregator.py`; the AOI catalogue is `mal-commonlib/src/mal_commonlib/aois.yaml`.
+transmission) — the retired specification said `(2,H,W)`;
+`state_loader.py:50` (day clamped to `[1,730]`) — the retired specification
+said `[7,360]`; `mal-core/src/mal_core/prediction/predictor.py:30-41` (the band
+names are `predicted_*`, one per output channel) — the retired specification
+said a single band named `risk`;
+`predictor.py:121` (`nodata` read from config) — the retired specification said
+`nodata=-9999.0` was hardcoded; and no `AOI_CATALOGUE` symbol exists in
+`aggregator.py` — the AOI catalogue is
+`mal-commonlib/src/mal_commonlib/aois.yaml`.
 Answer: the spec is a set of drifts, not a description; the document must be
 written from the code.
 

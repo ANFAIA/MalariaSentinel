@@ -10,7 +10,9 @@ evaluated. It was written after reading the stage's material: the whole of
 judge and its prompt), the `score` / `validate-detections` / `validate-cases` /
 `feedback` CLI commands, the state-COG writer in the C++ engine, the
 `docs/concepts/README.md` stance note, and the (retired, non-authoritative)
-`docs/specs/scoring/spec.md`. Every question below carries a `path:line`
+scoring specification (audit trail:
+`docs/plans/in-process/spec-retirement-ledger.md`). Every question below
+carries a `path:line`
 citation a reviewer can open; where the code answers the question
 unambiguously, the answer is recorded so the drafter can check the document
 against the code instead of re-deriving it. Where the code does **not** answer
@@ -25,7 +27,7 @@ could not be verified are stated as such.
 
 **Q1. What question does the scoring stage exist to answer, and what counts as
 having answered it?**
-Citation: `mal-core/src/mal_core/scoring/registry.py:1-18`; `mal-core/src/mal_core/scoring/scorers/base.py:1-10`; `docs/specs/scoring/spec.md:39-50`.
+Citation: `mal-core/src/mal_core/scoring/registry.py:1-18`; `mal-core/src/mal_core/scoring/scorers/base.py:1-10`.
 Answer: it exists to answer "is this simulation behaving like the malaria
 literature it is meant to emulate, and did my change make it better or worse?"
 The registry docstring states the weights reflect validation value for the
@@ -356,15 +358,14 @@ against a pydantic schema `Verdict` with fields `verdict`
 
 **Q34. What is the LLM component NOT allowed to do — can it gate a run?**
 Citation: `mal-core/src/mal_core/scoring/runner.py:135-142`;
-`mal-core/src/mal_core/scoring/llm_scorer.py:222-246`;
-`docs/specs/scoring/spec.md:164-168`.
+`mal-core/src/mal_core/scoring/llm_scorer.py:222-246`.
 Answer: it cannot gate anything. The runner calls it after the composite and
 the verdict are already computed, and only attaches its result under the
 optional key `verdict_llm`; if the call fails, the module returns a fallback
 dict and the runner omits the key entirely (`runner.py:135-142`). The
 deterministic composite and verdict are unaffected by the LLM in every path.
-The retired spec states the same intent as INV-12
-(`docs/specs/scoring/spec.md:164-168`); the code confirms it.
+The retired scoring specification stated the same intent (INV-12); the code
+confirms it.
 
 **Q35. How does the LLM component behave when it cannot be used?**
 Citation: `mal-core/src/mal_core/scoring/llm_scorer.py:126-166`, `:222-246`,
@@ -401,7 +402,7 @@ prompted against a stale description of the scorecard it is judging.
 
 **Q38. Is there a pytest calibration harness in the tree?**
 Citation: `mal-core/src/mal_core/scoring/scorers/base.py:1-6`;
-`docs/specs/scoring/spec.md:54-63`, `:86-88`; directory listing — the path
+directory listing — the path
 `mal-core/src/mal_core/abm/tests/calibration/` **does not exist**; the unit
 tests live in `mal-core/tests/test_scoring_state.py`,
 `test_scoring_cohort.py`, `test_scoring_pools.py`, `test_scoring_llm.py`,
@@ -409,8 +410,8 @@ tests live in `mal-core/tests/test_scoring_state.py`,
 Answer: **no.** The harness (with its `thresholds.yaml`, diff/best trackers
 and pytest tiers) was deleted; the base module states "the old pytest
 calibration harness and its duplicated scorers were deleted"
-(`base.py:3-5`), and the retired spec says the same
-(`docs/specs/scoring/spec.md:61-63`). There is no `thresholds.yaml` anywhere in
+(`base.py:3-5`), and the retired scoring specification said the same.
+There is no `thresholds.yaml` anywhere in
 the working tree and no `calibration/` directory. The threshold values that
 used to live there are now inlined in each scorer module and, where they
 derive from the model, read from `model_constants.yaml`.
@@ -435,9 +436,9 @@ a summary; it does not fail the run, exit non-zero, or block anything
 downstream. The verdict label is a human-readable summary of the number, and
 the only mechanical consequence anywhere is the LLM verdict's non-gating
 status (Q34). **Open**: whether some external process is meant to consume
-the verdict as a promotion criterion — the retired spec claims the composite
-"gates parameter changes" (`docs/specs/scoring/spec.md:48-50`) but no code
-in the tree enforces that.
+the verdict as a promotion criterion — the retired scoring specification
+claimed the composite "gates parameter changes", but no code in the tree
+enforces that.
 
 **Q41. What is the feedback step, and is it part of the scoring stage?**
 Citation: `mal-core/src/mal_core/scoring/feedback.py:16-53`;

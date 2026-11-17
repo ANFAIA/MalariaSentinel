@@ -12,6 +12,7 @@
 \usepackage[hidelinks]{hyperref}
 \newcommand{\code}[1]{\texttt{#1}}
 \input{../generated/macros.tex}
+\input{../generated/code-macros.tex}
 
 \title{The \code{prediction} stage of the MalariaSentinel pipeline\\
 \large A conceptual description}
@@ -41,6 +42,32 @@ than values in the frozen configuration.
 \tableofcontents
 
 \section{What this stage is for}
+
+\subsection{Which source wins when two of them disagree}
+
+Three authorities govern the statements in this document, and they are not
+interchangeable. \emph{Values} --- the numbers the pipeline actually uses ---
+come from \code{mal-core/config/model\_constants.yaml}, which reaches this
+document through the generated \code{\textbackslash mskey} macros, and from the
+code constants that the generator reads out of the implementation, which
+reach it through the generated \code{\textbackslash codeconst} macros; where a
+value is both configured and hard-coded in the code, the configured value
+wins. \emph{Contract values and
+contract names} --- version labels, band names, field names --- come from the
+generated contract table (\code{docs/concepts/generated/contracts.tex}) and
+from the generated code constants that carry the labels the implementation
+writes, and that generated table wins over any prose that paraphrases it.
+\emph{Semantics} --- what a step means, what its inputs are for, what its
+outputs do and do not license a reader to conclude --- belong to this
+document, and this document wins over a contract table or a configuration
+file whenever the two disagree about meaning. When the three contradict one
+another, the lower authority is the bug: the code is what runs, the
+configuration is what is meant to govern the code, and this document is what
+is meant to describe the code, so a contradiction means that one of the three
+is wrong and has to be corrected rather than reconciled. The rule is stated
+here because this document owns the semantics of the \code{prediction} stage;
+there is no separate page that arbitrates between the three authorities, and
+none is needed while each stage states the rule for the content it owns.
 
 \subsection{The question it answers}
 
@@ -494,10 +521,10 @@ has the following fields:
 Field & Default & Meaning \\
 \midrule
 \code{name} & --- & the model's key \\
-\code{version} & \code{"1.0"} & the version component of the key \\
-\code{contract\_version} & \code{"1.1"} & the model's own contract label \\
-\code{in\_channels} & 10 & channels the network expects on input \\
-\code{out\_channels} & 6 & channels the network emits \\
+\code{version} & \code{\codeconst{prediction.manifest_version}} & the version component of the key \\
+\code{contract\_version} & \code{\codeconst{prediction.contract_version_manifest}} & the model's own contract label \\
+\code{in\_channels} & \code{\codeconst{prediction.in_channels}} & channels the network expects on input \\
+\code{out\_channels} & \code{\codeconst{prediction.out_channels}} & channels the network emits \\
 \code{checkpoint} & empty & file name of the weights, relative to the manifest \\
 \code{description} & empty & free text \\
 \bottomrule
@@ -505,7 +532,8 @@ Field & Default & Meaning \\
 \end{center}
 
 The defaults are placeholders rather than measurements: a manifest that omits
-the channel counts advertises a ten-channel input and a six-channel output
+the channel counts advertises a \codeconst{prediction.in_channels}-channel
+input and a \codeconst{prediction.out_channels}-channel output
 regardless of what the weights actually are. That disagreement is not
 silent: the wrapper builds the network with the counts it was given and then
 loads the checkpoint into it
@@ -613,7 +641,8 @@ network at all.
 
 The \code{training} stage does. After training, the trainer writes a
 \code{model.yaml} beside the weights, with the name taken from the output
-directory's name, version \code{"1.0"}, contract \code{"1.1"}, the
+directory's name, version \code{\codeconst{prediction.manifest_version}},
+contract \code{\codeconst{prediction.contract_version_manifest}}, the
 checkpoint file name \code{best\_model.pt}, and the input and output channel
 counts \emph{measured} from the first training sample rather than declared
 (\code{mal-core/src/mal\_core/training/trainer.py:95-106};
@@ -641,7 +670,7 @@ The wrapper concatenates the state and the environment along the channel axis
 (\code{mal-core/src/mal\_core/training/wrapper.py:79-88}). If the
 concatenation has fewer channels than the network expects, zero channels are
 appended; if it has more, it is truncated. The raster is then padded up to a
-multiple of sixteen rows and columns --- the network pools four times --- by
+multiple of \codeconst{training.pad_multiple} rows and columns --- the network pools four times --- by
 edge replication, and the result is cropped back to the original dimensions
 after the forward pass
 (\code{mal-core/src/mal\_core/training/wrapper.py:90-104}).
@@ -686,7 +715,8 @@ consequence is a misalignment rather than a shortage of data: with a state
 file that carries no transmission raster, the network receives the environment
 channels where it was trained to expect transmission channels, and zeros where
 it was trained to expect the environment. The output band count is the
-manifest's declared output count, so the stage still writes six bands and
+manifest's declared output count, so the stage still writes
+\codeconst{prediction.out_channels} bands and
 names them after the training target's order
 (\code{mal-core/src/mal\_core/prediction/predictor.py:33-40}); nothing in the
 code ties those names to what the network actually produced.
@@ -721,17 +751,19 @@ own aggregator (\code{mal-core/src/mal\_core/prediction/aggregator.py:25-29},
 is built from the registry entry for the slug, with the registry's own
 resolution overridden by the scale's
 (\code{mal-core/src/mal\_core/prediction/aggregator.py:32-44}). The
-resolution values are literals in the source; they are listed in the
-evidence appendix and are not currently emitted by the generator.
+resolution values are literals in the source; the generator now reads them
+out of the code and emits them as the three per-scale resolution macros used
+in the table below, and the evidence appendix cites their
+source locations.
 
 \begin{center}
 \begin{tabular}{@{}llll@{}}
 \toprule
-Scale & Resolution (source literal) & Grid cell count & Aggregation \\
+Scale & Resolution & Grid cell count & Aggregation \\
 \midrule
-regional & 1000 m & $(H, W)$ & identity \\
-national & 2000 m & $(H, W)$ & rectangular block mean \\
-continental & 5000 m & $1 \times 1$ & single scalar \\
+regional & \codeconst{prediction.scale_regional_m}~m & $(H, W)$ & identity \\
+national & \codeconst{prediction.scale_national_m}~m & $(H, W)$ & rectangular block mean \\
+continental & \codeconst{prediction.scale_continental_m}~m & $1 \times 1$ & single scalar \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -748,8 +780,8 @@ whole number of blocks, reshaped into blocks, and averaged within each block
 (\code{mal-core/src/mal\_core/prediction/aggregator.py:56-66}). The number
 of block rows is the raster height divided by ten, at least one, and likewise
 for the columns, so the effective block size is approximately ten by ten
-cells of the two-kilometre grid. Each output cell is therefore the mean over
-roughly a twenty-kilometre square.
+cells of the \codeconst{prediction.scale_national_m}-metre grid. Each output
+cell is therefore the mean over roughly a twenty-kilometre square.
 
 This is a rectangular block mean on the grid, and it is worth naming the
 difference plainly, because the grid definition's own description string says
@@ -784,12 +816,14 @@ height and width are taken from the \emph{aggregated} array
 \code{mal-core/src/mal\_core/prediction/predictor.py:117-118}). For the
 regional scale the two coincide. For the national scale the written raster
 has one tenth of the rows and columns of the grid the transform was built
-for, while the transform's pixel size is still the two-kilometre grid's pixel
+for, while the transform's pixel size is still the
+\codeconst{prediction.scale_national_m}-metre grid's pixel
 size; the result is a raster whose pixels are twice the intended width and
 whose extent covers roughly one tenth of the AOI's bounding box, anchored at
 its upper-left corner. For the continental scale the same discrepancy is
 extreme: a single pixel carrying a transform whose pixel size is the
-five-kilometre grid's, so the one-pixel raster covers a small corner of the
+\codeconst{prediction.scale_continental_m}-metre grid's, so the one-pixel
+raster covers a small corner of the
 bounding box rather than the whole of it.
 
 This is stated here as a description of current behaviour, not as an
@@ -820,7 +854,7 @@ Property & Value \\
 Driver & GeoTIFF \\
 Data type & 32-bit floating point \\
 Band count & the aggregated array's channel count \\
-Tiling & tiled, blocks of 128 by 128 \\
+Tiling & tiled, blocks of \codeconst{prediction.block_size} by \codeconst{prediction.block_size} \\
 Compression & deflate \\
 CRS & the AOI's CRS \\
 Transform & affine transform from the AOI bounds over the scale grid \\
@@ -929,7 +963,9 @@ independent: the stage does not gate on the state contract at all, and no
 consumer in the repository validates the prediction's own contract label.
 The label and the generator version are literals in the source
 (\code{mal-core/src/mal\_core/prediction/predictor.py:144-145}) rather than
-values in the frozen configuration; they are listed in the evidence appendix.
+values in the frozen configuration. The label is emitted by the generator as
+\codeconst{prediction.contract_version_sidecar}; the generator version has no
+generated home and is listed in the evidence appendix.
 
 \subsection{The ``latest prediction''}
 \label{sec:latest}
@@ -949,6 +985,9 @@ most recent one''.
 
 \subsection{Pseudocode}
 
+In the listing below, \code{PAD\_MULTIPLE} stands for the wrapper's padding
+multiple, \codeconst{training.pad_multiple}.
+
 \begin{verbatim}
 resolve AOI and scale grid
 load checkpoint (registry scan -> name@version -> weights -> device)
@@ -956,7 +995,7 @@ load state tensor   (search runs tree -> pick snapshot -> resample
                       -> optionally concatenate transmission bands)
 load env tensor     (NetCDF -> GeoTIFF -> legacy array -> zeros -> resample)
 assemble input      (concat(state, env), zero-pad or truncate to in_channels,
-                      pad to a multiple of 16)
+                      pad to a multiple of PAD_MULTIPLE)
 forward pass        (one pass of the U-Net; crop back to original size)
 aggregate           (identity | block mean | scalar)
 compute transform   (from the scale grid, before the aggregate is inspected)
@@ -1243,11 +1282,15 @@ Neither the manifest's contract label nor any other field closes these gaps.
 \subsection{Values that are literals in the source, not in the configuration}
 
 The project's documentation layer requires that values come from the frozen
-configuration or from a generated table. The following values are used by
-this stage but are literals in the source; none of them exists in
-\code{mal-core/config/model\_constants.yaml}, and none of them is emitted by
-the generator. They are listed here as a reading of the code, with their
-locations, so that a reader can check them and so that the gap is visible.
+configuration or from a generated table. Most of the values this stage uses
+now have a generated home: the contract labels, the channel counts, the
+per-scale resolutions, the padding multiple and the tiling block size are
+read out of the implementation by the generator and reach this document as
+\code{\textbackslash codeconst} macros. The values listed below are the ones that are still
+literals in the source with no generated home --- neither a key in
+\code{mal-core/config/model\_constants.yaml} nor a constant the generator
+reads. They are listed here as a reading of the code, with their locations,
+so that a reader can check them and so that the remaining gap is visible.
 
 \begin{center}
 \begin{longtable}{@{}llll@{}}
@@ -1255,52 +1298,46 @@ locations, so that a reader can check them and so that the gap is visible.
 Value & Where & Kind & Note \\
 \midrule
 \endhead
-\code{"1.1"} (output contract label) &
-  \code{mal-core/src/mal\_core/prediction/predictor.py:144} &
-  literal string & not the state contract \\
-\code{"1.1"} (manifest default) &
-  \code{mal-core/src/mal\_core/prediction/registry.py:27} &
-  literal string & not compared with anything \\
-\code{"mal-execution-0.1.0"} &
+\code{"mal-execution-0.1.0"} (generator version) &
   \code{mal-core/src/mal\_core/prediction/predictor.py:145} &
-  literal string & generator version \\
-10 (default input channels) &
-  \code{mal-core/src/mal\_core/prediction/registry.py:28} &
-  literal integer & placeholder \\
-6 (default output channels) &
-  \code{mal-core/src/mal\_core/prediction/registry.py:29} &
-  literal integer & placeholder \\
-1000, 2000, 5000 (metres, per scale) &
-  \code{mal-core/src/mal\_core/prediction/aggregator.py:25-29} &
-  literal integers & per-scale resolutions \\
+  literal string & written into the sidecar \\
 10 (block divisor, national) &
   \code{mal-core/src/mal\_core/prediction/aggregator.py:59} &
-  literal integer & block size \\
-16 (padding multiple) &
-  \code{mal-core/src/mal\_core/training/wrapper.py:92-94} &
-  literal integer & network pooling depth \\
+  literal integer & rows and columns per block \\
 $(-3.0, 4.0, 2.0, 12.0)$ (legacy array bounds) &
   \code{mal-core/src/mal\_core/prediction/env\_loader.py:134} &
-  literal tuple & fallback bounds \\
+  literal tuple & fallback bounds, west/south/east/north \\
 30 (days per month proxy) &
   \code{mal-core/src/mal\_core/prediction/state\_loader.py:50} &
   literal integer & date proxy \\
 1, 730 (day clamp) &
   \code{mal-core/src/mal\_core/prediction/state\_loader.py:50} &
   literal integers & date clamp \\
-128 (block size) &
-  \code{mal-core/src/mal\_core/prediction/predictor.py:124-125} &
-  literal integer & tiling \\
 \bottomrule
 \end{longtable}
 \end{center}
 
+The legacy bounds are the fallback the environment loader uses when a legacy
+array file carries no \code{bounds} entry of its own
+(\code{mal-core/src/mal\_core/prediction/env\_loader.py:134}); they are not
+the ingest bounding box of any AOI, and they are not read from
+\code{mal-commonlib/src/mal\_commonlib/aois.yaml}. They describe a box
+shifted north-east relative to the Ghana AOI's own bounds (west $-3.5$,
+south $4.5$, east $1.5$, north $11.5$), reaching further east and north than
+the AOI does, so a legacy array file without bounds is georeferenced onto a
+different area than the one the rest of the stage works on.
+
 The configuration file currently defines two contract versions, the
 environment contract and the state contract
 (\code{mal-core/config/model\_constants.yaml:8-10}); there is no key for the
-prediction stage's own output contract, and no generated source for the
-per-scale resolutions. Both are gaps rather than facts, and the question set
-that accompanies this document records them as open.
+prediction stage's own output contract, and no row for the prediction
+artefact in the generated contract table
+(\code{docs/concepts/generated/contracts.tex}). The stage's contract label
+is nevertheless emitted, as a code constant read out of the implementation
+(\codeconst{prediction.contract_version_sidecar}), as are the per-scale
+resolutions; what remains without a generated home is the set of values
+listed in the table above. These are gaps rather than facts, and the
+question set that accompanies this document records them as open.
 
 \subsection{Verification status}
 
