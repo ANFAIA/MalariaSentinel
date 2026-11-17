@@ -2,7 +2,7 @@
 
 > **Status**: In process (2026-08-13). Initial plan — design decisions pending.
 >
-> **Related**: `docs/plans/in-process/odd-fixes/01-odd-doc-and-papers.md` (ODD
+> **Related**: `docs/plans/in-process/odd-fixes/09-docs-and-papers.md` (ODD
 > `.tex` automation — the first concrete consumer of the PR-doc agent proposed here).
 
 ## Intentions
@@ -106,6 +106,7 @@ gets codebase-memory **already loaded** — no manual indexing step.
 
 ## Reference
 
-- Pack 01: `docs/plans/in-process/odd-fixes/01-odd-doc-and-papers.md` (note p.1:
+- Document 09 of the odd-fixes directory:
+  `docs/plans/in-process/odd-fixes/09-docs-and-papers.md` (note p.1:
   "Create a GitHub Action to update this document for each PR using an agent").
 - Pages config: `docs/CNAME` → `malariasentinel.com`, legacy build `main:/docs`.
