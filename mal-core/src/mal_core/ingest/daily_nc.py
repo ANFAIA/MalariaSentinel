@@ -294,6 +294,16 @@ def build_daily_env_nc(
 
     # --- static habitat features ------------------------------------------
     def _static_from_ds(path, var_names: tuple[str, ...]) -> dict[str, np.ndarray]:
+        """Read the requested static planes from a NetCDF file.
+
+        A variable stored as a per-year stack (3-D) is averaged over the
+        year axis to obtain the single static plane; every plane must have
+        the shape of the env grid. NaN cells become 0.0.
+
+        Raises:
+            ValueError: a variable is missing or its shape does not match
+                the env grid.
+        """
         with xr.open_dataset(path) as ds_ref:
             out = {}
             for v in var_names:

@@ -44,19 +44,35 @@ struct StateCogMetadata {
     std::array<double, 6>       transform;          ///< GDAL affine 6-tuple
     std::string                 aoi_slug;           ///< matches AOI.slug
     std::string                 scale;              ///< matches AOI.scale
+    /// Calendar year of the simulated month (sidecar key `year`).
     int32_t                     year  = 0;
+    /// Calendar month of the simulated month, 1-12 (sidecar key `month`).
     int32_t                     month = 0;
+    /// Random seed of the run (sidecar key `seed`).
     int32_t                     seed  = 0;
     int32_t                     n_rollouts     = 1;  ///< F1.c
     int32_t                     rollout_index  = 0;  ///< F1.c (0-indexed)
+    /// Version of the data-generator stack (sidecar key `generator_version`),
+    /// hard-coded here as GENERATOR_VERSION ("proxy_habitat_v1").
     std::string                 generator_version = GENERATOR_VERSION;
+    /// Hash of the ABM parameter set (sidecar key `abm_params_hash`); the
+    /// placeholder "sha256:pending" means the caller never supplied a digest.
     std::string                 abm_params_hash   = "sha256:pending";
+    /// Version of the state-COG + sidecar contract (sidecar key
+    /// `contract_version`), from the configuration file (key:
+    /// `contracts.cogs_state`); consumers must version-gate on it.
     std::string                 contract_version  = CONTRACT_VERSION();
+    /// Names of the two COG bands (GDAL band descriptions and sidecar key
+    /// `band_names`), in band order: adult_patch_count, adult_cell_count.
     std::array<std::string, 2>  band_names         = {
         STATE_BAND_NAMES[0], STATE_BAND_NAMES[1]
     };
+    /// The no-data sentinel stamped on both bands and written as the sidecar
+    /// key `nodata`, from the configuration file (key: `ingest.nodata_sentinel`).
     float                       nodata = NODATA_SENTINEL();
+    /// Grid height in cells (rows); written as the sidecar `shape`.
     int32_t                     h = 0;
+    /// Grid width in cells (columns); written as the sidecar `shape`.
     int32_t                     w = 0;
 };
 

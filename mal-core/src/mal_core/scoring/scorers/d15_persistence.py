@@ -26,11 +26,13 @@ _DAY_RE = re.compile(r"_day(\d+)_aquatic\.json$")
 
 
 def _parse_day(path: Path) -> int | None:
+    """Day number encoded in an aquatic JSON file name, or None if it carries none."""
     m = _DAY_RE.search(path.name)
     return int(m.group(1)) if m else None
 
 
 def _load_aquatic_pop(run_dir: Path) -> dict[int, int]:
+    """Map day number to total aquatic population, from the run's per-day aquatic JSONs."""
     pops: dict[int, int] = {}
     for p in find_aquatic_day_files(run_dir):
         day = _parse_day(p)
@@ -45,6 +47,7 @@ def _load_aquatic_pop(run_dir: Path) -> dict[int, int]:
 
 
 def _count_occupied(tif_path: Path, threshold: float = 0.05) -> int | None:
+    """Count cells of a state raster above the occupancy threshold, or None if it cannot be read."""
     try:
         import numpy as np
         import rasterio
@@ -60,6 +63,16 @@ def _count_occupied(tif_path: Path, threshold: float = 0.05) -> int | None:
 
 
 class LongHorizonPersistenceScorer(Scorer):
+    """Measures whether the population survives over the whole run.
+
+    Three sub-scores are combined with a geometric mean: the population
+    at the last day relative to its peak, the absence of any day with a
+    dead aquatic population, and the expansion of the occupied area
+    relative to the horizon day. Each sub-score is 1 when the
+    population is healthy and falls towards 0 as it deteriorates, so a
+    run that dies out late scores 0.
+    """
+
     name = "D15_persistence"
     kind = "composite"
     weight = 3.0
@@ -68,6 +81,12 @@ class LongHorizonPersistenceScorer(Scorer):
     hard_floor = 0.4
 
     def score(self, run_dir: Path, ctx: dict[str, Any]) -> ScorerResult:
+        """Compute the persistence sub-scores and their geometric mean.
+
+        Returns the final aquatic population size as the value, or a
+        skipped result when the run has no aquatic day logs or is too
+        short to have a persistence horizon.
+        """
         pops = _load_aquatic_pop(run_dir)
         if not pops:
             return ScorerResult.skipped(
@@ -107,6 +126,7 @@ class LongHorizonPersistenceScorer(Scorer):
         if expansion == 0.0:
             # fallback: top_patches counts from the aquatic JSONs
             def _patches_from(day: int) -> int:
+                """Number of top_patches listed in the aquatic JSON of that day (0 if absent)."""
                 for p in find_aquatic_day_files(run_dir):
                     if _parse_day(p) == day:
                         try:

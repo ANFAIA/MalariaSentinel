@@ -46,6 +46,11 @@ class DataValidGate(Scorer):
     aoi_generalizable = True
 
     def score(self, run_dir: Path, ctx: dict[str, Any]) -> ScorerResult:
+        """Check that every state band value is finite and non-negative.
+
+        Returns the share of valid cell values as the value and score;
+        the gate passes only when every sampled value is valid.
+        """
         tifs = find_state_files(run_dir)
         if not tifs:
             return ScorerResult.skipped("no state files", target="finite & >= 0")
@@ -87,6 +92,11 @@ class DeterminismGate(Scorer):
     aoi_generalizable = True
 
     def score(self, run_dir: Path, ctx: dict[str, Any]) -> ScorerResult:
+        """Check that repeated runs with the same seed are byte-identical.
+
+        Returns the number of mismatching seed groups as the value; the
+        gate passes when there are none.
+        """
         tifs = sorted(p for p in run_dir.glob("state_seed*.tif") if "_day" not in p.stem)
         if not tifs:
             return ScorerResult.skipped(
@@ -123,6 +133,11 @@ class PerformanceGate(Scorer):
     aoi_generalizable = True
 
     def score(self, run_dir: Path, ctx: dict[str, Any]) -> ScorerResult:
+        """Check the recorded wall time of the run against the budget.
+
+        Returns the wall time in seconds as the value; the gate is
+        skipped when the run metadata does not record a wall time.
+        """
         meta_path = run_dir / "run_metadata.json"
         if not meta_path.exists():
             return ScorerResult.skipped(
@@ -154,6 +169,12 @@ class HostInputGate(Scorer):
     aoi_generalizable = True
 
     def score(self, run_dir: Path, ctx: dict[str, Any]) -> ScorerResult:
+        """Check that the input host grid totals close to the census reference.
+
+        Returns the grid population total as the value; the gate passes
+        when the total stays within the tolerance band around the
+        reference.
+        """
         aoi = require_aoi(ctx)
         if not aoi:
             return ScorerResult.skipped(
@@ -204,6 +225,12 @@ class MobilityGate(Scorer):
     aoi_generalizable = True
 
     def score(self, run_dir: Path, ctx: dict[str, Any]) -> ScorerResult:
+        """Check that the mobility origin-destination matrix is row-stochastic.
+
+        Returns the smallest fraction of rows summing to one across the
+        checked files as the value; the gate passes when every file
+        clears the tolerance.
+        """
         csr_files = sorted(run_dir.glob("*.csr"))
         if not csr_files:
             for parent in (run_dir.parent, run_dir.parent / "hosts"):
@@ -259,6 +286,13 @@ class UrbanProductivityGate(Scorer):
     manual = True  # AOI-dependent: needs the AOI's urban class raster
 
     def score(self, run_dir: Path, ctx: dict[str, Any]) -> ScorerResult:
+        """Check that urban cells carry less adult density than rural cells.
+
+        Returns the urban-to-rural mean density ratio as the value; the
+        gate passes when the ratio stays at or below the bound. The
+        result is skipped when the urban class raster or enough active
+        cells of each class are missing.
+        """
         aoi = require_aoi(ctx)
         urban_raster = ctx.get("urban_class_path") or resolve_aoi_artifact(
             aoi, ["data/{aoi}/{aoi}_urban_class.tif", "data/{aoi}/urban_class.tif"]

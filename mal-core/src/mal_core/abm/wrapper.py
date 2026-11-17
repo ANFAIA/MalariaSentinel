@@ -10,16 +10,37 @@ from typing import Any
 log = logging.getLogger(__name__)
 
 class CppAbmWrapper:
+    """Thin Python wrapper that drives the compiled C++ ABM binary.
+
+    It locates the binary, translates keyword arguments into the
+    binary's command-line flags and runs it, returning the captured
+    process output.
+    """
+
     def __init__(
         self,
         binary_path: Path | None = None,
         worktree: str | Path | None = None,
     ):
+        """Bind the wrapper to a binary, resolving one when none is given.
+
+        Args:
+            binary_path: explicit path to the compiled binary.
+            worktree: root of a worktree whose build directory may hold the
+                binary; used when the installed package does not ship one.
+        """
         self.worktree = Path(worktree).resolve() if worktree else None
         self.binary = binary_path or self._resolve_binary()
         self._flags_schema: dict[str, dict[str, Any]] | None = None
 
     def _resolve_binary(self) -> Path:
+        """Locate the compiled ABM binary.
+
+        Looks in the worktree (if given) and then in the installed package
+        directory, preferring the platform-named binary under ``bin/`` over
+        the generic one under ``build/src/``. Raises FileNotFoundError with
+        the compile command when no binary is found.
+        """
         candidate_dirs: list[Path] = []
         worktree = getattr(self, "worktree", None)
         if worktree:
@@ -47,6 +68,12 @@ class CppAbmWrapper:
         raise FileNotFoundError(f"ABM binary not found. Run: {err_hint}")
 
     def _introspect_flags(self) -> dict[str, dict[str, Any]]:
+        """Parse the binary's ``--help`` output into a flag schema.
+
+        Returns a mapping of flag name (underscored) to its type, default
+        and help text. An empty mapping is returned when the binary cannot
+        be executed or times out.
+        """
         try:
             result = subprocess.run([str(self.binary), "--help"], capture_output=True, text=True)
             output = result.stdout + result.stderr
@@ -62,6 +89,15 @@ class CppAbmWrapper:
         return flags
 
     def run(self, _timeout: int | None = None, **flags) -> dict[str, Any]:
+        """Run the binary in its ``run`` subcommand with the given flags.
+
+        Keyword names become dashed command-line flags; ``None`` values are
+        dropped and booleans are passed only when true.
+
+        Returns:
+            A dict with the captured ``stdout``, ``stderr`` and the process
+            ``returncode``.
+        """
         if self._flags_schema is None:
             self._flags_schema = self._introspect_flags()
         cmd = [str(self.binary), "run"]
@@ -78,6 +114,7 @@ class CppAbmWrapper:
         return {"stdout": result.stdout, "stderr": result.stderr, "returncode": result.returncode}
 
     def get_flags_schema(self) -> dict[str, dict[str, Any]]:
+        """Return the flag schema of the binary, introspecting it once."""
         if self._flags_schema is None:
             self._flags_schema = self._introspect_flags()
         return self._flags_schema

@@ -88,6 +88,7 @@ GHSL_RURAL = 21  # lowest rural density; callers should use is_rural()
 
 
 def _default_cache_dir() -> pathlib.Path:
+    """Cache directory for GHSL downloads, under the XDG cache home."""
     base = os.environ.get("XDG_CACHE_HOME") or os.path.expanduser("~/.cache")
     return pathlib.Path(base) / "mal_commonlib" / "ghsl"
 

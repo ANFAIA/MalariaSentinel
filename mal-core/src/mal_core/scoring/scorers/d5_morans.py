@@ -56,6 +56,16 @@ def morans_i_active(grid: np.ndarray) -> float:
 
 
 class MoransScorer(Scorer):
+    """Measures the spatial autocorrelation of the adult population.
+
+    The value is Moran's I computed on the occupied cells only, so it
+    describes how clustered the adult distribution is rather than the
+    mostly-empty background. The score is 1 when the index falls
+    inside the accepted band — clustered but not pathologically so —
+    and decays as a Gaussian outside it; a spatially random
+    configuration scores near 0.
+    """
+
     name = "D5_morans"
     kind = "composite"
     weight = 1.0
@@ -64,6 +74,12 @@ class MoransScorer(Scorer):
     hard_floor = 0.2
 
     def score(self, run_dir: Path, ctx: dict[str, Any]) -> ScorerResult:
+        """Compute Moran's I of the occupied cells and its score.
+
+        Returns the index as the value, or a skipped result when there
+        is no state snapshot or too few occupied cells for a spatial
+        statistic.
+        """
         final = find_final_state(run_dir)
         if final is None:
             return ScorerResult.skipped("no state files", target="0.20-0.85")

@@ -23,6 +23,18 @@ def train_unet(
     include_transmission: bool = True,
     env_path: str | Path | None = None,
 ) -> float:
+    """Train the U-Net surrogate on the rollouts of a run directory.
+
+    The input and output channel counts are inferred from the first sample
+    of the training set. Checkpoints are written to ``output_dir``: the
+    best validation Dice score as ``best_model.pt``, a checkpoint every
+    ten epochs and the last epoch as ``final_model.pt``; a ``model.yaml``
+    manifest describing the model is written last.
+
+    Returns:
+        The best validation Dice score reached (hard Dice on the primary
+        channel, thresholds expressed in adult counts).
+    """
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 

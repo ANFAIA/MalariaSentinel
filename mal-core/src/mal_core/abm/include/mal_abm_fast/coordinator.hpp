@@ -53,6 +53,8 @@ class MosquitoSubmodel;
 /// Hash functor for (row, col) pairs (used by the candidate-patch
 /// registry). Packs the two int32s into an int64 then hashes that.
 struct PairHash {
+    /// Hash a grid cell (row, col) pair for the candidate-patch registry:
+    /// packs the two int32 coordinates into one int64 and hashes it.
     std::size_t operator()(const std::pair<int32_t, int32_t>& p) const noexcept {
         const std::uint64_t packed =
             (static_cast<std::uint64_t>(static_cast<std::uint32_t>(p.first)) << 32) |
@@ -61,6 +63,10 @@ struct PairHash {
     }
 };
 
+/// The engine's spatial façade (the Mesa-Geo half of the ABM). It owns the
+/// AOI geometry, the env-NC climate reader, the candidate-patch habitat
+/// registry and the per-rollout PRNG, and serves the per-day habitat
+/// update, the seeding plans and the state-COG output.
 class CoordinatorModel {
 public:
     CoordinatorModel() = default;
@@ -75,12 +81,25 @@ public:
     /// Accessors. The Prng is mutable (submodel.advance_day advances
     /// it) so `rng()` is non-const.
     const AOI&            aoi()        const { return aoi_; }
+    /// The env-NC climate reader (daily rainfall, daily air temperature and
+    /// the static habitat planes); valid for the coordinator's lifetime.
     const ClimateEngine&  climate()    const { return *climate_; }
+    /// The candidate-patch habitat registry read from the habitat gpkg;
+    /// valid for the coordinator's lifetime.
     const HabitatEngine&  habitat()    const { return habitat_; }
+    /// The calendar date (day resolution) of the simulated day. The Engine
+    /// advances it by one day at the end of every step, so after a step it
+    /// already holds the date of the *next* day.
     std::chrono::sys_days current_date() const { return current_date_; }
+    /// Mutable calendar date of the simulated day; the Engine uses it to
+    /// advance the simulation by one day at the end of each step.
     std::chrono::sys_days& current_date()       { return current_date_; }
+    /// The per-rollout PRNG sub-stream (derived from `--seed`). It is
+    /// advanced by the seeding planners and by `MosquitoSubmodel::advance_day`.
     Prng&                 rng()              { return rng_; }
 
+    /// The per-patch state vector cached by the last `to_dataframe()` call
+    /// (one PatchState per candidate cell); empty until that call runs.
     const std::vector<PatchState>& patch_states_today() const {
         return cached_states_;
     }
@@ -114,8 +133,13 @@ public:
     /// wires the active species' `salinity_hi_tol_ppt`; the default
     /// comes from the default species row.
     void set_salinity_hi_tol_ppt(float ppt) { salinity_hi_tol_ppt_ = ppt; }
+    /// Attach the host landscape (non-owning pointer) used to score candidate
+    /// cells in HOST_WEIGHTED seeding; it must outlive the coordinator and may
+    /// be left null, in which case HOST_WEIGHTED seeding is rejected.
     void set_host_landscape(const HostLandscape* hosts)
     { host_landscape_ = hosts; }
+    /// The species salinity high-tolerance in PSU (parts per thousand):
+    /// patches whose water salinity reaches it cannot breed.
     float salinity_hi_tol_ppt() const { return salinity_hi_tol_ppt_; }
 
     /// Legacy no-op kept for engine.step() API parity.
@@ -155,10 +179,15 @@ public:
     /// per day by update_habitat_day; plan §5.4). Null until the first
     /// update_habitat_day().
     struct JetView {
+        /// Per-cell capacity K, row-major H*W floats; zero until the first update_habitat_day().
         const float* data = nullptr;
+        /// Grid width in cells (columns of K).
         int32_t     width = 0;
+        /// Grid height in cells (rows of K).
         int32_t     height = 0;
     };
+    /// The read-only per-cell capacity K view for the current day, in
+    /// absolute Beverton-Holt capacity units (individual-equivalent).
     JetView J_view() const { return {K_cell_.data(), W_, H_}; }
 
     /// Read-only per-cell pluvial state z in [0,1] (plan 04 §2.3 — the GIF
@@ -173,6 +202,9 @@ public:
     /// (individuals). No K_MAX division, no [0,1] clamp.
 
     DensityGrid aggregate_density(const MosquitoSubmodel& sub) const;
+    /// Per-cell raw adult counts at the adults' current position (state COG
+    /// band 2, `adult_cell_count`); counts every adult regardless of sex or
+    /// physiological state.
     SuitabilityGrid suitability_grid(const MosquitoSubmodel& sub) const;
 
     /// -- output -------------------------------------------------------------

@@ -37,6 +37,7 @@ PUPA_BAND = (0.02, 0.15)
 
 
 def _structure_from(data: dict[str, Any]) -> tuple[float, float] | None:
+    """Extract (larval share, pupal share) of the aquatic population, or None if the JSON lacks the stage breakdown."""
     stage = data.get("by_stage")
     total = data.get("total_aquatic", 0)
     if not isinstance(stage, dict) or not total:
@@ -47,6 +48,15 @@ def _structure_from(data: dict[str, Any]) -> tuple[float, float] | None:
 
 
 class AquaticStructureScorer(Scorer):
+    """Measures the stage composition of the aquatic (immature) population.
+
+    The value is the share of the aquatic population that is in the
+    larval stage, as expected from stage-duration data (Bayoh &
+    Lindsay 2003); the pupal share is scored alongside it. Each
+    sub-score is 1 inside its accepted band and decays smoothly
+    outside, and the reported score is the mean of the two.
+    """
+
     name = "D11_aquatic_structure"
     kind = "composite"
     weight = 1.0
@@ -55,6 +65,12 @@ class AquaticStructureScorer(Scorer):
     hard_floor = 0.3
 
     def score(self, run_dir: Path, ctx: dict[str, Any]) -> ScorerResult:
+        """Compute the larval and pupal shares of the aquatic population and their score.
+
+        Returns the mean larval share as the value, or a skipped result
+        when the run has no aquatic JSONs or they carry no stage
+        breakdown.
+        """
         target = f"larva {LARVA_BAND[0]}-{LARVA_BAND[1]}, pupa {PUPA_BAND[0]}-{PUPA_BAND[1]}"
         daily = find_aquatic_day_files(run_dir)
         sources = daily[-30:] if daily else []

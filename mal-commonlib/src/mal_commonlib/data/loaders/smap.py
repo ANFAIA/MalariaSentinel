@@ -101,6 +101,7 @@ def _earthaccess_login() -> None:
 
 
 def _search_window(year: int, month: int) -> tuple[str, str]:
+    """Inclusive (start, end) ISO dates covering the whole calendar month."""
     start = f"{year:04d}-{month:02d}-01"
     # Add one month in [M] units first, then cast to [D]: mixing a
     # datetime64[D] with a timedelta64[M] directly raises a cast error.
@@ -145,6 +146,7 @@ def _aoi_native_grid(aoi: AOI) -> tuple[np.ndarray, np.ndarray]:
 
 
 def _write_crs_transform(da: xr.DataArray, w: float, s: float, e: float, n: float) -> None:
+    """Attach EPSG:4326 and the affine transform of the given bounds to a DataArray, in place."""
     h, width = da.shape
     da.rio.write_crs("EPSG:4326", inplace=True)
     da.rio.write_transform(from_bounds(w, s, e, n, width, h), inplace=True)
@@ -314,6 +316,7 @@ def load_smap_salinity(
     if _fetch_monthly is None:
 
         def _default_fetch(y: int, m: int) -> xr.Dataset | None:
+            """Fetch one month of raw SMAP granules through earthaccess."""
             return _fetch_monthly_via_earthaccess(aoi, y, m, cache)
 
         fetch = _default_fetch
@@ -378,6 +381,7 @@ def load_smap_salinity_synthetic(
         source = _synthetic_raw_ds(aoi)
 
     def _fetch(year: int, month: int) -> xr.Dataset:
+        """Testing hook that returns the same synthetic granule for every requested month."""
         return source
 
     return load_smap_salinity(

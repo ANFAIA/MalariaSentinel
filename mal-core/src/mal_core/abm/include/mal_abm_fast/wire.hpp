@@ -34,27 +34,76 @@ namespace mal_abm_fast {
 /// Values live in mal-core/config/model_constants.yaml; accessors read the
 /// load_config() singleton (plan constants-yaml §4 — no compiled defaults).
 inline double EIP_BASE_C() { return static_cast<double>(load_config().eip.base_c); }
+/// Infectivity threshold of the extrinsic incubation period, in growing-degree
+/// days (config key: `eip.threshold_gd`); a mosquito is infective once its
+/// accumulated EIP progress reaches it.
 inline double EIP_THRESHOLD_GD() { return static_cast<double>(load_config().eip.threshold_gd); }
+/// Daily probability that an adult mosquito disperses, in 1/day
+/// (config key: `dispersal.adult_prob_day`).
 inline double ADULT_DISPERSE_PROB() { return static_cast<double>(load_config().dispersal.adult_prob_day); }
+/// Standard deviation of the isotropic Gaussian adult dispersal step, in metres
+/// (config key: `dispersal.adult_sigma_m`).
 inline double ADULT_DISPERSE_SIGMA_M() { return static_cast<double>(load_config().dispersal.adult_sigma_m); }
+/// Radius at which the Gaussian adult dispersal step is clipped to a disc, in
+/// metres (config key: `dispersal.adult_max_m`).
 inline double ADULT_DISPERSE_MAX_M() { return static_cast<double>(load_config().dispersal.adult_max_m); }
+/// Daily probability that a gravid female attempts a windborne migration, in
+/// 1/day (config key: `dispersal.wind_migration_prob`).
 inline double WIND_MIGRATION_PROB() { return static_cast<double>(load_config().dispersal.wind_migration_prob); }
+/// Duration of the windborne flight, in hours (config key:
+/// `dispersal.wind_flight_hours`).
 inline double WIND_FLIGHT_HOURS() { return static_cast<double>(load_config().dispersal.wind_flight_hours); }
+/// Probability that a mosquito survives the windborne flight, a fraction in
+/// [0,1] (config key: `dispersal.wind_survival`).
 inline double WIND_SURVIVAL() { return static_cast<double>(load_config().dispersal.wind_survival); }
+/// Self-propelled flight speed added to the wind speed during the windborne
+/// flight, in m/s (config key: `dispersal.wind_self_speed_ms`).
 inline double WIND_FLIGHT_SPEED_MS() { return static_cast<double>(load_config().dispersal.wind_self_speed_ms); }
+/// Maximum number of days a female may remain in the HOST_SEEKING state
+/// without finding a host before she is killed by starvation (config key:
+/// `host_seeking.starvation_days`).
 inline int HOST_SEEKING_STARVATION_DAYS() { return static_cast<int>(load_config().host_seeking.starvation_days); }
+/// E-folding length of the breeding-site attraction plume around a habitat
+/// patch, in metres (config key: `oviposition.scale_m`).
 inline double OVIPOSITION_SCALE_M() { return static_cast<double>(load_config().oviposition.scale_m); }
+/// Number of days a female may spend walking towards a breeding site before
+/// she gives up and returns to HOST_SEEKING without ovipositing (config key:
+/// `oviposition.timeout_days`).
 inline double OVIPOSITION_SEEKING_TIMEOUT_DAYS() { return static_cast<double>(load_config().oviposition.timeout_days); }
+/// Basal daily survival of larvae in the absence of density dependence, a
+/// fraction in [0,1] (config key: `aquatic_stages.larva_bh_s0`).
 inline double LARVA_BH_S0() { return static_cast<double>(load_config().aquatic_stages.larva_bh_s0); }
+/// Competition coefficient of the Beverton-Holt larval density-dependence,
+/// dimensionless (config key: `aquatic_stages.larva_bh_alpha`).
 inline double LARVA_BH_ALPHA() { return static_cast<double>(load_config().aquatic_stages.larva_bh_alpha); }
+/// Basal daily survival probability of adult mosquitoes (config key:
+/// `adults.daily_mort_basal`); the key name is historical — it holds a
+/// survival probability, not a mortality rate.
 inline double ADULT_DAILY_MORT_BASAL() { return static_cast<double>(load_config().adults.daily_mort_basal); }
+/// Centre of the Gaussian thermal survival curve of adults, in degrees Celsius
+/// (config key: `adults.opt_c`).
 inline double ADULT_OPT_C() { return static_cast<double>(load_config().adults.opt_c); }
+/// Width of the Gaussian thermal survival curve of adults, in degrees Celsius
+/// (config key: `adults.sigma_c`).
 inline double ADULT_SIGMA() { return static_cast<double>(load_config().adults.sigma_c); }
+/// Upper clamp applied to the computed daily adult survival probability, a
+/// fraction in [0,1] (config key: `adults.mort_cap`).
 inline double ADULT_MORT_CAP() { return static_cast<double>(load_config().adults.mort_cap); }
+/// Lower clamp applied to the computed daily adult survival probability, a
+/// fraction in [0,1] (config key: `adults.mort_floor`).
 inline double ADULT_MORT_FLOOR() { return static_cast<double>(load_config().adults.mort_floor); }
+/// Value written into NoData pixels of the raster outputs (state COG,
+/// transmission GeoTIFF, env NC), in the units of the band (config key:
+/// `ingest.nodata_sentinel`).
 inline double NODATA_SENTINEL() { return static_cast<double>(load_config().ingest.nodata_sentinel); }
+/// Mean Earth radius used by the geodesy helpers, in metres (config key:
+/// `geodesy.earth_radius_m`).
 inline double kEarthRadiusM() { return static_cast<double>(load_config().geodesy.earth_radius_m); }
+/// Metres covered by one degree of latitude, used to convert metric offsets
+/// into degrees (config key: `geodesy.metres_per_deg_lat`).
 inline double kMetresPerDegLat() { return static_cast<double>(load_config().geodesy.metres_per_deg_lat); }
+/// Version string of the state-COG + sidecar contract, written into the
+/// sidecar JSON so consumers can gate on it (config key: `contracts.cogs_state`).
 inline std::string CONTRACT_VERSION() { return load_config().contracts.cogs_state; }
 
 
@@ -108,9 +157,14 @@ inline std::string CONTRACT_VERSION() { return load_config().contracts.cogs_stat
 /// Runtime-configurable overrides for dispersal and larval parameters.
 /// Used by CLI to override wire.hpp defaults for invasion simulations.
 struct RuntimeOverrides {
+    /// Daily adult dispersal probability, in 1/day (overrides `dispersal.adult_prob_day`).
     float disperse_prob    = static_cast<float>(load_config().dispersal.adult_prob_day);
+    /// Gaussian sigma of the dispersal step, in metres (overrides `dispersal.adult_sigma_m`).
     float disperse_sigma_m = static_cast<float>(load_config().dispersal.adult_sigma_m);
+    /// Clipping radius of the dispersal step, in metres (overrides `dispersal.adult_max_m`).
     float disperse_max_m   = static_cast<float>(load_config().dispersal.adult_max_m);
+    /// Beverton-Holt larval competition coefficient, dimensionless (overrides
+    /// `aquatic_stages.larva_bh_alpha`).
     float larva_bh_alpha   = static_cast<float>(load_config().aquatic_stages.larva_bh_alpha);
 };
 
@@ -155,7 +209,11 @@ struct RuntimeOverrides {
 ///   band 2 (STATE_BAND_SUITABILITY) — adults counted at their current
 ///                                     position (lon/lat snap)
 inline constexpr int    STATE_BAND_DENSITY          = 1;
+/// Band 2 of the state COG: raw per-cell count of adults at their current
+/// position (contract 4.0).
 inline constexpr int    STATE_BAND_SUITABILITY      = 2;
+/// Band names of the state COG, indexed by band number minus one; written as
+/// the GDAL band descriptions of the output COG (contract 4.0).
 inline constexpr const char* STATE_BAND_NAMES[2]     = {"adult_patch_count", "adult_cell_count"};
 
 /// Contract and generator version strings — written into the sidecar JSON
@@ -189,16 +247,25 @@ inline constexpr const char* GENERATOR_VERSION       = "proxy_habitat_v1";
 /// The full inline implementation lives in aoi.hpp; the declaration is
 /// here so wire.hpp remains self-contained for the data types.
 struct AOI {
+    /// Western bbox edge, EPSG:4326 degrees.
     double  west          = 0.0;
+    /// Southern bbox edge, EPSG:4326 degrees.
     double  south         = 0.0;
+    /// Eastern bbox edge, EPSG:4326 degrees.
     double  east          = 0.0;
+    /// Northern bbox edge, EPSG:4326 degrees.
     double  north         = 0.0;
+    /// CRS identifier of the bbox and the grids.
     std::string crs       = "EPSG:4326";
+    /// Short AOI name used in output file naming.
     std::string slug      = "custom";
+    /// Ground size of one grid cell, in metres (default from `ingest.cell_size_hint_m`).
     int32_t  resolution_m = static_cast<int32_t>(
         load_config().ingest.cell_size_hint_m);
     std::string scale    = "regional";  ///< matches Scale.REGIONAL.value
 
+    /// Number of grid cells along the east-west axis (the AOI width); the
+    /// height follows symmetrically from the north-south extent.
     int32_t cells_per_side() const noexcept;
 
     /// Bbox as (W, S, E, N) for GDAL/rasterio interop.
@@ -209,9 +276,13 @@ struct AOI {
 /// coordinator hands to the MosquitoSubmodel. Mirrors the Polars
 /// patch_state.PATCH_STATE_SCHEMA in the Python engine.
 struct PatchState {
+    /// Identifier of the habitat patch this state refers to.
     int64_t patch_id      = 0;
+    /// Grid row index of the patch cell.
     int32_t row           = 0;
+    /// Grid column index of the patch cell.
     int32_t col           = 0;
+    /// True when today's habitat availability reaches the activation threshold.
     bool    activated     = false;
     float   rain_d        = 0.0f;     ///< mm, today's daily rainfall at the cell
     float   temp_d        = 25.0f;    ///< deg C, post thermal inverse (EIP uses T)
@@ -232,8 +303,11 @@ struct PatchState {
 ///   * hab_col_    — the six per-type H features are carried at the
 ///                   coordinator level (habitat_features struct), not here.
 struct HabitatPatch {
+    /// Runtime-assigned row-major index of the patch.
     int64_t patch_id  = 0;
+    /// Grid row index of the patch cell.
     int32_t row       = 0;
+    /// Grid column index of the patch cell.
     int32_t col       = 0;
     float   potential = 0.0f;         ///< H_total in [0, 1]
     double  lon       = 0.0;   ///< EPSG:4326 deg
@@ -245,8 +319,11 @@ struct HabitatPatch {
 /// Two-band adult count grid (raw per-cell adult counts, contract 4.0).
 /// Row-major float32 layout matching GDAL/rasterio conventions.
 struct DensityGrid {
+    /// Row-major float32 adult counts, h * w entries (band 1).
     std::vector<float> data;
+    /// Number of grid rows.
     int32_t h = 0;
+    /// Number of grid columns.
     int32_t w = 0;
 };
 
@@ -254,8 +331,11 @@ struct DensityGrid {
 /// current position, contract 4.0).
 /// Row-major float32 layout matching GDAL/rasterio conventions.
 struct SuitabilityGrid {
+    /// Row-major float32 adult counts, h * w entries (band 2).
     std::vector<float> data;
+    /// Number of grid rows.
     int32_t h = 0;
+    /// Number of grid columns.
     int32_t w = 0;
 };
 

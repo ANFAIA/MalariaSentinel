@@ -42,6 +42,7 @@ BAND_NAMES_MAP = {
 
 
 def _generate_dummy_inputs(h: int, w: int, state_channels: int = 6) -> tuple[np.ndarray, np.ndarray]:
+    """All-zero state and environment stacks of the requested shape."""
     state = np.zeros((state_channels, h, w), dtype=np.float32)
     env = np.zeros((ENV_CHANNELS, h, w), dtype=np.float32)
     return state, env
@@ -74,6 +75,7 @@ def run_prediction(
     output_dir: Path | None = None,
     rollout_dir: Path | None = None,
 ) -> Path:
+    """Run the prediction for one AOI and month and write the result as a GeoTIFF with its sidecar, returning the GeoTIFF's path."""
     aoi = make_aoi(aoi_slug, scale)
     h, w = grid_shape(aoi)
 
@@ -151,6 +153,7 @@ def run_prediction(
 
 
 def get_latest_prediction(aoi_slug: str) -> Path | None:
+    """Path of the most recent prediction GeoTIFF for an AOI, or ``None`` when it has none."""
     pred_dir = RUNS_DIR / "predictions"
     if not pred_dir.exists():
         return None
@@ -159,6 +162,7 @@ def get_latest_prediction(aoi_slug: str) -> Path | None:
 
 
 def get_prediction_metadata(aoi_slug: str) -> dict | None:
+    """The sidecar metadata of the most recent prediction for an AOI, or ``None`` when it has none."""
     latest = get_latest_prediction(aoi_slug)
     if latest is None:
         return None

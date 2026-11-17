@@ -18,6 +18,15 @@ from .base import Scorer, ScorerResult, find_cohort_file
 
 
 class StabilityScorer(Scorer):
+    """Measures whether the adult population stays stable over the run.
+
+    Two failure modes are scored separately: collapse (the population
+    falling to a small fraction of its day-0 size) and explosion (the
+    population growing many-fold); the score is the mean of the two
+    sub-scores, each of which is 1 inside its accepted range and
+    decays smoothly outside it.
+    """
+
     name = "D4_stability"
     kind = "composite"
     weight = 2.0
@@ -26,6 +35,11 @@ class StabilityScorer(Scorer):
     hard_floor = 0.3
 
     def score(self, run_dir: Path, ctx: dict[str, Any]) -> ScorerResult:
+        """Compute the adult-population collapse and explosion ratios and their score.
+
+        Returns the collapse ratio as the value, or a skipped result when
+        the cohort log is missing or too short to assess stability.
+        """
         cohort_path = find_cohort_file(run_dir)
         if cohort_path is None:
             return ScorerResult.skipped(

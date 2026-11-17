@@ -44,6 +44,7 @@ def reproject_to_grid(
 
 
 def _nodata_policy(name: str) -> str | float:
+    """Fill value used for the gaps of a named layer: a number, or 'aoi_mean' to fill with the mean of the finite cells."""
     return {
         "jrc_persistent": 0.0,
         "rainfall":    "aoi_mean",

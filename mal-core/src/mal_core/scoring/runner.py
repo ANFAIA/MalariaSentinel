@@ -25,6 +25,7 @@ VERDICTS = ((0.70, "VIABLE"), (0.50, "BORDERLINE"), (0.30, "REGRESSED"))
 
 
 def _verdict(composite: float) -> str:
+    """Label a composite score: the first threshold it reaches, else "COLLAPSED"."""
     for threshold, label in VERDICTS:
         if composite >= threshold:
             return label
@@ -32,6 +33,7 @@ def _verdict(composite: float) -> str:
 
 
 def _build_ctx(run_dir: Path, aoi: str | None) -> dict[str, Any]:
+    """Build the scorer context: the AOI slug, the run summary metadata and the run directory."""
     run_meta = load_run_metadata(run_dir)
     return {
         "aoi": aoi,
@@ -41,6 +43,7 @@ def _build_ctx(run_dir: Path, aoi: str | None) -> dict[str, Any]:
 
 
 def _result_to_dict(r: ScorerResult) -> dict[str, Any]:
+    """Flatten a ScorerResult into the plain dict stored in the scorecard."""
     return {
         "score": r.score,
         "value": r.value,

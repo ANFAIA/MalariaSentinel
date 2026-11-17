@@ -36,6 +36,15 @@ def _extract_seed_and_day(path: Path) -> tuple[int, int]:
 
 
 class RolloutDataset(Dataset):
+    """Patches of consecutive ABM state snapshots for surrogate training.
+
+    Reads the ``*_dayNNN`` state snapshots of a run directory, tiles them
+    into square patches and pairs each patch with the same patch one day
+    later, so the dataset yields ``(state_t + env, state_{t+1})`` samples.
+    The spatial split is fixed: patches whose left column is east of the
+    raster mid-line belong to the validation split, the rest to training.
+    """
+
     def __init__(
         self,
         run_dir: str | Path,
@@ -46,6 +55,23 @@ class RolloutDataset(Dataset):
         include_transmission: bool = True,
         env_path: str | Path | None = None,
     ):
+        """Index the patches of a run directory for one spatial split.
+
+        Args:
+            run_dir: directory holding the ``*_dayNNN.tif`` (or ``.npy``)
+                state snapshots and, optionally, the transmission snapshots.
+            split: ``"train"`` (west of the raster mid-line) or ``"val"``.
+            patch_size: side of the square patch in cells.
+            subsample: fraction of the selected patches to keep, in [0, 1].
+            preload: read every referenced raster into memory up front.
+            include_transmission: append the transmission channels when
+                matching snapshots exist.
+            env_path: optional NetCDF or GeoTIFF of environmental planes
+                whose channels are concatenated to the input.
+
+        Raises:
+            FileNotFoundError: no state snapshot files in ``run_dir``.
+        """
         self.run_dir = Path(run_dir)
         self.split = split
         self.patch_size = patch_size
@@ -64,6 +90,14 @@ class RolloutDataset(Dataset):
             self._preload_data()
 
     def _load_env_if_available(self) -> None:
+        """Load the environmental planes into ``_env_cache``, if any.
+
+        Reads the first ``ENV_CHANNELS`` variables of a NetCDF (or bands of
+        a GeoTIFF) as float32 arrays of shape (channels, height, width);
+        missing channels are zero-padded. Any failure (unreadable file,
+        wrong shape) leaves the cache at None, i.e. the environmental input
+        is silently all-zero for that dataset.
+        """
         if self.env_path and self.env_path.exists():
             try:
                 if self.env_path.suffix in (".nc", ".nc4"):
@@ -88,6 +122,15 @@ class RolloutDataset(Dataset):
                 self._env_cache = None
 
     def _build_patches(self) -> None:
+        """Enumerate the (day t, day t+1) patch pairs of the selected split.
+
+        Groups the state snapshots by rollout seed and simulation day, pairs
+        consecutive days, and cuts each raster into patches of
+        ``patch_size`` cells, keeping only the patches of the requested
+        spatial split. A random subsample is drawn when ``subsample`` is
+        below 1. Raises FileNotFoundError when the run directory holds no
+        state snapshot.
+        """
         # 1. Discover all state snapshot files (excluding transmission files)
         candidate_tifs = sorted(self.run_dir.glob("*.tif"))
         state_tifs = [p for p in candidate_tifs if "_day" in p.name and "transmission" not in p.name]
@@ -170,6 +213,11 @@ class RolloutDataset(Dataset):
             self.patches = [self.patches[i] for i in indices]
 
     def _read_raster(self, path: Path | str, is_tiff: bool) -> np.ndarray:
+        """Read one snapshot as a float32 array of shape (channels, H, W).
+
+        GeoTIFF nodata cells are replaced by 0.0. When ``preload`` is set the
+        array is cached in ``_data_cache`` and returned again on later calls.
+        """
         p_str = str(path)
         if p_str in self._data_cache:
             return self._data_cache[p_str]
@@ -190,6 +238,7 @@ class RolloutDataset(Dataset):
         return arr
 
     def _preload_data(self) -> None:
+        """Read every raster referenced by the patch index into the cache."""
         for patch in self.patches:
             self._read_raster(patch["state_path"], patch["use_tiff"])
             self._read_raster(patch["next_path"], patch["use_tiff"])
@@ -199,9 +248,17 @@ class RolloutDataset(Dataset):
                 self._read_raster(patch["trans_next_path"], True)
 
     def __len__(self) -> int:
+        """Number of patches in this split."""
         return len(self.patches)
 
     def __getitem__(self, idx: int) -> tuple[torch.Tensor, torch.Tensor]:
+        """Return the (input, target) pair of one patch.
+
+        The input stacks the state channels, the transmission channels and
+        the environmental channels of the patch; the target is the same
+        patch one day later. Edge patches smaller than ``patch_size`` are
+        zero-padded. Both tensors are float32.
+        """
         patch = self.patches[idx]
         use_tiff = patch["use_tiff"]
         r, c = patch["row"], patch["col"]
@@ -261,6 +318,12 @@ def get_dataloaders(
     include_transmission: bool = True,
     env_path: str | Path | None = None,
 ) -> tuple[torch.utils.data.DataLoader, torch.utils.data.DataLoader]:
+    """Build the training and validation data loaders of a run directory.
+
+    The two loaders share the same options; only the spatial split
+    differs. The training loader shuffles its batches, the validation
+    loader does not.
+    """
     train_ds = RolloutDataset(
         run_dir,
         split="train",

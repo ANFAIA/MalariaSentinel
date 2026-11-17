@@ -67,11 +67,13 @@ ERA5_VARIABLE_NETCDF_ALIAS: dict[str, str] = {
 
 
 def _default_cache_dir() -> pathlib.Path:
+    """Cache directory for ERA5 CDS downloads, under the XDG cache home."""
     base = os.environ.get("XDG_CACHE_HOME") or os.path.expanduser("~/.cache")
     return pathlib.Path(base) / "mal_commonlib" / "era5"
 
 
 def _days_in_month(year: int, month: int) -> list[str]:
+    """Zero-padded day strings ('01'..'NN') of the given calendar month."""
     n = calendar.monthrange(year, month)[1]
     return [f"{d:02d}" for d in range(1, n + 1)]
 

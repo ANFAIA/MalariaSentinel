@@ -18,6 +18,16 @@ from .base import NODATA, Scorer, ScorerResult, find_final_state
 
 
 class CouplingScorer(Scorer):
+    """Measures how well the adult density follows the habitat field.
+
+    The value is the Pearson correlation between adult density and
+    host-seeking pressure over the occupied cells of the final
+    snapshot. A score of 1 means a perfect positive coupling, so the
+    score is the correlation rescaled against the target correlation
+    declared in ``score()``; a population that ignores the habitat
+    field scores 0.
+    """
+
     name = "D8_coupling"
     kind = "composite"
     weight = 2.0
@@ -26,6 +36,12 @@ class CouplingScorer(Scorer):
     hard_floor = 0.1
 
     def score(self, run_dir: Path, ctx: dict[str, Any]) -> ScorerResult:
+        """Compute the density-versus-habitat correlation and its score.
+
+        Returns the correlation coefficient as the value, or a skipped
+        result when there is no state snapshot or too few occupied
+        cells to correlate.
+        """
         final = find_final_state(run_dir)
         if final is None:
             return ScorerResult.skipped("no state files", target=">=0.30 r")

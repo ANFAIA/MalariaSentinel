@@ -84,6 +84,7 @@ _VALID_COUNT_EPSILON = float(model_constant("ingest", "valid_count_epsilon"))
 
 
 def _ensure_cache_dir(cache_dir: pathlib.Path | None) -> pathlib.Path:
+    """Resolve and create the cache directory used for Planetary Computer downloads."""
     if cache_dir is None:
         cache_dir = pathlib.Path(tempfile.gettempdir()) / "mal_commonlib" / "jrc_gsw"
     cache_dir.mkdir(parents=True, exist_ok=True)
@@ -91,6 +92,7 @@ def _ensure_cache_dir(cache_dir: pathlib.Path | None) -> pathlib.Path:
 
 
 def _aoi_bbox_wgs84(aoi: AOI) -> tuple[float, float, float, float]:
+    """Bounding box as (west, south, east, north) in WGS-84 degrees, reprojected when the AOI CRS is projected."""
     import pyproj
 
     if str(aoi.crs_obj).upper() in {"EPSG:4326", "WGS84", "4326"}:
@@ -103,6 +105,7 @@ def _aoi_bbox_wgs84(aoi: AOI) -> tuple[float, float, float, float]:
 
 
 def _make_reference_grid(aoi: AOI) -> xr.DataArray:
+    """Empty DataArray carrying the AOI grid's shape, affine transform and CRS; its values are placeholders."""
     h, w = aoi.cells_per_side()
     wmin, smin, wmax, smax = aoi.bbox
     transform = from_bounds(wmin, smin, wmax, smax, w, h)

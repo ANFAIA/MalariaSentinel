@@ -5,6 +5,7 @@ from typing import Any
 
 
 def _lowest(scorecard: dict[str, Any], n: int = 3) -> list[tuple[str, float]]:
+    """Return the n weakest composite dimensions as (name, score) pairs, lowest first."""
     dims = scorecard.get("composite_dimensions", {})
     ranked = sorted(
         ((name, info["score"]) for name, info in dims.items()),
@@ -14,6 +15,13 @@ def _lowest(scorecard: dict[str, Any], n: int = 3) -> list[tuple[str, float]]:
 
 
 def get_feedback(scorecard: dict[str, Any], baseline: dict[str, Any] | None = None) -> str:
+    """Render a scorecard as Markdown feedback for a human reader.
+
+    Reports the composite and its verdict, the failed gates, the skipped
+    scorers, the weakest composite dimensions and — when a baseline
+    scorecard is given — the composite delta and the dimensions that
+    regressed against it.
+    """
     lines = ["## Scoring Feedback", ""]
     composite = scorecard.get("composite", 0.0)
     verdict = scorecard.get("verdict", "?")

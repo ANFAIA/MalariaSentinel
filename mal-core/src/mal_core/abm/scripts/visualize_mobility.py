@@ -169,6 +169,7 @@ def weighted_percentiles(dist_hist, dist_edges, quants=(10, 25, 50, 75, 90, 99))
 
 
 def gridify(H: np.ndarray, grid_h: int, grid_w: int) -> np.ndarray:
+    """Reshape a flat cell vector into a (grid_h, grid_w) grid."""
     return np.asarray(H, dtype=np.float64).reshape(grid_h, grid_w)
 
 
@@ -183,6 +184,11 @@ def downsample(arr: np.ndarray, target: int = 220) -> np.ndarray:
 
 def save_map(arr: np.ndarray, title: str, out_path: Path, cmap: str = "YlOrRd",
              log: bool = True, vmin_pct: float = 0.5, vmax_pct: float = 99.0):
+    """Render a 2-D grid as a PNG map and save it.
+
+    With ``log`` the values are mapped through log1p, otherwise the colour
+    scale spans the given percentiles of the positive cells.
+    """
     fig, ax = plt.subplots(figsize=(8, 11), dpi=120)
     a = np.asarray(arr, dtype=np.float64)
     a = np.where(np.isnan(a), 0.0, a)
@@ -204,6 +210,7 @@ def save_map(arr: np.ndarray, title: str, out_path: Path, cmap: str = "YlOrRd",
 
 
 def centroid(grid: np.ndarray) -> tuple[float, float]:
+    """Return the value-weighted (row, col) centroid of a grid, in cells."""
     rows = np.arange(grid.shape[0])[:, None]
     cols = np.arange(grid.shape[1])[None, :]
     tot = float(grid.sum())
@@ -213,6 +220,7 @@ def centroid(grid: np.ndarray) -> tuple[float, float]:
 
 
 def top_n(arr: np.ndarray, n: int, grid_w: int):
+    """Return the n highest-valued cells as dicts with cell index, row, col and value."""
     if len(arr) == 0:
         return []
     n = min(n, len(arr))
@@ -223,6 +231,12 @@ def top_n(arr: np.ndarray, n: int, grid_w: int):
 
 
 def main(argv: list[str] | None = None) -> None:
+    """Run the phase-1 mobility diagnostics for one AOI.
+
+    Reads the host grid and the mobility CSR matrices, samples host
+    relocations, and writes a JSON diagnostics report plus the density
+    maps under the output directory.
+    """
     parser = argparse.ArgumentParser(description="Fase 1 mobility diagnostics.")
     parser.add_argument("--aoi", default="ghana", help="AOI slug (default: ghana)")
     parser.add_argument("--data-dir", type=Path, default=None,
@@ -365,10 +379,12 @@ def main(argv: list[str] | None = None) -> None:
 
     # --- diagnostics numbers ---------------------------------------------------
     def frac_leq(hist, edges, r):
+        """Fraction of the relocation mass at a distance of at most r km."""
         idx = int(np.searchsorted(edges, r, side="right"))
         return float(hist[:idx].sum() / max(hist.sum(), 1e-12))
 
     def mat_diag(hist, edges, total_res, mass_self, mass_moved, name):
+        """Summarise one mobility matrix: mass conservation and distance distribution."""
         return {
             "total_residential": round(total_res, 3),
             "mass_self_loop": round(mass_self, 3),
@@ -395,6 +411,7 @@ def main(argv: list[str] | None = None) -> None:
     c_live = centroid(g_live)
 
     def disp(a, b):
+        """Euclidean distance between two (row, col) centroids, in cells."""
         return float(np.sqrt((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2))
 
     diag = {

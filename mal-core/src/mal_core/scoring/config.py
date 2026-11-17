@@ -24,10 +24,17 @@ from .registry import COMPOSITE_WEIGHTS, build_registry
 
 @dataclass
 class ScoringConfig:
+    """Effective scoring configuration: which scorers run and their weights.
+
+    Built by :func:`load_config` from the registry defaults, an optional
+    YAML file and the CLI overrides.
+    """
+
     enabled: set[str] = field(default_factory=set)
     weights: dict[str, float] = field(default_factory=dict)
 
     def weight_of(self, name: str) -> float:
+        """Composite weight of one scorer, falling back to the registry default."""
         return self.weights.get(name, COMPOSITE_WEIGHTS.get(name, 1.0))
 
 
@@ -54,11 +61,23 @@ def load_config(
     skip: list[str] | None = None,
     enable: list[str] | None = None,
 ) -> ScoringConfig:
+    """Resolve the scoring configuration from defaults, YAML and CLI flags.
+
+    Precedence, weakest first: registry defaults, then the YAML file
+    given by ``config_path``, then ``enable``/``only``/``skip``. An
+    unknown scorer name in any of them raises ValueError; a missing
+    config file raises FileNotFoundError.
+    """
     cfg = default_config()
     registry = build_registry()
     canonical = {name.lower(): name for name in registry}
 
     def _resolve(names: list[str]) -> list[str]:
+        """Map CLI scorer names to canonical registry names.
+
+        Matching is case-insensitive and blank names are dropped; an
+        unknown name raises ValueError (there is no fallback name).
+        """
         resolved = []
         for raw in names:
             name = raw.strip()

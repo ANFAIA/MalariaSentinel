@@ -92,6 +92,10 @@ def total_potential(h: Mapping[str, np.ndarray | float]) -> np.ndarray | float:
 def _feature(
     features: Mapping[str, np.ndarray | float], name: str
 ) -> np.ndarray | float:
+    """Return one contract v3.0 feature column, clipped to [0, 1].
+
+    Raises KeyError when the column is absent from the mapping.
+    """
     if name not in features:
         raise KeyError(
             f"missing contract v3.0 feature column '{name}' "
@@ -101,6 +105,7 @@ def _feature(
 
 
 def _clip(x):
+    """Return ``x`` as float64 with NaN replaced by 0.0 and values clipped to [0, 1]."""
     import numpy as _np
 
     arr = _np.asarray(x, dtype=_np.float64)

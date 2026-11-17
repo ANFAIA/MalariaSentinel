@@ -24,6 +24,9 @@
 
 namespace mal_abm_fast {
 
+/// Reader of the candidate habitat-patch census: loads the single-layer
+/// OGR Point gpkg emitted by ingest and keeps the patches that pass the
+/// candidate-potential floor, indexed for O(1) lookup by patch_id.
 class HabitatEngine {
 public:
     HabitatEngine() = default;

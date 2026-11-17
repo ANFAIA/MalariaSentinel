@@ -55,6 +55,13 @@ from .cli import main as cli_main  # noqa: E402
 
 
 def __getattr__(name: str):
+    """Resolve a lazily-exported public name by importing its module on demand.
+
+    Heavy submodules (torch, fastapi) are only imported when one of the
+    names listed in ``__all__`` is first accessed; the resolved object is
+    then cached in the module globals. Raises AttributeError for any name
+    that is not part of the lazy export table.
+    """
     entry = _LAZY.get(name)
     if entry is None:
         raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
@@ -68,4 +75,5 @@ def __getattr__(name: str):
 
 
 def __dir__():
+    """List the module's attributes, including the not-yet-imported lazy names."""
     return sorted(set(globals()) | set(__all__))

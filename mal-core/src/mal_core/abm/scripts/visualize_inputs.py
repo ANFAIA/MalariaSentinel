@@ -178,6 +178,11 @@ def animate_climate(env_nc: Path, output: Path, sample_every: int = 1) -> None:
         temp_stack.append(ds["air_temp_c"].isel(time=idx).values)
 
     def safe_norm(arrays, pct_lo=2, pct_hi=98):
+        """Build a colour normalisation from a stack of arrays.
+
+        Non-positive and NaN values are ignored; a log scale is used when
+        the upper percentile is more than ten times the lower one.
+        """
         all_vals = np.concatenate([a.ravel() for a in arrays])
         all_vals = all_vals[~np.isnan(all_vals)]
         all_vals = all_vals[all_vals > 0] if len(all_vals[all_vals > 0]) > 0 else all_vals
@@ -217,6 +222,7 @@ def animate_climate(env_nc: Path, output: Path, sample_every: int = 1) -> None:
 
 
 def main(argv: list[str] | None = None) -> None:
+    """Render the ABM input panels: host density, habitat statics, climate animation."""
     parser = argparse.ArgumentParser(description="Visualize ABM input data.")
     parser.add_argument("--host-nc", type=Path, required=True,
                         help="Host static NetCDF (ghana_host_static.nc)")

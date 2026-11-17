@@ -70,6 +70,7 @@ class _GifAwareCommand(TyperCommand):
     """TyperCommand that accepts ``--gif`` with or without a value."""
 
     def parse_args(self, ctx, args):  # type: ignore[override]
+        """Parse the command arguments, accepting ``--gif`` with or without a value."""
         return super().parse_args(ctx, _normalise_gif_args(list(args)))
 
 
@@ -96,6 +97,7 @@ def _requires_model_constants(fn):
 
     @functools.wraps(fn)
     def wrapper(*args, **kwargs):
+        """Validate the model constants, then run the wrapped command."""
         _validate_model_constants()
         return fn(*args, **kwargs)
 
@@ -891,4 +893,5 @@ def serve(
 
 
 def main() -> None:
+    """Entry point of the ``malariasim`` console script: runs the Typer application."""
     app()

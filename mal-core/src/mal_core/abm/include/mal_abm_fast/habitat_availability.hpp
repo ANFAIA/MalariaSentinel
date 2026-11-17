@@ -41,12 +41,28 @@ namespace mal_abm_fast {
 
 /// Static bundle of features read from the env contract (v3.0 planes).
 struct HabitatFeatures {
+    /// Fraction of the cell covered by persistent surface water (JRC Global
+    /// Surface Water occurrence, after the coastal filter); a fraction in
+    /// [0,1] read from the env NC plane `jrc_persistent`.
     float jrc_persistent = 0.0f;
+    /// Built-up area fraction of the cell (Dynamic World class "built"), a
+    /// fraction in [0,1] read from the env NC plane `lc_built`.
     float lc_built = 0.0f;
+    /// Flooded-vegetation area fraction of the cell (Dynamic World class
+    /// "flooded_vegetation"), a fraction in [0,1] read from the env NC plane
+    /// `lc_wetland`.
     float lc_wetland = 0.0f;
+    /// Open, low-vegetation, bare and water area fraction of the cell
+    /// (Dynamic World classes grass, shrub_and_scrub, bare, water), a
+    /// fraction in [0,1] read from the env NC plane `lc_open_plus_water`.
     float lc_open_plus_water = 0.0f;
+    /// Cropland area fraction of the cell (Dynamic World class "crops"), a
+    /// fraction in [0,1] read from the env NC plane `lc_crop`.
     float lc_crop = 0.0f;
 
+    /// Build the bundle from the five raw band values, clamping negative
+    /// inputs to 0 (no evidence of cover). Values above 1 are kept here and
+    /// clipped to [0,1] later, in habitat_potential().
     static HabitatFeatures from_bands(float jrc, float built, float wetland,
                                       float open_plus, float crop) {
         return HabitatFeatures{std::max(0.0f, jrc), std::max(0.0f, built),
@@ -122,6 +138,9 @@ enum class SpeciesId : std::size_t {
     ARABIENSIS,
 };
 
+/// Configuration key of a species: the name under which its affinity row
+/// lives in model_constants.yaml (`species.<name>.weights`).
+/// Returns "unknown" for an out-of-range id.
 inline const char* species_name(SpeciesId id) {
     switch (id) {
         case SpeciesId::FUNESTUS:   return "funestus";

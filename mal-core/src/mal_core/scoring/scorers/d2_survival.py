@@ -18,6 +18,15 @@ from .base import Scorer, ScorerResult, find_cohort_file
 
 
 class SurvivalScorer(Scorer):
+    """Measures the mean adult lifespan of the simulated population.
+
+    The lifespan is derived from the mean daily adult survival rate of
+    the steady-state half of the run. The score is 1 when the lifespan
+    sits at the centre of the accepted field window and decays as a
+    Gaussian away from it, so a population that dies out too fast
+    scores near 0.
+    """
+
     name = "D2_survival"
     kind = "composite"
     weight = 4.0
@@ -26,6 +35,12 @@ class SurvivalScorer(Scorer):
     hard_floor = 0.2
 
     def score(self, run_dir: Path, ctx: dict[str, Any]) -> ScorerResult:
+        """Compute the mean adult lifespan in days and its score.
+
+        Returns the lifespan as the value, or a skipped result when the
+        cohort log is missing, unreadable or too short to have a
+        steady-state phase.
+        """
         cohort_path = find_cohort_file(run_dir)
         if cohort_path is None:
             return ScorerResult.skipped(

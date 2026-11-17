@@ -49,10 +49,12 @@ _MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
 
 
 def _dataset_path() -> Path:
+    """Repository-relative path where the DHIMS-II cases CSV is expected to live."""
     return _repo_root() / DATASET_SUBPATH
 
 
 def _sha256(path: Path) -> str:
+    """Hex SHA-256 digest of a file's bytes."""
     h = hashlib.sha256()
     h.update(path.read_bytes())
     return h.hexdigest()
@@ -175,6 +177,17 @@ def _simulated_climatology(run_dir: Path, start_month: int = 1) -> np.ndarray | 
 
 
 class CasesGhanaScorer(Scorer):
+    """Measures how well the simulated transmission seasonality matches
+    the reported malaria cases in Ghana.
+
+    The value is the Pearson correlation between the simulated
+    calendar-month climatology and the observed reported-case series
+    (or the aligned single-year series when the run covers one full
+    post-warm-up year). The score is 1 at or above the target
+    correlation and decays as a Gaussian below it, so an uncorrelated
+    seasonality scores near 0.
+    """
+
     name = "D25_cases_ghana"
     kind = "composite"
     weight = 2.0
@@ -184,6 +197,13 @@ class CasesGhanaScorer(Scorer):
     manual = True  # Ghana-only: fixed national dataset, not generalizable
 
     def score(self, run_dir: Path, ctx: dict[str, Any]) -> ScorerResult:
+        """Compute the seasonality correlation against reported cases and its score.
+
+        Returns the correlation coefficient as the value. The result is
+        skipped for any AOI other than Ghana, when the run has no
+        transmission log, when the observed dataset cannot be fetched,
+        or when either series has no variance.
+        """
         aoi = require_aoi(ctx)
         if not aoi:
             return ScorerResult.skipped(

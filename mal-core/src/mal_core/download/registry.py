@@ -29,6 +29,14 @@ def _loader_module_names() -> list[str]:
 
 @dataclass
 class DownloaderSpec:
+    """Description of one dataset that can be downloaded for an AOI.
+
+    Mirrors the ``DOWNLOADER`` dict exported by a loader module: the
+    dataset name, its outputs (callables) and the manifest key under which
+    each output is registered, plus the metadata used by the runner
+    (time series flag, formats, authentication, licence).
+    """
+
     name: str
     description: str
     requires_auth: list[str]
@@ -45,6 +53,16 @@ class DownloaderSpec:
 
 
 def discover_downloaders() -> dict[str, DownloaderSpec]:
+    """Collect the downloader plugins exported by the loader modules.
+
+    Every module of ``mal_commonlib.data.loaders`` is imported and its
+    ``DOWNLOADER`` dict, if present, is turned into a DownloaderSpec keyed
+    by dataset name. Modules without a ``DOWNLOADER`` and modules that
+    fail to import are skipped with a warning.
+
+    Returns:
+        Mapping of dataset name to its spec.
+    """
     registry: dict[str, DownloaderSpec] = {}
     for mod_name in _loader_module_names():
         try:
@@ -107,6 +125,7 @@ def discover_downloaders() -> dict[str, DownloaderSpec]:
 
 
 def list_downloaders() -> list[dict[str, Any]]:
+    """Summarise the available downloaders as name, description and outputs."""
     registry = discover_downloaders()
     return [
         {

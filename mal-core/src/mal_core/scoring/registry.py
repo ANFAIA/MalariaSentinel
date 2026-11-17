@@ -46,6 +46,12 @@ from .scorers.base import Scorer
 
 @dataclass(frozen=True)
 class ScorerSpec:
+    """One registry entry: the scorer class and the role it plays.
+
+    ``kind`` is either "composite" (a dimension weighted into the
+    composite) or "gate" (a binary invariant reported apart).
+    """
+
     cls: type[Scorer]
     kind: str  # "composite" | "gate"
 
@@ -77,6 +83,7 @@ GATES: tuple[str, ...] = (
 
 
 def build_registry() -> dict[str, ScorerSpec]:
+    """Instantiate every known scorer and map its name to its registry entry."""
     instances: list[Scorer] = [
         HabitatOccupancyScorer(),    # D1
         SurvivalScorer(),            # D2

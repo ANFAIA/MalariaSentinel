@@ -255,6 +255,7 @@ def write_manifest(
     H, W = human.shape
 
     def _stats(arr: np.ndarray, name: str) -> dict:
+        """Summary statistics of one array (min, max, mean, total, nodata count), ignoring NoData cells."""
         valid = arr[arr != _NODATA]
         return {
             "variable": name,

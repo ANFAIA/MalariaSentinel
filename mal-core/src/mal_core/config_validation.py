@@ -115,21 +115,25 @@ class _StrictModel(BaseModel):
 # ---------------------------------------------------------------------------
 
 class Contracts(_StrictModel):
+    """The version strings of the two data contracts: the environment NetCDF and the state COG."""
     env_nc: str
     cogs_state: str
 
 
 class HabitatTypes(_StrictModel):
+    """The habitat taxonomy: the ordered habitat type names and each one's dynamic class, persistent or pluvial."""
     types: list[str]
     dynamics: dict[str, Literal["persistent", "pluvial"]]
 
 
 class Habitat(_StrictModel):
+    """The engine's habitat thresholds: when a patch is activated and when a habitat candidate is admitted."""
     activation_min_engine: float
     candidate_min_engine: float
 
 
 class Pluvial(_StrictModel):
+    """The parameters of the pluvial, rain-fed habitat response: rainfall scaling, dry memory and cold start."""
     rain_scale_mm: float
     dry_memory_days: float
     delta_days: float
@@ -137,6 +141,7 @@ class Pluvial(_StrictModel):
 
 
 class AquaticStress(_StrictModel):
+    """The desiccation and washout stress applied to the aquatic stages."""
     desicc_grace_days: float
     desicc_base_daily: float
     desicc_ramp_decay: float
@@ -146,6 +151,7 @@ class AquaticStress(_StrictModel):
 
 
 class Urban(_StrictModel):
+    """The parameters of the urban habitat class."""
     beta_urban: float
     rain_pools_built_damage: float
 
@@ -171,6 +177,7 @@ class NeutralRow(_StrictModel):
 
 
 class Species(_StrictModel):
+    """The species section: the default species, the reference capacity and one parameter row per species."""
     default_species: str
     k_ref: float
     coluzzii: SpeciesRow
@@ -182,19 +189,23 @@ class Species(_StrictModel):
     neutral: NeutralRow
 
     def named_rows(self) -> dict[str, SpeciesRow]:
+        """The six named species parameter rows, keyed by species name."""
         return {name: getattr(self, name) for name in NAMED_SPECIES}
 
 
 class Capacity(_StrictModel):
+    """The scaling of the habitat capacity relative to the reference value."""
     persistent_availability: float
 
 
 class Geodesy(_StrictModel):
+    """The earth geometry used to convert between degrees and metres."""
     earth_radius_m: float
     metres_per_deg_lat: float
 
 
 class Ingest(_StrictModel):
+    """The parameters and sentinels of the ingest stage that turns raw data into the environment grid."""
     nodata_sentinel: float
     nodata_sentinel_int: int
     residential_from_indoor_frac: float
@@ -215,17 +226,20 @@ class Ingest(_StrictModel):
 
 
 class WildlifeWeights(_StrictModel):
+    """The weights of the three components of the wildlife habitat suitability."""
     habitat: float
     water: float
     remoteness: float
 
 
 class Wildlife(_StrictModel):
+    """The wildlife suitability of each Dynamic World class and the weights of its components."""
     class_suitability: dict[str, float]
     weights: WildlifeWeights
 
 
 class Adults(_StrictModel):
+    """The adult mosquito mortality: the basal daily rate and the thermal mortality curve."""
     daily_mort_basal: float
     opt_c: float
     sigma_c: float
@@ -234,11 +248,13 @@ class Adults(_StrictModel):
 
 
 class Eip(_StrictModel):
+    """The exogenous incubation period of the parasite: its base temperature and its growth threshold."""
     base_c: float
     threshold_gd: float
 
 
 class Transmission(_StrictModel):
+    """The human-vector transmission parameters: the biting rates, the human infection periods and the initial infection fractions."""
     beta_hv: float
     beta_vh: float
     human_incubation_days: int
@@ -249,6 +265,7 @@ class Transmission(_StrictModel):
 
 
 class Thermal(_StrictModel):
+    """The temperature-dependent development and fecundity parameters of the aquatic stages."""
     efd_max_eggs_per_day: float
     efd_tmin_c: float
     efd_tmax_c: float
@@ -265,6 +282,7 @@ class Thermal(_StrictModel):
 
 
 class Gonotrophic(_StrictModel):
+    """The gonotrophic cycle: its duration, the feeding success rate and the egg batch size."""
     cycle_duration_days: float
     first_cycle_days: float
     feeding_success_rate: float
@@ -276,6 +294,7 @@ class Gonotrophic(_StrictModel):
 
 
 class Dispersal(_StrictModel):
+    """The dispersal and migration parameters: daily adult movement, wind-driven migration and the night flight window."""
     adult_prob_day: float
     adult_sigma_m: float
     adult_max_m: float
@@ -291,6 +310,7 @@ class Dispersal(_StrictModel):
 
 
 class HostSeeking(_StrictModel):
+    """The host-seeking parameters: starvation, indoor attraction and the detection and approach geometry."""
     starvation_days: int
     indoor_attraction_add: float
     urbanicity_add: float
@@ -301,6 +321,7 @@ class HostSeeking(_StrictModel):
 
 
 class Oviposition(_StrictModel):
+    """The oviposition site-search parameters: the attraction kernel scale and the search geometry."""
     scale_m: float
     detect_range_m: float
     step_m: float
@@ -309,6 +330,7 @@ class Oviposition(_StrictModel):
 
 
 class AquaticStages(_StrictModel):
+    """The mortality and density-dependence parameters of the aquatic stages: eggs, larvae and pupae."""
     egg_daily_mort: float
     pupa_daily_mort: float
     larva_bh_s0: float
@@ -318,6 +340,7 @@ class AquaticStages(_StrictModel):
 
 
 class Rng(_StrictModel):
+    """The seeds of the random number generators used by the aquatic submodel."""
     aquatic_seed_washout: int
     aquatic_seed_stage_mortality: int
     aquatic_seed_larva_mortality: int
@@ -358,6 +381,7 @@ class ModelConfig(_StrictModel):
 
     @pydantic.model_validator(mode="after")
     def _check_invariants(self) -> "ModelConfig":
+        """Check every cross-section invariant, reporting all violations together."""
         errors: list[str] = []
         types_list = self.habitat_types.types
         dynamics = self.habitat_types.dynamics
@@ -618,17 +642,20 @@ class ModelConfig(_StrictModel):
     # Derived API (never stored in the YAML; plan v1 §9.5).
     @property
     def num_persistent(self) -> int:
+        """The number of habitat types whose dynamic class is persistent."""
         return sum(1 for kind in self.habitat_types.dynamics.values()
                    if kind == "persistent")
 
     @property
     def persistent_names(self) -> frozenset[str]:
+        """The names of the persistent habitat types."""
         return frozenset(
             name for name, kind in self.habitat_types.dynamics.items()
             if kind == "persistent")
 
     @property
     def pluvial_names(self) -> frozenset[str]:
+        """The names of the pluvial, rain-fed habitat types."""
         return frozenset(
             name for name, kind in self.habitat_types.dynamics.items()
             if kind == "pluvial")
@@ -642,6 +669,7 @@ class _StrictLoader(yaml.SafeLoader):
     """SafeLoader that rejects a key re-declared in the same mapping."""
 
     def construct_mapping(self, node, deep=False):
+        """Build a mapping, rejecting a key that is declared twice in the same block."""
         seen = set()
         for key_node, _value_node in node.value:
             key = self.construct_object(key_node, deep=deep)
@@ -690,6 +718,7 @@ def _expected_text(error: dict[str, Any]) -> str:
 
 
 def _format_errors(exc: pydantic.ValidationError, path: pathlib.Path) -> str:
+    """Group a pydantic validation failure into missing keys, unknown keys, wrong types and broken invariants."""
     missing: list[str] = []
     unknown: list[str] = []
     wrong_type: list[str] = []

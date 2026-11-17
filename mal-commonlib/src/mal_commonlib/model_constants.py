@@ -42,6 +42,7 @@ def resolve_path(path: str | os.PathLike[str] | None = None) -> pathlib.Path:
 
 @functools.lru_cache(maxsize=8)
 def _tree(path: str) -> dict[str, Any]:
+    """Load and cache the model-constants YAML at path as a dict; raises ValueError if the file is not a mapping."""
     with open(path, encoding="utf-8") as fh:
         data = yaml.safe_load(fh)
     if not isinstance(data, dict):

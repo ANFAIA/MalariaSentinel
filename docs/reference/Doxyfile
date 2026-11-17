@@ -29,7 +29,12 @@ RECURSIVE              = NO
 EXCLUDE_PATTERNS       = */third_party/*
 
 FILE_PATTERNS          = *.hpp
-EXTRACT_ALL            = YES
+# EXTRACT_ALL=NO: the reference publishes what is documented, and nothing
+# else. With EXTRACT_ALL=YES every entity appears with an empty
+# description when it carries no comment, which is a hole in the published
+# reference that no reader can fill. With it off, an undocumented entity
+# is reported instead of published.
+EXTRACT_ALL            = NO
 EXTRACT_PRIVATE        = NO
 EXTRACT_STATIC         = YES
 HIDE_UNDOC_MEMBERS     = NO
@@ -40,7 +45,10 @@ GENERATE_TREEVIEW      = YES
 HAVE_DOT               = NO
 QUIET                  = YES
 WARNINGS               = YES
-WARN_IF_UNDOCUMENTED   = NO
+# An undocumented entity fails the build: tools/build_reference.sh turns
+# the warning into an error. The reference must not silently lose an
+# entity, and it must not publish one it cannot explain.
+WARN_IF_UNDOCUMENTED   = YES
 WARN_IF_DOC_ERROR      = YES
 
 PROJECT_NUMBER         =

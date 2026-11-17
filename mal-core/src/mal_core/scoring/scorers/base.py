@@ -43,6 +43,11 @@ class ScorerResult:
 
     @classmethod
     def skipped(cls, reason: str, target: str = "") -> "ScorerResult":
+        """Build a "skipped" result carrying the reason it was skipped.
+
+        The reason is stored in the diagnostics under ``skipped_reason``
+        so the scorecard can explain why the dimension is missing.
+        """
         return cls(
             score=0.0,
             value=0.0,
@@ -76,13 +81,23 @@ class Scorer(ABC):
     operator who knows the AOI has the required data."""
 
     @abstractmethod
-    def score(self, run_dir: Path, ctx: dict[str, Any]) -> ScorerResult: ...
+    def score(self, run_dir: Path, ctx: dict[str, Any]) -> ScorerResult:
+        """Measure this dimension against one ABM run directory.
+
+        Returns a :class:`ScorerResult` whose ``score`` is in [0, 1]
+        (higher is better), whose ``value`` is the raw measured quantity
+        and whose ``target`` describes the expected range. Implementations
+        must return ``ScorerResult.skipped`` rather than fail when the
+        artifacts or datasets they need are missing.
+        """
+        ...
 
 
 # -- Shared run-artifact discovery helpers -----------------------------------
 
 
 def _is_transmission(name: str) -> bool:
+    """True when a file name denotes a transmission snapshot rather than a state snapshot."""
     return "transmission" in name.lower()
 
 
@@ -103,6 +118,7 @@ def find_state_files(run_dir: Path) -> list[Path]:
 
 
 def find_final_state(run_dir: Path) -> Path | None:
+    """The last (final-day) state snapshot of the run, or None if absent."""
     files = find_state_files(run_dir)
     return files[-1] if files else None
 
@@ -224,6 +240,7 @@ def resolve_aoi_artifact(
 
 
 def _repo_root() -> Path:
+    """Root directory of the repository, derived from this module's path."""
     return Path(__file__).resolve().parents[5]
 
 

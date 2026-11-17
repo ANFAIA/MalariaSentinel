@@ -14,6 +14,11 @@ from __future__ import annotations
 
 
 def __getattr__(name: str):
+    """Reject every attribute access: the constants moved to the model configuration.
+
+    Raises AttributeError pointing at ``mal_core.habitat.config`` and
+    ``mal-core/config/model_constants.yaml``.
+    """
     raise AttributeError(
         f"mal_core.habitat.constants.{name} was removed: constants live "
         "in mal-core/config/model_constants.yaml — read them via "
