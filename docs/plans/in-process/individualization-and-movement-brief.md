@@ -17,6 +17,14 @@
 > **Decisión marco**: los escenarios sintéticos del paquete de verificación **ejercitan la
 > cadena real** (alimentar → ovipositar → eclosionar → alimentar). Por tanto el arreglo del
 > pipeline es parte del cambio, no un prerrequisito aparte.
+>
+> **Secciones del documento que este brief invalida (CUJ-4)**: cuando el brief se aplique,
+> `docs/concepts/abm/odd-2010-malariasentinel.tex` tendrá que cambiar en §2.1 "Entities",
+> §2.2 "State variables", §4.7 "Sensing", §4.8 "Interaction", §4.10 "Collectives",
+> §5.2 "Mosquito seeding", §5.3 "Humans, transmission, hosts, mobility, and wind",
+> §7.2 "Advance aquatic stages", §7.4 "Run the gonotrophic cycle",
+> §7.6 "Seek hosts and feed" y §7.7 "Disperse adults". El documento se modifica en el
+> commit que aplica el cambio, no en este brief.
 
 ---
 

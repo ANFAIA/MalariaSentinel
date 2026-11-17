@@ -1,6 +1,11 @@
 # Pack 13 — Open design questions (parked)
 
-> Source: ODD 2010 review notes. Status: initial plan — these are questions,
+> Source: ODD 2010 review notes.
+**Document sections invalidated (CUJ-4):** `docs/concepts/abm/odd-2010-malariasentinel.tex` → §4.3 "Adaptation", §4.6 "Prediction", §6 "Input data", §7.8 "Survive adults".
+When this pack is decided and applied, these are the passages that
+must change; the document is amended in the commit that applies the
+pack, not in the pack itself.
+ Status: initial plan — these are questions,
 > not yet decided actions. Each needs a research/decision step before it
 > becomes a detailed plan.
 

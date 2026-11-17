@@ -1,6 +1,11 @@
 # Pack 05 — Habitat species-coherence and state duplication
 
-> Source: ODD 2010 review notes. Status: initial plan — to be detailed later.
+> Source: ODD 2010 review notes.
+**Document sections invalidated (CUJ-4):** `docs/concepts/abm/odd-2010-malariasentinel.tex` → §2.2 "State variables", §7.1 "Update habitat availability and capacity", §6 "Input data".
+When this pack is decided and applied, these are the passages that
+must change; the document is amended in the commit that applies the
+pack, not in the pack itself.
+ Status: initial plan — to be detailed later.
 
 ## Objective
 

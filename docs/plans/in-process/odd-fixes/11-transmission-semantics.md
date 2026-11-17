@@ -1,6 +1,11 @@
 # Pack 11 — Transmission semantics and Ross–Macdonald coherence
 
-> Source: ODD 2010 review notes. Status: initial plan — to be detailed later.
+> Source: ODD 2010 review notes.
+**Document sections invalidated (CUJ-4):** `docs/concepts/abm/odd-2010-malariasentinel.tex` → §4.1 "Basic principles", §5.3 "Humans, transmission, hosts, mobility, and wind", §7.9 "Transmit parasites", Appendix A.12.
+When this pack is decided and applied, these are the passages that
+must change; the document is amended in the commit that applies the
+pack, not in the pack itself.
+ Status: initial plan — to be detailed later.
 
 ## Objective
 

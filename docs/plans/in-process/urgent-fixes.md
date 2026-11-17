@@ -24,14 +24,14 @@ they are to fix.
 
 | # | Defect | Where | Consequence |
 |---|---|---|---|
-| U1 | The environmental stack is discarded on load | `training/dataset.py:65-87` | The surrogate is trained with **zero** climate channels |
-| U2 | Training and inference read the environment on different grids | `training/dataset.py:246-249`, `prediction/env_loader.py:69-83` | The two sides of the surrogate see different quantities |
-| U3 | The channel order differs when the transmission raster is missing | `training/wrapper.py:80-88` | The network is fed the transmission bands in the env slots |
-| U4 | The best checkpoint is the last epoch | `training/trainer.py:86` | The published model is the last one, not the best one |
-| U5 | A missing checkpoint aborts the run | `prediction/predictor.py:81` | The stage does not degrade to the documented behaviour |
-| U6 | `--model` defaults to `dummy` | `prediction/registry.py:96`, `cli.py:112` | A trained surrogate is **never** used unless it is named explicitly |
-| U7 | The urban class is inverted, and water counts as urban | `ingest/hosts.py:122-128`, `abm/src/host_landscape.cpp:111-121` | **97.8%** of the Ghana area of interest is read as urban |
-| U8 | Four configuration parameters have no effect | `mal-core/config/model_constants.yaml` | The operator believes four knobs exist that do not |
+| U1 | The environmental stack is discarded on load | `training/dataset.py:65-87` | The surrogate is trained with **zero** climate channels | `docs/concepts/training/training.tex` → §"The environmental stack, and its problems" → "What actually happens with the real environmental NetCDF"; §"What the stage consumes" → "The environmental context" |
+| U2 | Training and inference read the environment on different grids | `training/dataset.py:246-249`, `prediction/env_loader.py:69-83` | The two sides of the surrogate see different quantities | `docs/concepts/training/training.tex` → §"The environmental stack, and its problems" → "The grid is assumed, not checked"; `docs/concepts/prediction/prediction.tex` → §"What the stage consumes" → "The environment tensor" |
+| U3 | The channel order differs when the transmission raster is missing | `training/wrapper.py:80-88` | The network is fed the transmission bands in the env slots | `docs/concepts/training/training.tex` → §"The surrogate, introduced" → "Channel composition"; `docs/concepts/prediction/prediction.tex` → §"Inference" → "Assembling the input tensor" |
+| U4 | The best checkpoint is the last epoch | `training/trainer.py:86` | The published model is the last one, not the best one | `docs/concepts/training/training.tex` → §"What the stage produces, and who consumes it" → "The four artefacts" and "The consumption contract, stated exactly" |
+| U5 | A missing checkpoint aborts the run | `prediction/predictor.py:81` | The stage does not degrade to the documented behaviour | `docs/concepts/prediction/prediction.tex` → §"Choosing and loading a checkpoint" → "Loading the weights" |
+| U6 | `--model` defaults to `dummy` | `prediction/registry.py:96`, `cli.py:112` | A trained surrogate is **never** used unless it is named explicitly | `docs/concepts/prediction/prediction.tex` → §"Choosing and loading a checkpoint" → "The registry and its manifests" and "The dummy model is not a model" |
+| U7 | The urban class is inverted, and water counts as urban | `ingest/hosts.py:122-128`, `abm/src/host_landscape.cpp:111-121` | **97.8%** of the Ghana area of interest is read as urban | `docs/concepts/ingest/ingest.tex` → §"The urban class is inverted with respect to the product" (the section already states the defect; the fix changes its numbers); `docs/concepts/abm/odd-2010-malariasentinel.tex` → §6 "Input data" → the "Urban class" row, and §2.2 "State variables" → the urban-class row |
+| U8 | Four configuration parameters have no effect | `mal-core/config/model_constants.yaml` | The operator believes four knobs exist that do not | `docs/concepts/abm/odd-2010-malariasentinel.tex` → §"Generated parameter table" (the "Read by" column) and Appendix B.1 "Constants and contracts" |
 
 The work happens on another branch. This plan is the input, and the
 verification that closes it is: for each item, the test that fails before the
@@ -40,6 +40,13 @@ fix and passes after it, named.
 --------------------------------------------------------------------------------
 
 ## U1. The environmental stack is discarded on load
+
+**Document sections invalidated (CUJ-4):** `docs/concepts/training/training.tex` → §"The environmental stack, and its problems" → "What actually happens with the real environmental NetCDF"; §"What the stage consumes" → "The environmental context".
+
+When the fix lands, these are the passages that must change. The
+document is not updated by this plan — the plan is the input; the
+document is amended in its own commit, on the branch that carries
+the fix.
 
 ### Symptom
 
@@ -128,6 +135,13 @@ inferred.
 
 ## U2. Training and inference read the environment on different grids
 
+**Document sections invalidated (CUJ-4):** `docs/concepts/training/training.tex` → §"The environmental stack, and its problems" → "The grid is assumed, not checked"; `docs/concepts/prediction/prediction.tex` → §"What the stage consumes" → "The environment tensor".
+
+When the fix lands, these are the passages that must change. The
+document is not updated by this plan — the plan is the input; the
+document is amended in its own commit, on the branch that carries
+the fix.
+
 ### Symptom
 
 The training side crops the environment at the **ABM patch index**; the
@@ -195,6 +209,13 @@ land together with U1, because both touch the same function.
 
 ## U3. The channel order differs when the transmission raster is missing
 
+**Document sections invalidated (CUJ-4):** `docs/concepts/training/training.tex` → §"The surrogate, introduced" → "Channel composition"; `docs/concepts/prediction/prediction.tex` → §"Inference" → "Assembling the input tensor".
+
+When the fix lands, these are the passages that must change. The
+document is not updated by this plan — the plan is the input; the
+document is amended in its own commit, on the branch that carries
+the fix.
+
 ### Symptom
 
 The network's input is `[state, transmission, env]` in training and
@@ -260,6 +281,13 @@ Low-medium. It touches the model manifest's schema.
 
 ## U4. The best checkpoint is the last epoch
 
+**Document sections invalidated (CUJ-4):** `docs/concepts/training/training.tex` → §"What the stage produces, and who consumes it" → "The four artefacts" and "The consumption contract, stated exactly".
+
+When the fix lands, these are the passages that must change. The
+document is not updated by this plan — the plan is the input; the
+document is amended in its own commit, on the branch that carries
+the fix.
+
 ### Symptom
 
 When the validation Dice is zero in every epoch — which is what happens when
@@ -315,6 +343,13 @@ Low.
 
 ## U5. A missing checkpoint aborts the run
 
+**Document sections invalidated (CUJ-4):** `docs/concepts/prediction/prediction.tex` → §"Choosing and loading a checkpoint" → "Loading the weights".
+
+When the fix lands, these are the passages that must change. The
+document is not updated by this plan — the plan is the input; the
+document is amended in its own commit, on the branch that carries
+the fix.
+
 ### Symptom
 
 The prediction stage's documented behaviour is to fall back to zeros when the
@@ -369,6 +404,13 @@ Low.
 
 ## U6. `--model` defaults to `dummy`
 
+**Document sections invalidated (CUJ-4):** `docs/concepts/prediction/prediction.tex` → §"Choosing and loading a checkpoint" → "The registry and its manifests" and "The dummy model is not a model".
+
+When the fix lands, these are the passages that must change. The
+document is not updated by this plan — the plan is the input; the
+document is amended in its own commit, on the branch that carries
+the fix.
+
 ### Symptom
 
 A trained surrogate is never applied unless its name is typed on the command
@@ -422,6 +464,13 @@ Low.
 --------------------------------------------------------------------------------
 
 ## U7. The urban class is inverted, and water counts as urban
+
+**Document sections invalidated (CUJ-4):** `docs/concepts/ingest/ingest.tex` → §"The urban class is inverted with respect to the product" (the section already states the defect; the fix changes its numbers); `docs/concepts/abm/odd-2010-malariasentinel.tex` → §6 "Input data" → the "Urban class" row, and §2.2 "State variables" → the urban-class row.
+
+When the fix lands, these are the passages that must change. The
+document is not updated by this plan — the plan is the input; the
+document is amended in its own commit, on the branch that carries
+the fix.
 
 This is the one with a consequence in the science: it changes what the engine
 believes about the landscape it is simulating.
@@ -551,6 +600,13 @@ calibration baseline is implied.
 --------------------------------------------------------------------------------
 
 ## U8. Four configuration parameters have no effect
+
+**Document sections invalidated (CUJ-4):** `docs/concepts/abm/odd-2010-malariasentinel.tex` → §"Generated parameter table" (the "Read by" column) and Appendix B.1 "Constants and contracts".
+
+When the fix lands, these are the passages that must change. The
+document is not updated by this plan — the plan is the input; the
+document is amended in its own commit, on the branch that carries
+the fix.
 
 ### Symptom
 

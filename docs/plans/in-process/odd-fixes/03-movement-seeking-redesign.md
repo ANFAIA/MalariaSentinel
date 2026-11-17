@@ -1,6 +1,11 @@
 # Pack 03 — Movement and seeking redesign (direction vectors, pheromones)
 
-> Source: ODD 2010 review notes. Status: initial plan — to be detailed later.
+> Source: ODD 2010 review notes.
+**Document sections invalidated (CUJ-4):** `docs/concepts/abm/odd-2010-malariasentinel.tex` → §4.7 "Sensing", §4.8 "Interaction", §7.6 "Seek hosts and feed", §7.7 "Disperse adults", §5.4 "Randomness and reproducibility".
+When this pack is decided and applied, these are the passages that
+must change; the document is amended in the commit that applies the
+pack, not in the pack itself.
+ Status: initial plan — to be detailed later.
 
 ## Objective
 

@@ -3,6 +3,11 @@
 > Source: ODD 2010 review notes (`.cache/odd-latex/odd-2010-malariasentinel-notes.tex`).
 > Status: initial plan — to be detailed later.
 
+**Document sections invalidated (CUJ-4):** `docs/concepts/abm/odd-2010-malariasentinel.tex` → the whole document, and §1 "Purpose" → the list of ODD elements it answers.
+When this pack is decided and applied, these are the passages that must
+change; the document is amended in the commit that applies the pack, not in
+the pack itself.
+
 ## Objective
 
 Keep the ODD description automatically in sync with the code, make the
