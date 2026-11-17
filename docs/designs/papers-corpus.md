@@ -145,10 +145,11 @@ c. Every PDF fetched has a sha256 equal to the manifest value.
   by the tool to `provenance.yaml`): `ok`, `pending_no_source`,
   `pending_paywalled`, `pending_network`, `pending_extraction_failed`,
   `withdrawn`.
-- **Layout compatibility.** Paths cited today must keep resolving, so the
-  flat addressable unit `papers/<theme>/<slug>.md` stays, with the heavy
-  artefacts as siblings — *or* every path citation is re-pointed in the same
-  change (§8, step 4). Decision needed: §6.3 Q4.
+- **Layout: one subfolder per paper (DECIDED, Q4).** `papers/<theme>/<slug>/`
+  holds the source PDF, the docling Markdown, `images/` when referenced, and
+  `provenance.yaml`. Images and extracts stay together, and the folder is the
+  citation target. Path citations are re-pointed to the folder in the same commit
+  that moves the files (§8, step 4).
 - **Gitignore:** `papers/*/` plus explicit re-inclusions only:
   ```
   papers/*/
@@ -185,18 +186,24 @@ c. Every PDF fetched has a sha256 equal to the manifest value.
 
 ### 6.3 Open — the author must answer
 
-- **Q1. History rewrite.** Do we run `git filter-repo` over the paper paths to
+- **Q1. History rewrite — APPROVED by the author.** Executed last (§8, step 6),
+  never in this change. It needs a force-with-lease push that the `main` ruleset
+  blocks; per the project rule (#233), the author configures a bypass actor, and
+  no one forces around the ruleset. GitHub Pages caches may keep old blobs until
+  purged. Original question: Do we run `git filter-repo` over the paper paths to
   remove the already-committed extracts, with a force-with-lease push? This
   rewrites shared history and affects the GitHub Pages cache. Default: no. The
   legal cleanup in §3 stands without it.
-- **Q2. Non-OA curated summaries (~26 rows).** Keep them as paraphrase with
+- **Q2. Non-OA curated summaries — APPROVED: keep** as paraphrase with licence
+  line until the ledger holds their values. Original question: Keep them as paraphrase with
   licence line (default), or delete the restricted ones and lose the only copy of
   their values? Default: keep until the ledger (§6.2) holds their values.
 - **Q3. Licence of the open hybrids.** Recorded as CC in `REFERENCES.md`, but
   the licence line in the file header is not always present. Default: verify
   each against the publisher page during step 2; the `## Full Text` blocks stay
   until then.
-- **Q4. Layout: flat path or subfolder?** The reviewers' cheaper option keeps
+- **Q4. Layout — DECIDED: subfolder (author).** Consequence: step 4 is a `git mv`
+  plus re-pointing in one commit. Original question: The reviewers' cheaper option keeps
   `papers/<theme>/<slug>.md` addressable. The subfolder option requires
   re-pointing every path citation (`dispersal-plans/plan-D…:84-99`,
   `m7-4-seir-sei.md:53-62`, `abm-mesa-geo-adaptation.md:135`, `AGENTS.md:9`).
@@ -220,7 +227,8 @@ c. Every PDF fetched has a sha256 equal to the manifest value.
 - **Q10. Language.** Default: English for the generated index and ledger,
   matching `docs/`. The Spanish notes are deleted in §8 step 6, so the Spanish
   content is migrated into the ledger first.
-- **Q11. `AGENTS.md`.** It is a protected file (`AGENTS.md` protected-files
+- **Q11. `AGENTS.md` — APPROVED by the author**, applied in step 4 (same commit
+  as the move that re-points `:9`). Original question: It is a protected file (`AGENTS.md` protected-files
   table). Its `:9` link is the only reference that a fresh clone would break.
   Default: a separately approved one-line edit to point at the manifest entry,
   after step 2.
@@ -247,7 +255,7 @@ Each step leaves every citation resolving to something real.
    unobtainable entries).
 3. **Claims ledger** for the Tier 1 claims; correct the journal attributions,
    the phantom Bissett citation and the judge-prompt path.
-4. **Re-point citations** — the named sites (§4, plan 09 references,
+4. **Move and re-point citations, in one commit** (subfolder layout, Q4) — the named sites (§4, plan 09 references,
    `calibration-test-framework.md:283`, the plan-D table, `m7-3-multi-species.md:39`,
    `m7-7-insecticide-resistance.md:42`, `abm-mesa-geo-adaptation.md:135`) to
    `doi:` form, each paired with a ledger row. Nothing deleted yet. Also fix the
