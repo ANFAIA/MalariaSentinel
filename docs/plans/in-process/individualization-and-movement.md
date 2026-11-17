@@ -1693,8 +1693,14 @@ el motivo del rechazo, para que el implementador no las reabra sin evidencia nue
 *   `papers/anopheles-dynamics/` — 84 extractos de la literatura citada.
 *   `papers/REFERENCES.md` — filas 32–88 (rondas de fisiología de la sangre, cascada
     sensorial, machos y estado fisiológico).
-*   `docs/plans/in-process/odd-fixes/` — packs ODD 02, 03, 04 y partes de 05/08/10/11,
-    que este cambio sustituye.
+*   `docs/plans/in-process/odd-fixes/` — el trabajo **pendiente** que este cambio no
+    cierra, reagrupado por tema en nueve documentos (2026-11-17): 01 habitat y
+    entorno, 02 fase acuática, 03 comportamiento del vector, 04 semántica de
+    transmisión, 05 parámetros y calibración, 06 observación y salida, 07 higiene del
+    motor, 08 preguntas estacionadas, 09 documentación y `papers/`. Cada documento
+    contiene sólo lo **no realizado**; lo cubierto por este plan (los antiguos packs
+    02 individualización y 09 semilla maestra, y parte de 03, 04, 05, 08, 10 y 13)
+    no se repite allí.
 *   `mal-core/src/mal_core/abm/include/mal_abm_fast/wire.hpp` — invariantes del contrato
     de estado (nombres de banda, `CONTRACT_VERSION`, `STATE_BAND_NAMES`).
 *   `mal-core/src/mal_core/download/manifest.py` — contrato de datos y manifiesto.
@@ -2020,9 +2026,25 @@ empieza hasta que el anterior pasa su verificación.
 *   **`docs/specs/abm/spec.md`** (o el documento de contrato vigente que lo
     substituya) — se actualizan las invariantes afectadas por la banda única, por el
     registro por celda y por los identificadores de evento.
-*   **`docs/concepts/abm/odd-2010-malariasentinel.tex`** — los packs ODD 02, 03, 04
-    y las partes de 05/08/10/11 quedan sustituidos por este plan; los pasajes
-    concretos a enmendar se listan en `docs/plans/in-process/odd-fixes/`.
+*   **`docs/concepts/abm/odd-2010-malariasentinel.tex`** — este plan sustituye a los
+    antiguos packs ODD 02 (individualización) y 09 (semilla maestra), borrados, y a la
+    parte cubierta de los packs 03, 04, 05, 08, 10 y 13, cuyo pendiente vive ahora
+    en los documentos reagrupados de `docs/plans/in-process/odd-fixes/`. Los
+    **pasajes concretos a enmendar** en el commit que aplica este plan son:
+
+    | Pasaje del ODD | Por qué lo invalida este plan |
+    |---|---|
+    | §2.1 "Entities" | las personas pasan a ser individuos (§2) |
+    | §2.2 "State variables" | campos nuevos del SoA, estado humano individual, estado acuático por celda (§3, §9) |
+    | §4.10 "Collectives" | la fase acuática sigue siendo cohorte; el enjambre es un agregado por sitio (§8, N1) |
+    | §5.4 "Randomness and reproducibility" | un solo maestro de semilla, con el stream acuático derivado (§13.4, NFR-1) |
+    | §7.2 "Advance aquatic stages" | registro por celda y emergencia en la posición de la madre (§9) |
+    | §7.6 "Seek hosts and feed" | cascada sensorial, multipicadura y sondeo por individuo (§4, §6) |
+    | Appendix A.5 | semillas y sub-streams (§13.4, Apéndice B) |
+
+    Los pasajes de los documentos **pendientes** del directorio
+    `docs/plans/in-process/odd-fixes/` siguen listados en cada uno de ellos, que es
+    donde queda lo que este plan no decide.
 *   **`papers/REFERENCES.md`** — ya actualizado con las filas 89–113 (§16).
 *   **Artefactos temporales que se borran al cerrar este plan**: el documento de diseño
     intermedio (y su informe de revisión Goldfish) y la nota de trabajo del arnés de
