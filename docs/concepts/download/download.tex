@@ -1,0 +1,2022 @@
+% Conceptual document — download stage of the MalariaSentinel pipeline.
+% Style follows docs/concepts/README.md (stance S1-S10). Semantics here;
+% values are generated (model_constants.yaml via docs/concepts/generated).
+
+\documentclass[11pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+% Latin Modern: a scalable Type 1 font. With T1 and the default
+% Computer Modern, TeX asks for the EC fonts, and when the Type 1 EC
+% ones (cm-super) are missing it falls back to bitmaps -- and
+% microtype's font expansion cannot work with a bitmap font, so the
+% build fails on a TeX Live without cm-super.
+\usepackage[T1]{fontenc}
+\usepackage[english]{babel}
+\usepackage[margin=2.3cm]{geometry}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{amsmath,amssymb}
+\usepackage{listings}
+\usepackage[hidelinks]{hyperref}
+\newcommand{\code}[1]{\texttt{#1}}
+\input{../generated/macros.tex}
+\input{../generated/code-macros.tex}
+
+% The generated download parameter file emits two tables in one file: the
+% dataset registry (five columns) and the AOI registry (seven columns), but
+% declares a six-column longtable preamble for both. A longtable preamble
+% with more columns than a row uses is legal, so the preamble is widened
+% once here instead of editing the generated file. The widening is undone
+% immediately after that file is read, so that every hand-written table in
+% this document keeps the column widths it declares.
+\makeatletter
+\let\origlongtableat\LT@array
+\def\LT@array[#1]#2{\origlongtableat[#1]{@{}lllllll@{}}}
+\makeatother
+
+\title{The \emph{download} stage: bringing external data onto the AOI grid\\
+and recording it}
+\author{Conceptual documentation layer}
+\date{}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+This document explains how the \emph{download} stage of the MalariaSentinel
+pipeline obtains the external datasets an area of interest (AOI) needs, reduces
+each of them onto the AOI's own grid, writes them to disk, and records their
+existence in the AOI manifest. It is written for a reader who has never opened
+the code, and covers the stage's purpose and negative purpose, the plugin
+registry, the manifest schema and the naming conventions, the resolution
+contract downstream stages rely on, the order of operations and its
+consequences, the authentication behaviour, the seam at which the
+areal-fraction rule is applied, the provenance of every class of value, the
+units and the temporal resolution of every output, the outputs and their
+consumption contract, what the stage does \emph{not} do, and
+an evidence appendix. Every claim resolves to a file and a line.
+\end{abstract}
+
+\tableofcontents
+
+% ---------------------------------------------------------------------------
+\section{Purpose and boundary}
+
+\subsection{What question the stage answers}
+
+The pipeline in this project is a chain of six stages:
+\code{download} $\rightarrow$ \code{ingest} $\rightarrow$ \code{abm} $\rightarrow$
+\code{score} $\rightarrow$ \code{train} $\rightarrow$ \code{predict}. The order is
+declared in the CLI help text
+(\code{mal-core/src/mal\_core/cli.py:32}) and each stage reads what the previous
+one wrote.
+
+The \emph{download} stage answers one question:
+
+\begin{quote}
+\emph{Do the external datasets this AOI needs exist on this machine, reduced to
+this AOI's grid, and recorded under a known key?}
+\end{quote}
+
+It would count as having answered that question when, for every requested
+dataset, a file exists under \code{data/<aoi>/} and the AOI manifest --- the
+JSON file that lists, per dataset, the file on disk that holds it --- names
+that file under the dataset's \emph{manifest key}: the unique string under
+which that dataset is recorded, and the only name a consumer may ask for.
+That pair --- file, key --- is exactly what the rest of the pipeline checks.
+The third half of the question --- that the file holds the AOI-grid reduction
+of the upstream product --- is \emph{not} verified by this stage: neither the
+runner nor the writer inspects the shape or the CRS of what it writes
+(\code{mal-core/src/mal\_core/download/runner.py:140-142},
+\code{.../writer.py:12-53}). Two terms in that sentence: the \emph{CRS} is
+the map projection the grid is defined in, and the \emph{shape} is the
+(rows, columns) of the array. The consequence of not checking them is
+concrete: a loader that returns an array on the wrong grid, or with the
+wrong number of rows and columns, is written out and registered as if it
+were correct, and the mistake surfaces only in the stage that consumes it.
+That is an intent the code does not encode; Section~\ref{sec:reduction}
+describes the convention instead.
+
+The stage has one orchestrator, \code{run\_download}
+(\code{mal-core/src/mal\_core/download/runner.py:69}), and one save point,
+\code{save\_product}
+(\code{mal-core/src/mal\_core/download/writer.py:12}). The orchestrator is the
+only writer of products into \code{data/<aoi>/} and the only registrar of
+manifest entries; the save point is the only place a product reaches disk.
+
+Throughout this document a path abbreviated \code{.../name.py:12-34} is the
+file of that name in the package named in the surrounding text; a path
+written out in full is the repository-relative path.
+
+\subsection{What the stage is \emph{not} for}
+
+The download stage is explicitly not:
+
+\begin{itemize}
+\item \textbf{Not the interpretation stage.} Turning a stack of rasters into
+the model input tensor is the work of \code{ingest}
+(\code{mal-core/src/mal\_core/ingest/daily\_nc.py}, \code{ingest/env.py});
+the tensor is written as two artefacts: the \code{env} NetCDF --- a
+multi-dimensional array file --- holding the daily environmental drivers of
+every cell (rainfall, air temperature and the static habitat planes), and the
+\code{habitat} GeoPackage --- a spatial database file --- holding the static
+per-cell habitat classes. The
+two are separated in the manifest by the \code{INGEST\_ARTIFACTS} table
+(\code{mal-core/src/mal\_core/download/catalog.py:55-92}).
+\item \textbf{Not the modeller.} No biology, no transmission, no scenario
+choice.
+\item \textbf{Not a resampler for the consumer.} The runner never resamples:
+it calls the loader, receives an array already on the AOI grid, and writes it.
+Each loader owns its own reduction (Section~\ref{sec:reduction}).
+\item \textbf{Not a validator of scientific content.} The stage checks that
+files exist and are declared; it does not check that a rainfall field is
+plausible or that a land-cover class makes sense.
+\item \textbf{Not a mirror of upstream products.} Every product that leaves
+this stage has already passed through an AOI-grid reduction, and the reduction
+discards information (Section~\ref{sec:reduction}).
+\end{itemize}
+
+The negative purpose is a filter, not a description: a reader who asks
+"where is the daily rainfall tensor built?" should leave this document and read
+the ingest document.
+
+\subsection{Who is authoritative when a value and this document disagree}
+
+Three authorities govern the content of this stage, and their remits do not
+overlap. \textbf{Values} --- the magnitudes the pipeline is built from ---
+belong to \code{mal-core/config/model\_constants.yaml} and, for the module
+constants the loaders own, to the code that implements them; the generated
+macro families (the \code{mskey} and \code{codeconst} commands) carry them
+into this document, so a change in either place breaks the build here instead
+of quietly making
+this document wrong. \textbf{Contract values and names} --- dataset keys,
+output names, file-naming patterns, contract versions --- belong to the
+generated contract table. \textbf{Semantics} --- what the stage does, what a
+reduction loses, what a failure means --- belong to this document. When two of
+these contradict one another, the statement with the lower authority is the
+bug: it is corrected in the place that owns it, not by rewriting the document
+that quoted it. This document states the rule in its own words because it
+owns the semantics of the download stage; it states it here rather than
+deferring the reader to a shared page.
+
+% ---------------------------------------------------------------------------
+\section{Entry points}
+\label{sec:entry}
+
+There are three ways in, and they expose different things.
+
+\begin{description}
+\item[\code{malariasim download}] The command-line subcommand
+(\code{mal-core/src/mal\_core/cli.py:155-193}). Its options are \code{--aoi},
+\code{--datasets}, \code{--outputs}, \code{--years}, \code{--months},
+\code{--output-dir}. It parses the comma-separated lists and calls
+\code{run\_download} (\code{.../cli.py:182-189}), then prints one status line
+per dataset (\code{.../cli.py:190-192}).
+\item[\code{malariasim datasets}] The inspection subcommand
+(\code{mal-core/src/mal\_core/cli.py:809-838}): one row per known manifest
+key, with the columns \code{kind}, \code{key}, \code{source}, \code{abm},
+\code{manifest}, \code{disk} and the file name. With \code{--missing} it
+suppresses rows that are both in the manifest and on disk
+(\code{.../cli.py:830-831}).
+\item[The Python API] \code{mal\_core.download} re-exports the runner
+(\code{run\_download}), the registry helpers, the manifest functions
+(\code{read\_manifest}, \code{update\_dataset}, \code{validate\_completeness},
+\code{get\_dataset\_files}, \code{resolve\_dataset\_file}) and the catalogue
+functions (\code{INGEST\_ARTIFACTS}, \code{Slot}, \code{catalog\_status},
+\code{downloadable\_datasets}, \code{register\_existing}, \code{resolve},
+\code{resolve\_inputs}) --- see
+\code{mal-core/src/mal\_core/download/\_\_init\_\_.py:1-27}. Those catalogue
+names, like \code{resolve\_dataset\_file}, are module attributes imported
+into the package's namespace; the declared exports are the seven names listed
+in \code{\_\_all\_\_}
+(\code{mal-core/src/mal\_core/download/\_\_init\_\_.py:22-27}), and none of
+the catalogue functions is among them.
+\end{description}
+
+\subsection{What the options do}
+
+\code{--datasets} and \code{--outputs} select what is fetched
+(Section~\ref{sec:profile}); \code{--years} selects the years a time-series
+product covers, and a time-series loader called without years is skipped
+with a warning (\code{runner.py:117-119}), so a run without \code{--years}
+fetches no time-series product at all. \code{--months} selects the calendar
+months within those years: the runner passes the argument to every loader
+it calls (\code{runner.py:128}, \code{...:165}, \code{...:194}), but only
+four loaders honour it --- CHIRPS (\code{.../chirps.py:252,276-277}), both
+ERA5 outputs (\code{.../era5.py:301,316-317}, \code{...:371,395-398}),
+MODIS (\code{.../modis.py:391,407-408}) and SMAP
+(\code{.../smap.py:289,309-310}) --- and the months are 1-indexed calendar
+months, defaulting to all twelve. The file those four loaders write then
+covers only the requested months of the requested years. The Dynamic World
+loader accepts the argument and ignores it, because its product is an annual
+composite (\code{.../dynamic\_world.py:340}); the static loaders take no
+months argument at all, and their products are not time series.
+
+\subsection{What a default run fetches}
+
+\code{malariasim download --aoi ghana} --- no \code{--datasets}, no
+\code{--outputs}, no \code{--years} --- puts the runner in profile mode
+(Section~\ref{sec:profile}): every registered loader is selected, and each
+is filtered down to its ABM-profile outputs. What a bare run actually
+fetches is therefore the static part of that profile: the JRC permanent-water
+fraction, the WorldPop population raster, the five livestock densities, the
+GHSL settlement class, the Overture building fraction, the wildlife host
+proxy and the coastline land mask. No time-series product is fetched,
+because no years were requested and a time-series loader without years is
+skipped with a warning (\code{runner.py:117-119}) --- and the status line
+still reports those loaders as \code{ok} (\code{runner.py:265}), so a bare
+run's report does not tell the reader that nothing was fetched for them. To
+fetch the time-series products, name the years: \code{malariasim download
+--aoi ghana --years 2024}. The membership of the profile is tabulated in
+Section~\ref{sec:profile}.
+
+\subsection{An advertised flag that does not exist}
+
+The \code{download} subcommand's own docstring shows
+\code{malariasim download --aoi ghana --all}
+(\code{mal-core/src/mal\_core/cli.py:171-173}), and the ABM's remediation
+message tells the user to run \code{malariasim download --aoi \{aoi\} --all}
+(\code{mal-core/src/mal\_core/abm/wrapper.py:118-121}). There is no \code{--all}
+option in the option list
+(\code{mal-core/src/mal\_core/cli.py:158-163}); the CLI would reject the
+command. The behaviour the message was trying to describe is obtained by
+omitting both \code{--datasets} and \code{--outputs}
+(Section~\ref{sec:profile}). This is recorded as a defect in
+Section~\ref{sec:discrepancies}; the document describes the real invocation.
+
+% ---------------------------------------------------------------------------
+\section{The dataset registry: what exists and how it is declared}
+
+The generated file this section draws on carries three tables in all: the
+dataset registry (the loaders, Section~\ref{sec:registry}), the AOI registry
+--- the spatial frame every stage agrees on, printed in
+Section~\ref{sec:aoi-registry} --- and the loaders' native grids.
+
+\subsection{Discovery is by existence}
+
+The set of downloadable datasets is not a hard-coded list. The registry scans
+the loader package with \code{pkgutil.iter\_modules} and keeps every module
+that is not a package and is not the package's own initialiser
+(\code{mal-core/src/mal\_core/download/registry.py:12-25}). A module becomes a
+plugin by being present and exporting a \code{DOWNLOADER} dictionary; nothing
+else has to be edited. The docstring records the reason: a previously
+hard-coded list had silently missed a loader
+(\code{mal-core/src/mal\_core/download/registry.py:14-19}).
+
+Two consequences follow directly from the scan. A sub-package inside the
+loaders directory is invisible to it: the retired loaders live in
+\code{mal\_commonlib/data/loaders/\_legacy/}, and \code{info.ispkg} is true
+for that directory. And a module that raises on import is not fatal: the
+per-module \code{try}/\code{except} logs a warning and continues
+(\code{mal-core/src/mal\_core/download/registry.py:102-106}), so a broken
+loader disappears from the registry beyond a log line.
+
+\subsection{What a loader declares}
+
+Each loader module exports a dictionary called \code{DOWNLOADER}. The
+registry copies it into a \code{DownloaderSpec}
+(\code{mal-core/src/mal\_core/download/registry.py:31-45}), whose fields are:
+
+\begin{description}
+\item[\code{name}] The loader's name: the key under which it is registered and
+the value the user passes to \code{--datasets}.
+\item[\code{description}] One line of prose about the product.
+\item[\code{requires\_auth}] The credential families the loader needs; the
+runner's gate probes each one before the loader is called. There are four
+families, and a loader declares the ones it needs: \code{cds}
+(Copernicus), \code{earthdata} (NASA), \code{earthengine} (Google) and
+\code{none}. The family is both what the loader declares and what the runner
+probes (Section~\ref{sec:auth}).
+\item[\code{outputs}] Output name $\rightarrow$ callable. The callable is
+invoked with \code{aoi}, \code{years}, \code{months} and \code{cache\_dir}
+for a time series, or with \code{aoi} and \code{cache\_dir} for a static
+product.
+\item[\code{manifest\_keys}] Output name $\rightarrow$ manifest key: the
+\emph{only} definition of a downloaded dataset's identity.
+\item[\code{is\_time\_series}] Selects the runner's time-series branch.
+\item[\code{formats}] Optional per-output format hint: \code{"monthly"}
+(default), \code{"daily"} or \code{"monthly\_nc"}.
+\item[\code{abm\_default\_outputs}] Optional; the outputs kept when the user
+names no dataset and no output.
+\item[\code{required\_for\_abm}] Optional per-output flag, copied into the
+manifest entry.
+\item[\code{reductions}] Optional per-output year-aggregation rule for
+monthly products.
+\item[\code{license}, \code{attribution}] Licence identifier and literal
+credit line.
+\end{description}
+
+The registry supplies fallbacks for two of these fields from a hard-coded
+profile table keyed by loader name: the default outputs
+(\code{mal-core/src/mal\_core/download/registry.py:55-75}) and the format hints
+(\code{mal-core/src/mal\_core/download/registry.py:76-82}). A loader that
+declares its own value wins over the table.
+
+\subsection{The registry table}
+\label{sec:registry}
+
+The following table is generated from the live registry
+(\code{docs/concepts/generated/params-download.tex}). It has five columns:
+the \emph{dataset}, which is the loader's registered name and what
+\code{--datasets} takes; the column headed \emph{Manifest keys}; the
+\emph{authentication} family the loader declares; its \emph{reduction} rule;
+and the \emph{module} the loader lives in. The column headed \emph{Manifest
+keys} lists, per loader, the loader's \emph{output} names --- the keys of
+its \code{manifest\_keys} mapping --- and not the manifest keys themselves;
+the reading note below says so again, and Table~\ref{tab:loaders} gives the
+manifest key of every output.
+
+The same generated file ends with a table of its own, ``The loaders' native
+grids'', which states the resolution each upstream product is published at
+and the product or epoch that resolution belongs to; the native grids quoted
+in this document come from that table. Every native grid in that table is a
+\emph{source} grid: the target the stage reduces onto is the AOI grid at
+\codeconst{ingest.cell_size_m}\,m (Section~\ref{sec:grid}), so the table
+is the comparison a reader needs to judge whether a reduction is a
+reduction. A cell that reads ``---'' means the loader's code states no such
+value, and is left empty rather than typed by hand.
+
+\input{../generated/params-download.tex}
+\makeatletter
+\let\LT@array\origlongtableat
+\makeatother
+
+\begin{quote}
+\small
+\emph{Reading note.} The column headed ``Manifest keys'' is emitted by the
+generator from the \emph{keys} of each loader's \code{manifest\_keys} mapping
+(\code{tools/gen\_concepts\_values.py:334}), which are the loader's
+\emph{output} names. The manifest keys themselves are the \emph{values} of
+that mapping and are listed in Table~\ref{tab:loaders} below, read from
+the loaders' source.
+\end{quote}
+
+\subsection{Every loader, its provider, its credential and its key}
+
+Table~\ref{tab:loaders} is the reader's map of the stage. It names every
+loader the scan discovers, the provider it fetches from, the credential
+artefact that must exist, the manifest key it produces, and the output it
+writes. The native grid of each upstream product is not repeated here: it is
+stated by the generated table ``The loaders' native grids'' in
+Section~\ref{sec:registry}, and the loader-local module constants and
+docstring statements it is read from are cited in that table's source column.
+Those native grids are \emph{not} values from \code{model\_constants.yaml}
+(Section~\ref{sec:provenance}).
+
+\footnotesize
+\begin{longtable}{@{}p{1.9cm}p{3.4cm}p{2.9cm}p{3.3cm}p{2.7cm}@{}}
+\toprule
+Loader & Provider & Credential & Manifest key & Output \\
+\midrule
+\endhead
+\code{chirps} & UCSB Climate Hazards Center, CHIRPS v2.0 daily &
+none (public) & \code{chirps\allowbreak\_rainfall\allowbreak\_daily} &
+\code{rainfall\allowbreak\_daily} \\
+\code{era5} & Copernicus CDS, ERA5-Land daily statistics and
+ERA5 single-levels reanalysis & \code{cds} (\code{\textasciitilde/.cdsapirc}
+or \code{CDSAPI\_RC}) &
+\code{era5\allowbreak\_air\allowbreak\_temp\allowbreak\_daily},
+\code{wind} & \code{air\allowbreak\_temp\allowbreak\_daily},
+\code{wind\_6hourly} \\
+\code{jrc\_gsw} & Microsoft Planetary Computer STAC, JRC Global Surface
+Water \code{occurrence} asset & none &
+\code{jrc\allowbreak\_habitat\allowbreak\_features} &
+\code{habitat\allowbreak\_features} \\
+\code{dynamic\_world} & Google Earth Engine, \code{GOOGLE/DYNAMICWORLD/V1}
+& \code{earthengine}
+(\code{\textasciitilde/.config/\allowbreak earthengine/\allowbreak credentials}) &
+\code{dw\allowbreak\_class\allowbreak\_fractions} &
+\code{class\allowbreak\_fractions} \\
+\code{worldpop} & WorldPop constrained population rasters fetched over plain
+HTTPS from \code{data.worldpop.org} & none & \code{worldpop} &
+\code{population} \\
+\code{glw} & FAO Gridded Livestock of the World v4 & none &
+\code{glw\_cattle}, \code{glw\_goats}, \code{glw\_sheep}, \code{glw\_pigs},
+\code{glw\_chickens} & \code{cattle}, \code{goats}, \code{sheep}, \code{pigs},
+\code{chickens} \\
+\code{ghsl} & JRC FTP mirror, GHS-SMOD settlement classification & none &
+\code{ghsl\_urban} & \code{urban\allowbreak\_class} \\
+\code{buildings} & Overture Maps footprints on S3, read through DuckDB & none &
+\code{buildings} & \code{building\allowbreak\_fraction} \\
+\code{wildlife} & derived from Dynamic World + JRC GSW + Overture buildings &
+none & \code{wildlife\_proxy} &
+\code{wildlife\allowbreak\_host\allowbreak\_proxy} \\
+\code{coastline} & GSHHG shoreline polygons & none &
+\code{coastline\allowbreak\_land\allowbreak\_mask} &
+\code{land\allowbreak\_mask} \\
+\code{smap} & SMAP RSS L3 sea-surface salinity via NASA PO.DAAC &
+\code{earthdata} (\code{EARTHDATA\_TOKEN}) & \code{smap\_salinity} &
+\code{salinity} \\
+\code{modis} & MODIS MOD13A3 via NASA LP DAAC & \code{earthdata}
+(\code{EARTHDATA\_TOKEN}) & \code{modis\_ndvi} & \code{ndvi} \\
+\bottomrule
+\end{longtable}
+\normalsize
+\label{tab:loaders}
+
+\subsection{Output name versus manifest key}
+
+The identity of a dataset is its manifest key, and the key is defined in one
+place only: the loader's \code{manifest\_keys} mapping, read by the registry
+and surfaced by the catalogue. The distinction matters because the \emph{file
+name} on disk is built from the output name, not from the manifest key, and
+because one consumer --- the ABM --- hard-codes a key by hand. Table~
+\ref{tab:loaders} gives the mapping as the code has it.
+
+Two entries deserve attention. The ERA5 wind output is registered under the
+manifest key \code{wind} and under no other name
+(\code{mal-commonlib/src/mal\_commonlib/data/loaders/era5.py:501-504}); it is
+the one place where a consumer refers to a key by hand rather than through a
+loader declaration (Section~\ref{sec:consumption}). The wildlife loader's
+declared description and attribution still name ESA WorldCover
+(\code{mal-commonlib/src/mal\_commonlib/data/loaders/wildlife.py:277-285}),
+which is no longer the source it reads --- it consumes the Dynamic World
+modal-label raster (\code{.../wildlife.py:42-45}).
+
+\subsection{What ``download everything'' means}
+\label{sec:profile}
+
+The runner distinguishes two modes
+(\code{mal-core/src/mal\_core/download/runner.py:98}):
+
+\begin{itemize}
+\item \textbf{Profile mode.} When the user names neither \code{--datasets}
+nor \code{--outputs}, every registered loader is taken, but each is filtered
+down to its ABM-profile outputs: the intersection of the loader's own
+\code{abm\_default\_outputs} (or the registry's profile table) with the
+outputs it actually has
+(\code{mal-core/src/mal\_core/download/runner.py:109-110}). A loader whose
+profile list is empty has all of its outputs filtered out, so it fetches
+nothing --- but it is still recorded in the status map as
+\code{\{"status": "ok"\}} (\code{.../runner.py:265}); only a missing
+credential produces \code{"status": "skipped"}
+(\code{.../runner.py:101-103}). A loader whose \code{abm\_default\_outputs}
+is \code{None} is \emph{not} filtered at all.
+\item \textbf{Explicit mode.} Naming \code{--datasets} or \code{--outputs}
+disables the profile completely and selects exactly what was named
+(\code{mal-core/src/mal\_core/download/runner.py:98},
+\code{...:106-110}).
+\end{itemize}
+
+The registry's profile table
+(\code{mal-core/src/mal\_core/download/registry.py:55-75}) assigns
+\code{rainfall\_daily} to CHIRPS, \code{air\_temp\_daily} and
+\code{wind\_6hourly} to ERA5, \code{habitat\_features} to JRC GSW,
+\code{class\_fractions} to Dynamic World, \code{population} to WorldPop, the
+five livestock species to GLW, \code{urban\_class} to GHSL,
+\code{building\_fraction} to Overture buildings,
+\code{wildlife\_host\_proxy} to the wildlife proxy and \code{land\_mask} to
+the coastline loader. SMAP and the retired hydrorivers loader are explicitly
+excluded by empty lists.
+
+The \code{modis} loader declares no \code{abm\_default\_outputs} and has no
+entry in the profile table, so its value is \code{None}
+(\code{mal-core/src/mal\_core/download/registry.py:92-94}); the filter at
+\code{.../runner.py:109-110} then does not exclude it. A default run
+therefore fetches MODIS NDVI even though no consumer in the current contract
+reads it. This is a live inconsistency, recorded in
+Section~\ref{sec:discrepancies}.
+
+The membership of the profile, loader by loader, is as follows. The first
+column is the loader; the second says whether a default run fetches anything
+from it; the third says which of its outputs survive the filter.
+
+\begin{longtable}{@{}llp{0.42\textwidth}@{}}
+\toprule
+Loader & In the default profile? & Outputs kept \\
+\midrule
+\endhead
+\code{chirps} & yes & \code{rainfall\_daily} (time series: needs \code{--years}) \\
+\code{era5} & yes & \code{air\_temp\_daily}, \code{wind\_6hourly} (time series: needs \code{--years}) \\
+\code{jrc\_gsw} & yes & \code{habitat\_features} (static) \\
+\code{dynamic\_world} & yes & \code{class\_fractions} (time series: needs \code{--years}; one frame per run year) \\
+\code{worldpop} & yes & \code{population} (static) \\
+\code{glw} & yes & \code{cattle}, \code{goats}, \code{sheep}, \code{pigs}, \code{chickens} (static) \\
+\code{ghsl} & yes & \code{urban\_class} (static) \\
+\code{buildings} & yes & \code{building\_fraction} (static) \\
+\code{wildlife} & yes & \code{wildlife\_host\_proxy} (static) \\
+\code{coastline} & yes & \code{land\_mask} (static) \\
+\code{smap} & \textbf{no} & none: the profile list is empty, so every output is filtered out; the loader is still recorded as \code{ok} although it fetched nothing \\
+\code{modis} & \textbf{yes, inconsistently} & \code{ndvi}: the loader declares no \code{abm\_default\_outputs} and has no entry in the profile table, so nothing excludes it, and no consumer in the current contract reads the product \\
+\midrule
+\end{longtable}
+
+The retired \code{hydrorivers} loader is an entry in the profile table with
+an empty list, but it is no longer in the loaders package, so the scan does
+not discover it and it does not appear here.
+
+% ---------------------------------------------------------------------------
+\section{The spatial frame: the AOI and its grid}
+
+\subsection{The AOI registry}
+\label{sec:aoi-registry}
+
+Every stage in the pipeline agrees on one spatial frame, and the frame is
+declared in a single file, \code{mal-commonlib/src/mal\_commonlib/aois.yaml}.
+Adding an AOI means editing that file; no code change is needed, because
+\code{AOI.from\_slug} reads it at run time
+(\code{mal-commonlib/src/mal\_commonlib/aois.yaml:1-15}).
+
+The AOI registry is the second of the three tables in the generated
+\code{params-download.tex} file --- after the dataset registry and before the
+loaders' native grids --- and is printed in Section~\ref{sec:registry}. It
+gives, per AOI, the bounding box, the CRS, the cell size, the scale and the
+resulting grid dimensions.
+
+\paragraph{The fields of an AOI entry.} The file's own header lists them
+(\code{.../aois.yaml:5-14}). Three are required, because the code reads
+them without a default: \code{bbox} (the bounding box, west/south/east/north,
+in the CRS's units), \code{crs} (the projection) and \code{resolution\_m}
+(the ground resolution in metres). Three are optional: \code{name} (the
+human-readable name, defaulting to the slug), \code{scale} (defaulting to
+\code{regional}) and \code{gadm\_id}. A fourth, \code{iso3}, is optional in
+the file but required by the country-scoped loaders: without it WorldPop and
+the livestock loaders cannot address the country
+(\code{.../worldpop.py:13-16}).
+
+\paragraph{How to check an AOI.} No command validates an AOI entry and no
+command lists the registry: the YAML file \emph{is} the registry. The only
+validation the code performs is at run time, where \code{AOI.from\_slug}
+raises a \code{ValueError} naming the slugs it does know when the slug is
+unknown (\code{.../aoi.py:282-285}). To see what the pipeline knows about
+one AOI's data --- which manifest keys exist, which are registered, which
+files are on disk --- run \code{malariasim datasets --aoi <slug>}, whose
+columns are described in Section~\ref{sec:datasets-report}. To check the
+entry itself, read it against the field list above: a wrong \code{crs}, a
+transposed \code{bbox} or a missing \code{resolution\_m} produces an AOI
+that loads without complaint and a grid nobody expected.
+
+\subsection{How the grid is derived}
+\label{sec:grid}
+
+The AOI object (\code{mal-commonlib/src/mal\_commonlib/aoi.py}) carries a
+bounding box in the CRS's units, a CRS and a ground resolution in metres. The
+resolution is a property of the AOI entry, not of this stage: for the Ghana
+AOI it is \codeconst{ingest.cell_size_m}\,m
+(\code{.../aois.yaml:20}), and every output the stage writes is reduced
+onto that same grid. The cell count is derived by converting the
+bounding-box extent to metres at the centroid latitude and dividing by the
+resolution, rounding up
+(\code{.../aoi.py:154-167},
+\code{...:195-199}). The result is \code{cells\_per\_side()}, a
+$(\text{height}, \text{width})$ pair in cells.
+
+\paragraph{Worked example.} For the Ghana AOI the bounding box runs from
+\codeconst{ingest.bbox_west}° to \codeconst{ingest.bbox_east}° in longitude
+and \codeconst{ingest.bbox_south}° to \codeconst{ingest.bbox_north}° in
+latitude, in \code{EPSG:4326}. At \codeconst{ingest.cell_size_m}\,m the grid
+is $H\times W$ cells of \codeconst{ingest.cell_size_m}\,m $\times$
+\codeconst{ingest.cell_size_m}\,m --- the cells are square --- where $H$ and
+$W$ are the north-south and east-west extents converted to metres at the
+box's mid-latitude and rounded up (\code{.../aoi.py:154-167}). For the Ghana
+AOI the grid therefore reads 779 rows by 551 columns --- a reading of the
+derived grid rather than a configured value, recorded in the evidence
+appendix, and printed next to the cell size in the generated AOI registry
+table.
+
+Three consequences are worth stating because loaders depend on them. First,
+the grid covers the \emph{bounding box}, not a country outline: cells outside
+the AOI's real footprint are still cells, and what they hold is whatever the
+source dataset holds there. Second, the artefact that carries the footprint
+is a different one: the coastline loader's per-cell land fraction
+(\code{coastline\_land\_mask}), which the ingest stage turns into an
+open-sea mask. The outputs behave differently over the ocean: the JRC
+permanent-water fraction is high there, the Dynamic World water class covers
+much of a coastal cell, and the ERA5 and CHIRPS fields are interpolated
+from the nearest valid source cell, so a coastal cell carries a
+sea-surface contribution (Table~\ref{tab:resampling}). Third, the
+AOI grid is what every
+loader is asked to hit, and it is what the ingest stage later re-derives from
+the env tensor's shape. The download stage's grid is therefore a convention
+that the ingest stage re-establishes, not a hard contract the runner enforces
+(Section~\ref{sec:consumption}).
+
+\subsection{The AOI is passed to every loader}
+
+The runner builds the AOI object from the slug and hands it to every loader it
+calls (\code{mal-core/src/mal\_core/download/runner.py:82-83},
+\code{...:114}, \code{...:129}, \code{...:246}). The AOI's \code{iso3} field
+is what makes country-scoped providers work --- WorldPop, for instance,
+parameterises its URL by the AOI's ISO 3166-1 alpha-3 code
+(\code{mal-commonlib/src/mal\_commonlib/data/loaders/worldpop.py:13-16},
+\code{...:375-396}). An AOI without \code{iso3} cannot use those loaders.
+
+% ---------------------------------------------------------------------------
+\section{The manifest: schema, authority and naming}
+\label{sec:manifest}
+
+\subsection{Where it lives and who writes it}
+
+The manifest is \code{data/<aoi>/manifest.json}. Its location follows the
+output directory: the CLI's \code{--output-dir} is the root under which the
+AOI's own directory is created, and the manifest is written inside that
+directory (\code{.../cli.py:161,182-189},
+\code{.../runner.py:87-93,147-159}); the CLI's default for
+\code{--output-dir} is \code{data}, so a run made from the repository root
+writes \code{data/<aoi>/manifest.json}. When the runner is called from
+Python without an output directory, the root is instead derived by walking
+up from the module until a directory containing \code{.git} is found
+(\code{.../manifest.py:16-27,30}) --- the repository root --- and the
+manifest goes to \code{<repository root>/data/<aoi>/manifest.json}. The two
+rules agree when the command is run from the repository root, and they differ
+when \code{--output-dir} points elsewhere: the manifest then travels with
+the outputs, and the downstream stages, which look under \code{data/<aoi>/}
+relative to the working directory, will not find it.
+
+The paths recorded \emph{inside} the manifest are file names, relative to
+the AOI directory: the runner passes \code{path.name} and never an absolute
+path (\code{.../runner.py:147-159}, \code{...:252-262}), and the resolver
+joins that name with the AOI directory to find the file
+(\code{.../manifest.py:108}). A manifest therefore says nothing about where
+its AOI directory is; that is fixed by the convention above. Reading a manifest
+that does not exist yields an empty skeleton with three keys
+(\code{.../manifest.py:30-36}):
+
+\begin{itemize}
+\item \code{aoi} --- the AOI slug.
+\item \code{datasets} --- a map from manifest key to dataset entry.
+\item \code{expected\_files} --- a flat, sorted list of every declared file
+name.
+\end{itemize}
+
+The only writer is \code{update\_dataset}
+(\code{mal-core/src/mal\_core/download/manifest.py:118-189}), and the runner
+calls it after every single successful write
+(\code{mal-core/src/mal\_core/download/runner.py:147-159},
+\code{...:178-190}, \code{...:212-223}, \code{...:230-241},
+\code{...:252-262}).
+
+\subsection{The dataset entry, field by field}
+
+\begin{longtable}{@{}llp{0.5\textwidth}@{}}
+\toprule
+Field & Type & Meaning \\
+\midrule
+\endhead
+\code{type} & str & \code{"time-series"} or \code{"static"}. \\
+\code{format} & str & File format: \code{nc}, \code{tif}, \code{gpkg},
+\code{json}, \code{csr}; defaults to the file extension
+(\code{.../manifest.py:157}). \\
+\code{required\_for\_abm} & bool & Copied from the loader's per-output flag
+(\code{.../manifest.py:166}). \\
+\code{files} & map & For per-year outputs, the key is the year as a string;
+for single-file outputs, the key is the dataset key itself
+(\code{.../manifest.py:176-179}). \\
+\code{variables} & list & Optional; names of the variables in the file. \\
+\code{period} & map & Optional; \code{\{"start": ..., "end": ...\}} for
+multi-year NetCDF products (\code{.../manifest.py:170}). \\
+\code{license} & str & Optional; identifier from the licence registry
+(\code{.../manifest.py:172}). \\
+\code{attribution} & str & Optional; the literal credit line
+(\code{.../manifest.py:174}). \\
+\bottomrule
+\end{longtable}
+
+Fields that are omitted in an update leave the stored value untouched
+(\code{.../manifest.py:162-174}): a re-registration with \code{license=None}
+does not erase an existing licence.
+
+Two details of that table need spelling out. \code{csr} is the
+compressed-sparse-row file the mobility builder writes
+(\code{.../ingest/mobility.py:99-110}): it is a derived product, not a
+downloaded one, and it appears in a manifest only because ingest registers
+it. The \emph{rule} for the \code{files} map is one sentence: a write that
+carries a year keys the entry by that year, as a string, and a write that
+carries no year keys it by the dataset's own manifest key. Which of the two
+happens is decided by the write path, not by the nature of the product: the
+multi-year NetCDF path passes no year (\code{runner.py:147-159}), the
+per-year GeoTIFF path passes one (\code{runner.py:210-222}) and the static
+path passes none (\code{runner.py:252-262}). A per-year output is therefore
+a \code{"time-series"} entry with one key per year; a multi-year NetCDF is
+a \code{"time-series"} entry with a single key; a static output is a
+\code{"static"} entry with a single key.
+
+An entry taken from the real Ghana manifest
+(\code{data/ghana/manifest.json}) reads, for the ERA5 daily temperature:
+
+\begin{quote}
+\small
+\code{"era5\_air\_temp\_daily": \{"type": "time-series", "format": "nc",
+"required\_for\_abm": true, "files": \{"era5\_air\_temp\_daily":
+"ghana\_air\_temp\_daily\_2024\_2024\_daily.nc"\}, "period": \{"start":
+"2024-01-01", "end": "2024-12-31"\}, "license": "Copernicus-Cite",
+"attribution": "Contains modified Copernicus Climate Change Service
+information [Year]. ..."\}}
+\end{quote}
+
+\subsection{What the manifest is authoritative for}
+
+The module docstring of the catalogue states the rule
+(\code{mal-core/src/mal\_core/download/catalog.py:1-30}): the manifest is
+authoritative for \emph{which files exist for which AOI and under which key},
+and for the completeness check that follows from that. It is \emph{not} where
+dataset identity is defined: for downloaded products that lives in each
+loader's \code{manifest\_keys}, and for derived ingest products it lives in
+\code{INGEST\_ARTIFACTS} (\code{.../catalog.py:45-92}). The catalogue adds
+no table of its own for downloaded products; it derives their rows from the
+registry itself (\code{.../catalog.py:270-290}). The only table it declares
+is \code{INGEST\_ARTIFACTS}, the derived artefacts of the ingest stage; the
+other two tables of this document are the dataset registry and the AOI
+registry, both generated from the loaders and from \code{aois.yaml}
+(Section~\ref{sec:registry}).
+
+The manifest is also not a place where metadata may be silently re-derived:
+a consumer that cannot find its key does not go looking for a file whose name
+looks right (Section~\ref{sec:slots}).
+
+\subsection{On-disk naming conventions}
+
+The runner's three naming helpers produce four patterns
+(\code{mal-core/src/mal\_core/download/runner.py:49-66}):
+
+\begin{longtable}{@{}lp{0.62\textwidth}@{}}
+\toprule
+Pattern & Applies to \\
+\midrule
+\endhead
+\code{<aoi>\_<product>.<ext>} & single-file static products. \\
+\code{<aoi>\_<product>\_<year>.<ext>} & per-year GeoTIFF products. \\
+\code{<aoi>\_<product>\_<start>\_<end>\_daily.nc} & multi-year daily NetCDF. \\
+\code{<aoi>\_<product>\_<start>\_<end>\_monthly.nc} & multi-year monthly NetCDF. \\
+\bottomrule
+\end{longtable}
+
+In every case \code{<product>} is the \emph{output} name, not the manifest
+key: the Dynamic World fractions land in
+\code{ghana\_class\_fractions\_2024\_2024\_daily.nc} under the manifest key
+\code{dw\_class\_fractions}, and the WorldPop raster lands in
+\code{ghana\_population.tif} under the key \code{worldpop}. The manifest on
+disk confirms both (\code{data/ghana/manifest.json}).
+
+The suffix in the name records the \emph{write path}, not the temporal
+resolution of what is inside: the ERA5 wind output is six-hourly and the
+Dynamic World output is one frame per run year, and both are written through
+the ``daily'' path and therefore carry a \code{\_daily.nc} name
+(\code{.../era5.py:493-496}, \code{.../dynamic\_world.py:491}; see the
+evidence appendix). A reader who needs the resolution of a file must read
+its time axis, not its name.
+
+These conventions are not enforced anywhere. The only regular expressions
+that know them live in the migration path
+(\code{mal-core/src/mal\_core/download/catalog.py:330-331}), and the runner
+never validates a name against them.
+
+\subsection{\code{expected\_files}}
+
+\code{expected\_files} is rebuilt from scratch on every manifest write as the
+sorted union of all \code{files} values of all entries
+(\code{mal-core/src/mal\_core/download/manifest.py:181-184}). It is therefore
+redundant with the per-dataset \code{files} maps, and it exists so that a
+reader can ask "which files does this AOI declare?" in one place.
+\code{validate\_completeness} re-checks that union independently
+(\code{.../manifest.py:237-240}).
+
+\subsection{What completeness validation does, and does not, check}
+
+\code{validate\_completeness(aoi, *, years=None, data\_root=None)}
+(\code{mal-core/src/mal\_core/download/manifest.py:192-195}) returns the list
+of missing items; an empty list means complete. The requested years are an
+argument of the \emph{caller} --- nothing in the manifest declares them ---
+and the default is no year list at all: with no years, the period check is
+skipped and only the existence of the declared files is tested
+(\code{.../manifest.py:205-235}). The ABM wrapper calls it without years
+(\code{.../abm/wrapper.py:117}), so the check that gates a simulation is
+the file-existence one.
+
+It does the following:
+
+\begin{enumerate}
+\item For every dataset entry with a \code{period} \emph{and} a requested
+year list, it checks that the period covers each requested year, and that at
+least one declared file exists
+(\code{.../manifest.py:205-225}).
+\item For every other entry, it checks that each declared file exists under
+\code{data/<aoi>/} (\code{.../manifest.py:226-235}).
+\item It re-checks the \code{expected\_files} union
+(\code{.../manifest.py:237-240}).
+\end{enumerate}
+
+Taken together, the three checks are: every declared file exists on disk;
+every declared file is also a member of the \code{expected\_files} union;
+and, where a year list was supplied, the \code{period} of every entry that
+has one covers every requested year. The verdict rests on the first of the
+three --- the other two are additional conditions on the same declared
+files, and none of them looks at the content of a file.
+
+It is a \emph{declared-files-exist} check: it does not know which datasets a
+given consumer needs. An AOI whose manifest has no \code{dw\_class\_fractions}
+entry at all passes it with an empty missing list, and fails only later, in
+the consumer, for a different reason.
+
+% ---------------------------------------------------------------------------
+\section{The catalogue and the \code{Slot} contract}
+\label{sec:slots}
+
+The catalogue (\code{mal-core/src/mal\_core/download/catalog.py}) is the
+project's lookup structure for dataset identity: it is what knows which
+manifest keys exist --- the downloaded ones, derived from the loader
+registry, and the derived ones, declared in \code{INGEST\_ARTIFACTS} --- and
+how a consumer's declared slot resolves to a path.
+
+\subsection{\code{Slot}}
+
+A \code{Slot}
+(\code{mal-core/src/mal\_core/download/catalog.py:97-108}) is a frozen
+dataclass with three fields: \code{key} (the manifest key),
+\code{required} (whether absence is an error) and \code{per\_year} (whether
+the entry is keyed by year, in which case the resolved value is a
+\code{dict[year, Path]}). A consumer declares a mapping
+\code{\{slot\_name: Slot(...)\}} and receives
+\code{\{slot\_name: Path | dict[year, Path] | None\}}. The consumer's only
+knowledge of the datasets is the manifest key.
+
+\subsection{Resolution semantics}
+
+\code{resolve\_inputs}
+(\code{mal-core/src/mal\_core/download/catalog.py:176-268}) is the entry
+point; \code{resolve} (\code{.../catalog.py:155-173}) is the single-key
+version. Both delegate the per-entry lookup to
+\code{resolve\_dataset\_file}
+(\code{.../manifest.py:39-114}). There are exactly three failure modes,
+distinguishable by their messages:
+
+\begin{description}
+\item[No manifest entry] An optional slot resolves to \code{None} --- the
+signal for ``this input is absent, carry on without it''. A required slot
+raises \code{FileNotFoundError} naming the AOI and telling the user to run
+\code{malariasim download} (\code{.../catalog.py:228-235},
+\code{...:258-263}).
+\item[Entry present, file missing on disk] \code{FileNotFoundError}: a stale
+manifest is an error, never a silent fallback (\code{.../manifest.py:103-114}).
+The \code{strict} flag exists for diagnostics, but every consumer uses the
+strict default.
+\item[Per-year entry lacking the requested year] \code{FileNotFoundError}:
+silently substituting another year's file would be a data-integrity bug, and
+the message says so (\code{.../manifest.py:91-98}).
+\end{description}
+
+An explicit override always wins over the manifest and is validated to exist
+(\code{.../catalog.py:207-215}).
+
+\subsection{There is no conventional-name fallback}
+
+The catalogue's docstring is unambiguous: there is no conventional-name
+fallback inside consumers (\code{.../catalog.py:26-29}), and the rule is
+restated at the point of resolution, in the docstring of
+\code{resolve\_dataset\_file}
+(\code{.../manifest.py:58-68}): a dataset that was never registered does not
+exist as far as the pipeline is concerned. The only place conventional names are
+derived is the migration path \code{register\_existing}
+(\code{.../catalog.py:334-427}), which scans a pre-manifest data directory,
+derives the conventional names from each loader's own \code{formats} plus the
+runner's naming rules, registers what it finds, and never overwrites an entry
+that already exists (\code{.../catalog.py:359-377}). It can be run as a dry
+run (\code{dry\_run=True}), and it reports \code{registered}, \code{skipped},
+\code{missing} and \code{dry\_run}
+(\code{.../catalog.py:430-435}).
+
+The migration path does embed a second, hand-written copy of the artefact
+naming rules for the ingest outputs
+(\code{.../catalog.py:411-421}), which are not derived from the producers
+themselves. This is a known duplication and is listed in
+Section~\ref{sec:discrepancies}.
+
+\subsection{What \code{malariasim datasets} reports}
+\label{sec:datasets-report}
+
+\code{catalog\_status} (\code{.../catalog.py:292-325}) produces one row per
+known key: one row per downloaded dataset (derived from the registry) and one
+row per ingest artefact (from \code{INGEST\_ARTIFACTS}). Each row carries the
+key, the source that declares it, whether it is required for the ABM, whether
+it is in the manifest, whether the declared file exists on disk, and the path.
+
+The row shows only the \emph{first} declared file of an entry
+(\code{.../catalog.py:305-318}). A multi-year output is therefore not fully
+described by its row, and the \code{--missing} filter
+(\code{mal-core/src/mal\_core/cli.py:830-831}) hides a partially complete
+entry.
+
+% ---------------------------------------------------------------------------
+\section{Order of operations}
+\label{sec:order}
+
+\subsection{Pseudocode}
+
+\begin{lstlisting}[basicstyle=\small,frame=single,breaklines=true]
+run_download(aoi, datasets, outputs, years, months, output_dir, cache_dir):
+    aoi_obj = AOI.from_slug(aoi);  registry = discover_downloaders()
+    selected = registry restricted by --datasets, or all of registry
+    out_dir = output_dir or data/<aoi>;  create it
+    cache = cache_dir or None
+    profile_mode = (datasets is None and outputs is None)
+    for each (name, spec) in selected:
+        if not credential_present(spec): record(name, skipped); continue
+        try:
+            for each (output_name, func) in spec.outputs:
+                if outputs given and output_name not in outputs: continue
+                if profile_mode and spec.abm_default_outputs is not None
+                        and output_name not in spec.abm_default_outputs: continue
+                if spec.is_time_series:
+                    if no years given: warn and continue
+                    format = spec.formats[output_name] or "monthly"
+                    result = func(aoi=aoi_obj, years=years, months=months, cache_dir=cache)
+                    if result is None: continue          # nothing to write
+                    if format == "daily":        write ONE multi-year NetCDF
+                    elif format == "monthly_nc": write ONE multi-year monthly NetCDF
+                    else: for each year: reduce over time; write GeoTIFF
+                else:
+                    result = func(aoi=aoi_obj, cache_dir=cache)
+                    if result is None: continue
+                    write GeoTIFF or NetCDF
+                register what was written
+            record(name, ok)
+        except Exception as e:
+            log it;  record(name, error, str(e))          # next loader continues
+    warn_manifest_limits(aoi)                  # advisory; never fails the run
+    return the per-dataset status map
+\end{lstlisting}
+
+\subsection{Step, actor, order and mode}
+
+The CLI parses the comma-separated lists first
+(\code{cli.py:177-189}). The runner then builds the AOI object
+(\code{runner.py:82-83}); the registry scans the loaders package, imports
+each module and reads its \code{DOWNLOADER}
+(\code{registry.py:47-107}); the runner selects loaders by name and creates
+the output directory (\code{runner.py:87-93}). Per loader, the runner
+probes each declared credential family (\code{runner.py:101-103},
+\code{...:20-46}). Per output, it filters by \code{--outputs} and then by
+the ABM profile, and chooses the write path from the declared format
+(\code{runner.py:106-110}, \code{...:121-124}). The loader fetches and
+reduces and returns an in-memory array (\code{runner.py:128}, \code{...:165},
+\code{...:194}, \code{...:244}); the writer writes the file
+(\code{writer.py:12-53}); the manifest is rewritten to register it
+(\code{runner.py:147-159} and siblings). Last, the licences are aggregated and
+any usage limits warned about (\code{runner.py:270-276}).
+
+\subsection{Consequences of that order}
+
+These are the falsifiable claims the order produces.
+
+\begin{enumerate}
+\item \textbf{Registration is per output, not per dataset.} Each output is
+written and registered before the next output of the same loader is touched
+(\code{runner.py:106-262}); a loader that fails on its third output leaves its
+first two registered.
+\item \textbf{A missing credential removes the whole loader, not one output.}
+The gate runs before the output loop (\code{runner.py:101-103}), so the ERA5
+loader, whose two outputs share the \code{cds} credential, contributes
+neither or both.
+\item \textbf{A loader that returns \code{None} writes nothing and registers
+nothing} (\code{runner.py:129-130}, \code{...:166-167}, \code{...:195-196},
+\code{...:246-247}).
+\item \textbf{A failure is contained to its loader.} The exception is caught
+at the loader level and reported as a status (\code{runner.py:266-268}); the
+result is a per-dataset status map, not a pass/fail verdict for the AOI.
+\item \textbf{The manifest is consistent after an interruption.} Because the
+manifest is rewritten after every output, a killed run leaves a manifest
+whose every declared file exists --- possibly an incomplete data set, but
+never a manifest pointing at a missing file.
+\item \textbf{Nothing is skipped because it already exists.} The runner does
+not consult the manifest before downloading; idempotence comes from the
+loaders' own caches.
+\item \textbf{The output directory is created before any credential check}
+(\code{runner.py:92-93}), so a run that skips everything still leaves an
+empty \code{data/<aoi>/}.
+\end{enumerate}
+
+\subsection{A described situation}
+
+\emph{A reader asks for the daily rainfall for 2024 over the Ghana AOI.} The
+reader runs \code{malariasim download --aoi ghana --datasets chirps --years
+2024}. The CLI splits the comma-separated strings
+(\code{cli.py:177-189}) and calls the runner. The runner builds the AOI
+object for \code{ghana} and scans the loaders package; the registry returns
+every loader, and the runner keeps only \code{chirps}. The CHIRPS loader
+declares no credential, so the gate passes. Its single output
+\code{rainfall\_daily} survives the filters, and because \code{--datasets}
+was named, the profile mode is off. The loader is time series, so years were
+required and were given; its declared format is \code{"daily"}
+(\code{.../chirps.py:346-348}), so the multi-year NetCDF branch is taken. The
+loader walks the requested days, fetching one public GeoTIFF per day into its
+cache, reprojecting each onto the AOI grid, and returns one array with
+dimensions \code{(time, y, x)}. The runner derives the NetCDF variable name
+from the output name with the \code{\_daily} suffix stripped --- \code{rainfall}
+--- because the returned array carries no name of its own
+(\code{runner.py:135-139}). The writer writes
+\code{data/ghana/ghana\_rainfall\_daily\_2024\_2024\_daily.nc}
+(\code{runner.py:140-142}) and the manifest gains an entry keyed
+\code{chirps\_rainfall\_daily} with the period of the returned time axis
+(\code{runner.py:147-159}). The CLI prints one status line and the
+per-dataset status map.
+
+\section{Authentication and credential behaviour}
+\label{sec:auth}
+
+\subsection{The gate}
+
+\code{\_check\_auth} (\code{mal-core/src/mal\_core/download/runner.py:20-46})
+probes one artefact per credential family:
+
+\small
+\begin{longtable}{@{}p{1.9cm}p{5.2cm}p{0.38\textwidth}@{}}
+\toprule
+Family & Probe & Missing-credential behaviour \\
+\midrule
+\endhead
+\code{cds} & the file \code{\textasciitilde/.cdsapirc}, or the path in
+\code{CDSAPI\_RC} (\code{runner.py:22-33}) & warning, then the loader is
+skipped. The probe catches \code{OSError} as well as a missing file, so a
+sandboxed home directory reads as "no auth". \\
+\code{earthdata} & the environment variable \code{EARTHDATA\_TOKEN} is set
+(\code{runner.py:34-37}) & warning, then the loader is skipped. \\
+\code{earthengine} & the file
+\code{\textasciitilde/.config/\allowbreak earthengine/\allowbreak credentials}
+exists (\code{runner.py:38-45}) & warning naming the \code{earthengine
+authenticate} command, then the loader is skipped. \\
+\code{none} & nothing (\code{runner.py:21-46}) & never skipped. \\
+\bottomrule
+\end{longtable}
+\normalsize
+
+A missing credential never raises. The loader is skipped, the status is
+\code{\{"status": "skipped", "reason": "auth missing"\}}
+(\code{runner.py:102}), and the run continues with the next loader. A user
+without any credentials still receives a report; the report says which
+datasets were skipped and why.
+
+\subsection{Inside a directly-called loader}
+
+The gate is a convenience of the runner, not a property of the loaders. A
+loader invoked directly raises instead of skipping: the Earth Engine loader
+raises \code{RuntimeError} naming the project and the one-line fix
+\code{earthengine authenticate}
+(\code{mal-commonlib/src/mal\_commonlib/data/loaders/dynamic\_world.py:149-159}),
+never opening an interactive browser flow; the ERA5 loader raises
+\code{RuntimeError} when the CDS client cannot be constructed, naming the
+expected configuration (\code{.../era5.py:201-208}, and again for the wind
+product at \code{...:402-409}).
+
+The Earth Engine loader also installs a shim around the OAuth module's
+application-default-credentials probe, so that an unreadable Google Cloud
+credentials path cannot abort initialisation when the Earth Engine token
+itself is fine (\code{.../dynamic\_world.py:129-147}). A filesystem permission
+problem is therefore reported as an initialisation failure, not as a missing
+credential.
+
+\subsection{The credential artefact, per provider}
+
+\small
+\begin{longtable}{@{}lp{5.4cm}p{0.34\textwidth}@{}}
+\toprule
+Provider family & Artefact that must exist & Used by \\
+\midrule
+\endhead
+Copernicus CDS & \code{\textasciitilde/.cdsapirc} (or \code{CDSAPI\_RC}) &
+ERA5 (air temperature and wind) \\
+NASA Earthdata & \code{EARTHDATA\_TOKEN} in the environment & MODIS NDVI,
+SMAP salinity \\
+Google Earth Engine &
+\code{\textasciitilde/.config/\allowbreak earthengine/\allowbreak credentials}
+& Dynamic World fractions \\
+none & --- & CHIRPS, JRC GSW, WorldPop, GLW, GHSL, Overture buildings, the
+wildlife proxy, GSHHG coastline \\
+\bottomrule
+\end{longtable}
+\normalsize
+
+The Earth Engine project identifier used by the loader is a module-level
+constant in the loader file itself, not a value from the constants file
+(\code{.../dynamic\_world.py:57}).
+
+% ---------------------------------------------------------------------------
+\section{The write path}
+
+\subsection{Three write paths}
+
+The declared format of an output selects the path
+(\code{mal-core/src/mal\_core/download/runner.py:121-124}; the default is
+\code{"monthly"}).
+
+\begin{itemize}
+\item \code{"daily"}: one multi-year NetCDF covering the whole requested year
+span, named with the first and last requested years (\code{runner.py:140}).
+The period is read from the returned array's time coordinate --- \code{time}
+if present, otherwise \code{valid\_time} (\code{runner.py:144-146}) --- and
+recorded in the manifest (\code{runner.py:147-159}).
+\item \code{"monthly\_nc"}: the same with a \code{\_monthly.nc} name and
+monthly steps; used by the SMAP salinity output (\code{runner.py:161-191},
+\code{.../smap.py:433-435}).
+\item Anything else: per-year GeoTIFFs. If the returned array has a time
+dimension, the runner slices it per year and reduces over time before
+writing; if it has none, it writes the single array under the first requested
+year (\code{runner.py:220-262}).
+\end{itemize}
+
+Static outputs take their extension from the returned object: a NetCDF for
+an \code{xarray.Dataset}, a GeoTIFF for anything else
+(\code{runner.py:249-250}).
+
+\subsection{The writer}
+
+\code{save\_product} (\code{mal-core/src/mal\_core/download/writer.py:12-53})
+is the single save point. It infers the format when none is given
+(\code{.../writer.py:29-30}), writes GeoTIFFs through the \code{rio} accessor
+and NetCDFs through \code{xarray}
+(\code{.../writer.py:32-49}), and refuses a three-dimensional array sent to
+the GeoTIFF writer with a \code{ValueError}
+(\code{.../writer.py:32-40}). Loaders never write files: they return data in
+memory, and the runner passes it to the writer.
+
+\subsection{The NetCDF variable name is a contract}
+
+The name of the variable inside a NetCDF file is how the ingest stage finds
+the channel. The runner prefers the loader's own array name and falls back to
+the output name with the \code{\_daily} suffix stripped
+(\code{runner.py:135-139}); the monthly path strips \code{\_salinity}
+instead (\code{runner.py:170}). The writer applies the name when it turns an
+array into a dataset (\code{writer.py:45-48}).
+
+In practice: ERA5's temperature loader renames its array to
+\code{air\_temp\_c}
+(\code{mal-commonlib/src/mal\_commonlib/data/loaders/era5.py:335},
+\code{...:337}), so the file carries \code{air\_temp\_c}; CHIRPS returns an
+unnamed array, so the fallback yields \code{rainfall}, which is the channel
+the ingest builder reads
+(\code{mal-core/src/mal\_core/ingest/daily\_nc.py:198-199}); the JRC loader
+returns a dataset whose variable is \code{jrc\_persistent}
+(\code{.../jrc\_gsw.py:318-321}).
+
+\subsection{What each output contains}
+\label{sec:units}
+
+Every output the stage can write is listed here, with the variable it
+carries, the unit that variable is in, and the temporal resolution it is
+written at. The units are those the loaders themselves declare, in their
+own docstrings and in the \code{units} attribute they attach to the array;
+where a loader declares no unit, the table says so rather than guessing.
+The two outputs outside the default profile (\code{salinity}, \code{ndvi}) are
+included, because a reader who asks for them by name gets them.
+
+\small
+\begin{longtable}{@{}p{3.0cm}p{2.4cm}p{2.6cm}p{2.8cm}p{1.9cm}p{1.5cm}@{}}
+\toprule
+Output & Source dataset & Variable & Unit & Temporal resolution & Spatial
+resolution \\
+\midrule
+\endhead
+\code{rainfall\allowbreak\_daily} & CHIRPS v2.0 & \code{rainfall} &
+millimetres per day; the band stays in millimetres & daily & source grid,
+§\ref{sec:registry} \\
+\code{air\allowbreak\_temp\allowbreak\_daily} & ERA5-Land daily statistics &
+\code{air\_temp\_c} & degrees Celsius; daily mean of the 2 m temperature &
+daily & as above \\
+\code{wind\allowbreak\_6hourly} & ERA5 single-levels reanalysis &
+\code{100m\_u\allowbreak\_component\allowbreak\_of\allowbreak\_wind},
+\code{100m\_v\allowbreak\_component\allowbreak\_of\allowbreak\_wind} & not
+stated by the loader & six-hourly (00, 06, 12, 18 UTC) & as above \\
+\code{habitat\allowbreak\_features} & JRC Global Surface Water &
+\code{jrc\_persistent} & fraction of the cell in $[0,1]$: the share of its
+area that is permanently wet & static (one year) & as above \\
+\code{class\allowbreak\_fractions} & Google Dynamic World V1 &
+\code{lc\_built}, \code{lc\_wetland}, \code{lc\_crop},
+\code{lc\_open\allowbreak\_plus\allowbreak\_water} & areal fraction of the
+cell, $[0,1]$ & one frame per run year & as above \\
+\code{population} & WorldPop constrained population & \code{population} &
+persons per cell --- a count, not a density & static & as above \\
+\code{cattle}, \code{goats}, \code{sheep}, \code{pigs}, \code{chickens} & FAO
+GLW4 & one band per species & heads per square kilometre; density, not a
+count & static & as above \\
+\code{urban\allowbreak\_class} & GHS-SMOD settlement classification & class
+code & a class code, not a quantity: 20 water, 30 urban, 50 rural & static
+(2030 epoch) & as above \\
+\code{building\allowbreak\_fraction} & Overture Maps footprints &
+\code{building\allowbreak\_fraction} & fraction in $[0,1]$; 1.0 means at
+least one footprint centroid in the cell & static & as above \\
+\code{wildlife\allowbreak\_host\allowbreak\_proxy} & Dynamic World + JRC GSW
++ Overture buildings & \code{wildlife\allowbreak\_host\allowbreak\_proxy} &
+suitability score in $[0,1]$ & static (one year) & as above \\
+\code{land\allowbreak\_mask} & GSHHG shorelines & land fraction & fraction
+of the cell that is land, $[0,1]$ & static & as above \\
+\code{salinity} & SMAP RSS L3 sea-surface salinity & \code{salinity} &
+practical salinity units (PSU); land and missing months are NaN & monthly &
+as above \\
+\code{ndvi} & MODIS MOD13A3 & \code{ndvi} & unitless index in $[0,1]$,
+rescaled from the raw $[-1,1]$ & monthly & as above \\
+\bottomrule
+\end{longtable}
+\label{tab:units}
+\normalsize
+
+The units are the loaders' own declarations, read from their docstrings:
+CHIRPS (\code{.../chirps.py:16}), ERA5 (\code{.../era5.py:29},
+\code{.../era5.py:374-376}), JRC GSW (\code{.../jrc\_gsw.py:11,33}),
+Dynamic World (\code{.../dynamic\_world.py:18-25}), WorldPop
+(\code{.../worldpop.py:9}), GLW (\code{.../glw.py:13}), GHSL
+(\code{.../ghsl.py:31}), Overture (\code{.../buildings.py:8}), the wildlife
+proxy (\code{.../wildlife.py:7-9}), GSHHG (\code{.../coastline.py:6}), SMAP
+(\code{.../smap.py:28-29}) and MODIS (\code{.../modis.py:27}).
+
+The spatial resolution column is uniform because the reduction is uniform:
+every output lands on the AOI grid at \codeconst{ingest.cell_size_m}\,m
+(Section~\ref{sec:grid}), and the resolution it came from is the native grid
+of its source dataset, tabulated in Section~\ref{sec:registry}. A reader
+comparing an input to the target grid compares the two tables: the native
+grid of the source, and the AOI grid.
+
+% ---------------------------------------------------------------------------
+\section{The AOI reduction: where the aggregation actually happens}
+\label{sec:reduction}
+
+\subsection{The seam}
+
+The runner never resamples. It calls the loader, and the loader returns
+something already on the AOI grid. The ``areal fraction before reduction''
+rule is therefore a \emph{per-loader implementation}, not a framework
+guarantee --- and neither is the grid. Each loader derives the grid for
+itself by calling \code{aoi.cells\_per\_side()}
+(\code{mal-commonlib/src/mal\_commonlib/aoi.py:195-199}); neither the runner
+nor the writer checks the shape or the CRS of the array it is handed. Both
+the grid and the rule are per-loader conventions: a new loader could
+satisfy the grid and violate the rule, or the other way round, and nothing
+in the framework would notice.
+
+\subsection{The Dynamic World rule, stated exactly}
+
+The Dynamic World loader is the reference implementation of the rule
+(\code{mal-commonlib/src/mal\_commonlib/data/loaders/dynamic\_world.py}):
+
+\begin{enumerate}
+\item For each run year, the Earth Engine image collection
+\code{GOOGLE/DYNAMICWORLD/V1} is filtered to that year and its \code{label}
+band is reduced by mode over the year's Sentinel-2 passes
+(\code{.../dynamic\_world.py:235-246}). Cloudy passes contribute transient
+labels that lose the vote.
+\item The modal-label raster is requested at the \emph{request scale} --- 100
+metres, the value the generated native-grid table records for
+\code{dynamic\_world} --- which is coarser than the product's own native
+resolution: the request is a hundred times cheaper and the
+\codeconst{ingest.cell_size_m}\,m aggregation smooths the difference anyway
+(\code{.../dynamic\_world.py:56-63}). The areal fractions themselves are
+computed on the AOI's own grid, at \codeconst{ingest.cell_size_m}\,m
+(Section~\ref{sec:grid}): the request scale is a fetching convenience, not
+the resolution of the product.
+\item Each label code is turned into a binary layer and reprojected onto the
+AOI grid with an \emph{averaging} resampling, so each cell receives the
+fraction of its area covered by that class
+(\code{.../dynamic\_world.py:302}, \code{...:314}).
+\item The class fractions are summed into four feature columns and divided by
+the number of valid pixels in the cell
+(\code{.../dynamic\_world.py:318-331}). A cell with no valid pixel gets the
+NoData sentinel \mskey{ingest.nodata_sentinel}; the divisor is floored at
+\mskey{ingest.valid_count_epsilon} so that the division cannot divide by
+zero. The sentinel is a reserved out-of-range value, shared with the
+simulation engine, which reads it from the same configuration key; every
+downstream consumer must treat it as missing rather than as a number. The
+epsilon floor bounds the divisor, so a cell with a single valid pixel is not
+divided by a number close to zero.
+\item The four feature columns are \code{lc\_built},
+\code{lc\_wetland}, \code{lc\_crop} and \code{lc\_open\_plus\_water}, the last
+being the union of grass, shrub and scrub, bare and water
+(\code{.../dynamic\_world.py:92-103}).
+\end{enumerate}
+
+What this reduction loses: the composition of every cell below the request
+scale; the identity of the minority class in a mixed cell; and the difference
+between a class that dominates because it is persistent and one that won a
+close annual vote --- not recoverable downstream, because the annual mode has
+already discarded the vote distribution.
+
+The loader returns one frame per requested year on a \code{time} dimension
+(\code{.../dynamic\_world.py:378-410}); the ingest stage averages the frames
+into the single static plane of the habitat contract.
+
+\subsection{The JRC rule, stated exactly}
+
+The JRC loader streams the \code{occurrence} asset from the Planetary
+Computer STAC catalogue and bins it at a fixed occurrence threshold of
+\codeconst{ingest.jrc_occurrence_threshold_pct} per cent
+(\code{.../jrc\_gsw.py:61-72}) --- the product's own definition of
+"permanent water". A source pixel is binned as water only if it was
+observed as water in at least that share of the monthly observations; the
+cell's value is then the fraction of its area made of such pixels. The
+threshold is therefore a substantive choice and not a formality: a lower one
+describes a different wetland than a higher one. The binarised mask and the valid-pixel mask are each
+reprojected onto the AOI grid and their ratio is the cell's permanent-water
+fraction (\code{.../jrc\_gsw.py:209-235}). The year used is the last year of
+the product's coverage range, and the loader refuses a year outside it
+(\code{.../jrc\_gsw.py:296-299}).
+
+\subsection{Resampling, per source dataset}
+
+\small
+\begin{longtable}{@{}p{3.3cm}p{3.4cm}p{0.40\textwidth}@{}}
+\toprule
+Product class & Resampling & Consequence \\
+\midrule
+\endhead
+Continuous field (ERA5 temperature) & bilinear & each destination cell
+takes a weighted average of
+the surrounding source cells, so the value is smoothed, and the coastal
+cells are pulled towards the sea-surface temperature; before the warp the
+loader fills the NaN holes with the \emph{nearest finite neighbour} (a
+distance transform: each hole takes the value of the closest cell that has
+data), because GDAL's bilinear warper turns NaN into an expanding nodata
+fillet; only afterwards is the NoData sentinel written, as the raster's own
+nodata tag rather than as a substitute value
+(\code{.../era5.py:137-146}, \code{.../era5.py:151}) \\
+Rainfall (CHIRPS) & nearest & each
+destination cell takes the value of the nearest source cell that has data,
+without interpolating; the loader's comment states the reason: for small
+coastal AOIs the source window is tiny and mostly ocean NoData, and a
+bilinear blend propagates that NoData into every destination cell
+(\code{.../chirps.py:230-241}) \\
+Categorical settlement class (GHSL) & nearest & each destination cell takes
+the value of the
+nearest source cell that has data; a categorical field must not be
+interpolated, and the class codes are preserved
+(\code{.../ghsl.py:199-206}) \\
+Population (WorldPop) & sum-preserving rectangle sum & each destination cell
+sums the
+overlapping source cells, weighted by the overlap, so the total is
+preserved; the per-cell value stays a \emph{count of people}, not a density;
+the loader's docstring records that an earlier nearest-neighbour
+implementation discarded most of the source mass
+(\code{.../worldpop.py:141-200}, \code{.../worldpop.py:30-36}) \\
+Livestock density (GLW) & nearest & each
+destination cell takes the value of the nearest source cell that has data:
+density is intensive, and summing it would inflate the value by the number
+of fine cells per coarse pixel (\code{.../glw.py:183-189}) \\
+Land-cover class fractions (Dynamic World) & averaging & each destination
+cell takes the
+fraction of its area covered by the class, so the value is an areal
+fraction by construction (\code{.../dynamic\_world.py:302}) \\
+Building fraction (Overture) & centroid containment & the value is 1.0 in
+any cell containing at
+least one footprint centroid, and 0 in a cell containing none; it is
+\emph{not} an area fraction (\code{.../buildings.py:18-25}) \\
+Coastline land fraction (GSHHG) & sub-cell rasterisation then averaging
+(\code{.../coastline.py:33-37}) & the cell is subdivided into sub-pixels,
+each sub-pixel is classified as land or sea, and the cell takes the
+fraction of its sub-pixels that are land; no dilation is applied \\
+\bottomrule
+\end{longtable}
+\normalsize
+\label{tab:resampling}
+
+\subsection{The one systematic bias: the coast}
+
+The coastal cells of a bilinear field carry a sea-surface contribution, and
+the reader must know where that contribution survives. The ERA5 temperature
+plane is interpolated from a source grid that covers land and sea alike, so
+a coastal cell's temperature is pulled towards the sea value; the loader
+does not correct this, and neither does any later stage. What downstream
+does correct is the open sea: the ingest stage derives an open-sea mask from
+the coastline land fraction --- a cell is open sea when its land fraction is
+below the floor and it lies further from land than the coastal band --- and
+sets the open-sea cells' rainfall and temperature to the zero sentinel
+(\code{mal-core/src/mal\_core/ingest/daily\_nc.py:225-255},
+\code{...:285-293}). Cells inside the coastal band keep the interpolated
+value, so the band is where the bias lives: it is a bias of the temperature
+field itself, and it is not corrected anywhere in the pipeline.
+
+\subsection{What is lost in the population layer}
+
+The WorldPop reduction preserves the total by summing source pixels into
+destination cells, so the AOI-grid raster is a count per cell and the sum
+over cells is the population of the covered area. What is lost is the
+within-cell distribution: a cell's inhabitants are placed uniformly across it,
+and a cell straddling an urban boundary keeps only its total. The source's
+own resolution is finer than the target, so the aggregation is not lossy in
+mass --- it is lossy in position.
+
+% ---------------------------------------------------------------------------
+\section{What arrives from outside, and what is decided here}
+
+This section reserves two words, and uses them consistently throughout the
+document: a \emph{source dataset} is the upstream product a loader fetches
+(CHIRPS, ERA5, JRC GSW), and an \emph{output} is what this stage writes to
+disk under an output name and registers under a manifest key.
+
+\begin{itemize}
+\item \textbf{Which source datasets exist} is decided by the loaders package,
+by existence (\code{registry.py:12-25}).
+\item \textbf{Which outputs a default run fetches} is decided by the
+registry's profile table and the loaders' \code{abm\_default\_outputs}
+(\code{registry.py:55-75}).
+\item \textbf{Which years and months} are decided by the caller
+(\code{cli.py:158-163}).
+\item \textbf{Which AOI} is decided by the caller and resolved against
+\code{aois.yaml}; \textbf{the grid resolution} is decided by the AOI
+registry.
+\item \textbf{The source dataset's native resolution} is a fact about the
+upstream provider and is not a choice here.
+\item \textbf{The class composition and the areal-fraction rule} are decided
+by the loader's source code (\code{dynamic\_world.py:92-103}).
+\item \textbf{The occurrence threshold for ``permanent water''} is a module
+constant in the JRC loader, generated here as
+\codeconst{ingest.jrc_occurrence_threshold_pct} per cent
+(\code{jrc\_gsw.py:68-72}).
+\item \textbf{The year-aggregation rule for monthly products} is a module
+constant defaulting to the mean (\code{runner.py:203-209}).
+\item \textbf{The credential families} are decided by each loader's
+\code{requires\_auth}.
+\item \textbf{The licence and attribution lines} are decided by each loader
+(\code{licenses.py:1-12}).
+\item \textbf{The NoData sentinel} is not a choice here: it is shared with the
+engine and read from the constants file
+(\code{dynamic\_world.py:110-112}).
+\end{itemize}
+
+A reader who wants a different scenario --- a different year, a different
+AOI, a different land-cover decomposition --- changes the corresponding row
+in that table and nothing else. A reader who wants a different \emph{science}
+changes the constants file or the loader. The stage does have parameters of
+its own, though, and each of them has a default and a failure mode:
+
+\small
+\begin{longtable}{@{}p{2.6cm}p{3.6cm}p{0.42\textwidth}@{}}
+\toprule
+Parameter & Default & What breaks when it is wrong \\
+\midrule
+\endhead
+\code{CDSAPI\_RC} & unset; the probe then falls back to
+\code{\textasciitilde/.cdsapirc} & the CDS probe fails, the ERA5 loader is
+skipped with the status \code{auth missing}, and the run continues without
+temperature or wind --- no error, no product
+(\code{runner.py:22-33}) \\
+\code{EARTHDATA\_TOKEN} & unset & the MODIS and SMAP loaders are skipped in
+the same way (\code{runner.py:34-37}) \\
+\code{ERA5\_AREA\_PAD\_DEG} & the loader's own module constant, half a
+degree (\code{.../era5.py:56}) & too small a padding makes the CDS request
+area return a mostly empty source slice, and the loader then raises
+\code{RuntimeError} (``ERA5 source slice is near-empty'') instead of
+writing a plane that is mostly NoData; too large a padding only costs
+download time, because the padding is cropped away once the field is on the
+AOI grid (\code{.../era5.py:120-127}, \code{...:158-186}) \\
+\code{XDG\_CACHE\_HOME} & unset, so the cache lives under
+\code{\textasciitilde/.cache} & nothing breaks, but the cache moves and the
+next run re-downloads everything
+(\code{.../chirps.py:57-61}) \\
+\code{--years} & none & every time-series product is skipped with a warning
+and the status map still reports those loaders as \code{ok}, so a run that
+fetched no time-series product looks successful
+(\code{runner.py:117-119}, \code{...:265}) \\
+\code{--months} & all twelve & honoured only by CHIRPS, ERA5, MODIS and
+SMAP; the other loaders ignore it (Section~\ref{sec:entry}) \\
+\code{--output-dir} & \code{data} & the products and the manifest move out
+of \code{data/<aoi>/}, where the ingest stage and the ABM wrapper do not look
+for them (Section~\ref{sec:manifest}) \\
+\bottomrule
+\end{longtable}
+\normalsize
+\label{tab:parameters}
+
+% ---------------------------------------------------------------------------
+\section{Provenance of the values}
+\label{sec:provenance}
+
+\subsection{Three tiers, and where each class of value lives}
+
+\begin{itemize}
+\item \textbf{Model parameters shared with the engine} --- the NoData
+sentinel (\mskey{ingest.nodata_sentinel}), its integer twin
+(\mskey{ingest.nodata_sentinel_int}), the valid-count epsilon
+(\mskey{ingest.valid_count_epsilon}), the wildlife suitability table
+(\mskey{wildlife.class_suitability.trees} and its eight siblings) and the
+wildlife component weights (\mskey{wildlife.weights.habitat},
+\mskey{wildlife.weights.water}, \mskey{wildlife.weights.remoteness}) ---
+are a \emph{model definition}. They live in
+\code{mal-core/config/model\_constants.yaml} and are read through the
+read-only accessor; the loaders read them and never define their own --- both
+the Dynamic World loader
+(\code{.../dynamic\_world.py:112}) and the JRC loader
+(\code{.../jrc\_gsw.py:83}) read the valid-count epsilon from the same
+configuration key.
+\item \textbf{Upstream facts} --- native resolutions, product identifiers,
+coverage years, class codes, the request scale, the
+request padding --- are \emph{measured or literature-anchored}. They are
+stated by the provider and recorded in the loader's module constants and
+docstrings; they are cited to the source in this document and are not
+generated.
+\item \textbf{Engineering choices} --- the ABM profile table, the default
+year-aggregation rule, the file-naming patterns, the cache locations --- are
+an \emph{engineering prior}: chosen by the project, revisable, and cited to
+the module that holds them.
+\end{itemize}
+
+The following values in this document come from the generated macros, that
+is, from \code{mal-core/config/model\_constants.yaml} through
+\code{docs/concepts/generated/macros.tex}: the NoData sentinels
+\mskey{ingest.nodata_sentinel} and \mskey{ingest.nodata_sentinel_int};
+the valid-count epsilon \mskey{ingest.valid_count_epsilon}; the wildlife
+suitability table \mskey{wildlife.class_suitability.water},
+\mskey{wildlife.class_suitability.trees},
+\mskey{wildlife.class_suitability.grass},
+\mskey{wildlife.class_suitability.flooded_vegetation},
+\mskey{wildlife.class_suitability.crops},
+\mskey{wildlife.class_suitability.shrub_and_scrub},
+\mskey{wildlife.class_suitability.built},
+\mskey{wildlife.class_suitability.bare} and
+\mskey{wildlife.class_suitability.snow_and_ice}; the wildlife component
+weights \mskey{wildlife.weights.habitat}, \mskey{wildlife.weights.water} and
+\mskey{wildlife.weights.remoteness}; the ingest-side coastline parameters
+\mskey{ingest.coastline_buffer_m} and \mskey{ingest.coastline_resolution};
+the cell-size hint \mskey{ingest.cell_size_hint_m}; and the contract
+versions \mskey{contracts.env_nc} and \mskey{contracts.cogs_state}.
+
+A second generated family carries the values that live in the code rather
+than in the constants file, through
+\code{docs/concepts/generated/code-macros.tex}: the AOI cell size
+\codeconst{ingest.cell_size_m} (read from \code{aois.yaml}), the JRC
+occurrence threshold \codeconst{ingest.jrc_occurrence_threshold_pct}, and
+the wildlife loader's neutral fallbacks
+\codeconst{download.wildlife_habitat_fallback} and
+\codeconst{download.wildlife_remoteness_neutral}. The native grids are
+generated as well, in the table ``The loaders' native grids''
+(Section~\ref{sec:registry}).
+
+Every other magnitude quoted in this document is a \emph{reading of the
+code}: a number typed into a loader's source or into a docstring, cited to
+that file and line. Such readings are explicitly marked as such in the
+evidence appendix.
+
+\subsection{The output contracts of the pipeline}
+
+The generated contract table below is authoritative for the pipeline's
+artefacts; the download stage participates in it through the \code{manifest}
+row. Each row is one artefact: its \emph{name}; the module that \emph{produces}
+it; the modules that \emph{consume} it; the \emph{contract version}, which is
+a schema version --- the number the producer stamps on the artefact and that
+a consumer is entitled to check --- and which is empty for the artefacts that
+carry no version; the \emph{bands or variables} the artefact holds; and the
+\emph{sentinel} it uses for missing data.
+
+\input{../generated/contracts.tex}
+
+% ---------------------------------------------------------------------------
+\section{Outputs and their consumption contract}
+\label{sec:consumption}
+
+\subsection{What the download stage itself produces}
+
+Four kinds of file, all under \code{data/<aoi>/}, all registered in the
+manifest:
+
+\begin{itemize}
+\item A multi-year daily NetCDF, \code{<aoi>\_<output>\_<start>\_<end>\_daily.nc},
+registered as \code{"time-series"} with \code{format="nc"} and a
+\code{period}.
+\item A multi-year monthly NetCDF,
+\code{<aoi>\_<output>\_<start>\_<end>\_monthly.nc}, registered the same way.
+\item A per-year GeoTIFF, \code{<aoi>\_<output>\_<year>.tif}, registered as
+\code{"time-series"} with \code{format="tif"} and keyed by year.
+\item A static GeoTIFF or NetCDF, \code{<aoi>\_<output>.<ext>}, registered as
+\code{"static"}.
+\end{itemize}
+
+The consumption contract for all of them is the same and is enforced by the
+catalogue: a consumer asks for a manifest key, and the manifest answers with
+a path; if the path is absent the consumer is told which dataset is missing.
+
+\subsection{What the ingest stage requires}
+
+The ingest stage declares its inputs as \code{Slot}s and nothing else
+(\code{mal-core/src/mal\_core/ingest/daily\_nc.py:87-98}):
+
+\begin{longtable}{@{}lllp{0.24\textwidth}@{}}
+\toprule
+Slot & Manifest key & Required? & Produced by \\
+\midrule
+\endhead
+\code{rainfall} & \code{chirps\_rainfall\_daily} & yes & downloaded from an
+external source (CHIRPS) \\
+\code{air\_temp} & \code{era5\_air\_temp\_daily} & yes & downloaded from an
+external source (ERA5-Land) \\
+\code{jrc\_features} & \code{jrc\_habitat\_features} & yes & downloaded from
+an external source (JRC GSW) \\
+\code{wc\_fractions} & \code{dw\_class\_fractions} & yes & downloaded from an
+external source (Dynamic World) \\
+\code{land\_mask} & \code{coastline\_land\_mask} & no & downloaded from an
+external source (GSHHG) \\
+\code{host\_static} & \code{host\_static} & no & derived by ingest \\
+\code{salinity} & \code{smap\_salinity} & no & downloaded from an external
+source (SMAP), but outside the default profile \\
+\bottomrule
+\end{longtable}
+
+A default download leaves two of these slots empty. \code{host\_static} is
+not a download at all: the ingest stage builds it from the population,
+livestock, settlement and building layers. \code{salinity} is a download, but
+SMAP is outside the default profile (Section~\ref{sec:profile}), so a default
+run never fetches it and the slot resolves to nothing.
+
+A missing required slot is a hard error at resolution time
+(\code{.../daily\_nc.py:113-122}); a missing optional slot disables the
+corresponding behaviour. Note what this means: the ingest stage re-reads the
+static rasters at the target shape, resampling bilinearly if the grid differs
+(\code{.../daily\_nc.py:126-148}), so the download stage's grid is a
+convention for those products rather than an enforced contract.
+
+\subsection{What the ABM requires}
+
+The ABM wrapper validates completeness first
+(\code{mal-core/src/mal\_core/abm/wrapper.py:116-121}) and then resolves
+seven paths: \code{env}, \code{habitat}, \code{host\_static}, \code{wind},
+\code{mobility\_day}, \code{mobility\_night} and \code{livestock\_mobility}
+(\code{...:141-165}). Only \code{env} and \code{habitat} are mandatory; the
+others are passed to the binary when present
+(\code{...:167-178}). The wind path is resolved by the literal key
+\code{"wind"} rather than through a loader declaration, and the source says
+so in a comment (\code{...:149-152}). This is the one consumer that
+hard-codes a dataset key.
+
+The mapping from those seven paths back to their producers is the reader's
+answer to ``what do I have to download to make the model run?'':
+
+\begin{longtable}{@{}llp{0.40\textwidth}@{}}
+\toprule
+Path the ABM resolves & Manifest key & What fills it \\
+\midrule
+\endhead
+\code{env} & \code{env} & the ingest stage builds the env NetCDF from the
+downloaded CHIRPS rainfall, the ERA5 air temperature, the JRC
+permanent-water fraction and the Dynamic World class fractions \\
+\code{habitat} & \code{habitat} & the ingest stage builds the habitat
+GeoPackage from the JRC fraction and the Dynamic World fractions \\
+\code{host\_static} & \code{host\_static} & the ingest stage builds it from
+WorldPop, GLW, GHSL, Overture buildings and the wildlife proxy \\
+\code{wind} & \code{wind} & the ERA5 loader's \code{wind\_6hourly} output
+(the key is the literal string \code{"wind"}) \\
+\code{mobility\_day} & \code{mobility\_day} & the ingest stage builds the
+mobility CSR from \code{host\_static} \\
+\code{mobility\_night} & \code{mobility\_night} & the ingest stage builds the
+mobility CSR from \code{host\_static} \\
+\code{livestock\_mobility} & \code{livestock\_mobility} & the ingest stage
+builds the mobility CSR from \code{host\_static} \\
+\bottomrule
+\end{longtable}
+\label{tab:abm-paths}
+
+Only one of the seven is a download in itself: the ERA5 wind. The other six
+are derived by ingest, and every one of them is built from downloads that
+are in the default profile --- \code{env} from the CHIRPS rainfall, the
+ERA5 air temperature, the JRC permanent-water fraction and the Dynamic
+World class fractions; \code{habitat} from the JRC fraction and the Dynamic
+World fractions; \code{host\_static} from WorldPop, GLW, GHSL, Overture
+buildings and the wildlife proxy; and the three mobility CSRs from
+\code{host\_static}. The set of downloads the ABM needs is therefore the
+default profile of Section~\ref{sec:profile}, less the two products no
+consumer of the current contract reads.
+
+The \code{required\_for\_abm} flag is \emph{not} the gate the ABM uses. It is
+declared only by the Dynamic World and ERA5 loaders
+(\code{.../dynamic\_world.py:500}, \code{.../era5.py:506}), copied into the
+manifest entry, and displayed by \code{malariasim datasets}; the gate itself
+is completeness plus the presence of \code{env} and \code{habitat}.
+
+\subsection{Ordering constraint with the rest of the pipeline}
+
+The download stage must precede ingest, and ingest must precede the ABM. The
+\code{abm} command chains the first two automatically: it calls the download
+runner for the datasets the contract consumes and then builds the env NetCDF
+(\code{mal-core/src/mal\_core/cli.py:665-693}). The manifest carries raw
+layers and derived products alike --- the \code{env} and \code{habitat} keys
+are registered by ingest into the same file the download stage writes
+(\code{mal-core/src/mal\_core/download/catalog.py:55-68}).
+
+% ---------------------------------------------------------------------------
+\section{Cache, state and restart}
+\label{sec:state}
+
+\subsection{Three kinds of on-disk thing}
+
+\begin{description}
+\item[Cache] \code{\textasciitilde/.cache/mal\_commonlib/<dataset>/} (or
+\code{\$XDG\_CACHE\_HOME/mal\_commonlib/<dataset>/}), overridable per loader
+(\code{.../era5.py:69-72}, \code{.../chirps.py:57-61},
+\code{.../worldpop.py:105-107}, \code{.../glw.py:97-99},
+\code{.../buildings.py:52-54}, \code{.../dynamic\_world.py:170-176}). It
+holds the network-fetched artefacts --- per-month NetCDFs, per-day GeoTIFFs,
+Dynamic World label tiles, rasterised \code{.npz} results. It is a pure
+cache: deleting it changes nothing about the manifest.
+\item[Products] \code{data/<aoi>/}: the AOI-grid reductions, named by the
+conventions above and registered in the manifest.
+\item[Manifest] \code{data/<aoi>/manifest.json}: the state.
+\end{description}
+
+The runner passes a \code{cache\_dir} argument to every loader; when it is
+not given, each loader falls back to its own location
+(\code{mal-core/src/mal\_core/download/runner.py:95},
+\code{...:128}, \code{...:244}). A cached file makes a re-run cheap; a cold
+cache makes it slow, but the products and the manifest are the same either
+way.
+
+\subsection{The restart test}
+
+If the stage were interrupted and restarted, what would have to be on disk to
+resume identically? The answer is: the manifest, plus the files it names.
+
+Because the manifest is rewritten after every single output
+(\code{runner.py:147-159} and siblings) and \code{expected\_files} is
+recomputed on every write (\code{.../manifest.py:172-180}), an interrupted
+run leaves a manifest that is internally consistent: every file it declares
+exists, and the set of files may be incomplete. Re-running the same command
+does not consult the manifest at all: the runner re-executes every selected
+loader and overwrites the products it writes. What it does \emph{not} do is
+skip what is already present --- idempotence comes from the loaders' own
+caches, not from the manifest.
+
+The one thing that is \emph{not} restart-safe is a half-written product file:
+the write and the manifest update are separate steps, so a crash between them
+leaves an orphan file that no manifest entry names. The next run overwrites
+it.
+
+% ---------------------------------------------------------------------------
+\section{Licensing and attribution}
+
+Each loader declares a licence identifier and a literal attribution line
+(\code{mal-commonlib/src/mal\_commonlib/data/loaders/era5.py:481-491},
+\code{.../chirps.py:335-340}, and the equivalent in every other loader).
+The identifiers come from a registry of known licences with their usage
+limits (\code{mal-commonlib/src/mal\_commonlib/data/licenses.py:25-146}).
+
+The runner copies both into the manifest entry
+(\code{runner.py:147-159}, \code{...:212-223}) and, at the end of the run,
+aggregates the licences of all entries and warns about any usage limits
+(\code{runner.py:270-276}). The warning is advisory: it is wrapped in a
+\code{try}/\code{except} whose comment states that a download must never
+break over a warning. Derived products registered by ingest carry compound
+identifiers joined with \code{+} (\code{.../licenses.py:110-124}).
+
+The attribution stored for the wildlife proxy still names ESA WorldCover as a
+source, although the loader now reads the Dynamic World modal-label raster
+(\code{.../wildlife.py:277-285}, \code{...:wildlife.py:42-45}). The credit
+line therefore does not match the data. This is recorded in
+Section~\ref{sec:discrepancies}.
+
+\subsection{What the reader must do about licences}
+
+The authoritative record of every licence and of its limits is
+\code{docs/licenses.md}; this document does not restate it. What applies to
+the products of the default profile is this:
+
+\begin{itemize}
+\item Every product carries an attribution or citation obligation, and the
+literal credit line is stamped into the manifest entry
+(\code{runner.py:147-159}), so the obligation travels with the file.
+\item One product carries a redistribution obligation: the Overture Maps
+buildings are ODbL 1.0, and everything derived from them --- the
+\code{building\_fraction} term of \code{host\_static}, the remoteness term
+of the wildlife proxy, the mobility CSRs --- is share-alike if it is ever
+published or shared.
+\item One product carries a notification duty: the GSHHG coastline data is
+LGPL v3, and its authors ask to be notified if the data is modified for
+commercial use.
+\item One product carries a responsible-use disclaimer: the WorldPop data may
+not be used in ways that discriminate against, exploit or harm individuals,
+and the assessment of combination risks belongs to the user.
+\end{itemize}
+
+The pipeline's own warning is advisory. The runner aggregates the licences
+of the manifest entries at the end of the run and reports the limits that
+apply (\code{runner.py:270-276}); the call is wrapped in a
+\code{try}/\code{except} whose comment states that a download must never
+break over a warning. The warning therefore never fails a run and never
+blocks a product.
+
+% ---------------------------------------------------------------------------
+\section{What this stage does not do}
+\label{sec:absences}
+
+These are absences of implementation, not of documentation.
+
+\begin{enumerate}
+\item \textbf{No transformation into model inputs.} The env tensor and the
+habitat GeoPackage are ingest products
+(\code{mal-core/src/mal\_core/download/catalog.py:55-68}).
+\item \textbf{No resampling for the consumer.} The runner writes what the
+loader returned; the loaders own the reduction
+(Section~\ref{sec:reduction}).
+\item \textbf{No validation of scientific content.} Only existence and
+declaration are checked (\code{.../manifest.py:192-242}).
+\item \textbf{No skipping of already-downloaded outputs.} The runner always
+re-fetches and re-registers; idempotence comes from the caches.
+\item \textbf{No retry or back-off policy at the runner level.} A loader that
+raises is recorded as an error and the run moves on
+(\code{runner.py:266-268}).
+\item \textbf{No load-or-download fast path.} There is no function that
+checks the manifest and returns an existing file instead of fetching. The
+loaders always fetch; the manifest is written by the runner and read by
+consumers. The convention described in the project's \code{AGENTS.md} as
+``load-or-download'' is not implemented in the code.
+\item \textbf{No \code{--all} flag.} The two places that advertise it
+(\code{cli.py:171-173}, \code{abm/wrapper.py:118-121}) refer to a flag that
+does not exist.
+\item \textbf{No configurable year-aggregation rule in practice.} The runner
+supports \code{"sum"}, \code{"first"} and the default \code{"mean"}
+(\code{runner.py:203-209}), but no loader declares a \code{reductions} map,
+so the alternative branches are unreachable and every monthly product is
+reduced by the mean.
+\item \textbf{No consumer-side dataset knowledge beyond manifest keys.} The
+one exception is the ABM wrapper's literal \code{"wind"}
+(\code{abm/wrapper.py:149-152}).
+\item \textbf{No verification that the products agree with each other.} Two
+products describing the same AOI are reduced independently and never
+cross-checked.
+\end{enumerate}
+
+\subsection{What the reader should check}
+
+The stage checks existence and declaration. It does not check the grid, the
+content or the unit of what it wrote, and a run that reports \code{ok} for
+every loader has still produced files nobody has looked at. A reader who
+must trust the numbers has six checks of their own:
+
+\begin{enumerate}
+\item \code{malariasim datasets --aoi <aoi>} --- every key the pipeline
+knows is registered and its file is on disk; with \code{--missing} the
+command lists only the rows that are not
+(\code{.../cli.py:809-838}).
+\item The grid: open a written product and compare its shape with the grid
+the AOI registry prints (Section~\ref{sec:aoi-registry}); the stage does not
+check it, and a product on the wrong grid is registered as if it were right.
+\item The unit: compare the variable against Table~\ref{tab:units}.
+\item The period: for a multi-year NetCDF, compare the manifest's
+\code{period} with the years that were asked for
+(\code{.../manifest.py:205-225}).
+\item The log: the wildlife proxy's component warnings --- a silently
+substituted component is a wrong proxy and a successful run
+(\code{.../wildlife.py:200-233}) --- and the ERA5 near-empty refusal
+(\code{.../era5.py:120-127}).
+\item The licences: the aggregated warning at the end of the run
+(\code{runner.py:270-276}).
+\end{enumerate}
+
+% ---------------------------------------------------------------------------
+\section{Evidence appendix}
+
+\subsection{Implementation notes a replicator needs}
+
+\begin{enumerate}
+\item \textbf{The runner is the only writer.} Loaders return arrays; the writer
+is the only place that touches the filesystem for products
+(\code{writer.py:12-53}). Write, then register, per output --- not per
+dataset (\code{runner.py:147-159}).
+\item \textbf{The output name, not the manifest key, names the file.} A
+renamed loader changes the file names but not the manifest keys, so a
+migration is then needed (\code{runner.py:49-66}).
+\item \textbf{The NetCDF variable name is chosen by the runner} unless the
+loader names its array (\code{runner.py:135-139}).
+\item \textbf{The period is derived from the returned time coordinate.} A
+loader with no time dimension cannot be registered with a period, and its
+completeness check falls back to plain file existence
+(\code{runner.py:144-146}, \code{.../manifest.py:205-225}).
+\item \textbf{The \code{formats} map is a routing token, not a
+description.} Dynamic World is one frame per year yet takes the ``daily''
+path, because that path writes one multi-year NetCDF
+(\code{registry.py:76-82}, \code{.../dynamic\_world.py:491}).
+\item \textbf{The ERA5 wind output takes the ``daily'' path too}, although the
+product is six-hourly: the loader returns a six-hourly dataset and the
+runner writes it under a \code{\_daily} file name, so the stored file's
+temporal resolution is the loader's, not the file name's
+(\code{.../era5.py:493-496}, \code{...:era5.py:447-470}).
+\item \textbf{The ERA5 request area is padded} by half a degree by default,
+because a bare small bounding box produced a nearly empty source slice; the
+padding is overridden by an environment variable, and a source slice less
+than half finite is refused (\code{.../era5.py:56}, \code{...:158-186},
+\code{...:120-127}).
+\item \textbf{The ERA5 wind request area is hard-coded to a Ghana-wide
+window}, not to the AOI's bounding box; the result is reprojected afterwards
+(\code{.../era5.py:357}, \code{...:429}).
+\item \textbf{The channel names} come from the loader where it names its
+array: ERA5 returns \code{air\_temp\_c}, CHIRPS returns an unnamed array and
+the runner supplies the fallback \code{rainfall}
+(\code{.../era5.py:335}, \code{runner.py:135-139}).
+\item \textbf{The wildlife proxy is the one loader that consumes other
+products.} It reads the Dynamic World modal-label raster, the JRC occurrence
+fraction and the Overture building fraction and combines them with the
+weights \mskey{wildlife.weights.habitat},
+\mskey{wildlife.weights.water} and \mskey{wildlife.weights.remoteness}. A
+component that fails to load silently becomes a neutral constant ---
+\codeconst{download.wildlife_habitat_fallback} for the habitat component,
+the same neutral fraction for the water component, and
+\codeconst{download.wildlife_remoteness_neutral} for remoteness (\code{.../wildlife.py:21-23},
+\code{.../wildlife.py:200-233}). The substitution is recorded in the log
+and nowhere else: the loader emits a warning naming the component that
+failed and the neutral value it used (\code{.../wildlife.py:200-233}), and
+the manifest entry it writes is identical for a fully computed proxy and for
+a neutral one. Nothing in the manifest or in the status map shows that a
+component was substituted, so a reader who must trust the proxy has to read
+the download log.
+\item \textbf{The JRC loader's year is bounded} by the product's coverage
+range (\code{.../jrc\_gsw.py:74-76}, \code{...:289-293}); \textbf{the Dynamic
+World loader refuses years before the record starts}
+(\code{.../dynamic\_world.py:106}, \code{...:361-364}).
+\item \textbf{Modis, SMAP and the retired hydrorivers loader} are the three
+special cases of the profile table: SMAP and hydrorivers are entries with
+empty lists, and \code{modis} is not an entry of the table at all, which is
+why it is not excluded
+(\code{registry.py:55-75}).
+\end{enumerate}
+
+\subsection{Readings of the code, not configured values}
+
+The following counts and enumerations in this document are readings of the
+source at the time of writing, not values from the constants file:
+
+\begin{itemize}
+\item The registry discovers twelve loader modules, listed in
+Section~3.4; the retired loaders under
+\code{mal\_commonlib/data/loaders/\_legacy/} are invisible to the scan
+because they form a package (\code{registry.py:12-25}).
+\item That table lists seventeen output-to-key mappings.
+\item The profile table has twelve entries, of which ten assign outputs and
+two are empty lists (\code{registry.py:55-75}).
+\item The \code{INGEST\_ARTIFACTS} table holds eight derived artefacts
+(\code{catalog.py:55-92}); the ingest stage declares four required and three
+optional slots (\code{ingest/daily\_nc.py:87-98}); the ABM wrapper resolves
+seven paths (\code{abm/wrapper.py:137-163}).
+\item The Ghana AOI's grid reads 779 rows by 551 columns at
+\codeconst{ingest.cell_size_m}\,m, from the bounding box and the resolution
+in \code{.../aois.yaml:18-20} and the conversion at
+\code{.../aoi.py:154-167}; this is a reading of the derived grid, not a
+configured value, and the same two numbers are printed by the generated AOI
+registry table.
+\item The ERA5 request area is padded by half a degree by default
+(\code{.../era5.py:56}); the loader's own module constant, not a value from
+\code{model\_constants.yaml}.
+\end{itemize}
+
+
+\subsection{Verified and not verified}
+
+\begin{itemize}
+\item \emph{Verified by reading the code}: the manifest schema and its three
+top-level keys, checked against the real \code{data/ghana/manifest.json}
+(\code{.../download/manifest.py:30-189}); the resolution semantics and their
+three failure modes (\code{.../download/catalog.py:155-268},
+\code{.../manifest.py:39-114}); the order of operations
+(\code{.../download/runner.py:69-278}); the credential probes
+(\code{.../download/runner.py:20-46}); the areal-fraction rule for Dynamic
+World (\code{.../dynamic\_world.py:273-334}); the resampling choices in
+Table~\ref{tab:resampling}.
+\item \emph{Read but not executed}: the behaviour of the CDS client and of the
+Earth Engine initialiser inside the loaders, and the Dynamic World
+reduction path --- both were read, not run.
+\item \emph{Not verified here}: the real numbers of a Ghana download (this
+review did not run a download; the manifest on disk is the evidence used for
+the naming and schema claims), and the scientific adequacy of the products,
+which is not this stage's concern.
+\end{itemize}
+
+\subsection{Discrepancies found while writing this document}
+\label{sec:discrepancies}
+
+These are places where the code, the documentation and the generated tables
+disagree. The document describes the code; the disagreements are listed here
+so that they are not lost.
+
+\begin{itemize}
+\item \code{cli.py:171-173} and \code{abm/wrapper.py:118-121} advertise a
+\code{--all} flag the CLI does not define; the behaviour is obtained by
+omitting \code{--datasets} and \code{--outputs}.
+\item \code{registry.py:55-75} and \code{runner.py:109-110}: \code{modis} is
+absent from the profile table and declares no \code{abm\_default\_outputs},
+so its value is \code{None} and the filter does not exclude it --- a default
+run fetches MODIS NDVI, which no current consumer reads.
+\item \code{runner.py:203-209}: the \code{"sum"} and \code{"first"} reduction
+branches are unreachable, because no loader declares a \code{reductions} map.
+\item \code{tools/gen\_concepts\_values.py:334}: the generated dataset
+table's column headed ``Manifest keys'' enumerates the \emph{keys} of each
+loader's \code{manifest\_keys} mapping, which are the output names; the
+manifest keys are the mapping's \emph{values} (Table~\ref{tab:loaders}).
+\item \code{.../wildlife.py:277-285}: the attribution still credits ESA
+WorldCover, which is no longer the source.
+\item \code{.../dynamic\_world.py:491} and \code{.../era5.py:493-496}: two
+products are routed through the ``daily'' write path although one is annual
+and the other six-hourly; the path chooses the container and the naming, not
+the temporal resolution.
+\item \code{.../era5.py:357}: the ERA5 wind request area is a hard-coded
+Ghana-wide window rather than the AOI's bounding box.
+\item \code{catalog.py:411-421}: the migration path embeds a hand-written
+copy of the ingest artefacts' naming rules, not derived from the producers.
+\item \code{abm/wrapper.py:149-152}: the ABM resolves the ERA5 wind by the
+literal key \code{"wind"} instead of through the loader's declaration.
+\item \code{.../manifest.py:91-98} against \code{.../manifest.py:103-114}: the
+per-year miss and the stale-manifest miss both raise
+\code{FileNotFoundError}; only their messages distinguish them.
+\end{itemize}
+
+\subsection{What this document must not be used for}
+
+It is not an installation guide for the credential systems, not a licence
+audit (that is \code{docs/licenses.md}), not a specification of the manifest
+schema (which the code owns), and not a claim that the data in
+\code{data/<aoi>/} is scientifically adequate for the malaria question. It
+describes one stage: how external data arrives, is reduced onto the AOI grid,
+is written, and is recorded.
+
+\end{document}

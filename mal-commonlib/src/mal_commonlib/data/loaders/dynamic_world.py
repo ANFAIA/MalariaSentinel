@@ -137,6 +137,7 @@ def _ensure_ee():
         _orig = _ee_oauth.get_appdefault_project
 
         def _safe_appdefault_project() -> str | None:
+            """Return the Google Cloud quota project for Earth Engine, or None when it cannot be read."""
             try:
                 return _orig()
             except OSError:
@@ -174,6 +175,7 @@ def _aoi_bbox_wgs84(aoi: "AOI") -> tuple[float, float, float, float]:
 
 
 def _ensure_cache_dir(cache_dir: Path | None) -> Path:
+    """Resolve and create the cache directory that holds the Dynamic World label tiles."""
     base = Path(cache_dir) if cache_dir is not None else (
         Path.home() / ".cache" / "mal_commonlib" / "dynamic_world"
     )
@@ -263,6 +265,7 @@ def _year_mode_label_tifs(
 
 
 def _read_tile(path: Path) -> tuple[np.ndarray, rasterio.Affine, object]:
+    """Read band 1 of a cached label GeoTIFF; returns (labels, affine transform, CRS), masked pixels filled with 0."""
     with rasterio.open(path) as src:
         arr = src.read(1)
         if hasattr(arr, "filled"):

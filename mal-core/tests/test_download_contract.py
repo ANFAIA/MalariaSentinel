@@ -1,7 +1,7 @@
 """Contract tests for the download plugin system.
 
 Validates that every DOWNLOADER dict in mal_commonlib.data.loaders follows
-the spec in docs/specs/download/spec.md. The modules are discovered (not
+the DOWNLOADER contract. The modules are discovered (not
 listed) so a new loader is covered automatically.
 """
 import importlib
@@ -78,7 +78,7 @@ def test_manifest_keys_unique_within_downloader():
 
 def test_registered_set_matches_contract_v3():
     # Contract v3.0 (+Dynamic World swap): dem is retired, worldcover is
-    # replaced by dynamic_world (see docs/specs/download/spec.md).
+    # replaced by dynamic_world (see mal_commonlib/data/loaders/).
     found = set(_discover_downloaders())
     expected = {
         "era5", "chirps", "jrc_gsw", "modis", "worldpop",

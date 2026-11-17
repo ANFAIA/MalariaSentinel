@@ -9,6 +9,7 @@ from mal_core.habitat.config import CONFIG
 
 
 def _ingest_nodata() -> float:
+    """Return the nodata sentinel used by the host grids, read from the configuration."""
     return float(CONFIG["ingest"]["nodata_sentinel"])
 
 import logging

@@ -1,6 +1,23 @@
-"""Configuration: AOI, grid, paths, v1 parameters, weights, randomization ranges.
+"""Configuration: AOI, grid, paths, v1 parameters, randomization ranges.
 
-All values come from DESIGN.md (rev 4, APPROVED). Tunable knobs live here.
+This module is the single place where the legacy v1 rollout knobs live.
+The shared py⇄C++ model constants have their own source of truth in
+``mal-core/config/model_constants.yaml``; the AOI registry lives in
+``mal_commonlib.aoi`` (``aois.yaml``).
+
+What the module holds, and where each thing belongs:
+
+* the repository's paths (``DATA_DIR``, ``PAPERS_DIR``, ``TERRAIN_DIR``,
+  ``RUNS_DIR``) and the dataset files under ``data/``;
+* the **deprecated** AOI and grid constants (``AOI_W``/``AOI_E``/
+  ``AOI_S``/``AOI_N``, ``DST_CRS``, ``DST_RES``) — the SRTM DEM crop, not
+  the national bbox; use ``AOI.from_slug()`` instead;
+* the file names of the environment layers (``LAYER_FILES``), which the
+  contract v3.0 names;
+* the legacy v1 rollout knobs (``SimParams``, ``PARAM_RANGES``) — see
+  the class: nothing reads them yet;
+* the training constants (``PATCH``, ``STRIDE``, ``UNET_CHANNELS``,
+  ``LOSS_DICE_WEIGHT``, ``LOSS_DICE_TAU``, ``PRESENCE_THRESH``).
 """
 from __future__ import annotations
 
@@ -67,13 +84,22 @@ SEED_DENSITY_FRAC = 0.1
 
 @dataclass
 class SimParams:
-    """One parameter set for a rollout (randomized per rollout in Stage 4)."""
+    """The legacy v1 rollout knobs: r_max, mu and water_thresh.
+
+    The class is declared but **nothing in the repository reads it**:
+    the values the pipeline actually uses live in
+    ``mal-core/config/model_constants.yaml``, and the per-rollout
+    randomisation these knobs were meant for is not performed by any
+    code. It is kept because it names the three legacy parameters in
+    one place, not because it drives a rollout.
+    """
     r_max: float = R_MAX
     mu: float = MU
     water_thresh: float = WATER_THRESH
-
-    def r_of(self, T):
-        return self.r_max * temp_suitability(T)
+    # The legacy temperature-scaled reproduction rate (r_of) was removed
+    # here: it called a module-level helper that the retired annual
+    # temperature-suitability channel took with it, so it raised NameError
+    # for every caller. No caller in the repository used it.
 
 
 # Randomization ranges for training rollouts (Stage 4)

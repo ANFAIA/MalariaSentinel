@@ -1,0 +1,134 @@
+# contracts.yaml — the generator's input for the contract table.
+#
+# This file is NOT a human document and NOT a source of truth: the generator
+# (tools/gen_concepts_values.py) cross-checks it against the code and fails
+# the build on a mismatch, and the GENERATED table
+# (docs/concepts/generated/contracts.tex) is what a conceptual document may
+# cite. Contract versions are never duplicated here: they come from
+# model_constants.yaml (contracts.*), which D2 makes the authority.
+#
+# artefact      — the manifest key / file family
+# producer      — who writes it
+# consumers     — who reads it
+# version_from  — the model_constants.yaml key holding the version (or absent)
+# bands/variables — the names carried by the artefact
+# sentinel      — the no-data value: a number, or the word `none` when the
+#                 artefact carries no no-data marker of its own
+# keys          — the JSON keys the artefact writes, in emission order
+# band_names    — the band names the artefact carries, from wire.hpp
+# nodata        — the NoData value the artefact writes
+# compatibility — the rule a consumer must apply
+#
+# The `keys`, `band_names` and `nodata` fields are DECLARATIONS the
+# coherence review cross-checks against the code (tools/coherence_signals.py):
+# the declared set must equal the code's set. The generator does not read
+# them, so a declaration can never make the documentation build fail on a
+# field it does not know.
+
+artefacts:
+  - key: env
+    producer: mal_core.ingest.env.build_env_tensor
+    consumers: [abm, prediction, scoring]
+    version_from: contracts.env_nc
+    variables:
+      - rainfall
+      - air_temp_c
+      - jrc_persistent
+      - lc_built
+      - lc_wetland
+      - lc_open_plus_water
+      - lc_crop
+      - land_frac (optional)
+      - salinity_ppt (optional)
+    # The file carries NO sentinel: the encoding sets the dtype and the
+    # compression only, so a missing value lands as the writer's default
+    # NaN fill for 32-bit floats. The -9999.0 sentinel is a build-time
+    # value (it is what the readers recognise in the inputs) and is never
+    # stored. land_frac and salinity_ppt appear only when their inputs
+    # resolve.
+    sentinel: none
+    compatibility: >-
+      A reader that finds a different env_nc contract version must refuse the
+      file rather than reinterpret the planes.
+
+  - key: habitat
+    producer: mal_core.ingest.env.build_env_tensor
+    consumers: [abm]
+    variables:
+      - hab_type
+      - habitat_potential
+      - row
+      - col
+    # The file carries NO no-data marker: a cell without habitat
+    # potential is ABSENT from the file, not marked in it. The sentinel
+    # belongs to the rasters the file is built from.
+    sentinel: none
+    compatibility: >-
+      The candidate patches are an INDEX, not a measurement of pools; a
+      reader must not read habitat_potential as a count, depth or volume.
+      A cell that is missing is a cell with no potential, not a cell whose
+      value is unknown.
+
+  - key: state_cog
+    producer: mal_abm_fast::write_state_cog
+    consumers: [scoring, prediction, training]
+    version_from: contracts.cogs_state
+    bands:
+      - adult_patch_count
+      - adult_cell_count
+    sentinel: -9999.0
+    compatibility: >-
+      The bands are RAW per-cell adult counts: no capacity normalisation, no
+      [0,1] clamp. A reader that normalises them is reading a different
+      quantity.
+
+  - key: state_sidecar
+    producer: mal_abm_fast::write_state_sidecar
+    consumers: [scoring]
+    version_from: contracts.cogs_state
+    keys:
+      - crs
+      - transform
+      - aoi_slug
+      - scale
+      - year
+      - month
+      - seed
+      - n_rollouts
+      - rollout_index
+      - generator_version
+      - abm_params_hash
+      - contract_version
+      - band_names
+      - nodata
+      - shape
+    band_names:
+      - adult_patch_count
+      - adult_cell_count
+    nodata: -9999.0
+    compatibility: >-
+      The key order is part of the contract, so two engines writing the same
+      run produce byte-equal sidecars.
+
+  - key: manifest
+    producer: mal_core.download.manifest.update_dataset
+    consumers: [download, ingest, abm]
+    compatibility: >-
+      manifest.json is the single source of truth for what exists and in
+      which file. A declared entry whose file is missing is an error, never a
+      fallback to a conventional name.
+
+  - key: host_static
+    producer: mal_core.ingest.hosts.build_host_dataset
+    consumers: [abm]
+    variables: [humans, livestock, urban, buildings]
+    compatibility: >-
+      The static host grid is read by the ABM engine as the human side of the
+      transmission model; it is a raster on the spatial frame of the env NC.
+
+  - key: mobility_day
+    producer: mal_core.ingest.mobility.build_mobility_dataset
+    consumers: [abm]
+    compatibility: >-
+      The daytime mobility CSR is a sparse operator on the same grid; it is
+      applied to the human counts, not to the vector counts.

@@ -20,6 +20,16 @@ from .base import Scorer, ScorerResult, find_cohort_file
 
 
 class EIPScorer(Scorer):
+    """Measures how far the infected mosquito cohort has progressed
+    through the extrinsic incubation period.
+
+    The value is the fraction of infected mosquitoes whose EIP has
+    completed at the measurement day. The score is 1 when that fraction
+    falls inside the accepted window and decays as a Gaussian around
+    the window centre otherwise. Runs without transmission dynamics
+    (a constant fraction) are skipped rather than scored.
+    """
+
     name = "D3_eip"
     kind = "composite"
     weight = 3.0
@@ -28,6 +38,11 @@ class EIPScorer(Scorer):
     hard_floor = 0.1
 
     def score(self, run_dir: Path, ctx: dict[str, Any]) -> ScorerResult:
+        """Compute the completed-EIP fraction at the measurement day and its score.
+
+        Returns the completed fraction as the value, or a skipped result
+        when the cohort log is missing or carries no EIP dynamics.
+        """
         cohort_path = find_cohort_file(run_dir)
         if cohort_path is None:
             return ScorerResult.skipped(

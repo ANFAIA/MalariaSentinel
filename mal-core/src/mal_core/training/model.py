@@ -12,7 +12,14 @@ import torch.nn.functional as F
 
 
 class DoubleConv(nn.Module):
+    """Two 3x3 convolutions, each followed by batch norm and ReLU.
+
+    The standard convolutional block of the U-Net encoder and decoder; it
+    preserves the spatial resolution of its input.
+    """
+
     def __init__(self, in_ch, out_ch):
+        """Build the block mapping ``in_ch`` input channels to ``out_ch``."""
         super().__init__()
         self.block = nn.Sequential(
             nn.Conv2d(in_ch, out_ch, 3, padding=1, bias=False),
@@ -22,12 +29,28 @@ class DoubleConv(nn.Module):
         )
 
     def forward(self, x):
+        """Apply the convolution block to a (N, C, H, W) tensor."""
         return self.block(x)
 
 
 class UNet(nn.Module):
+    """Encoder-decoder network that predicts the next state of a patch.
+
+    Four encoder stages with max-pooling between them, a bottleneck at
+    twice the deepest width, and a mirrored decoder that concatenates the
+    skip connections. The head is a 1x1 convolution producing the output
+    channels.
+    """
+
     def __init__(self, in_channels=6, out_channels=2,
                  channels=(32, 64, 128, 256)):
+        """Build the network.
+
+        Args:
+            in_channels: channels of the input tensor (state plus environment).
+            out_channels: channels of the predicted next state.
+            channels: width of each encoder stage, deepest last.
+        """
         super().__init__()
         c = channels
         self.enc = nn.ModuleList()
@@ -46,6 +69,7 @@ class UNet(nn.Module):
         self.head = nn.Conv2d(c[0], out_channels, 1)
 
     def forward(self, x):
+        """Predict the next state from a (N, in_channels, H, W) tensor."""
         skips = []
         for enc in self.enc:
             x = enc(x); skips.append(x); x = self.pool(x)

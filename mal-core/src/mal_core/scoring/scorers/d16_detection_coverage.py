@@ -51,6 +51,18 @@ OCCURRENCE_CANDIDATES = [
 
 
 class DetectionCoverageScorer(Scorer):
+    """Measures the share of real detection points the simulated
+    population reaches.
+
+    The run is expected to come from ``malariasim validate-detections``,
+    which seeds mosquitoes at the AOI's real detection points; a spot
+    counts as covered when the final snapshot holds at least one
+    occupied cell within the detection radius. The value is the covered
+    fraction of spots and the score is that fraction rescaled against
+    the coverage target, so a population that never establishes scores
+    0.
+    """
+
     name = "D16_detection_coverage"
     kind = "composite"
     weight = 4.0
@@ -60,6 +72,13 @@ class DetectionCoverageScorer(Scorer):
     manual = True  # AOI-dependent: needs the AOI's occurrence dataset
 
     def score(self, run_dir: Path, ctx: dict[str, Any]) -> ScorerResult:
+        """Compute the detection-point coverage and its score.
+
+        Returns the covered fraction of detection spots as the value.
+        The result is skipped when the AOI, its occurrence table or the
+        grid transform cannot be resolved; a population with no
+        occupied cell at all scores 0 and is flagged as extinct.
+        """
         target = f"coverage >= {COVERAGE_TARGET} @ r={RADIUS_KM_DEFAULT}km"
         aoi = require_aoi(ctx)
         if not aoi:
@@ -144,6 +163,7 @@ class DetectionCoverageScorer(Scorer):
 
     @staticmethod
     def _extinct(run_dir: Path) -> bool | None:
+        """True when the run's last cohort day reports zero adults, None if the cohort log is unreadable."""
         cohort = find_cohort_file(run_dir)
         if cohort is None:
             return None
@@ -158,6 +178,7 @@ class DetectionCoverageScorer(Scorer):
 
     @staticmethod
     def _cell_size_km(transform: Any) -> float:
+        """Mean cell edge length in km, assuming a degrees-based grid."""
         import math
 
         a = abs(transform.a)
@@ -173,6 +194,7 @@ class DetectionCoverageScorer(Scorer):
         occ_cols: np.ndarray,
         r_cells: float,
     ) -> float:
+        """Fraction of the in-grid detection spots lying within r_cells of an occupied cell."""
         if len(occ_rows) == 0 or not in_grid.any():
             return 0.0
         r2 = float(r_cells * r_cells)

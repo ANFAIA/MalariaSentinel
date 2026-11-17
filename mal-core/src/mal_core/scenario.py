@@ -16,12 +16,14 @@ from mal_commonlib.aoi import Scale
 
 
 class InterventionConfig(BaseModel):
+    """One public-health intervention in a scenario: its type and the population coverage it reaches, a fraction in [0, 1]."""
     type: str
     coverage: float = Field(ge=0.0, le=1.0)
 
     @field_validator("type")
     @classmethod
     def _valid_type(cls, v: str) -> str:
+        """Accept only the intervention types the engine implements."""
         allowed = {"bednets", "irs", "larviciding", "drug_campaign", "vaccine"}
         if v not in allowed:
             raise ValueError(f"intervention type must be one of {allowed}; got {v!r}")
@@ -29,6 +31,7 @@ class InterventionConfig(BaseModel):
 
 
 class ClimateConfig(BaseModel):
+    """The climate perturbations of a scenario: rainfall and temperature anomalies and multipliers for evaporation and washout."""
     rainfall_anomaly: float = Field(default=0.0, ge=-1.0, le=1.0)
     temperature_anomaly: float = Field(default=0.0, ge=-5.0, le=5.0)
     evaporation_multiplier: float = Field(default=1.0, ge=0.0, le=2.0)
@@ -36,6 +39,7 @@ class ClimateConfig(BaseModel):
 
 
 class ScenarioConfig(BaseModel):
+    """A complete what-if scenario: the AOI and scale, the year and month, the interventions and the climate perturbations."""
     aoi: str
     scale: Scale = Scale.REGIONAL
     year: int = Field(ge=2000, le=2100)
@@ -54,6 +58,7 @@ INTERVENTION_EFFECTS: dict[str, dict[str, float]] = {
 
 
 def load_scenario(path: Path | str) -> ScenarioConfig:
+    """Read and validate a scenario YAML file, accepting either a bare scenario block or one nested under a ``scenario`` key."""
     p = Path(path)
     raw = yaml.safe_load(p.read_text())
     if "scenario" in raw:
@@ -62,6 +67,7 @@ def load_scenario(path: Path | str) -> ScenarioConfig:
 
 
 def interventions_to_params(scenario: ScenarioConfig) -> dict[str, Any]:
+    """Translate a scenario into the multiplier parameters the engine consumes: intervention effects scaled by coverage, plus the climate terms."""
     params: dict[str, Any] = {}
     for iv in scenario.interventions:
         effects = INTERVENTION_EFFECTS.get(iv.type, {})

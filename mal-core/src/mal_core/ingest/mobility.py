@@ -93,6 +93,10 @@ def build_mobility_dataset(
     nnz_by_file: dict[str, int] = {}
 
     def _build_write(name: str, grid: np.ndarray, beta: float) -> str:
+        """Build one gravity OD matrix and write it as a CSR file.
+
+        Returns the path of the written file.
+        """
         rp, ci, vl, nr, nc = build_gravity_od(
             grid, cell_size_km, beta, max_distance_km, sparsity_threshold,
         )

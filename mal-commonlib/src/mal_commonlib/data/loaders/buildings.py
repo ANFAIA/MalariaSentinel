@@ -50,6 +50,7 @@ _NODATA = float(model_constant("ingest", "nodata_sentinel"))
 
 
 def _default_cache_dir() -> pathlib.Path:
+    """Cache directory for Overture Maps downloads, under the XDG cache home."""
     base = os.environ.get("XDG_CACHE_HOME") or os.path.expanduser("~/.cache")
     return pathlib.Path(base) / "mal_commonlib" / "buildings"
 
@@ -84,6 +85,7 @@ def _resolve_latest_release() -> str:
 
 
 def _aoi_crs_epsg(aoi: AOI) -> int:
+    """EPSG code of the AOI's CRS; raises ValueError when the CRS has no EPSG code."""
     epsg = aoi.crs_obj.to_epsg()
     if epsg is None:
         raise ValueError(f"AOI CRS has no EPSG code: {aoi.crs}")

@@ -24,7 +24,7 @@ top-level `mal-abm-fast/` package no longer exists).
 | `scripts/` | Input overlay / visualization utilities (hosts overlay, state/mobility/transmission visualization) |
 | `pool_hydrology.py` | Pool hydrology reference model (Python parity of the C++ header) |
 | `cmake/` | Compiler-warning flags module |
-| `docs/specs/abm/spec.md` | Output contract spec (repo-wide, single source of truth) |
+| `mal-core/tests/test_spec_retirement_abm.py` | Output-contract checks (bands, sidecar keys, naming, NoData) |
 | `bin/mal_abm_fast_<platform>` | Compiled binary (wrapper prefers this over `build/`) |
 
 ## Build
@@ -114,6 +114,6 @@ uv run python -m pytest mal-core/tests -q
 
 ## See also
 
-- `docs/specs/abm/spec.md` — frozen output contract (shape, sidecar keys, naming, NoData, versioning)
+- `mal-core/tests/test_spec_retirement_abm.py` — the frozen output contract (shape, sidecar keys, naming, NoData, versioning)
 - `mal-execution/scripts/cesga-run/` — CESGA FT3 automation (the live SLURM pipeline)
 - `mal-core/README.md` — pipeline stage order and the post-run scoring CLI

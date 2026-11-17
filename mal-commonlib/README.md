@@ -10,9 +10,9 @@ pipeline logic — stable pipeline code belongs in `mal-core`.
 |---|---|
 | `src/mal_commonlib/aoi.py` | `AOI` model (pydantic) + `Scale` enum + `AOI.from_slug()` — bbox, CRS, resolution, geometry helpers |
 | `src/mal_commonlib/aois.yaml` | **AOI registry** — single source of truth for slug → AOI mappings (add a new AOI here, no code changes) |
-| `src/mal_commonlib/config.py` | Simulation parameters (`SimParams`), thermal responses (`temp_suitability`, `mortality_rate`), repo paths |
+| `src/mal_commonlib/model_constants.py` | The shared py⇄C++ model constants, read from `mal-core/config/model_constants.yaml` |
+| `src/mal_commonlib/config.py` | Repo paths, the deprecated AOI/grid constants, the env layer file names, the legacy v1 rollout knobs (`SimParams`) and the training constants |
 | `src/mal_commonlib/data/` | Data utilities: host loaders (`loaders/`), `host_utils.py`, mobility helpers, generic utils |
-| `src/mal_commonlib/terrain/` | TWI (topographic wetness index) helpers |
 | `tests/` | pytest suites (chirps, coastline, host loaders, mobility) |
 
 ## Adding a new AOI

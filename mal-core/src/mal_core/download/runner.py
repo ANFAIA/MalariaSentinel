@@ -18,6 +18,15 @@ _REPO_ROOT = Path(__file__).resolve().parents[4]
 
 
 def _check_auth(spec: DownloaderSpec) -> bool:
+    """Check that the credentials a downloader needs are available.
+
+    Looks for the CDS rc file, the ``EARTHDATA_TOKEN`` environment variable
+    and the Earth Engine credentials file, as declared by the spec's
+    ``requires_auth`` list.
+
+    Returns:
+        True when every required credential is present; False otherwise.
+    """
     for auth in spec.requires_auth:
         if auth == "cds":
             # CDSAPI_RC overrides the rc location (cdsapi honours it too);
@@ -47,6 +56,7 @@ def _check_auth(spec: DownloaderSpec) -> bool:
 
 
 def _standard_path(aoi: str, product: str, year: int | None, ext: str, data_dir: Path | None = None) -> Path:
+    """Conventional file path of a product: ``<aoi>_<product>[_<year>].<ext>``."""
     data_dir = data_dir or (_REPO_ROOT / "data" / aoi)
     if year:
         return data_dir / f"{aoi}_{product}_{year}.{ext}"

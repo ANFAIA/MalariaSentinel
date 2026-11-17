@@ -7,13 +7,13 @@
 // post-dispersal), band 2 = adult_cell_count (all adults counted at
 // their current position). Contract 4.0: raw per-cell counts, no
 // capacity normalization. The nodata sentinel is `NODATA_SENTINEL()`.
-// The COG profile mirrors the output contract spec
-// (`docs/specs/abm/spec.md`).
+// The COG profile is fixed by the writer below (tiled, deflate,
+// 128x128 blocks, band descriptions = the state band names).
 //
 // `write_state_sidecar` writes a JSON sidecar next to the .tif, with
-// the 14 keys the F1.e parity test pins. The keys are emitted in the
-// order listed in `docs/specs/abm/spec.md` so the byte-equal test is
-// stable across engines.
+// fifteen keys. The keys are emitted in the
+// fixed order of the writer below so the byte-equal test is stable
+// across engines.
 #include "output_contract.hpp"
 
 #include <array>
@@ -239,9 +239,8 @@ void write_state_cog(const std::string& path,
 void write_state_sidecar(const std::string& tif_path,
                          const StateCogMetadata& meta) {
     nlohmann::json j;
-    // The key order here matches the output contract spec
-    // (`docs/specs/abm/spec.md`; the parity test relies on a stable
-    // ordering for the JSON object).
+    // The key order here is the output contract (the parity test relies
+    // on a stable ordering for the JSON object).
     //
     // F1.c: `n_rollouts` and `rollout_index` are inserted between
     // `seed` and `generator_version` (after the F1.b keys, before

@@ -67,11 +67,13 @@ ERA5_VARIABLE_NETCDF_ALIAS: dict[str, str] = {
 
 
 def _default_cache_dir() -> pathlib.Path:
+    """Cache directory for ERA5 CDS downloads, under the XDG cache home."""
     base = os.environ.get("XDG_CACHE_HOME") or os.path.expanduser("~/.cache")
     return pathlib.Path(base) / "mal_commonlib" / "era5"
 
 
 def _days_in_month(year: int, month: int) -> list[str]:
+    """Zero-padded day strings ('01'..'NN') of the given calendar month."""
     n = calendar.monthrange(year, month)[1]
     return [f"{d:02d}" for d in range(1, n + 1)]
 
@@ -110,7 +112,10 @@ def _reproject_to_aoi_grid(
        warper turns every NaN source cell into an expanding nodata fillet,
        so with a sparse-valid source almost the whole target plane came
        back NaN (only a ~6x6 corner survived in the committed env NC).
-       NaN nodata is replaced by a finite sentinel BEFORE the warp.
+       The NaN holes are filled with the NEAREST FINITE NEIGHBOUR before
+       the warp (a distance transform), because GDAL's bilinear fillets
+       cannot be trusted on NaN. The NoData sentinel is written afterwards,
+       as the raster's own nodata tag, not as a substitute value.
     3. After the warp the target plane is nearest-filled for any remaining
        hole so a broken interior cannot slip into the env NC silently.
 

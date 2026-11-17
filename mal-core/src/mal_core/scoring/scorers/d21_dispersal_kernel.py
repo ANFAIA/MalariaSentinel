@@ -43,6 +43,7 @@ P90_CENTER, P90_SIGMA = 1.60, 0.80
 
 
 def _haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    """Great-circle distance in kilometres between two lon/lat points."""
     R = 6371.0
     dlat = math.radians(lat2 - lat1)
     dlon = math.radians(lon2 - lon1)
@@ -56,6 +57,16 @@ def _haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
 
 
 class DispersalKernelScorer(Scorer):
+    """Measures the displacement distribution of the adult population
+    relative to its seeding origin.
+
+    The value is the 90th-percentile displacement at the measurement
+    day; the median displacement is scored alongside it. Each
+    sub-score is 1 inside its mark-release-recapture band and decays as
+    a Gaussian outside it, so both an immobile and an over-dispersing
+    population are penalised.
+    """
+
     name = "D21_dispersal_kernel"
     kind = "composite"
     weight = 1.0
@@ -64,6 +75,12 @@ class DispersalKernelScorer(Scorer):
     hard_floor = 0.3
 
     def score(self, run_dir: Path, ctx: dict[str, Any]) -> ScorerResult:
+        """Compute the p50/p90 displacement at the measurement day and its score.
+
+        Returns the p90 displacement in km as the value, or a skipped
+        result when there are no day snapshots, no usable grid
+        transform, or no occupied cells to measure.
+        """
         target = f"p50 {P50_BAND[0]}-{P50_BAND[1]} km, p90 {P90_BAND[0]}-{P90_BAND[1]} km @ day30"
         files = find_state_files(run_dir)
         if not files:

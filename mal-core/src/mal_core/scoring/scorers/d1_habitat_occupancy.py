@@ -36,6 +36,16 @@ OCC_SIGMA = 0.15
 
 
 class HabitatOccupancyScorer(Scorer):
+    """Measures the share of aquatic-capable habitat cells that are
+    actually occupied by adults in the final snapshot.
+
+    This is the field "larval-habitat occupancy" fraction reported by
+    longitudinal surveys (Bogh 2004; Ndenga 2011). A score of 1 means
+    the occupancy falls inside the literature band declared in
+    ``OCC_BAND``; outside it the score falls off as a Gaussian around
+    ``OCC_CENTER``, so 0 (no habitat occupied) scores 0.
+    """
+
     name = "D1_habitat_occupancy"
     kind = "composite"
     weight = 1.0
@@ -44,6 +54,12 @@ class HabitatOccupancyScorer(Scorer):
     hard_floor = 0.2
 
     def score(self, run_dir: Path, ctx: dict[str, Any]) -> ScorerResult:
+        """Compute the habitat occupancy fraction and its score.
+
+        Returns the occupied share of habitat cells as the value, or a
+        skipped result when the run has no state snapshot or no habitat
+        cells at all.
+        """
         target = "0.20-0.70 of habitat cells occupied"
         final = find_final_state(run_dir)
         if final is None:

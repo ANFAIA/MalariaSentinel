@@ -67,6 +67,7 @@ _MODIS_SPHERE_RADIUS_M = 6371007.181
 
 
 def _ensure_cache_dir(cache_dir: pathlib.Path | None) -> pathlib.Path:
+    """Resolve and create the cache directory that holds downloaded MODIS granules."""
     if cache_dir is None:
         cache_dir = pathlib.Path(tempfile.gettempdir()) / "mal_commonlib" / "mod13a3"
     cache_dir.mkdir(parents=True, exist_ok=True)
@@ -74,6 +75,7 @@ def _ensure_cache_dir(cache_dir: pathlib.Path | None) -> pathlib.Path:
 
 
 def _search_window(year: int, month: int) -> tuple[str, str]:
+    """Inclusive (start, end) ISO dates covering the whole calendar month."""
     start = _dt.date(year, month, 1)
     if month == 12:
         end = _dt.date(year + 1, 1, 1) - _dt.timedelta(days=1)

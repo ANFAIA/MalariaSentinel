@@ -103,6 +103,7 @@ __all__ = ["load_worldpop_population", "DOWNLOADER"]
 
 
 def _default_cache_dir() -> pathlib.Path:
+    """Cache directory for WorldPop downloads, under the XDG cache home."""
     base = os.environ.get("XDG_CACHE_HOME") or os.path.expanduser("~/.cache")
     return pathlib.Path(base) / "mal_commonlib" / "worldpop"
 
@@ -400,6 +401,7 @@ def _resolve_url(year: int, iso3: str, *, release: str) -> str:
 
 
 def _cache_filename(iso3_lower: str, year: int, release: str) -> str:
+    """File name the provider uses for one country, year and release; used as the cache key."""
     if release == "Global1":
         return f"{iso3_lower}_ppp_{year}_constrained.tif"
     return f"{iso3_lower}_t_00_{year}_CN_100m_R2025A_v1.tif"

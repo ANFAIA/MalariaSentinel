@@ -1,0 +1,26 @@
+var searchData=
+[
+  ['candidate_5fmin_5fengine_0',['candidate_min_engine',['../structmal__abm__fast_1_1_habitat_cfg.html#adca5c3bc884d494e92676f64ddae6e46',1,'mal_abm_fast::HabitatCfg']]],
+  ['candidate_5fmin_5fingest_1',['candidate_min_ingest',['../structmal__abm__fast_1_1_ingest_cfg.html#a930590461ccb95da6b6dcb0fa57f7b21',1,'mal_abm_fast::IngestCfg']]],
+  ['capacity_2',['capacity',['../structmal__abm__fast_1_1_model_config.html#a865003e07a94ab6f03ebf71d088543db',1,'mal_abm_fast::ModelConfig']]],
+  ['capacitycfg_3',['CapacityCfg',['../structmal__abm__fast_1_1_capacity_cfg.html',1,'mal_abm_fast']]],
+  ['cell_5farea_5fkm2_4',['cell_area_km2',['../namespacemal__abm__fast.html#a13f62f4fe641870d6f8cf0894760c6de',1,'mal_abm_fast']]],
+  ['cell_5fsize_5fhint_5fm_5',['cell_size_hint_m',['../structmal__abm__fast_1_1_ingest_cfg.html#a5e4940eab036192d6147241e6686fa97',1,'mal_abm_fast::IngestCfg']]],
+  ['cells_5fper_5fside_6',['cells_per_side',['../structmal__abm__fast_1_1_a_o_i.html#a93417dbb1c3b562ea9663ad0cfbaa3cb',1,'mal_abm_fast::AOI']]],
+  ['climate_7',['climate',['../classmal__abm__fast_1_1_coordinator_model.html#a61562a0709446035509015757486556c',1,'mal_abm_fast::CoordinatorModel']]],
+  ['coastline_5fbuffer_5fm_8',['coastline_buffer_m',['../structmal__abm__fast_1_1_ingest_cfg.html#aee2fdfd734271e96676f49cdab76e0a4',1,'mal_abm_fast::IngestCfg']]],
+  ['coastline_5fresolution_9',['coastline_resolution',['../structmal__abm__fast_1_1_ingest_cfg.html#a7778ffc9c26c3ff19abed3ad376d3877',1,'mal_abm_fast::IngestCfg']]],
+  ['cogs_5fstate_10',['cogs_state',['../structmal__abm__fast_1_1_contracts_cfg.html#aec895ada887dee2b220598e217c63e85',1,'mal_abm_fast::ContractsCfg']]],
+  ['col_11',['col',['../structmal__abm__fast_1_1_patch_state.html#a2582c454dec11d1934fca38aa76933ec',1,'mal_abm_fast::PatchState::col'],['../structmal__abm__fast_1_1_habitat_patch.html#a66339bd41f60df28b37bb8f5e0f0fd6b',1,'mal_abm_fast::HabitatPatch::col']]],
+  ['cold_5fstart_5fz_12',['cold_start_z',['../structmal__abm__fast_1_1_pluvial_cfg.html#afc379c76121082041cd49fa2d00fba64',1,'mal_abm_fast::PluvialCfg']]],
+  ['configerror_13',['ConfigError',['../structmal__abm__fast_1_1_config_error.html',1,'mal_abm_fast']]],
+  ['constants_20—_20match_20mal_5fghana_5fsim_20abm_20defaults_20exactly_20m1_205_20thin_20slice_14',['Constants — match mal_ghana_sim.abm defaults exactly (M1.5 thin slice).',['../structmal__abm__fast_1_1_runtime_overrides.html#autotoc_md1',1,'']]],
+  ['contract_5fversion_15',['CONTRACT_VERSION',['../namespacemal__abm__fast.html#a8fec20c9e51d5cd54a560c2dbb9faa72',1,'mal_abm_fast']]],
+  ['contract_5fversion_16',['contract_version',['../structmal__abm__fast_1_1_state_cog_metadata.html#ad6f6564a789e6ef716d0ac8ab2c806f9',1,'mal_abm_fast::StateCogMetadata']]],
+  ['contracts_17',['contracts',['../structmal__abm__fast_1_1_model_config.html#aaa4569656054c54959287bb51855ab98',1,'mal_abm_fast::ModelConfig']]],
+  ['contractscfg_18',['ContractsCfg',['../structmal__abm__fast_1_1_contracts_cfg.html',1,'mal_abm_fast']]],
+  ['coordinatormodel_19',['CoordinatorModel',['../classmal__abm__fast_1_1_coordinator_model.html',1,'mal_abm_fast::CoordinatorModel'],['../classmal__abm__fast_1_1_coordinator_model.html#a3185dde8caecb568ba6067a4da8e4a3e',1,'mal_abm_fast::CoordinatorModel::CoordinatorModel()']]],
+  ['crs_20',['crs',['../structmal__abm__fast_1_1_a_o_i.html#a2a59133eba814da519a0761c0c280d59',1,'mal_abm_fast::AOI::crs'],['../structmal__abm__fast_1_1_state_cog_metadata.html#a0650e10dcefd4d47323206963e03ec89',1,'mal_abm_fast::StateCogMetadata::crs']]],
+  ['current_5fdate_21',['current_date',['../classmal__abm__fast_1_1_coordinator_model.html#aff25a95ac7d1adb238f693da80772e3e',1,'mal_abm_fast::CoordinatorModel::current_date() const'],['../classmal__abm__fast_1_1_coordinator_model.html#afbb16b94ab57c4d389c1fb82216ddf8e',1,'mal_abm_fast::CoordinatorModel::current_date()']]],
+  ['cycle_5fduration_5fdays_22',['cycle_duration_days',['../structmal__abm__fast_1_1_gonotrophic_cfg.html#a2e053548532759d2d584c991e4eb2c32',1,'mal_abm_fast::GonotrophicCfg']]]
+];

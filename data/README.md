@@ -8,13 +8,55 @@ Raw occurrence files (`.txt`), DwC-A archives (`.zip`), SRTM rasters, and the
 AOI env/host rasters are **kept out of git** to avoid bloating the repo.
 Folder structure and small metadata files are tracked.
 
+## The backup archive
+
+The whole tree — tracked and ignored files alike — was archived before
+anything was untracked, and the archive lives **outside** the repository (a
+tracked or ignored in-tree archive is not a backup):
+
+```
+../MalariaSentinel-data-backup-2026-11-16.zip        (2.0 GB)
+sha256  ff48b6a40f2f528f901defc1ff7d6f6e0352003f0b9ad4cf0aa9108f71625fcd
+```
+
+The checksum is also written beside the archive, in
+`../MalariaSentinel-data-backup-2026-11-16.zip.sha256`. Verify before
+restoring:
+
+```bash
+cd .. && shasum -a 256 -c MalariaSentinel-data-backup-2026-11-16.zip.sha256
+unzip -t MalariaSentinel-data-backup-2026-11-16.zip
+```
+
+**What the commands do not regenerate.** `malariasim download` re-registers
+the upstream products and `malariasim ingest` the derived ones, so the
+manifest rebuilds itself from nothing. Four kinds of material are *not*
+produced by either command and therefore depend on the archive (or on the
+copy still tracked in git):
+
+- `moua_2016.pdf` — the Moua et al. 2016 paper (open access via HAL).
+- `maps/*.png` — the renderings; they come from `mal-data-explorer`, not
+  from `download`.
+- the `eml.xml` / `meta.xml` sidecars of the IPT datasets.
+- the raw IPT archives themselves (the downloaders do not fetch them; the
+  table below names the source).
+
+**Skipped is not failed.** A dataset whose credentials are absent — CDS
+(`~/.cdsapirc` or `CDSAPI_RC`), `EARTHDATA_TOKEN`, the Earth Engine OAuth
+token — is **skipped**, not failed: the run continues, the manifest comes
+back partial, and `validate_completeness` names what is missing. A dataset
+that is *skipped* leaves no trace in the manifest beyond its absence; a
+dataset that *failed* reports `"status": "error"` and the error. Read the
+manifest, not the exit code, to tell the two apart.
+
 Two data layers live here:
 
 1. **AOI pipeline data** (`data/<aoi>/`) — everything the ABM pipeline needs,
    downloaded and registered by `malariasim download`. The AOI manifest
    (`data/<aoi>/manifest.json`) is the **single source of truth** for the
    inventory; never hardcode paths, resolve from the manifest
-   (spec: `docs/specs/data/spec.md`).
+   (the manifest schema is pinned by `mal-core/tests/test_manifest.py`; the
+   naming convention by `mal-core/tests/test_spec_retirement_data.py`).
 
    ```bash
    uv run malariasim download --aoi ghana --datasets era5 --outputs wind_6hourly --years 2024,2025

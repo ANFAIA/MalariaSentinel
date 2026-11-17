@@ -13,7 +13,8 @@ Identity of a dataset is its **manifest key**. There are exactly two kinds:
 Consumers (ingest builders, the ABM wrapper, CLI, viz scripts) declare
 dependencies as :class:`Slot` specs and resolve paths through
 :func:`resolve_inputs`. ``manifest.json`` is the single source of truth
-for what exists and in which file (docs/specs/data/spec.md §5.2).
+for what exists and in which file (the v3.1 datasets block; see
+`mal-core/src/mal_core/download/manifest.py`).
 
 Resolution semantics (agreed 2026-10-04):
 
@@ -303,6 +304,11 @@ def catalog_status(
     rows: list[dict[str, Any]] = []
 
     def _row(kind, key, source, required=False):
+        """Append one status row for a dataset key.
+
+        The row records whether the key is registered in the manifest,
+        whether its file exists on disk and its path.
+        """
         entry = datasets.get(key)
         files = entry.get("files", {}) if entry else {}
         fname = next(iter(files.values()), None) if files else None
@@ -357,6 +363,12 @@ def register_existing(
     missing: list[str] = []
 
     def _register(key: str, year, fname: str, **meta):
+        """Register one existing file in the manifest.
+
+        Keys already registered are skipped and files absent from disk are
+        reported as missing; with ``dry_run`` set the manifest is not
+        modified. ``year`` is None for datasets that are not time series.
+        """
         entry = datasets.get(key)
         if entry is not None and (
             year is None or str(year) in entry.get("files", {})

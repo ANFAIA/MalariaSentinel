@@ -1,0 +1,1410 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+% Latin Modern: a scalable Type 1 font. With T1 and the default
+% Computer Modern, TeX asks for the EC fonts, and when the Type 1 EC
+% ones (cm-super) are missing it falls back to bitmaps -- and
+% microtype's font expansion cannot work with a bitmap font, so the
+% build fails on a TeX Live without cm-super.
+\usepackage[T1]{fontenc}
+\usepackage[english]{babel}
+\usepackage[margin=2.3cm]{geometry}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{amsmath,amssymb}
+\usepackage{listings}
+\usepackage[hidelinks]{hyperref}
+\newcommand{\code}[1]{\texttt{#1}}
+\input{../generated/macros.tex}
+\input{../generated/code-macros.tex}
+
+\title{The \code{prediction} stage of the MalariaSentinel pipeline\\
+\large A conceptual description}
+\author{MalariaSentinel conceptual documentation layer}
+\date{}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+\noindent
+This document explains the \code{prediction} stage: the sixth stage of the
+MalariaSentinel pipeline, and the one that applies a trained surrogate of the
+agent-based model (ABM) to a real area of interest (AOI) and writes a
+multi-band GeoTIFF. It is written for a reader who has never opened the
+code. It is not a specification and not a code reference: it names no
+invariant, no call graph and no test. Every claim is cited to a file and a
+line a reviewer can open, and every number that exists in the project's
+configuration is emitted by the generator rather than typed by hand. The
+document is deliberately blunt about the stage's limits, because the stage's
+limits are large: it emulates one step of a model rather than forecasting
+epidemiology, it degrades silently to zeros when its inputs are absent, and
+several of its most consequential constants are literals in the source rather
+than values in the frozen configuration.
+\end{abstract}
+
+\tableofcontents
+
+\section{What this stage is for}
+
+\subsection{Which source wins when two of them disagree}
+
+Three authorities govern the statements in this document, and they are not
+interchangeable. \emph{Values} --- the numbers the pipeline actually uses ---
+come from \code{mal-core/config/model\_constants.yaml}, which reaches this
+document through the generated \code{\textbackslash mskey} macros, and from the
+code constants that the generator reads out of the implementation, which
+reach it through the generated \code{\textbackslash codeconst} macros; where a
+value is both configured and hard-coded in the code, the configured value
+wins. \emph{Contract values and
+contract names} --- version labels, band names, field names --- come from the
+generated contract table (\code{docs/concepts/generated/contracts.tex}) and
+from the generated code constants that carry the labels the implementation
+writes, and that generated table wins over any prose that paraphrases it.
+\emph{Semantics} --- what a step means, what its inputs are for, what its
+outputs do and do not license a reader to conclude --- belong to this
+document, and this document wins over a contract table or a configuration
+file whenever the two disagree about meaning. When the three contradict one
+another, the lower authority is the bug: the code is what runs, the
+configuration is what is meant to govern the code, and this document is what
+is meant to describe the code, so a contradiction means that one of the three
+is wrong and has to be corrected rather than reconciled. The rule is stated
+here because this document owns the semantics of the \code{prediction} stage;
+there is no separate page that arbitrates between the three authorities, and
+none is needed while each stage states the rule for the content it owns.
+
+\subsection{The question it answers}
+
+The pipeline as a whole exists to support malaria elimination programmes: it
+ingests spatial and epidemiological data, simulates transmission, scores the
+simulation against biological expectations, trains a surrogate on the
+simulation's own output, and finally applies that surrogate to produce a
+raster a decision-maker could look at
+(\code{mal-core/src/mal\_core/prediction/predictor.py:1-9}, the module
+docstring, which enumerates the stage's own five steps: load the model, load
+the state and environment tensors, run inference, save the GeoTIFF, return
+its path).
+
+The question the \code{prediction} stage answers is therefore narrow and
+mechanical: \emph{given an AOI, a scale, a date and a trained surrogate, what
+does the surrogate say the next state of the system looks like, on that AOI's
+grid?}
+
+Concretely, the stage does exactly five things
+(\code{mal-core/src/mal\_core/prediction/predictor.py:77-150}, the body of
+\code{run\_prediction}, the single entry point): it resolves the AOI and its
+scale-specific grid; it loads a checkpoint from the model registry; it loads
+the ABM's state raster and the environment tensor for that AOI; it runs one
+forward pass of the surrogate; and it aggregates the result to the requested
+scale and writes it to disk as a GeoTIFF with a JSON sidecar. The path of the
+written raster is returned to the caller
+(\code{mal-core/src/mal\_core/prediction/predictor.py:150}).
+
+What counts as having answered the question is therefore also mechanical: a
+GeoTIFF exists at the returned path, it opens with a valid CRS and transform,
+and its sidecar parses. That is the entirety of the stage's success
+criterion as implemented; there is no skill score, no validation against
+surveillance data, and no threshold that the output must clear
+(\code{mal-core/src/mal\_core/prediction/predictor.py:89-132}, the inference
+and write path; \code{mal-core/src/mal\_core/prediction/}, the package
+contains no validation module of any kind).
+
+\subsection{What it is explicitly not for}
+
+The negative purpose is as important as the purpose, and the stage's own
+code makes several of these exclusions visible.
+
+\paragraph{It is not a measurement.}
+The surrogate was fitted to the ABM's own snapshots, not to observations.
+The training target is the \emph{next} ABM snapshot's bands
+(\code{mal-core/src/mal\_core/training/dataset.py:242-252}), and the model's
+header states the mapping it learns: state at time $t$ plus environment in,
+state at time $t+1$ out
+(\code{mal-core/src/mal\_core/training/model.py:1-6}). The stage's output is
+a \emph{model of a model}. It is not an estimate of infection in human
+populations, not a prevalence measurement, and not a probability of anything.
+
+\paragraph{It is not an independent forecast.}
+Because the surrogate reproduces one step of the simulator, the output
+inherits every structural assumption of the simulator --- its habitat
+representation, its mortality constants, its transmission model --- without
+adding evidence. Where the ABM is wrong, the prediction is wrong in the same
+direction, and it presents that error with the same confidence.
+
+\paragraph{It does not train, and it does not simulate.}
+Training lives in the \code{training} stage
+(\code{mal-core/src/mal\_core/training/trainer.py:14-25}, the signature of
+\code{train\_unet}); the ABM itself is the \code{abm} stage. The prediction
+stage's own signature exposes only model selection, AOI, scale, date,
+scenario, output directory and rollout directory
+(\code{mal-core/src/mal\_core/prediction/predictor.py:66-76}); there is no
+parameter that could cause it to train or to run the simulator.
+
+\paragraph{It does not classify.}
+The CLI help text for the \code{predict} subcommand says the stage will
+``produce a classified risk map''
+(\code{mal-core/src/mal\_core/cli.py:120-131}), but no classification is
+performed anywhere. The network's output is written to the raster unchanged
+(\code{mal-core/src/mal\_core/prediction/predictor.py:89} and
+\code{mal-core/src/mal\_core/prediction/predictor.py:128}). There is no
+threshold, no risk class, no probability scale, no uncertainty band and no
+ensemble over seeds
+(\code{mal-core/src/mal\_core/prediction/predictor.py:66-76}, the signature,
+which has no parameter for any of these). The help text is aspirational; the
+artefact is a surrogate state raster.
+
+\paragraph{It does not model interventions.}
+This is worth stating separately because the stage accepts a scenario and
+converts it, then throws the conversion away. The interventions and climate
+anomalies of a scenario are turned into a parameter dictionary
+(\code{mal-core/src/mal\_core/prediction/predictor.py:86-87},
+\code{params = interventions\_to\_params(scenario)}), and the dictionary is
+never passed to the model: the inference call takes only the state and the
+environment (\code{mal-core/src/mal\_core/prediction/predictor.py:89}). A
+scenario therefore affects the output only through its \code{aoi},
+\code{scale}, \code{year} and \code{month} fields, which the CLI copies over
+the command-line arguments
+(\code{mal-core/src/mal\_core/cli.py:133-140}). No intervention effect of any
+kind is attributable to this stage's output.
+
+\subsection{Where the stage sits in the pipeline}
+
+The stage consumes two upstream artefacts and produces one:
+
+\begin{center}
+\begin{tabular}{@{}lll@{}}
+\toprule
+Producer & Artefact & Consumer here \\
+\midrule
+\code{abm} & state COG (per-day snapshots and/or the final state raster) &
+state tensor \\
+\code{abm} & transmission COG (optional) & state tensor, appended \\
+\code{ingest} & environment NetCDF & environment tensor \\
+\code{training} & checkpoint + \code{model.yaml} manifest & the surrogate \\
+\midrule
+\code{prediction} & risk GeoTIFF + JSON sidecar & the sidecar readers: the
+\code{status} CLI command and the FastAPI endpoints \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The consumers inside the repository are the pair of sidecar readers: the
+\code{status} CLI command
+(\code{mal-core/src/mal\_core/cli.py:866-877}) and the two FastAPI endpoints
+\code{GET /aoi/\{name\}/risk} and \code{GET /aoi/\{name\}/status}
+(\code{mal-core/src/mal\_core/server.py:89-104}). No map, dashboard or
+intervention-planning consumer exists anywhere in the tree.
+
+\section{What the stage consumes}
+
+This section is where the consumption is first described, so the band names,
+the contract version and the resampling consequences all appear here rather
+than only in the appendix.
+
+\subsection{The ABM state raster}
+
+\subsubsection{What it is and what it carries}
+
+The stage consumes the \emph{state COG} written by the \code{abm} stage: a
+two-band GeoTIFF on the ABM's own grid, with a JSON sidecar beside it. Under
+the current state contract, version \mskey{contracts.cogs_state}, the two
+bands are:
+
+\input{../generated/params-prediction.tex}
+
+Both bands are \emph{raw per-cell adult counts} --- numbers of individuals.
+They are not densities, not normalised by any capacity constant, and not
+bounded to the unit interval. The \code{abm} stage's own header states this
+explicitly: the capacity normalisation was retired at contract 4.0, band 1
+counts the adults associated with a cell through their patch after dispersal,
+and band 2 counts the adults at their current position
+(\code{mal-core/src/mal\_core/abm/include/mal\_abm\_fast/wire.hpp:124-133}).
+
+The sidecar that accompanies the state COG carries a substantial amount of
+metadata: the CRS, the affine transform, the AOI slug and scale, the year,
+month and seed, the rollout count and index, the generator version, a hash of
+the ABM parameters, the contract version, the band names, the NoData
+sentinel and the raster shape
+(\code{mal-core/src/mal\_core/abm/include/mal\_abm\_fast/output\_contract.hpp:36-56};
+the full key list is reproduced in the generated contract table below).
+
+\input{../generated/contracts.tex}
+
+\subsubsection{The sidecar is not consulted}
+
+The state loader reads the raster and nothing else. It opens the GeoTIFF
+(\code{mal-core/src/mal\_core/prediction/state\_loader.py:82-86}), reads every
+band, replaces cells equal to the file's declared NoData value with zero
+(\code{mal-core/src/mal\_core/prediction/state\_loader.py:88-89}), and derives
+the number of output channels from the number of bands in the file
+(\code{mal-core/src/mal\_core/prediction/state\_loader.py:92}). The sidecar
+JSON is never opened.
+
+The consequences are worth stating as consequences, because they are the
+kind that a reader could otherwise assume are handled:
+
+\begin{itemize}
+\item \textbf{Bands are read positionally.} The loader never looks up a band
+by name. Band 1 of the file is taken to be band 1 of the tensor, band 2 to be
+band 2. If a file's bands were in a different order, the loader would not
+notice.
+\item \textbf{No version gating.} Nothing in the stage compares the state
+contract version in the sidecar against anything. A state raster produced
+under a retired contract --- in particular under the pre-4.0 contract, whose
+bands were normalised counts --- is consumed silently and produces
+meaningless input to the surrogate. There is in fact no trained checkpoint
+anywhere in the tree: the runs tree holds no \code{*.pt} and no
+\code{model.yaml}, so nothing exists under the current contract and nothing
+exists under a retired one either. The
+redesign plan for the capacity retirement states that checkpoints trained
+against the retired normalised bands are not reusable without retraining
+(\code{docs/plans/completed/redesign/03-retirada-k-max-y-separacion-de-escalas.md:67-70}),
+and the registry performs no such check
+(\code{mal-core/src/mal\_core/prediction/registry.py:95-117}).
+\item \textbf{No NoData harmonisation beyond the raster header.} The
+sentinel used to blank cells is the one declared inside the GeoTIFF, not the
+one in the sidecar; the two are the same value in practice, but the loader
+only ever sees the former.
+\end{itemize}
+
+\subsubsection{How the snapshot for a date is chosen}
+
+The stage is asked for a \code{month}. The loader converts that into a target
+day: \code{target\_day = min(730, max(1, month * 30))}
+(\code{mal-core/src/mal\_core/prediction/state\_loader.py:50}) --- the month
+number times thirty, clamped into the range one to seven hundred and thirty
+days. This is a coarse proxy for a calendar month, and it is the only place
+where the stage's date argument reaches the data.
+
+The candidate directories are searched in a fixed order
+(\code{mal-core/src/mal\_core/prediction/state\_loader.py:38-47}):
+
+\begin{enumerate}
+\item an explicit directory, if the caller supplied one
+  (\code{mal-core/src/mal\_core/prediction/predictor.py:75}, the
+  \code{rollout\_dir} argument, exposed on the CLI as
+  \code{--rollout-dir} at \code{mal-core/src/mal\_core/cli.py:116-119});
+\item \code{runs/<aoi slug>};
+\item \code{runs/abm};
+\item \code{runs/1year-50r};
+\item \code{runs/<aoi slug>\_2years};
+\item \code{runs/test\_gif\_14d}.
+\end{enumerate}
+
+This list is hardcoded; it is not derived from a manifest or from any
+inventory of the runs tree
+(\code{mal-core/src/mal\_core/prediction/state\_loader.py:41-47}).
+
+Within a directory, the loader first collects files whose names contain the
+AOI slug and the string \code{day}, then all files matching \code{*\_day*.tif}
+(\code{mal-core/src/mal\_core/prediction/state\_loader.py:57}); it removes
+from that list any file whose name contains \code{transmission}
+(\code{mal-core/src/mal\_core/prediction/state\_loader.py:59}). If nothing
+remains, it falls back to files containing the slug and \code{seed}, then to
+all TIFFs in the directory, again excluding transmission rasters
+(\code{mal-core/src/mal\_core/prediction/state\_loader.py:61-62}). Among the
+candidates it selects the one whose \code{\_dayNNN} suffix is numerically
+closest to the target day; a file with no day suffix is treated as day
+thirty (\code{mal-core/src/mal\_core/prediction/state\_loader.py:65-75}).
+
+Two consequences follow directly from that loop's structure. First, the
+search stops at the \emph{first} directory that yields any candidate
+(\code{mal-core/src/mal\_core/prediction/state\_loader.py:76}, the
+\code{break}), so a directory with a poor match beats a later directory with
+a perfect one. Second, if no directory yields a candidate, the loader raises
+\code{FileNotFoundError}
+(\code{mal-core/src/mal\_core/prediction/state\_loader.py:78-79}) --- which the
+caller converts into an all-zero state (see
+Section~8).
+
+\paragraph{Which files the ABM actually writes.}
+The per-day snapshot file name is the output stem plus \code{\_dayNNN},
+where \code{NNN} is zero-padded to three digits
+(\code{mal-core/src/mal\_core/abm/src/main.cpp:169-183}), and the per-day
+transmission file follows the same pattern
+(\code{mal-core/src/mal\_core/abm/src/main.cpp:218-230}). Crucially, per-day
+state snapshots are written only when the interval option is positive, and
+that option's default is zero
+(\code{mal-core/src/mal\_core/abm/src/main.cpp:1203-1216},
+\code{mal-core/src/mal\_core/abm/src/main.cpp:409}), while the transmission
+snapshot interval likewise defaults to zero, meaning the final transmission
+snapshot only
+(\code{mal-core/src/mal\_core/abm/src/main.cpp:806-809}). With default flags
+the ABM writes only the final state raster and the final transmission raster.
+The day-indexed files that the loader prefers are the exception, not the
+norm, and a reader must not assume a month can be selected at all in a
+default run.
+
+\subsubsection{The transmission branch}
+
+If the caller asks for transmission --- and the stage's only caller always
+does (\code{mal-core/src/mal\_core/prediction/predictor.py:54},
+\code{include\_transmission=True}) --- the loader looks for a transmission
+raster in the directory of the chosen state file
+(\code{mal-core/src/mal\_core/prediction/state\_loader.py:110-127}), trying
+three strategies in order:
+
+\begin{enumerate}
+\item the paired name, i.e. the state file's stem plus \code{\_transmission.tif}
+  (\code{mal-core/src/mal\_core/prediction/state\_loader.py:113-114});
+\item any file matching \code{*transmission*dayNNN.tif}, where \code{NNN} is
+  the day index parsed out of the chosen state file's name
+  (\code{mal-core/src/mal\_core/prediction/state\_loader.py:116-122});
+\item any file matching \code{*transmission*.tif}
+  (\code{mal-core/src/mal\_core/prediction/state\_loader.py:124-127}).
+\end{enumerate}
+
+The transmission raster carries four bands, named
+\code{human\_prevalence}, \code{human\_incidence},
+\code{infectious\_vector\_pressure} and \code{active\_focus}
+(\code{mal-core/src/mal\_core/abm/include/mal\_abm\_fast/transmission\_output.hpp:21-25}).
+When one is found, its bands are resampled and concatenated onto the vector
+bands, so the state tensor has as many channels as the state raster had bands
+plus four --- six for the usual two-band vector raster, and more if the raster
+carried more; when no transmission raster is found, the tensor has only the
+vector bands
+(\code{mal-core/src/mal\_core/prediction/state\_loader.py:36},
+\code{mal-core/src/mal\_core/prediction/state\_loader.py:139-149}).
+
+The third strategy is the one to be careful about. Because the default
+transmission snapshot interval is zero
+(\code{mal-core/src/mal\_core/abm/src/main.cpp:806-809}), the only transmission
+raster in a default run is the \emph{final} one. The third strategy will
+happily pick it up and pair it with a vector snapshot that is the nearest day
+to the requested month --- two different points in time, concatenated without
+comment. The stage does not record, anywhere, which day each channel came
+from, and it does not refuse the pairing.
+
+\subsubsection{Bring the state onto the AOI grid}
+
+Both the state and the environment are brought onto the AOI's grid by
+bilinear resampling (\code{mal-core/src/mal\_core/prediction/state\_loader.py:98-107};
+the same operation appears in the environment loader at
+\code{mal-core/src/mal\_core/prediction/env\_loader.py:74-83}). The target
+grid is defined by the AOI's bounding box and by the cell count the AOI
+object computes for the scale's resolution
+(\code{mal-core/src/mal\_core/prediction/state\_loader.py:91-96}; the AOI's
+own cell-count rule is a ceiling division of the bounding box's ground
+dimensions by the resolution, at
+\code{mal-commonlib/src/mal\_commonlib/aoi.py:195-199}). The source CRS is
+taken from the source file and the destination CRS from the AOI
+(\code{mal-core/src/mal\_core/prediction/state\_loader.py:99-107}).
+
+The consequence of bilinear resampling a \emph{count-valued} band is worth
+stating explicitly: after this step the values are no longer integers. A
+cell that had two adults may become one and a half. The tensor the surrogate
+receives is a field of fractional individuals, and the surrogate was trained
+on integer-valued patches
+(\code{mal-core/src/mal\_core/training/dataset.py:242-252}). Bilinear
+interpolation also conserves nothing: it redistributes individuals between
+neighbouring cells without preserving the total.
+
+\subsection{The environment tensor}
+
+\subsubsection{Which channels, and from where}
+
+The environment tensor has four channels, in a fixed order
+(\code{mal-core/src/mal\_core/prediction/env\_loader.py:17-18}):
+
+\begin{center}
+\begin{tabular}{@{}cl@{}}
+\toprule
+Index & Channel \\
+\midrule
+1 & \code{rainfall} \\
+2 & \code{air\_temp\_c} \\
+3 & \code{jrc\_persistent} \\
+4 & \code{lc\_wetland} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The producer is the \code{ingest} stage, which writes an environment NetCDF
+under the environment contract version \mskey{contracts.env_nc}. That file
+carries seven base variables: the two time series \code{rainfall} and
+\code{air\_temp\_c}, and five static planes \code{jrc\_persistent},
+\code{lc\_built}, \code{lc\_wetland}, \code{lc\_open\_plus\_water} and
+\code{lc\_crop}
+(\code{mal-core/src/mal\_core/ingest/daily\_nc.py:404-431}), plus up to two
+optional ones that are added only when the corresponding input was available:
+the static plane \code{land\_frac} and, when a salinity product was supplied,
+the time series \code{salinity\_ppt}
+(\code{mal-core/src/mal\_core/ingest/daily\_nc.py:443-457}); the file is
+named \code{<aoi>\_regional\_<y0>\_<y1>\_env.nc}
+(\code{mal-core/src/mal\_core/ingest/daily\_nc.py:466}). The prediction stage
+reads four of them: the two time series, \code{jrc\_persistent} and
+\code{lc\_wetland}
+(\code{mal-core/src/mal\_core/prediction/env\_loader.py:17-18}).
+
+\subsubsection{The fallback chain}
+
+The environment loader resolves its input through a chain of five
+possibilities, and every step of the chain is a choice a reader can vary
+(\code{mal-core/src/mal\_core/prediction/env\_loader.py:36-151}):
+
+\begin{enumerate}
+\item an explicit path, if one is supplied
+  (\code{mal-core/src/mal\_core/prediction/env\_loader.py:36-39});
+\item otherwise, a NetCDF in the AOI's data directory, matched by
+  \code{*\_env.nc} and then by \code{*.nc}, taking the first in sorted order
+  (\code{mal-core/src/mal\_core/prediction/env\_loader.py:41-47});
+\item otherwise, a GeoTIFF in the same directory, matched by \code{*\_env*.tif}
+  and then \code{*.tif} (\code{mal-core/src/mal\_core/prediction/env\_loader.py:45},
+  \code{mal-core/src/mal\_core/prediction/env\_loader.py:48-49});
+\item otherwise, the legacy array file \code{runs/env\_stack.npz}
+  (\code{mal-core/src/mal\_core/prediction/env\_loader.py:120-148});
+\item otherwise, an all-zero tensor
+  (\code{mal-core/src/mal\_core/prediction/env\_loader.py:150-151}).
+\end{enumerate}
+
+Two properties of this chain deserve comment.
+
+First, the data directory is addressed relatively, as
+\code{Path("data") / aoi.slug}
+(\code{mal-core/src/mal\_core/prediction/env\_loader.py:42}), so the stage
+finds the AOI's data only if it is run from the repository root. The
+convention elsewhere in the project is that the manifest at
+\code{data/<aoi>/manifest.json} is the single source of truth for an AOI's
+data inventory, and the prediction package contains a resolver that implements
+that convention
+(\code{mal-core/src/mal\_core/prediction/aoi\_resolver.py:68-100}), but that
+resolver has no caller anywhere in the package: the environment loader
+bypasses it with its own glob. This is a departure from the project's
+manifest-first rule, and it is a departure that is present in the code, not a
+missing feature that a reader might imagine.
+
+Second, the NetCDF branch selects only the variables that are actually
+present in the file, in the order of the channel list, and zero-fills any
+that are missing
+(\code{mal-core/src/mal\_core/prediction/env\_loader.py:56-66}). A file that
+lacks \code{lc\_wetland} therefore yields a fourth channel of zeros --- a
+silently different tensor with the same shape, not an error.
+
+\subsubsection{The environment is not date-specific}
+
+For a variable with a time axis, the loader takes the \emph{first} time step
+of the file and discards the rest: \code{vals = vals[0]}
+(\code{mal-core/src/mal\_core/prediction/env\_loader.py:60-62}). The stage's
+\code{month} argument selects a state snapshot but does not select an
+environment slice. The environmental forcing the surrogate sees is therefore
+the first day of the ingested record, whatever month was requested.
+
+This is a behavioural fact, not an intention stated in the code, and it is
+listed among the open questions of the stage's question set. A reader who
+wants to know what the surrogate actually saw must know it: the environment
+channels do not correspond to the same date as the state channels.
+
+\subsubsection{Bring the environment onto the AOI grid}
+
+The NetCDF branch assumes that the file covers exactly the AOI's bounding
+box: it reconstructs the source transform from the AOI's own bounds and the
+file's own array dimensions
+(\code{mal-core/src/mal\_core/prediction/env\_loader.py:70-73}), then
+bilinearly resamples into the AOI grid
+(\code{mal-core/src/mal\_core/prediction/env\_loader.py:74-83}). The GeoTIFF
+branch instead takes the source CRS and transform from the file
+(\code{mal-core/src/mal\_core/prediction/env\_loader.py:92-95}). The legacy
+array branch reconstructs its transform from a bounds quadruple stored in the
+file, falling back to a hardcoded default when the file does not carry one
+(\code{mal-core/src/mal\_core/prediction/env\_loader.py:134-135}); that default
+is a literal in the source and is listed in the evidence appendix.
+
+\section{Choosing and loading a checkpoint}
+
+\subsection{The registry and its manifests}
+
+The model registry (\code{mal-core/src/mal\_core/prediction/registry.py}) is
+a directory scanner. Each model is described by a \code{model.yaml} manifest
+sitting beside its checkpoint, and the registry's manifest record
+(\code{ModelManifest}, \code{mal-core/src/mal\_core/prediction/registry.py:24-31})
+has the following fields:
+
+\begin{center}
+\begin{tabular}{@{}lll@{}}
+\toprule
+Field & Default & Meaning \\
+\midrule
+\code{name} & --- & the model's key \\
+\code{version} & \code{\codeconst{prediction.manifest_version}} & the version component of the key \\
+\code{contract\_version} & \code{\codeconst{prediction.contract_version_manifest}} & the model's own contract label \\
+\code{in\_channels} & \code{\codeconst{prediction.in_channels}} & channels the network expects on input \\
+\code{out\_channels} & \code{\codeconst{prediction.out_channels}} & channels the network emits \\
+\code{checkpoint} & empty & file name of the weights, relative to the manifest \\
+\code{description} & empty & free text \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The defaults are placeholders rather than measurements: a manifest that omits
+the channel counts advertises a \codeconst{prediction.in_channels}-channel
+input and a \codeconst{prediction.out_channels}-channel output
+regardless of what the weights actually are. That disagreement is not
+silent: the wrapper builds the network with the counts it was given and then
+loads the checkpoint into it
+(\code{mal-core/src/mal\_core/training/wrapper.py:64-65}), and
+\code{load\_state\_dict} raises on any shape mismatch, so a manifest whose
+counts disagree with its checkpoint cannot be loaded at all --- the run
+aborts with the exception instead of running a mis-sized network. The
+manifest's
+\code{contract\_version} is a label on the model; it is not the state
+contract, it is never compared with the state contract, and nothing in the
+repository validates it.
+
+The scan walks two roots --- the registry's own models directory, by default
+\code{runs/models}, and the runs directory itself --- and collects every
+\code{model.yaml} found recursively
+(\code{mal-core/src/mal\_core/prediction/registry.py:53-72}). Each manifest
+is keyed by its name and version joined with an at-sign. A manifest that
+fails to parse is skipped silently
+(\code{mal-core/src/mal\_core/prediction/registry.py:69-70}).
+
+\subsection{Version resolution}
+
+When a version is given, the key is the exact name-at-version pair
+(\code{mal-core/src/mal\_core/prediction/registry.py:78-79}). When no version
+is given, the registry takes the \emph{last} key in scan order that begins
+with the requested name and an at-sign
+(\code{mal-core/src/mal\_core/prediction/registry.py:81-89}); failing that, it
+tries the bare name as a key
+(\code{mal-core/src/mal\_core/prediction/registry.py:83-85}), and failing
+that it raises a \code{KeyError}
+(\code{mal-core/src/mal\_core/prediction/registry.py:87}).
+
+``Last in scan order'' is not a semantic-version comparison, but it is
+deterministic. The scan visits the manifests in sorted path order
+(\code{mal-core/src/mal\_core/prediction/registry.py:61}) and the keys are
+inserted in that order, so the ``last'' match is the manifest whose path is
+lexicographically greatest among those carrying the requested name. Nothing
+compares version strings: which of two versions of the same model wins is
+decided by their directory paths, not by which is newer. The
+CLI exposes no way to ask for a specific version: the \code{predict}
+subcommand has a \code{--model} option and no version option
+(\code{mal-core/src/mal\_core/cli.py:107-119}).
+
+\subsection{Loading the weights}
+
+The loader has a special case first: the literal name \code{"dummy"}
+short-circuits to a zero model, bypassing the registry entirely
+(\code{mal-core/src/mal\_core/prediction/registry.py:95-97}). Otherwise it
+resolves the manifest, and if the manifest's checkpoint field is empty it
+also returns the zero model
+(\code{mal-core/src/mal\_core/prediction/registry.py:115-116}). A non-empty
+checkpoint is resolved relative to the manifest's directory; if that file
+does not exist, the loader raises \code{FileNotFoundError}
+(\code{mal-core/src/mal\_core/prediction/registry.py:103-109}). The exception
+is not caught: the registry is loaded outside any \code{try} block
+(\code{mal-core/src/mal\_core/prediction/predictor.py:81}), and the two
+exception types the stage treats as ``no input'' are the state loader's
+\code{FileNotFoundError} and the environment loader's catch-all
+(\code{mal-core/src/mal\_core/prediction/predictor.py:55-62}; see
+Section~8). A missing checkpoint therefore aborts the run rather than
+degrading to zeros.
+
+The weights are loaded by a wrapper (\code{UNetWrapper},
+\code{mal-core/src/mal\_core/training/wrapper.py:18-106}) that implements the
+same prediction interface the registry expects
+(\code{ModelProtocol}, \code{mal-core/src/mal\_core/prediction/registry.py:20-21}).
+The wrapper resolves the channel counts in this order:
+
+\begin{enumerate}
+\item the counts the caller passed, which for the registry path are the
+  manifest's counts
+  (\code{mal-core/src/mal\_core/prediction/registry.py:110-114});
+\item otherwise, a \code{model.yaml} sitting beside the checkpoint file,
+  which supplies both counts, but only when the caller supplied none: the
+  manifest is read as a fallback and the caller's value wins if it is set
+  (\code{mal-core/src/mal\_core/training/wrapper.py:39-48}). On the registry
+  path the counts are always supplied
+  (\code{mal-core/src/mal\_core/prediction/registry.py:110-114}), so the
+  manifest beside the checkpoint is never read;
+\item otherwise, counts inferred from the weight tensors themselves: the
+  input count from the first encoder convolution's second dimension, and the
+  output count from the head convolution's first dimension
+  (\code{mal-core/src/mal\_core/training/wrapper.py:50-59}).
+\end{enumerate}
+
+The weights are then loaded into the network and the network is put into
+evaluation mode (\code{mal-core/src/mal\_core/training/wrapper.py:64-66}).
+The compute device is chosen in the order CUDA, then Apple's Metal
+accelerator, then CPU
+(\code{mal-core/src/mal\_core/training/wrapper.py:29-37}).
+
+\subsection{The dummy model is not a model}
+
+The zero model returned for the name \code{"dummy"}, and for any manifest
+with an empty checkpoint, returns a tensor of zeros with the same number of
+channels as the state it was given and the same spatial dimensions
+(\code{mal-core/src/mal\_core/prediction/registry.py:41-45}). Its output band
+count therefore follows the \emph{input's} channel count, not the manifest's
+declared output count: a two-channel state yields a two-band raster, a
+six-channel state a six-band raster. It performs no arithmetic, and it
+therefore exercises the file-writing path of the stage without exercising the
+network at all.
+
+\subsection{Who writes the manifests}
+
+The \code{training} stage does. After training, the trainer writes a
+\code{model.yaml} beside the weights, with the name taken from the output
+directory's name, version \code{\codeconst{prediction.manifest_version}},
+contract \code{\codeconst{prediction.contract_version_manifest}}, the
+checkpoint file name \code{best\_model.pt}, and the input and output channel
+counts \emph{measured} from the first training sample rather than declared
+(\code{mal-core/src/mal\_core/training/trainer.py:95-106};
+the measurement is at \code{mal-core/src/mal\_core/training/trainer.py:50-52}).
+That measurement is the reason a trained model's manifest can be trusted even
+though the schema's defaults are placeholders.
+
+\section{Inference}
+
+\subsection{What is executed}
+
+One forward pass of the U-Net over the whole AOI grid, and nothing else. The
+network (\code{UNet}, \code{mal-core/src/mal\_core/training/model.py:28-60})
+is a four-stage encoder-decoder with skip connections, whose head is a
+one-by-one convolution applied directly to the decoded features
+(\code{mal-core/src/mal\_core/training/model.py:46}); there is no activation
+on the output. The sigmoid appears only inside the loss function, as a
+soft-thresholding device for the Dice term
+(\code{mal-core/src/mal\_core/training/model.py:63-73}), and therefore plays
+no part in the values written to disk.
+
+\subsection{Assembling the input tensor}
+
+The wrapper concatenates the state and the environment along the channel axis
+(\code{mal-core/src/mal\_core/training/wrapper.py:79-88}). If the
+concatenation has fewer channels than the network expects, zero channels are
+appended; if it has more, it is truncated. The raster is then padded up to a
+multiple of \codeconst{training.pad_multiple} rows and columns --- the network pools four times --- by
+edge replication, and the result is cropped back to the original dimensions
+after the forward pass
+(\code{mal-core/src/mal\_core/training/wrapper.py:90-104}).
+
+The channel order is the concatenation of the state channels and the
+environment channels. The state's own order agrees with the training order:
+the vector bands first, then the transmission bands
+(\code{mal-core/src/mal\_core/prediction/state\_loader.py:149}, compared with
+\code{mal-core/src/mal\_core/training/dataset.py:242-252}). The environment's
+order does \emph{not} agree with the training order: the training dataset
+selects the first four variables of its own list, which are
+\code{rainfall}, \code{air\_temp\_c}, \code{jrc\_persistent} and
+\code{lc\_built}
+(\code{mal-core/src/mal\_core/training/dataset.py:72}), whereas the
+prediction loader selects \code{rainfall}, \code{air\_temp\_c},
+\code{jrc\_persistent} and \code{lc\_wetland}
+(\code{mal-core/src/mal\_core/prediction/env\_loader.py:18}). A checkpoint
+trained under the training order receives, at inference, a fourth channel
+that means something different from the one it was trained on. The stage
+contains no list that both sides read, and the mismatch is silent.
+
+\subsection{Consequences of the padding rules}
+
+Two consequences of the wrapper's rules are worth drawing out, because they
+change the meaning of the output rather than merely its shape.
+
+First, with the manifest's default input count of ten and the two most
+common input shapes, the wrapper's padding rules bite exactly once. A
+six-channel state (two vector bands plus four transmission bands) plus a
+four-channel environment is exactly ten channels and needs no padding. A
+two-channel state --- the case in which no transmission raster was found ---
+plus four environment channels is six, so four zero channels are appended ---
+and they are appended at the \emph{end} of the concatenation
+(\code{mal-core/src/mal\_core/training/wrapper.py:80-88}). The layout the
+network therefore receives is \code{[vector(2), env(4), zeros(4)]}, whereas
+the training layout is
+\code{[vector(2), transmission(4), env(4)]}
+(\code{mal-core/src/mal\_core/training/dataset.py:242-243},
+\code{mal-core/src/mal\_core/training/dataset.py:251}). The zero padding
+does not land in the transmission positions: the \emph{environment} does. The
+consequence is a misalignment rather than a shortage of data: with a state
+file that carries no transmission raster, the network receives the environment
+channels where it was trained to expect transmission channels, and zeros where
+it was trained to expect the environment. The output band count is the
+manifest's declared output count, so the stage still writes
+\codeconst{prediction.out_channels} bands and
+names them after the training target's order
+(\code{mal-core/src/mal\_core/prediction/predictor.py:33-40}); nothing in the
+code ties those names to what the network actually produced.
+
+Second, a truncation would occur if the inputs exceeded the network's expected
+count, in which case the trailing environment channels would be cut. With the
+current defaults and shapes this cannot happen, but the rule is unconditional
+in the wrapper.
+
+\subsection{What the numbers mean}
+
+The written values are raw network outputs. Their \emph{intended} units are the
+units of the training target: for the first two bands, adult counts in the
+sense of contract \mskey{contracts.cogs_state}; for the remaining bands, the
+transmission quantities the surrogate was trained to reproduce. That mapping is
+an intention, not a guarantee the code enforces: the head is a bare
+convolution with no output activation
+(\code{mal-core/src/mal\_core/training/model.py:46}), so the values are
+whatever the mean-squared-error fit produced, and nothing constrains them to
+be counts rather than, say, thousands of counts. They are not probabilities,
+not percentages, and not clamped to any interval: the stage writes the
+activations unchanged
+(\code{mal-core/src/mal\_core/prediction/predictor.py:128}).
+
+\section{Aggregation by scale}
+
+\subsection{The scales and their grids}
+
+The stage supports three scales, each with its own grid resolution and its
+own aggregator (\code{mal-core/src/mal\_core/prediction/aggregator.py:25-29},
+\code{mal-core/src/mal\_core/prediction/aggregator.py:74-79}). The AOI object
+is built from the registry entry for the slug, with the registry's own
+resolution overridden by the scale's
+(\code{mal-core/src/mal\_core/prediction/aggregator.py:32-44}). The
+resolution values are literals in the source; the generator now reads them
+out of the code and emits them as the three per-scale resolution macros used
+in the table below, and the evidence appendix cites their
+source locations.
+
+\begin{center}
+\begin{tabular}{@{}llll@{}}
+\toprule
+Scale & Resolution & Grid cell count & Aggregation \\
+\midrule
+regional & \codeconst{prediction.scale_regional_m}~m & $(H, W)$ & identity \\
+national & \codeconst{prediction.scale_national_m}~m & $(H, W)$ & rectangular block mean \\
+continental & \codeconst{prediction.scale_continental_m}~m & $1 \times 1$ & single scalar \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{What each aggregator does}
+
+\paragraph{Regional.} The raster is returned unchanged
+(\code{mal-core/src/mal\_core/prediction/aggregator.py:51-53}). This is the
+only scale for which the written raster's shape equals the grid the
+transform was computed on.
+
+\paragraph{National.} The output is a block mean: the raster is trimmed to a
+whole number of blocks, reshaped into blocks, and averaged within each block
+(\code{mal-core/src/mal\_core/prediction/aggregator.py:56-66}). The number
+of block rows is the raster height divided by ten, at least one, and likewise
+for the columns, so the effective block size is approximately ten by ten
+cells of the \codeconst{prediction.scale_national_m}-metre grid. Each output
+cell is therefore the mean over roughly a twenty-kilometre square.
+
+This is a rectangular block mean on the grid, and it is worth naming the
+difference plainly, because the grid definition's own description string says
+something else: it describes the national scale as a mean-pool to the
+second administrative level
+(\code{mal-core/src/mal\_core/prediction/aggregator.py:27}). The code
+pools into rectangles; it does not intersect administrative boundaries, and
+no boundary geometry is loaded anywhere in the package. The description
+string is not what the code does.
+
+\paragraph{Continental.} The whole raster is reduced to one number, its
+mean over all cells and all bands
+(\code{mal-core/src/mal\_core/prediction/aggregator.py:69-71}). The writer
+then reshapes a one-dimensional result into a single-pixel square raster
+(\code{mal-core/src/mal\_core/prediction/predictor.py:102-108}), so the
+continental output is a one-by-one, one-band raster --- a single cell, not a
+grid --- whose value is the mean
+of everything. Because its band count is one, the band-name table gives it
+the name \code{predicted\_risk}
+(\code{mal-core/src/mal\_core/prediction/predictor.py:30-31}) --- a name that
+is applied on the basis of the band count alone, and that describes the
+value no more accurately than the other scales' names describe theirs.
+
+\subsection{Georeferencing does not follow the aggregation}
+
+The transform written into the output is computed from the \emph{scale grid}
+dimensions, before the aggregated array's shape is known
+(\code{mal-core/src/mal\_core/prediction/predictor.py:78},
+\code{mal-core/src/mal\_core/prediction/predictor.py:100}). The raster's
+height and width are taken from the \emph{aggregated} array
+(\code{mal-core/src/mal\_core/prediction/predictor.py:112},
+\code{mal-core/src/mal\_core/prediction/predictor.py:117-118}). For the
+regional scale the two coincide. For the national scale the written raster
+has one tenth of the rows and columns of the grid the transform was built
+for, while the transform's pixel size is still the
+\codeconst{prediction.scale_national_m}-metre grid's pixel
+size; the result is a raster whose pixels are twice the intended width and
+whose extent covers roughly one tenth of the AOI's bounding box, anchored at
+its upper-left corner. For the continental scale the same discrepancy is
+extreme: a single pixel carrying a transform whose pixel size is the
+\codeconst{prediction.scale_continental_m}-metre grid's, so the one-pixel
+raster covers a small corner of the
+bounding box rather than the whole of it.
+
+This is stated here as a description of current behaviour, not as an
+endorsement. Whether it is a defect or the intended contract is an open
+question in the stage's question set; a reader who needs the national or
+continental output in a map should not assume it is georeferenced to the AOI.
+
+\section{What the stage produces}
+
+\subsection{File name and location}
+
+By default the output directory is the \code{predictions} directory inside the
+runs directory (\code{mal-core/src/mal\_core/prediction/predictor.py:94-95});
+a caller may override it. The file name is built from the AOI slug, the
+scale, the year and the zero-padded month, followed by the suffix
+\code{\_risk.tif}
+(\code{mal-core/src/mal\_core/prediction/predictor.py:97}). The scale is
+embedded in the name, which is what makes the ``latest prediction'' lookup
+behave in the way described in Section~6.5.
+
+\subsection{Raster format}
+
+\begin{center}
+\begin{tabular}{@{}ll@{}}
+\toprule
+Property & Value \\
+\midrule
+Driver & GeoTIFF \\
+Data type & 32-bit floating point \\
+Band count & the aggregated array's channel count \\
+Tiling & tiled, blocks of \codeconst{prediction.block_size} by \codeconst{prediction.block_size} \\
+Compression & deflate \\
+CRS & the AOI's CRS \\
+Transform & affine transform from the AOI bounds over the scale grid \\
+NoData & the ingest sentinel, \mskey{ingest.nodata_sentinel} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+All of these are set in one profile dictionary
+(\code{mal-core/src/mal\_core/prediction/predictor.py:113-126}). The NoData
+value is read from the frozen configuration rather than typed in
+(\code{mal-core/src/mal\_core/prediction/predictor.py:121}, reading the
+\code{ingest.nodata\_sentinel} key), which is the stage's only numeric
+constant with a configured home.
+
+The NoData value is, in practice, never encountered in the data: the
+surrogate's outputs are unbounded network activations, and the writer performs
+no masking
+(\code{mal-core/src/mal\_core/prediction/predictor.py:128}). The sentinel in
+the profile is a declaration of what the file's \emph{absence} would look
+like, not a description of any value present in it.
+
+\subsection{Band names}
+
+The band descriptions are chosen by band count, from a table
+(\code{mal-core/src/mal\_core/prediction/predictor.py:30-41}):
+
+\begin{center}
+\begin{tabular}{@{}llp{7cm}@{}}
+\toprule
+Band count & Names & Applies to \\
+\midrule
+1 & \code{predicted\_risk} & the continental scalar \\
+2 & \code{predicted\_adult\_patch\_count}, \code{predicted\_adult\_cell\_count}
+  & a state without transmission \\
+6 & the two adult-count names, then \code{predicted\_human\_prevalence},
+  \code{predicted\_human\_incidence}, \code{predicted\_infectious\_pressure},
+  \code{predicted\_transmission\_focus} & the full state \\
+other & \code{band\_1} \dots & fallback \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Any other band count gets generic names
+(\code{mal-core/src/mal\_core/prediction/predictor.py:129}). Note that the
+six-band names mirror the surrogate's \emph{training target} order --- two
+adult-count bands then four transmission bands --- and not the ABM's own band
+names, which are \code{adult\_patch\_count} and \code{adult\_cell\_count}
+(\code{mal-core/src/mal\_core/abm/include/mal\_abm\_fast/wire.hpp:124-133}).
+The \code{predicted\_} prefix is the only thing marking the difference
+between a simulated quantity and a surrogate's estimate of it, and it lives
+in the band description rather than in the data.
+
+\subsection{The sidecar}
+
+Beside the raster, the stage writes a JSON file whose name is the raster's
+name with the suffix \code{.tif.json}
+(\code{mal-core/src/mal\_core/prediction/predictor.py:147}). The suffix is
+the opposite of the convention used by the existing artefacts in the runs
+tree, where a sidecar \emph{replaces} the raster's extension: the ABM's writer
+turns \code{<name>.tif} into \code{<name>.json}
+(\code{mal-core/src/mal\_core/abm/src/output\_contract.cpp:43-64},
+\code{mal-core/src/mal\_core/abm/src/output\_contract.cpp:90-94}). The
+prediction stage appends instead, so the two sidecars of the same stem can
+coexist. The sidecar contains:
+
+\begin{center}
+\begin{tabular}{@{}ll@{}}
+\toprule
+Key & Meaning \\
+\midrule
+\code{crs} & the AOI's CRS \\
+\code{transform} & the first six components of the affine transform \\
+\code{aoi\_slug} & the requested slug \\
+\code{scale} & the requested scale \\
+\code{year} & the requested year \\
+\code{month} & the requested month \\
+\code{bands} & the band names written \\
+\code{model\_name} & the requested model name \\
+\code{model\_version} & the requested version, or the word \code{latest} \\
+\code{contract\_version} & the output contract label \\
+\code{generator\_version} & the writing tool's version \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+All of these are written in one dictionary
+(\code{mal-core/src/mal\_core/prediction/predictor.py:134-148}).
+
+Two facts about the sidecar must be stated together, because the second
+undercuts the first. First, the sidecar does not record \emph{which model was
+actually loaded}. The registry may have resolved the requested name to some
+other name-at-version pair --- the version resolution rule is ``last in scan
+order'' --- but the sidecar writes the \code{model\_name} it was given and
+the \code{model\_version} it was given, which the CLI never supplies, so the
+version field always reads \code{latest}
+(\code{mal-core/src/mal\_core/prediction/predictor.py:142-143};
+the CLI's absence of a version option is at
+\code{mal-core/src/mal\_core/cli.py:107-119}). There is no checkpoint hash,
+no reference to the training run, and no fingerprint of the inputs.
+
+Second, the sidecar's \code{contract\_version} is the stage's \emph{own}
+output contract label. It is not the state contract version
+\mskey{contracts.cogs_state} of the raster it consumed, and the two are
+independent: the stage does not gate on the state contract at all, and no
+consumer in the repository validates the prediction's own contract label.
+The label and the generator version are literals in the source
+(\code{mal-core/src/mal\_core/prediction/predictor.py:144-145}) rather than
+values in the frozen configuration. The label is emitted by the generator as
+\codeconst{prediction.contract_version_sidecar}; the generator version has no
+generated home and is listed in the evidence appendix.
+
+\subsection{The ``latest prediction''}
+\label{sec:latest}
+
+The lookup for an AOI's most recent prediction sorts the matching file names
+and takes the last
+(\code{mal-core/src/mal\_core/prediction/predictor.py:153-158}). The match
+pattern is \code{<slug>\_*\_risk.tif}. Because the scale is embedded in the
+name, the sort is lexicographic over a mixed set of scales and dates, so it
+is neither chronological nor a single-scale series: \code{national} sorts
+after \code{continental} and before \code{regional}, and the year-month
+component only breaks ties within a scale. The reader of this fact should
+treat the returned path as ``some prediction for this AOI'', not as ``the
+most recent one''.
+
+\section{The order of operations, and what follows from it}
+
+\subsection{Pseudocode}
+
+In the listing below, \code{PAD\_MULTIPLE} stands for the wrapper's padding
+multiple, \codeconst{training.pad_multiple}.
+
+\begin{verbatim}
+resolve AOI and scale grid
+load checkpoint (registry scan -> name@version -> weights -> device)
+load state tensor   (search runs tree -> pick snapshot -> resample
+                      -> optionally concatenate transmission bands)
+load env tensor     (NetCDF -> GeoTIFF -> legacy array -> zeros -> resample)
+assemble input      (concat(state, env), zero-pad or truncate to in_channels,
+                      pad to a multiple of PAD_MULTIPLE)
+forward pass        (one pass of the U-Net; crop back to original size)
+aggregate           (identity | block mean | scalar)
+compute transform   (from the scale grid, before the aggregate is inspected)
+reshape             (scalar -> 1x1; 1-D -> square; 2-D -> single band)
+write GeoTIFF       (bands, descriptions, profile)
+write sidecar       (metadata dictionary)
+return the raster path
+\end{verbatim}
+
+\subsection{Schedule table}
+
+\begin{center}
+\begin{longtable}{@{}llll@{}}
+\toprule
+Step & Actor & Order & Mode \\
+\midrule
+\endhead
+Resolve AOI, scale grid & aggregator & first & deterministic \\
+Load checkpoint & registry, wrapper & second & may raise \\
+Load state tensor & state loader & third & may degrade to zeros \\
+Load env tensor & environment loader & fourth & may degrade to zeros \\
+Assemble input & wrapper & fifth & deterministic \\
+Forward pass & network & sixth & deterministic \\
+Aggregate & aggregator & seventh & deterministic \\
+Compute transform & predictor & eighth & deterministic \\
+Write raster & predictor & ninth & deterministic \\
+Write sidecar & predictor & tenth & deterministic \\
+\bottomrule
+\end{longtable}
+\end{center}
+
+\subsection{Consequences of this order}
+
+\begin{enumerate}
+\item \textbf{The transform precedes the aggregation.} The georeferencing is
+fixed from the scale grid before the aggregated array exists
+(\code{mal-core/src/mal\_core/prediction/predictor.py:100}), while the
+raster's dimensions come from the aggregated array afterwards
+(\code{mal-core/src/mal\_core/prediction/predictor.py:112}). For the
+regional scale the two agree; for the other two they do not, as described in
+Section~5.3.
+\item \textbf{Aggregation precedes writing, and aggregation changes the shape
+that is written.} The band count in the file is the aggregated array's
+channel count, not the network's output count in general: the continental
+aggregator collapses all channels into one, so a six-band network output
+becomes a one-band file, and the band-name table consequently assigns that
+band the name \code{predicted\_risk}
+(\code{mal-core/src/mal\_core/prediction/predictor.py:129}).
+\item \textbf{The model is loaded before the inputs, and the inputs cannot
+influence the choice of model.} Because the registry resolves the model
+before any data is read, a run with missing inputs and a run with present
+inputs use the same weights.
+\item \textbf{The inputs are loaded before the output directory is created.}
+The output directory is created only after inference
+(\code{mal-core/src/mal\_core/prediction/predictor.py:94-95}), so a failed
+inference leaves no partial output. Conversely, a successful inference
+followed by a write failure leaves a raster without a sidecar.
+\item \textbf{The scenario's parameters are computed and discarded before the
+forward pass} (\code{mal-core/src/mal\_core/prediction/predictor.py:86-89}),
+which is why no intervention can influence the output.
+\item \textbf{Only the month reaches the data.} The year selects no
+snapshot, no environment slice and no model; it appears in the file name and
+the sidecar and nowhere else
+(\code{mal-core/src/mal\_core/prediction/predictor.py:69-70},
+\code{mal-core/src/mal\_core/prediction/predictor.py:97},
+\code{mal-core/src/mal\_core/prediction/predictor.py:140-141}).
+\end{enumerate}
+
+\section{Declaration of absences}
+
+\subsection{Absent inputs degrade silently}
+\label{sec:absent-inputs}
+
+This is the single most consequential fact in the stage. The input loader
+catches two failure classes and converts both into all-zero tensors, without
+a warning, without a log line and without any record in the output
+(\code{mal-core/src/mal\_core/prediction/predictor.py:50-62}):
+
+\begin{itemize}
+\item a \code{FileNotFoundError} from the state loader --- meaning no ABM
+  snapshot was found in any candidate directory --- yields a zero state of
+  six channels;
+\item \emph{any} exception from the environment loader, of whatever kind,
+  yields a zero environment.
+\end{itemize}
+
+The stage then proceeds exactly as it would have: it runs the surrogate on
+zeros, aggregates, and writes a complete, well-formed GeoTIFF with a
+well-formed sidecar. Nothing in the output distinguishes this artefact from
+one computed on real data. A consumer reading the sidecar sees a valid
+contract version and a valid generator version; a consumer reading the raster
+sees numbers.
+
+Two narrower points about the same mechanism. The state branch catches only
+\code{FileNotFoundError}; a corrupt or unreadable state file raises whatever
+exception the reader produced, and that exception propagates and aborts the
+run (\code{mal-core/src/mal\_core/prediction/predictor.py:55-56}). The
+environment branch catches everything, so a corrupt environment file is
+indistinguishable from an absent one. And because the state fallback is
+hardcoded to six channels
+(\code{mal-core/src/mal\_core/prediction/predictor.py:56}), the zero state
+always has the full channel count, so the downstream zero-padding rule never
+fires for a missing state --- the surrogate receives zeros in the
+transmission channels, as it would in the two-channel case.
+
+\subsection{Implemented but never reached}
+
+\begin{itemize}
+\item \textbf{The dummy input generator.} The helper that fabricates a
+  zero state and a zero environment
+  (\code{mal-core/src/mal\_core/prediction/predictor.py:44-47}) has no
+  caller anywhere in the repository.
+\item \textbf{The manifest-aware AOI resolver.} The resolver that reads
+  \code{data/<aoi>/manifest.json} and returns the AOI's data files
+  (\code{mal-core/src/mal\_core/prediction/aoi\_resolver.py:68-100}) is
+  never called. The environment loader uses its own glob instead
+  (\code{mal-core/src/mal\_core/prediction/env\_loader.py:42-49}), which is
+  a departure from the project's manifest-first convention.
+\end{itemize}
+
+\subsection{Inputs accepted and not used}
+
+\begin{itemize}
+\item \textbf{The seed.} The state loader's signature accepts a seed,
+  described in its docstring as the rollout seed to use
+  (\code{mal-core/src/mal\_core/prediction/state\_loader.py:23},
+  \code{mal-core/src/mal\_core/prediction/state\_loader.py:32}), and the
+  body never refers to it. The seed is inert.
+\item \textbf{The year.} The year selects no snapshot, no environment and no
+  model. It is written into the file name and the sidecar.
+\end{itemize}
+
+\subsection{States the code never enters}
+
+\begin{itemize}
+\item The transmission branch is skipped entirely when no transmission raster
+  is found (\code{mal-core/src/mal\_core/prediction/state\_loader.py:129-151});
+  in that case the state tensor has two channels and the wrapper appends
+  four zero channels.
+\item The scenario branch computes a parameter dictionary and discards it
+  (\code{mal-core/src/mal\_core/prediction/predictor.py:86-87}); the forward
+  pass is called without it.
+\item The \code{"dummy"} name and the empty-checkpoint case both return the
+  zero model without touching the registry's manifests
+  (\code{mal-core/src/mal\_core/prediction/registry.py:96-97},
+  \code{mal-core/src/mal\_core/prediction/registry.py:115-116}).
+\end{itemize}
+
+\subsection{Unknown AOIs fail loudly}
+
+The one failure mode in the stage that is \emph{not} silent is an unknown AOI
+slug. The AOI is built from the registry of AOIs, and a slug that is not in
+that registry raises a \code{ValueError} naming the slug and listing the
+available ones
+(\code{mal-commonlib/src/mal\_commonlib/aoi.py:275-285}; the call is at
+\code{mal-core/src/mal\_core/prediction/aggregator.py:34}). The stage
+therefore fails fast on an unknown area, in contrast with its silent
+degradation on missing data.
+
+\subsection{Whole capabilities that do not exist}
+
+There is no ensemble over seeds, no uncertainty quantification, no
+calibration of the output against any reference, no thresholding or
+classification, no re-projection onto administrative boundaries, and no
+epidemiological validation of any kind
+(\code{mal-core/src/mal\_core/prediction/predictor.py:66-76}, the signature;
+and the package contains no validation module). The stage writes what the
+network produced.
+
+\section{The seams with the other stages}
+
+\subsection{With the \code{abm} stage}
+
+The seam is the state COG and its sidecar. The prediction stage reads the
+raster positionally and ignores the sidecar, so the seam is one-way and
+unguarded: the ABM writes a rich description of what it produced, and the
+prediction stage takes only the numbers. The ABM's own contract version
+\mskey{contracts.cogs_state} is therefore not enforced at this seam; the
+consequence of a mismatch is a surrogate fed normalised counts where it
+expects raw ones, and no error.
+
+The second half of the seam is the transmission raster, which may come from a
+different day than the vector snapshot, as described in
+Section~2.1.4.
+
+\subsection{With the \code{training} stage}
+
+The seam is the checkpoint and its manifest. The training stage measures the
+network's input and output channel counts from its own data and writes them
+into the manifest
+(\code{mal-core/src/mal\_core/training/trainer.py:50-52},
+\code{mal-core/src/mal\_core/training/trainer.py:95-106}); the prediction
+stage reads them and uses them to size the network
+(\code{mal-core/src/mal\_core/prediction/registry.py:110-114}).
+
+Two mismatches live on this seam, and neither is detected.
+
+\begin{itemize}
+\item \textbf{The environment channel order.} Training and inference read
+  different fourth channels, as described in Section~4.2.
+\item \textbf{The environment may be empty at training and real at
+  inference.} The training dataset substitutes an all-zero environment patch
+  whenever no environment file was supplied
+  (\code{mal-core/src/mal\_core/training/dataset.py:246-249}), and the
+  training CLI's environment-path option defaults to nothing
+  (\code{mal-core/src/mal\_core/cli.py:780}). A checkpoint trained that way
+  has never seen a real environment, and the prediction stage will hand it
+  one.
+\end{itemize}
+
+Neither the manifest's contract label nor any other field closes these gaps.
+
+\section{What the artefact must not be used for}
+
+\begin{enumerate}
+\item \textbf{Not as a measurement of infection.} The output is a surrogate's
+  estimate of what the ABM would do next; the ABM itself is a model, and
+  the surrogate is a model of that model
+  (\code{mal-core/src/mal\_core/training/model.py:1-6}).
+\item \textbf{Not as a probability.} The values are unbounded network
+  outputs, not a score in the unit interval
+  (\code{mal-core/src/mal\_core/training/model.py:46},
+  \code{mal-core/src/mal\_core/prediction/predictor.py:128}).
+\item \textbf{Not as a risk class.} Despite the file name's suffix and the
+  band name \code{predicted\_risk}, no classification is performed.
+\item \textbf{Not as the result of an intervention scenario.} Interventions
+  are converted and discarded
+  (\code{mal-core/src/mal\_core/prediction/predictor.py:86-87}).
+\item \textbf{Not as a dated product.} The state channels come from the
+  snapshot nearest the requested month; the environment channels come from
+  the first time step of the ingested file
+  (\code{mal-core/src/mal\_core/prediction/env\_loader.py:60-62}); and the
+  transmission channels may come from a different day again
+  (\code{mal-core/src/mal\_core/prediction/state\_loader.py:124-127}).
+\item \textbf{Not as a record of what was run.} The sidecar names the model
+  that was requested, not the model that was loaded, and does not record
+  that the inputs were absent
+  (\code{mal-core/src/mal\_core/prediction/predictor.py:142-143},
+  \code{mal-core/src/mal\_core/prediction/predictor.py:55-61}).
+\item \textbf{Not as a national or continental map.} Their georeferencing
+  does not match their dimensions
+  (\code{mal-core/src/mal\_core/prediction/predictor.py:100},
+  \code{mal-core/src/mal\_core/prediction/predictor.py:117-118}).
+\end{enumerate}
+
+\section{Evidence appendix}
+
+\subsection{Implementation notes for a replicator}
+
+\begin{itemize}
+\item The state loader's directory search stops at the first directory that
+  has any candidate, not the best match
+  (\code{mal-core/src/mal\_core/prediction/state\_loader.py:52-76}). A
+  replicator who puts a better snapshot in a later directory will not reach
+  it.
+\item A snapshot file with no \code{\_dayNNN} suffix is treated as day
+  thirty when the nearest-day comparison is made
+  (\code{mal-core/src/mal\_core/prediction/state\_loader.py:70}).
+\item The environment loader's data directory is relative to the process's
+  working directory (\code{mal-core/src/mal\_core/prediction/env\_loader.py:42}),
+  so the stage must be run from the repository root to find the AOI's data.
+\item The environment loader's NetCDF branch assumes the file spans exactly
+  the AOI's bounding box (\code{mal-core/src/mal\_core/prediction/env\_loader.py:70-73}).
+\item The wrapper's zero-padding and truncation rules are unconditional
+  (\code{mal-core/src/mal\_core/training/wrapper.py:80-88}); the replicator
+  should check the channel arithmetic before assuming a missing band is
+  absent rather than zeroed.
+\item The registry's version resolution is lexicographic over manifest paths,
+  not over version strings
+  (\code{mal-core/src/mal\_core/prediction/registry.py:61},
+  \code{mal-core/src/mal\_core/prediction/registry.py:81-89}); a replicator
+  who needs a specific version must edit the call, since the command line
+  offers no version option (\code{mal-core/src/mal\_core/cli.py:107-119}).
+\item The whole array is written to the file in a single call, and only the
+  band descriptions are set afterwards, one band at a time
+  (\code{mal-core/src/mal\_core/prediction/predictor.py:127-132}); a reader
+  that treats a missing description as an error would misread the
+  fallback names.
+\item The sidecar's transform is truncated to its first six components
+  (\code{mal-core/src/mal\_core/prediction/predictor.py:136}), which is the
+  affine tuple without the offset convention spelled out.
+\end{itemize}
+
+\subsection{Values that are literals in the source, not in the configuration}
+
+The project's documentation layer requires that values come from the frozen
+configuration or from a generated table. Most of the values this stage uses
+now have a generated home: the contract labels, the channel counts, the
+per-scale resolutions, the padding multiple and the tiling block size are
+read out of the implementation by the generator and reach this document as
+\code{\textbackslash codeconst} macros. The values listed below are the ones that are still
+literals in the source with no generated home --- neither a key in
+\code{mal-core/config/model\_constants.yaml} nor a constant the generator
+reads. They are listed here as a reading of the code, with their locations,
+so that a reader can check them and so that the remaining gap is visible.
+
+\begin{center}
+\begin{longtable}{@{}llll@{}}
+\toprule
+Value & Where & Kind & Note \\
+\midrule
+\endhead
+\code{"mal-execution-0.1.0"} (generator version) &
+  \code{mal-core/src/mal\_core/prediction/predictor.py:145} &
+  literal string & written into the sidecar \\
+10 (block divisor, national) &
+  \code{mal-core/src/mal\_core/prediction/aggregator.py:59} &
+  literal integer & rows and columns per block \\
+$(-3.0, 4.0, 2.0, 12.0)$ (legacy array bounds) &
+  \code{mal-core/src/mal\_core/prediction/env\_loader.py:134} &
+  literal tuple & fallback bounds, west/south/east/north \\
+30 (days per month proxy) &
+  \code{mal-core/src/mal\_core/prediction/state\_loader.py:50} &
+  literal integer & date proxy \\
+1, 730 (day clamp) &
+  \code{mal-core/src/mal\_core/prediction/state\_loader.py:50} &
+  literal integers & date clamp \\
+\bottomrule
+\end{longtable}
+\end{center}
+
+The legacy bounds are the fallback the environment loader uses when a legacy
+array file carries no \code{bounds} entry of its own
+(\code{mal-core/src/mal\_core/prediction/env\_loader.py:134}); they are not
+the ingest bounding box of any AOI, and they are not read from
+\code{mal-commonlib/src/mal\_commonlib/aois.yaml}. They describe a box
+shifted north-east relative to the Ghana AOI's own bounds (west $-3.5$,
+south $4.5$, east $1.5$, north $11.5$), reaching further east and north than
+the AOI does, so a legacy array file without bounds is georeferenced onto a
+different area than the one the rest of the stage works on.
+
+The configuration file currently defines two contract versions, the
+environment contract and the state contract
+(\code{mal-core/config/model\_constants.yaml:8-10}); there is no key for the
+prediction stage's own output contract, and no row for the prediction
+artefact in the generated contract table
+(\code{docs/concepts/generated/contracts.tex}). The stage's contract label
+is nevertheless emitted, as a code constant read out of the implementation
+(\codeconst{prediction.contract_version_sidecar}), as are the per-scale
+resolutions; what remains without a generated home is the set of values
+listed in the table above. These are gaps rather than facts, and the
+question set that accompanies this document records them as open.
+
+\subsection{Verification status}
+
+\begin{center}
+\begin{tabular}{@{}lp{9.5cm}@{}}
+\toprule
+Aspect & Status \\
+\midrule
+Registry, dummy path & exercised by the test suite \\
+State loader & shape-level assertion only \\
+Environment loader & shape-level assertion only \\
+End-to-end run & exercised with the dummy model: file exists, sidecar
+  exists and parses, raster opens with a CRS \\
+Real checkpoint load & \textbf{not} covered \\
+Inference correctness & \textbf{not} covered \\
+National and continental aggregators & \textbf{not} covered \\
+Band names, sidecar contract label & \textbf{not} asserted \\
+Degradation to zeros & \textbf{not} asserted \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The coverage described here is what the repository's test suite exercises
+around this stage; the assertions it makes are about existence and shape
+rather than about values. No test in the repository loads a real checkpoint
+and checks the inference; no test exercises the national or continental
+aggregators; no test asserts the output's band names or the sidecar's
+contract label; and no test asserts that a missing input produces a warning
+or a distinguishable output. The stage's end-to-end path is therefore
+verified only in the sense that a raster and a sidecar appear.
+
+\subsection{What is verified and what is not, in this document}
+
+Verified against the code by direct reading: the band names and their
+meanings; the contract versions; the order of operations; the fallback
+chains; the aggregation rules; the output profile; the sidecar's key list;
+the behaviour of the scenario parameter; the absence of version gating; the
+absence of any classification, calibration or uncertainty treatment; and the
+absence of a manifest consumer.
+
+Verified by inspection of the tree: no trained checkpoint and no
+\code{model.yaml} exists anywhere in the repository --- the runs tree holds
+no \code{*.pt} and no \code{model.yaml} --- so there is no checkpoint under
+the current state contract, and none under a retired one either.
+
+Not established, and stated as such in the body: whether the national block
+mean or the description string is the intended national semantics; whether
+the transform/dimension discrepancy at the coarser scales is a defect or the
+intended contract; which environment channel order is intended; and whether
+the transmission raster and the vector snapshot are ever intended to come
+from the same day.
+
+\subsection{Statements about the retired specification}
+
+The retired specification for this stage disagrees with the implementation in
+several places, and this document follows the implementation. Where the two
+differ on the number of input channels, on the number of state channels, on
+the day clamp, on the band description, on the source of the NoData value and
+on the existence of an AOI catalogue symbol, the code is authoritative. The
+specification's own description of the stage's consumers --- maps,
+dashboards, intervention planning --- describes consumers that do not exist
+in the tree.
+
+\end{document}

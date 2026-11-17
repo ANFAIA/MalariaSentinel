@@ -130,6 +130,10 @@ def test_schema_is_declared_not_yaml_derived():
 
 _CONFIG_DUMP_CANDIDATES = (
     pathlib.Path("mal-core/src/mal_core/abm/build/src/config_dump"),
+    # The same binary, resolved from this file, so the test does not depend
+    # on the working directory the suite is launched from.
+    pathlib.Path(__file__).resolve().parents[1]
+    / "src/mal_core/abm/build/src/config_dump",
 )
 
 

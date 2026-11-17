@@ -2,7 +2,7 @@
 
 Weights reflect validation value for the question "is the system good?"
 — external validation and core biology dominate; engineering invariants
-are gates, not dimensions (see docs/specs or AGENTS.md conventions).
+are gates, not dimensions (see the AGENTS.md conventions).
 
 Anchors (all papers live in papers/):
 - D1  occupancy: Bogh 2004; Ndenga 2011 (habitat occupancy range)
@@ -46,6 +46,12 @@ from .scorers.base import Scorer
 
 @dataclass(frozen=True)
 class ScorerSpec:
+    """One registry entry: the scorer class and the role it plays.
+
+    ``kind`` is either "composite" (a dimension weighted into the
+    composite) or "gate" (a binary invariant reported apart).
+    """
+
     cls: type[Scorer]
     kind: str  # "composite" | "gate"
 
@@ -77,6 +83,7 @@ GATES: tuple[str, ...] = (
 
 
 def build_registry() -> dict[str, ScorerSpec]:
+    """Instantiate every known scorer and map its name to its registry entry."""
     instances: list[Scorer] = [
         HabitatOccupancyScorer(),    # D1
         SurvivalScorer(),            # D2

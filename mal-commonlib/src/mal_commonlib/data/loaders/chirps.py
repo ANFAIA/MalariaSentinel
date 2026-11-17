@@ -124,11 +124,13 @@ def _write_aoi_tif(path: pathlib.Path, da: xr.DataArray, aoi: AOI) -> None:
 
 
 def _days_in_month(year: int, month: int) -> list[int]:
+    """Day-of-month numbers (1..N) of the given calendar month."""
     n = calendar.monthrange(year, month)[1]
     return list(range(1, n + 1))
 
 
 def _daily_url_for(year: int, month: int, day: int) -> str:
+    """URL of the gzipped CHIRPS v2.0 daily GeoTIFF for one calendar day."""
     return CHIRPS_DAILY_TIF_GZ_TEMPLATE.format(year=year, month=month, day=day)
 
 
@@ -280,6 +282,7 @@ def load_chirps_rainfall_daily(
         cdir = cache_dir if cache_dir is not None else _default_cache_dir()
 
         def _default_fetch(y: int, m: int, d: int) -> xr.DataArray:
+            """Download one CHIRPS day and clip it to the AOI, caching the clipped GeoTIFF."""
             url = _daily_url_for(y, m, d)
             dest = _cache_path_aoi(cdir, aoi.slug, y, m, d)
             return _download_and_clip_to_aoi(url, aoi, dest)

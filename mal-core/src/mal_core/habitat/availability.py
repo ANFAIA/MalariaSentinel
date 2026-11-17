@@ -77,6 +77,7 @@ def warm_up_pluvial(
 
 
 def _as_array(x) -> np.ndarray:
+    """Return ``x`` as a float64 array with NaN replaced by 0.0."""
     arr = np.asarray(x, dtype=np.float64)
     return np.nan_to_num(arr, nan=0.0)
 

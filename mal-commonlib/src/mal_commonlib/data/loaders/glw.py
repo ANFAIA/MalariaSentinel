@@ -95,6 +95,7 @@ __all__ = ["load_glw_livestock", "DOWNLOADER", "SUPPORTED_SPECIES"]
 
 
 def _default_cache_dir() -> pathlib.Path:
+    """Cache directory for GLW4 livestock downloads, under the XDG cache home."""
     base = os.environ.get("XDG_CACHE_HOME") or os.path.expanduser("~/.cache")
     return pathlib.Path(base) / "mal_commonlib" / "glw4"
 

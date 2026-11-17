@@ -1,0 +1,1446 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+% Latin Modern: a scalable Type 1 font. With T1 and the default
+% Computer Modern, TeX asks for the EC fonts, and when the Type 1 EC
+% ones (cm-super) are missing it falls back to bitmaps -- and
+% microtype's font expansion cannot work with a bitmap font, so the
+% build fails on a TeX Live without cm-super.
+\usepackage[T1]{fontenc}
+\usepackage[english]{babel}
+\usepackage[margin=2.3cm]{geometry}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{amsmath,amssymb}
+\usepackage{listings}
+\usepackage{pdflscape}
+\setlength{\emergencystretch}{6em}
+\usepackage[hidelinks]{hyperref}
+\newcommand{\code}[1]{\texttt{#1}}
+\newcommand{\codex}[1]{\texttt{#1}}
+\input{../generated/macros.tex}
+\input{../generated/code-macros.tex}
+
+% ---------------------------------------------------------------------------
+% Values that do not live in mal-core/config/model_constants.yaml.  Every one
+% of them is a literal in the source of the training package; each is listed,
+% with its file and line, in the evidence appendix ("Code literals used in
+% this document").  tools/gen_concepts_values.py reads them out of the code
+% text and emits them as \codeconst{...} macros in
+% docs/concepts/generated/code-macros.tex, so that a value the code changes
+% makes this document fail to build instead of making it lie.  The macros
+% below are short aliases for those generated macros; the body of the
+% document never contains a hand-typed number.
+% ---------------------------------------------------------------------------
+\newcommand{\PatchSize}{\codeconst{training.patch_size}}
+\newcommand{\EnvChannels}{\codeconst{training.env_channels}}
+\newcommand{\VectorChannels}{\codeconst{training.vector_channels}}
+\newcommand{\TransChannels}{\codeconst{training.transmission_channels}}
+\newcommand{\DiceWeight}{\codeconst{training.dice_weight}}
+\newcommand{\DiceTau}{\codeconst{training.dice_tau}}
+\newcommand{\DiceThresh}{\codeconst{training.dice_thresh}}
+\newcommand{\DiceEps}{\ensuremath{\text{\codeconst{training.dice_eps}}}}
+\newcommand{\SubSeed}{\codeconst{training.sub_seed}}
+\newcommand{\CkptPeriod}{\codeconst{training.ckpt_period}}
+\newcommand{\PoolMult}{\codeconst{training.pad_multiple}}
+\newcommand{\StateContract}{\mskey{contracts.cogs_state}}
+\newcommand{\EnvContract}{\mskey{contracts.env_nc}}
+
+\title{The \emph{training} stage of the Centinela:\\
+a learned one-step surrogate for the agent-based model}
+\author{Conceptual document, \texttt{docs/concepts/training/}}
+\date{}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+The \emph{training} stage fits a small convolutional network --- a U-Net --- to
+imitate one simulated day of the agent-based model (ABM). It reads the daily
+state snapshots that an ABM run leaves on disk, tiles them, pairs consecutive
+days, splits the tiles spatially, and optimises the network so that its
+prediction of tomorrow's state matches what the ABM actually produced
+tomorrow. The fitted weights are written out as checkpoints that a later
+stage (\emph{prediction}) loads --- but only when the operator names the
+model explicitly --- in order to produce a risk map without running the C++
+ABM at all.
+
+This document explains what the stage is for, what it consumes, what it
+produces, in what order it does its work, how the data is assembled and split,
+what the network is and what it is optimising, how the ``best'' model is
+chosen, what a checkpoint contains and how it is read back, and where the
+seam between training and prediction is thin. It is written for a reader who
+has never opened the code, and every factual claim resolves to a file and a
+line.
+\end{abstract}
+
+\tableofcontents
+
+% ===========================================================================
+\section{Purpose, and what this stage is not}
+\label{sec:purpose}
+
+\subsection{The question the stage exists to answer}
+
+Running the full agent-based model is expensive. The ABM is a C++ binary that
+must be executed day by day for every area of interest, every year, every
+scenario; a decision-support system that has to answer ``where is transmission
+risk concentrated in this district next month'' cannot afford to re-run it for
+every question. The \emph{training} stage therefore exists to answer one
+question:
+
+\begin{quote}
+\emph{Can a small learned network reproduce the ABM's own one-day state
+transition closely enough that the prediction stage can use it in place of
+re-running the ABM?}
+\end{quote}
+
+The stage's own command-line help states the intent in exactly these terms:
+it trains a U-Net ``to predict ABM outcomes from environmental tensors,
+enabling fast inference without full ABM runs''
+(\codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}cli.py:784-785}). The prediction stage can close the
+loop, but it does not do so by itself: its \codex{--model} option defaults to
+\codex{"dummy"}
+(\codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}cli.py:112}), and the registry answers that name with a
+zero-emitting \codex{DummyModel}
+(\codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}prediction/\allowbreak{}registry.py:41-46,96-97}). A trained
+checkpoint is therefore \emph{never picked up automatically}: the surrogate
+is applied only when the operator passes the model's registry key to
+\codex{--model}, in which case the registry resolves the manifest and builds
+a wrapper around the declared checkpoint
+(\codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}prediction/\allowbreak{}registry.py:96-118}).
+
+\subsection{What would count as the question having been answered}
+
+The question is answered in the operational sense when a checkpoint exists on
+disk that the prediction stage can find, load and apply to a state snapshot.
+Concretely, the training stage has done its job when the output directory
+contains a manifest file named \codex{model.yaml} naming a checkpoint file that
+exists next to it (\codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}training/\allowbreak{}trainer.py:88,93,105-106}),
+the prediction stage's registry can scan that directory, resolve the
+manifest, and construct the network (\codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}prediction/\allowbreak{}registry.py:61-74,96-118}),
+and the operator names that model on the prediction command line --- the
+\codex{--model} default of \codex{"dummy"} would otherwise select the
+zero-emitting dummy
+(\codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}cli.py:112};
+\codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}prediction/\allowbreak{}registry.py:96-97}).
+
+Notice what this criterion does \emph{not} include. It does not include any
+accuracy floor, any comparison against the ABM, any tolerance band, any
+acceptance scorecard. \emph{The stage answers the question when it has produced
+a loadable artefact; whether that artefact is faithful to the ABM is not
+checked anywhere.} Section~\ref{sec:absences} returns to this.
+
+\subsection{Negative purpose: what the surrogate is not}
+
+The surrogate introduced in Section~\ref{sec:surrogate} is a very particular
+object, and the following are \emph{not} among its properties. They are stated
+here, at the point where the reader first meets the surrogate, because a reader
+who knows them will read the rest of this document correctly.
+
+\begin{itemize}
+\item \textbf{It is not a measurement.} The network's output is a set of
+      learned parameters. It has no physical unit of its own; the units it
+      carries are borrowed from whatever the ABM happened to write into the
+      training rasters, and even those are inherited by imitation, not by
+      construction. Nothing in the training path measures anything.
+\item \textbf{It is not a model of the ABM.} It is a model of \emph{one ABM
+      step}, in one area, under the conditions the supplied rollouts
+      exhibited. It has no representation of the mechanisms the ABM
+      implements --- no gonotrophic cycle, no host-seeking, no larval
+      competition, no dispersal kernel, no human immunity. Those mechanisms
+      survive only as statistical regularities in the training pairs.
+\item \textbf{It is not a projection.} Nothing in the code rolls the surrogate
+      forward over a horizon. The prediction stage calls it exactly once per
+      invocation and aggregates the single answer into a risk map
+      (\codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}prediction/\allowbreak{}predictor.py:89-92}). The
+      surrogate cannot produce a multi-day trajectory, a prevalence curve, or
+      a scenario comparison.
+\item \textbf{It is not a generalisation beyond the rollouts it saw.} It is
+      trained only on the ABM outputs present in the run directory it was
+      given. What it can be expected to represent \emph{outside} those
+      rollouts --- a different intervention regime, a different area of
+      interest, a different year, a newer version of the ABM --- is a
+      statistical expectation: nothing in this repository establishes it,
+      and no artefact of this stage records it (see the evidence appendix).
+\item \textbf{It is not a calibrated instrument.} There is no scorer, no
+      tolerance, no floor and no scorecard for this stage (Section
+      \ref{sec:absences}). The word ``best'' in the training loop means
+      ``the largest validation Dice seen so far, with ties overwriting'',
+      nothing more.
+\end{itemize}
+
+\subsection{Which source wins when they disagree}
+
+This document draws its values from three sources, and they do not carry equal
+authority. \textbf{Values} --- the numbers that enter a computation --- are
+governed by the shared configuration file
+(\codex{mal-core/\allowbreak{}config/\allowbreak{}model\_\allowbreak{}constants.yaml}), and that file wins.
+\textbf{Contract values and names} --- version strings, band names, artefact
+names --- are governed by the generated contract table, and that table wins.
+\textbf{Semantics} --- what the numbers mean, and how the stage behaves --- are
+governed by this document, because this document owns the training stage's
+prose, and this document wins. When two of these sources contradict each
+other, the one with the lower authority is the bug: a value that disagrees
+with the configuration file is an error in the configuration file or in the
+code that reads it, a contract name that disagrees with the generated table
+is an error in one of them, and a sentence here that disagrees with the code
+is an error in the sentence. The rule is stated in this document rather than
+on a shared page because the training stage's authority belongs to this
+document, and no other document speaks for it.
+
+% ===========================================================================
+\section{The surrogate, introduced}
+
+\label{sec:surrogate}
+
+\subsection{The mapping}
+
+The surrogate is a feed-forward convolutional network, a \emph{U-Net}
+(a U-shaped encoder--decoder network with skip connections), implemented as
+the class \codex{UNet} (\codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}training/\allowbreak{}model.py:28-46}).
+It learns a one-step state transition:
+
+\begin{equation}
+\widehat{S_{t+1}} \;=\; f_\theta\!\left(S_t \,\Vert\, T_t \,\Vert\, E\right),
+\label{eq:mapping}
+\end{equation}
+
+where \(S_t\) is the ABM's vector state at day \(t\), \(T_t\) is the optional
+transmission state at day \(t\), \(E\) is the environmental context, and
+\(\Vert\) denotes channel-wise concatenation. The target of the fit is the
+ABM's own state at day \(t+1\), \(S_{t+1}\) (and \(T_{t+1}\) where present).
+
+The \emph{temporal horizon of one training example is exactly one simulated
+day}. Pairs are formed from consecutive snapshots present in the run
+directory: the code sorts the day numbers of a rollout and pairs
+\((d_i, d_{i+1})\) for each adjacent pair in that sorted list
+(\codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}training/\allowbreak{}dataset.py:135-146}). Two consequences
+follow and both matter. First, the horizon is a day, so a surrogate that has
+been trained cannot be asked for a week's transition. Second, the pairing is
+by \emph{adjacency in the sorted list of present days}, not by adjacency in
+integers: if a run directory holds days \(1,2,9,10\), the pair \((2,9)\) is
+formed, and it spans an interval of seven days even though the network is
+being taught a one-day transition.
+
+\subsection{Channel composition}
+
+The channel counts are \emph{not} fixed constants in the training path; they
+are read off the data at run time. The trainer takes a single sample from the
+training dataset and reads the channel counts off the sample's two axes
+(\codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}training/\allowbreak{}trainer.py:50-52}), then builds the
+network with those counts (\codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}training/\allowbreak{}trainer.py:54}).
+The composition is:
+
+\begin{center}
+\begin{tabular}{@{}lll@{}}
+\toprule
+Tensor & Channels & Source \\
+\midrule
+Input \(x\) & \(\VectorChannels\) (state) \(\oplus\) \(\TransChannels\) (transmission, optional) \(\oplus\) \EnvChannels{} (environment)
+  & \codex{dataset.py:245-252} \\
+Target \(y\) & \(\VectorChannels\) (state) \(\oplus\) \(\TransChannels\) (transmission, optional)
+  & \codex{dataset.py:242-243} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+With transmission enabled --- the default --- this is a ten-channel input and a
+six-channel target; without it, six in and two out. The module's own
+docstring still advertises the older six-in/two-out shape
+(\codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}training/\allowbreak{}model.py:1-5}), and the constructor's
+default arguments are still the \codex{in\_\allowbreak{}channels} and
+\codex{out\_\allowbreak{}channels} values recorded in the generated parameter
+table of Section~\ref{sec:architecture}
+(\codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}training/\allowbreak{}model.py:29-30}); the training loop
+overrides both from the data, so the docstring is stale but harmless in the
+training path. It is \emph{not} harmless in the standalone validation script,
+which constructs the network with those defaults and would fail to load a
+transmission-enabled checkpoint (Section~\ref{sec:absences}).
+
+Two module-level constants, \codex{VECTOR\_\allowbreak{}CHANNELS} and
+\codex{TRANSMISSION\_\allowbreak{}CHANNELS}, are declared in the dataset module
+(\codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}training/\allowbreak{}dataset.py:20-21}) but never read
+anywhere; only \codex{ENV\_\allowbreak{}CHANNELS} is used
+(\codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}training/\allowbreak{}dataset.py:22}). The state and
+transmission band counts are in fact taken from the rasters themselves
+(\codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}training/\allowbreak{}dataset.py:179,229-230}). A consequence
+worth stating: a run directory whose rasters carry an unexpected number of
+bands produces a model with that number of channels, and nothing complains.
+
+\subsection{What the surrogate cannot represent}
+
+The limitations are structural consequences of the three facts above, and the
+reader should hold them in mind while reading Sections
+\ref{sec:data}--\ref{sec:selection}.
+
+\begin{enumerate}
+\item \textbf{It is purely local.} The network is convolutional with a
+      receptive field of finite extent; a cell's prediction depends on its
+      neighbourhood, not on the whole raster. It cannot express a
+      population-level constraint or a basin-wide balance.
+\item \textbf{It has no memory.} The input is a single state snapshot plus a
+      single static environmental stack. There is no recurrent state, no
+      stack of previous days, and no daily rainfall history. A rainfall event
+      on day \(t\) cannot influence the prediction for day \(t+1\), because
+      the environmental planes the network sees are the same for every
+      training pair (Section~\ref{sec:env}).
+\item \textbf{It is trained on one regime only.} It inherits the ABM's
+      behaviour for the seeds, years, areas and interventions present in the
+      supplied run directory, and nothing else.
+\item \textbf{It is bounded only by what the loss encourages.} The output
+      head is a bare convolution with no activation
+      (\codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}training/\allowbreak{}model.py:46}), so a predicted
+      adult count may come out negative or fractional, and nothing clamps it
+      in training or at inference
+      (\codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}training/\allowbreak{}wrapper.py:106}). How the two
+      loss terms actually traded off during the fit is not observable: the
+      code records no per-epoch loss beyond the single printed line
+      (\codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}training/\allowbreak{}trainer.py:84}).
+\end{enumerate}
+
+% ===========================================================================
+\section{Notation}
+
+The table below fixes the symbols used in this document. The parenthesis gives
+the code name, so that a reader can hold the description and the source in one
+head.
+
+\begin{center}
+\begin{longtable}{@{}lp{3.4cm}p{9.0cm}@{}}
+\toprule
+Symbol & Code name & Meaning \\
+\midrule
+\endhead
+\(S_t\) & state raster, bands 1--2 & The ABM's vector state at day \(t\): two bands of raw per-cell adult counts, \codex{adult\_\allowbreak{}patch\_\allowbreak{}count} and \codex{adult\_\allowbreak{}cell\_\allowbreak{}count} (\codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}abm/\allowbreak{}include/\allowbreak{}mal\_\allowbreak{}abm\_\allowbreak{}fast/\allowbreak{}wire.hpp:133}), under state contract \StateContract. \\
+\(T_t\) & transmission raster, bands 1--4 & The ABM's transmission state at day \(t\): four bands, named \codex{human\_\allowbreak{}prevalence}, \codex{human\_\allowbreak{}incidence}, \codex{infectious\_\allowbreak{}vector\_\allowbreak{}pressure} and \codex{active\_\allowbreak{}focus} by the transmission output writer (\codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}abm/\allowbreak{}include/\allowbreak{}mal\_\allowbreak{}abm\_\allowbreak{}fast/\allowbreak{}transmission\_\allowbreak{}output.hpp:21-26}). The fourth is \emph{not} the ``transmission focus'' band of the prediction risk map, which is a different artefact (\codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}prediction/\allowbreak{}predictor.py:39}). \\
+\(E\) & environmental stack & Up to four planes, read once from a NetCDF or GeoTIFF supplied by the operator (\codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}training/\allowbreak{}dataset.py:66-88}); with the real environmental NetCDF the read fails and every plane is zero (Section~\ref{sec:env}). \\
+\(f_\theta\) & \codex{UNet} & The surrogate network (\codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}training/\allowbreak{}model.py:28-60}). \\
+\(\theta\) & \codex{state\_\allowbreak{}dict} & The learned parameters, as written to a checkpoint. \\
+\(P\) & \codex{patch\_\allowbreak{}size} & The side of a training tile, in raster cells (\codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}training/\allowbreak{}dataset.py:19}). \\
+\(c_{\mathrm{mid}}\) & \codex{mid\_\allowbreak{}col} & The column at which the raster is split between training and validation tiles (\codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}training/\allowbreak{}dataset.py:131}). \\
+\(D_\mathrm{train}, D_\mathrm{val}\) & \codex{RolloutDataset} & The two splits, each a list of tile records (\codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}training/\allowbreak{}dataset.py:99-170}). \\
+\(\mathrm{MSE}\) & \codex{F.mse\_\allowbreak{}loss} & The mean squared error over \emph{all} channels (\codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}training/\allowbreak{}model.py:79}). \\
+\(\mathrm{Dice}_{\mathrm{soft}}\) & \codex{soft\_\allowbreak{}dice\_\allowbreak{}loss} & The sigmoid-smoothed Dice on the first channel (\codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}training/\allowbreak{}model.py:63-74}). \\
+\(\mathrm{Dice}_{\mathrm{hard}}\) & \codex{eval\_\allowbreak{}dice} & The hard Dice on the first channel at a fixed count threshold (\codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}training/\allowbreak{}model.py:86-95}). \\
+\bottomrule
+\end{longtable}
+\end{center}
+
+% ===========================================================================
+\section{What the stage consumes}
+\label{sec:consumes}
+
+\subsection{The ABM's daily snapshots}
+
+The training data are the daily snapshots an ABM run writes into its output
+directory. Two conventions of the ABM's file naming are load-bearing here,
+because the training stage discovers its data by globbing rather than by
+reading a manifest:
+
+\begin{itemize}
+\item The per-day state raster is \codex{<stem>\_\allowbreak{}dayNNN.tif}, with the day
+      number zero-padded to three digits
+      (\codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}abm/\allowbreak{}src/\allowbreak{}main.cpp:173-185}).
+\item The per-day transmission raster follows the same
+      \codex{<stem>\_\allowbreak{}dayNNN.tif} pattern
+      (\codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}abm/\allowbreak{}src/\allowbreak{}main.cpp:218-230}); the two
+      families are distinguished only by the substring
+      \codex{transmission} appearing in the file name.
+\end{itemize}
+
+The state rasters carry \emph{raw per-cell adult counts}, not densities
+normalised by any capacity constant. Under state contract \StateContract the
+retired \codex{K\_\allowbreak{}MAX} normalisation is absent from the whole output path
+(\codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}abm/\allowbreak{}src/\allowbreak{}output\_\allowbreak{}contract.cpp:272}); the surrogate
+is therefore fitted to the same quantity the ABM emits, and no normalisation
+step exists anywhere in the training package.
+
+\subsection{The environmental context}
+
+The environmental context is not discovered; the operator names it. The
+command-line option \codex{--env-path} accepts a NetCDF or a GeoTIFF
+(\codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}cli.py:780}), and the dataset reads it once, at
+construction (\codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}training/\allowbreak{}dataset.py:66-88}). Its
+contents and its ordering are treated in Section~\ref{sec:env}.
+
+\subsection{What the run directory must contain for the stage to run at all}
+
+The stage requires, at minimum, a run directory containing files whose names
+carry the substring \codex{\_\allowbreak{}day} and one of the extensions \codex{.tif} or
+\codex{.npy}. If none is found, the dataset raises
+\codex{FileNotFoundError} (\codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}training/\allowbreak{}dataset.py:99-101}).
+The generated contract table below places this stage among the consumers of
+the ABM's state output.
+
+\begin{landscape}
+{\tiny\setlength{\tabcolsep}{3pt}\setlength{\LTleft}{0pt}\setlength{\LTright}{0pt}%
+\input{../generated/contracts.tex}}
+\end{landscape}
+
+% ===========================================================================
+\section{What the stage produces, and who consumes it}
+\label{sec:produces}
+
+\subsection{The four artefacts}
+
+The training stage writes into its output directory:
+
+\begin{center}
+\begin{longtable}{@{}lp{3.2cm}p{3.7cm}p{3.7cm}@{}}
+\toprule
+Artefact & Written at & Contents & Consumed by \\
+\midrule
+\endhead
+\codex{best\_\allowbreak{}model.pt} & \codex{trainer.py:88} & Bare \codex{state\_\allowbreak{}dict} of the best-scoring weights & \codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}prediction/\allowbreak{}registry.py:110-114} (as the manifest's declared checkpoint) \\
+\codex{model\_\allowbreak{}epoch\_\allowbreak{}N.pt} & \codex{trainer.py:90-91} & Bare \codex{state\_\allowbreak{}dict}, written every \CkptPeriod{}th epoch & Nothing in the tree; a manual inspection point \\
+\codex{final\_\allowbreak{}model.pt} & \codex{trainer.py:93} & Bare \codex{state\_\allowbreak{}dict} of the last epoch's weights & Nothing in the tree \\
+\codex{model.yaml} & \codex{trainer.py:96-106} & A small YAML manifest & The prediction stage's model registry (\codex{registry.py:61-74}) \\
+\bottomrule
+\end{longtable}
+\end{center}
+
+\subsection{The manifest}
+
+The manifest carries seven keys and no more
+(\codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}training/\allowbreak{}trainer.py:96-105}):
+
+\begin{center}
+\begin{tabular}{@{}lp{3.2cm}p{8.2cm}@{}}
+\toprule
+Key & Value & Meaning \\
+\midrule
+\codex{name} & the output directory's own name & The model is named after its directory, so two training runs into differently named directories yield two differently named models. \\
+\codex{version} & \codex{\codeconst{prediction.manifest_version}} & The model's own version; the registry keys models as \codex{name@version}. \\
+\codex{contract\_\allowbreak{}version} & \codex{\codeconst{prediction.contract_version_manifest}} & The \emph{prediction} contract version, written as a hard-coded literal by the trainer (\codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}training/\allowbreak{}trainer.py:99}); it is not the ABM state contract, and it is not read from the registry --- the registry's own default of \codex{\codeconst{prediction.contract_version_manifest}} is only a fallback for manifests that omit the key (\codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}prediction/\allowbreak{}registry.py:24-31}). \\
+\codex{in\_\allowbreak{}channels} & read off the data & Number of input channels the network was built with. \\
+\codex{out\_\allowbreak{}channels} & read off the data & Number of output channels. \\
+\codex{checkpoint} & \codex{best\_\allowbreak{}model.pt} & Which of the three checkpoints the registry should load. \\
+\codex{description} & free text & Contains the run directory path and the channel counts, and nothing else machine-readable. \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Two facts a reader should notice by their absence. The manifest does not
+record the ABM state-contract version under which the training rasters were
+written --- so a checkpoint fitted to contract-\StateContract{} raw counts is
+indistinguishable from one fitted to any other contract --- and it records no
+provenance of the training data beyond a path embedded in a sentence: not the
+area of interest, not the seed set, not the number of days, not the patch
+size, not the split rule, not the date of training.
+
+\subsection{The consumption contract, stated exactly}
+
+The prediction stage consumes the checkpoint through the manifest, and the
+contract is thin: the manifest must sit in the same directory as the
+checkpoint it names, the checkpoint must exist, and the channel counts in the
+manifest must match the weights in the checkpoint. Given those, the wrapper
+rebuilds the network and loads the weights strictly
+(\codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}training/\allowbreak{}wrapper.py:64-67}); a mismatch raises at
+construction. The registry additionally requires the checkpoint to exist on
+disk, raising \codex{FileNotFoundError} otherwise
+(\codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}prediction/\allowbreak{}registry.py:106-109}).
+
+% ===========================================================================
+\section{Order of operations, and its consequences}
+
+\subsection{The order}
+
+\begin{longtable}{@{}cp{2.4cm}p{8.6cm}p{1.9cm}@{}}
+\toprule
+Step & Actor & Order & Mode \\
+\midrule
+\endhead
+1 & \codex{train\_\allowbreak{}unet} & Create the output directory (\codex{trainer.py:26-27}) & state \\
+2 & \codex{train\_\allowbreak{}unet} & Resolve the device: CUDA, else Apple MPS, else CPU (\codex{trainer.py:29-35}) & choice \\
+3 & dataset & Read the environmental stack, once (\codex{dataset.py:61,66-88}) & input \\
+4 & dataset & Discover, group, pair, tile, split, subsample (\codex{dataset.py:90-170}) & derived \\
+5 & \codex{train\_\allowbreak{}unet} & Build the two data loaders (\codex{trainer.py:37-45}) & derived \\
+6 & \codex{train\_\allowbreak{}unet} & Raise if the training split is empty (\codex{trainer.py:47-48}) & check \\
+7 & \codex{train\_\allowbreak{}unet} & Read the channel counts off one training sample (\codex{trainer.py:50-52}) & derived \\
+8 & \codex{train\_\allowbreak{}unet} & Build the network and the optimiser (\codex{trainer.py:54-55}) & state \\
+9 & \codex{train\_\allowbreak{}unet} & Epoch loop: train, evaluate, select, checkpoint (\codex{trainer.py:57-91}) & state \\
+10 & \codex{train\_\allowbreak{}unet} & Write the final checkpoint and the manifest (\codex{trainer.py:93-106}) & output \\
+\bottomrule
+\end{longtable}
+
+\subsection{Consequences of that order}
+
+\begin{itemize}
+\item \textbf{The environment is read before the data is known to exist.}
+      Step 3 precedes step 4, so a malformed environment file is consumed
+      and discarded before the stage discovers that the run directory is
+      empty. The environmental failure is silent
+      (\codex{dataset.py:87-88}); the empty-directory failure is loud
+      (\codex{dataset.py:99-101}). The two errors do not look alike to the
+      operator, although the first is the more consequential.
+\item \textbf{The split is decided before the subsample is drawn.} Steps 4
+      contains both the mid-column split and the random subsample, in that
+      order (\codex{dataset.py:148-170}). The subsample is therefore drawn
+      independently within each split, each from its own patch list, and each
+      from a generator re-seeded to the same fixed value
+      (\codex{dataset.py:167}). The subsets are reproducible across runs on
+      the same directory, but they are not the same subset of tiles --- they
+      are different subsets of different populations.
+\item \textbf{The channel counts are frozen from one sample.} Step 7 reads
+      the widths of a single element of the training set and step 8 builds
+      the network for those widths for the whole run. If the first training
+      tile happened to lack transmission channels while later tiles had them,
+      the network would be built too narrow and the wider tiles would fail at
+      the concatenation. In practice the series are generated together, so
+      the widths are uniform; the code does not check that they are.
+\item \textbf{Selection happens inside the epoch loop, not after it.} Step 9
+      both optimises and decides which weights to keep, so the ``best''
+      checkpoint is a running maximum over epochs rather than a model chosen
+      from a completed run (Section~\ref{sec:selection}).
+\item \textbf{The manifest is written last.} Step 10 runs after the final
+      checkpoint, so a run interrupted before step 10 leaves weights with no
+      manifest, and the prediction stage's registry, which discovers models
+      by manifest, will not see them
+      (\codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}prediction/\allowbreak{}registry.py:61-74}).
+\end{itemize}
+
+% ===========================================================================
+\section{Assembling the training data}
+
+\label{sec:data}
+
+\subsection{Discovery}
+
+The dataset globs the run directory for all \codex{*.tif} files, keeps those
+whose names contain \codex{\_\allowbreak{}day} and do not contain \codex{transmission}, and
+separately globs for \codex{*\_\allowbreak{}day*.npy}
+(\codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}training/\allowbreak{}dataset.py:90-97}). GeoTIFF is preferred
+when the two families are of equal size or the GeoTIFF family is larger; the
+choice is global for the whole dataset, not per file. The two families are
+thus interchangeable only in the sense that the newer GeoTIFF path wins.
+
+The discovery is looser than the naming convention the ABM follows
+(Section~\ref{sec:consumes}): any file with \codex{\_\allowbreak{}day} in its name and no
+\codex{transmission} substring is accepted as a state snapshot, and bands are
+read positionally (\codex{dataset.py:178-179}), so the band \emph{order} is
+assumed rather than checked against the band descriptions the ABM writes
+(\codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}abm/\allowbreak{}src/\allowbreak{}output\_\allowbreak{}contract.cpp:202,223}).
+
+\subsection{Seeds, days, and pairing}
+
+The seed and the day are recovered from the file name by regular expression:
+\codex{seed(\d+)} and \codex{\_\allowbreak{}day(\d+)}
+(\codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}training/\allowbreak{}dataset.py:25-36}). A file whose name
+carries neither pattern is assigned seed one and day zero --- a fallback, not
+a parse. Snapshots are then grouped into a per-seed dictionary indexed by day
+(\codex{dataset.py:102-110}), and the training pairs are the adjacent entries
+of the sorted day list (\codex{dataset.py:135-146}).
+
+The transmission rasters are indexed the same way
+(\codex{dataset.py:112-118}) and are attached to a pair only when \emph{both}
+the current and the next day's transmission raster exist for that pair
+(\codex{dataset.py:143-146}); the concatenation itself happens at
+\codex{dataset.py:242-243}. A pair without transmission is therefore a
+state-only pair. Because the ABM writes the two families together, the
+width of the dataset is in practice uniform; the code does not enforce it.
+
+\subsection{Tiling}
+
+The raster is cut into square tiles of side \(P = \PatchSize\)
+(\codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}training/\allowbreak{}dataset.py:19}). The tile grid counts
+are \(\lfloor H/P \rfloor\) rows and \(\lfloor W/P \rfloor\) columns
+(\codex{dataset.py:129-130}), so a raster whose height or width is not an
+exact multiple of \(P\) has its remainder \emph{not represented in training
+at all}: those cells are never cropped, never seen. The cropping and the
+zero-padding of the edge tile are implemented in the item accessor
+(\codex{dataset.py:210-225}), but for a grid computed by integer division the
+edge tile is already full-size, so the padding branch is a safety net rather
+than a routine path.
+
+\subsection{No-data and dtype}
+
+Rasters are read as \codex{float32}, and cells whose value equals the file's
+declared no-data sentinel are set to zero
+(\codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}training/\allowbreak{}dataset.py:181-182}). The \codex{.npy}
+fallback is cast to \codex{float32} and given a channel axis if it is
+two-dimensional (\codex{dataset.py:184-186}). The consequence is worth naming:
+\textbf{no-data becomes zero, which is the same value as ``no adults''}. The
+surrogate cannot distinguish an unobserved cell from an empty one, and no
+mask is carried through to the target.
+
+\subsection{Subsampling}
+
+When the subsample fraction is below one, a reproducible random subset of the
+tiles is kept: the generator is seeded with a fixed value
+(\codex{dataset.py:167}), the number kept is
+\(\max(1, \lfloor \lvert \text{tiles} \rvert \times \text{fraction} \rfloor)\),
+and the indices are drawn without replacement
+(\codex{dataset.py:168-169}). Because the seed is fixed, the same subset is
+drawn on every run over the same run directory.
+
+% ===========================================================================
+\section{The environmental stack, and its problems}
+
+\label{sec:env}
+
+\subsection{What is read}
+
+The environmental context is read once, at dataset construction, into a cache
+(\codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}training/\allowbreak{}dataset.py:59,66-88}).
+
+\begin{itemize}
+\item From a \emph{NetCDF}, the variables are drawn in the order
+      \codex{rainfall}, \codex{air\_\allowbreak{}temp\_\allowbreak{}c}, \codex{jrc\_\allowbreak{}persistent},
+      \codex{lc\_\allowbreak{}built}, \codex{lc\_\allowbreak{}wetland}, \codex{lc\_\allowbreak{}open\_\allowbreak{}plus\_\allowbreak{}water},
+      \codex{lc\_\allowbreak{}crop}, filtered to those present in the file, and then
+      \emph{truncated to the first} \EnvChannels{}
+      (\codex{dataset.py:72-73}). If fewer than \EnvChannels{} variables are
+      present, the stack is padded with zero planes
+      (\codex{dataset.py:74-77}).
+\item From a \emph{GeoTIFF}, the first four bands are taken, zero-padded if
+      the file has fewer (\codex{dataset.py:80-86}).
+\item If the file cannot be read for any reason, the entire environmental
+      stack is discarded and set to \codex{None}
+      (\codex{dataset.py:87-88}), and every environmental channel of every
+      tile becomes zero (\codex{dataset.py:249}).
+\end{itemize}
+
+\subsection{What actually happens with the real environmental NetCDF}
+
+This is the most important fact in this section, and it is a defect in the
+code rather than a property of the data.
+
+The environmental artefact that the ingest stage produces stores the two
+dynamic variables with a time dimension and the static ones without one:
+\codex{rainfall} and \codex{air\_\allowbreak{}temp\_\allowbreak{}c} carry the dimensions
+(\codex{time}, \codex{y}, \codex{x}), while \codex{jrc\_\allowbreak{}persistent},
+\codex{lc\_\allowbreak{}built}, \codex{lc\_\allowbreak{}wetland},
+\codex{lc\_\allowbreak{}open\_\allowbreak{}plus\_\allowbreak{}water} and \codex{lc\_\allowbreak{}crop} are
+two-dimensional (\codex{y}, \codex{x})
+(\codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}ingest/\allowbreak{}daily\_\allowbreak{}nc.py:404-430}). The
+training path reads each variable with \codex{ds[v].values.squeeze()} and
+stacks the results with \codex{np.stack}
+(\codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}training/\allowbreak{}dataset.py:71-78}); \codex{squeeze}
+removes unit dimensions only, so the two dynamic variables stay
+three-dimensional and the two static ones stay two-dimensional, and
+\codex{np.stack} then raises \codex{ValueError} because the arrays do not
+all have the same shape. The \codex{except Exception} handler swallows that
+error and sets the cache to \codex{None}
+(\codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}training/\allowbreak{}dataset.py:87-88}).
+
+\textbf{The consequence is that training with the real environmental NetCDF
+produces all-zero environmental channels.} The four-plane composition
+described below never materialises; the network is fitted to the state and
+transmission channels alone, and the four environmental input planes are
+constant zeros. The prediction stage does not share the defect: its loader
+takes \codex{vals[0]} when a variable is three-dimensional
+(\codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}prediction/\allowbreak{}env\_\allowbreak{}loader.py:57-62}) and
+reprojects the stack onto the area-of-interest grid
+(\codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}prediction/\allowbreak{}env\_\allowbreak{}loader.py:69-84,120-146}), so
+it reads real environmental planes where the training path reads zeros. The
+asymmetry is silent in both directions.
+
+Had the stack been read, the four planes that survive truncation in the
+NetCDF case would be \codex{rainfall}, \codex{air\_\allowbreak{}temp\_\allowbreak{}c},
+\codex{jrc\_\allowbreak{}persistent} and \codex{lc\_\allowbreak{}built} --- and the two paths
+would then disagree about the fourth (Problem two).
+
+\subsection{The grid is assumed, not checked}
+
+The training path aligns the environmental stack to the ABM's raster by
+direct cropping: it slices the cached array at the state raster's own row
+and column indices, reads no transform, and performs no resampling
+(\codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}training/\allowbreak{}dataset.py:246-247}). It therefore
+\emph{assumes} that the environmental file and the state raster share a
+grid. That assumption is not verified anywhere, and the environmental
+NetCDF carries no geographic coordinates of its own --- its \codex{x} and
+\codex{y} are bare indices --- and the grid it holds is the one inherited from
+the rainfall file it was assembled from
+(\codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}ingest/\allowbreak{}daily\_\allowbreak{}nc.py:196-203,404-412}), while the
+state raster is on the area-of-interest grid. The training path never
+compares the two, so the alignment is a property of how the artefacts were
+produced rather than a checked fact. When the grids differ in
+extent, resolution or origin, the crop silently samples the wrong pixels,
+and any tile that extends beyond the environmental array's extent is filled
+with zeros without a word
+(\codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}training/\allowbreak{}dataset.py:249}).
+
+\subsection{Problem one: the stack does not vary in time}
+
+There is exactly one environmental snapshot for the whole dataset, and it
+serves every training pair. The real rainfall plane is a daily field, and the
+environment contract lists \codex{rainfall} among the variables of the
+environmental artefact (\codex{docs/\allowbreak{}concepts/\allowbreak{}generated/\allowbreak{}contracts.tex}), but the
+training path has no notion of a per-day environment. Consequently the
+surrogate \textbf{cannot learn the effect of a rainfall event on the next
+day's state}, and a model fitted this way treats the environmental channels
+as a static spatial covariate. With the real environmental NetCDF the
+question is moot in the stronger sense: the channels are zero throughout
+(the previous subsection), so no environmental information of any kind
+reaches the network.
+
+\subsection{Problem two: the fourth plane differs from the prediction stage's}
+
+The prediction stage loads its environmental stack in the order
+\codex{rainfall}, \codex{air\_\allowbreak{}temp\_\allowbreak{}c}, \codex{jrc\_\allowbreak{}persistent},
+\codex{lc\_\allowbreak{}wetland}
+(\codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}prediction/\allowbreak{}env\_\allowbreak{}loader.py:17-18}). The training
+path's fourth plane would be \codex{lc\_\allowbreak{}built}. Were the training stack read
+at all, a checkpoint trained with an environmental file supplied would
+receive, at inference time, a channel it was never trained on
+(\codex{lc\_\allowbreak{}wetland} in place of \codex{lc\_\allowbreak{}built}), and the two
+channels are not interchangeable: one is a built-surface fraction, the
+other a wetland fraction. This is a defect at the training--prediction seam.
+Nothing in either path detects it: the wrapper's channel-count check compares
+counts, not identities (\codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}training/\allowbreak{}wrapper.py:79-88}),
+and the four planes are, as far as the code is concerned, interchangeable
+numbers. As it happens, with the real environmental NetCDF the seam defect
+never materialises either, because the training stack is discarded before
+its composition can matter: the trained network sees four zero planes where
+the prediction stage supplies four real ones.
+
+\subsection{Problem three: the silent fallback}
+
+If the environmental file is unreadable, the stage does not stop and does not
+warn. It trains a network with no environmental context at all, and reports
+nothing. The only symptom is a worse model, whose cause the operator must
+infer.
+
+With the real environmental NetCDF this fallback is not an edge case but the
+normal path: the shape mismatch described above raises inside the loader,
+is caught by the blanket \codex{except Exception}, and is reported to
+nobody. The trained model is indistinguishable, from its artefacts, from one
+trained without an environmental file at all.
+
+% ===========================================================================
+\section{The train/validation split}
+\label{sec:split}
+
+\subsection{The rule}
+
+The split is \textbf{spatial and per-tile}. The raster's mid-column
+\(c_{\mathrm{mid}} = \lfloor W/2 \rfloor\) is computed once
+(\codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}training/\allowbreak{}dataset.py:131}); a tile whose first
+column index satisfies \(c \cdot P \ge c_{\mathrm{mid}}\) is a validation
+tile, and every other tile is a training tile
+(\codex{dataset.py:149-153}). Tiles west of the boundary train; tiles east of
+it validate. The boundary is a column of the raster, so it is a geographic
+statement only in the sense that the raster's own extent gives it meaning ---
+it is \emph{not} a meridian, and no longitude is involved anywhere in the
+code.
+
+No size and no ratio is recorded anywhere. The split is expressed as a
+column index, so the validation side receives the tile columns whose first
+cell lies at or beyond the mid-column --- with \(P = \PatchSize\), roughly the
+eastern half of the raster in whole tiles, but not exactly half of the cells
+and not a fixed fraction. The code fixes no target proportion, and the
+manifest does not record the rule that was used
+(Section~\ref{sec:produces}).
+
+\subsection{What this split does and does not guarantee}
+
+The rule partitions space, not rollouts. The same seed contributes tiles to
+both splits, and the tile immediately west of the boundary is spatially
+adjacent to the tile immediately east of it. There is no held-out seed, no
+buffer between the two regions, no cross-validation and no shuffling by
+rollout. The validation score is therefore an \emph{in-region,
+adjacent-tile} score: it measures the network's ability to generalise a few
+cells across a vertical line in the same region, on the same rollout, from the
+same forcing. It is not a measure of generalisation to a new area, a new
+season or a new intervention.
+
+No further defence against leakage or overfitting exists in the code. The
+split rule is the only regularisation present; there is no early stopping
+(Section~\ref{sec:selection}), no weight decay, no data augmentation and no
+dropout.
+
+\subsection{An empty validation split is not an error}
+
+The trainer raises when the \emph{training} split is empty
+(\codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}training/\allowbreak{}trainer.py:47-48}) but treats an empty
+validation split as legitimate: the evaluation block is guarded by a length
+check, and the validation Dice stays at zero for every epoch
+(\codex{trainer.py:74-82}).
+
+The validation split \emph{can} be empty, and the mechanism is worth
+stating precisely, because it is a property of the rule rather than of any
+particular raster. A tile is classified by its \emph{first} column only, so
+the tile that straddles the mid-column is assigned by its left edge
+(\codex{dataset.py:129-131,148-151}). The validation side receives the tile
+columns with \(c \ge \lceil c_{\mathrm{mid}}/P \rceil\), and the raster
+contributes \(\lfloor W/P \rfloor\) tile columns; the validation split is
+therefore empty whenever
+\(\lceil c_{\mathrm{mid}}/P \rceil \ge \lfloor W/P \rfloor\). For a width
+of \(W = 300\) cells, for instance, the tiles start at columns \(0\) and
+\(128\), the mid-column is \(150\), and both tiles are training tiles, so
+the validation set has no members at all.
+
+When the validation split is empty, the validation Dice is zero at every
+epoch, and the selection rule is a tie at every epoch: the comparison is
+\codex{>=} and the running best starts at \(0.0\)
+(\codex{trainer.py:57,86-88}), so \codex{0.0 >= 0.0} holds every time.
+The checkpoint is therefore overwritten at \emph{every} epoch and
+\codex{best\_model.pt} ends up holding the \textbf{last} epoch's weights,
+not the first one's. The training loss of that last epoch is not necessarily
+the best one observed.
+
+% ===========================================================================
+\section{The architecture and the loss}
+\label{sec:architecture}
+
+\subsection{Architecture}
+
+The network is a standard U-Net with four resolution levels
+(\codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}training/\allowbreak{}model.py:28-46}).
+
+\begin{itemize}
+\item \textbf{Encoder.} Four stages, with the widths recorded in the
+      generated parameter table below. Each
+      stage is a \emph{double convolution block}: a \(3\times3\) convolution
+      without bias, batch normalisation, a ReLU, and then the same three
+      operations again (\codex{model.py:14-25}). A \(2\times2\) max-pool
+      halves the resolution between stages (\codex{model.py:37}).
+\item \textbf{Bottleneck.} A double convolution block of double the last
+      encoder width, at the coarsest resolution
+      (\codex{model.py:38}).
+\item \textbf{Decoder.} For each width in reverse order, a transposed
+      convolution with stride two upsamples, the corresponding encoder
+      feature is concatenated onto it, and a double convolution block
+      processes the result (\codex{model.py:39-44}).
+\item \textbf{Head.} A \(1\times1\) convolution from the first width to the
+      number of output channels (\codex{model.py:46}). There is no activation
+      on the head: the output is an unbounded real tensor.
+\end{itemize}
+
+The generated table records the constructor's declared shape
+parameters:
+
+\input{../generated/params-training.tex}
+
+If the encoder's resolution does not match the skip feature's, the mismatch
+is repaired by bilinear interpolation to the skip's size
+(\codex{model.py:55-57}). With \(P = \PatchSize\) and four pooling stages the
+two agree, so the interpolation branch is not exercised during training. In
+the inference wrapper a different repair is used: the input is padded with
+replicate padding to a multiple of \PoolMult{}
+(\codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}training/\allowbreak{}wrapper.py:90-98}) and the output is
+cropped back (\codex{wrapper.py:102-104}). \PoolMult{} is the product of the
+four pooling factors.
+
+\subsection{The loss}
+
+\begin{equation}
+ \mathcal{L} \;=\; \mathrm{MSE}\!\left(\hat{y}, y\right)
+ \;+\; \DiceWeight \cdot \mathrm{Dice}_{\mathrm{soft}}\!\left(\hat{y}_{0}, y_{0}\right),
+ \label{eq:loss}
+\end{equation}
+
+where the mean squared error is taken over \emph{all} channels
+(\codex{model.py:79}) and the soft-Dice term is computed on \emph{channel 0
+only} (\codex{model.py:80}) --- the first state band, which under contract
+\StateContract{} holds raw adult counts and is the sparse one. The rationale
+is stated in the code itself: the Dice term focuses on the sparse channel.
+
+The soft-Dice term smooths both arguments through a logistic function before
+forming the ratio (\codex{model.py:69-73}):
+
+\begin{equation}
+ p = \sigma\!\left(\frac{\hat{y}-\theta}{\tau}\right),\qquad
+ t = \sigma\!\left(\frac{y-\theta}{\tau}\right),\qquad
+ \mathrm{Dice}_{\mathrm{soft}} = \frac{2\sum pt + \varepsilon}{\sum p + \sum t + \varepsilon},
+\end{equation}
+
+with temperature \(\tau = \DiceTau\), threshold \(\theta = \DiceThresh\), and
+stabiliser \(\varepsilon = \DiceEps\). The sum runs over the whole batch and
+the whole tile, not over pixels individually: a tile is scored as one object.
+
+\subsection{Units of the threshold --- and why they matter}
+
+Under state contract \StateContract{} the state bands hold raw adult counts,
+so a threshold of \(\DiceThresh\) adult counts means
+\emph{one adult or more in the cell} (the code says so in as many words at
+\codex{model.py:66-67}). This is a deliberate and consequential choice: the
+Dice term is effectively an occupancy term --- ``does this cell contain
+mosquitoes tomorrow'' --- while the MSE term, whose gradient contribution
+grows with the magnitude of the adult counts, is an exactness term. Which of
+the two terms dominates the gradient in practice depends on the count
+magnitudes in the training rasters, which this document does not fix; the
+code does not record the balance, and no claim about it is made here. A
+retrained checkpoint from before the
+retirement of the capacity normalisation would have a different meaning for
+the same number, which is one reason the manifest's silence about the
+contract version (Section~\ref{sec:produces}) is a real omission rather than
+a cosmetic one.
+
+\subsection{The validation metric}
+
+The validation metric is a \emph{hard} Dice on the same channel, using a
+strict comparison against the same threshold
+(\codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}training/\allowbreak{}model.py:86-95}), averaged over the
+validation batches (\codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}training/\allowbreak{}trainer.py:75-82}).
+
+It is important to be clear about what this number characterises. It is
+computed on \emph{one band of one output}: the first state channel. It says
+nothing about the second state band (\codex{adult\_\allowbreak{}cell\_\allowbreak{}count}), which is
+trained only through the MSE term, and nothing about the four transmission
+bands, which are also trained only through the MSE term. Their accuracy is
+never measured anywhere. The reported ``best validation Dice'' is therefore a
+statement about occupancy of the first state band, not about the surrogate.
+
+% ===========================================================================
+\section{Optimisation and model selection}
+
+\label{sec:selection}
+
+\subsection{Optimiser}
+
+The optimiser is Adam (\codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}training/\allowbreak{}trainer.py:55})
+with the learning rate given by the caller; the packaged default is the one
+in the generated table above. There is no learning-rate schedule, no weight
+decay, no momentum configuration beyond Adam's own defaults, no gradient
+clipping and no warm-up.
+
+\subsection{What stands in for early stopping}
+
+Nothing. The epoch loop has exactly two conditionals, and both concern
+checkpoint writing (\codex{trainer.py:86-91}). There is no patience counter,
+no early-stopping criterion, no minimum delta, and the loop always runs the
+full number of epochs. The only mechanism that resembles early stopping is
+the running maximum of the validation Dice, described next.
+
+\subsection{The selection rule}
+
+\begin{quote}
+The checkpoint is rewritten whenever the validation Dice is \emph{at least}
+the best value seen so far, and unconditionally at the first epoch
+(\codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}training/\allowbreak{}trainer.py:86-88}).
+\end{quote}
+
+Three points follow from the exact form of that comparison.
+
+\begin{enumerate}
+\item The comparison is \codex{>=}, so a \emph{tie} also overwrites the
+      checkpoint. A later epoch that merely equals the best replaces it.
+\item The write at epoch zero is unconditional, so a checkpoint always exists
+      even if every subsequent validation score is worse.
+\item Because the loop never stops, ``best'' is a running maximum over all
+      epochs. The final \codex{best\_\allowbreak{}model.pt} is the weights of the last
+      epoch that attained the maximum, not an early-stopped model, and the
+      training loss of that epoch may be far from the best loss observed.
+\end{enumerate}
+
+There is a fourth consequence, and it is the one that bites in practice. The
+running best is initialised to \(0.0\)
+(\codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}training/\allowbreak{}trainer.py:57}), and the
+comparison is \codex{>=}, so a validation Dice of exactly zero is a tie with
+the running best at \emph{every} epoch: \codex{0.0 >= 0.0} holds. The
+checkpoint is therefore rewritten on every epoch, and
+\codex{best\_\allowbreak{}model.pt} ends up holding the \emph{last} epoch's
+weights rather than the first one's. A zero validation Dice is what an empty
+validation split produces (Section~\ref{sec:selection}), so a run whose
+validation set is empty selects its final epoch and calls it ``best'' without
+saying so (Section~\ref{sec:split}).
+
+\subsection{What the operator sees}
+
+One line per epoch, carrying the mean training loss and the validation Dice
+(\codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}training/\allowbreak{}trainer.py:84}); and a final line
+carrying the best validation Dice, which is also the function's return value
+(\codex{trainer.py:108-109}), echoed by the command-line wrapper
+(\codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}cli.py:806}).
+
+\subsection{Reproducibility}
+
+Training is \emph{not} reproducible end to end, and the reason is worth
+stating precisely rather than as a blanket complaint. Only the tile
+subsample is seeded (\codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}training/\allowbreak{}dataset.py:167}).
+The global torch random number generator is never seeded, so the weight
+initialisation differs between runs; the training loader shuffles with an
+unseeded generator (\codex{dataset.py:281-283}); and no seed, RNG state or
+epoch counter is stored in the checkpoint. Two runs over the same data will
+produce different weights and, almost surely, different validation Dice
+values. Only the \emph{set of tiles} is reproducible.
+
+\subsection{Device}
+
+The device is resolved as CUDA if available, else Apple MPS, else CPU
+(\codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}training/\allowbreak{}trainer.py:29-35}); the inference
+wrapper repeats the same resolution (\codex{wrapper.py:29-37}). The choice is
+not recorded in any artefact, so a checkpoint carries no hint of the hardware
+it was fitted on.
+
+% ===========================================================================
+\section{Checkpoints, and how one is loaded}
+
+\subsection{What is inside a checkpoint}
+
+All three checkpoint files are written with the same call: a bare
+\codex{torch.save} of the network's \codex{state\_\allowbreak{}dict}
+(\codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}training/\allowbreak{}trainer.py:88,91,93}). A
+\codex{state\_\allowbreak{}dict} holds parameters and buffers only. It does \emph{not} hold:
+
+\begin{itemize}
+\item the optimiser state, so training cannot be resumed;
+\item the epoch number or the metric history;
+\item the random number generator's state;
+\item the architecture description --- the channel counts and the widths must
+      be recovered from elsewhere;
+\item the loss configuration, the split rule, or any data provenance;
+\item the ABM state-contract version of the rasters it was fitted to.
+\end{itemize}
+
+A checkpoint is therefore an inference artefact and nothing else. Resuming
+training from one is impossible.
+
+\subsection{How a checkpoint is loaded}
+
+The wrapper's constructor performs the load eagerly, in four steps
+(\codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}training/\allowbreak{}wrapper.py:39-66}):
+
+\begin{enumerate}
+\item \textbf{The manifest first.} If a \codex{model.yaml} sits beside the
+      checkpoint, its \codex{in\_\allowbreak{}channels} and \codex{out\_\allowbreak{}channels} are read
+      and, where the caller did not supply them, used
+      (\codex{wrapper.py:39-46}).
+\item \textbf{Shape inference as a fallback.} If the channel counts are still
+      unknown, they are inferred from the tensors themselves: the first
+      encoder convolution's weight tensor carries the input width, and the
+      head's weight tensor carries the output width
+      (\codex{wrapper.py:51-59}). Fixed fallbacks of
+      \codeconst{training.fallback_in_channels} and
+      \codeconst{training.fallback_out_channels} apply if even
+      those tensors are absent.
+\item \textbf{Rebuild and load.} The network is constructed with the
+      resolved counts and the weights are loaded with a strict
+      \codex{load\_\allowbreak{}state\_\allowbreak{}dict}, then the network is put into evaluation mode
+      (\codex{wrapper.py:64-67}). A missing or mismatched checkpoint raises at
+      construction --- there is no lazy path and no partially initialised
+      model.
+\item \textbf{Input adaptation.} At call time, if the channels presented sum
+      to fewer than the model's input width, the input is zero-padded; if
+      they sum to more, the input is truncated
+      (\codex{wrapper.py:79-88}).
+\end{enumerate}
+
+Step 4 deserves emphasis: the wrapper \emph{silently adapts} to a channel
+mismatch rather than refusing. A network trained without transmission, fed
+the six-channel state stack that the prediction stage assembles, will receive
+its first six channels and ignore the rest; a network trained with
+transmission but fed only a two-channel state will receive four zero planes
+it was never trained to interpret. Neither case produces a warning, a log
+line, or an exception. The prediction stage does pass the manifest's counts
+to the wrapper (\codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}prediction/\allowbreak{}registry.py:110-114}),
+so in the normal path the widths agree; the adaptation exists for the
+mismatch cases, and it hides them.
+
+% ===========================================================================
+\section{The seam with the prediction stage}
+
+\subsection{How the prediction stage finds the model}
+
+The registry scans two roots --- the models directory and the runs directory
+--- for files named \codex{model.yaml}, and keys each model as
+\codex{name@version}
+(\codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}prediction/\allowbreak{}registry.py:54-74}). Loading a model
+by that key builds the wrapper from the manifest's declared checkpoint
+(\codex{registry.py:96-118}). Finding a model is not the same as using it. The prediction command's
+\codex{--model} option defaults to \codex{"dummy"}
+(\codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}cli.py:112}), and the registry answers
+that name with the dummy without consulting the scan at all
+(\codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}prediction/\allowbreak{}registry.py:96-97}); a trained checkpoint is
+therefore applied only when the operator names its registry key explicitly.
+If no trained model exists, the registry
+returns a dummy model that emits zeros of the input's width
+(\codex{registry.py:41-46,96-97,115-116}); a prediction made with it is a raster of
+zeros, and the sidecar still names a model, so the reader of the output must
+look at the model name to tell.
+
+\subsection{What the prediction stage hands to the surrogate}
+
+The prediction stage assembles two tensors and calls the surrogate exactly
+once (\codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}prediction/\allowbreak{}predictor.py:84-91}):
+
+\begin{itemize}
+\item \textbf{The state stack.} Loaded by the state loader with transmission
+      requested (\codex{predictor.py:54-56}), giving two vector bands and,
+      when the transmission raster is found, four transmission bands. If
+      nothing is found the stage substitutes zeros of six channels
+      (\codex{predictor.py:55-56}).
+\item \textbf{The environmental stack.} Four planes on the area-of-interest
+      grid (\codex{predictor.py:58-61}), falling back to zeros if the
+      environment cannot be loaded (\codex{predictor.py:60-61}).
+\end{itemize}
+
+The answer is then aggregated to the requested scale --- no aggregation for
+the regional scale, a mean-pool for the national scale, a single mean for the
+continental scale (\codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}prediction/\allowbreak{}aggregator.py:51-71})
+--- and written as a risk GeoTIFF with band descriptions and a JSON sidecar
+(\codex{predictor.py:94-150}). With six output channels the band names are the
+predicted adult patch count, the predicted adult cell count, the predicted
+human prevalence, incidence, infectious pressure and transmission focus
+(\codex{predictor.py:30-41}).
+
+\subsection{Four mismatches across the seam}
+
+The training and inference paths do not agree on four points. All four are
+visible in the code; none is recorded anywhere in the repository as a known
+issue.
+
+\begin{enumerate}
+\item \textbf{The environmental plane order differs}, as established in
+      Section~\ref{sec:env}: \codex{lc\_\allowbreak{}built} at training,
+      \codex{lc\_\allowbreak{}wetland} at inference.
+\item \textbf{The environmental grids differ.} At training the environmental
+      planes are those of the environmental NetCDF, whose grid is inherited
+      from the rainfall file and which carries no geographic coordinates
+      (\codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}ingest/\allowbreak{}daily\_\allowbreak{}nc.py:196-203,404-412}); at
+      inference the same variables are reprojected onto the
+      area-of-interest grid
+      (\codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}prediction/\allowbreak{}env\_\allowbreak{}loader.py:69-84,120-146}). The two
+      sides therefore do not see the same environmental quantities, and the
+      training side does not resample anything at all
+      (\codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}training/\allowbreak{}dataset.py:246-247}).
+\item \textbf{The state stack is resampled at inference and cropped at
+      training.} The state loader reprojects the ABM's raster onto the
+      area-of-interest grid with bilinear interpolation
+      (\codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}prediction/\allowbreak{}state\_\allowbreak{}loader.py:99-107,140-148}), while
+      the training path crops raw ABM pixels and never interpolates
+      (\codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}training/\allowbreak{}dataset.py:210-214}). The
+      surrogate is therefore applied, at prediction time, to an interpolated
+      grid whose local statistics differ from the crisp pixels it was fitted
+      on --- and an adult count, which is an integer number of individuals,
+      is being bilinearly blended.
+\item \textbf{The channel counts agree only under a specific history.} The
+      prediction stage requests the transmission bands as well
+      (\codex{predictor.py:54-56}), so the stack it assembles has six
+      channels when the transmission raster is found and two when it is not
+      (\codex{predictor.py:55-56}). A surrogate trained with transmission
+      matches the first case and only that case; in the second it is fed a
+      two-channel stack and padded to the width it expects with zeros
+      (\codex{wrapper.py:79-88}). A checkpoint trained without transmission
+      is silently adapted by the same rule, in the opposite direction, by
+      truncation.
+\end{enumerate}
+
+A fifth difference belongs to the same seam, though it is a consequence of
+the first rather than an independent mismatch: with the real environmental
+NetCDF the training side's four environmental channels are all zeros
+(Section~\ref{sec:env}), while the prediction side's four are real
+environmental planes. A surrogate fitted on the training side has never seen
+a non-zero environmental channel at all.
+
+\subsection{The surrogate is applied once}
+
+There is no rollout loop. The prediction stage calls \codex{model.predict}
+once and aggregates the result
+(\codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}prediction/\allowbreak{}predictor.py:89-92}). The output is a
+\emph{risk map}, not a projection: it is one local transition applied to one
+snapshot, and it does not yield trajectories, prevalence over time, or
+intervention scenarios unless the rollouts the surrogate learned from
+contained them.
+
+% ===========================================================================
+\section{Declarations of absence}
+
+\label{sec:absences}
+
+This section records what the stage does \emph{not} do, and does \emph{not}
+have. Each item was verified against the tree, not inferred.
+
+\subsection{There is no calibration or acceptance harness}
+
+The pipeline has a scoring framework --- a directory of scorers, a registry
+of their weights, a composite score and a scorecard --- under
+\codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}scoring/\allowbreak{}} (with the
+scorers themselves in \codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}scoring/\allowbreak{}scorers/\allowbreak{}}).
+The training stage has
+no counterpart. Searching the training package
+(\codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}training/\allowbreak{}}) and its test file
+(\codex{mal-core/\allowbreak{}tests/\allowbreak{}test\_\allowbreak{}training\_\allowbreak{}pipeline.py}) finds no scorer, no
+thresholds file, no composite, no tolerance band, no scorecard, and no
+acceptance threshold of any kind. The only notion of ``best'' in the stage is
+the running maximum of the validation Dice described in
+Section~\ref{sec:selection}.
+
+The test file that does exist checks plumbing rather than fidelity: the
+network's output shapes for the two channel configurations, that the loss
+returns a non-negative tensor, that the dataset yields the expected tensor
+shapes, and that an end-to-end training run produces a checkpoint and a
+manifest that the wrapper can load
+(\codex{mal-core/\allowbreak{}tests/\allowbreak{}test\_\allowbreak{}training\_\allowbreak{}pipeline.py:38-114}).
+
+Two artefacts outside the package are worth recording here, because they are
+easy to mistake for the harness that does not exist.
+
+\begin{itemize}
+\item \codex{mal-execution/\allowbreak{}scripts/\allowbreak{}validate\_\allowbreak{}unet.py} contains a hard-coded
+      acceptance threshold on the validation Dice (a Dice of 0.6), prints a
+      pass/fail verdict and writes it to a text file
+      (\codex{mal-execution/\allowbreak{}scripts/\allowbreak{}validate\_\allowbreak{}unet.py:47-57}). It is a
+      standalone script, not reachable from the command line, not part of the
+      package, and not a gate that anything consults. It also constructs the
+      network with the constructor's default channel counts
+      (\codex{validate\_\allowbreak{}unet.py:31}), so it cannot load a transmission-enabled
+      checkpoint.
+\item \codex{mal-execution/\allowbreak{}scripts/\allowbreak{}train\_\allowbreak{}unet\_\allowbreak{}subsample.py} imports the
+      network from a module path that does not exist in the package
+      (\codex{train\_\allowbreak{}unet\_\allowbreak{}subsample.py:11}); the import fails before any
+      training happens. It also pairs a day with the day seven days later
+      (\codex{train\_\allowbreak{}unet\_\allowbreak{}subsample.py:65-66}), which is a different learning
+      problem from the one the packaged trainer solves.
+\end{itemize}
+
+The third script, \codex{mal-execution/\allowbreak{}scripts/\allowbreak{}train\_\allowbreak{}unet.py}, calls the
+packaged trainer through the public API and is consistent with it.
+
+\subsection{The surrogate is never validated against the ABM}
+
+No comparison between a surrogate's output and a subsequent ABM step exists
+anywhere in the tree; no accuracy floor, no regression test that a retrained
+checkpoint stays within a tolerance of a previous one. The surrogate's output
+goes straight into the risk map
+(\codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}prediction/\allowbreak{}predictor.py:89}). Fidelity is
+therefore \emph{ungated}: nothing in the pipeline would notice a checkpoint
+that had learned the wrong thing.
+
+\subsection{Other absences, itemised}
+
+\begin{itemize}
+\item No learning-rate schedule, no early stopping, no patience rule, no
+      gradient clipping (\codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}training/\allowbreak{}trainer.py:57-93}).
+\item No seeding of the global torch generator and no shuffling seed
+      (\codex{dataset.py:167,281-283}).
+\item No resumption from a checkpoint: no optimiser state, no epoch counter,
+      no RNG state in the checkpoint (\codex{trainer.py:88,91,93}).
+\item No data provenance in the manifest beyond a free-text description
+      (\codex{trainer.py:96-105}).
+\item No record of the state-contract version in the manifest
+      (\codex{trainer.py:96-105}).
+\item No record of the device, the seed, the split rule or the patch size in
+      any artefact.
+\item No environmental channel-identity check between training and inference
+      (\codex{dataset.py:72-73} against
+      \codex{mal-core/\allowbreak{}src/\allowbreak{}mal\_\allowbreak{}core/\allowbreak{}prediction/\allowbreak{}env\_\allowbreak{}loader.py:17-18}).
+\item No no-data mask: no-data becomes zero, indistinguishable from an empty
+      cell (\codex{dataset.py:181-182}).
+\item No per-day environmental stack, so no rainfall-event response can be
+      learned (\codex{dataset.py:59,66-88}).
+\item No handling of the mixed dimensionality of the real environmental
+      NetCDF: the stack is discarded wholesale by a blanket exception, so the
+      environmental channels of a real training run are all zero
+      (\codex{dataset.py:71-78,87-88}).
+\item No grid check between the environmental file and the state raster: the
+      crop is positional, and tiles beyond the environmental extent are
+      silently zeroed (\codex{dataset.py:246-249}).
+\item No remainder cells: a raster dimension not divisible by \(P\) loses its
+      edge strip from training (\codex{dataset.py:129-130}).
+\item No held-out seed, no buffered split, no cross-validation
+      (\codex{dataset.py:149-153}).
+\end{itemize}
+
+\subsection{What is not answered by the code}
+
+The following are questions the code does not settle. They are recorded here
+rather than answered by guesswork.
+
+\begin{enumerate}
+\item Whether the mid-column split is \emph{intended} to be a regional
+      in-sample score, or whether a spatially buffered split was expected,
+      is not recorded anywhere.
+\item Whether the absence of training-data provenance in the manifest is
+      deliberate or an oversight is not recorded.
+\item Whether an early-stopping rule, a learning-rate schedule or a patience
+      counter is wanted, or their absence is a decision, is not recorded.
+\item Whether end-to-end reproducibility is a requirement is not recorded.
+\item Whether the manifest should carry the ABM state-contract version is not
+      recorded.
+\item Whether the environmental channel-order mismatch, the discarded
+      environmental stack and the inference-time bilinear reprojection are
+      known defects is not stated anywhere in the
+      repository.
+\item Whether the surrogate's fidelity is intended to be gated against the
+      ABM at some point, or whether the stage is knowingly ungated, is not
+      recorded.
+\item Whether the training hyperparameters are intended to move into the
+      shared configuration file is a decision that has not been taken.
+\item No written prohibition exists on the uses the surrogate must not be put
+      to; the restrictions in Section~\ref{sec:purpose} are inferences from
+      the code's one-step, one-call structure.
+\end{enumerate}
+
+% ===========================================================================
+\section{Evidence appendix}
+
+\subsection{How the values in this document are sourced}
+
+Three sources, in increasing order of authority for this stage:
+
+\begin{enumerate}
+\item \textbf{The shared configuration.} Values that exist in
+      \codex{mal-core/\allowbreak{}config/\allowbreak{}model\_\allowbreak{}constants.yaml} are referenced through the
+      \code{\textbackslash mskey} macro, so that a renamed key makes this
+      document fail to build rather than silently print a stale number. The
+      values of that kind used here are the state contract version
+      (\codex{contracts.cogs\_\allowbreak{}state}), the environment contract version
+      (\codex{contracts.env\_\allowbreak{}nc}) and the no-data sentinel
+      (\mskey{ingest.nodata_sentinel}).
+\item \textbf{The generated tables.} The surrogate's declared constructor
+      parameters and the training loop's defaults are emitted by
+      \codex{tools/\allowbreak{}gen\_\allowbreak{}concepts\_\allowbreak{}values.py} --- the training table by
+      \codex{emit\_\allowbreak{}training\_\allowbreak{}params} at line 463, which reads the defaults with
+      \codex{\_\_function\_\allowbreak{}defaults} at lines 423--460. That helper parses the
+      source \emph{statically}, with Python's \codex{ast} module and without
+      importing the training package (its own docstring says so), so the
+      values are read from the code text rather than by introspection of
+      imported objects. The tables are included above via
+      \codex{\textbackslash input} of
+      \codex{../\allowbreak{}generated/\allowbreak{}params-training.tex}. The artefact contracts are
+      emitted from \codex{docs/\allowbreak{}concepts/\allowbreak{}contracts.yaml} and included via
+      \codex{../\allowbreak{}generated/\allowbreak{}contracts.tex}.
+\item \textbf{The code literals.} Everything else in this document is a
+      literal in the source of the training package. The shared configuration
+      file contains no key that mentions the training stage, the surrogate,
+      the network, the loss or the number of epochs --- this was checked by
+      searching that file --- so these numbers have no single source of truth
+      in the shared configuration file. They are read out of the code text by
+      \codex{tools/\allowbreak{}gen\_\allowbreak{}concepts\_\allowbreak{}values.py} and emitted as
+      \codex{\textbackslash codeconst} macros in
+      \codex{docs/\allowbreak{}concepts/\allowbreak{}generated/\allowbreak{}code-macros.tex}, each carrying the
+      file and line it was read from; the macros declared at the top of this
+      source file are short aliases for them, so an unknown key makes this
+      document fail to build rather than print a stale number.
+\end{enumerate}
+
+\subsection{Code literals used in this document}
+
+Each of these is a reading of the code, verified at the cited line.
+
+\begin{center}
+\begin{longtable}{@{}lp{2.4cm}lp{3.0cm}p{2.6cm}p{4.0cm}@{}}
+\toprule
+Quantity & Value & Where it is written & What it controls \\
+\midrule
+\endhead
+Tile side \(P\) & \PatchSize & \codex{dataset.py:19} & The side of a training tile in raster cells \\
+Vector channels & \VectorChannels & \codex{dataset.py:20} & Declared; unused in practice \\
+Transmission channels & \TransChannels & \codex{dataset.py:21} & Declared; unused in practice \\
+Environmental channels & \EnvChannels & \codex{dataset.py:22} & The width of the environmental stack \\
+Dice weight & \DiceWeight & \codex{model.py:81} & The weight of the soft-Dice term in the loss \\
+Dice temperature \(\tau\) & \DiceTau & \codex{model.py:63} & The smoothing of the soft-Dice term \\
+Dice threshold \(\theta\) & \DiceThresh & \codex{model.py:63,86} & The count threshold in the soft and hard Dice \\
+Dice stabiliser \(\varepsilon\) & \DiceEps & \codex{model.py:73,95} & The numerical floor in both Dice ratios \\
+Subsample seed & \SubSeed & \codex{dataset.py:167} & The reproducibility of the tile subsample \\
+Checkpoint period & \CkptPeriod & \codex{trainer.py:90-91} & How often a periodic checkpoint is written \\
+Padding multiple & \PoolMult & \codex{wrapper.py:93-94} & The size to which the inference input is padded \\
+\bottomrule
+\end{longtable}
+\end{center}
+
+\subsection{Implementation notes a replicator needs}
+
+These are behaviours invisible from the description above, and they are the
+ones that will bite a reimplementation.
+
+\begin{enumerate}
+\item \textbf{Adjacency is in the sorted list of present days, not in
+      integer days.} A run directory with days \(1,2,9,10\) produces the
+      pair \((2,9)\), and the network is being taught a one-day transition
+      from a seven-day gap (\codex{dataset.py:135-146}).
+\item \textbf{Bands are read positionally.} The training path never checks a
+      band description against an expected name
+      (\codex{dataset.py:178-179}); a reordering of the ABM's bands would
+      silently permute the target.
+\item \textbf{The seed fallback is one.} A file whose name carries neither
+      \codex{seedN} nor \codex{\_\allowbreak{}dayN} is filed under seed one, day zero
+      (\codex{dataset.py:27-34}).
+\item \textbf{The subsample is drawn per split.} The training and validation
+      datasets each seed the generator to the same value and each draw from
+      their own list (\codex{dataset.py:166-170}), so the two subsets are
+      reproducible but different.
+\item \textbf{An empty validation split is silently tolerated} and yields a
+      validation Dice of zero for every epoch; because the running best
+      starts at \(0.0\) and the comparison is \codex{>=}, the checkpoint is
+      rewritten every epoch and the \emph{last} epoch's weights end up in
+      \codex{best\_\allowbreak{}model.pt}
+      (\codex{trainer.py:57,74-88}).
+\item \textbf{Ties overwrite the best checkpoint}, because the comparison is
+      \codex{>=} and not \codex{>} (\codex{trainer.py:86}).
+\item \textbf{The environment is read once and cached for the whole
+      dataset}, and a read failure replaces it with nothing at all
+      (\codex{dataset.py:66-88}).
+\item \textbf{The real environmental NetCDF trips that fallback.} Its two
+      dynamic variables are three-dimensional and its statics are not, so
+      \codex{np.stack} raises and the blanket \codex{except Exception}
+      discards the whole stack; the four environmental channels of every
+      training tile are consequently zero
+      (\codex{dataset.py:71-78,87-88}; the dimensions are set in
+      \codex{mal-core/src/mal\_core/ingest/daily\_nc.py:404-430}).
+\item \textbf{The environmental crop is positional}, so the training path
+      assumes the environmental file and the state raster share a grid and
+      samples the wrong pixels whenever they do not; tiles beyond the
+      environmental extent are zeroed without comment
+      (\codex{dataset.py:246-249}).
+\item \textbf{The inference wrapper adapts to channel mismatches by padding
+      with zeros or truncating}, silently (\codex{wrapper.py:79-88}).
+\item \textbf{The inference wrapper pads to a multiple of \PoolMult{} with
+      replicate padding} and crops the result back
+      (\codex{wrapper.py:90-104}), so the border cells of the output are
+      computed from replicated values rather than from neighbouring data.
+\item \textbf{The dummy model emits zeros of the input's width}
+      (\codex{registry.py:41-46}); a prediction produced without a trained
+      model is a raster of zeros with a sidecar that still names a model.
+\item \textbf{A trained checkpoint is never selected automatically.} The
+      prediction command's \codex{--model} default is \codex{"dummy"}
+      (\codex{mal-core/src/mal\_core/cli.py:112}) and the registry answers
+      that name directly (\codex{registry.py:96-97}), so the surrogate runs
+      only when its registry key is passed explicitly.
+\end{enumerate}
+
+\subsection{What is verified, and what is not}
+
+\textbf{Verified by reading the code in this repository, at the cited lines:}
+the file discovery and naming conventions; the seed and day parsing; the
+pairing rule; the tile grid and the dropped remainder; the mid-column split
+and its exact inequality, including the empty-validation degenerate case;
+the environmental variable order and truncation, and the fact that the real
+environmental NetCDF is discarded by the shape mismatch; the silent
+environment fallback; the positional environmental crop and the
+zero-fill beyond the environmental extent; the no-data-to-zero conversion;
+the
+subsample's determinism; the architecture and the loss composition; the
+threshold's unit under state contract \StateContract; the optimiser, the
+absence of a schedule and of early stopping; the selection rule's exact
+comparison, including the \codex{>=} tie-overwrite and its consequence for
+an all-zero validation Dice; the checkpoint contents; the manifest's keys and
+omissions; the
+loading order and the shape-inference fallback; the silent input adaptation;
+the registry's discovery and the dummy model's behaviour; the prediction
+stage's single call and its aggregation; and the absence of any calibration
+harness, scorer, threshold or accuracy gate in the training package and its
+tests.
+
+\textbf{Not verified, and not claimed:} the numerical fidelity of any
+checkpoint (no checkpoint and no trained model were exercised here, and no
+accuracy comparison against the ABM exists in the tree to compare against);
+the behaviour of the stage on real ABM output, as opposed to the synthetic
+rasters used by the test file; the correctness of the ABM's own
+output contract, which this document takes as given from the ABM's
+description; and the intent behind the absences listed in
+Section~\ref{sec:absences}, which the code does not record.
+
+Three further statements are statistical expectations rather than code
+facts, and are marked as such where they appear: \emph{what a fitted
+network generalises to} beyond the rollouts it saw, since the code records
+no such measurement; \emph{the relative gradient weight of the MSE and
+Dice terms}, which depends on count magnitudes the code does not fix and
+records no trace of beyond the printed training loss; and \emph{the fidelity
+of the surrogate}, which is ungated by construction.
+
+\textbf{The retired specification is not used as a source.} The stage's
+former specification contains several statements that the code contradicts:
+it describes a fixed seven-day step where the code pairs consecutive days;
+it describes a narrow file-name glob where the code globs loosely; it gives
+different values for the Dice temperature, the Dice threshold and the
+selection comparison; and it presents the environmental zero-fill as a
+standing limitation where the code treats it as a fallback. None of its
+claims is cited as authority here; the code is.
+
+\end{document}

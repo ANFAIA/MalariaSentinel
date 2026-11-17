@@ -10,10 +10,10 @@ rejects interpreting it as such.
 Mapping (per cell i; features are column numpy arrays of the env NC statics):
 
     P := jrc_persistent          (JRC occurrence >= 80 %, post-coast-filter fraction)
-    V := lc_wetland              (ESA WorldCover classes 90 + 95 area fraction)
-    U := lc_built                (ESA WorldCover class 50 area fraction)
-    O := lc_open_plus_water      (open/low vegetation + bare + water, area fraction)
-    C := lc_crop                 (ESA WorldCover class 40 area fraction)
+    V := lc_wetland              (Dynamic World flooded-vegetation area fraction)
+    U := lc_built                (Dynamic World built-up area fraction)
+    O := lc_open_plus_water      (grass + shrub + bare + water area fraction)
+    C := lc_crop                 (Dynamic World crops area fraction)
 
     H_surface_persistent = P
     H_wetland_persistent = V
@@ -27,7 +27,7 @@ Binding rules (plan §6.4 + project rule #167):
   with built cover and zero JRC water keeps a small persistent offer for the
   whole dry season.
 * H is clipped to [0, 1]; nan features are treated as 0 (absence of
-  land-cover evidence, not a wet signal). NaN counts of valid WorldCover
+  land-cover evidence, not a wet signal). NaN counts of valid Dynamic World
   pixels are NOT used to rescale here — quality lives in the writer.
 * No alpha/theta matrix: the plan dropped the phase-1 linear-weight design;
   if a future weighting needs fitting, it must NOT resurrect the alpha
@@ -92,6 +92,10 @@ def total_potential(h: Mapping[str, np.ndarray | float]) -> np.ndarray | float:
 def _feature(
     features: Mapping[str, np.ndarray | float], name: str
 ) -> np.ndarray | float:
+    """Return one contract v3.0 feature column, clipped to [0, 1].
+
+    Raises KeyError when the column is absent from the mapping.
+    """
     if name not in features:
         raise KeyError(
             f"missing contract v3.0 feature column '{name}' "
@@ -101,6 +105,7 @@ def _feature(
 
 
 def _clip(x):
+    """Return ``x`` as float64 with NaN replaced by 0.0 and values clipped to [0, 1]."""
     import numpy as _np
 
     arr = _np.asarray(x, dtype=_np.float64)

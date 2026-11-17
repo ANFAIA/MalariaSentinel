@@ -25,6 +25,13 @@ class UNetWrapper:
         in_channels: int | None = None,
         out_channels: int | None = None,
     ):
+        """Load a trained checkpoint into a ready-to-predict U-Net.
+
+        The channel counts are taken from the arguments, else from the
+        ``model.yaml`` manifest next to the checkpoint, else inferred from
+        the shapes of the stored convolution weights. The device defaults to
+        CUDA, then Apple MPS, then CPU.
+        """
         self.checkpoint_path = Path(checkpoint_path)
         if device is None:
             if torch.cuda.is_available():

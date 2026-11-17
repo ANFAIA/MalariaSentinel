@@ -99,6 +99,7 @@ class AOI(BaseModel):
     @field_validator("slug")
     @classmethod
     def _slug_format(cls, v: str) -> str:
+        """Reject slugs that are not lowercase alphanumeric words joined by single hyphens."""
         if not re.fullmatch(r"[a-z0-9]+(-[a-z0-9]+)*", v):
             raise ValueError(
                 f"slug must be lowercase [a-z0-9-], no leading/trailing/consecutive hyphens; got {v!r}"
@@ -108,6 +109,7 @@ class AOI(BaseModel):
     @field_validator("iso3")
     @classmethod
     def _iso3_format(cls, v: str | None) -> str | None:
+        """Normalise an ISO 3166-1 alpha-3 code to uppercase and reject codes that are not three letters."""
         if v is None:
             return v
         v = v.strip().upper()
@@ -120,6 +122,7 @@ class AOI(BaseModel):
     @field_validator("bbox")
     @classmethod
     def _bbox_order(cls, v: tuple[float, float, float, float]) -> tuple[float, float, float, float]:
+        """Reject a bbox whose west/east or south/north edges are not strictly increasing."""
         w, s, e, n = v
         if not (w < e and s < n):
             raise ValueError(f"bbox must satisfy west<east and south<north; got {v!r}")
@@ -128,6 +131,7 @@ class AOI(BaseModel):
     @field_validator("crs")
     @classmethod
     def _crs_parseable(cls, v: str) -> str:
+        """Reject a CRS string that pyproj cannot parse into a CRS."""
         try:
             pyproj.CRS.from_user_input(v)
         except Exception as e:
@@ -143,6 +147,7 @@ class AOI(BaseModel):
 
     @property
     def _is_geographic(self) -> bool:
+        """True when the AOI CRS is geographic (units in degrees), False when it is projected."""
         return self.crs_obj.is_geographic
 
     @property
@@ -172,18 +177,21 @@ class AOI(BaseModel):
 
     @property
     def width_m(self) -> float:
+        """East-west extent of the bounding box in metres."""
         w, _, e, _ = self.bbox
         m_per_x, _ = self._m_per_unit()
         return abs(e - w) * m_per_x
 
     @property
     def height_m(self) -> float:
+        """North-south extent of the bounding box in metres."""
         _, s, _, n = self.bbox
         _, m_per_y = self._m_per_unit()
         return abs(n - s) * m_per_y
 
     @property
     def area_km2(self) -> float:
+        """Area of the bounding box in square kilometres, from width_m times height_m."""
         return (self.width_m * self.height_m) / 1_000_000.0
 
     @property

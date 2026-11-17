@@ -4,7 +4,7 @@ Convention: each AOI has a directory under data/<aoi>/ with a manifest.json
 listing available files. This module resolves paths from the manifest so no
 code needs to hardcode "data/ghana/...".
 
-Reads the v3.1 datasets-block manifest (docs/specs/data/spec.md §5.2).
+Reads the v3.1 datasets-block manifest (see mal_core.download.manifest).
 (The legacy v1 flat-files migration was removed on 2026-09-27.)
 """
 from __future__ import annotations
@@ -33,6 +33,7 @@ class AOIFiles:
     datasets: dict[str, dict]  # dataset_name → {type, format, files, ...}
 
     def get_files(self, dataset_name: str, year: int | str | None = None) -> list[Path]:
+        """The manifest-listed files of one dataset; with a year, only that year's file."""
         ds = self.datasets.get(dataset_name)
         if not ds:
             return []
@@ -42,6 +43,7 @@ class AOIFiles:
         return [self.data_dir / f for f in ds.get("files", {}).values()]
 
     def exists(self, key: str) -> bool:
+        """Whether any file of the named dataset is present on disk."""
         files = self.get_files(key)
         return any(f.exists() for f in files)
 

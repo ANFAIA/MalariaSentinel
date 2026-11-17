@@ -94,6 +94,7 @@ _NODATA_OUT_SCALAR = float(model_constant("ingest", "nodata_sentinel"))
 
 
 def _config_float(key: str, fallback: float) -> float:
+    """Read a float from the ``ingest`` section of the model constants, falling back when the key is absent."""
     try:
         return float(model_constant("ingest", key))
     except Exception:  # pragma: no cover - config always ships these keys
@@ -101,6 +102,7 @@ def _config_float(key: str, fallback: float) -> float:
 
 
 def _config_str(key: str, fallback: str) -> str:
+    """Read a string from the ``ingest`` section of the model constants, falling back when the key is absent."""
     try:
         return str(model_constant("ingest", key))
     except Exception:  # pragma: no cover
@@ -128,6 +130,7 @@ def default_resolution() -> str:
 
 
 def _ensure_cache_dir(cache_dir: pathlib.Path | None) -> pathlib.Path:
+    """Resolve and create the cache directory that holds the GSHHG shapefile."""
     if cache_dir is None:
         cache_dir = _DEFAULT_CACHE_DIR
     cache_dir = pathlib.Path(cache_dir).expanduser()

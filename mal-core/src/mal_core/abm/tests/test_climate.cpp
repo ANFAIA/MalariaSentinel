@@ -6,7 +6,7 @@
 // accessors (set_day, n_days), plus the out-of-bounds and NaN-salinity
 // accessor behaviour. (The legacy load_from_env_tif COG tests were
 // removed with the TIF path — the env input contract is NC-only; see
-// docs/specs/abm/spec.md INV-6.)
+// mal_core/ingest/daily_nc.py, contract v3.0.)
 
 #include <gtest/gtest.h>
 
