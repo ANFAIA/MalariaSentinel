@@ -18,6 +18,12 @@ the odour plume.
 ## Key Results (as used by the model)
 
 ### Setup  [P]
+**Sampling rate [M]:** two Cohu CCD cameras, "synchronized within 0.01 s";
+**PAL video, 704 × 576 px, interlaced at 25 frames/s**; Track3D (EthoVision
+3.1 add-on) produced "3D track data for the position of a mosquito **every
+0.04 s**" — i.e. the empirical integration step of this study is **1/25 s
+(40 ms)**.
+
 Wind tunnel 160 cm long × 60 × 60 cm; 27 ± 1 °C; 70 ± 3 % RH; **wind speed
 20.0 ± 1.0 cm s⁻¹**; odour plume from a glass funnel (4.3 cm tube → 10.5 cm
 open top) at the upwind end, approximated as a **cone of 20°** (13° relative to

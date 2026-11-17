@@ -27,6 +27,11 @@ black IR-transmitting plastic tiles placed randomly on the floor "to allow
 **optomotor navigation**". Mosquitoes concurrently stimulated with human
 odours and CO2 throughout.
 
+**Sampling rate [M]:** "two high-resolution analogue cameras (acA2440 – 75 µm,
+Basler) operating at **50 fps**" with IR band-pass filters (>800 nm), suspended
+~60 cm above the arena; 3-D tracks reconstructed at 50 fps. ⇒ empirical
+integration step **1/50 s = 20 ms**.
+
 ### Target size  [M]
 Targets: large 30 × 40 cm, small 15 × 20 cm (horizontal or vertical).
 * Two targets of identical size: more mosquitoes landed on the large target

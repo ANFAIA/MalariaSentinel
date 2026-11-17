@@ -101,6 +101,31 @@ Las atribuciones requeridas por cada licencia se detallan a continuación.
 | 86 | Dao A, Yaro AS, Diallo M, et al. Signatures of aestivation and migration in Sahelian malaria mosquito populations. *Nature* (2014) 516(7531):387–390 | **Manuscrito del autor** depositado en NIH (NIHMS637451) | [10.1038/nature13987](https://doi.org/10.1038/nature13987) |
 | 87 | Rossi IZ, Cassan C, Bagnoli JW, et al. The brain of the female *Anopheles gambiae* mosquito at spatial and single-cell resolution. *Nature Communications* (2026) 17:1 | **CC BY 4.0** | [10.1038/s41467-026-76839-z](https://doi.org/10.1038/s41467-026-76839-z) |
 | 88 | Fritz ML, Miller JR, Bayoh MN, et al. Application of a reverse dot blot DNA-DNA hybridization method to quantify host-feeding tendencies of two sibling species in the *Anopheles gambiae* complex. *Medical and Veterinary Entomology* (2013) 27(4):398–407 | Licencia no declarada en el depósito PMC (Wiley) | [10.1111/j.1365-2915.2012.01063.x](https://doi.org/10.1111/j.1365-2915.2012.01063.x) |
+| 89 | Onen H, Kaindoa EW, Akite P, Kayondo JK, Kaddumukasa MA, Akol AM, Tripet F. Semi-field experiments and sibship analyses reveal larval habitat size preferences and skip oviposition behaviour in female *Anopheles arabiensis*. *Parasites & Vectors* (2026) 19(1):336 | **CC BY 4.0** (BMC Open Access) | [10.1186/s13071-026-07482-2](https://doi.org/10.1186/s13071-026-07482-2) |
+| 90 | Kemibala EE, Shayo M, Swai IL, Kilagwile BH, Abdiel DH, Munishi A, Adam N, Rutayagi J, Bofu R, Mbise JT, Lyimo F, Ole Laizer S, Dekker T. Effects of natal habitat odour on oviposition site selection by *Anopheles gambiae* sensu lato. *Research Square* preprint (2026) | **CC BY 4.0** (preprint, no revisado por pares) | [10.21203/rs.3.rs-10515996/v1](https://doi.org/10.21203/rs.3.rs-10515996/v1) |
+| 91 | Tioyé DJJ, Sawadogo PS, Somda NSB, Poda BS, Sankara F, Dabiré KR. Habitats and dispersal of *Anopheles arabiensis* in the urban area of Bobo-Dioulasso, Burkina Faso. *Acta Tropica* (2026) 278:108107 | **© Elsevier** — no acceso abierto; sólo abstract leído | [10.1016/j.actatropica.2026.108107](https://doi.org/10.1016/j.actatropica.2026.108107) |
+| 92 | Mwingira VS, Spitzen J, Mboera LEG, Torres-Estrada JL, Takken W. The influence of larval stage and density on oviposition site-selection behavior of the Afrotropical malaria mosquito *Anopheles coluzzii*. *Journal of Medical Entomology* (2020) 57(6):1909-1915 | **CC BY-NC** (Oxford University Press) | [10.1093/jme/tjz172](https://doi.org/10.1093/jme/tjz172) |
+| 93 | Asmare Y, Hill SR, Hopkins RJ, Tekie H, Ignell R. The role of grass volatiles on oviposition site selection by *Anopheles arabiensis* and *Anopheles coluzzii*. *Malaria Journal* (2017) 16:65 | **CC BY 4.0** (BMC Open Access) | [10.1186/s12886-017-1717-z](https://doi.org/10.1186/s12886-017-1717-z) |
+| 94 | Nagi SC, Essandoh J, Ato-Egyir N, Lucas ER, Miles A, Desewu K, Williams I, Egyir-Yawson A, Sedda L, Weetman D, Donnelly MJ. Spatially-explicit genomics of *Anopheles gambiae* s.l. uncovers fine-scale population structure and mechanisms of insecticide resistance. *bioRxiv* preprint (2025) | **CC BY 4.0** (preprint, no revisado por pares) | [10.1101/2025.06.13.655782](https://doi.org/10.1101/2025.06.13.655782) |
+| 95 | Hamilton CE, Beresford DV, Sutcliffe JF. Effects of natal habitat odour, reinforced by adult experience, on choice of oviposition site in the mosquito *Aedes aegypti*. *Medical and Veterinary Entomology* (2011) 25(2):129-137 | **© Wiley** — no acceso abierto; sólo abstract leído | [10.1111/j.1365-2915.2011.00964.x](https://doi.org/10.1111/j.1365-2915.2011.00964.x) |
+| 96 | Jasper M, Schmidt TL, Ahmad NW, Sinkins SP, Hoffmann AA. A genomic approach to inferring kinship reveals limited intergenerational dispersal in the yellow fever mosquito. *Molecular Ecology Resources* (2019) 19(5):729-741 | **CC BY 4.0** (Wiley Open Access) | [10.1111/1755-0998.13043](https://doi.org/10.1111/1755-0998.13043) |
+| 97 | Eneh LK, Fillinger U, Borg Karlson AK, Kuttuva Rajarao G, Lindh J. *Anopheles arabiensis* oviposition site selection in response to habitat persistence and associated physicochemical parameters, bacteria and volatile profiles. *Medical and Veterinary Entomology* (2019) 33(4):709-716 | **© Wiley** — no acceso abierto; sólo abstract leído | [10.1111/mve.12336](https://doi.org/10.1111/mve.12336) |
+| 98 | Ouédraogo TFX, Sawadogo SP, Millogo AA, et al. Characterization of factors influencing swarm dynamics and mating efficiency in *Anopheles coluzzii*. *Parasites & Vectors* (2025) 18:512 | **CC BY 4.0** (BMC Open Access) | [10.1186/s13071-025-07151-w](https://doi.org/10.1186/s13071-025-07151-w) |
+| 99 | Cribellier A, Poda BS, Dabiré RK, Diabaté A, Roux O, Muijres FT. The complex swarming dynamics of malaria mosquitoes emerge from simple minimally-interactive behavioral rules. *PLoS Computational Biology* (2026) 22(8):e1014685 | **CC BY 4.0** | [10.1371/journal.pcbi.1014685](https://doi.org/10.1371/journal.pcbi.1014685) |
+| 100 | Iacomelli G, Lombardi M, Parisi L, et al. Experimental evidence of male-male interaction in laboratory swarms of *Anopheles gambiae* mosquitoes. *Scientific Reports* (2026) | **CC BY 4.0** | [10.1038/s41598-026-59111-8](https://doi.org/10.1038/s41598-026-59111-8) |
+| 101 | Shishika D, Manoukis NC, Butail S, Paley DA. Male motion coordination in anopheline mating swarms. *Scientific Reports* (2014) 4:6318 | **CC BY-NC-ND 4.0** | [10.1038/srep06318](https://doi.org/10.1038/srep06318) |
+| 102 | Diabaté A, Dao A, Yaro AS, et al. Spatial swarm segregation and reproductive isolation between the molecular forms of *Anopheles gambiae*. *Proceedings of the Royal Society B* (2009) 276(1676):4215–4222 | **CC BY 4.0** | [10.1098/rspb.2009.1167](https://doi.org/10.1098/rspb.2009.1167) |
+| 103 | Feugère L, Gibson G, Manoukis NC, Roux O. Mosquito sound communication: are male swarms loud enough to attract females? *Journal of the Royal Society Interface* (2021) 18(177):20210121 | **CC BY 4.0** | [10.1098/rsif.2021.0121](https://doi.org/10.1098/rsif.2021.0121) |
+| 104 | Vielma S, Minuz R, Trusso A, et al. The nocturnal swarming activity of the malaria mosquito: it's not just the males. Preprint (2025) | **Preprint — sólo abstract leído** | [10.21203/rs.3.rs-7045295/v1](https://doi.org/10.21203/rs.3.rs-7045295/v1) |
+| 105 | Charlwood JD. Swarming and mate selection in *Anopheles gambiae* mosquitoes (Diptera: Culicidae). *Journal of Medical Entomology* (2023) 60(5):857–864 | **© Oxford University Press** — sólo abstract leído | [10.1093/jme/tjad064](https://doi.org/10.1093/jme/tjad064) |
+| 106 | Sawadogo SP, Niang A, Wu SL, et al. Comparison of entomological impacts of two methods of intervention designed to control *Anopheles gambiae* s.l. via swarm killing in Western Burkina Faso. *Scientific Reports* (2022) 12:12397 | **CC BY 4.0** | [10.1038/s41598-022-16649-7](https://doi.org/10.1038/s41598-022-16649-7) |
+| 107 | Niang A, Sawadogo SP, Millogo AA, et al. Entomological baseline data collection and power analyses in preparation of a mosquito swarm-killing intervention in south-western Burkina Faso. *Malaria Journal* (2021) 20:346 | **CC BY 4.0** (BMC Open Access) | [10.1186/s12936-021-03877-x](https://doi.org/10.1186/s12936-021-03877-x) |
+| 108 | Kaiser ML, Wood OR, Damiens D, et al. Estimates of the population size and dispersal range of *Anopheles arabiensis* in Northern KwaZulu-Natal, South Africa. *Parasites & Vectors* (2021) 14:205 | **CC BY 4.0** (BMC Open Access) | [10.1186/s13071-021-04674-w](https://doi.org/10.1186/s13071-021-04674-w) |
+| 109 | Poda BS, Cribellier A, Feugère L, et al. Spatial and temporal characteristics of laboratory-induced *Anopheles coluzzii* swarms: shape, structure, and flight kinematics. *iScience* (2024) 27:111164 | **CC BY-NC 4.0** | [10.1016/j.isci.2024.111164](https://doi.org/10.1016/j.isci.2024.111164) |
+| 110 | Somers J, Georgiades M, Su MP, et al. Hitting the right note at the right time: circadian control of audibility in *Anopheles* mosquito mating swarms is mediated by flight tones. *Science Advances* (2022) 8:eabl4844 | **CC BY 4.0** | [10.1126/sciadv.abl4844](https://doi.org/10.1126/sciadv.abl4844) |
+| 111 | Gary RE, Cannon JW, Foster WA. Effect of sugar on male *Anopheles gambiae* mating performance, as modified by temperature, space, and body size. *Parasites & Vectors* (2009) 2:19 | **CC BY 4.0** (BMC Open Access) | [10.1186/1756-3305-2-19](https://doi.org/10.1186/1756-3305-2-19) |
+| 112 | Batista EPA, Mapua SA, Ngowo H, Matowo NS, Melo EF, Paixão KS, Eiras AE, Okumu FO. Videographic analysis of flight behaviours of host-seeking *Anopheles arabiensis* towards BG-Malaria trap. *PLoS ONE* (2019) 14(12):e0220563 | **CC BY 4.0** (PLOS Open Access) | [10.1371/journal.pone.0220563](https://doi.org/10.1371/journal.pone.0220563) |
+| 113 | Hinze A, Lantz J, Hill SR, Ignell R. Mosquito Host Seeking in 3D Using a Versatile Climate-Controlled Wind Tunnel System. *Frontiers in Behavioral Neuroscience* (2021) 15:643693 | **CC BY 4.0** (Frontiers Open Access) | [10.3389/fnbeh.2021.643693](https://doi.org/10.3389/fnbeh.2021.643693) |
 ---
 
 ## Notas sobre las licencias
@@ -198,6 +223,31 @@ Papers sobre biología, ecología y dinámica poblacional de los vectores *Anoph
 - **Das et al. 2017** — Multi-alimentación más allá del EIR (Zambia) (CC-BY 4.0) [Paper 51]
 - **Conway & McBride 1991** — Genética de la alimentación interrumpida (© Elsevier — fair use) [Paper 52]
 - **Choumet et al. 2012** — Visualización de la alimentación en ratones (CC-BY 4.0) [Paper 53]
+- **Onen 2026** — Skip oviposition y preferencias de hábitat larvaro en *A. arabiensis* (CC BY 4.0) [Paper 89]
+- **Kemibala 2026** — Olor del hábitat natal y selección del sitio de oviposición (CC BY 4.0 — preprint) [Paper 90]
+- **Tioyé 2026** — Hábitats y dispersión de *A. arabiensis* en Bobo-Dioulasso (© Elsevier — sólo abstract) [Paper 91]
+- **Mwingira 2020** — Estado larvario y densidad en la elección del sitio de oviposición de *A. coluzzii* (CC BY-NC) [Paper 92]
+- **Asmare 2017** — Volátiles de pasto en la elección del sitio de oviposición (CC BY 4.0) [Paper 93]
+- **Nagi 2025** — Genómica espacialmente explícita de *A. gambiae* s.l. en Obuasi, Ghana (CC BY 4.0 — preprint) [Paper 94]
+- **Hamilton 2011** — Preferencia por hábitat natal en *Aedes aegypti* (© Wiley — sólo abstract) [Paper 95]
+- **Jasper 2019** — Parentesco y dispersión intergeneracional en *Aedes aegypti* (CC BY 4.0) [Paper 96]
+- **Eneh 2019** — Persistencia del hábitat y selección del sitio de oviposición en *A. arabiensis* (© Wiley — sólo abstract) [Paper 97]
+- **Ouédraogo 2025** — Dinámica de enjambre y eficiencia de apareamiento en *A. coluzzii* (CC BY 4.0) [Paper 98]
+- **Cribellier 2026** — Reglas de comportamiento mínimo que emergen del enjambre (CC BY 4.0) [Paper 99]
+- **Iacomelli 2026** — Interacción macho-macho en enjambres de laboratorio (CC BY 4.0) [Paper 100]
+- **Shishika 2014** — Coordinación del movimiento de machos en enjambres (CC BY-NC-ND 4.0) [Paper 101]
+- **Diabaté 2009** — Segregación espacial de enjambres y aislamiento reproductivo (CC BY 4.0) [Paper 102]
+- **Feugère 2021** — ¿Son los enjambres lo bastante ruidosos para atraer a las hembras? (CC BY 4.0) [Paper 103]
+- **Vielma 2025** — Actividad de enjambre nocturna: no sólo los machos (preprint — sólo abstract) [Paper 104]
+- **Charlwood 2023** — Enjambre y selección de pareja en *A. gambiae* (© OUP — sólo abstract) [Paper 105]
+- **Sawadogo 2022** — Intervención de matanza de enjambre (CC BY 4.0) [Paper 106]
+- **Niang 2021** — Línea base entomológica para la intervención de enjambre (CC BY 4.0) [Paper 107]
+- **Kaiser 2021** — Tamaño poblacional y rango de dispersión de *A. arabiensis* (CC BY 4.0) [Paper 108]
+- **Poda 2024** — Forma, estructura y cinemática de enjambres de laboratorio de *A. coluzzii* (CC BY-NC 4.0) [Paper 109]
+- **Somers 2022** — Auditabilidad circadiana del enjambre (CC BY 4.0) [Paper 110]
+- **Gary 2009** — Efecto del azúcar en el apareamiento de los machos (CC BY 4.0) [Paper 111]
+- **Batista 2019** — Análisis videográfico del vuelo de búsqueda de hospedero (CC BY 4.0) [Paper 112]
+- **Hinze 2021** — Búsqueda de hospedero en 3D en túnel de viento (CC BY 4.0) [Paper 113]
 - **Lorenz et al. 2013** — Taxis assays: alcance de activación (100 m) y de orientación olfativa (50–70 m semicampo, 30 m campo abierto) (CC BY 2.0) [Paper 62]
 - **Hawkes & Gibson 2016** — Vuelo 3D de *A. coluzzii*: respuesta visual habilitada por olor, dipping, velocidades por régimen (CC BY 4.0) [Paper 63]
 - **Hawkes 2013** — Tesis doctoral: orientación a hospedero en *A. gambiae* (copyright del autor, repositorio de Greenwich) [Paper 64]

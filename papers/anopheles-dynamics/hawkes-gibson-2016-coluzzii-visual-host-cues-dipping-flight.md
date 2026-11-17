@@ -36,6 +36,10 @@ object (black vs transparent tile) in clean air vs with host odour.
   (range 791–3,462 ppm); background CO2 460 ± 5 ppm (439–511 ppm).**
 * 3-D capture volume ≈ 60 cm wide × 85 cm long, upwind edge ~20 cm from the
   upwind screen (so recorded mosquitoes were within ~1 m of the host).
+* **Sampling rate: "3D flight coordinates of only one mosquito at a time were
+  recorded … (recording rate 50 Hz by TrackIt3D software)".** The paper's
+  cumulative horizontal displacement is computed "**per 20 ms intervals**",
+  i.e. the empirical integration step of this study is **1/50 s**.
 * Visual target: 20 × 20 cm IR-transmitting tile held upright ~15 cm above the
   floor, **~55 cm downwind of the host**, perpendicular to the wind.
 * Experiments in the **first 3 h of the scotophase**; sugar withdrawn 3 h
@@ -88,7 +92,9 @@ Flight control during the visual response: ground speed **decelerates from
 40 cm s⁻¹ to 30 cm s⁻¹ in the 0.1 s** before closest approach, then
 accelerates at ~80 cm s⁻² to a mean 46 cm s⁻¹ within 0.1 s of moving away;
 mean angular acceleration **12,500 ° s⁻²** between 0.04 s before and 0.04 s
-after closest approach.
+after closest approach. **The turning event itself is therefore resolved on a
+~0.08 s window (4 frames at 50 Hz)** — the fastest behavioural feature
+documented in this paper.
 
 ### Activation  [M]
 54.5 % of mosquitoes flew out of the release cage in clean air vs **78.1 %**

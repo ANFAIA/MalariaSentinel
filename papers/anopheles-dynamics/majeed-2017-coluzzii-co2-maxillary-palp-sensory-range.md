@@ -29,8 +29,7 @@ molecular form), *Aedes aegypti* (Rockefeller), *Culex quinquefasciatus*
   *Cx. quinquefasciatus* (t = 3.12, df = 8, p < 0.05; t = 4.80, df = 8,
   p < 0.001; t = 3.09, df = 8, p < 0.05).
 * Stimulus train: **single CO2 pulses of 1 s with 1 s inter-stimulus
-  interval**; concentrations used **150, 300, 600, 1200, 2400 and 4800 ppm**.
-* At **600 and 1200 ppm** the A cell of **all three** species detected **and
+  interval**; concentrations used **150, 300, 600, 1200, 2400 and 4800 ppm**.* At **600 and 1200 ppm** the A cell of **all three** species detected **and
   tracked** the pulsed stimuli. **At higher concentrations all species still
   detected the pulses, but only *Ae. aegypti* and *An. coluzzii* could track
   them** (fire throughout each pulse); the *Cx. quinquefasciatus* A cell
@@ -55,6 +54,16 @@ molecular form), *Aedes aegypti* (Rockefeller), *Culex quinquefasciatus*
   *Ae. aegypti* and *An. coluzzii* at concentrations above 1200 ppm
   (2400 ppm: t-ratio −4.88 / −8.48, p < 0.0001; 4800 ppm: −3.72 / −7.53,
   p = 0.0035 / < 0.001).
+* **Activation latency:** "the **time to activation** decreased in the presence
+  of pulsed CO2 compared with the controls" and, with rising CO2 concentration,
+  the **time to reach halfway along the flight tube** decreased significantly
+  for *Ae. aegypti* and *An. coluzzii*. The absolute latencies are given only
+  as box-plots in Fig. 3a (not as numbers in the text) → **[NR] in seconds**;
+  what is published is the *ordering* and the *significance*, and the fact
+  that the effect is measurable within the seconds-scale flight of a 2.5 cm
+  flight tube (30 cm s⁻¹ flow ⇒ a few seconds end to end). **This is the only
+  *Anopheles* activation-latency measurement found** (as opposed to the
+  300 ms / 0.03 s figures, which are *Aedes*).
 * Time to reach halfway along the tube was significantly shorter for
   *Ae. aegypti* and *An. coluzzii* than for *Cx. quinquefasciatus* above
   600 ppm; **at 4800 ppm *An. coluzzii* took as long as *Cx. quinquefasciatus*

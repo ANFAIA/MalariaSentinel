@@ -25,6 +25,12 @@ the trap) that produce contrasting capture dynamics.
   (hanging) — the airflow field around the entry tube reached
   **up to 3 m s⁻¹**, dropping rapidly away from the entrance (the region
   with airspeed > 1.5 m s⁻¹ was only 3 cm high × 10 cm wide).
+* **Sampling rate: "two synchronized high-speed cameras (PROMON 501 camera
+  head with NIR sensors and 45 mm lenses), filming at 90 frames per second
+  with a resolution of 1240 × 1080 pixels."** ⇒ empirical integration step
+  **1/90 s ≈ 11 ms**, the finest of any malaria-vector host-seeking
+  videography found. (The anemometer used for the flow field, separately, had
+  "a 1 Hz sample rate".)
 
 ### *A. coluzzii* flight kinematics near a strong odour source  [M]
 * "Mosquitoes had their **highest mean ground speeds (up to 0.5 m s⁻¹) near
