@@ -30,6 +30,14 @@ if [ "$#" -gt 0 ]; then
   PHASES=("$@")
 fi
 
+# A reproducible PDF. Without this, every build stamps the current time
+# into the PDF's /CreationDate and /ID, so the committed PDF changes on
+# every run — the working tree is never clean after a build, and CI's
+# "rebuild and commit" step would commit a difference that carries no
+# information. With it, the PDF depends only on its source.
+export SOURCE_DATE_EPOCH=1767225600   # 2026-01-01T00:00:00Z
+export FORCE_SOURCE_DATE=1
+
 echo "==> regenerating values"
 uv run python tools/gen_concepts_values.py
 
