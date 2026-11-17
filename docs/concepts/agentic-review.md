@@ -78,11 +78,13 @@ deterministic: the same pull request produces the same context.
 
 ## Running it locally
 
-The same run, on the same machine, with the same inputs:
+The same run, on the same machine, with the same inputs. Locally there
+is no OIDC: the credential is a personal key, taken from pi's own
+credentials, and it never leaves the machine.
 
 ```bash
-# the credential: the key of the provider the review uses
-export OPENCODE_API_KEY=...            # never in the repository, never in the shell history
+# the credential: pi's own key for the provider
+export OPENCODE_API_KEY=$(python3 -c "import json,os;print(json.load(open(os.path.expanduser('~/.pi/agent/auth.json')))['opencode-go']['key'])")
 
 # a clean agent directory with the provider's models declared
 export PI_CODING_AGENT_DIR=$(mktemp -d)
@@ -90,7 +92,7 @@ mkdir -p "$PI_CODING_AGENT_DIR"
 cp .github/agentic-reviewers/models.json "$PI_CODING_AGENT_DIR/models.json"
 
 # the context
-python tools/agentic_review_context.py \
+python3 tools/agentic_review_context.py \
     --base origin/main --head HEAD --out /tmp/context.md
 
 # one lens
@@ -106,10 +108,10 @@ pi --print \
     > /tmp/report.md 2>/tmp/pi.err
 
 # the leak gate, before the report is read by anybody
-python tools/redact_secrets.py --secret-env OPENCODE_API_KEY --file /tmp/report.md
+python3 tools/redact_secrets.py --secret-env OPENCODE_API_KEY --file /tmp/report.md
 
 # the merge
-python tools/merge_agentic_reviews.py \
+python3 tools/merge_agentic_reviews.py \
     --report documentation=/tmp/report.md \
     --out-comment /tmp/comment.md --out-findings /tmp/findings.json
 ```
@@ -121,49 +123,82 @@ variable.
 
 ## The credential, and how it is kept
 
-The review needs a model. The credential is the repository secret
-`OPENCODE_API_KEY`; the model is chosen by the repository variable
-`AGENTIC_REVIEW_MODEL`; the endpoint and the models are declared in
-`.github/agentic-reviewers/models.json`.
+The review needs a model. There is **no stored credential**: the
+repository holds no key at all.
 
-The credential is a key of a paid service, so the review is built so
-that the key cannot reach a reader. The measures, in the order they
-matter:
+The provider issues the credential per run. The workflow proves its
+identity with the **OIDC token that GitHub issues to the job** (the job
+holds `id-token: write`), and exchanges it for an access token that
+**lasts an hour** and behaves like an API key:
 
-1. **A fork's pull request never receives a secret.** The trigger is
-   `pull_request`, never `pull_request_target`. GitHub gives no secret
-   to a pull request from a fork, so the reviewer there is simply
-   skipped, and the mechanical part of the review still runs.
-2. **The credential is in the environment of one step only**, and no
-   code from the pull request runs in that step. The reviewer is pi's
-   own binary, installed from npm in the step before.
-3. **The leak gate is written in the workflow**, not in the repository's
+```bash
+oidc=$(curl -sSf --oauth2-bearer "$ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+  "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=https://opencode.ai/console" | jq -r .value)
+token=$(curl -sSf https://opencode.ai/console/auth/oauth/token \
+  -d grant_type=urn:ietf:params:oauth:grant-type:token-exchange \
+  -d subject_token_type=urn:ietf:params:oauth:token-type:jwt \
+  -d client_id=<the service account's public client id> \
+  -d subject_token="$oidc" | jq -r .access_token)
+echo "::add-mask::$token"
+echo "OPENCODE_API_KEY=$token" >> "$GITHUB_ENV"
+```
+
+The **client id** (`sk_a0a294d9-…`) is the service account's public
+identifier, not a secret: the authentication is the OIDC token itself,
+and the client id can live in the workflow file. The service account is
+configured in the provider's console for one repository, with read-only
+permissions, a model scope, and an optional spending cap.
+
+The model is chosen by the repository variable `AGENTIC_REVIEW_MODEL`;
+the endpoint and the models are declared in
+`.github/agentic-reviewers/models.json`, which holds **no credential** —
+only the name of the environment variable pi reads.
+
+The measures that keep the credential from reaching a reader, in the
+order they matter:
+
+1. **There is nothing to leak.** The credential is minted per run and
+   dies in an hour. The repository stores no key, so there is no key to
+   steal from the repository's settings, no key to rotate after a leak,
+   and no key in the history of the branch.
+2. **A fork's pull request never gets one.** The trigger is
+   `pull_request`, never `pull_request_target`, and GitHub does not
+   grant `id-token: write` to a pull request from a fork: the exchange
+   fails, the reviewer is skipped, and the mechanical part of the review
+   still runs.
+3. **The credential is in the environment of one step only**, and no
+   code from the pull request runs in that step — the reviewer is pi's
+   own binary, installed from npm in the step before. A pull request
+   cannot change the sign-in step, because the sign-in step is in the
+   workflow file and a pull request changes only the tree.
+4. **The leak gate is written in the workflow**, not in the repository's
    `tools/`: the code that handles the credential must not be code the
    pull request can change. It masks the credential in everything the
    reviewer produced, and it fails the run when the credential is found
    in the working tree or in the history. Its logic is mirrored, and
    tested, in `tools/redact_secrets.py`, for use outside CI.
-4. **The artefact is the redacted report.** The comment, the artefact
-   and the log all carry the redacted text.
-5. **The checkout does not persist its token**, and the permissions are
-   `contents: read` and `pull-requests: write`.
-6. **A truncated credential counts as a leak.** The gate masks the whole
+5. **The artefact is the redacted report.** The comment, the artefact
+   and the log all carry the redacted text, and the token is masked in
+   the log by `::add-mask::`.
+6. **The checkout does not persist its token**, and the permissions are
+   `contents: read`, `id-token: write` (the review job) and
+   `pull-requests: write` (the job that posts the comment).
+7. **A truncated credential counts as a leak.** The gate masks the whole
    credential and every contiguous run of twelve characters or more of
    it, extending the match as far as the text and the credential agree.
 
 What these measures do **not** do:
 
-* They do not protect against a pull request that changes the workflow
-  itself. The workflow lives in the repository, so a branch can change
-  it; a fork's pull request cannot obtain the secret, but a branch
-  inside the repository could. The repository's ruleset should require
-  an approval for the workflow files — the same policy as for the code.
-* They do not protect the key from a maintainer who reads the CI
-  configuration. It is not printed anywhere; it is not in the log.
+* They do not protect against a branch **inside** this repository that
+  changes the workflow: that branch's run would mint a credential for
+  itself. The repository's ruleset should require an approval for the
+  workflow files — the same policy as for the code.
 * They do not limit what the credential can be used for. A key of a paid
-  service is a key of a paid service: if it leaks, it leaks. A
-  dedicated key for the review, with a spending limit, is the
-  remaining measure, and it belongs to whoever holds the account.
+  service is a key of a paid service: the spending cap belongs to the
+  service account, in the provider's console.
+* They do not protect the **model** from the content it reads. The
+  reviewer sees the diff of the pull request; that is the point, and it
+  is also the reason the reviewer runs with read-only tools.
 
 ## What it is not
 

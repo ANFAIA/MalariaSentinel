@@ -14,23 +14,28 @@
 #
 # The model is pi, the same harness this repository's agents use, with
 # read-only tools: the reviewer can read the tree but cannot write to it
-# and cannot run commands. The credential comes from the repository
-# secret OPENCODE_API_KEY and is in scope in exactly one step.
+# and cannot run commands. The credential is NOT a stored secret: the
+# workflow exchanges its own OIDC token for a short-lived access token
+# (one hour) that the provider's service account accepts. The repository
+# holds no key at all — only the service account's public client id.
 #
 # THE CREDENTIAL NEVER REACHES A READER:
 #
-#   * the trigger is `pull_request`, never `pull_request_target`, so a
-#     fork's pull request never receives a secret at all;
-#   * the secret is in the environment of one step only, and no code
-#     from the pull request runs in that step — the reviewer is pi's own
-#     binary, and the leak gate below is written here, in the workflow,
-#     on purpose: the code that handles the secret must not be code the
-#     pull request can change;
+#   * the trigger is `pull_request`, never `pull_request_target`;
+#   * the credential is minted per run, by the provider, from a token
+#     that GitHub issues to this repository's workflows; a fork's pull
+#     request is never granted `id-token: write`, so it cannot mint one
+#     — the reviewer is simply skipped there;
+#   * the access token lives one hour, in the environment of one step,
+#     and no code from the pull request runs in that step — the reviewer
+#     is pi's own binary, and the leak gate below is written here, in
+#     the workflow, on purpose: the code that handles the credential
+#     must not be code the pull request can change;
 #   * every artefact derived from the model — the report, the merged
 #     comment, the findings — passes through the leak gate before it is
 #     posted, uploaded, or printed;
 #   * the gate also scans the working tree and the whole history for the
-#     secret, so a leak that happened outside this workflow is caught
+#     credential, so a leak that happened outside this workflow is caught
 #     too;
 #   * the checkout does not persist its token, and the permissions are
 #     `contents: read` and `pull-requests: write`.
@@ -79,6 +84,11 @@ jobs:
     continue-on-error: true
     permissions:
       contents: read
+      # The only scope beyond reading: GitHub issues an OIDC token to
+      # this job, and the provider exchanges it for an access token.
+      # A pull request from a fork is never granted this scope, so it
+      # cannot mint a credential at all.
+      id-token: write
     strategy:
       fail-fast: false
       matrix:
@@ -108,10 +118,49 @@ jobs:
             --base "$BASE" --head HEAD --out "$RUNNER_TEMP/context.md"
           wc -c "$RUNNER_TEMP/context.md"
 
+      - name: Sign in to the provider
+        # There is no stored credential: the workflow proves its identity
+        # with the OIDC token that GitHub issues to it, and the provider
+        # exchanges it for an access token that lasts an hour. The
+        # client id below is the service account's *public* identifier,
+        # not a secret — the authentication is the OIDC token itself.
+        #
+        # A failure here is not an error: a fork's pull request has no
+        # `id-token: write`, and the reviewer is skipped there.
+        continue-on-error: true
+        env:
+          AUDIENCE: https://opencode.ai/console
+          OPENCODE_CLIENT_ID: sk_a0a294d9-aaf8-4d7b-a28d-c31dfb0d0ffe
+        run: |
+          set -uo pipefail
+          if [ -z "${ACTIONS_ID_TOKEN_REQUEST_TOKEN:-}" ] || [ -z "${ACTIONS_ID_TOKEN_REQUEST_URL:-}" ]; then
+            echo "this run has no identity token to present: the reviewer is skipped"
+            exit 0
+          fi
+          oidc=$(curl -sSf --oauth2-bearer "$ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=$AUDIENCE" | jq -r .value) || {
+            echo "the identity request failed: the reviewer is skipped"
+            exit 0
+          }
+          token=$(curl -sSf https://opencode.ai/console/auth/oauth/token \
+            -d grant_type=urn:ietf:params:oauth:grant-type:token-exchange \
+            -d subject_token_type=urn:ietf:params:oauth:token-type:jwt \
+            -d client_id="$OPENCODE_CLIENT_ID" \
+            -d subject_token="$oidc" | jq -r .access_token) || {
+            echo "the exchange failed: the reviewer is skipped"
+            exit 0
+          }
+          if [ -z "$token" ] || [ "$token" = "null" ]; then
+            echo "the exchange returned no token: the reviewer is skipped"
+            exit 0
+          fi
+          echo "::add-mask::$token"
+          echo "OPENCODE_API_KEY=$token" >> "$GITHUB_ENV"
+          echo "signed in"
+
       - name: The review
         # The only step whose environment holds the credential.
         env:
-          OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
           MODEL: ${{ vars.AGENTIC_REVIEW_MODEL }}
           PI_CODING_AGENT_DIR: ${{ runner.temp }}/pi-home
           PI_SKIP_VERSION_CHECK: "1"
@@ -159,15 +208,13 @@ jobs:
         # change. It masks the credential in everything the reviewer
         # produced, and it fails the run when the credential was found
         # anywhere in the tree or in the history.
-        env:
-          OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
         run: |
           set -uo pipefail
           if [ -z "${OPENCODE_API_KEY:-}" ]; then
             echo "no credential: nothing to gate"
             exit 0
           fi
-          python - <<'PY'
+          python3 - <<'PY'
           import os, pathlib, subprocess, sys
 
           secret = os.environ["OPENCODE_API_KEY"]
