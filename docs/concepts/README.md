@@ -19,8 +19,8 @@ both.
 The project documents its pipeline with two kinds of artefact, and this layer
 exists because the first kind does not survive change:
 
-* **Specs** (`docs/specs/`, retired) pinned band names, sentinels, contract
-  versions and sidecar keys — the class of fact a refactor renames. Every
+* **Specs** (retired) pinned band names, sentinels, contract versions and
+  sidecar keys — the class of fact a refactor renames. Every
   behaviour-preserving rename forced a noise edit, and nothing ever executed
   the checks the specs claimed to run, so they rotted.
 * **Conceptual documents** (this layer) explain how a stage works: the
@@ -39,7 +39,9 @@ Two mechanical properties hold across all six:
 2. **The coherence review warns, it never blocks.** An advisor reports
    incoherences between these documents and the implementation. It does not
    reject, does not require a document to change, and does not constrain how
-   documents are written.
+   documents are written. What has been measured about it so far — and what
+   has **not**, because the documents have never reached `main` — is written
+   down in `docs/concepts/coherence-review.md`.
 
 ## The stance (S1–S10)
 
@@ -121,7 +123,11 @@ transfer to the stages without entities; what changes is the nouns.
   described situation: a reader asks for something, and the document says what
   happens, in order.
 * **No hand-typed numbers.** Every value comes from `\input{generated/...}` or
-  from a macro the generator emits.
+  from a macro the generator emits. Two macro families carry them: `\mskey{...}`
+  for the values in `model_constants.yaml`, and `\codeconst{...}` for the
+  values that live in the code (a module constant, a function's default, a
+  loader's native grid). Both fail the build when the key is unknown, so a
+  value the code changes breaks the document instead of misleading it.
 * **Every claim cited.** Where a claim rests on the implementation, the
   document cites the file and line that supports it.
 * **The stage's own structure.** A shared outline is not a template here; see
@@ -131,14 +137,20 @@ transfer to the stages without entities; what changes is the nouns.
 
 1. An agent drafts the document from the stage's question set, the stance note
    above, and the stage's material.
-2. A human annotates the draft, marking defects.
+2. Someone reads the draft for defects. The instrument is a reader **without a
+   code profile** — a domain scientist who has never opened the repository —
+   who annotates every place they would have to stop and guess. A human does
+   this best; an agent instructed to read without a code profile does it
+   adequately, and the first execution is on record: the annotations of the
+   `download` document are in `docs/plans/in-process/download-concept-review.md`,
+   and the plan that came out of them is the pattern the other stages follow.
 3. The annotations are distilled into a plan under `docs/plans/`, naming the
    document section the plan invalidates and the code change required.
 4. Applying the plan updates the code **and** the document in the same
    commit, so the document never describes a state the code has already left.
 
-The step that matters for the reader is step 2: the human reading for defects
-is the detection instrument, because the coherence review is advisory only.
+The step that matters for the reader is step 2: the reading for defects is
+the detection instrument, because the coherence review is advisory only.
 
 ## The reference document
 

@@ -11,6 +11,18 @@
 # own LLM scorer already uses (mal-core/src/mal_core/scoring/llm_scorer.py).
 # A fork pull request has no secrets: the mechanical signals still run, the
 # semantic step reports that it was skipped, and the workflow exits 0.
+#
+# Two artefacts come out of a run:
+#
+#   * the comment (one per pull request, updated in place), and
+#   * `findings.json` — the findings array the reviewer ends its comment
+#     with, uploaded as the run's artefact. It exists so that a later
+#     measurement can collect the findings without scraping the comment;
+#     the procedure that reads it is in
+#     `.github/concepts-review-measurement.md`.
+#
+# The signals are read-only: the review reads the tree and writes nothing
+# back to the repository.
 name: coherence-review
 
 on:
@@ -38,7 +50,11 @@ jobs:
             git diff --name-only "origin/${{ github.base_ref }}...HEAD" || true
             echo
             echo "### Mechanical signals (inputs the reviewer may cite, not findings)"
-            uv run --with pyyaml python tools/coherence_signals.py \
+            # `--package mal-core` puts the project's own packages on the
+            # path: the signals reuse the value generator's readers (the
+            # model constants, the sidecar keys, the code constants), so
+            # they read the code the way the documentation build reads it.
+            uv run --package mal-core python tools/coherence_signals.py \
               --changed $(git diff --name-only "origin/${{ github.base_ref }}...HEAD" | tr '\n' ' ') || true
           } > "$RUNNER_TEMP/signals.md"
           cat "$RUNNER_TEMP/signals.md"
@@ -79,11 +95,15 @@ jobs:
           if [ -z "${OPENROUTER_KEY:-}" ]; then
             echo "semantic check skipped (no secret on this pull request)"
             echo "skipped=secret" >> "$GITHUB_OUTPUT"
+            printf '[]\n' > "$RUNNER_TEMP/findings.json"
+            : > "$RUNNER_TEMP/comment.md"
             exit 0
           fi
           if [ -z "${MODEL:-}" ]; then
             echo "semantic check skipped (CONCEPTS_REVIEW_MODEL is not set)"
             echo "skipped=model" >> "$GITHUB_OUTPUT"
+            printf '[]\n' > "$RUNNER_TEMP/findings.json"
+            : > "$RUNNER_TEMP/comment.md"
             exit 0
           fi
           echo "skipped=no" >> "$GITHUB_OUTPUT"
@@ -115,6 +135,42 @@ jobs:
               print(f"Semantic check skipped (the model call failed: {exc}).")
           PY
           head -c 2000 "$RUNNER_TEMP/comment.md"
+
+      - name: Extract the findings array
+        # The reviewer ends its comment with a fenced `json` array (see
+        # .github/concepts-review-prompt.md). The array is what the future
+        # measurement collects; a comment without it yields an empty array
+        # and no failure.
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, os, pathlib, re
+
+          run = pathlib.Path(os.environ["RUNNER_TEMP"])
+          comment = run / "comment.md"
+          text = comment.read_text() if comment.exists() else ""
+          findings = []
+          match = re.search(r"```json\s*(\[.*?\])\s*```", text, re.DOTALL)
+          if match:
+              try:
+                  parsed = json.loads(match.group(1))
+              except json.JSONDecodeError:
+                  parsed = []
+              if isinstance(parsed, list):
+                  findings = parsed
+          (run / "findings.json").write_text(json.dumps(findings, indent=2) + "\n")
+          print(f"findings: {len(findings)}")
+          PY
+          cat "$RUNNER_TEMP/findings.json"
+
+      - name: Upload the findings
+        # No extra permission: an artifact does not need one. The file is
+        # the measurement's raw material.
+        uses: actions/upload-artifact@v4
+        with:
+          name: coherence-findings
+          path: ${{ runner.temp }}/findings.json
+          if-no-files-found: error
 
       - name: Post the comment
         uses: actions/github-script@v7

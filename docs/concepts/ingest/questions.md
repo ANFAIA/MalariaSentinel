@@ -168,7 +168,7 @@ formula?**
   (the C++ mirror, same formula),
   `mal-core/src/mal_core/abm/src/coordinator.cpp:130-134` (the engine uses
   the **row-centre** latitude and `aoi_.resolution_m`),
-  `mal-core/src/mal_commonlib/aoi.py:157-170` (`_m_per_unit`: degrees are
+  `mal-commonlib/src/mal_commonlib/aoi.py:157-170` (`_m_per_unit`: degrees are
   converted to metres at the AOI **centroid** latitude).
 - Answer: the cell area is the approximation
   `resolution_m² · cos(lat_row) / 1e6`, applied per grid row, and the same

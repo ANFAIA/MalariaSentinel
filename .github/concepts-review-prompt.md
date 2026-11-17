@@ -63,3 +63,39 @@ to look.
 * Do not report style, wording, or the absence of a section. The documents
   have no shared structure, by design.
 * Do not report a difference that an in-process plan already accounts for.
+
+## How the comment ends
+
+The comment ends with a fenced `json` block that holds an **array** — one
+object per finding, in the order you reported them:
+
+```json
+[
+  {
+    "id": "F1",
+    "doc": "docs/concepts/scoring/scoring.tex",
+    "passage": "§3.2, the paragraph that says the composite has thirteen dimensions",
+    "code_ref": "mal-core/src/mal_core/scoring/registry.py:116"
+  }
+]
+```
+
+* `id` — a short identifier, unique within the comment (`F1`, `F2`, …). It is
+  how a verdict on a finding is recorded, so it must be stable.
+* `doc` — the path of the document, as it appears in the repository.
+* `passage` — where in the document the passage is (section, and the
+  sentence or table cell).
+* `code_ref` — the code that contradicts it: `file:line`, or `file:from-to`.
+
+The array is a **summary of the findings you already reported in prose**, not
+a new kind of output: every object must correspond to an incoherence you
+wrote above, and every incoherence you wrote above must appear in the array.
+The "ask a human" items are not findings: they stay in the prose and do not
+appear in the array.
+
+Rules:
+
+* The block is the **last** thing in the comment.
+* If you found nothing, the array is empty (`[]`) and the prose says so.
+* The array must be valid JSON on its own: no comments, no trailing commas,
+  no text outside the array inside the block.

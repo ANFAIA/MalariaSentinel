@@ -13,7 +13,16 @@
 # version_from  — the model_constants.yaml key holding the version (or absent)
 # bands/variables — the names carried by the artefact
 # sentinel      — the no-data value
+# keys          — the JSON keys the artefact writes, in emission order
+# band_names    — the band names the artefact carries, from wire.hpp
+# nodata        — the NoData value the artefact writes
 # compatibility — the rule a consumer must apply
+#
+# The `keys`, `band_names` and `nodata` fields are DECLARATIONS the
+# coherence review cross-checks against the code (tools/coherence_signals.py):
+# the declared set must equal the code's set. The generator does not read
+# them, so a declaration can never make the documentation build fail on a
+# field it does not know.
 
 artefacts:
   - key: env
@@ -63,6 +72,26 @@ artefacts:
     producer: mal_abm_fast::write_state_sidecar
     consumers: [scoring]
     version_from: contracts.cogs_state
+    keys:
+      - crs
+      - transform
+      - aoi_slug
+      - scale
+      - year
+      - month
+      - seed
+      - n_rollouts
+      - rollout_index
+      - generator_version
+      - abm_params_hash
+      - contract_version
+      - band_names
+      - nodata
+      - shape
+    band_names:
+      - adult_patch_count
+      - adult_cell_count
+    nodata: -9999.0
     compatibility: >-
       The key order is part of the contract, so two engines writing the same
       run produce byte-equal sidecars.

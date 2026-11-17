@@ -889,6 +889,24 @@ user approval when edited: `AGENTS.md`, `.gitignore` and `data/` — each is
 flagged below. No code is specified here; signatures and schemas are described
 in prose.
 
+### Deviations from this plan (recorded decisions)
+
+This plan was written before the stages ran. Where the execution departed
+from it, the departure is recorded here rather than left for a reader to
+discover by diffing the plan against the tree — a plan that lies about its
+own state is worse than no plan. Each entry names the stage it changes, the
+decision, and why.
+
+| # | Stage | The plan said | What was decided | Why |
+|---|---|---|---|---|
+| 1 | 1 | The ODD is a byte-for-byte copy of `.cache/odd-latex/odd-2010-malariasentinel.tex` | It is no longer a copy. Stage 4's value machinery rewrote 668 lines to call the generated macros, and a verification pass against the code corrected fourteen substantive claims (the feeding semantics, the one-day prevalence lag, the configured habitat types, the parity-test claim, the two calibration statements, the three patch counts, the coastal band, the binomial rounding, the population comparison, the cohort age, the software-testing paragraph). | The copy was a starting point, not the deliverable: the plan's own goal is a document that matches the code, and the code had moved since the copy was written. The substance is as-built, not as-targeted. |
+| 2 | 4 | One macro family (`\mskey`) over `model_constants.yaml` | Two families: `\mskey` for the model constants and `\codeconst{stage.name}` for the values that live in the code (the patch size, the channel counts, the verdict thresholds, the loaders' native grids). | Roughly a hundred values the documents state are readable from the code but are not model constants; a single family could not carry them without a YAML key per value, and a YAML key per value would duplicate the code. |
+| 3 | 5–9 | Each document is revised once through the annotation → plan → commit loop (CUJ-4/CUJ-5) | The documents landed in one commit each and the loop did not run while they were written. It runs now, per document, with a plan that names the section each item invalidates. | The loop is a mechanism, not a deadline: the honest record is that it did not happen during authoring, and the remedy is to run it, not to claim it happened. |
+| 4 | 10 | The site's stage index is written by hand in `documentacion.html` | It is generated (`docs/concepts/generated/stages.js`), and the page also links the technical reference and the stance note. | The plan's own rule for a hand-maintained index is "never". |
+| 5 | 11 | Doxygen writes `docs/reference/cpp/html/index.html` | Doxygen writes `docs/reference/cpp/` itself (`HTML_OUTPUT = .`), so `docs/reference/cpp/index.html` exists and the index page's link resolves. The build clears the directory first, so a page from a previous build cannot survive. | The verification plan of Stage 11 requires both references to carry their own `index.html`; with the old layout the generated index pointed at a 404. |
+| 6 | 12 | The reviewer's false-positive rate is measured over the last 20 merges | It cannot be: the documents have never been on `main`, so the population is empty. What was measured instead is written down in `docs/concepts/coherence-review.md`: the per-class precision of the mechanical signals, replayed over the branch's document-touching commits, plus the procedure and the instrumentation that will make the rate measurable once the documents land. | A number that could not be computed must not be printed as a number. The exit condition is met by stating plainly what is measured and what is not. |
+| 7 | 13 | `git ls-files data/` ends up showing only `data/README.md` | The index keeps the README, the small XML sidecars, the PNG renderings and the open-access paper (16 files, ≈4.5 MB); every heavy product stays out. | The sidecars, the figures and the paper are the four kinds of material that no command regenerates, and the code and the papers refer to them (`mal-data-explorer/README.md`, `docs/licenses.md`). Untracking them would make the tree depend on the zip for its own documentation. The backup still exists and is verified, so nothing is at risk either way. |
+
 ### Stage 0 — Truth pass (one commit, no new concepts)
 
 #### 1. `docs/README.md` (Modify)
@@ -1547,6 +1565,18 @@ parent directory, written and verified before anything is untracked.
     covers `data/README.md` as well, so without it the README leaves the
     index too, and the exit condition cannot hold. After this,
     `git ls-files data/` shows only `data/README.md`.
+*   **Decision (applied 2026-11-16, commit 4e833bf; recorded as deviation 7
+    above)**: the index keeps the README, the four `eml.xml`/`meta.xml`
+    sidecars, the seven PNG renderings and the open-access paper — sixteen
+    files, ≈4.5 MB, of which the paper is 2.6 MB. Every heavy product (the
+    env/host rasters, the DwC-A archives, the NetCDFs, the GeoTIFFs) is
+    excluded by the format rules in `.gitignore` and stays out of the index.
+    The reason is the one this stage itself states: the sidecars, the
+    figures and the paper are the material no command regenerates, and the
+    repository refers to them (`mal-data-explorer/README.md` points at the
+    figures, `docs/licenses.md` at the paper). Untracking them would make
+    the tree's own documentation depend on the zip. The backup is verified
+    either way, so the choice is about convenience, not about safety.
 *   **Rationale**: The index is what makes `data/` travel to GitHub. Removing it
     from the index, with the working tree untouched, is the whole of
     "untracking" — `rm` would destroy the local copy the zip was made from.
@@ -1654,17 +1684,22 @@ grid, CRS — lands in `ingest`, the first stage that needs `(H,W)`), and
     the compiled ABM binary that `_introspect_flags` scrapes
     (`mal-core/src/mal_core/abm/wrapper.py`), stating that the `malariasim`
     Typer CLI is outside that scope.
-*   **Stage 12**: Run the reviewer over the last 20 merges on `main` (or all
-    of them if the repository has fewer — its PR history is unverified, as
-    the repository has no `.github/` directory today); record findings versus
-    confirmed false positives; the stage closes when the measured
-    first-pass rate is written down — no threshold is set on it. A PR that
-    changes only a comment under `mal_core/<stage>/` must produce no
-    incoherence finding from the LLM reviewer (there is no presence rule, so
-    this asserts a behaviour, not the absence of a mechanism).
+*   **Stage 12**: The reviewer's false-positive rate over the last 20 merges
+    **cannot be measured today** — the documents have never been on `main`,
+    so the population is empty; the stage closes instead with the measurable
+    substitute written down in `docs/concepts/coherence-review.md`: the
+    per-class precision of the mechanical signals, replayed over the
+    branch's document-touching commits, the procedure and the instrumentation
+    that will make the rate measurable once the documents land, and a
+    statement of what was not measured. A PR that changes only a comment
+    under `mal_core/<stage>/` must produce no incoherence finding from the
+    LLM reviewer (there is no presence rule, so this asserts a behaviour, not
+    the absence of a mechanism).
 *   **Stage 13**: The zip exists in the repository's parent directory and
-    passes `unzip -t`; `git ls-files data/` shows only `data/README.md` while
-    the working tree still holds every file; clean-room clone →
+    passes `unzip -t`; `git ls-files data/` shows the documented tracked set
+    (the README, the XML sidecars, the PNG renderings and the paper — see
+    deviation 7) and no heavy product, while the working tree still holds
+    every file; clean-room clone →
     `uv sync --all-packages` → `uv run malariasim download` (which rebuilds
     the upstream half of `data/<aoi>/manifest.json` from the registry, from
     nothing) → `uv run malariasim ingest` (the derived half) →
