@@ -15,7 +15,11 @@
 
 Writing a description of what the pipeline does is a way of finding out what
 it does. Six documents, each verified against the code, produced eight defects
-that no test and no review had caught. None of them is a crash: every one of
+that no test and no review had caught. A later pass — documenting every
+entity the technical reference publishes — produced eight more, of a
+different kind: they are in the code's *contracts* rather than in its
+data path, and they are the defects a reader of the reference finds in
+one minute, because the reference now says what the code claims to do. None of them is a crash: every one of
 them is a **silent** misbehaviour — a channel that becomes zero, a checkpoint
 that is not the best one, a cell that is called urban when it is a field.
 
@@ -32,6 +36,14 @@ they are to fix.
 | U6 | `--model` defaults to `dummy` | `prediction/registry.py:96`, `cli.py:112` | A trained surrogate is **never** used unless it is named explicitly | `docs/concepts/prediction/prediction.tex` → §"Choosing and loading a checkpoint" → "The registry and its manifests" and "The dummy model is not a model" |
 | U7 | The urban class is inverted, and water counts as urban | `ingest/hosts.py:122-128`, `abm/src/host_landscape.cpp:111-121` | **97.8%** of the Ghana area of interest is read as urban | `docs/concepts/ingest/ingest.tex` → §"The urban class is inverted with respect to the product" (the section already states the defect; the fix changes its numbers); `docs/concepts/abm/odd-2010-malariasentinel.tex` → §6 "Input data" → the "Urban class" row, and §2.2 "State variables" → the urban-class row |
 | U8 | Four configuration parameters have no effect | `mal-core/config/model_constants.yaml` | The operator believes four knobs exist that do not | `docs/concepts/abm/odd-2010-malariasentinel.tex` → §"Generated parameter table" (the "Read by" column) and Appendix B.1 "Constants and contracts" |
+| U9 | A scenario's interventions have no effect on the prediction | `prediction/predictor.py:89` | The API accepts interventions and ignores them | `docs/concepts/prediction/prediction.tex` → §"What the stage consumes" → the scenario |
+| U10 | The national aggregation ignores the geography it claims to follow | `prediction/aggregator.py:63-74` | The "GADM-2 district" cells are 10×10 blocks of the raster | `docs/concepts/prediction/prediction.tex` → §"Aggregating the output" |
+| U11 | The mobility gate raises inside its own `try` and is skipped | `scoring/scorers/gates.py:257` | The gate never reports | `docs/concepts/scoring/scoring.tex` → §"The gates" |
+| U12 | The temperature scaling of the pluvial memory is not applied | `abm/src/coordinator.cpp:92-98` | The header documents a formula the engine does not implement | `docs/concepts/abm/odd-2010-malariasentinel.tex` → the pluvial drying memory |
+| U13 | The cold-start value of the pluvial memory is discarded | `abm/src/coordinator.cpp:78-89` | The warm-up starts from zeros, not from the configured value | `docs/concepts/abm/odd-2010-malariasentinel.tex` → the pluvial drying memory |
+| U14 | Two scorers declare no hard floor | `scoring/scorers/d19_pool_persistence.py:49`, `d20_washout_response.py:39` | The floor they inherit is not the one the others set | `docs/concepts/scoring/scoring.tex` → §"The scorers" |
+| U15 | The training loader replaces a broken environment with zeros, silently | `training/dataset.py:92-121` | The surrogate is trained on a fabricated environment | `docs/concepts/training/training.tex` → §"The environmental stack, and its problems" |
+| U16 | The constants file is read once per process | `mal-commonlib/model_constants.py:43-44` | An edit to the YAML is invisible until the process restarts | `docs/concepts/abm/odd-2010-malariasentinel.tex` → §"Sources of truth and their precedence" |
 
 The work happens on another branch. This plan is the input, and the
 verification that closes it is: for each item, the test that fails before the
@@ -672,6 +684,178 @@ question, not a bug fix.
 ### Risk
 
 Low for A, medium for D (the engine's failure mode changes).
+
+--------------------------------------------------------------------------------
+
+## U9–U16. What the reference documentation pass found
+
+These eight were found while writing one line of documentation for every
+entity the technical reference publishes: to say what an accessor reads,
+the writer had to read what it reads, and the code said something other
+than what the header claimed. Each is recorded with the evidence, the
+consequence, and the test that would close it. They are grouped by the
+file that owns them rather than by severity, because the severity is not
+yet judged — that judgement is the work.
+
+### U9. A scenario's interventions have no effect on the prediction
+
+**Evidence.** `prediction/predictor.py:89`:
+
+```python
+if scenario is not None:
+    params = interventions_to_params(scenario)
+
+prediction = model.predict(state, env)
+```
+
+`params` is computed and never used: `model.predict` takes the state and
+the environment, and nothing else. `server.py` builds a `ScenarioConfig`
+from the request and passes it down, so the API's intervention input is a
+silent no-op.
+
+**Consequence.** A caller who sets an intervention and reads a prediction
+sees no change, and no error. The scenario's climate overrides are in the
+same state.
+
+**Test that would close it.** A prediction run with a scenario whose
+intervention changes a parameter that the model consumes must produce a
+different output; and `run_prediction` must not compute a value it
+discards (a test that asserts the parameter reaches the model, or that
+the scenario is rejected as unsupported).
+
+### U10. The national aggregation ignores the geography it claims to follow
+
+**Evidence.** `prediction/aggregator.py:28` describes the national grid as
+`"GADM-2 mean-pool (district level)"`, and `aggregator.py:63-74` pools the
+raster into blocks of ten by ten cells:
+
+```python
+n_rows, n_cols = max(1, h // 10), max(1, w // 10)
+```
+
+No GADM geometry is read. At the 2 km national resolution the published
+cells are therefore 20 km across — ten times the resolution the grid
+claims — and their boundaries follow the raster, not the districts.
+
+**Consequence.** A "national" cell is not a district. A number published
+for a district is a block of the raster near it.
+
+**Test that would close it.** A test that asserts the national grid's
+cell size (2 km) and its alignment with the GADM-2 units, and a test that
+fails while the pooling ignores the geometry.
+
+### U11. The mobility gate raises inside its own `try` and is skipped
+
+**Evidence.** `scoring/scorers/gates.py:252-257`:
+
+```python
+row_ptr = np.frombuffer(f.read(4 * (n_rows + 1)), dtype=np.int32)
+...
+values, row_ptr[:-1].clip(max=len(values))
+```
+
+`np.add.reduceat` raises `IndexError` when an index equals `len(values)`;
+the clip should be `len(values) - 1`. The exception is caught by the
+surrounding `try`, so the gate reports nothing rather than failing.
+
+**Consequence.** A mobility gate that cannot read the file is silent: a
+run with a broken mobility raster scores as if the gate had passed.
+
+**Test that would close it.** A test that feeds the gate a row pointer
+whose last index is the length of the values, and asserts the gate
+reports its verdict (or names the failure) instead of being skipped.
+
+### U12. The temperature scaling of the pluvial memory is not applied
+
+**Evidence.** `abm/src/coordinator.cpp:92-98`:
+
+```cpp
+void CoordinatorModel::update_habitat_day(float gamma_t) {
+    ...
+    (void)gamma_t;
+```
+
+The header documents `gamma_t` as the temperature scaling of the pluvial
+drying memory. The argument is discarded.
+
+**Consequence.** The drying memory decays at the same rate in cold and in
+hot weather, which is the opposite of what the header (and the ODD) say.
+
+**Test that would close it.** A test that runs two days at different
+temperatures and asserts the drying memory decays differently; and the
+header's claim either implemented or removed.
+
+### U13. The cold-start value of the pluvial memory is discarded
+
+**Evidence.** `abm/src/coordinator.cpp:78-89`: `z_cold` is read from
+`load_config().pluvial.cold_start_z` and then dropped with `(void)z_cold;`.
+The warm-up starts from the pre-existing `z_` values, which are zero at
+construction.
+
+**Consequence.** The configured cold start has no effect.
+
+**Test that would close it.** A test that sets `pluvial.cold_start_z` to a
+value other than zero and asserts the first day's pluvial state starts
+from it.
+
+### U14. Two scorers declare no hard floor
+
+**Evidence.** `d19_pool_persistence.py:49` and `d20_washout_response.py:39`
+set `min_score = 0.70` and no `hard_floor`, so both inherit the base
+class's floor. Every other scorer declares its own.
+
+**Consequence.** Two of the nineteen scorers are judged against a floor
+nobody chose for them.
+
+**Test that would close it.** A test that asserts every scorer in the
+registry declares a `hard_floor`, and the two that do not are given one
+(or the base default is removed so that declaring it is mandatory).
+
+### U15. The training loader replaces a broken environment with zeros, silently
+
+**Evidence.** `training/dataset.py:92-121`: `_load_env_if_available`
+catches every exception and leaves the environmental stack at zero.
+
+**Consequence.** This is U1 seen from the other side: the surrogate is
+trained on a fabricated environment without a word of warning. It is
+listed here because the fix for U1 must also fix this one — a loader that
+cannot read the environment must fail, not invent one.
+
+**Test that would close it.** A test that points the loader at an
+unreadable environment and asserts that it raises (or records the failure
+in the run's metadata), instead of returning zeros.
+
+### U16. The constants file is read once per process
+
+**Evidence.** `mal-commonlib/model_constants.py:43-44`:
+
+```python
+@functools.lru_cache(maxsize=8)
+def _tree(path: str) -> dict[str, Any]:
+```
+
+**Consequence.** The process reads the configuration once. An operator
+who edits `model_constants.yaml` and re-runs a command in the same
+process sees the old values, with no warning. A long-lived server keeps
+the values it started with.
+
+**Test that would close it.** A test that writes the file, reads it,
+writes it again and asserts the second read sees the change; or a
+documented statement in the ODD that the configuration is read once per
+process, which would make the cache a decision rather than a surprise.
+
+### The two that are not defects
+
+Two findings from the same pass are *documentation* facts, not behaviour
+bugs, and are recorded here so that they are not "fixed" by changing
+code:
+
+- `SpeciesRow::host_seeking_radius_m` is reachable only through the `-1`
+  sentinel path; the live path uses `host_seeking.detect_range_m`. The
+  header now says so.
+- `HabitatCfg` carries both the `habitat_types:` taxonomy and the
+  `habitat:` thresholds, so `candidate_min_engine` appears in two places
+  in the configuration. The header now says so.
 
 --------------------------------------------------------------------------------
 
