@@ -1,0 +1,339 @@
+# The agentic documentation review: three reviewers, one advisory comment.
+#
+# An ADVISOR, never a gate: the workflow reports what three reviewers
+# found and never blocks, never rejects, and never requires a file to
+# change. Every step is `continue-on-error`, except the leak gate, which
+# must be loud.
+#
+# The three reviewers run in parallel, each with one lens:
+#
+#   documentation — is the change documented by the code's own docstrings
+#                   and comments?
+#   structure     — does a structural change have the LaTeX that states it?
+#   claims        — does the code do what its comments claim?
+#
+# The model is pi, the same harness this repository's agents use, with
+# read-only tools: the reviewer can read the tree but cannot write to it
+# and cannot run commands. The credential comes from the repository
+# secret OPENCODE_API_KEY and is in scope in exactly one step.
+#
+# THE CREDENTIAL NEVER REACHES A READER:
+#
+#   * the trigger is `pull_request`, never `pull_request_target`, so a
+#     fork's pull request never receives a secret at all;
+#   * the secret is in the environment of one step only, and no code
+#     from the pull request runs in that step — the reviewer is pi's own
+#     binary, and the leak gate below is written here, in the workflow,
+#     on purpose: the code that handles the secret must not be code the
+#     pull request can change;
+#   * every artefact derived from the model — the report, the merged
+#     comment, the findings — passes through the leak gate before it is
+#     posted, uploaded, or printed;
+#   * the gate also scans the working tree and the whole history for the
+#     secret, so a leak that happened outside this workflow is caught
+#     too;
+#   * the checkout does not persist its token, and the permissions are
+#     `contents: read` and `pull-requests: write`.
+#
+# The cost is three model runs per pull request. The model is chosen by
+# the repository variable AGENTIC_REVIEW_MODEL; the default is the
+# cheapest model in the provider's catalogue.
+name: agentic-doc-review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - "mal-core/src/**"
+      - "mal-commonlib/src/**"
+      - "mal-core/config/**"
+      - "docs/concepts/**"
+      - ".github/agentic-reviewers/**"
+      - "tools/agentic_review_context.py"
+  workflow_dispatch:
+    inputs:
+      base:
+        description: "the ref to review against"
+        default: "main"
+        required: false
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: agentic-doc-review-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+env:
+  PI_VERSION: "1.5.2"
+  DEFAULT_MODEL: "mimo-v2.6-flash"
+
+jobs:
+  review:
+    name: review (${{ matrix.lens }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    # An advisor: a reviewer that fails, hangs or is skipped must not
+    # turn the pull request red.
+    continue-on-error: true
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        lens: [documentation, structure, claims]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install pi
+        run: |
+          npm install --global --no-fund --no-audit \
+            "@earendil-works/pi-coding-agent@${{ env.PI_VERSION }}"
+          pi --version
+
+      - name: Build the context
+        env:
+          BASE: ${{ github.event_name == 'workflow_dispatch' && format('origin/{0}', inputs.base) || format('origin/{0}', github.base_ref) }}
+        run: |
+          set -euo pipefail
+          python3 tools/agentic_review_context.py \
+            --base "$BASE" --head HEAD --out "$RUNNER_TEMP/context.md"
+          wc -c "$RUNNER_TEMP/context.md"
+
+      - name: The review
+        # The only step whose environment holds the credential.
+        env:
+          OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+          MODEL: ${{ vars.AGENTIC_REVIEW_MODEL }}
+          PI_CODING_AGENT_DIR: ${{ runner.temp }}/pi-home
+          PI_SKIP_VERSION_CHECK: "1"
+          PI_TELEMETRY: "0"
+        run: |
+          set -uo pipefail
+          if [ -z "${OPENCODE_API_KEY:-}" ]; then
+            echo "no credential on this pull request: the reviewer is skipped"
+            exit 0
+          fi
+          mkdir -p "$PI_CODING_AGENT_DIR"
+          cp .github/agentic-reviewers/models.json "$PI_CODING_AGENT_DIR/models.json"
+          MODEL="${MODEL:-${{ env.DEFAULT_MODEL }}}"
+          echo "the reviewer: $MODEL"
+          # The reviewer gets twenty minutes. A model that does not
+          # finish is a reviewer that returns nothing, not a failure.
+          timeout --signal=TERM 1200 pi --print \
+            --no-session \
+            --no-extensions \
+            --no-skills \
+            --no-prompt-templates \
+            --no-mcp \
+            --approve \
+            --tools read,grep,find,ls \
+            --provider opencode-go-ci \
+            --model "$MODEL" \
+            --thinking low \
+            "@.github/agentic-reviewers/common.md" \
+            "@.github/agentic-reviewers/${{ matrix.lens }}.md" \
+            "@$RUNNER_TEMP/context.md" \
+            "Do the review now, and follow the output format the instructions give." \
+            > "$RUNNER_TEMP/report.raw.md" 2> "$RUNNER_TEMP/pi.err"
+          status=$?
+          if [ "$status" -ne 0 ]; then
+            echo "the reviewer exited with $status: its report is empty"
+            printf 'status=%s\n' "$status" > "$RUNNER_TEMP/pi.status"
+            exit 0
+          fi
+          printf 'status=0\n' > "$RUNNER_TEMP/pi.status"
+          wc -c "$RUNNER_TEMP/report.raw.md"
+
+      - name: The leak gate
+        # Written here, in the workflow, on purpose: the code that
+        # handles the credential must not be code the pull request can
+        # change. It masks the credential in everything the reviewer
+        # produced, and it fails the run when the credential was found
+        # anywhere in the tree or in the history.
+        env:
+          OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+        run: |
+          set -uo pipefail
+          if [ -z "${OPENCODE_API_KEY:-}" ]; then
+            echo "no credential: nothing to gate"
+            exit 0
+          fi
+          python - <<'PY'
+          import os, pathlib, subprocess, sys
+
+          secret = os.environ["OPENCODE_API_KEY"]
+          minimum = 12
+          run = pathlib.Path(os.environ["RUNNER_TEMP"])
+          report = run / "report.raw.md"
+          errors = run / "pi.err"
+
+          def mask(text):
+              hits = 0
+              if secret in text:
+                  text = text.replace(secret, "***REDACTED***")
+                  hits += 1
+              index = 0
+              while index <= len(secret) - minimum:
+                  window = secret[index:index + minimum]
+                  found = text.find(window)
+                  if found < 0:
+                      index += 1
+                      continue
+                  start, begin = index, found
+                  while start > 0 and begin > 0 and secret[start - 1] == text[begin - 1]:
+                      start -= 1
+                      begin -= 1
+                  end, stop = index + minimum, found + minimum
+                  while end < len(secret) and stop < len(text) and secret[end] == text[stop]:
+                      end += 1
+                      stop += 1
+                  text = text[:begin] + "***REDACTED***" + text[stop:]
+                  hits += 1
+                  index = max(end, index + 1)
+              return text, hits
+
+          leaked = False
+          for path in (report, errors):
+              if not path.exists():
+                  continue
+              text = path.read_text(encoding="utf-8", errors="replace")
+              new, hits = mask(text)
+              if hits:
+                  leaked = True
+                  path.write_text(new, encoding="utf-8")
+                  print(f"the credential was found in {path.name} and was masked")
+
+          # The proof: the credential must not be in the tree, nor in the
+          # history, nor in the report.
+          tracked = subprocess.run(
+              ["git", "grep", "-l", "-F", secret, "--", "."],
+              capture_output=True, text=True, check=False,
+          ).stdout.split()
+          if tracked:
+              leaked = True
+              for path in tracked:
+                  print(f"the credential is in the tree: {path}")
+          history = subprocess.run(
+              ["git", "log", "-p", "--all", "--full-history"],
+              capture_output=True, check=False,
+          ).stdout
+          if secret.encode("utf-8", "replace") in history:
+              leaked = True
+              print("the credential is in the history")
+
+          if leaked:
+              print("the leak gate failed")
+              sys.exit(1)
+          print("the leak gate passed")
+          PY
+
+      - name: Upload the report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: agentic-report-${{ matrix.lens }}
+          path: |
+            ${{ runner.temp }}/report.raw.md
+            ${{ runner.temp }}/pi.err
+          if-no-files-found: ignore
+          retention-days: 14
+
+  merge:
+    name: merge the reports
+    needs: review
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: agentic-report-*
+          path: ${{ runner.temp }}/reports
+
+      - name: Merge
+        run: |
+          set -euo pipefail
+          args=()
+          for dir in "$RUNNER_TEMP"/reports/*/; do
+            name="$(basename "$dir")"
+            lens="${name#agentic-report-}"
+            args+=(--report "$lens=$dir/report.raw.md")
+          done
+          if [ "${#args[@]}" -eq 0 ]; then
+            echo "no report: nothing to merge"
+            exit 0
+          fi
+          python3 tools/merge_agentic_reviews.py "${args[@]}" \
+            --out-comment "$RUNNER_TEMP/comment.md" \
+            --out-findings "$RUNNER_TEMP/findings.json"
+          cat "$RUNNER_TEMP/comment.md"
+
+      - name: Upload the findings
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: agentic-findings
+          path: ${{ runner.temp }}/findings.json
+          if-no-files-found: ignore
+          retention-days: 30
+
+      - name: Post the comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = `${process.env.RUNNER_TEMP}/comment.md`;
+            if (!fs.existsSync(path)) {
+              core.info('nothing to comment');
+              return;
+            }
+            const body = fs.readFileSync(path, 'utf8');
+            if (!body.trim()) {
+              core.info('nothing to comment');
+              return;
+            }
+            // Bot-loop guard: never comment on a comment.
+            const actor = context.payload.actor?.login || '';
+            if (actor.endsWith('[bot]')) {
+              core.info('skipping: the pull request was opened by a bot');
+              return;
+            }
+            const marker = '<!-- agentic-doc-review -->';
+            const text = `${marker}\n${body}\n`;
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const previous = comments.find(c => c.body && c.body.startsWith(marker));
+            if (previous) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: previous.id,
+                body: text,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: text,
+              });
+            }
