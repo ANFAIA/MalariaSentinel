@@ -33,6 +33,9 @@ fi
 echo "==> regenerating values"
 uv run python tools/gen_concepts_values.py
 
+echo "==> regenerating the site's document index"
+uv run python tools/gen_concepts_index.py
+
 for phase in "${PHASES[@]}"; do
   src="$(source_for "$phase")"
   if [ ! -f "$src" ]; then
@@ -58,3 +61,4 @@ done
 
 echo "==> checking that the generated fragments match the tree"
 uv run python tools/gen_concepts_values.py --check
+uv run python tools/gen_concepts_index.py --check
