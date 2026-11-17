@@ -131,7 +131,7 @@ transfer to the stages without entities; what changes is the nouns.
 * **Every claim cited.** Where a claim rests on the implementation, the
   document cites the file and line that supports it.
 * **The stage's own structure.** A shared outline is not a template here; see
-  `docs/plans/in-process/per-stage-conceptual-documentation.md`, Alternative E.
+  `docs/plans/completed/per-stage-conceptual-documentation.md`, Alternative E.
 
 ## The authoring loop
 
@@ -142,7 +142,7 @@ transfer to the stages without entities; what changes is the nouns.
    who annotates every place they would have to stop and guess. A human does
    this best; an agent instructed to read without a code profile does it
    adequately, and the first execution is on record: the annotations of the
-   `download` document are in `docs/plans/in-process/download-concept-review.md`,
+   `download` document are in `docs/plans/completed/download-concept-review.md`,
    and the plan that came out of them is the pattern the other stages follow.
 3. The annotations are distilled into a plan under `docs/plans/`, naming the
    document section the plan invalidates and the code change required.

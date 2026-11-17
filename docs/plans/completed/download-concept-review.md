@@ -1,7 +1,8 @@
 # Review of the `download` conceptual document — the loop, run once
 
-> **Status:** plan (in process) — the annotation step is done, the document
-> revision is the next commit.
+> **Status:** plan (executed) — the reader's 35 annotations were applied to
+> the `download` document: 34 fixed in the document, one (A27, the licence
+> limits) deferred to `docs/licenses.md`, which is the record of them.
 > **Stage:** the pilot of the plan's Stage 5 (CUJ-4 / CUJ-5).
 > **Reader:** one reader with no code profile (a domain scientist who has
 > never opened the repository). The annotations are theirs, unedited.

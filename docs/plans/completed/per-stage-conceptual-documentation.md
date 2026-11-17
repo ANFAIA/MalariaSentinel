@@ -1,7 +1,7 @@
 # Per-Stage Conceptual Documentation
 
 *   **Author:** david-fm
-*   **Status:** Plan (in process)
+*   **Status:** Plan (executed)
 *   **Date:** 2026-11-16
 *   **Origin:** the EGM brainstorm's RFC brief
     (`docs/designs/per-stage-conceptual-documentation.md`), deleted when this
