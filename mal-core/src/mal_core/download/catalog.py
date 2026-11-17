@@ -13,7 +13,8 @@ Identity of a dataset is its **manifest key**. There are exactly two kinds:
 Consumers (ingest builders, the ABM wrapper, CLI, viz scripts) declare
 dependencies as :class:`Slot` specs and resolve paths through
 :func:`resolve_inputs`. ``manifest.json`` is the single source of truth
-for what exists and in which file (docs/specs/data/spec.md §5.2).
+for what exists and in which file (the v3.1 datasets block; see
+`mal-core/src/mal_core/download/manifest.py`).
 
 Resolution semantics (agreed 2026-10-04):
 

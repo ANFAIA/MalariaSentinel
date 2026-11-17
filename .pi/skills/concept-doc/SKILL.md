@@ -17,7 +17,7 @@ source tree.
 |---|---|
 | The stage's question set | `docs/concepts/<phase>/questions.md` — for `abm`, the official `odd-2010-template.tex` beside the document |
 | The stance | `docs/concepts/README.md` (S1–S10, the devices that transfer, the precedence rule) |
-| The stage's material | The code, the specs under `docs/specs/<phase>/`, the plans under `docs/plans/`, the config |
+| The stage's material | The code, the plans under `docs/plans/`, the config |
 | The generated values | `docs/concepts/generated/` — emitted by `tools/gen_concepts_values.py`; **never type a number** |
 
 ## The operation

@@ -2,7 +2,7 @@
 
 Weights reflect validation value for the question "is the system good?"
 — external validation and core biology dominate; engineering invariants
-are gates, not dimensions (see docs/specs or AGENTS.md conventions).
+are gates, not dimensions (see the AGENTS.md conventions).
 
 Anchors (all papers live in papers/):
 - D1  occupancy: Bogh 2004; Ndenga 2011 (habitat occupancy range)

@@ -4,7 +4,7 @@ Convention: each AOI has a directory under data/<aoi>/ with a manifest.json
 listing available files. This module resolves paths from the manifest so no
 code needs to hardcode "data/ghana/...".
 
-Reads the v3.1 datasets-block manifest (docs/specs/data/spec.md §5.2).
+Reads the v3.1 datasets-block manifest (see mal_core.download.manifest).
 (The legacy v1 flat-files migration was removed on 2026-09-27.)
 """
 from __future__ import annotations
