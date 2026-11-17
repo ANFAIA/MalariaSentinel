@@ -423,7 +423,15 @@ def cross_check_contracts(
                 f"STATE_BAND_NAMES {bands}"
             )
         sentinel = art.get("sentinel")
-        if sentinel is not None:
+        if sentinel is not None and not isinstance(sentinel, (int, float)):
+            # The word `none` declares that the artefact carries no no-data
+            # marker of its own; any other string is a mistake in the file.
+            if str(sentinel).strip().lower() != "none":
+                problems.append(
+                    f"{key}: contracts.yaml sentinel {sentinel!r} is neither a "
+                    "number nor the word 'none'"
+                )
+        elif sentinel is not None:
             real = values.get("ingest.nodata_sentinel")
             if real is not None and float(sentinel) != float(real):
                 problems.append(

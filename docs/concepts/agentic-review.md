@@ -150,9 +150,10 @@ configured in the provider's console for one repository, with read-only
 permissions, a model scope, and an optional spending cap.
 
 The model is chosen by the repository variable `AGENTIC_REVIEW_MODEL`;
-the endpoint and the models are declared in
-`.github/agentic-reviewers/models.json`, which holds **no credential** —
-only the name of the environment variable pi reads.
+the endpoint and the models are declared twice — in the workflow, which
+is what runs, and in the file a local run uses — and the drift guard
+keeps the two the same. Neither copy holds a credential: only the name
+of the environment variable pi reads.
 
 The measures that keep the credential from reaching a reader, in the
 order they matter:
@@ -161,44 +162,72 @@ order they matter:
    dies in an hour. The repository stores no key, so there is no key to
    steal from the repository's settings, no key to rotate after a leak,
    and no key in the history of the branch.
-2. **A fork's pull request never gets one.** The trigger is
-   `pull_request`, never `pull_request_target`, and GitHub does not
-   grant `id-token: write` to a pull request from a fork: the exchange
-   fails, the reviewer is skipped, and the mechanical part of the review
-   still runs.
-3. **The credential is in the environment of one step only**, and no
-   code from the pull request runs in that step — the reviewer is pi's
-   own binary, installed from npm in the step before. A pull request
-   cannot change the sign-in step, because the sign-in step is in the
-   workflow file and a pull request changes only the tree.
-4. **The leak gate is written in the workflow**, not in the repository's
+2. **The workflow that runs is the base branch's.** The trigger is
+   `pull_request_target`, not `pull_request`: GitHub runs the workflow
+   file of the **base** branch, so a pull request cannot change the
+   sign-in step, the provider, the prompts, the gate, or the scripts
+   that run with the credential. (With `pull_request`, the workflow that
+   runs is the pull request's — the pull request could replace the gate
+   with a gate that always passes.)
+3. **Nothing from the pull request is executed.** The context builder,
+   the signals helper and the two reviewer prompts are taken from the
+   base branch with `git show`, which writes them out without running
+   them. The pull request's files are only **read**: by a model with
+   read-only tools, and by the leak gate.
+4. **The provider is written by the workflow, not read from the tree.**
+   The definition of the endpoint, the models and the credential's
+   source is a heredoc in the workflow file, so a pull request cannot
+   redirect the endpoint the credential is sent to. The file
+   `.github/agentic-reviewers/models.json` is the copy a *local* run
+   uses; `tools/check_agentic_models.py` fails when the two drift
+   apart, and a test runs it.
+5. **The credential is in the environment of two steps** — the reviewer
+   and the gate, which needs it to mask what the reviewer produced — and
+   no code from the pull request runs in either.
+6. **The leak gate is written in the workflow**, not in the repository's
    `tools/`: the code that handles the credential must not be code the
    pull request can change. It masks the credential in everything the
-   reviewer produced, and it fails the run when the credential is found
-   in the working tree or in the history. Its logic is mirrored, and
-   tested, in `tools/redact_secrets.py`, for use outside CI.
-5. **The artefact is the redacted report.** The comment, the artefact
+   reviewer produced, and it records a verdict: the credential was
+   found in the working tree or in the history, or it was not. Its
+   logic is mirrored, and tested, in `tools/redact_secrets.py`, for use
+   outside CI.
+7. **The verdict is loud.** The gate's verdict is a job of its own,
+   without `continue-on-error`: a leak turns the **run** red, and the
+   job that posts the comment only runs when the verdict is clean. A
+   leak therefore never reaches a reader *and* never passes unnoticed.
+8. **The artefact is the redacted report.** The comment, the artefact
    and the log all carry the redacted text, and the token is masked in
    the log by `::add-mask::`.
-6. **The checkout does not persist its token**, and the permissions are
+9. **The checkout does not persist its token**, and the permissions are
    `contents: read`, `id-token: write` (the review job) and
    `pull-requests: write` (the job that posts the comment).
-7. **A truncated credential counts as a leak.** The gate masks the whole
-   credential and every contiguous run of twelve characters or more of
-   it, extending the match as far as the text and the credential agree.
+10. **A truncated credential counts as a leak.** The gate masks the
+    whole credential and every contiguous run of twelve characters or
+    more of it, extending the match as far as the text and the
+    credential agree.
 
 What these measures do **not** do:
 
-* They do not protect against a branch **inside** this repository that
-  changes the workflow: that branch's run would mint a credential for
-  itself. The repository's ruleset should require an approval for the
-  workflow files — the same policy as for the code.
+* They do not protect against a change to the **base branch's** workflow
+  that a maintainer merges: the ruleset should require an approval for
+  the workflow files, as it does for the code.
+* They do not protect against a prompt injection through the diff: the
+  reviewer reads the pull request's content, and a malicious change can
+  try to make it say something else. The credential is not in the
+  model's context, the model has no tool that reaches the network or
+  the shell, and the gate still holds the verdict.
 * They do not limit what the credential can be used for. A key of a paid
   service is a key of a paid service: the spending cap belongs to the
   service account, in the provider's console.
 * They do not protect the **model** from the content it reads. The
   reviewer sees the diff of the pull request; that is the point, and it
   is also the reason the reviewer runs with read-only tools.
+
+One window remains, and it is this pull request's own: until the
+machinery is merged, the base branch has no `tools/agentic_review_context.py`
+and no reviewer prompt, so the workflow falls back to the pull request's
+copy and says so in the log. The window closes when this pull request is
+merged, and the fallback never runs again.
 
 ## What it is not
 
@@ -213,15 +242,28 @@ What these measures do **not** do:
 
 ## What has been measured
 
-So far: one reference change, one lens pair, by hand. The documentation
-lens found three defects in a single added docstring — one of them the
-docstring shadowing the accurate one that was already there — and the
-structure lens found the same defects from the other side and correctly
-concluded that no conceptual document had gone stale.
+The first run over a real pull request — this layer's own pull request —
+found **ten findings**, and all ten were real: three of them were holes
+in the review's own security claims (the provider's endpoint came from
+the tree the pull request controlled; the workflow that ran was the pull
+request's own; the gate could not fail the run), and seven were
+documentation defects the mechanical gates had missed (a contract table
+that declared a no-data sentinel two artefacts do not carry, a variable
+list two planes short of the file's, a docstring that promised a
+randomisation no code performs, a README that described a module and a
+package that no longer exist, and a module docstring that did not
+describe the module). Every one of them was fixed in the same pull
+request.
 
-The false-positive rate of the three lenses is **not measured**. The
-measurement is the same one the coherence review states: for each
-finding, whether a human confirmed it, over a population of merges. The
-artefact `agentic-findings` carries the merged findings of every run, so
-the population can be collected once the reviews have run on real pull
+Before that, one reference change and one lens pair, by hand: the
+documentation lens found three defects in a single added docstring — one
+of them the docstring shadowing the accurate one that was already there
+— and the structure lens found the same defects from the other side and
+correctly concluded that no conceptual document had gone stale.
+
+The false-positive rate is **one pull request old**. The measurement is
+the same one the coherence review states: for each finding, whether a
+human confirmed it, over a population of merges. The artefact
+`agentic-findings` carries the merged findings of every run, so the
+population can be collected once the reviews have run on real pull
 requests.

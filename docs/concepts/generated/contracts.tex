@@ -5,8 +5,8 @@
 Artefact & Producer & Consumers & Version & Bands / variables & Sentinel \\
 \midrule
 \endhead
-\code{env} & \code{mal\_core.ingest.env.build\_env\_tensor} & abm, prediction, scoring & "3.0" & rainfall, air\_temp\_c, jrc\_persistent, lc\_built, lc\_wetland, lc\_open\_plus\_water, lc\_crop & -9999.0 \\
-\code{habitat} & \code{mal\_core.ingest.env.build\_env\_tensor} & abm &  & hab\_type, habitat\_potential, row, col & -9999.0 \\
+\code{env} & \code{mal\_core.ingest.env.build\_env\_tensor} & abm, prediction, scoring & "3.0" & rainfall, air\_temp\_c, jrc\_persistent, lc\_built, lc\_wetland, lc\_open\_plus\_water, lc\_crop, land\_frac (optional), salinity\_ppt (optional) & none \\
+\code{habitat} & \code{mal\_core.ingest.env.build\_env\_tensor} & abm &  & hab\_type, habitat\_potential, row, col & none \\
 \code{state\_cog} & \code{mal\_abm\_fast::write\_state\_cog} & scoring, prediction, training & "4.0" & adult\_patch\_count, adult\_cell\_count & -9999.0 \\
 \code{state\_sidecar} & \code{mal\_abm\_fast::write\_state\_sidecar} & scoring & "4.0" &  &  \\
 \code{manifest} & \code{mal\_core.download.manifest.update\_dataset} & download, ingest, abm &  &  &  \\

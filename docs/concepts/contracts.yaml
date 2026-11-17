@@ -12,7 +12,8 @@
 # consumers     — who reads it
 # version_from  — the model_constants.yaml key holding the version (or absent)
 # bands/variables — the names carried by the artefact
-# sentinel      — the no-data value
+# sentinel      — the no-data value: a number, or the word `none` when the
+#                 artefact carries no no-data marker of its own
 # keys          — the JSON keys the artefact writes, in emission order
 # band_names    — the band names the artefact carries, from wire.hpp
 # nodata        — the NoData value the artefact writes
@@ -37,7 +38,15 @@ artefacts:
       - lc_wetland
       - lc_open_plus_water
       - lc_crop
-    sentinel: -9999.0
+      - land_frac (optional)
+      - salinity_ppt (optional)
+    # The file carries NO sentinel: the encoding sets the dtype and the
+    # compression only, so a missing value lands as the writer's default
+    # NaN fill for 32-bit floats. The -9999.0 sentinel is a build-time
+    # value (it is what the readers recognise in the inputs) and is never
+    # stored. land_frac and salinity_ppt appear only when their inputs
+    # resolve.
+    sentinel: none
     compatibility: >-
       A reader that finds a different env_nc contract version must refuse the
       file rather than reinterpret the planes.
@@ -50,10 +59,15 @@ artefacts:
       - habitat_potential
       - row
       - col
-    sentinel: -9999.0
+    # The file carries NO no-data marker: a cell without habitat
+    # potential is ABSENT from the file, not marked in it. The sentinel
+    # belongs to the rasters the file is built from.
+    sentinel: none
     compatibility: >-
       The candidate patches are an INDEX, not a measurement of pools; a
       reader must not read habitat_potential as a count, depth or volume.
+      A cell that is missing is a cell with no potential, not a cell whose
+      value is unknown.
 
   - key: state_cog
     producer: mal_abm_fast::write_state_cog

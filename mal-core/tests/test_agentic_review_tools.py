@@ -74,7 +74,6 @@ def test_the_tree_scan_finds_the_leak(tmp_path):
     leaks = redact.scan_tree(tmp_path, SECRET)
     assert leaks == ["leaky.py"]
 
-
 def test_the_history_scan_finds_the_leak(tmp_path):
     redact = _load("t_redact", "redact_secrets.py")
     repo = tmp_path / "repo"
@@ -276,3 +275,46 @@ def test_the_gate_and_the_tool_mask_the_same_way():
         assert tool_hits == gate_hits, f"the two count differently on {text!r}"
         assert secret not in by_gate
 
+
+# --------------------------------------------------------------------------
+# the provider the workflow writes
+# --------------------------------------------------------------------------
+
+
+def test_the_workflow_and_the_file_declare_the_same_provider():
+    """The workflow writes the provider itself; the file is the local copy.
+
+    Two copies drift, and the drift is invisible until a run sends the
+    credential to an endpoint the file does not declare.
+    """
+    checker = _load("t_models", "check_agentic_models.py")
+    assert checker.main() == 0
+
+
+def test_the_workflow_never_reads_the_provider_from_the_tree():
+    """The provider must be written by the workflow, not copied out of it.
+
+    A pull request that can change the file that declares the endpoint can
+    send the credential somewhere else. The copy is therefore banned.
+    """
+    workflow = (REPO / ".github" / "workflows" / "agentic-doc-review.yml").read_text(
+        encoding="utf-8"
+    )
+    assert "models.json" not in workflow.replace(
+        "$PI_CODING_AGENT_DIR/models.json", ""
+    ), "the workflow still names the file it must not read"
+
+
+def test_the_workflow_takes_its_machinery_from_the_base_branch():
+    """The scripts and the prompts the credential-bearing job runs are the
+    base branch's, not the pull request's."""
+    workflow = (REPO / ".github" / "workflows" / "agentic-doc-review.yml").read_text(
+        encoding="utf-8"
+    )
+    assert 'git show "origin/$BASE_REF:$path"' in workflow
+    for path in (
+        "tools/agentic_review_context.py",
+        "tools/coherence_signals.py",
+        ".github/agentic-reviewers/common.md",
+    ):
+        assert f"take {path} " in workflow, path

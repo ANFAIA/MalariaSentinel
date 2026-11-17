@@ -28,13 +28,29 @@ from __future__ import annotations
 import argparse
 import ast
 import json
+import os
 import pathlib
 import re
 import subprocess
 import sys
 
-REPO = pathlib.Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(REPO / "tools"))
+#: The tree the reviewers read. The workflow may point it elsewhere, so
+#: that this script can run from a copy taken from the base branch while
+#: reading the pull request's tree: the machinery is the base's, the
+#: material is the pull request's.
+REPO = pathlib.Path(
+    os.environ.get(
+        "AGENTIC_REVIEW_REPO", pathlib.Path(__file__).resolve().parent.parent
+    )
+).resolve()
+
+#: Where this script's own helpers are imported from. It is separate from
+#: REPO so that the helper can be the base branch's copy while the tree
+#: read is the pull request's.
+TOOLS = pathlib.Path(
+    os.environ.get("AGENTIC_REVIEW_TOOLS", REPO / "tools")
+).resolve()
+sys.path.insert(0, str(TOOLS))
 
 from coherence_signals import DOC_FOR_STAGE  # noqa: E402
 
