@@ -124,7 +124,9 @@ Public Attributes</h2></td></tr>
 <tr class="memitem:a1decc5d0eed4879d18d00bc146ed6a2a" id="r_a1decc5d0eed4879d18d00bc146ed6a2a"><td class="memItemLeft">int&#160;</td><td class="memItemRight"><a class="el" href="#a1decc5d0eed4879d18d00bc146ed6a2a">last_larval_instar</a> = 0</td></tr>
 <tr class="memitem:a87d58b033ef67f476e414bfdb8d7152f" id="r_a87d58b033ef67f476e414bfdb8d7152f"><td class="memItemLeft">double&#160;</td><td class="memItemRight"><a class="el" href="#a87d58b033ef67f476e414bfdb8d7152f">salinity_missing_psu</a> = 0.0</td></tr>
 </table>
-<a name="doc-variable-members" id="doc-variable-members"></a><h2 id="header-doc-variable-members" class="groupheader">Member Data Documentation</h2>
+<a name="details" id="details"></a><h2 id="header-details" class="groupheader">Detailed Description</h2>
+<div class="textblock"><p>Mortality and density dependence of the aquatic stages (<span class="tt">aquatic_stages:</span> section of model_constants.yaml). </p>
+</div><a name="doc-variable-members" id="doc-variable-members"></a><h2 id="header-doc-variable-members" class="groupheader">Member Data Documentation</h2>
 <a id="a57a51fcbe14673ee9393a3505592c0c5" name="a57a51fcbe14673ee9393a3505592c0c5"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#a57a51fcbe14673ee9393a3505592c0c5">&#9670;&#160;</a></span>egg_daily_mort</h2>
 
@@ -136,6 +138,7 @@ Public Attributes</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
+<p>Daily mortality rate (1/day) applied to the eggs of every patch (<span class="tt">aquatic_stages.egg_daily_mort</span>). </p>
 
 </div>
 </div>
@@ -150,6 +153,7 @@ Public Attributes</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
+<p>Competition coefficient alpha (dimensionless) of the Beverton-Holt larval density response p = S0 * K / (K + alpha * N) (<span class="tt">aquatic_stages.larva_bh_alpha</span>). </p>
 
 </div>
 </div>
@@ -164,6 +168,7 @@ Public Attributes</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
+<p>Low-density survival fraction (in [0,1]) of the larval stage in the Beverton-Holt density response (<span class="tt">aquatic_stages.larva_bh_s0</span>). </p>
 
 </div>
 </div>
@@ -178,6 +183,7 @@ Public Attributes</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
+<p>Index of the last (most advanced) larval instar the engine tracks, e.g. L4 (<span class="tt">aquatic_stages.last_larval_instar</span>). </p>
 
 </div>
 </div>
@@ -192,6 +198,7 @@ Public Attributes</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
+<p>Daily mortality rate (1/day) applied to the pupae of every patch (<span class="tt">aquatic_stages.pupa_daily_mort</span>). </p>
 
 </div>
 </div>
@@ -206,6 +213,7 @@ Public Attributes</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
+<p>Salinity (psu) assumed for a water body whose salinity measurement is missing — the freshwater anchor, which yields a suitability of 1 (<span class="tt">aquatic_stages.salinity_missing_psu</span>). </p>
 
 </div>
 </div>

@@ -126,7 +126,9 @@ Public Attributes</h2></td></tr>
 <tr class="memitem:afc7779fde6b27fda71e363140a72716b" id="r_afc7779fde6b27fda71e363140a72716b"><td class="memItemLeft">int&#160;</td><td class="memItemRight"><a class="el" href="#afc7779fde6b27fda71e363140a72716b">egg_batch_max</a> = 0</td></tr>
 <tr class="memitem:ad884d216fdf5883c1d2ee1ab327353f3" id="r_ad884d216fdf5883c1d2ee1ab327353f3"><td class="memItemLeft">double&#160;</td><td class="memItemRight"><a class="el" href="#ad884d216fdf5883c1d2ee1ab327353f3">resting_duration_days</a> = 0.0</td></tr>
 </table>
-<a name="doc-variable-members" id="doc-variable-members"></a><h2 id="header-doc-variable-members" class="groupheader">Member Data Documentation</h2>
+<a name="details" id="details"></a><h2 id="header-details" class="groupheader">Detailed Description</h2>
+<div class="textblock"><p>Gonotrophic cycle parameters: blood-feeding success, the egg-batch draw and the post-feed resting time (<span class="tt">gonotrophic:</span> section of model_constants.yaml). </p>
+</div><a name="doc-variable-members" id="doc-variable-members"></a><h2 id="header-doc-variable-members" class="groupheader">Member Data Documentation</h2>
 <a id="a2e053548532759d2d584c991e4eb2c32" name="a2e053548532759d2d584c991e4eb2c32"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#a2e053548532759d2d584c991e4eb2c32">&#9670;&#160;</a></span>cycle_duration_days</h2>
 
@@ -138,6 +140,7 @@ Public Attributes</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
+<p>Days (rounded up) a female needs to mature her eggs once the first gonotrophic cycle is over (<span class="tt">gonotrophic.cycle_duration_days</span>). </p>
 
 </div>
 </div>
@@ -152,6 +155,7 @@ Public Attributes</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
+<p>Upper clamp (eggs) applied to the drawn egg batch (<span class="tt">gonotrophic.egg_batch_max</span>). </p>
 
 </div>
 </div>
@@ -166,6 +170,7 @@ Public Attributes</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
+<p>Mean number of eggs of the binomial batch drawn at each oviposition (<span class="tt">gonotrophic.egg_batch_mean</span>). </p>
 
 </div>
 </div>
@@ -180,6 +185,7 @@ Public Attributes</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
+<p>Lower clamp (eggs) applied to the drawn egg batch (<span class="tt">gonotrophic.egg_batch_min</span>). </p>
 
 </div>
 </div>
@@ -194,6 +200,7 @@ Public Attributes</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
+<p>Number of trials of the binomial egg-batch draw; the per-trial probability is egg_batch_mean / egg_batch_n (<span class="tt">gonotrophic.egg_batch_n</span>). </p>
 
 </div>
 </div>
@@ -208,6 +215,7 @@ Public Attributes</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
+<p>Probability (fraction in [0,1]) that a probing female obtains a blood meal and enters the BLOOD_FED state (<span class="tt">gonotrophic.feeding_success_rate</span>). </p>
 
 </div>
 </div>
@@ -222,6 +230,7 @@ Public Attributes</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
+<p>Days (rounded up) a female needs to mature the eggs of her first gonotrophic cycle (<span class="tt">gonotrophic.first_cycle_days</span>). </p>
 
 </div>
 </div>
@@ -236,6 +245,7 @@ Public Attributes</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
+<p>Resting time (days, rounded to whole days) between blood feeding and the start of egg maturation (<span class="tt">gonotrophic.resting_duration_days</span>). </p>
 
 </div>
 </div>

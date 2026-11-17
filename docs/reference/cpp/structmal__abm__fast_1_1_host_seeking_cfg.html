@@ -125,7 +125,9 @@ Public Attributes</h2></td></tr>
 <tr class="memitem:acba0b83299ba31997b962306e438f279" id="r_acba0b83299ba31997b962306e438f279"><td class="memItemLeft">double&#160;</td><td class="memItemRight"><a class="el" href="#acba0b83299ba31997b962306e438f279">detect_range_m</a> = 0.0</td></tr>
 <tr class="memitem:a81459515a4927f15cd5c482c1cfa5d7d" id="r_a81459515a4927f15cd5c482c1cfa5d7d"><td class="memItemLeft">double&#160;</td><td class="memItemRight"><a class="el" href="#a81459515a4927f15cd5c482c1cfa5d7d">approach_step_m</a> = 0.0</td></tr>
 </table>
-<a name="doc-variable-members" id="doc-variable-members"></a><h2 id="header-doc-variable-members" class="groupheader">Member Data Documentation</h2>
+<a name="details" id="details"></a><h2 id="header-details" class="groupheader">Detailed Description</h2>
+<div class="textblock"><p>Host-seeking behaviour: the engine-level attraction terms and the detection geometry (<span class="tt">host_seeking:</span> section of model_constants.yaml). The per-species plume scale and radius live in the species rows. </p>
+</div><a name="doc-variable-members" id="doc-variable-members"></a><h2 id="header-doc-variable-members" class="groupheader">Member Data Documentation</h2>
 <a id="a81459515a4927f15cd5c482c1cfa5d7d" name="a81459515a4927f15cd5c482c1cfa5d7d"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#a81459515a4927f15cd5c482c1cfa5d7d">&#9670;&#160;</a></span>approach_step_m</h2>
 
@@ -137,6 +139,7 @@ Public Attributes</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
+<p>Length (m) of the step taken while approaching a detected host (<span class="tt">host_seeking.approach_step_m</span>). </p>
 
 </div>
 </div>
@@ -151,6 +154,7 @@ Public Attributes</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
+<p>Detection radius (m) within which the engine's host-seeking kernel can see a host cell (<span class="tt">host_seeking.detect_range_m</span>). A different concept from the per-species attraction-field radius species.&lt;name&gt;.host_seeking_radius_m. </p>
 
 </div>
 </div>
@@ -165,6 +169,7 @@ Public Attributes</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
+<p>Additive term (dimensionless) added to a host cell's attraction in proportion to its indoor fraction (<span class="tt">host_seeking.indoor_attraction_add</span>). </p>
 
 </div>
 </div>
@@ -179,6 +184,7 @@ Public Attributes</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
+<p>Indoor fraction (in [0,1]) assigned to rural cells of the host landscape (<span class="tt">host_seeking.indoor_fraction_rural</span>). </p>
 
 </div>
 </div>
@@ -193,6 +199,7 @@ Public Attributes</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
+<p>Indoor fraction (in [0,1]) assigned to urban cells of the host landscape (<span class="tt">host_seeking.indoor_fraction_urban</span>). </p>
 
 </div>
 </div>
@@ -207,6 +214,7 @@ Public Attributes</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
+<p>Maximum number of days a female can go without feeding before she dies of starvation (<span class="tt">host_seeking.starvation_days</span>). </p>
 
 </div>
 </div>
@@ -221,6 +229,7 @@ Public Attributes</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
+<p>Additive term (dimensionless) scaling the attraction by the urbanicity of the cell (<span class="tt">host_seeking.urbanicity_add</span>). </p>
 
 </div>
 </div>

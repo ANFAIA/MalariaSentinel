@@ -152,10 +152,10 @@ Classes</h2></td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 id="header-enum-members" class="groupheader"><a id="enum-members" name="enum-members"></a>
 Enumerations</h2></td></tr>
-<tr class="memitem:a3c608e8fc7ef2799233e8a38fd593933" id="r_a3c608e8fc7ef2799233e8a38fd593933"><td class="memItemLeft">enum class &#160;</td><td class="memItemRight"><a class="el" href="#a3c608e8fc7ef2799233e8a38fd593933">SpeciesId</a> : std::size_t { <a class="el" href="#a3c608e8fc7ef2799233e8a38fd593933ab5a6fba23b57097812a0b032cc1ab57f">FUNESTUS</a> = 0
-, <a class="el" href="#a3c608e8fc7ef2799233e8a38fd593933aa25e570e9da9fe82eeaec979e3c1c747">GAMBIAE_SS</a>
-, <a class="el" href="#a3c608e8fc7ef2799233e8a38fd593933a1ea1b688a84388697c4269580cbee6de">COLUZZII</a>
-, <a class="el" href="#a3c608e8fc7ef2799233e8a38fd593933a70c4e8ac2b4f28614183191539f3f439">ARABIENSIS</a>
+<tr class="memitem:a3c608e8fc7ef2799233e8a38fd593933" id="r_a3c608e8fc7ef2799233e8a38fd593933"><td class="memItemLeft">enum class &#160;</td><td class="memItemRight"><a class="el" href="#a3c608e8fc7ef2799233e8a38fd593933">SpeciesId</a> : std::size_t { <b>FUNESTUS</b> = 0
+, <b>GAMBIAE_SS</b>
+, <b>COLUZZII</b>
+, <b>ARABIENSIS</b>
  }</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 id="header-func-members" class="groupheader"><a id="func-members" name="func-members"></a>
@@ -195,11 +195,13 @@ Functions</h2></td></tr>
 <tr class="memitem:a1bf1acd270a278adb2f0546119f552a1" id="r_a1bf1acd270a278adb2f0546119f552a1"><td class="memItemLeft">std::array&lt; float, kNumZoneId &gt;&#160;</td><td class="memItemRight"><a class="el" href="#a1bf1acd270a278adb2f0546119f552a1">default_species_weights</a> ()</td></tr>
 <tr class="memitem:a17e345a6136f60f0775bab188bc71502" id="r_a17e345a6136f60f0775bab188bc71502"><td class="memItemLeft">float&#160;</td><td class="memItemRight"><a class="el" href="#a17e345a6136f60f0775bab188bc71502">species_accuracy</a> (const std::array&lt; float, kNumZoneId &gt; &amp;h, const std::array&lt; float, kNumZoneId &gt; &amp;w, float z_pluvial)</td></tr>
 <tr class="memitem:ad6d865e8c8e9ea2d348ecc9078591faa" id="r_ad6d865e8c8e9ea2d348ecc9078591faa"><td class="memItemLeft">double&#160;</td><td class="memItemRight"><a class="el" href="#ad6d865e8c8e9ea2d348ecc9078591faa">k_habitat</a> (double s, double cell_area_km2)</td></tr>
-<tr class="memitem:a13f62f4fe641870d6f8cf0894760c6de" id="r_a13f62f4fe641870d6f8cf0894760c6de"><td class="memItemLeft">double&#160;</td><td class="memItemRight"><a class="el" href="#a13f62f4fe641870d6f8cf0894760c6de">cell_area_km2</a> (double lat_deg, double cell_size_m)</td></tr>
-<tr class="memdesc:a13f62f4fe641870d6f8cf0894760c6de"><td class="mdescLeft">&#160;</td><td class="mdescRight">Approximate cell area (km²) at a given latitude and edge cell size (m).  <br /></td></tr>
+<tr class="memitem:a13f62f4fe641870d6f8cf0894760c6de" id="r_a13f62f4fe641870d6f8cf0894760c6de"><td class="memItemLeft"><a id="a13f62f4fe641870d6f8cf0894760c6de" name="a13f62f4fe641870d6f8cf0894760c6de"></a>
+double&#160;</td><td class="memItemRight"><b>cell_area_km2</b> (double lat_deg, double cell_size_m)</td></tr>
+<tr class="memdesc:a13f62f4fe641870d6f8cf0894760c6de"><td class="mdescLeft">&#160;</td><td class="mdescRight">Approximate cell area (km²) at a given latitude and edge cell size (m). <br /></td></tr>
 <tr class="memitem:a89f39f2617cbe4d8f45bf625733603a4" id="r_a89f39f2617cbe4d8f45bf625733603a4"><td class="memItemLeft">const <a class="el" href="structmal__abm__fast_1_1_model_config.html">ModelConfig</a> &amp;&#160;</td><td class="memItemRight"><a class="el" href="#a89f39f2617cbe4d8f45bf625733603a4">load_config</a> ()</td></tr>
-<tr class="memitem:a45e0c7cbb15c154d5a997c9f80a604d9" id="r_a45e0c7cbb15c154d5a997c9f80a604d9"><td class="memItemLeft"><a class="el" href="structmal__abm__fast_1_1_model_config.html">ModelConfig</a>&#160;</td><td class="memItemRight"><a class="el" href="#a45e0c7cbb15c154d5a997c9f80a604d9">parse_config_file</a> (const std::string &amp;path)</td></tr>
-<tr class="memdesc:a45e0c7cbb15c154d5a997c9f80a604d9"><td class="mdescLeft">&#160;</td><td class="mdescRight">Explicit parse of a given path (tests / config_dump tool).  <br /></td></tr>
+<tr class="memitem:a45e0c7cbb15c154d5a997c9f80a604d9" id="r_a45e0c7cbb15c154d5a997c9f80a604d9"><td class="memItemLeft"><a id="a45e0c7cbb15c154d5a997c9f80a604d9" name="a45e0c7cbb15c154d5a997c9f80a604d9"></a>
+<a class="el" href="structmal__abm__fast_1_1_model_config.html">ModelConfig</a>&#160;</td><td class="memItemRight"><b>parse_config_file</b> (const std::string &amp;path)</td></tr>
+<tr class="memdesc:a45e0c7cbb15c154d5a997c9f80a604d9"><td class="mdescLeft">&#160;</td><td class="mdescRight">Explicit parse of a given path (tests / config_dump tool). <br /></td></tr>
 <tr class="memitem:a39657146eee2698ec67432cda37bc889" id="r_a39657146eee2698ec67432cda37bc889"><td class="memItemLeft">std::string&#160;</td><td class="memItemRight"><a class="el" href="#a39657146eee2698ec67432cda37bc889">resolve_config_path</a> ()</td></tr>
 <tr class="memitem:aff619e83cb8cd7cbbe276dec4011b38e" id="r_aff619e83cb8cd7cbbe276dec4011b38e"><td class="memItemLeft">std::optional&lt; ZoneId &gt;&#160;</td><td class="memItemRight"><a class="el" href="#aff619e83cb8cd7cbbe276dec4011b38e">zone_id_of_habitat</a> (const std::string &amp;name)</td></tr>
 <tr class="memitem:a52fcf6d6e5f08968ef9f9950dcf541ca" id="r_a52fcf6d6e5f08968ef9f9950dcf541ca"><td class="memItemLeft">float&#160;</td><td class="memItemRight"><a class="el" href="#a52fcf6d6e5f08968ef9f9950dcf541ca">habitat_activation_min</a> ()</td></tr>
@@ -214,21 +216,21 @@ Variables</h2></td></tr>
 <tr class="memitem:aba74f6881924dfcdfa459e8cea1705d8" id="r_aba74f6881924dfcdfa459e8cea1705d8"><td class="memItemLeft">constexpr double&#160;</td><td class="memItemRight"><a class="el" href="#aba74f6881924dfcdfa459e8cea1705d8">kPi</a> = 3.14159265358979323846</td></tr>
 </table>
 <a name="details" id="details"></a><h2 id="header-details" class="groupheader">Detailed Description</h2>
-<div class="textblock"><p>SPDX-License-Identifier: MIT <a class="el" href="wire_8hpp.html">wire.hpp</a> — single shared header for the C++ ABM engine (M-perf / mal-abm-fast).</p>
-<p>This is the canonical "data contract" header. Every module in mal-abm-fast includes <a class="el" href="wire_8hpp.html">wire.hpp</a> to pick up:</p><ul>
+<div class="textblock"><p>SPDX-License-Identifier: MIT <a class="el" href="wire_8hpp_source.html">wire.hpp</a> — single shared header for the C++ ABM engine (M-perf / mal-abm-fast).</p>
+<p>This is the canonical "data contract" header. Every module in mal-abm-fast includes <a class="el" href="wire_8hpp_source.html">wire.hpp</a> to pick up:</p><ul>
 <li>the model-constant accessors (EIP thresholds, dispersal kernel, birth rate, the no-data sentinel — all read from model_constants.yaml), the state-band names and the contract / generator version strings</li>
 <li>the shared value types (<a class="el" href="structmal__abm__fast_1_1_a_o_i.html">AOI</a>, <a class="el" href="structmal__abm__fast_1_1_habitat_patch.html">HabitatPatch</a>, <a class="el" href="structmal__abm__fast_1_1_patch_state.html">PatchState</a>, <a class="el" href="structmal__abm__fast_1_1_density_grid.html">DensityGrid</a>, <a class="el" href="structmal__abm__fast_1_1_suitability_grid.html">SuitabilityGrid</a>)</li>
 </ul>
 <p>Historical note: bit-for-bit parity with the retired Python Mesa-Geo engine was the constraining invariant until proxy_habitat_v1 removed the Python engine (plan docs/plans/in-process/redesign/01-retirada-*.md §9). Parity tests compare against the historical baseline outputs.</p>
-<p>The <a class="el" href="wire_8hpp.html">wire.hpp</a> header is header-only. The <a class="el" href="structmal__abm__fast_1_1_a_o_i.html#a93417dbb1c3b562ea9663ad0cfbaa3cb">AOI::cells_per_side()</a> method is defined in aoi.hpp (separately compiled into the library, although header-only is also viable).</p>
-<p>SPDX-License-Identifier: MIT <a class="el" href="output__contract_8hpp.html">output_contract.hpp</a> — 2-band state COG writer + sidecar JSON writer.</p>
-<p>The state COG is a 2-band GeoTIFF (band 1 = adult_patch_count, band 2 = adult_cell_count), tiled, deflate-compressed, 128x128 blocks, with <span class="tt">nodata = <a class="el" href="#a07dec5424ef30306ad1affdec5cedfb3">NODATA_SENTINEL()</a></span>. The band names are the single source of truth in <a class="el" href="wire_8hpp.html">wire.hpp</a> (STATE_BAND_NAMES); the values are raw per-cell adult counts — no capacity normalisation. The sidecar JSON is a small metadata file written next to the .tif (e.g. <span class="tt">ghana_regional_2024_06_seed0001.json</span> for the COG <span class="tt">ghana_regional_2024_06_seed0001.tif</span>).</p>
+<p>The <a class="el" href="wire_8hpp_source.html">wire.hpp</a> header is header-only. The <a class="el" href="structmal__abm__fast_1_1_a_o_i.html#a93417dbb1c3b562ea9663ad0cfbaa3cb">AOI::cells_per_side()</a> method is defined in aoi.hpp (separately compiled into the library, although header-only is also viable).</p>
+<p>SPDX-License-Identifier: MIT <a class="el" href="output__contract_8hpp_source.html">output_contract.hpp</a> — 2-band state COG writer + sidecar JSON writer.</p>
+<p>The state COG is a 2-band GeoTIFF (band 1 = adult_patch_count, band 2 = adult_cell_count), tiled, deflate-compressed, 128x128 blocks, with <span class="tt">nodata = <a class="el" href="#a07dec5424ef30306ad1affdec5cedfb3">NODATA_SENTINEL()</a></span>. The band names are the single source of truth in <a class="el" href="wire_8hpp_source.html">wire.hpp</a> (STATE_BAND_NAMES); the values are raw per-cell adult counts — no capacity normalisation. The sidecar JSON is a small metadata file written next to the .tif (e.g. <span class="tt">ghana_regional_2024_06_seed0001.json</span> for the COG <span class="tt">ghana_regional_2024_06_seed0001.tif</span>).</p>
 <p>The sidecar is the F1.e parity test's primary input — it lists <span class="tt">contract_version</span>, <span class="tt">generator_version</span>, <span class="tt">band_names</span>, <span class="tt">nodata</span>, etc. (the <span class="tt">k_max</span> key was retired with contract 4.0). Two engines producing the same state COG bytes for the same inputs must also produce byte-equal sidecars.</p>
-<p>SPDX-License-Identifier: MIT <a class="el" href="habitat__availability_8hpp.html">habitat_availability.hpp</a> — the single number (0..1) that determines whether mosquitoes CAN breed in a cell right now. Contract v3.0.</p>
+<p>SPDX-License-Identifier: MIT <a class="el" href="habitat__availability_8hpp_source.html">habitat_availability.hpp</a> — the single number (0..1) that determines whether mosquitoes CAN breed in a cell right now. Contract v3.0.</p>
 <p>habitat_potential : static per-cell amplitude, six habitat types update_z_step : one-day pluvial recursion (rain-driven) species_accuracy : daily accuracy, affinity × potential × availability k_habitat : absolute per-cell capacity in individual-equivalents</p>
 <p>Legacy foreword (plan 01 §7): what was removed is what didn't belong — the pool water balance in mm and its constants, the TWI gate, the urban mm floor, and the urban capacity clamp K_eff. Rain only enters the pluvial reservoir as a forcing; total water is not reconstructed.</p>
 <p>The urban persistent supply premise (user-fixed): leaks, seepage, drainage and human water storage support small dry-season breeding supply, represented by urban.beta_urban × lc_built (a proxy, not a measurement, not a forced depth).</p>
-<p>SPDX-License-Identifier: MIT <a class="el" href="habitat__engine_8hpp.html">habitat_engine.hpp</a> — candidate habitat patches reader (gpkg via OGR).</p>
+<p>SPDX-License-Identifier: MIT <a class="el" href="habitat__engine_8hpp_source.html">habitat_engine.hpp</a> — candidate habitat patches reader (gpkg via OGR).</p>
 <p>Contract v3.0: a single-layer OGR Point datasource; the loader reads</p><ul>
 <li>optional <span class="tt">hab_type</span> (string; accepted without filtering)</li>
 <li>optional <span class="tt"><a class="el" href="#aa2f843069aefb51165cd261a1cc2fc1c">habitat_potential</a></span> (float, [0,1]; default = full potential)</li>
@@ -236,7 +238,7 @@ Variables</h2></td></tr>
 <li>optional <span class="tt">row</span>, <span class="tt">col</span> (int32; pre-computed cell index)</li>
 <li>the Point geometry (lon, lat) Features below the habitat.candidate_min_engine floor are dropped.</li>
 </ul>
-<p>SPDX-License-Identifier: MIT <a class="el" href="coordinator_8hpp.html">coordinator.hpp</a> — Mesa-Geo half of the C++ ABM (the spatial layer).</p>
+<p>SPDX-License-Identifier: MIT <a class="el" href="coordinator_8hpp_source.html">coordinator.hpp</a> — Mesa-Geo half of the C++ ABM (the spatial layer).</p>
 <p>Contract v3.0 (proxy_habitat_v1): the coordinator owns</p><ul>
 <li>the <a class="el" href="structmal__abm__fast_1_1_a_o_i.html">AOI</a> (cell geometry + transform)</li>
 <li>the ClimateEngine (env NC reader: daily rainfall + air temperature, five static habitat planes)</li>
@@ -252,7 +254,7 @@ Variables</h2></td></tr>
 <li>density/suitability aggregation</li>
 <li>coordinator.write_state_cog(...)</li>
 </ol>
-<p>SPDX-License-Identifier: MIT <a class="el" href="config_8hpp.html">config.hpp</a> — single model-constants source for the C++ engine (plan constants-yaml §4). mal-core/config/model_constants.yaml is the ONLY source of shared py⇄C++ parameters. The loader:</p>
+<p>SPDX-License-Identifier: MIT <a class="el" href="config_8hpp_source.html">config.hpp</a> — single model-constants source for the C++ engine (plan constants-yaml §4). mal-core/config/model_constants.yaml is the ONLY source of shared py⇄C++ parameters. The loader:</p>
 <ul>
 <li>parses a PLAIN YAML SUBSET with a hand-written micro-parser (no yaml-cpp dependency; see config.cc SupportedSubsetData rules);</li>
 <li>fails LOUDLY: missing keys are reported as a COMPLETE list, unknown keys (typos) are an error, wrong types are an error, duplicate keys inside the file are an error;</li>
@@ -282,12 +284,6 @@ Variables</h2></td></tr>
 </table>
 </div><div class="memdoc">
 <p>&ndash; species affinities ----------------------------------------------------&mdash; Species affinity w[s, g]; each row sums to 1. Anchored on 1.0 × the plant list (order, habitat-preference context; plan 02 §8). </p>
-<table class="fieldtable">
-<tr><th colspan="2">Enumerator</th></tr><tr><td class="fieldname"><a id="a3c608e8fc7ef2799233e8a38fd593933ab5a6fba23b57097812a0b032cc1ab57f" name="a3c608e8fc7ef2799233e8a38fd593933ab5a6fba23b57097812a0b032cc1ab57f"></a>FUNESTUS&#160;</td><td class="fielddoc"></td></tr>
-<tr><td class="fieldname"><a id="a3c608e8fc7ef2799233e8a38fd593933aa25e570e9da9fe82eeaec979e3c1c747" name="a3c608e8fc7ef2799233e8a38fd593933aa25e570e9da9fe82eeaec979e3c1c747"></a>GAMBIAE_SS&#160;</td><td class="fielddoc"></td></tr>
-<tr><td class="fieldname"><a id="a3c608e8fc7ef2799233e8a38fd593933a1ea1b688a84388697c4269580cbee6de" name="a3c608e8fc7ef2799233e8a38fd593933a1ea1b688a84388697c4269580cbee6de"></a>COLUZZII&#160;</td><td class="fielddoc"></td></tr>
-<tr><td class="fieldname"><a id="a3c608e8fc7ef2799233e8a38fd593933a70c4e8ac2b4f28614183191539f3f439" name="a3c608e8fc7ef2799233e8a38fd593933a70c4e8ac2b4f28614183191539f3f439"></a>ARABIENSIS&#160;</td><td class="fielddoc"></td></tr>
-</table>
 
 </div>
 </div>
@@ -314,6 +310,7 @@ Variables</h2></td></tr>
   </tr>
 </table>
 </div><div class="memdoc">
+<p>Basal daily survival probability of adult mosquitoes (config key: <span class="tt">adults.daily_mort_basal</span>); the key name is historical — it holds a survival probability, not a mortality rate. </p>
 
 </div>
 </div>
@@ -339,6 +336,7 @@ Variables</h2></td></tr>
   </tr>
 </table>
 </div><div class="memdoc">
+<p>Radius at which the Gaussian adult dispersal step is clipped to a disc, in metres (config key: <span class="tt">dispersal.adult_max_m</span>). </p>
 
 </div>
 </div>
@@ -364,6 +362,7 @@ Variables</h2></td></tr>
   </tr>
 </table>
 </div><div class="memdoc">
+<p>Daily probability that an adult mosquito disperses, in 1/day (config key: <span class="tt">dispersal.adult_prob_day</span>). </p>
 
 </div>
 </div>
@@ -389,6 +388,7 @@ Variables</h2></td></tr>
   </tr>
 </table>
 </div><div class="memdoc">
+<p>Standard deviation of the isotropic Gaussian adult dispersal step, in metres (config key: <span class="tt">dispersal.adult_sigma_m</span>). </p>
 
 </div>
 </div>
@@ -414,6 +414,7 @@ Variables</h2></td></tr>
   </tr>
 </table>
 </div><div class="memdoc">
+<p>Upper clamp applied to the computed daily adult survival probability, a fraction in [0,1] (config key: <span class="tt">adults.mort_cap</span>). </p>
 
 </div>
 </div>
@@ -439,6 +440,7 @@ Variables</h2></td></tr>
   </tr>
 </table>
 </div><div class="memdoc">
+<p>Lower clamp applied to the computed daily adult survival probability, a fraction in [0,1] (config key: <span class="tt">adults.mort_floor</span>). </p>
 
 </div>
 </div>
@@ -464,6 +466,7 @@ Variables</h2></td></tr>
   </tr>
 </table>
 </div><div class="memdoc">
+<p>Centre of the Gaussian thermal survival curve of adults, in degrees Celsius (config key: <span class="tt">adults.opt_c</span>). </p>
 
 </div>
 </div>
@@ -489,37 +492,7 @@ Variables</h2></td></tr>
   </tr>
 </table>
 </div><div class="memdoc">
-
-</div>
-</div>
-<a id="a13f62f4fe641870d6f8cf0894760c6de" name="a13f62f4fe641870d6f8cf0894760c6de"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a13f62f4fe641870d6f8cf0894760c6de">&#9670;&#160;</a></span>cell_area_km2()</h2>
-
-<div class="memitem">
-<div class="memproto">
-<table class="mlabels">
-  <tr>
-  <td class="mlabels-left">
-      <table class="memname">
-        <tr>
-          <td class="memname">double mal_abm_fast::cell_area_km2 </td>
-          <td>(</td>
-          <td class="paramtype">double</td>          <td class="paramname"><span class="paramname"><em>lat_deg</em></span>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">double</td>          <td class="paramname"><span class="paramname"><em>cell_size_m</em></span>&#160;)</td>
-        </tr>
-      </table>
-  </td>
-  <td class="mlabels-right">
-<span class="mlabels"><span class="mlabel inline">inline</span></span>  </td>
-  </tr>
-</table>
-</div><div class="memdoc">
-
-<p>Approximate cell area (km²) at a given latitude and edge cell size (m). </p>
+<p>Width of the Gaussian thermal survival curve of adults, in degrees Celsius (config key: <span class="tt">adults.sigma_c</span>). </p>
 
 </div>
 </div>
@@ -545,6 +518,7 @@ Variables</h2></td></tr>
   </tr>
 </table>
 </div><div class="memdoc">
+<p>Version string of the state-COG + sidecar contract, written into the sidecar JSON so consumers can gate on it (config key: <span class="tt">contracts.cogs_state</span>). </p>
 
 </div>
 </div>
@@ -648,6 +622,7 @@ Variables</h2></td></tr>
   </tr>
 </table>
 </div><div class="memdoc">
+<p>Infectivity threshold of the extrinsic incubation period, in growing-degree days (config key: <span class="tt">eip.threshold_gd</span>); a mosquito is infective once its accumulated EIP progress reaches it. </p>
 
 </div>
 </div>
@@ -673,6 +648,7 @@ Variables</h2></td></tr>
   </tr>
 </table>
 </div><div class="memdoc">
+<p>Habitat-accuracy threshold S above which a cell counts as a live (activated) patch; reads habitat.activation_min_engine from the configuration singleton. </p>
 
 </div>
 </div>
@@ -698,6 +674,7 @@ Variables</h2></td></tr>
   </tr>
 </table>
 </div><div class="memdoc">
+<p>Habitat-potential floor a cell must clear to become a candidate patch; reads habitat.candidate_min_engine from the configuration singleton. </p>
 
 </div>
 </div>
@@ -775,6 +752,7 @@ Variables</h2></td></tr>
   </tr>
 </table>
 </div><div class="memdoc">
+<p>Maximum number of days a female may remain in the HOST_SEEKING state without finding a host before she is killed by starvation (config key: <span class="tt">host_seeking.starvation_days</span>). </p>
 
 </div>
 </div>
@@ -830,6 +808,7 @@ Variables</h2></td></tr>
   </tr>
 </table>
 </div><div class="memdoc">
+<p>Mean Earth radius used by the geodesy helpers, in metres (config key: <span class="tt">geodesy.earth_radius_m</span>). </p>
 
 </div>
 </div>
@@ -855,6 +834,7 @@ Variables</h2></td></tr>
   </tr>
 </table>
 </div><div class="memdoc">
+<p>Metres covered by one degree of latitude, used to convert metric offsets into degrees (config key: <span class="tt">geodesy.metres_per_deg_lat</span>). </p>
 
 </div>
 </div>
@@ -880,6 +860,7 @@ Variables</h2></td></tr>
   </tr>
 </table>
 </div><div class="memdoc">
+<p>Competition coefficient of the Beverton-Holt larval density-dependence, dimensionless (config key: <span class="tt">aquatic_stages.larva_bh_alpha</span>). </p>
 
 </div>
 </div>
@@ -905,6 +886,7 @@ Variables</h2></td></tr>
   </tr>
 </table>
 </div><div class="memdoc">
+<p>Basal daily survival of larvae in the absence of density dependence, a fraction in [0,1] (config key: <span class="tt">aquatic_stages.larva_bh_s0</span>). </p>
 
 </div>
 </div>
@@ -948,6 +930,7 @@ Variables</h2></td></tr>
   </tr>
 </table>
 </div><div class="memdoc">
+<p>Value written into NoData pixels of the raster outputs (state COG, transmission GeoTIFF, env NC), in the units of the band (config key: <span class="tt">ingest.nodata_sentinel</span>). </p>
 
 </div>
 </div>
@@ -973,6 +956,7 @@ Variables</h2></td></tr>
   </tr>
 </table>
 </div><div class="memdoc">
+<p>E-folding length of the breeding-site attraction plume around a habitat patch, in metres (config key: <span class="tt">oviposition.scale_m</span>). </p>
 
 </div>
 </div>
@@ -998,25 +982,7 @@ Variables</h2></td></tr>
   </tr>
 </table>
 </div><div class="memdoc">
-
-</div>
-</div>
-<a id="a45e0c7cbb15c154d5a997c9f80a604d9" name="a45e0c7cbb15c154d5a997c9f80a604d9"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a45e0c7cbb15c154d5a997c9f80a604d9">&#9670;&#160;</a></span>parse_config_file()</h2>
-
-<div class="memitem">
-<div class="memproto">
-      <table class="memname">
-        <tr>
-          <td class="memname"><a class="el" href="structmal__abm__fast_1_1_model_config.html">ModelConfig</a> mal_abm_fast::parse_config_file </td>
-          <td>(</td>
-          <td class="paramtype">const std::string &amp;</td>          <td class="paramname"><span class="paramname"><em>path</em></span></td><td>)</td>
-          <td></td>
-        </tr>
-      </table>
-</div><div class="memdoc">
-
-<p>Explicit parse of a given path (tests / config_dump tool). </p>
+<p>Number of days a female may spend walking towards a breeding site before she gives up and returns to HOST_SEEKING without ovipositing (config key: <span class="tt">oviposition.timeout_days</span>). </p>
 
 </div>
 </div>
@@ -1095,6 +1061,7 @@ Variables</h2></td></tr>
   </tr>
 </table>
 </div><div class="memdoc">
+<p>Configuration key of a species: the name under which its affinity row lives in model_constants.yaml (<span class="tt">species.&lt;name&gt;.weights</span>). Returns "unknown" for an out-of-range id. </p>
 
 </div>
 </div>
@@ -1192,6 +1159,7 @@ Variables</h2></td></tr>
   </tr>
 </table>
 </div><div class="memdoc">
+<p>Duration of the windborne flight, in hours (config key: <span class="tt">dispersal.wind_flight_hours</span>). </p>
 
 </div>
 </div>
@@ -1217,6 +1185,7 @@ Variables</h2></td></tr>
   </tr>
 </table>
 </div><div class="memdoc">
+<p>Self-propelled flight speed added to the wind speed during the windborne flight, in m/s (config key: <span class="tt">dispersal.wind_self_speed_ms</span>). </p>
 
 </div>
 </div>
@@ -1242,6 +1211,7 @@ Variables</h2></td></tr>
   </tr>
 </table>
 </div><div class="memdoc">
+<p>Daily probability that a gravid female attempts a windborne migration, in 1/day (config key: <span class="tt">dispersal.wind_migration_prob</span>). </p>
 
 </div>
 </div>
@@ -1267,6 +1237,7 @@ Variables</h2></td></tr>
   </tr>
 </table>
 </div><div class="memdoc">
+<p>Probability that a mosquito survives the windborne flight, a fraction in [0,1] (config key: <span class="tt">dispersal.wind_survival</span>). </p>
 
 </div>
 </div>
@@ -1396,7 +1367,7 @@ Variables</h2></td></tr>
 <hr  />
  <h2 class="doxsection"><a class="anchor" id="autotoc_md5"></a>
 Inline method definitions</h2>
-<p><a class="el" href="structmal__abm__fast_1_1_a_o_i.html#a93417dbb1c3b562ea9663ad0cfbaa3cb">AOI::cells_per_side</a> — number of cells along the east-west axis (WIDTH). The full derivation lives here (rather than in aoi.hpp) so that every translation unit pulling in <a class="el" href="wire_8hpp.html">wire.hpp</a> sees the inline definition and the linker does not have to find a separate .cpp definition. aoi.hpp contains the related free function <span class="tt">cells_per_side_h</span> (H dimension).</p>
+<p><a class="el" href="structmal__abm__fast_1_1_a_o_i.html#a93417dbb1c3b562ea9663ad0cfbaa3cb">AOI::cells_per_side</a> — number of cells along the east-west axis (WIDTH). The full derivation lives here (rather than in aoi.hpp) so that every translation unit pulling in <a class="el" href="wire_8hpp_source.html">wire.hpp</a> sees the inline definition and the linker does not have to find a separate .cpp definition. aoi.hpp contains the related free function <span class="tt">cells_per_side_h</span> (H dimension).</p>
 <p>Parity with the Python reference (mal_commonlib.aoi.AOI.cells_per_side): m_per_deg_lat = π · R / 180 from geodesy.* (WGS84 mean Earth radius) width_m = (east - west) * m_per_deg_lat * cos(centroid_lat_rad) cells_per_side = ceil(width_m / resolution_m) (NOT lround — see parity note)</p>
 <p>F1.b parity note: Python's <span class="tt">mal_commonlib.aoi.AOI.cells_per_side</span> uses <span class="tt">math.ceil</span> (not <span class="tt">round</span>); we use <span class="tt">std::ceil</span> to match. For the Ghana regional <a class="el" href="structmal__abm__fast_1_1_a_o_i.html">AOI</a> both formulas agree; for AOIs near a cell boundary the rounding mode diverges. </p>
 
@@ -1444,6 +1415,7 @@ Inline method definitions</h2>
   </tr>
 </table>
 </div><div class="memdoc">
+<p>Band names of the state COG, indexed by band number minus one; written as the GDAL band descriptions of the output COG (contract 4.0). </p>
 
 </div>
 </div>
@@ -1466,6 +1438,7 @@ Inline method definitions</h2>
   </tr>
 </table>
 </div><div class="memdoc">
+<p>Band 2 of the state COG: raw per-cell count of adults at their current position (contract 4.0). </p>
 
 </div>
 </div>

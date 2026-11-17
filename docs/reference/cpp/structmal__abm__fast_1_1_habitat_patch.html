@@ -117,17 +117,27 @@ document.addEventListener('DOMContentLoaded',() => { initNavTree('structmal__abm
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 id="header-pub-attribs" class="groupheader"><a id="pub-attribs" name="pub-attribs"></a>
 Public Attributes</h2></td></tr>
-<tr class="memitem:ade08fd564e00618e3ef8b632a4c755ff" id="r_ade08fd564e00618e3ef8b632a4c755ff"><td class="memItemLeft">int64_t&#160;</td><td class="memItemRight"><a class="el" href="#ade08fd564e00618e3ef8b632a4c755ff">patch_id</a> = 0</td></tr>
-<tr class="memitem:aed8cec02fa4b29e921985a6a65d628b5" id="r_aed8cec02fa4b29e921985a6a65d628b5"><td class="memItemLeft">int32_t&#160;</td><td class="memItemRight"><a class="el" href="#aed8cec02fa4b29e921985a6a65d628b5">row</a> = 0</td></tr>
-<tr class="memitem:a66339bd41f60df28b37bb8f5e0f0fd6b" id="r_a66339bd41f60df28b37bb8f5e0f0fd6b"><td class="memItemLeft">int32_t&#160;</td><td class="memItemRight"><a class="el" href="#a66339bd41f60df28b37bb8f5e0f0fd6b">col</a> = 0</td></tr>
-<tr class="memitem:abbc50847d2ea1fd83a4aa8e6894fb7e8" id="r_abbc50847d2ea1fd83a4aa8e6894fb7e8"><td class="memItemLeft">float&#160;</td><td class="memItemRight"><a class="el" href="#abbc50847d2ea1fd83a4aa8e6894fb7e8">potential</a> = 0.0f</td></tr>
-<tr class="memdesc:abbc50847d2ea1fd83a4aa8e6894fb7e8"><td class="mdescLeft">&#160;</td><td class="mdescRight">H_total in [0, 1].  <br /></td></tr>
-<tr class="memitem:ab816819f7e720f5301b6484b4c8bf87d" id="r_ab816819f7e720f5301b6484b4c8bf87d"><td class="memItemLeft">double&#160;</td><td class="memItemRight"><a class="el" href="#ab816819f7e720f5301b6484b4c8bf87d">lon</a> = 0.0</td></tr>
-<tr class="memdesc:ab816819f7e720f5301b6484b4c8bf87d"><td class="mdescLeft">&#160;</td><td class="mdescRight">EPSG:4326 deg.  <br /></td></tr>
-<tr class="memitem:ad9d2f1e5c668fccf376c1393dfdfed71" id="r_ad9d2f1e5c668fccf376c1393dfdfed71"><td class="memItemLeft">double&#160;</td><td class="memItemRight"><a class="el" href="#ad9d2f1e5c668fccf376c1393dfdfed71">lat</a> = 0.0</td></tr>
-<tr class="memdesc:ad9d2f1e5c668fccf376c1393dfdfed71"><td class="mdescLeft">&#160;</td><td class="mdescRight">EPSG:4326 deg.  <br /></td></tr>
-<tr class="memitem:a6301e60d0b75016b2e5ba585c2b59068" id="r_a6301e60d0b75016b2e5ba585c2b59068"><td class="memItemLeft">int&#160;</td><td class="memItemRight"><a class="el" href="#a6301e60d0b75016b2e5ba585c2b59068">dynamics</a> = 0</td></tr>
-<tr class="memdesc:a6301e60d0b75016b2e5ba585c2b59068"><td class="mdescLeft">&#160;</td><td class="mdescRight">0 = persistent offer, 1 = pluvial offer  <br /></td></tr>
+<tr class="memitem:ade08fd564e00618e3ef8b632a4c755ff" id="r_ade08fd564e00618e3ef8b632a4c755ff"><td class="memItemLeft"><a id="ade08fd564e00618e3ef8b632a4c755ff" name="ade08fd564e00618e3ef8b632a4c755ff"></a>
+int64_t&#160;</td><td class="memItemRight"><b>patch_id</b> = 0</td></tr>
+<tr class="memdesc:ade08fd564e00618e3ef8b632a4c755ff"><td class="mdescLeft">&#160;</td><td class="mdescRight">Runtime-assigned row-major index of the patch. <br /></td></tr>
+<tr class="memitem:aed8cec02fa4b29e921985a6a65d628b5" id="r_aed8cec02fa4b29e921985a6a65d628b5"><td class="memItemLeft"><a id="aed8cec02fa4b29e921985a6a65d628b5" name="aed8cec02fa4b29e921985a6a65d628b5"></a>
+int32_t&#160;</td><td class="memItemRight"><b>row</b> = 0</td></tr>
+<tr class="memdesc:aed8cec02fa4b29e921985a6a65d628b5"><td class="mdescLeft">&#160;</td><td class="mdescRight">Grid row index of the patch cell. <br /></td></tr>
+<tr class="memitem:a66339bd41f60df28b37bb8f5e0f0fd6b" id="r_a66339bd41f60df28b37bb8f5e0f0fd6b"><td class="memItemLeft"><a id="a66339bd41f60df28b37bb8f5e0f0fd6b" name="a66339bd41f60df28b37bb8f5e0f0fd6b"></a>
+int32_t&#160;</td><td class="memItemRight"><b>col</b> = 0</td></tr>
+<tr class="memdesc:a66339bd41f60df28b37bb8f5e0f0fd6b"><td class="mdescLeft">&#160;</td><td class="mdescRight">Grid column index of the patch cell. <br /></td></tr>
+<tr class="memitem:abbc50847d2ea1fd83a4aa8e6894fb7e8" id="r_abbc50847d2ea1fd83a4aa8e6894fb7e8"><td class="memItemLeft"><a id="abbc50847d2ea1fd83a4aa8e6894fb7e8" name="abbc50847d2ea1fd83a4aa8e6894fb7e8"></a>
+float&#160;</td><td class="memItemRight"><b>potential</b> = 0.0f</td></tr>
+<tr class="memdesc:abbc50847d2ea1fd83a4aa8e6894fb7e8"><td class="mdescLeft">&#160;</td><td class="mdescRight">H_total in [0, 1]. <br /></td></tr>
+<tr class="memitem:ab816819f7e720f5301b6484b4c8bf87d" id="r_ab816819f7e720f5301b6484b4c8bf87d"><td class="memItemLeft"><a id="ab816819f7e720f5301b6484b4c8bf87d" name="ab816819f7e720f5301b6484b4c8bf87d"></a>
+double&#160;</td><td class="memItemRight"><b>lon</b> = 0.0</td></tr>
+<tr class="memdesc:ab816819f7e720f5301b6484b4c8bf87d"><td class="mdescLeft">&#160;</td><td class="mdescRight">EPSG:4326 deg. <br /></td></tr>
+<tr class="memitem:ad9d2f1e5c668fccf376c1393dfdfed71" id="r_ad9d2f1e5c668fccf376c1393dfdfed71"><td class="memItemLeft"><a id="ad9d2f1e5c668fccf376c1393dfdfed71" name="ad9d2f1e5c668fccf376c1393dfdfed71"></a>
+double&#160;</td><td class="memItemRight"><b>lat</b> = 0.0</td></tr>
+<tr class="memdesc:ad9d2f1e5c668fccf376c1393dfdfed71"><td class="mdescLeft">&#160;</td><td class="mdescRight">EPSG:4326 deg. <br /></td></tr>
+<tr class="memitem:a6301e60d0b75016b2e5ba585c2b59068" id="r_a6301e60d0b75016b2e5ba585c2b59068"><td class="memItemLeft"><a id="a6301e60d0b75016b2e5ba585c2b59068" name="a6301e60d0b75016b2e5ba585c2b59068"></a>
+int&#160;</td><td class="memItemRight"><b>dynamics</b> = 0</td></tr>
+<tr class="memdesc:a6301e60d0b75016b2e5ba585c2b59068"><td class="mdescLeft">&#160;</td><td class="mdescRight">0 = persistent offer, 1 = pluvial offer <br /></td></tr>
 </table>
 <a name="details" id="details"></a><h2 id="header-details" class="groupheader">Detailed Description</h2>
 <div class="textblock"><p>A single habitat patch loaded from the gpkg. Carries the cell (row, col), the static potential amplitude (H total in [0, 1]) and the dominant habitat type's dynamics label. proxy_habitat_v1 contract (env.py):</p><ul>
@@ -135,114 +145,7 @@ Public Attributes</h2></td></tr>
 <li>potential — H_total = sum_g H[i,g] (attraction amplitude)</li>
 <li>hab_col_ — the six per-type H features are carried at the coordinator level (habitat_features struct), not here. </li>
 </ul>
-</div><a name="doc-variable-members" id="doc-variable-members"></a><h2 id="header-doc-variable-members" class="groupheader">Member Data Documentation</h2>
-<a id="a66339bd41f60df28b37bb8f5e0f0fd6b" name="a66339bd41f60df28b37bb8f5e0f0fd6b"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a66339bd41f60df28b37bb8f5e0f0fd6b">&#9670;&#160;</a></span>col</h2>
-
-<div class="memitem">
-<div class="memproto">
-      <table class="memname">
-        <tr>
-          <td class="memname">int32_t mal_abm_fast::HabitatPatch::col = 0</td>
-        </tr>
-      </table>
-</div><div class="memdoc">
-
-</div>
-</div>
-<a id="a6301e60d0b75016b2e5ba585c2b59068" name="a6301e60d0b75016b2e5ba585c2b59068"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a6301e60d0b75016b2e5ba585c2b59068">&#9670;&#160;</a></span>dynamics</h2>
-
-<div class="memitem">
-<div class="memproto">
-      <table class="memname">
-        <tr>
-          <td class="memname">int mal_abm_fast::HabitatPatch::dynamics = 0</td>
-        </tr>
-      </table>
-</div><div class="memdoc">
-
-<p>0 = persistent offer, 1 = pluvial offer </p>
-
-</div>
-</div>
-<a id="ad9d2f1e5c668fccf376c1393dfdfed71" name="ad9d2f1e5c668fccf376c1393dfdfed71"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#ad9d2f1e5c668fccf376c1393dfdfed71">&#9670;&#160;</a></span>lat</h2>
-
-<div class="memitem">
-<div class="memproto">
-      <table class="memname">
-        <tr>
-          <td class="memname">double mal_abm_fast::HabitatPatch::lat = 0.0</td>
-        </tr>
-      </table>
-</div><div class="memdoc">
-
-<p>EPSG:4326 deg. </p>
-
-</div>
-</div>
-<a id="ab816819f7e720f5301b6484b4c8bf87d" name="ab816819f7e720f5301b6484b4c8bf87d"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#ab816819f7e720f5301b6484b4c8bf87d">&#9670;&#160;</a></span>lon</h2>
-
-<div class="memitem">
-<div class="memproto">
-      <table class="memname">
-        <tr>
-          <td class="memname">double mal_abm_fast::HabitatPatch::lon = 0.0</td>
-        </tr>
-      </table>
-</div><div class="memdoc">
-
-<p>EPSG:4326 deg. </p>
-
-</div>
-</div>
-<a id="ade08fd564e00618e3ef8b632a4c755ff" name="ade08fd564e00618e3ef8b632a4c755ff"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#ade08fd564e00618e3ef8b632a4c755ff">&#9670;&#160;</a></span>patch_id</h2>
-
-<div class="memitem">
-<div class="memproto">
-      <table class="memname">
-        <tr>
-          <td class="memname">int64_t mal_abm_fast::HabitatPatch::patch_id = 0</td>
-        </tr>
-      </table>
-</div><div class="memdoc">
-
-</div>
-</div>
-<a id="abbc50847d2ea1fd83a4aa8e6894fb7e8" name="abbc50847d2ea1fd83a4aa8e6894fb7e8"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#abbc50847d2ea1fd83a4aa8e6894fb7e8">&#9670;&#160;</a></span>potential</h2>
-
-<div class="memitem">
-<div class="memproto">
-      <table class="memname">
-        <tr>
-          <td class="memname">float mal_abm_fast::HabitatPatch::potential = 0.0f</td>
-        </tr>
-      </table>
-</div><div class="memdoc">
-
-<p>H_total in [0, 1]. </p>
-
-</div>
-</div>
-<a id="aed8cec02fa4b29e921985a6a65d628b5" name="aed8cec02fa4b29e921985a6a65d628b5"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#aed8cec02fa4b29e921985a6a65d628b5">&#9670;&#160;</a></span>row</h2>
-
-<div class="memitem">
-<div class="memproto">
-      <table class="memname">
-        <tr>
-          <td class="memname">int32_t mal_abm_fast::HabitatPatch::row = 0</td>
-        </tr>
-      </table>
-</div><div class="memdoc">
-
-</div>
-</div>
-<hr/>The documentation for this struct was generated from the following file:<ul>
+</div><hr/>The documentation for this struct was generated from the following file:<ul>
 <li>mal-core/src/mal_core/abm/include/mal_abm_fast/<a class="el" href="wire_8hpp_source.html">wire.hpp</a></li>
 </ul>
 </div><!-- contents -->

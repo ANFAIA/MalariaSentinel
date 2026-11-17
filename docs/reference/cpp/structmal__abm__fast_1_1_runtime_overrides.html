@@ -117,59 +117,23 @@ document.addEventListener('DOMContentLoaded',() => { initNavTree('structmal__abm
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 id="header-pub-attribs" class="groupheader"><a id="pub-attribs" name="pub-attribs"></a>
 Public Attributes</h2></td></tr>
-<tr class="memitem:adbc436cc449953b94d955d4993b2be08" id="r_adbc436cc449953b94d955d4993b2be08"><td class="memItemLeft">float&#160;</td><td class="memItemRight"><a class="el" href="#adbc436cc449953b94d955d4993b2be08">disperse_prob</a> = static_cast&lt;float&gt;(<a class="el" href="namespacemal__abm__fast.html#a89f39f2617cbe4d8f45bf625733603a4">load_config</a>().dispersal.adult_prob_day)</td></tr>
-<tr class="memitem:a3a64cea1c1e24398bfd5bd0c264d9e12" id="r_a3a64cea1c1e24398bfd5bd0c264d9e12"><td class="memItemLeft">float&#160;</td><td class="memItemRight"><a class="el" href="#a3a64cea1c1e24398bfd5bd0c264d9e12">disperse_sigma_m</a> = static_cast&lt;float&gt;(<a class="el" href="namespacemal__abm__fast.html#a89f39f2617cbe4d8f45bf625733603a4">load_config</a>().dispersal.adult_sigma_m)</td></tr>
-<tr class="memitem:a1c9995d4b512298df6ae60352906f9d4" id="r_a1c9995d4b512298df6ae60352906f9d4"><td class="memItemLeft">float&#160;</td><td class="memItemRight"><a class="el" href="#a1c9995d4b512298df6ae60352906f9d4">disperse_max_m</a> = static_cast&lt;float&gt;(<a class="el" href="namespacemal__abm__fast.html#a89f39f2617cbe4d8f45bf625733603a4">load_config</a>().dispersal.adult_max_m)</td></tr>
+<tr class="memitem:adbc436cc449953b94d955d4993b2be08" id="r_adbc436cc449953b94d955d4993b2be08"><td class="memItemLeft"><a id="adbc436cc449953b94d955d4993b2be08" name="adbc436cc449953b94d955d4993b2be08"></a>
+float&#160;</td><td class="memItemRight"><b>disperse_prob</b> = static_cast&lt;float&gt;(<a class="el" href="namespacemal__abm__fast.html#a89f39f2617cbe4d8f45bf625733603a4">load_config</a>().dispersal.adult_prob_day)</td></tr>
+<tr class="memdesc:adbc436cc449953b94d955d4993b2be08"><td class="mdescLeft">&#160;</td><td class="mdescRight">Daily adult dispersal probability, in 1/day (overrides <span class="tt">dispersal.adult_prob_day</span>). <br /></td></tr>
+<tr class="memitem:a3a64cea1c1e24398bfd5bd0c264d9e12" id="r_a3a64cea1c1e24398bfd5bd0c264d9e12"><td class="memItemLeft"><a id="a3a64cea1c1e24398bfd5bd0c264d9e12" name="a3a64cea1c1e24398bfd5bd0c264d9e12"></a>
+float&#160;</td><td class="memItemRight"><b>disperse_sigma_m</b> = static_cast&lt;float&gt;(<a class="el" href="namespacemal__abm__fast.html#a89f39f2617cbe4d8f45bf625733603a4">load_config</a>().dispersal.adult_sigma_m)</td></tr>
+<tr class="memdesc:a3a64cea1c1e24398bfd5bd0c264d9e12"><td class="mdescLeft">&#160;</td><td class="mdescRight">Gaussian sigma of the dispersal step, in metres (overrides <span class="tt">dispersal.adult_sigma_m</span>). <br /></td></tr>
+<tr class="memitem:a1c9995d4b512298df6ae60352906f9d4" id="r_a1c9995d4b512298df6ae60352906f9d4"><td class="memItemLeft"><a id="a1c9995d4b512298df6ae60352906f9d4" name="a1c9995d4b512298df6ae60352906f9d4"></a>
+float&#160;</td><td class="memItemRight"><b>disperse_max_m</b> = static_cast&lt;float&gt;(<a class="el" href="namespacemal__abm__fast.html#a89f39f2617cbe4d8f45bf625733603a4">load_config</a>().dispersal.adult_max_m)</td></tr>
+<tr class="memdesc:a1c9995d4b512298df6ae60352906f9d4"><td class="mdescLeft">&#160;</td><td class="mdescRight">Clipping radius of the dispersal step, in metres (overrides <span class="tt">dispersal.adult_max_m</span>). <br /></td></tr>
 <tr class="memitem:a16dacd88b1e2a9e2294c9c11e746b8ac" id="r_a16dacd88b1e2a9e2294c9c11e746b8ac"><td class="memItemLeft">float&#160;</td><td class="memItemRight"><a class="el" href="#a16dacd88b1e2a9e2294c9c11e746b8ac">larva_bh_alpha</a> = static_cast&lt;float&gt;(<a class="el" href="namespacemal__abm__fast.html#a89f39f2617cbe4d8f45bf625733603a4">load_config</a>().aquatic_stages.larva_bh_alpha)</td></tr>
 </table>
 <a name="details" id="details"></a><h2 id="header-details" class="groupheader">Detailed Description</h2>
 <div class="textblock"><hr  />
  <h2 class="doxsection"><a class="anchor" id="autotoc_md1"></a>
 Constants — match mal_ghana_sim.abm defaults exactly (M1.5 thin slice).</h2>
-<p>K_MAX retired (plan 03-retirada-k-max): the larval capacity is the absolute per-cell K_ref × area_km2 × S computed by the coordinator (<a class="el" href="habitat__availability_8hpp.html">habitat_availability.hpp</a> k_habitat); initial populations are explicit adult/immature counts (SeedingConfig), and the state COG carries raw per-cell adult counts. No global adult-capacity constant exists anymore. EIP (extrinsic incubation period) growing-degree-day model. daily_gd = max(0, T - EIP_BASE_C) infective when eip_progress &gt;= EIP_THRESHOLD_GD Adult dispersal kernel: isotropic Gaussian in metres, clipped at dispersal.adult_max_m (probabilities and widths come from dispersal.*). Windborne long-range migration (M7.6 Phase 1). Parameters come from dispersal.wind_* in model_constants.yaml. Egg batch size is temperature-scaled at oviposition time via the EFD thermal modifier (birth_rate.hpp): the binomial draw of GonotrophicParams::egg_batch_n trials uses p = (egg_batch_mean / egg_batch_n) × birth_rate_modifier(T), with T the same per-patch temp_d that drives adult survival. Larva density-dependent mortality (Beverton-Holt): the daily survival probability of the patch's larvae is p = S0 * K / (K + alpha * N), with S0 and alpha read from model_constants.yaml (aquatic_stages.larva_bh_s0 / larva_bh_alpha) and N the summed larval instars of the patch. Runtime-configurable overrides for dispersal and larval parameters. Used by CLI to override <a class="el" href="wire_8hpp.html">wire.hpp</a> defaults for invasion simulations. </p>
+<p>K_MAX retired (plan 03-retirada-k-max): the larval capacity is the absolute per-cell K_ref × area_km2 × S computed by the coordinator (<a class="el" href="habitat__availability_8hpp_source.html">habitat_availability.hpp</a> k_habitat); initial populations are explicit adult/immature counts (SeedingConfig), and the state COG carries raw per-cell adult counts. No global adult-capacity constant exists anymore. EIP (extrinsic incubation period) growing-degree-day model. daily_gd = max(0, T - EIP_BASE_C) infective when eip_progress &gt;= EIP_THRESHOLD_GD Adult dispersal kernel: isotropic Gaussian in metres, clipped at dispersal.adult_max_m (probabilities and widths come from dispersal.*). Windborne long-range migration (M7.6 Phase 1). Parameters come from dispersal.wind_* in model_constants.yaml. Egg batch size is temperature-scaled at oviposition time via the EFD thermal modifier (birth_rate.hpp): the binomial draw of GonotrophicParams::egg_batch_n trials uses p = (egg_batch_mean / egg_batch_n) × birth_rate_modifier(T), with T the same per-patch temp_d that drives adult survival. Larva density-dependent mortality (Beverton-Holt): the daily survival probability of the patch's larvae is p = S0 * K / (K + alpha * N), with S0 and alpha read from model_constants.yaml (aquatic_stages.larva_bh_s0 / larva_bh_alpha) and N the summed larval instars of the patch. Runtime-configurable overrides for dispersal and larval parameters. Used by CLI to override <a class="el" href="wire_8hpp_source.html">wire.hpp</a> defaults for invasion simulations. </p>
 </div><a name="doc-variable-members" id="doc-variable-members"></a><h2 id="header-doc-variable-members" class="groupheader">Member Data Documentation</h2>
-<a id="a1c9995d4b512298df6ae60352906f9d4" name="a1c9995d4b512298df6ae60352906f9d4"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a1c9995d4b512298df6ae60352906f9d4">&#9670;&#160;</a></span>disperse_max_m</h2>
-
-<div class="memitem">
-<div class="memproto">
-      <table class="memname">
-        <tr>
-          <td class="memname">float mal_abm_fast::RuntimeOverrides::disperse_max_m = static_cast&lt;float&gt;(<a class="el" href="namespacemal__abm__fast.html#a89f39f2617cbe4d8f45bf625733603a4">load_config</a>().dispersal.adult_max_m)</td>
-        </tr>
-      </table>
-</div><div class="memdoc">
-
-</div>
-</div>
-<a id="adbc436cc449953b94d955d4993b2be08" name="adbc436cc449953b94d955d4993b2be08"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#adbc436cc449953b94d955d4993b2be08">&#9670;&#160;</a></span>disperse_prob</h2>
-
-<div class="memitem">
-<div class="memproto">
-      <table class="memname">
-        <tr>
-          <td class="memname">float mal_abm_fast::RuntimeOverrides::disperse_prob = static_cast&lt;float&gt;(<a class="el" href="namespacemal__abm__fast.html#a89f39f2617cbe4d8f45bf625733603a4">load_config</a>().dispersal.adult_prob_day)</td>
-        </tr>
-      </table>
-</div><div class="memdoc">
-
-</div>
-</div>
-<a id="a3a64cea1c1e24398bfd5bd0c264d9e12" name="a3a64cea1c1e24398bfd5bd0c264d9e12"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a3a64cea1c1e24398bfd5bd0c264d9e12">&#9670;&#160;</a></span>disperse_sigma_m</h2>
-
-<div class="memitem">
-<div class="memproto">
-      <table class="memname">
-        <tr>
-          <td class="memname">float mal_abm_fast::RuntimeOverrides::disperse_sigma_m = static_cast&lt;float&gt;(<a class="el" href="namespacemal__abm__fast.html#a89f39f2617cbe4d8f45bf625733603a4">load_config</a>().dispersal.adult_sigma_m)</td>
-        </tr>
-      </table>
-</div><div class="memdoc">
-
-</div>
-</div>
 <a id="a16dacd88b1e2a9e2294c9c11e746b8ac" name="a16dacd88b1e2a9e2294c9c11e746b8ac"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#a16dacd88b1e2a9e2294c9c11e746b8ac">&#9670;&#160;</a></span>larva_bh_alpha</h2>
 
@@ -181,6 +145,7 @@ Constants — match mal_ghana_sim.abm defaults exactly (M1.5 thin slice).</h2>
         </tr>
       </table>
 </div><div class="memdoc">
+<p>Beverton-Holt larval competition coefficient, dimensionless (overrides <span class="tt">aquatic_stages.larva_bh_alpha</span>). </p>
 
 </div>
 </div>

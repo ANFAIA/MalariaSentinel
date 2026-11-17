@@ -1,7 +1,6 @@
 var classmal__abm__fast_1_1_coordinator_model =
 [
     [ "JetView", "structmal__abm__fast_1_1_coordinator_model_1_1_jet_view.html", "structmal__abm__fast_1_1_coordinator_model_1_1_jet_view" ],
-    [ "CoordinatorModel", "classmal__abm__fast_1_1_coordinator_model.html#ab1fc504f23c6ff28f3456bf509d3455a", null ],
     [ "CoordinatorModel", "classmal__abm__fast_1_1_coordinator_model.html#a3185dde8caecb568ba6067a4da8e4a3e", null ],
     [ "activate_patches", "classmal__abm__fast_1_1_coordinator_model.html#a9f85265e4ad94a76ab1bbb6755085cfd", null ],
     [ "aggregate_density", "classmal__abm__fast_1_1_coordinator_model.html#a52f6f7288a6f5909fc7bfdda747e5745", null ],

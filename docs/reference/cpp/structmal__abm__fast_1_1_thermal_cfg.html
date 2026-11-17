@@ -131,7 +131,9 @@ Public Attributes</h2></td></tr>
 <tr class="memitem:ae3a299534aabf8df0eb667cf35c8c9a0" id="r_ae3a299534aabf8df0eb667cf35c8c9a0"><td class="memItemLeft">double&#160;</td><td class="memItemRight"><a class="el" href="#ae3a299534aabf8df0eb667cf35c8c9a0">pupa_development_tmax_c</a> = 0.0</td></tr>
 <tr class="memitem:ad9146dd167d8e0d08bfbc430aad9b8e8" id="r_ad9146dd167d8e0d08bfbc430aad9b8e8"><td class="memItemLeft">double&#160;</td><td class="memItemRight"><a class="el" href="#ad9146dd167d8e0d08bfbc430aad9b8e8">pupa_development_scale</a> = 0.0</td></tr>
 </table>
-<a name="doc-variable-members" id="doc-variable-members"></a><h2 id="header-doc-variable-members" class="groupheader">Member Data Documentation</h2>
+<a name="details" id="details"></a><h2 id="header-details" class="groupheader">Detailed Description</h2>
+<div class="textblock"><p>Thermal response curves: the aquatic development rates and the temperature-dependent egg production rate (<span class="tt">thermal:</span> section of model_constants.yaml). </p>
+</div><a name="doc-variable-members" id="doc-variable-members"></a><h2 id="header-doc-variable-members" class="groupheader">Member Data Documentation</h2>
 <a id="ade93c52c4c5340370283002aca80d2e6" name="ade93c52c4c5340370283002aca80d2e6"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#ade93c52c4c5340370283002aca80d2e6">&#9670;&#160;</a></span>efd_max_eggs_per_day</h2>
 
@@ -143,6 +145,7 @@ Public Attributes</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
+<p>Peak of the egg-production-rate curve (eggs per female per day), reached at efd_topt_c (<span class="tt">thermal.efd_max_eggs_per_day</span>). </p>
 
 </div>
 </div>
@@ -157,6 +160,7 @@ Public Attributes</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
+<p>Upper temperature threshold (°C) of the egg-production curve, where the rate falls to zero (<span class="tt">thermal.efd_tmax_c</span>). </p>
 
 </div>
 </div>
@@ -171,6 +175,7 @@ Public Attributes</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
+<p>Lower temperature threshold (°C) of the egg-production curve, where the rate falls to zero (<span class="tt">thermal.efd_tmin_c</span>). </p>
 
 </div>
 </div>
@@ -185,6 +190,7 @@ Public Attributes</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
+<p>Temperature (°C) at which the egg-production curve is maximal; used to normalise the birth-rate modifier to 1 (<span class="tt">thermal.efd_topt_c</span>). </p>
 
 </div>
 </div>
@@ -199,6 +205,7 @@ Public Attributes</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
+<p>Scale coefficient a of the Brière-1 egg-development rate a * T * (T - T_L) * sqrt(T_H - T) (<span class="tt">thermal.egg_development_scale</span>). </p>
 
 </div>
 </div>
@@ -213,6 +220,7 @@ Public Attributes</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
+<p>Upper threshold (°C) of the Brière-1 egg-development curve, above which eggs do not develop (<span class="tt">thermal.egg_development_tmax_c</span>). </p>
 
 </div>
 </div>
@@ -227,6 +235,7 @@ Public Attributes</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
+<p>Lower threshold (°C) of the Brière-1 egg-development curve, below which eggs do not develop (<span class="tt">thermal.egg_development_tmin_c</span>). </p>
 
 </div>
 </div>
@@ -241,6 +250,7 @@ Public Attributes</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
+<p>Scale coefficient a of the quadratic larval-development rate a * (T - T_L) * (T_H - T) (<span class="tt">thermal.larva_development_scale</span>). </p>
 
 </div>
 </div>
@@ -255,6 +265,7 @@ Public Attributes</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
+<p>Upper threshold (°C) of the quadratic larval-development curve, above which larvae do not develop (<span class="tt">thermal.larva_development_tmax_c</span>). </p>
 
 </div>
 </div>
@@ -269,6 +280,7 @@ Public Attributes</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
+<p>Lower threshold (°C) of the quadratic larval-development curve, below which larvae do not develop (<span class="tt">thermal.larva_development_tmin_c</span>). </p>
 
 </div>
 </div>
@@ -283,6 +295,7 @@ Public Attributes</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
+<p>Scale coefficient a of the Brière-1 pupal-development rate a * T * (T - T_L) * sqrt(T_H - T) (<span class="tt">thermal.pupa_development_scale</span>). </p>
 
 </div>
 </div>
@@ -297,6 +310,7 @@ Public Attributes</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
+<p>Upper threshold (°C) of the Brière-1 pupal-development curve, above which pupae do not develop (<span class="tt">thermal.pupa_development_tmax_c</span>). </p>
 
 </div>
 </div>
@@ -311,6 +325,7 @@ Public Attributes</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
+<p>Lower threshold (°C) of the Brière-1 pupal-development curve, below which pupae do not develop (<span class="tt">thermal.pupa_development_tmin_c</span>). </p>
 
 </div>
 </div>

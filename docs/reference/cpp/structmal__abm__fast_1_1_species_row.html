@@ -121,15 +121,18 @@ Public Attributes</h2></td></tr>
 <tr class="memitem:a371dfb1ca77a3583bf8066d70f0e32eb" id="r_a371dfb1ca77a3583bf8066d70f0e32eb"><td class="memItemLeft">std::array&lt; double, kNumZoneId &gt;&#160;</td><td class="memItemRight"><a class="el" href="#a371dfb1ca77a3583bf8066d70f0e32eb">weights</a> {}</td></tr>
 <tr class="memitem:afb88703706b025ece13af09239594959" id="r_afb88703706b025ece13af09239594959"><td class="memItemLeft">std::array&lt; double, 4 &gt;&#160;</td><td class="memItemRight"><a class="el" href="#afb88703706b025ece13af09239594959">activity_weights</a> {}</td></tr>
 <tr class="memdesc:afb88703706b025ece13af09239594959"><td class="mdescLeft">&#160;</td><td class="mdescRight">v2 extension (plan v2 §1): behavioural physiological block.  <br /></td></tr>
-<tr class="memitem:ae673610eba412ce33296fb01dec752e7" id="r_ae673610eba412ce33296fb01dec752e7"><td class="memItemLeft">std::array&lt; double, 5 &gt;&#160;</td><td class="memItemRight"><a class="el" href="#ae673610eba412ce33296fb01dec752e7">pref</a> {}</td></tr>
-<tr class="memdesc:ae673610eba412ce33296fb01dec752e7"><td class="mdescLeft">&#160;</td><td class="mdescRight">HostType order (human, cattle,.  <br /></td></tr>
+<tr class="memitem:ae673610eba412ce33296fb01dec752e7" id="r_ae673610eba412ce33296fb01dec752e7"><td class="memItemLeft"><a id="ae673610eba412ce33296fb01dec752e7" name="ae673610eba412ce33296fb01dec752e7"></a>
+std::array&lt; double, 5 &gt;&#160;</td><td class="memItemRight"><b>pref</b> {}</td></tr>
+<tr class="memdesc:ae673610eba412ce33296fb01dec752e7"><td class="mdescLeft">&#160;</td><td class="mdescRight">HostType order (human, cattle,. <br /></td></tr>
 <tr class="memitem:a59d7111811fb54666434da6b778d7b53" id="r_a59d7111811fb54666434da6b778d7b53"><td class="memItemLeft">double&#160;</td><td class="memItemRight"><a class="el" href="#a59d7111811fb54666434da6b778d7b53">salinity_opt_ppt</a> = 0.0</td></tr>
 <tr class="memitem:a2eef3605e35c98d593c395744a34f022" id="r_a2eef3605e35c98d593c395744a34f022"><td class="memItemLeft">double&#160;</td><td class="memItemRight"><a class="el" href="#a2eef3605e35c98d593c395744a34f022">salinity_hi_tol_ppt</a> = 0.0</td></tr>
 <tr class="memitem:a1a333ca28749c4c23191ff59685fa4df" id="r_a1a333ca28749c4c23191ff59685fa4df"><td class="memItemLeft">double&#160;</td><td class="memItemRight"><a class="el" href="#a1a333ca28749c4c23191ff59685fa4df">salinity_slope</a> = 0.0</td></tr>
 <tr class="memitem:a828af6155142d3ce423aa8af64b82b9f" id="r_a828af6155142d3ce423aa8af64b82b9f"><td class="memItemLeft">double&#160;</td><td class="memItemRight"><a class="el" href="#a828af6155142d3ce423aa8af64b82b9f">host_seeking_scale_m</a> = 0.0</td></tr>
 <tr class="memitem:ab58e2ba8e69dc621d09475eaf96e93e9" id="r_ab58e2ba8e69dc621d09475eaf96e93e9"><td class="memItemLeft">double&#160;</td><td class="memItemRight"><a class="el" href="#ab58e2ba8e69dc621d09475eaf96e93e9">host_seeking_radius_m</a> = 0.0</td></tr>
 </table>
-<a name="doc-variable-members" id="doc-variable-members"></a><h2 id="header-doc-variable-members" class="groupheader">Member Data Documentation</h2>
+<a name="details" id="details"></a><h2 id="header-details" class="groupheader">Detailed Description</h2>
+<div class="textblock"><p>One species' row of the <span class="tt">species:</span> section: habitat affinities, daily activity, host preference and the tolerances that shape its range. </p>
+</div><a name="doc-variable-members" id="doc-variable-members"></a><h2 id="header-doc-variable-members" class="groupheader">Member Data Documentation</h2>
 <a id="afb88703706b025ece13af09239594959" name="afb88703706b025ece13af09239594959"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#afb88703706b025ece13af09239594959">&#9670;&#160;</a></span>activity_weights</h2>
 
@@ -158,6 +161,7 @@ Public Attributes</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
+<p>Radius (m) of the host-seeking attraction field: beyond it a host exerts no attraction at all (<span class="tt">species.&amp;lt;<a class="el" href="#a775beae87953bfc41c6b7ec665f4a76d">name</a>&amp;gt;.<a class="el" href="#ab58e2ba8e69dc621d09475eaf96e93e9">host_seeking_radius_m</a></span>). A different concept from host_seeking.detect_range_m, the engine's kernel detection radius. </p>
 
 </div>
 </div>
@@ -172,6 +176,7 @@ Public Attributes</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
+<p>Decay length (m) of the host-seeking attraction plume, i.e. how fast the attraction of a host falls off with distance (<span class="tt">species.&lt;<a class="el" href="#a775beae87953bfc41c6b7ec665f4a76d">name</a>&gt;.<a class="el" href="#a828af6155142d3ce423aa8af64b82b9f">host_seeking_scale_m</a></span>). </p>
 
 </div>
 </div>
@@ -186,22 +191,7 @@ Public Attributes</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
-
-</div>
-</div>
-<a id="ae673610eba412ce33296fb01dec752e7" name="ae673610eba412ce33296fb01dec752e7"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#ae673610eba412ce33296fb01dec752e7">&#9670;&#160;</a></span>pref</h2>
-
-<div class="memitem">
-<div class="memproto">
-      <table class="memname">
-        <tr>
-          <td class="memname">std::array&lt;double, 5&gt; mal_abm_fast::SpeciesRow::pref {}</td>
-        </tr>
-      </table>
-</div><div class="memdoc">
-
-<p>HostType order (human, cattle,. </p>
+<p>Species key as written in the YAML (the map key under <span class="tt">species:</span>); the canonical display name is resolved elsewhere. </p>
 
 </div>
 </div>
@@ -216,6 +206,7 @@ Public Attributes</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
+<p>Salinity (psu) above which the species cannot breed at all — the suitability multiplier is hard-capped to 0 there (<span class="tt">species.&lt;<a class="el" href="#a775beae87953bfc41c6b7ec665f4a76d">name</a>&gt;.<a class="el" href="#a2eef3605e35c98d593c395744a34f022">salinity_hi_tol_ppt</a></span>). </p>
 
 </div>
 </div>
@@ -230,6 +221,7 @@ Public Attributes</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
+<p>Salinity (psu) at which the species' breeding-suitability multiplier equals 1 (<span class="tt">species.&lt;<a class="el" href="#a775beae87953bfc41c6b7ec665f4a76d">name</a>&gt;.<a class="el" href="#a59d7111811fb54666434da6b778d7b53">salinity_opt_ppt</a></span>). </p>
 
 </div>
 </div>
@@ -244,6 +236,7 @@ Public Attributes</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
+<p>Rate (1/psu) at which the breeding-suitability multiplier decays as the salinity rises above the optimum (<span class="tt">species.&lt;<a class="el" href="#a775beae87953bfc41c6b7ec665f4a76d">name</a>&gt;.<a class="el" href="#a1a333ca28749c4c23191ff59685fa4df">salinity_slope</a></span>). </p>
 
 </div>
 </div>

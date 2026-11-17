@@ -125,7 +125,9 @@ Public Attributes</h2></td></tr>
 <tr class="memitem:ae9b945eac5fa7a9c44954853d8589cd0" id="r_ae9b945eac5fa7a9c44954853d8589cd0"><td class="memItemLeft">double&#160;</td><td class="memItemRight"><a class="el" href="#ae9b945eac5fa7a9c44954853d8589cd0">initial_human_prevalence</a> = 0.0</td></tr>
 <tr class="memitem:afb83275b57a13d51ea7370cc900b6057" id="r_afb83275b57a13d51ea7370cc900b6057"><td class="memItemLeft">double&#160;</td><td class="memItemRight"><a class="el" href="#afb83275b57a13d51ea7370cc900b6057">initial_vector_infected_frac</a> = 0.0</td></tr>
 </table>
-<a name="doc-variable-members" id="doc-variable-members"></a><h2 id="header-doc-variable-members" class="groupheader">Member Data Documentation</h2>
+<a name="details" id="details"></a><h2 id="header-details" class="groupheader">Detailed Description</h2>
+<div class="textblock"><p>Ross–Macdonald transmission parameters: the human SEI compartments and the two bite-rate terms (<span class="tt">transmission:</span> section of model_constants.yaml). </p>
+</div><a name="doc-variable-members" id="doc-variable-members"></a><h2 id="header-doc-variable-members" class="groupheader">Member Data Documentation</h2>
 <a id="a589e069bcc6479cb739d74d56d1b61a4" name="a589e069bcc6479cb739d74d56d1b61a4"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#a589e069bcc6479cb739d74d56d1b61a4">&#9670;&#160;</a></span>beta_hv</h2>
 
@@ -137,6 +139,7 @@ Public Attributes</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
+<p>Probability that an infectious human infects a vector per blood meal (<span class="tt">transmission.beta_hv</span>). </p>
 
 </div>
 </div>
@@ -151,6 +154,7 @@ Public Attributes</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
+<p>Probability that an infectious vector infects a human per blood meal (<span class="tt">transmission.beta_vh</span>). </p>
 
 </div>
 </div>
@@ -165,6 +169,7 @@ Public Attributes</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
+<p>Length (days) of immunity after recovery; consulted only when immunity is enabled for the run (<span class="tt">transmission.human_immunity_days</span>). </p>
 
 </div>
 </div>
@@ -179,6 +184,7 @@ Public Attributes</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
+<p>Length (days) of the human incubation period, from infection to infectiousness (<span class="tt">transmission.human_incubation_days</span>). </p>
 
 </div>
 </div>
@@ -193,6 +199,7 @@ Public Attributes</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
+<p>Length (days) a human remains infectious before recovering or entering the immune state (<span class="tt">transmission.human_infectious_days</span>). </p>
 
 </div>
 </div>
@@ -207,6 +214,7 @@ Public Attributes</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
+<p>Initial fraction of the human population placed in the infectious state by the legacy uniform-initialisation mode (<span class="tt">transmission.initial_human_prevalence</span>). </p>
 
 </div>
 </div>
@@ -221,6 +229,7 @@ Public Attributes</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
+<p>Initial fraction of adult females placed in the infectious state (<span class="tt">transmission.initial_vector_infected_frac</span>). </p>
 
 </div>
 </div>

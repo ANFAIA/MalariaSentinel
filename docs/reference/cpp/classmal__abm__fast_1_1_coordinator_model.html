@@ -121,7 +121,6 @@ Classes</h2></td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 id="header-pub-methods" class="groupheader"><a id="pub-methods" name="pub-methods"></a>
 Public Member Functions</h2></td></tr>
-<tr class="memitem:ab1fc504f23c6ff28f3456bf509d3455a" id="r_ab1fc504f23c6ff28f3456bf509d3455a"><td class="memItemLeft">&#160;</td><td class="memItemRight"><a class="el" href="#ab1fc504f23c6ff28f3456bf509d3455a">CoordinatorModel</a> ()=default</td></tr>
 <tr class="memitem:a3185dde8caecb568ba6067a4da8e4a3e" id="r_a3185dde8caecb568ba6067a4da8e4a3e"><td class="memItemLeft">&#160;</td><td class="memItemRight"><a class="el" href="#a3185dde8caecb568ba6067a4da8e4a3e">CoordinatorModel</a> (<a class="el" href="structmal__abm__fast_1_1_a_o_i.html">AOI</a> aoi, std::shared_ptr&lt; ClimateEngine &gt; climate, <a class="el" href="classmal__abm__fast_1_1_habitat_engine.html">HabitatEngine</a> habitat, int32_t seed, std::chrono::sys_days start_date)</td></tr>
 <tr class="memitem:a14a67d9344d6939f408b3b099873412f" id="r_a14a67d9344d6939f408b3b099873412f"><td class="memItemLeft">const <a class="el" href="structmal__abm__fast_1_1_a_o_i.html">AOI</a> &amp;&#160;</td><td class="memItemRight"><a class="el" href="#a14a67d9344d6939f408b3b099873412f">aoi</a> () const</td></tr>
 <tr class="memitem:a61562a0709446035509015757486556c" id="r_a61562a0709446035509015757486556c"><td class="memItemLeft">const ClimateEngine &amp;&#160;</td><td class="memItemRight"><a class="el" href="#a61562a0709446035509015757486556c">climate</a> () const</td></tr>
@@ -136,8 +135,9 @@ Public Member Functions</h2></td></tr>
 <tr class="memitem:a219f286b24997c9524fe18aaedf01ada" id="r_a219f286b24997c9524fe18aaedf01ada"><td class="memItemLeft">void&#160;</td><td class="memItemRight"><a class="el" href="#a219f286b24997c9524fe18aaedf01ada">set_salinity_hi_tol_ppt</a> (float ppt)</td></tr>
 <tr class="memitem:a7b9c22d23fd8cdb099fc053c309f82ef" id="r_a7b9c22d23fd8cdb099fc053c309f82ef"><td class="memItemLeft">void&#160;</td><td class="memItemRight"><a class="el" href="#a7b9c22d23fd8cdb099fc053c309f82ef">set_host_landscape</a> (const HostLandscape *hosts)</td></tr>
 <tr class="memitem:a257d0b7ca52aa8c0e03a4388d3d082a8" id="r_a257d0b7ca52aa8c0e03a4388d3d082a8"><td class="memItemLeft">float&#160;</td><td class="memItemRight"><a class="el" href="#a257d0b7ca52aa8c0e03a4388d3d082a8">salinity_hi_tol_ppt</a> () const</td></tr>
-<tr class="memitem:a9f85265e4ad94a76ab1bbb6755085cfd" id="r_a9f85265e4ad94a76ab1bbb6755085cfd"><td class="memItemLeft">void&#160;</td><td class="memItemRight"><a class="el" href="#a9f85265e4ad94a76ab1bbb6755085cfd">activate_patches</a> ()</td></tr>
-<tr class="memdesc:a9f85265e4ad94a76ab1bbb6755085cfd"><td class="mdescLeft">&#160;</td><td class="mdescRight">Legacy no-op kept for engine.step() API parity.  <br /></td></tr>
+<tr class="memitem:a9f85265e4ad94a76ab1bbb6755085cfd" id="r_a9f85265e4ad94a76ab1bbb6755085cfd"><td class="memItemLeft"><a id="a9f85265e4ad94a76ab1bbb6755085cfd" name="a9f85265e4ad94a76ab1bbb6755085cfd"></a>
+void&#160;</td><td class="memItemRight"><b>activate_patches</b> ()</td></tr>
+<tr class="memdesc:a9f85265e4ad94a76ab1bbb6755085cfd"><td class="mdescLeft">&#160;</td><td class="mdescRight">Legacy no-op kept for engine.step() API parity. <br /></td></tr>
 <tr class="memitem:a303b05f578cd9b78136a9761c4faa5f5" id="r_a303b05f578cd9b78136a9761c4faa5f5"><td class="memItemLeft">std::vector&lt; <a class="el" href="structmal__abm__fast_1_1_patch_state.html">PatchState</a> &gt;&#160;</td><td class="memItemRight"><a class="el" href="#a303b05f578cd9b78136a9761c4faa5f5">to_dataframe</a> ()</td></tr>
 <tr class="memitem:ac5d83ff604d8febd3c41806d5398719f" id="r_ac5d83ff604d8febd3c41806d5398719f"><td class="memItemLeft">std::vector&lt; SeedInstruction &gt;&#160;</td><td class="memItemRight"><a class="el" href="#ac5d83ff604d8febd3c41806d5398719f">build_seed_instructions</a> (const SeedingConfig &amp;config)</td></tr>
 <tr class="memitem:a333b17c0d06604e39d86837e7aca97e8" id="r_a333b17c0d06604e39d86837e7aca97e8"><td class="memItemLeft">std::vector&lt; SeedInstruction &gt;&#160;</td><td class="memItemRight"><a class="el" href="#a333b17c0d06604e39d86837e7aca97e8">build_uniform_seed_instructions</a> (int32_t n_adults, int32_t n_immatures)</td></tr>
@@ -145,37 +145,15 @@ Public Member Functions</h2></td></tr>
 <tr class="memitem:a3908c74ee7a1f64b98cd9c8f291b43a6" id="r_a3908c74ee7a1f64b98cd9c8f291b43a6"><td class="memItemLeft">const std::vector&lt; float &gt; &amp;&#160;</td><td class="memItemRight"><a class="el" href="#a3908c74ee7a1f64b98cd9c8f291b43a6">z_grid</a> () const</td></tr>
 <tr class="memitem:a52f6f7288a6f5909fc7bfdda747e5745" id="r_a52f6f7288a6f5909fc7bfdda747e5745"><td class="memItemLeft"><a class="el" href="structmal__abm__fast_1_1_density_grid.html">DensityGrid</a>&#160;</td><td class="memItemRight"><a class="el" href="#a52f6f7288a6f5909fc7bfdda747e5745">aggregate_density</a> (const MosquitoSubmodel &amp;sub) const</td></tr>
 <tr class="memitem:ae988f49162d76bccea008b7eb901c7af" id="r_ae988f49162d76bccea008b7eb901c7af"><td class="memItemLeft"><a class="el" href="structmal__abm__fast_1_1_suitability_grid.html">SuitabilityGrid</a>&#160;</td><td class="memItemRight"><a class="el" href="#ae988f49162d76bccea008b7eb901c7af">suitability_grid</a> (const MosquitoSubmodel &amp;sub) const</td></tr>
-<tr class="memitem:ab543b5f8d7e00c28641f23661919c685" id="r_ab543b5f8d7e00c28641f23661919c685"><td class="memItemLeft">std::string&#160;</td><td class="memItemRight"><a class="el" href="#ab543b5f8d7e00c28641f23661919c685">write_state_cog</a> (const std::string &amp;path, const <a class="el" href="structmal__abm__fast_1_1_density_grid.html">DensityGrid</a> &amp;density, const <a class="el" href="structmal__abm__fast_1_1_suitability_grid.html">SuitabilityGrid</a> &amp;suit, int32_t year, int32_t month, int32_t seed, int32_t n_rollouts=1, int32_t rollout_index=0) const</td></tr>
-<tr class="memdesc:ab543b5f8d7e00c28641f23661919c685"><td class="mdescLeft">&#160;</td><td class="mdescRight">&ndash; output ----------------------------------------------------------&mdash;  <br /></td></tr>
+<tr class="memitem:ab543b5f8d7e00c28641f23661919c685" id="r_ab543b5f8d7e00c28641f23661919c685"><td class="memItemLeft"><a id="ab543b5f8d7e00c28641f23661919c685" name="ab543b5f8d7e00c28641f23661919c685"></a>
+std::string&#160;</td><td class="memItemRight"><b>write_state_cog</b> (const std::string &amp;path, const <a class="el" href="structmal__abm__fast_1_1_density_grid.html">DensityGrid</a> &amp;density, const <a class="el" href="structmal__abm__fast_1_1_suitability_grid.html">SuitabilityGrid</a> &amp;suit, int32_t year, int32_t month, int32_t seed, int32_t n_rollouts=1, int32_t rollout_index=0) const</td></tr>
+<tr class="memdesc:ab543b5f8d7e00c28641f23661919c685"><td class="mdescLeft">&#160;</td><td class="mdescRight">&ndash; output ----------------------------------------------------------&mdash; <br /></td></tr>
 </table>
-<a name="doc-constructors" id="doc-constructors"></a><h2 id="header-doc-constructors" class="groupheader">Constructor &amp; Destructor Documentation</h2>
-<a id="ab1fc504f23c6ff28f3456bf509d3455a" name="ab1fc504f23c6ff28f3456bf509d3455a"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#ab1fc504f23c6ff28f3456bf509d3455a">&#9670;&#160;</a></span>CoordinatorModel() <span class="overload">[1/2]</span></h2>
-
-<div class="memitem">
-<div class="memproto">
-<table class="mlabels">
-  <tr>
-  <td class="mlabels-left">
-      <table class="memname">
-        <tr>
-          <td class="memname">mal_abm_fast::CoordinatorModel::CoordinatorModel </td>
-          <td>(</td>
-          <td class="paramname"><span class="paramname"><em></em></span></td><td>)</td>
-          <td></td>
-        </tr>
-      </table>
-  </td>
-  <td class="mlabels-right">
-<span class="mlabels"><span class="mlabel default">default</span></span>  </td>
-  </tr>
-</table>
-</div><div class="memdoc">
-
-</div>
-</div>
+<a name="details" id="details"></a><h2 id="header-details" class="groupheader">Detailed Description</h2>
+<div class="textblock"><p>The engine's spatial façade (the Mesa-Geo half of the ABM). It owns the <a class="el" href="structmal__abm__fast_1_1_a_o_i.html">AOI</a> geometry, the env-NC climate reader, the candidate-patch habitat registry and the per-rollout PRNG, and serves the per-day habitat update, the seeding plans and the state-COG output. </p>
+</div><a name="doc-constructors" id="doc-constructors"></a><h2 id="header-doc-constructors" class="groupheader">Constructor &amp; Destructor Documentation</h2>
 <a id="a3185dde8caecb568ba6067a4da8e4a3e" name="a3185dde8caecb568ba6067a4da8e4a3e"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a3185dde8caecb568ba6067a4da8e4a3e">&#9670;&#160;</a></span>CoordinatorModel() <span class="overload">[2/2]</span></h2>
+<h2 class="memtitle"><span class="permalink"><a href="#a3185dde8caecb568ba6067a4da8e4a3e">&#9670;&#160;</a></span>CoordinatorModel()</h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -212,33 +190,6 @@ Public Member Functions</h2></td></tr>
 </div>
 </div>
 <a name="doc-func-members" id="doc-func-members"></a><h2 id="header-doc-func-members" class="groupheader">Member Function Documentation</h2>
-<a id="a9f85265e4ad94a76ab1bbb6755085cfd" name="a9f85265e4ad94a76ab1bbb6755085cfd"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a9f85265e4ad94a76ab1bbb6755085cfd">&#9670;&#160;</a></span>activate_patches()</h2>
-
-<div class="memitem">
-<div class="memproto">
-<table class="mlabels">
-  <tr>
-  <td class="mlabels-left">
-      <table class="memname">
-        <tr>
-          <td class="memname">void mal_abm_fast::CoordinatorModel::activate_patches </td>
-          <td>(</td>
-          <td class="paramname"><span class="paramname"><em></em></span></td><td>)</td>
-          <td></td>
-        </tr>
-      </table>
-  </td>
-  <td class="mlabels-right">
-<span class="mlabels"><span class="mlabel inline">inline</span></span>  </td>
-  </tr>
-</table>
-</div><div class="memdoc">
-
-<p>Legacy no-op kept for engine.step() API parity. </p>
-
-</div>
-</div>
 <a id="a52f6f7288a6f5909fc7bfdda747e5745" name="a52f6f7288a6f5909fc7bfdda747e5745"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#a52f6f7288a6f5909fc7bfdda747e5745">&#9670;&#160;</a></span>aggregate_density()</h2>
 
@@ -346,6 +297,7 @@ Public Member Functions</h2></td></tr>
   </tr>
 </table>
 </div><div class="memdoc">
+<p>The env-NC climate reader (daily rainfall, daily air temperature and the static habitat planes); valid for the coordinator's lifetime. </p>
 
 </div>
 </div>
@@ -371,6 +323,7 @@ Public Member Functions</h2></td></tr>
   </tr>
 </table>
 </div><div class="memdoc">
+<p>Mutable calendar date of the simulated day; the Engine uses it to advance the simulation by one day at the end of each step. </p>
 
 </div>
 </div>
@@ -396,6 +349,7 @@ Public Member Functions</h2></td></tr>
   </tr>
 </table>
 </div><div class="memdoc">
+<p>The calendar date (day resolution) of the simulated day. The Engine advances it by one day at the end of every step, so after a step it already holds the date of the <em>next</em> day. </p>
 
 </div>
 </div>
@@ -421,6 +375,7 @@ Public Member Functions</h2></td></tr>
   </tr>
 </table>
 </div><div class="memdoc">
+<p>The candidate-patch habitat registry read from the habitat gpkg; valid for the coordinator's lifetime. </p>
 
 </div>
 </div>
@@ -446,6 +401,7 @@ Public Member Functions</h2></td></tr>
   </tr>
 </table>
 </div><div class="memdoc">
+<p>The read-only per-cell capacity K view for the current day, in absolute Beverton-Holt capacity units (individual-equivalent). </p>
 
 </div>
 </div>
@@ -471,6 +427,7 @@ Public Member Functions</h2></td></tr>
   </tr>
 </table>
 </div><div class="memdoc">
+<p>The per-patch state vector cached by the last <span class="tt"><a class="el" href="#a303b05f578cd9b78136a9761c4faa5f5">to_dataframe()</a></span> call (one <a class="el" href="structmal__abm__fast_1_1_patch_state.html">PatchState</a> per candidate cell); empty until that call runs. </p>
 
 </div>
 </div>
@@ -496,6 +453,7 @@ Public Member Functions</h2></td></tr>
   </tr>
 </table>
 </div><div class="memdoc">
+<p>The per-rollout PRNG sub-stream (derived from <span class="tt">--seed</span>). It is advanced by the seeding planners and by <span class="tt">MosquitoSubmodel::advance_day</span>. </p>
 
 </div>
 </div>
@@ -521,6 +479,7 @@ Public Member Functions</h2></td></tr>
   </tr>
 </table>
 </div><div class="memdoc">
+<p>The species salinity high-tolerance in PSU (parts per thousand): patches whose water salinity reaches it cannot breed. </p>
 
 </div>
 </div>
@@ -572,6 +531,7 @@ Public Member Functions</h2></td></tr>
   </tr>
 </table>
 </div><div class="memdoc">
+<p>Attach the host landscape (non-owning pointer) used to score candidate cells in HOST_WEIGHTED seeding; it must outlive the coordinator and may be left null, in which case HOST_WEIGHTED seeding is rejected. </p>
 
 </div>
 </div>
@@ -615,6 +575,7 @@ Public Member Functions</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
+<p>Per-cell raw adult counts at the adults' current position (state COG band 2, <span class="tt">adult_cell_count</span>); counts every adult regardless of sex or physiological state. </p>
 
 </div>
 </div>
@@ -669,59 +630,6 @@ Public Member Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 <p>Integrate the pluvial state z causally over every env-NC band from <span class="tt">base_day - n_warmup_bands</span> to <span class="tt">base_day - 1</span>, starting from z = 0 at the cold end. Called once by the Engine facade before the daily loop (plan §6.5 warm-up Causal). </p>
-
-</div>
-</div>
-<a id="ab543b5f8d7e00c28641f23661919c685" name="ab543b5f8d7e00c28641f23661919c685"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#ab543b5f8d7e00c28641f23661919c685">&#9670;&#160;</a></span>write_state_cog()</h2>
-
-<div class="memitem">
-<div class="memproto">
-      <table class="memname">
-        <tr>
-          <td class="memname">std::string mal_abm_fast::CoordinatorModel::write_state_cog </td>
-          <td>(</td>
-          <td class="paramtype">const std::string &amp;</td>          <td class="paramname"><span class="paramname"><em>path</em></span>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">const <a class="el" href="structmal__abm__fast_1_1_density_grid.html">DensityGrid</a> &amp;</td>          <td class="paramname"><span class="paramname"><em>density</em></span>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">const <a class="el" href="structmal__abm__fast_1_1_suitability_grid.html">SuitabilityGrid</a> &amp;</td>          <td class="paramname"><span class="paramname"><em>suit</em></span>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">int32_t</td>          <td class="paramname"><span class="paramname"><em>year</em></span>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">int32_t</td>          <td class="paramname"><span class="paramname"><em>month</em></span>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">int32_t</td>          <td class="paramname"><span class="paramname"><em>seed</em></span>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">int32_t</td>          <td class="paramname"><span class="paramname"><em>n_rollouts</em></span><span class="paramdefsep"> = </span><span class="paramdefval">1</span>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">int32_t</td>          <td class="paramname"><span class="paramname"><em>rollout_index</em></span><span class="paramdefsep"> = </span><span class="paramdefval">0</span>&#160;) const</td>
-        </tr>
-      </table>
-</div><div class="memdoc">
-
-<p>&ndash; output ----------------------------------------------------------&mdash; </p>
 
 </div>
 </div>

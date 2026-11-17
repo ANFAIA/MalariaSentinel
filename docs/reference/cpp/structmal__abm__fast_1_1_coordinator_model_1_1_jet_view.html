@@ -117,56 +117,19 @@ document.addEventListener('DOMContentLoaded',() => { initNavTree('structmal__abm
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 id="header-pub-attribs" class="groupheader"><a id="pub-attribs" name="pub-attribs"></a>
 Public Attributes</h2></td></tr>
-<tr class="memitem:a322c434aeb7dbcf3b5b1aca57f80a368" id="r_a322c434aeb7dbcf3b5b1aca57f80a368"><td class="memItemLeft">const float *&#160;</td><td class="memItemRight"><a class="el" href="#a322c434aeb7dbcf3b5b1aca57f80a368">data</a> = nullptr</td></tr>
-<tr class="memitem:adf2d4e273f8eb21ebad19313d41015e3" id="r_adf2d4e273f8eb21ebad19313d41015e3"><td class="memItemLeft">int32_t&#160;</td><td class="memItemRight"><a class="el" href="#adf2d4e273f8eb21ebad19313d41015e3">width</a> = 0</td></tr>
-<tr class="memitem:a19b26470c206fa546bc5e92de5658eb1" id="r_a19b26470c206fa546bc5e92de5658eb1"><td class="memItemLeft">int32_t&#160;</td><td class="memItemRight"><a class="el" href="#a19b26470c206fa546bc5e92de5658eb1">height</a> = 0</td></tr>
+<tr class="memitem:a322c434aeb7dbcf3b5b1aca57f80a368" id="r_a322c434aeb7dbcf3b5b1aca57f80a368"><td class="memItemLeft"><a id="a322c434aeb7dbcf3b5b1aca57f80a368" name="a322c434aeb7dbcf3b5b1aca57f80a368"></a>
+const float *&#160;</td><td class="memItemRight"><b>data</b> = nullptr</td></tr>
+<tr class="memdesc:a322c434aeb7dbcf3b5b1aca57f80a368"><td class="mdescLeft">&#160;</td><td class="mdescRight">Per-cell capacity K, row-major H*W floats; zero until the first <a class="el" href="classmal__abm__fast_1_1_coordinator_model.html#a58f0dda85f550ba5082fdf12ddb369dd">update_habitat_day()</a>. <br /></td></tr>
+<tr class="memitem:adf2d4e273f8eb21ebad19313d41015e3" id="r_adf2d4e273f8eb21ebad19313d41015e3"><td class="memItemLeft"><a id="adf2d4e273f8eb21ebad19313d41015e3" name="adf2d4e273f8eb21ebad19313d41015e3"></a>
+int32_t&#160;</td><td class="memItemRight"><b>width</b> = 0</td></tr>
+<tr class="memdesc:adf2d4e273f8eb21ebad19313d41015e3"><td class="mdescLeft">&#160;</td><td class="mdescRight">Grid width in cells (columns of K). <br /></td></tr>
+<tr class="memitem:a19b26470c206fa546bc5e92de5658eb1" id="r_a19b26470c206fa546bc5e92de5658eb1"><td class="memItemLeft"><a id="a19b26470c206fa546bc5e92de5658eb1" name="a19b26470c206fa546bc5e92de5658eb1"></a>
+int32_t&#160;</td><td class="memItemRight"><b>height</b> = 0</td></tr>
+<tr class="memdesc:a19b26470c206fa546bc5e92de5658eb1"><td class="mdescLeft">&#160;</td><td class="mdescRight">Grid height in cells (rows of K). <br /></td></tr>
 </table>
 <a name="details" id="details"></a><h2 id="header-details" class="groupheader">Detailed Description</h2>
 <div class="textblock"><p>&ndash; per-cell daily capacity view -----------------------------------&mdash; Read-only view of the per-cell daily capacity K (ABSOLUTE Beverton-Holt capacity in individual-equivalent units, computed per day by update_habitat_day; plan §5.4). Null until the first <a class="el" href="classmal__abm__fast_1_1_coordinator_model.html#a58f0dda85f550ba5082fdf12ddb369dd">update_habitat_day()</a>. </p>
-</div><a name="doc-variable-members" id="doc-variable-members"></a><h2 id="header-doc-variable-members" class="groupheader">Member Data Documentation</h2>
-<a id="a322c434aeb7dbcf3b5b1aca57f80a368" name="a322c434aeb7dbcf3b5b1aca57f80a368"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a322c434aeb7dbcf3b5b1aca57f80a368">&#9670;&#160;</a></span>data</h2>
-
-<div class="memitem">
-<div class="memproto">
-      <table class="memname">
-        <tr>
-          <td class="memname">const float* mal_abm_fast::CoordinatorModel::JetView::data = nullptr</td>
-        </tr>
-      </table>
-</div><div class="memdoc">
-
-</div>
-</div>
-<a id="a19b26470c206fa546bc5e92de5658eb1" name="a19b26470c206fa546bc5e92de5658eb1"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a19b26470c206fa546bc5e92de5658eb1">&#9670;&#160;</a></span>height</h2>
-
-<div class="memitem">
-<div class="memproto">
-      <table class="memname">
-        <tr>
-          <td class="memname">int32_t mal_abm_fast::CoordinatorModel::JetView::height = 0</td>
-        </tr>
-      </table>
-</div><div class="memdoc">
-
-</div>
-</div>
-<a id="adf2d4e273f8eb21ebad19313d41015e3" name="adf2d4e273f8eb21ebad19313d41015e3"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#adf2d4e273f8eb21ebad19313d41015e3">&#9670;&#160;</a></span>width</h2>
-
-<div class="memitem">
-<div class="memproto">
-      <table class="memname">
-        <tr>
-          <td class="memname">int32_t mal_abm_fast::CoordinatorModel::JetView::width = 0</td>
-        </tr>
-      </table>
-</div><div class="memdoc">
-
-</div>
-</div>
-<hr/>The documentation for this struct was generated from the following file:<ul>
+</div><hr/>The documentation for this struct was generated from the following file:<ul>
 <li>mal-core/src/mal_core/abm/include/mal_abm_fast/<a class="el" href="coordinator_8hpp_source.html">coordinator.hpp</a></li>
 </ul>
 </div><!-- contents -->

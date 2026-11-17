@@ -52,8 +52,8 @@ var NAVTREE =
 var NAVTREEINDEX =
 [
 "annotated.html",
-"structmal__abm__fast_1_1_density_grid.html#a10c91ba76f649976210b18120f76ab42",
-"structmal__abm__fast_1_1_rng_cfg.html#aafbe3f12daa2e6fcacae0517e759b3eb"
+"structmal__abm__fast_1_1_dispersal_cfg.html#a3c5c1bca41a2559a10ca540ea5f2f3a6",
+"structmal__abm__fast_1_1_runtime_overrides.html#adbc436cc449953b94d955d4993b2be08"
 ];
 
 const SYNCONMSG = 'click to disable panel synchronization';

@@ -121,10 +121,12 @@ Public Attributes</h2></td></tr>
 <tr class="memitem:a6a2f7a580d1270cb6b1eb64dbb300945" id="r_a6a2f7a580d1270cb6b1eb64dbb300945"><td class="memItemLeft">int&#160;</td><td class="memItemRight"><a class="el" href="#a6a2f7a580d1270cb6b1eb64dbb300945">nodata_sentinel_int</a> = 0</td></tr>
 <tr class="memitem:aa06b8282c1012c6c883ce13deb08e5b9" id="r_aa06b8282c1012c6c883ce13deb08e5b9"><td class="memItemLeft">double&#160;</td><td class="memItemRight"><a class="el" href="#aa06b8282c1012c6c883ce13deb08e5b9">residential_from_indoor_frac</a> = 0.0</td></tr>
 <tr class="memitem:aee2fdfd734271e96676f49cdab76e0a4" id="r_aee2fdfd734271e96676f49cdab76e0a4"><td class="memItemLeft">double&#160;</td><td class="memItemRight"><a class="el" href="#aee2fdfd734271e96676f49cdab76e0a4">coastline_buffer_m</a> = 0.0</td></tr>
-<tr class="memitem:a7778ffc9c26c3ff19abed3ad376d3877" id="r_a7778ffc9c26c3ff19abed3ad376d3877"><td class="memItemLeft">std::string&#160;</td><td class="memItemRight"><a class="el" href="#a7778ffc9c26c3ff19abed3ad376d3877">coastline_resolution</a> = &quot;f&quot;</td></tr>
-<tr class="memdesc:a7778ffc9c26c3ff19abed3ad376d3877"><td class="mdescLeft">&#160;</td><td class="mdescRight">GSHHG resolution code for the coastline artifact: c/l/i/h/f.  <br /></td></tr>
-<tr class="memitem:a7e3116a969c946dfb5bf84adde0dad15" id="r_a7e3116a969c946dfb5bf84adde0dad15"><td class="memItemLeft">double&#160;</td><td class="memItemRight"><a class="el" href="#a7e3116a969c946dfb5bf84adde0dad15">sea_water_floor</a> = 0.05</td></tr>
-<tr class="memdesc:a7e3116a969c946dfb5bf84adde0dad15"><td class="mdescLeft">&#160;</td><td class="mdescRight">Land fraction below which an <a class="el" href="structmal__abm__fast_1_1_a_o_i.html">AOI</a> cell counts as water.  <br /></td></tr>
+<tr class="memitem:a7778ffc9c26c3ff19abed3ad376d3877" id="r_a7778ffc9c26c3ff19abed3ad376d3877"><td class="memItemLeft"><a id="a7778ffc9c26c3ff19abed3ad376d3877" name="a7778ffc9c26c3ff19abed3ad376d3877"></a>
+std::string&#160;</td><td class="memItemRight"><b>coastline_resolution</b> = &quot;f&quot;</td></tr>
+<tr class="memdesc:a7778ffc9c26c3ff19abed3ad376d3877"><td class="mdescLeft">&#160;</td><td class="mdescRight">GSHHG resolution code for the coastline artifact: c/l/i/h/f. <br /></td></tr>
+<tr class="memitem:a7e3116a969c946dfb5bf84adde0dad15" id="r_a7e3116a969c946dfb5bf84adde0dad15"><td class="memItemLeft"><a id="a7e3116a969c946dfb5bf84adde0dad15" name="a7e3116a969c946dfb5bf84adde0dad15"></a>
+double&#160;</td><td class="memItemRight"><b>sea_water_floor</b> = 0.05</td></tr>
+<tr class="memdesc:a7e3116a969c946dfb5bf84adde0dad15"><td class="mdescLeft">&#160;</td><td class="mdescRight">Land fraction below which an <a class="el" href="structmal__abm__fast_1_1_a_o_i.html">AOI</a> cell counts as water. <br /></td></tr>
 <tr class="memitem:a5e4940eab036192d6147241e6686fa97" id="r_a5e4940eab036192d6147241e6686fa97"><td class="memItemLeft">double&#160;</td><td class="memItemRight"><a class="el" href="#a5e4940eab036192d6147241e6686fa97">cell_size_hint_m</a> = 0.0</td></tr>
 <tr class="memitem:a930590461ccb95da6b6dcb0fa57f7b21" id="r_a930590461ccb95da6b6dcb0fa57f7b21"><td class="memItemLeft">double&#160;</td><td class="memItemRight"><a class="el" href="#a930590461ccb95da6b6dcb0fa57f7b21">candidate_min_ingest</a> = 0.0</td></tr>
 <tr class="memitem:a34b8c0210e33a677343a58a98f096ae3" id="r_a34b8c0210e33a677343a58a98f096ae3"><td class="memItemLeft">int&#160;</td><td class="memItemRight"><a class="el" href="#a34b8c0210e33a677343a58a98f096ae3">min_dilation_radius_cells</a> = 0</td></tr>
@@ -135,7 +137,9 @@ Public Attributes</h2></td></tr>
 <tr class="memitem:aea3c5ecb9c68a105030e068bd689d4da" id="r_aea3c5ecb9c68a105030e068bd689d4da"><td class="memItemLeft">int&#160;</td><td class="memItemRight"><a class="el" href="#aea3c5ecb9c68a105030e068bd689d4da">grid_degrees_step_max</a> = 0</td></tr>
 <tr class="memitem:a2b584af86fe67b9e34aed02ebc159f91" id="r_a2b584af86fe67b9e34aed02ebc159f91"><td class="memItemLeft">int&#160;</td><td class="memItemRight"><a class="el" href="#a2b584af86fe67b9e34aed02ebc159f91">nc_compression_level</a> = 0</td></tr>
 </table>
-<a name="doc-variable-members" id="doc-variable-members"></a><h2 id="header-doc-variable-members" class="groupheader">Member Data Documentation</h2>
+<a name="details" id="details"></a><h2 id="header-details" class="groupheader">Detailed Description</h2>
+<div class="textblock"><p>Input-side constants of the ingest stage: the NoData sentinel, the coastal band and the masking/threshold rules applied while the environment NetCDF is written. Several of them are consumed by the Python writer, not by the engine (<span class="tt">ingest:</span> section of model_constants.yaml). </p>
+</div><a name="doc-variable-members" id="doc-variable-members"></a><h2 id="header-doc-variable-members" class="groupheader">Member Data Documentation</h2>
 <a id="a930590461ccb95da6b6dcb0fa57f7b21" name="a930590461ccb95da6b6dcb0fa57f7b21"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#a930590461ccb95da6b6dcb0fa57f7b21">&#9670;&#160;</a></span>candidate_min_ingest</h2>
 
@@ -147,6 +151,7 @@ Public Attributes</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
+<p>Habitat-potential floor (index) applied by the ingest census when it marks candidate patches — a deliberately different role from habitat.candidate_min_engine, which the engine applies afterwards (<span class="tt">ingest.candidate_min_ingest</span>). </p>
 
 </div>
 </div>
@@ -161,6 +166,7 @@ Public Attributes</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
+<p>Default cell size (m) of the simulation grid when the run does not override the <a class="el" href="structmal__abm__fast_1_1_a_o_i.html">AOI</a> resolution (<span class="tt">ingest.cell_size_hint_m</span>). </p>
 
 </div>
 </div>
@@ -179,22 +185,6 @@ Public Attributes</h2></td></tr>
 
 </div>
 </div>
-<a id="a7778ffc9c26c3ff19abed3ad376d3877" name="a7778ffc9c26c3ff19abed3ad376d3877"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a7778ffc9c26c3ff19abed3ad376d3877">&#9670;&#160;</a></span>coastline_resolution</h2>
-
-<div class="memitem">
-<div class="memproto">
-      <table class="memname">
-        <tr>
-          <td class="memname">std::string mal_abm_fast::IngestCfg::coastline_resolution = &quot;f&quot;</td>
-        </tr>
-      </table>
-</div><div class="memdoc">
-
-<p>GSHHG resolution code for the coastline artifact: c/l/i/h/f. </p>
-
-</div>
-</div>
 <a id="aca791017adaacc123b1e95cee19e0314" name="aca791017adaacc123b1e95cee19e0314"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#aca791017adaacc123b1e95cee19e0314">&#9670;&#160;</a></span>fill_frac_valid_max</h2>
 
@@ -206,6 +196,7 @@ Public Attributes</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
+<p>Maximum NoData fraction of a cell for it to count as valid (<span class="tt">ingest.fill_frac_valid_max</span>). </p>
 
 </div>
 </div>
@@ -220,6 +211,7 @@ Public Attributes</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
+<p>Maximum implicit step (degrees) allowed when reconstructing a grid expressed in degrees (<span class="tt">ingest.grid_degrees_step_max</span>). </p>
 
 </div>
 </div>
@@ -234,6 +226,7 @@ Public Attributes</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
+<p>Land-fraction threshold of the land mask (<span class="tt">ingest.land_mask_threshold</span>). Loaded into this struct but read by no engine code. </p>
 
 </div>
 </div>
@@ -248,6 +241,7 @@ Public Attributes</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
+<p>Minimum radius (in cells) of the morphological dilation applied to the land/ocean masks (<span class="tt">ingest.min_dilation_radius_cells</span>). Loaded into this struct but read by no engine code. </p>
 
 </div>
 </div>
@@ -262,6 +256,7 @@ Public Attributes</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
+<p>zlib compression level used when writing the environment NetCDF — a file-format setting, not a model parameter (<span class="tt">ingest.nc_compression_level</span>). </p>
 
 </div>
 </div>
@@ -276,6 +271,7 @@ Public Attributes</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
+<p>Float NoData sentinel written into the environment NetCDF and the COGs, and recognised when they are read back (<span class="tt">ingest.nodata_sentinel</span>). </p>
 
 </div>
 </div>
@@ -290,6 +286,7 @@ Public Attributes</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
+<p>Integer mirror of the NoData sentinel, used by the label-mode (categorical) writers (<span class="tt">ingest.nodata_sentinel_int</span>). </p>
 
 </div>
 </div>
@@ -304,6 +301,7 @@ Public Attributes</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
+<p>Land-fraction threshold of the ocean mask (<span class="tt">ingest.ocean_mask_threshold</span>). Loaded into this struct but read by no engine code. </p>
 
 </div>
 </div>
@@ -318,22 +316,7 @@ Public Attributes</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
-
-</div>
-</div>
-<a id="a7e3116a969c946dfb5bf84adde0dad15" name="a7e3116a969c946dfb5bf84adde0dad15"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a7e3116a969c946dfb5bf84adde0dad15">&#9670;&#160;</a></span>sea_water_floor</h2>
-
-<div class="memitem">
-<div class="memproto">
-      <table class="memname">
-        <tr>
-          <td class="memname">double mal_abm_fast::IngestCfg::sea_water_floor = 0.05</td>
-        </tr>
-      </table>
-</div><div class="memdoc">
-
-<p>Land fraction below which an <a class="el" href="structmal__abm__fast_1_1_a_o_i.html">AOI</a> cell counts as water. </p>
+<p>Fraction of the indoor host fraction attributed to residential cells when the building fraction is unavailable (<span class="tt">ingest.residential_from_indoor_frac</span>). </p>
 
 </div>
 </div>
@@ -348,6 +331,7 @@ Public Attributes</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
+<p>Tolerance (counts) below which a valid-pixel count is treated as zero (<span class="tt">ingest.valid_count_epsilon</span>). </p>
 
 </div>
 </div>

@@ -120,7 +120,9 @@ Public Attributes</h2></td></tr>
 <tr class="memitem:a42217a7358b44f323f9d22f479c5d504" id="r_a42217a7358b44f323f9d22f479c5d504"><td class="memItemLeft">double&#160;</td><td class="memItemRight"><a class="el" href="#a42217a7358b44f323f9d22f479c5d504">base_c</a> = 0.0</td></tr>
 <tr class="memitem:acc84b01ccab81ffca27a5fa6ed5f3cf1" id="r_acc84b01ccab81ffca27a5fa6ed5f3cf1"><td class="memItemLeft">double&#160;</td><td class="memItemRight"><a class="el" href="#acc84b01ccab81ffca27a5fa6ed5f3cf1">threshold_gd</a> = 0.0</td></tr>
 </table>
-<a name="doc-variable-members" id="doc-variable-members"></a><h2 id="header-doc-variable-members" class="groupheader">Member Data Documentation</h2>
+<a name="details" id="details"></a><h2 id="header-details" class="groupheader">Detailed Description</h2>
+<div class="textblock"><p>Degree-day model of the extrinsic incubation period of the parasite (<span class="tt">eip:</span> section of model_constants.yaml). </p>
+</div><a name="doc-variable-members" id="doc-variable-members"></a><h2 id="header-doc-variable-members" class="groupheader">Member Data Documentation</h2>
 <a id="a42217a7358b44f323f9d22f479c5d504" name="a42217a7358b44f323f9d22f479c5d504"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#a42217a7358b44f323f9d22f479c5d504">&#9670;&#160;</a></span>base_c</h2>
 
@@ -132,6 +134,7 @@ Public Attributes</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
+<p>Thermal base temperature (°C) of the degree-day accumulation: the daily increment is max(0, T - base_c) (<span class="tt">eip.base_c</span>). </p>
 
 </div>
 </div>
@@ -146,6 +149,7 @@ Public Attributes</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
+<p>Accumulated degree-days (°C·days) the parasite must reach before the vector becomes infectious (<span class="tt">eip.threshold_gd</span>). </p>
 
 </div>
 </div>

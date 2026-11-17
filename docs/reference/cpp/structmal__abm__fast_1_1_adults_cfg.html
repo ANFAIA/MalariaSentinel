@@ -119,11 +119,15 @@ document.addEventListener('DOMContentLoaded',() => { initNavTree('structmal__abm
 Public Attributes</h2></td></tr>
 <tr class="memitem:af219b0581f9e040d10793724a485b8cf" id="r_af219b0581f9e040d10793724a485b8cf"><td class="memItemLeft">double&#160;</td><td class="memItemRight"><a class="el" href="#af219b0581f9e040d10793724a485b8cf">daily_mort_basal</a> = 0.0</td></tr>
 <tr class="memitem:ad1ab69d96dd693811727590f82d3bdc5" id="r_ad1ab69d96dd693811727590f82d3bdc5"><td class="memItemLeft">double&#160;</td><td class="memItemRight"><a class="el" href="#ad1ab69d96dd693811727590f82d3bdc5">opt_c</a> = 0.0</td></tr>
-<tr class="memitem:a3e507ff77f4252f08c1355999ebf88b8" id="r_a3e507ff77f4252f08c1355999ebf88b8"><td class="memItemLeft">double&#160;</td><td class="memItemRight"><a class="el" href="#a3e507ff77f4252f08c1355999ebf88b8">sigma_c</a> = 0.0</td></tr>
+<tr class="memitem:a3e507ff77f4252f08c1355999ebf88b8" id="r_a3e507ff77f4252f08c1355999ebf88b8"><td class="memItemLeft"><a id="a3e507ff77f4252f08c1355999ebf88b8" name="a3e507ff77f4252f08c1355999ebf88b8"></a>
+double&#160;</td><td class="memItemRight"><b>sigma_c</b> = 0.0</td></tr>
+<tr class="memdesc:a3e507ff77f4252f08c1355999ebf88b8"><td class="mdescLeft">&#160;</td><td class="mdescRight">Standard deviation (°C) of the survival Gaussian (<span class="tt">adults.sigma_c</span>). <br /></td></tr>
 <tr class="memitem:a64a0c31b150d65834f3e92c3778d3150" id="r_a64a0c31b150d65834f3e92c3778d3150"><td class="memItemLeft">double&#160;</td><td class="memItemRight"><a class="el" href="#a64a0c31b150d65834f3e92c3778d3150">mort_cap</a> = 0.0</td></tr>
 <tr class="memitem:a665a898cb472aafd140708f1ea306bbe" id="r_a665a898cb472aafd140708f1ea306bbe"><td class="memItemLeft">double&#160;</td><td class="memItemRight"><a class="el" href="#a665a898cb472aafd140708f1ea306bbe">mort_floor</a> = 0.0</td></tr>
 </table>
-<a name="doc-variable-members" id="doc-variable-members"></a><h2 id="header-doc-variable-members" class="groupheader">Member Data Documentation</h2>
+<a name="details" id="details"></a><h2 id="header-details" class="groupheader">Detailed Description</h2>
+<div class="textblock"><p>Adult survival model: the Lardeux thermal Gaussian evaluated for every adult on every day (<span class="tt">adults:</span> section of model_constants.yaml). </p>
+</div><a name="doc-variable-members" id="doc-variable-members"></a><h2 id="header-doc-variable-members" class="groupheader">Member Data Documentation</h2>
 <a id="af219b0581f9e040d10793724a485b8cf" name="af219b0581f9e040d10793724a485b8cf"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#af219b0581f9e040d10793724a485b8cf">&#9670;&#160;</a></span>daily_mort_basal</h2>
 
@@ -135,6 +139,7 @@ Public Attributes</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
+<p>Basal daily survival probability of an adult female, used as the constant factor of the thermal Gaussian and as the survival when no temperature is available. The name is historical: the value is a survival probability per day, not a mortality rate (<span class="tt">adults.daily_mort_basal</span>). </p>
 
 </div>
 </div>
@@ -149,6 +154,7 @@ Public Attributes</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
+<p>Upper clamp (fraction in [0,1]) applied to the daily survival probability p_d (<span class="tt">adults.mort_cap</span>). </p>
 
 </div>
 </div>
@@ -163,6 +169,7 @@ Public Attributes</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
+<p>Lower clamp (fraction in [0,1]) applied to the daily survival probability p_d (<span class="tt">adults.mort_floor</span>). </p>
 
 </div>
 </div>
@@ -177,20 +184,7 @@ Public Attributes</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
-
-</div>
-</div>
-<a id="a3e507ff77f4252f08c1355999ebf88b8" name="a3e507ff77f4252f08c1355999ebf88b8"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a3e507ff77f4252f08c1355999ebf88b8">&#9670;&#160;</a></span>sigma_c</h2>
-
-<div class="memitem">
-<div class="memproto">
-      <table class="memname">
-        <tr>
-          <td class="memname">double mal_abm_fast::AdultsCfg::sigma_c = 0.0</td>
-        </tr>
-      </table>
-</div><div class="memdoc">
+<p>Temperature (°C) at which the survival Gaussian peaks (<span class="tt">adults.opt_c</span>). </p>
 
 </div>
 </div>

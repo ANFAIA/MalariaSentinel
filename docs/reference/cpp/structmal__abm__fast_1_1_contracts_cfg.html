@@ -120,7 +120,9 @@ Public Attributes</h2></td></tr>
 <tr class="memitem:aaeefae8b739ade584b2f425e5456e3c3" id="r_aaeefae8b739ade584b2f425e5456e3c3"><td class="memItemLeft">std::string&#160;</td><td class="memItemRight"><a class="el" href="#aaeefae8b739ade584b2f425e5456e3c3">env_nc</a></td></tr>
 <tr class="memitem:aec895ada887dee2b220598e217c63e85" id="r_aec895ada887dee2b220598e217c63e85"><td class="memItemLeft">std::string&#160;</td><td class="memItemRight"><a class="el" href="#aec895ada887dee2b220598e217c63e85">cogs_state</a></td></tr>
 </table>
-<a name="doc-variable-members" id="doc-variable-members"></a><h2 id="header-doc-variable-members" class="groupheader">Member Data Documentation</h2>
+<a name="details" id="details"></a><h2 id="header-details" class="groupheader">Detailed Description</h2>
+<div class="textblock"><p>Frozen input/output contract versions, mirroring the <span class="tt">contracts:</span> section of model_constants.yaml. </p>
+</div><a name="doc-variable-members" id="doc-variable-members"></a><h2 id="header-doc-variable-members" class="groupheader">Member Data Documentation</h2>
 <a id="aec895ada887dee2b220598e217c63e85" name="aec895ada887dee2b220598e217c63e85"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#aec895ada887dee2b220598e217c63e85">&#9670;&#160;</a></span>cogs_state</h2>
 
@@ -132,6 +134,7 @@ Public Attributes</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
+<p>Version string of the state COG + sidecar output contract; read at runtime by <a class="el" href="wire_8hpp_source.html">wire.hpp</a> <a class="el" href="namespacemal__abm__fast.html#a8fec20c9e51d5cd54a560c2dbb9faa72">CONTRACT_VERSION()</a> and written into the state sidecar (<span class="tt">contracts.cogs_state</span>). </p>
 
 </div>
 </div>
@@ -146,6 +149,7 @@ Public Attributes</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
+<p>Version string of the environment NetCDF input contract; the value the ingest writer stamps on the file it produces (<span class="tt">contracts.env_nc</span>). Declared only: no code compares the file's attribute against it. </p>
 
 </div>
 </div>

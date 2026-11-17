@@ -122,7 +122,9 @@ Public Attributes</h2></td></tr>
 <tr class="memitem:aef5cb4bd1129df719dc2d84db0d2157a" id="r_aef5cb4bd1129df719dc2d84db0d2157a"><td class="memItemLeft">double&#160;</td><td class="memItemRight"><a class="el" href="#aef5cb4bd1129df719dc2d84db0d2157a">delta_days</a> = 0.0</td></tr>
 <tr class="memitem:afc379c76121082041cd49fa2d00fba64" id="r_afc379c76121082041cd49fa2d00fba64"><td class="memItemLeft">double&#160;</td><td class="memItemRight"><a class="el" href="#afc379c76121082041cd49fa2d00fba64">cold_start_z</a> = 0.0</td></tr>
 </table>
-<a name="doc-variable-members" id="doc-variable-members"></a><h2 id="header-doc-variable-members" class="groupheader">Member Data Documentation</h2>
+<a name="details" id="details"></a><h2 id="header-details" class="groupheader">Detailed Description</h2>
+<div class="textblock"><p>Rain-driven state of the pluvial (seasonal) habitats: the shared wetness factor z, in [0,1], that scales their availability (<span class="tt">pluvial:</span> section of model_constants.yaml). </p>
+</div><a name="doc-variable-members" id="doc-variable-members"></a><h2 id="header-doc-variable-members" class="groupheader">Member Data Documentation</h2>
 <a id="afc379c76121082041cd49fa2d00fba64" name="afc379c76121082041cd49fa2d00fba64"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#afc379c76121082041cd49fa2d00fba64">&#9670;&#160;</a></span>cold_start_z</h2>
 
@@ -134,6 +136,7 @@ Public Attributes</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
+<p>Initial value of the wetness state z at the start of a run (cold start), dimensionless in [0,1] (<span class="tt">pluvial.cold_start_z</span>). </p>
 
 </div>
 </div>
@@ -148,6 +151,7 @@ Public Attributes</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
+<p>Length (days) of the model time step used when decaying the wetness state (<span class="tt">pluvial.delta_days</span>). </p>
 
 </div>
 </div>
@@ -162,6 +166,7 @@ Public Attributes</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
+<p>Memory constant (days) of the dry decay of the wetness state, z_dry = z * exp(-delta_days / dry_memory_days) (<span class="tt">pluvial.dry_memory_days</span>). </p>
 
 </div>
 </div>
@@ -176,6 +181,7 @@ Public Attributes</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
+<p>Rainfall depth (mm) that sets the scale of the wetness response z = z_dry + (1 - z_dry) * (1 - exp(-rain_mm / rain_scale_mm)) (<span class="tt">pluvial.rain_scale_mm</span>). </p>
 
 </div>
 </div>

@@ -15,7 +15,6 @@ var searchData=
   ['wind_5fself_5fspeed_5fms_12',['wind_self_speed_ms',['../structmal__abm__fast_1_1_dispersal_cfg.html#ae09d15046837976af7ca5b7f0ce5727d',1,'mal_abm_fast::DispersalCfg']]],
   ['wind_5fsurvival_13',['WIND_SURVIVAL',['../namespacemal__abm__fast.html#a83084874ef3508a04120f08c0f1adc89',1,'mal_abm_fast']]],
   ['wind_5fsurvival_14',['wind_survival',['../structmal__abm__fast_1_1_dispersal_cfg.html#ab2f634a4228a44a2e73593fc56f302d1',1,'mal_abm_fast::DispersalCfg']]],
-  ['wire_2ehpp_15',['wire.hpp',['../wire_8hpp.html',1,'']]],
-  ['write_5fstate_5fcog_16',['write_state_cog',['../classmal__abm__fast_1_1_coordinator_model.html#ab543b5f8d7e00c28641f23661919c685',1,'mal_abm_fast::CoordinatorModel::write_state_cog()'],['../namespacemal__abm__fast.html#a4074e67bf662fc4bb6f21f7249f2edbc',1,'mal_abm_fast::write_state_cog(const std::string &amp;path, const DensityGrid &amp;density, const SuitabilityGrid &amp;suit, const StateCogMetadata &amp;meta)']]],
-  ['write_5fstate_5fsidecar_17',['write_state_sidecar',['../namespacemal__abm__fast.html#a672f3abfa39f37e440c5a4c5d3bb7c34',1,'mal_abm_fast']]]
+  ['write_5fstate_5fcog_15',['write_state_cog',['../classmal__abm__fast_1_1_coordinator_model.html#ab543b5f8d7e00c28641f23661919c685',1,'mal_abm_fast::CoordinatorModel::write_state_cog()'],['../namespacemal__abm__fast.html#a4074e67bf662fc4bb6f21f7249f2edbc',1,'mal_abm_fast::write_state_cog(const std::string &amp;path, const DensityGrid &amp;density, const SuitabilityGrid &amp;suit, const StateCogMetadata &amp;meta)']]],
+  ['write_5fstate_5fsidecar_16',['write_state_sidecar',['../namespacemal__abm__fast.html#a672f3abfa39f37e440c5a4c5d3bb7c34',1,'mal_abm_fast']]]
 ];

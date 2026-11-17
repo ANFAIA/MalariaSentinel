@@ -118,13 +118,15 @@ document.addEventListener('DOMContentLoaded',() => { initNavTree('structmal__abm
 <tr class="heading"><td colspan="2"><h2 id="header-pub-attribs" class="groupheader"><a id="pub-attribs" name="pub-attribs"></a>
 Public Attributes</h2></td></tr>
 <tr class="memitem:a301e7a151e206f9da5090b2b6bf180a5" id="r_a301e7a151e206f9da5090b2b6bf180a5"><td class="memItemLeft">std::string&#160;</td><td class="memItemRight"><a class="el" href="#a301e7a151e206f9da5090b2b6bf180a5">default_species</a></td></tr>
-<tr class="memitem:a0b1e92d2884bd2c674fa13d2e7d43e5c" id="r_a0b1e92d2884bd2c674fa13d2e7d43e5c"><td class="memItemLeft">double&#160;</td><td class="memItemRight"><a class="el" href="#a0b1e92d2884bd2c674fa13d2e7d43e5c">k_ref</a> = 0.0</td></tr>
-<tr class="memdesc:a0b1e92d2884bd2c674fa13d2e7d43e5c"><td class="mdescLeft">&#160;</td><td class="mdescRight">[ind·km⁻²·d⁻¹]  <br /></td></tr>
+<tr class="memitem:a0b1e92d2884bd2c674fa13d2e7d43e5c" id="r_a0b1e92d2884bd2c674fa13d2e7d43e5c"><td class="memItemLeft"><a id="a0b1e92d2884bd2c674fa13d2e7d43e5c" name="a0b1e92d2884bd2c674fa13d2e7d43e5c"></a>
+double&#160;</td><td class="memItemRight"><b>k_ref</b> = 0.0</td></tr>
+<tr class="memdesc:a0b1e92d2884bd2c674fa13d2e7d43e5c"><td class="mdescLeft">&#160;</td><td class="mdescRight">[ind·km⁻²·d⁻¹] <br /></td></tr>
 <tr class="memitem:afb1d9000defa601e784b7c241e5803ba" id="r_afb1d9000defa601e784b7c241e5803ba"><td class="memItemLeft">std::map&lt; std::string, <a class="el" href="structmal__abm__fast_1_1_species_row.html">SpeciesRow</a> &gt;&#160;</td><td class="memItemRight"><a class="el" href="#afb1d9000defa601e784b7c241e5803ba">rows</a></td></tr>
-<tr class="memdesc:afb1d9000defa601e784b7c241e5803ba"><td class="mdescLeft">&#160;</td><td class="mdescRight">named rows, by NAME  <br /></td></tr>
 <tr class="memitem:aea191ddc0e0793d1dc20e18088588756" id="r_aea191ddc0e0793d1dc20e18088588756"><td class="memItemLeft">std::array&lt; double, kNumZoneId &gt;&#160;</td><td class="memItemRight"><a class="el" href="#aea191ddc0e0793d1dc20e18088588756">neutral_weights</a> {}</td></tr>
 </table>
-<a name="doc-variable-members" id="doc-variable-members"></a><h2 id="header-doc-variable-members" class="groupheader">Member Data Documentation</h2>
+<a name="details" id="details"></a><h2 id="header-details" class="groupheader">Detailed Description</h2>
+<div class="textblock"><p>Species section of the configuration: the active species, the single Beverton-Holt capacity constant, and the per-species rows keyed by name. </p>
+</div><a name="doc-variable-members" id="doc-variable-members"></a><h2 id="header-doc-variable-members" class="groupheader">Member Data Documentation</h2>
 <a id="a301e7a151e206f9da5090b2b6bf180a5" name="a301e7a151e206f9da5090b2b6bf180a5"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#a301e7a151e206f9da5090b2b6bf180a5">&#9670;&#160;</a></span>default_species</h2>
 
@@ -136,22 +138,7 @@ Public Attributes</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
-
-</div>
-</div>
-<a id="a0b1e92d2884bd2c674fa13d2e7d43e5c" name="a0b1e92d2884bd2c674fa13d2e7d43e5c"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a0b1e92d2884bd2c674fa13d2e7d43e5c">&#9670;&#160;</a></span>k_ref</h2>
-
-<div class="memitem">
-<div class="memproto">
-      <table class="memname">
-        <tr>
-          <td class="memname">double mal_abm_fast::SpeciesCfg::k_ref = 0.0</td>
-        </tr>
-      </table>
-</div><div class="memdoc">
-
-<p>[ind·km⁻²·d⁻¹] </p>
+<p>Key of the species row used as the engine's default parameter set (species_params.hpp, coordinator) and as the fallback of the species registry (<span class="tt">species.default_species</span>). </p>
 
 </div>
 </div>
@@ -166,6 +153,7 @@ Public Attributes</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
+<p>Habitat affinities (fraction per habitat type, Σ=1) of the species-neutral row, used by runs that select no explicit species (<span class="tt">species.neutral.weights</span>). </p>
 
 </div>
 </div>
@@ -180,7 +168,6 @@ Public Attributes</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
-
 <p>named rows, by NAME </p>
 
 </div>

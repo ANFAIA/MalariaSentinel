@@ -124,7 +124,9 @@ Public Attributes</h2></td></tr>
 <tr class="memitem:ace10cac76b6dad7f6652f49c39cd5441" id="r_ace10cac76b6dad7f6652f49c39cd5441"><td class="memItemLeft">double&#160;</td><td class="memItemRight"><a class="el" href="#ace10cac76b6dad7f6652f49c39cd5441">wash_fraction_max</a> = 0.0</td></tr>
 <tr class="memitem:a86032cec0463b0137dc44d6a8c82c5c0" id="r_a86032cec0463b0137dc44d6a8c82c5c0"><td class="memItemLeft">int&#160;</td><td class="memItemRight"><a class="el" href="#a86032cec0463b0137dc44d6a8c82c5c0">vulnerable_instar_max</a> = 0</td></tr>
 </table>
-<a name="doc-variable-members" id="doc-variable-members"></a><h2 id="header-doc-variable-members" class="groupheader">Member Data Documentation</h2>
+<a name="details" id="details"></a><h2 id="header-details" class="groupheader">Detailed Description</h2>
+<div class="textblock"><p>Stressors applied to the aquatic cohorts of a patch: desiccation driven by the habitat-dry streak and washout driven by heavy rain (<span class="tt">aquatic_stress:</span> section of model_constants.yaml). </p>
+</div><a name="doc-variable-members" id="doc-variable-members"></a><h2 id="header-doc-variable-members" class="groupheader">Member Data Documentation</h2>
 <a id="a2c8f2be678a5592e1bd9495ba55cfb5e" name="a2c8f2be678a5592e1bd9495ba55cfb5e"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#a2c8f2be678a5592e1bd9495ba55cfb5e">&#9670;&#160;</a></span>desicc_base_daily</h2>
 
@@ -136,6 +138,7 @@ Public Attributes</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
+<p>Ceiling (1/day) of the daily desiccation mortality; the realised rate is this value times the exponential ramp in the dry-day streak (<span class="tt">aquatic_stress.desicc_base_daily</span>). </p>
 
 </div>
 </div>
@@ -150,6 +153,7 @@ Public Attributes</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
+<p>Number of consecutive habitat-dry days tolerated before the desiccation stressor starts killing aquatic stages (<span class="tt">aquatic_stress.desicc_grace_days</span>). </p>
 
 </div>
 </div>
@@ -164,6 +168,7 @@ Public Attributes</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
+<p>Rate (1/day) at which the desiccation ramp grows with each day past the grace period (<span class="tt">aquatic_stress.desicc_ramp_decay</span>). </p>
 
 </div>
 </div>
@@ -178,6 +183,7 @@ Public Attributes</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
+<p>Highest larval instar (index) still vulnerable to desiccation; instars above it are not affected by the desiccation stressor (<span class="tt">aquatic_stress.vulnerable_instar_max</span>). </p>
 
 </div>
 </div>
@@ -192,6 +198,7 @@ Public Attributes</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
+<p>Maximum fraction (in [0,1]) of a patch's aquatic cohorts that a single heavy-rain event can wash out (<span class="tt">aquatic_stress.wash_fraction_max</span>). </p>
 
 </div>
 </div>
@@ -206,6 +213,7 @@ Public Attributes</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
+<p>Daily rainfall (mm) at or above which heavy rain washes aquatic cohorts out of their patches (<span class="tt">aquatic_stress.wash_threshold_mm</span>). </p>
 
 </div>
 </div>

@@ -33,12 +33,7 @@ var namespacemal__abm__fast =
     [ "ThermalCfg", "structmal__abm__fast_1_1_thermal_cfg.html", "structmal__abm__fast_1_1_thermal_cfg" ],
     [ "TransmissionCfg", "structmal__abm__fast_1_1_transmission_cfg.html", "structmal__abm__fast_1_1_transmission_cfg" ],
     [ "UrbanCfg", "structmal__abm__fast_1_1_urban_cfg.html", "structmal__abm__fast_1_1_urban_cfg" ],
-    [ "SpeciesId", "namespacemal__abm__fast.html#a3c608e8fc7ef2799233e8a38fd593933", [
-      [ "FUNESTUS", "namespacemal__abm__fast.html#a3c608e8fc7ef2799233e8a38fd593933ab5a6fba23b57097812a0b032cc1ab57f", null ],
-      [ "GAMBIAE_SS", "namespacemal__abm__fast.html#a3c608e8fc7ef2799233e8a38fd593933aa25e570e9da9fe82eeaec979e3c1c747", null ],
-      [ "COLUZZII", "namespacemal__abm__fast.html#a3c608e8fc7ef2799233e8a38fd593933a1ea1b688a84388697c4269580cbee6de", null ],
-      [ "ARABIENSIS", "namespacemal__abm__fast.html#a3c608e8fc7ef2799233e8a38fd593933a70c4e8ac2b4f28614183191539f3f439", null ]
-    ] ],
+    [ "SpeciesId", "namespacemal__abm__fast.html#a3c608e8fc7ef2799233e8a38fd593933", null ],
     [ "ADULT_DAILY_MORT_BASAL", "namespacemal__abm__fast.html#a3fb97bcc2d8ac6f0826b24417bfec5d9", null ],
     [ "ADULT_DISPERSE_MAX_M", "namespacemal__abm__fast.html#ad36db15a631b63170921deaf22a43c60", null ],
     [ "ADULT_DISPERSE_PROB", "namespacemal__abm__fast.html#af0480f6c6bb2da919d868b7d1f995129", null ],

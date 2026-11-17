@@ -117,38 +117,13 @@ document.addEventListener('DOMContentLoaded',() => { initNavTree('classmal__abm_
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 id="header-pub-methods" class="groupheader"><a id="pub-methods" name="pub-methods"></a>
 Public Member Functions</h2></td></tr>
-<tr class="memitem:a9ba088c85d63bc8cad6f208ff1f89472" id="r_a9ba088c85d63bc8cad6f208ff1f89472"><td class="memItemLeft">&#160;</td><td class="memItemRight"><a class="el" href="#a9ba088c85d63bc8cad6f208ff1f89472">HabitatEngine</a> ()=default</td></tr>
 <tr class="memitem:af31733513a08903c6bf3915ddc268d1f" id="r_af31733513a08903c6bf3915ddc268d1f"><td class="memItemLeft">void&#160;</td><td class="memItemRight"><a class="el" href="#af31733513a08903c6bf3915ddc268d1f">load_from_gpkg</a> (const std::string &amp;path, const <a class="el" href="structmal__abm__fast_1_1_a_o_i.html">AOI</a> &amp;aoi)</td></tr>
 <tr class="memitem:a3221624fe400aac8d6e07253128c04b5" id="r_a3221624fe400aac8d6e07253128c04b5"><td class="memItemLeft">const std::vector&lt; <a class="el" href="structmal__abm__fast_1_1_habitat_patch.html">HabitatPatch</a> &gt; &amp;&#160;</td><td class="memItemRight"><a class="el" href="#a3221624fe400aac8d6e07253128c04b5">patches</a> () const</td></tr>
 <tr class="memitem:afdd7bdd3060ded10194cf0f82b3586e5" id="r_afdd7bdd3060ded10194cf0f82b3586e5"><td class="memItemLeft">const <a class="el" href="structmal__abm__fast_1_1_habitat_patch.html">HabitatPatch</a> &amp;&#160;</td><td class="memItemRight"><a class="el" href="#afdd7bdd3060ded10194cf0f82b3586e5">patch_by_id</a> (int64_t pid) const</td></tr>
 </table>
-<a name="doc-constructors" id="doc-constructors"></a><h2 id="header-doc-constructors" class="groupheader">Constructor &amp; Destructor Documentation</h2>
-<a id="a9ba088c85d63bc8cad6f208ff1f89472" name="a9ba088c85d63bc8cad6f208ff1f89472"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a9ba088c85d63bc8cad6f208ff1f89472">&#9670;&#160;</a></span>HabitatEngine()</h2>
-
-<div class="memitem">
-<div class="memproto">
-<table class="mlabels">
-  <tr>
-  <td class="mlabels-left">
-      <table class="memname">
-        <tr>
-          <td class="memname">mal_abm_fast::HabitatEngine::HabitatEngine </td>
-          <td>(</td>
-          <td class="paramname"><span class="paramname"><em></em></span></td><td>)</td>
-          <td></td>
-        </tr>
-      </table>
-  </td>
-  <td class="mlabels-right">
-<span class="mlabels"><span class="mlabel default">default</span></span>  </td>
-  </tr>
-</table>
-</div><div class="memdoc">
-
-</div>
-</div>
-<a name="doc-func-members" id="doc-func-members"></a><h2 id="header-doc-func-members" class="groupheader">Member Function Documentation</h2>
+<a name="details" id="details"></a><h2 id="header-details" class="groupheader">Detailed Description</h2>
+<div class="textblock"><p>Reader of the candidate habitat-patch census: loads the single-layer OGR Point gpkg emitted by ingest and keeps the patches that pass the candidate-potential floor, indexed for O(1) lookup by patch_id. </p>
+</div><a name="doc-func-members" id="doc-func-members"></a><h2 id="header-doc-func-members" class="groupheader">Member Function Documentation</h2>
 <a id="af31733513a08903c6bf3915ddc268d1f" name="af31733513a08903c6bf3915ddc268d1f"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#af31733513a08903c6bf3915ddc268d1f">&#9670;&#160;</a></span>load_from_gpkg()</h2>
 
@@ -167,7 +142,7 @@ Public Member Functions</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
-<p>Read the candidate-patch gpkg from <span class="tt">path</span> and populate <span class="tt">patches_</span>. Each row becomes a <span class="tt"><a class="el" href="structmal__abm__fast_1_1_habitat_patch.html">HabitatPatch</a></span> (see <a class="el" href="wire_8hpp.html">wire.hpp</a>). Throws std::runtime_error if the OGR driver fails or the layer is missing. </p>
+<p>Read the candidate-patch gpkg from <span class="tt">path</span> and populate <span class="tt">patches_</span>. Each row becomes a <span class="tt"><a class="el" href="structmal__abm__fast_1_1_habitat_patch.html">HabitatPatch</a></span> (see <a class="el" href="wire_8hpp_source.html">wire.hpp</a>). Throws std::runtime_error if the OGR driver fails or the layer is missing. </p>
 
 </div>
 </div>
