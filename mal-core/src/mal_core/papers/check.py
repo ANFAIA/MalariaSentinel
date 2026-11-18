@@ -65,9 +65,8 @@ class Report:
         self.notes += other.notes
 
 
-def http_doi_resolver(doi: str, timeout: float = 20.0) -> bool | None:
-    """True if doi.org answers the DOI, False if it says it is unknown, None if unreachable."""
-    request = urllib.request.Request(DOI_RESOLVER_URL.format(doi=doi), method="HEAD")
+def _probe(url: str, method: str, timeout: float) -> bool | None:
+    request = urllib.request.Request(url, method=method, headers={"User-Agent": "malariasim-papers-check"})
     try:
         with urllib.request.urlopen(request, timeout=timeout):
             return True
@@ -75,6 +74,20 @@ def http_doi_resolver(doi: str, timeout: float = 20.0) -> bool | None:
         return False if exc.code == 404 else None
     except (urllib.error.URLError, OSError, ValueError):
         return None
+
+
+def http_doi_resolver(doi: str, timeout: float = 20.0) -> bool | None:
+    """True if the DOI is known, False if it is unknown, None if it cannot be checked.
+
+    Crossref's works endpoint is asked first: it answers reliably, where publisher
+    pages often reject HEAD requests. DOIs that Crossref does not register (DataCite,
+    arXiv, Zenodo) fall back to doi.org.
+    """
+    found = _probe(f"https://api.crossref.org/works/{doi}", "GET", timeout)
+    if found is True:
+        return True
+    via_doi = _probe(DOI_RESOLVER_URL.format(doi=doi), "HEAD", timeout)
+    return via_doi if found is None or via_doi is not None else False
 
 
 def check_dois(manifest: Manifest, *, resolve: bool = False, resolver: DoiResolver | None = None) -> Report:

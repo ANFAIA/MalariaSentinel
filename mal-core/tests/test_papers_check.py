@@ -201,3 +201,33 @@ def test_read_documents_skips_binary_and_unknown_suffixes(tmp_path):
     (tmp_path / "docs" / "img.png").write_bytes(b"\x89PNG")
     docs = read_documents(tmp_path, ["docs/a.md", "docs/img.png", "docs/missing.md"])
     assert list(docs) == ["docs/a.md"]
+
+
+def test_http_resolver_falls_back_to_doi_org_when_crossref_is_unknown(monkeypatch):
+    from mal_core.papers import check as chk
+
+    calls: list[tuple[str, str]] = []
+
+    def fake_probe(url, method, timeout):
+        calls.append((url, method))
+        if "api.crossref.org" in url:
+            return False  # Crossref does not register this DOI (e.g. DataCite)
+        return True  # doi.org knows it
+
+    monkeypatch.setattr(chk, "_probe", fake_probe)
+    assert chk.http_doi_resolver("10.5281/zenodo.1") is True
+    assert calls[0][0].startswith("https://api.crossref.org/works/")
+
+
+def test_http_resolver_reports_unknown_when_both_say_404(monkeypatch):
+    from mal_core.papers import check as chk
+
+    monkeypatch.setattr(chk, "_probe", lambda url, method, timeout: False)
+    assert chk.http_doi_resolver("10.9999/none") is False
+
+
+def test_http_resolver_none_when_network_unreachable(monkeypatch):
+    from mal_core.papers import check as chk
+
+    monkeypatch.setattr(chk, "_probe", lambda url, method, timeout: None)
+    assert chk.http_doi_resolver("10.1111/x.y") is None
