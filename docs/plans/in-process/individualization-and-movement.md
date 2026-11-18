@@ -2590,7 +2590,7 @@ Prioridad declarada: **consistencia con la realidad sobre estabilidad de identif
 | 2c | Individuos de ganado **sin infección** (solo dilución), opción A. | No hay estado de infección en animales. |
 | 2c | **Fuente:** ganado GLW por especie (`ingest/hosts.py:93`, `load_glw_livestock`), agregado sin distinguir especie en el ABM. | Especies: secundario; se trata como «animal» genérico. |
 | 2c | **Wildlife no entra como individuos.** Es un índice de idoneidad en [0, 1] (`mal_commonlib` `wildlife.py`), no un recuento. | Convertirlo en individuos exige un factor de densidad sin dato; queda **fuera de 2c** hasta que haya uno. |
-| Vis. | **Pendiente**: el usuario indica que la visualización fue absorbida por el ABM. Se decide tras el informe de investigación (§15.1). | §15.1 se reescribe. |
+| Vis. | Visualización **dentro del motor C++**, un fotograma **por día** (sin fases), trazo = polilínea de las posiciones diarias, mosquito como círculo (§15.1). | §15.1 y §15.1.2 reescritos; V1 y el `xfail` por fase se sustituyen. |
 
 | Orden | Paso | Entrega | Precondición |
 |---|---|---|---|
@@ -2639,11 +2639,17 @@ corrida.
 *   **PNG estáticos** (mapa de un día, serie de 30 días): `stb_image_write.h` (un fichero,
     dominio público) en `include/mal_abm_fast/third_party/`, junto a `gif.h`. Si no se
     necesitan PNG, la serie sale en CSV.
-*   **Trayectorias por hembra:** `<stem>_agents.parquet`, escrito por el motor **sólo en
-    modo escenario** (decisión 2b). **Dependencia nueva:** Apache Arrow (C++) o un
-    escritor Parquet mínimo, a decidir en el Paso 2b; se añade a `CMakeLists.txt` en el
-    mismo commit que el escritor (regla de §Detailed Implementation Plan).
-*   **Granularidad:** posición por fase de la jornada.
+*   **Trayectorias por hembra:** las dibuja el propio motor con las posiciones que ya
+    tiene en memoria; el visualizador es el mismo C++ y lee las mismas variables. **No
+    lee `_agents.parquet`**, de modo que la visualización **no añade** la dependencia de
+    Apache Arrow (el Parquet sigue siendo un artefacto de análisis, §11).
+*   **Granularidad:** **un fotograma por día simulado**, sin fases. El **trazo** de cada
+    mosquito es la polilínea de sus posiciones diarias acumuladas; el mosquito se dibuja
+    como círculo (hembra relleno, macho hueco). Las posiciones **por fase** del día no se
+    visualizan.
+*   **Consecuencia aceptada:** un escenario de 1 día (E00, E01) da un GIF de **1 fotograma**
+    con la siembra y el resultado en la misma imagen. Lo que lo hace legible es V2/V3
+    (marcadores en metros, anillos de la cascada y regla), no el número de fotogramas.
 
 #### 15.1.1 — Qué cambia en el visualizador, paso a paso
 
@@ -2655,7 +2661,7 @@ visualización **en el mismo commit**. Lo que no está aquí no se redibuja.
 | 2a | Personas individuales | Pintar personas como puntos (no como densidad por celda). |
 | 2b | Ledger de eventos | Picaduras como eventos puntuales (`BiteEvent`), no como cuadrado por celda. |
 | 3 | Multipicadura y ciclo | Mostrar en la hembra el número de picaduras de la noche. |
-| 5 | Cascada de movimiento | Trazo de la trayectoria por fase (fuente: `_agents.parquet`). |
+| 5 | Cascada de movimiento | Trazo = polilínea de las posiciones diarias (fuente: el estado del motor en memoria, no `_agents.parquet`). |
 | 6 | Arresto ovárico en seca | Estado `ARRESTED` con un tercer tratamiento visual (no un color nuevo de la paleta). |
 | 7 | Emergencia en la posición de la madre | Las hembras nacen en el punto de la madre, no en el centro de la celda. |
 | **Puesta de huevos** (cambio pedido) | Lote de huevos ∝ volumen de sangre (`eggs_per_ul`, Paso 3) y oviposición en el sitio del hábitat (Paso 9) | Marcar en el mapa el **punto de oviposición**, no la celda; la serie de huevos pasa a usar el lote real, no el de la celda. |
@@ -2675,6 +2681,39 @@ visualización **en el mismo commit**. Lo que no está aquí no se redibuja.
 
 **Decidido:** el punto de oviposición se dibuja como **cruz** (símbolo propio, distinto de
 el disco de hembra y de macho).
+
+#### 15.1.2 — Estado del visualizador y trabajo pendiente (medido el 2026-11-18)
+
+**Estado hoy (medido, no supuesto).** Una corrida de escenario con `--enable-transmission`
+escribe `<stem>_transmission.gif` (`viz_tx.cpp`) con **un fotograma por día simulado**:
+E00 (1 día) produce un GIF de **1 diapositiva**, E01/E02 (3 días) uno de **3**. No hay
+ninguna vista de escenario: las celdas siguen coloreadas por densidad (rampas
+`kHumanCellLow/High`, `kAnimalCellLow/High`), todos los agentes llevan el mismo símbolo y
+las picaduras salen como cuadrado por celda. Por eso un GIF de escenario **no sirve hoy
+para confirmar ni refutar** ninguna expectativa: no se ve a la persona sembrada, ni la
+distancia, ni la trayectoria. El test `test_baseline_gif_has_one_frame_per_day` fija este
+estado, y **sigue siendo correcto**: la unidad del GIF es el día (decisión del autor,
+§15.1). `test_target_gif_has_one_frame_per_phase` (`xfail` estricto, objetivo
+≥ `days × 4`) **queda sin objeto** y se **elimina** en el commit de V5/V6; el objetivo
+que lo sustituye es V1 (trazo) y V6 (humo).
+
+**Cambios pendientes del visualizador** (además de la tabla de §15.1.1, que sigue
+vigente; cada uno va en el commit del paso que lo hace posible, no antes):
+
+| Id | Cambio | Paso que lo habilita | Fichero |
+|---|---|---|---|
+| V0 | El arnés pide el GIF de forma explícita (`--gif`) sólo en modo escenario y lo archiva junto a `<id>.observed.json`; hoy sale como efecto lateral de `enable_transmission`. | 0 (hecho en el arnés; falta el flag explícito) | `harness.py` |
+| V1 | **Trazo del mosquito**: polilínea de sus posiciones diarias acumuladas, dibujada por el motor desde su estado en memoria; el mosquito sigue siendo un círculo (hembra relleno, macho hueco). **Sin fotogramas por fase**: un fotograma por día. Mínimo comprobable: `n_frames == days` y la polilínea del fotograma `d` tiene `d+1` vértices. | 5 (antes la hembra no sale de su celda y el trazo sería un punto) | `viz_tx.cpp`, `engine.cpp` |
+| V2 | **Marcadores de escenario**: persona como punto en su posición en metros; ganado; cohortes acuáticas / criaderos; sitios de enjambre. Hoy el visualizador sólo conoce celdas. | 2a (personas), 2c (ganado), 7 (criaderos), 8 (enjambres) | `viz_tx.cpp` |
+| V3 | **Anillos de la cascada** alrededor de la hembra (activación, olfativa, visual: radios de §4) y regla de escala en metros: es lo que permite ver *a ojo* que a 200 m no hay contacto (E01) y a 2 000 m tampoco (E02). | 5 | `viz_tx.cpp` |
+| V4 | **Rótulo de escenario**: id, día, modo (`gate`/`report`) y el valor observado frente al esperado en el pie del fotograma (la banda del `catalog.yaml`). | 5 (primera expectativa en forma cerrada) | `viz_tx.cpp`, `harness.py` |
+| V5 | Quitar las rampas verde/rojo de celdas (decisión del autor, §15.1) y distinguir sexo (disco relleno/hueco) también en `viz_tx.cpp:697-701`. | 0/2a, primer commit de visualización | `viz_tx.cpp` |
+| V6 | Prueba de humo del GIF en CI: abrirlo y comprobar `n_frames == days` y que no es uniforme (no todo gris). Sustituye al `xfail` eliminado. | con V1 | `test_scenarios.py` |
+
+**Qué NO está hecho y no debe darse por hecho.** Ninguna de V0–V6 está implementada. Los
+GIF de los 19 escenarios existen (los escribe el arnés en `runs/_check_current/<id>/`)
+pero son los del visualizador actual; documentarlos como evidencia de comportamiento
+sería un error.
 
 #### 15.2 — Ganado individual sin infección (Paso 2c)
 
@@ -3159,6 +3198,65 @@ empieza hasta que el anterior pasa su verificación.
     que el fichero nuevo**: sin ellos el módulo y los tests nuevos **no se compilan ni
     aparecen en `ctest`**, y el paso se vería verde sin haber probado nada.
 
+### Estado de ejecución (actualizado 2026-11-18, rama `sim/individualization-movement`)
+
+**Pasos 0 y 1: hechos y verificados; sin commit todavía** (el árbol de trabajo lleva los
+cambios). **Siguiente paso a ejecutar: 2a** (humanos individuales, §15.0), luego 4, 5, 2b…
+en el orden de §15. Quien arranque en una sesión nueva debe leer esta sección y §15.1.2.
+
+*Qué existe y dónde:*
+
+| Pieza | Fichero |
+|---|---|
+| Siembra por escenario (`ScenarioSpec`, `load_scenario_spec`, `SeedingMode::SCENARIO`, `seed_scenario`, `register_scenario_cell`, `derive_substream_seed`, streams acuáticos derivados del maestro, `micro_rng_`) | `abm/include/mal_abm_fast/{seeding,prng,mosquito_submodel,coordinator,engine,aquatic_cohort_bank}.hpp` y sus `.cpp`, `main.cpp` (`--scenario`) |
+| Plomería Python (`SCENARIO_ARTIFACT`, `scenario_key`, `resolve_scenario`, `--scenario`, `--data-root`, `dynamics` entero) | `download/catalog.py`, `abm/wrapper.py`, `cli.py`, `ingest/env.py` |
+| AOI sintético 10×10 + manifiesto con **una** clave `scenario:<id>` | `mal-execution/scripts/make_synthetic_aoi.py` → `runs/synthetic/accra-synth-10x10/` |
+| 19 escenarios `E00…E18.json` (sin expectativas) y su documentación | `abm/tests/scenarios/E*.json`, `catalog.yaml` |
+| Arnés y punto de entrada pytest | `abm/tests/scenarios/harness.py`, `abm/tests/test_scenarios.py` |
+| Tests | C++: `test_scenario_seeding.cpp` (35); Python: `mal-core/tests/test_scenario_manifest.py` (14), `test_scenarios.py` |
+
+*Cómo se verifica (todo medido al cerrar el paso):* `ctest` 313/313; `uv run pytest` desde
+la raíz en verde (el arnés incluido); tras cualquier `cmake --build`, copiar
+`build/src/mal_abm_fast` a `abm/bin/mal_abm_fast_darwin`. Ejecutar un escenario a mano:
+`uv run malariasim abm --aoi accra-synth-10x10 --bbox=-0.2,5.7,-0.10971147034573944,5.789842104336081 --data-root runs/synthetic --scenario E01 --seed 20261117 --days 3 --month 6 --enable-transmission`.
+
+*Qué comprueba hoy el arnés y qué no* (la documentación por escenario, con el propósito, lo
+que implica, lo esperado y lo comprobado hoy, está en `abm/tests/scenarios/catalog.yaml` y
+se publica en el documento ABM, apéndice «Scenario harness», generada por
+`tools/gen_concepts_values.py`):
+
+*   **Fidelidad de siembra, los 19 escenarios (real):** identidad de conservación
+    `adultos(d) = adultos(d−1) − muertes(d) + emergidos(d)` desde lo sembrado; el COG y el
+    registro de cohortes coinciden; las pupas sembradas de E07 emergen; la mortalidad
+    cambia con la semilla (E13/E15); determinismo byte a byte (E01/E02/E13).
+*   **Baseline de la cadena actual (E00/E01/E02):** la hembra no sale de su celda; la
+    picadura sale del agregado de celda (ver arriba).
+*   **Objetivos del plan como `xfail` estricto:** E01 sin picadura a 200 m, E02 sin
+    picadura a 2 000 m, y el trazo del GIF (V1). Fallan hoy por la razón
+    correcta; al pasar, el test se pone rojo y obliga a promoverlos.
+*   **Lo que NO comprueban:** ningún comportamiento biológico de E03–E18 (sangre, seca,
+    machos, viento…): dependen de pasos posteriores y su expectativa la escribe cada
+    paso. Un escenario que sólo «corre» no cuenta como cerrado.
+
+*Desviaciones y deudas conocidas (no ocultas):*
+
+*   Celdas de ≈ 998,9 × 999,0 m (el bbox da 9 989 × 9 990 m), no 1 000 m exactos; el motor
+    usa `resolution_m` = 1 000 para metros → celda.
+*   `host_static.nc` sale del remuestreo de Accra, no de recuentos puestos a mano; el
+    suelo de potencial 0,01 no descarta ninguna celda de esta ventana.
+*   Los `overrides` no vacíos los **rechaza** el motor hasta el Paso 5: el arnés los quita
+    del JSON ejecutado y los anota (`overrides_not_applied_until_paso_5`). E10 declara
+    claves (`co2_activation_radius_m`, `olfactory_radius_m`, `visual_radius_m`) que aún
+    **no existen** en `model_constants.yaml` (Paso 4).
+*   El parser aún no admite `PRE_GRAVID` (E06 usa `TENERAL`), `blood_volume_ul` (E04/E05),
+    sitios de enjambre y `swarm_site_id` (E13–E17), ITN (E16) ni machos estériles (E17):
+    cada paso amplía el esquema que necesita.
+*   `cell_id` de las cohortes acuáticas se valida en el motor (`engine.cpp`), sin test
+    unitario. `mode`, `humans[].state` y `livestock[].species` no validan el tipo antes de
+    leer (lanzan `type_error` en vez del error con ruta).
+*   Los GIF de escenario son los del visualizador actual (1 fotograma por día) y no
+    prueban nada: ver §15.1.2 (V0–V6).
+
 ### Paso 0 — Arnés de escenarios sobre manifiesto sintético
 
 *   **`mal-execution/scripts/make_synthetic_aoi.py`** (nuevo) — construye el AOI
@@ -3241,8 +3339,14 @@ empieza hasta que el anterior pasa su verificación.
 ### Paso 1 — Línea base
 
 *   **`mal-core/src/mal_core/abm/tests/scenarios/`** (modifica) — E00, E01 y E02
-    **completados** con el **baseline de la cadena actual** (fallos conocidos: 0 picaduras humanos,
-    población de vectores colapsada). El Paso 1 **no escribe expectativas**: escribe el
+    **completados** con el **baseline de la cadena actual**. **Medido el 2026-11-18**
+    (corrige la suposición anterior de «0 picaduras»): la hembra sembrada **no sale de
+    su celda en 3 días** y la cadena registra **1 picadura humana el día 1** y ninguna
+    después, **también en E02 (persona a 2 000 m)**: la picadura se sortea contra el
+    agregado de la celda (≈127 000 personas), no contra la persona sembrada. Ese hecho
+    es el fallo que cierran el Paso 2a y el Paso 5; está fijado por
+    `test_baseline_bite_is_drawn_from_cell_aggregate` y los objetivos `xfail` estrictos
+    `test_target_e01_no_bite_at_200_m` / `test_target_e02_no_bite_at_2000_m`. El Paso 1 **no escribe expectativas**: escribe el
     baseline en `runs/_check_current/E0x.baseline.json`, y ese baseline es lo que se
     compara para detectar regresiones. Los pasos 2+ sustituyen el baseline por
     expectativas en forma cerrada.

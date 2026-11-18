@@ -2132,6 +2132,44 @@ from the generated values.
 \end{itemize}
 
 % =====================================================================
+\section{Scenario harness}
+
+The individualisation and movement redesign is verified against synthetic
+scenarios, E00 to E18, run on a 10$\times$10 synthetic area of interest
+through the same manifest route as a production run. This appendix is
+generated from the scenario files and their catalogue
+(\code{mal-core/src/mal_core/abm/tests/scenarios/}); every number a scenario
+fixes is read from its JSON, and a scenario without a catalogue entry fails
+the documentation build.
+
+A scenario passing is easy to misread, so the test suite
+(\code{mal-core/src/mal_core/abm/tests/test_scenarios.py}) separates four
+kinds of check, and each entry below says which of them run today:
+
+\begin{itemize}
+\item \textbf{Seeding fidelity} (all scenarios): what the engine holds after
+  reading the scenario matches the file. Adults obey the conservation
+  identity (adults today equal adults yesterday minus deaths plus emerged),
+  the raster output and the cohort log agree, and seeded pupae emerge.
+\item \textbf{Baseline pins}: facts about the chain as it is now, recorded so
+  that a change in behaviour is noticed. They are known failures, not
+  expectations.
+\item \textbf{Target gates}: the behaviour the design pre-registers (for
+  example no bite at 200 m). They are written as strict expected failures:
+  they fail today, and the day one passes the test turns red and must be
+  promoted to a plain assertion.
+\item \textbf{Determinism}: the same seed gives byte-identical artefacts and
+  another seed does not.
+\end{itemize}
+
+A run that exits normally proves nothing about behaviour, and no check relies
+on that alone. Scenarios whose behaviour is implemented by a later step run
+only the seeding checks until that step lands; the field
+\emph{Runs a behaviour test today} says so.
+
+\input{../generated/scenarios-abm.tex}
+
+% =====================================================================
 \section{Generated parameter table}
 
 The complete table of the model's constants, generated from
