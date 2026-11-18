@@ -52,19 +52,19 @@ El código ya contiene una base reutilizable:
 
 ### Gatore Sinigirira, Ogana y Chirove 2025
 
-`papers/abm-intervention/GatoreSinigirira-2025-SEIR-SEIMalariaBurundi.md` define la estructura SEIR-SEI, acopla temperatura, lluvia y NDVI a nacimiento/supervivencia vectorial, y destaca sensibilidad de `β`, recuperación humana, mordedura y mortalidad adulta. También documenta bifurcación hacia atrás: `R₀ < 1` no garantiza eliminación bajo alta infección inicial.
+`doi:10.1007/s10440-025-00740-y` (Gatore Sinigirira, Ogana y Chirove 2025) define la estructura SEIR-SEI, acopla temperatura, lluvia y NDVI a nacimiento/supervivencia vectorial, y destaca sensibilidad de `β`, recuperación humana, mordedura y mortalidad adulta. También documenta bifurcación hacia atrás: `R₀ < 1` no garantiza eliminación bajo alta infección inicial.
 
 **Aplicación**: implementar primero dinámica estocástica local; calcular `R₀` diagnóstico, no usarlo como única regla de eliminación; conservar inicialización alta para pruebas de bistabilidad futura. Lluvia/NDVI entran por `PatchState`/`AquaticCohortBank` existentes, no se duplican dentro de transmisión.
 
 ### Mordecai et al. 2013
 
-`papers/anopheles-dynamics/Mordecai-2013-OptimalTemperatureMalariaTransmission.md` fija curvas unimodales de mordedura, mortalidad, PDR y desarrollo vectorial: óptimo cercano a 25 °C, rango aproximado 16–34 °C y caída fuerte sobre 28 °C.
+`doi:10.1111/ele.12015` (Mordecai et al. 2013) fija curvas unimodales de mordedura, mortalidad, PDR y desarrollo vectorial: óptimo cercano a 25 °C, rango aproximado 16–34 °C y caída fuerte sobre 28 °C.
 
 **Aplicación**: `a(T)`, `pdr(T)` y mortalidad deben venir de funciones térmicas existentes o nuevas, con pruebas de límites y monotonicidad fuera del óptimo. No sustituir curvas por interpolación lineal global.
 
 ### Evidencia ABM espacial
 
-- Walker et al. 2026, resumido en `papers/research-harness/2026-07-17_ABM-Geospatial-SDSS-Malaria-Transmission-Risk.md`, respalda combinar mapas de idoneidad con exposición por hogar.
+- Walker et al. 2026, resumido en `doi:10.48550/arxiv.2505.16240`, respalda combinar mapas de idoneidad con exposición por hogar.
 - Angelakis et al. 2026 respalda movilidad, inmunidad y clima como procesos acoplados.
 - Khelifa y El Saadi 2024 respalda que distribución de hábitats y proximidad a humanos determinan intensidad local.
 - Fernandez Montoya et al. 2021 respalda separar exposición residual por comportamiento vectorial, especialmente para especies exofílicas.
@@ -287,9 +287,9 @@ La gráfica mostrará expansión espacial real, no una inferencia visual desde d
 ## Referencias
 
 - Issue: `ANFAIA/MalariaSentinel#18`.
-- `papers/abm-intervention/GatoreSinigirira-2025-SEIR-SEIMalariaBurundi.md`.
-- `papers/anopheles-dynamics/Mordecai-2013-OptimalTemperatureMalariaTransmission.md`.
-- `papers/research-harness/2026-07-17_ABM-Geospatial-SDSS-Malaria-Transmission-Risk.md`.
-- `papers/spatial-analysis/MalariaEliminationWithSpatialDecisionSupportSystems.md`.
+- `doi:10.1007/s10440-025-00740-y` (Gatore Sinigirira et al. 2025).
+- `doi:10.1111/ele.12015` (Mordecai et al. 2013).
+- `doi:10.48550/arxiv.2505.16240` (Walker et al. 2026).
+- `doi:10.1016/j.pt.2012.04.002` (Kelly et al. 2012).
 - Código base: `mal-core/src/mal_core/abm/include/mal_abm_fast/{species.hpp,species_params.hpp,mosquito_state.hpp,mosquito_submodel.hpp,engine.hpp}`.
 - Visualizador: `mal-core/src/mal_core/abm/scripts/visualize_state.py`.

@@ -39,7 +39,7 @@ Model the three main insecticide resistance mechanisms in *Anopheles*. The ABM h
 ## Reference
 
 - Issue: ANFAIA/MalariaSentinel#21 (M7.7: Insecticide resistance)
-- Papers: `papers/perplexity-investigations/` §8.
+- Papers: `local:mosquitos-de-la-malaria-biologia-comportamiento-expansion-y-variables-para-simulacion` §8 (class C, no DOI).
 
 ## Files (target, when promoted)
 

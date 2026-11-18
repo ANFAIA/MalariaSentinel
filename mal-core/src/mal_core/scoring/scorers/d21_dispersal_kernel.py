@@ -16,7 +16,7 @@ Expected bands at one month live in ``P50_BAND`` / ``P90_BAND`` below.
 Score = mean of both sub-scores (Gaussian falloff outside each band).
 
 Full table with references:
-papers/anopheles-dynamics/dispersal-kernel-calibration.md.
+docs/papers-syntheses/dispersal-kernel-calibration.md.
 """
 from __future__ import annotations
 

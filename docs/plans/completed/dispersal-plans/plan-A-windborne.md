@@ -21,10 +21,10 @@ We hypothesise that the **long-distance tail of the dispersal kernel is correct 
 
 | Source | File | Key numbers used |
 |---|---|---|
-| **Costantini et al. 1996** | `papers/anopheles-dynamics/costantini-1996-anopheles-density-survival-dispersal.md` | 350–650 m/day outward displacement in MRR; daily survival ~0.85; supports 6 h flight. |
-| **Thomas et al. 2013** | `papers/anopheles-dynamics/thomas-2013-anopheles-gambiae-gambia-dispersal.md` | Negative-exponential kernel: median 386 m, p90 1.28 km, p95 1.67 km. Half-Cauchy alt: 295 m / 1.64 km / 2.83 km. These are the targets for D16. |
+| **Costantini et al. 1996** | `doi:10.1111/j.1365-2915.1996.tb00733.x` | 350–650 m/day outward displacement in MRR; daily survival ~0.85; supports 6 h flight. |
+| **Thomas et al. 2013** | `doi:10.1371/journal.pone.0068679` | Negative-exponential kernel: median 386 m, p90 1.28 km, p95 1.67 km. Half-Cauchy alt: 295 m / 1.64 km / 2.83 km. These are the targets for D16. |
 | **Huestis & Lehmann 2019** | `../m7-6-wind-dispersal-plan.md` | Windborne *Anopheles* can move 100s of km in 6–11 h sustained flight; supports 6 h default and 0.90 in-flight survival. |
-| **Depinay et al. 2004** | `papers/anopheles-dynamics/depinay-2004-anopheles-simulation-model.md` | Site fidelity to natal habitat is a real behaviour; wind overrides it for the long tail. |
+| **Depinay et al. 2004** | `doi:10.1186/1475-2875-3-29` | Site fidelity to natal habitat is a real behaviour; wind overrides it for the long tail. |
 | **North & Godfray 2018** | (cited in dispersal-kernel-calibration.md) | Settlement-to-settlement dispersal with d=0.01 sets the lower bound for D16. |
 | **Yang et al. 2009** | `docs/dispersal-kernel-calibration.md` | 300 m habitat removal → 94 % reduction in local *Anopheles* density; supports the destination viability check. |
 

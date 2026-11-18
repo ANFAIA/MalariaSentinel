@@ -36,7 +36,7 @@ Support 4 Anopheles species with species-specific parameters. M1.5 currently onl
 
 - Issue: ANFAIA/MalariaSentinel#17 (M7.3: Multi-species support)
 - KB ref (if present): `inv-m7-3-multi-species` (placeholder; promote when promoted).
-- Papers: `papers/anopheles-dynamics/`, `papers/perplexity-investigations/` §1.3.
+- Papers: manifest theme `anopheles-dynamics` (`papers/manifest.json`), and `local:mosquitos-de-la-malaria-biologia-comportamiento-expansion-y-variables-para-simulacion` §1.3 (class C, no DOI).
 
 ## Files (target, when promoted)
 

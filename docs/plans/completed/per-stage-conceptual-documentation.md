@@ -274,7 +274,7 @@ Two further structural objections, which the plan absorbs silently:
   (2012) states its key elements verbatim as "(iii) application/intervention
   outcomes re-entered back into the SDSS as a cyclical input; and importantly
   (iv), expert knowledge, integrated throughout all stages of the SDSS process"
-  (`papers/spatial-analysis/MalariaEliminationWithSpatialDecisionSupportSystems.md:304-307`).
+  (Kelly et al. 2012, `doi:10.1016/j.pt.2012.04.002`; the section locator was lost when the summary's Full Text was removed).
   Whether the current pipeline closes that loop is a question about the system,
   not about the documentation. The author has ruled that no ABM modification and
   no generalisation to other systems is on the table, so this is recorded, not

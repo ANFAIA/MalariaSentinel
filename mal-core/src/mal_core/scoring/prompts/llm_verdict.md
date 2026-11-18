@@ -17,9 +17,9 @@ structured `Verdict` (see Output rules).
 
 | Setting | Reference value | Source |
 |---|---|---|
-| Insectary, 27°C, 80% RH, fed | **0.80 – 0.88 per day** | Costantini et al. 1996 (*J. Med. Entomol.*) |
+| Insectary, 27°C, 80% RH, fed | **0.80 – 0.88 per day** | Costantini et al. 1996 (*Med. Vet. Entomol.*) |
 | Field, Sahel, dry season | ~0.87 per day (best-fit to mark–recapture) | Saarman et al. 2019 (*Malar. J.*) |
-| Field, Kenya, moderate transmission | 0.83 – 0.95 per day (range across sites) | Midega et al. 2007 (*Malar. J.*) |
+| Field, Kenya, moderate transmission | 0.83 – 0.95 per day (range across sites) | Midega et al. 2007 (*J. Med. Entomol.*) |
 | After pyrethroid-resistant exposure | can drop to 0.40 – 0.60 | WHO 2012 (not used in baseline) |
 
 **Default daily survival is in [0.80, 0.90] for the Ghana baseline.** Values
@@ -42,7 +42,7 @@ For a Ghana 2024-06 rollout (mean T ≈ 26 °C), expect a mean EIP around
 
 | Setting | Reference | Source |
 |---|---|---|
-| *An. gambiae* at 27°C | **2 – 3 days** (bloodmeal to oviposition) | Depinay et al. 2004 (*J. Med. Entomol.*) |
+| *An. gambiae* at 27°C | **2 – 3 days** (bloodmeal to oviposition) | Depinay et al. 2004 (*Malar. J.*) |
 | *An. gambiae* at 20°C | 4 – 5 days | Depinay et al. 2004 |
 | *An. gambiae* at 30°C | ~2 days | Depinay et al. 2004 |
 

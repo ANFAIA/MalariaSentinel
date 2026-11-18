@@ -22,6 +22,7 @@ dependencies = [
 #   uv sync --package mal-core --group ingest       # ingest path
 #   uv sync --package mal-core --group train        # U-Net training (torch)
 #   uv sync --package mal-core --group serve        # FastAPI server
+#   uv sync --package mal-core --group papers       # paper corpus (docling, plan papers-corpus §6.5)
 #
 # Dev default stays `uv sync --all-packages` (installs every group below).
 [dependency-groups]
@@ -31,6 +32,7 @@ download = []
 ingest = []
 train = ["torch>=2.0"]
 serve = ["fastapi>=0.115", "uvicorn>=0.30"]
+papers = ["docling"]
 
 [build-system]
 requires = ["hatchling"]

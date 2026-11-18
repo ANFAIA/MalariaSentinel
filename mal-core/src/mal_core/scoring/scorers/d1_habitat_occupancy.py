@@ -16,8 +16,8 @@ occupancy" quantity measured by longitudinal field studies:
 The literature band and Gaussian centring live in ``OCC_BAND`` /
 ``OCC_CENTER`` / ``OCC_SIGMA`` below. Occupancy 0 (extinction) scores ~0.
 
-References: see papers/anopheles-dynamics/bogh-2004-larval-habitats-mbita.md
-and papers/anopheles-dynamics/ndenga-2011-larval-habitats-western-kenya.md.
+References: doi:10.1111/j.1365-3156.2004.01335.x (Bogh et al. 2004) and
+doi:10.1186/1475-2875-10-81 (Ndenga et al. 2011).
 """
 from __future__ import annotations
 

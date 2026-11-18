@@ -892,6 +892,158 @@ def serve(
     uvicorn.run(fastapi_app, host=host, port=port)
 
 
+# --- papers: paper-corpus tool (docs/plans/in-process/papers-corpus.md, §6.5) ---
+# Commands import mal_core.papers lazily; a bad manifest or config exits with code 2.
+
+papers_app = typer.Typer(
+    name="papers",
+    help="Paper corpus: fetch PDFs, extract with docling, generate REFERENCES.md, check the assertions.",
+    no_args_is_help=True,
+)
+app.add_typer(papers_app, name="papers")
+
+_PAPERS_ROOT_HELP = "Corpus root (default: output_root in mal-core/config/papers.yaml)"
+
+
+def _papers_context(papers_root: Path | None):
+    """(config, corpus root, manifest). Exits with code 2 on a bad config or manifest."""
+    from .papers.config import load_config
+    from .papers.manifest import ManifestError, load_manifest
+
+    try:
+        cfg = load_config()
+        root = papers_root or cfg.papers_root()
+        return cfg, root, load_manifest(root / "manifest.json")
+    except (ManifestError, ValueError) as exc:
+        typer.echo(f"papers: {exc}", err=True)
+        raise typer.Exit(code=2) from exc
+
+
+@papers_app.command("fetch")
+def papers_fetch(
+    theme: str | None = typer.Option(None, "--theme", help="Only this theme folder"),
+    paper_id: str | None = typer.Option(None, "--id", help="Only this manifest id"),
+    force: bool = typer.Option(False, "--force", help="Re-download even if the PDF is present"),
+    papers_root: Path | None = typer.Option(None, "--papers-root", help=_PAPERS_ROOT_HELP),
+) -> None:
+    """Download obtainable PDFs (Crossref -> Unpaywall -> Europe PMC).
+
+    Unobtainable papers are recorded as pending_* in their provenance.yaml and
+    the run continues. The exit code stays 0 for them.
+    """
+    from collections import Counter
+
+    from .papers.fetch import fetch_entry, urllib_downloader
+    from .papers.resolve import iter_candidates, urllib_json_getter, user_agent
+
+    cfg, root, manifest = _papers_context(papers_root)
+    ua = user_agent(cfg.unpaywall_email)
+    get_json = urllib_json_getter(user_agent_value=ua)
+    downloader = urllib_downloader(user_agent_value=ua)
+    counts: Counter[str] = Counter()
+    for entry in manifest.select(theme=theme, paper_id=paper_id):
+        attempts: list = []
+        candidates = (
+            iter_candidates(entry.doi, get_json=get_json, email=cfg.unpaywall_email, attempts=attempts)
+            if entry.doi
+            else ()
+        )
+        result = fetch_entry(entry, root, candidates=candidates, downloader=downloader, attempts=attempts, force=force)
+        counts[result.observed_status] += 1
+        typer.echo(f"{entry.id}  {result.observed_status}")
+    typer.echo("fetch summary: " + ", ".join(f"{k}={v}" for k, v in sorted(counts.items())))
+
+
+@papers_app.command("extract")
+def papers_extract(
+    theme: str | None = typer.Option(None, "--theme", help="Only this theme folder"),
+    paper_id: str | None = typer.Option(None, "--id", help="Only this manifest id"),
+    device: str | None = typer.Option(None, "--device", help="cpu (default, from config) or mps (opt-in)"),
+    papers_root: Path | None = typer.Option(None, "--papers-root", help=_PAPERS_ROOT_HELP),
+) -> None:
+    """Convert each downloaded PDF to Markdown with docling (--tables --ocr, no picture description)."""
+    import shutil
+
+    from .papers.extract import extract_entry, validate_device
+
+    cfg, root, manifest = _papers_context(papers_root)
+    try:
+        dev = validate_device(device or cfg.device)
+    except ValueError as exc:
+        typer.echo(f"papers: {exc}", err=True)
+        raise typer.Exit(code=2) from exc
+    if shutil.which("docling") is None:
+        typer.echo("papers: docling not found on PATH; install the group: uv sync --package mal-core --group papers", err=True)
+        raise typer.Exit(code=2)
+    for entry in manifest.select(theme=theme, paper_id=paper_id):
+        result = extract_entry(entry, root, device=dev)
+        typer.echo(f"{entry.id}  {result.status}  {result.detail}".rstrip())
+
+
+@papers_app.command("generate")
+def papers_generate(
+    papers_root: Path | None = typer.Option(None, "--papers-root", help=_PAPERS_ROOT_HELP),
+    out: Path | None = typer.Option(None, "--out", help="Output file (default: <corpus root>/REFERENCES.md)"),
+    check: bool = typer.Option(False, "--check", help="Do not write; exit 1 if the file differs from the manifest"),
+) -> None:
+    """Render REFERENCES.md from the manifest (deterministic; drift gate with --check)."""
+    from .papers.generate import is_up_to_date, write_references
+
+    _cfg, root, manifest = _papers_context(papers_root)
+    target = out or root / "REFERENCES.md"
+    if check:
+        if is_up_to_date(manifest, target):
+            typer.echo(f"{target}: up to date")
+            return
+        typer.echo(f"{target}: differs from the manifest; run without --check to regenerate", err=True)
+        raise typer.Exit(code=1)
+    changed = write_references(manifest, target)
+    typer.echo(f"{target}: {'written' if changed else 'unchanged'}")
+
+
+@papers_app.command("check")
+def papers_check(
+    papers_root: Path | None = typer.Option(None, "--papers-root", help=_PAPERS_ROOT_HELP),
+    resolve_dois: bool = typer.Option(False, "--resolve-dois", help="Resolve every DOI at doi.org (network; local only)"),
+) -> None:
+    """Run the assertions of plan §7 (a: DOIs, b: doi: tokens, c: sha256, d: tracked files)."""
+    from .papers.check import git_tracked_files, read_documents, run_checks
+    from .papers.config import REPO_ROOT
+
+    _cfg, root, manifest = _papers_context(papers_root)
+    try:
+        prefix = root.resolve().relative_to(REPO_ROOT).as_posix()
+    except ValueError as exc:
+        typer.echo("papers check: the corpus root must be inside the repository", err=True)
+        raise typer.Exit(code=2) from exc
+
+    tracked = git_tracked_files(REPO_ROOT)
+
+    def size_of(rel: str) -> int:
+        path = REPO_ROOT / rel
+        return path.stat().st_size if path.is_file() else 0
+
+    report = run_checks(
+        manifest,
+        papers_root=root,
+        prefix=prefix,
+        documents=read_documents(REPO_ROOT, tracked),
+        tracked=tracked,
+        size_of=size_of,
+        resolve=resolve_dois,
+    )
+    for line in report.failures:
+        typer.echo(f"FAIL  {line}")
+    for line in report.warnings:
+        typer.echo(f"WARN  {line}")
+    for line in report.notes:
+        typer.echo(f"NOTE  {line}")
+    verdict = "PASS" if report.ok else "FAIL"
+    typer.echo(f"{verdict}: {len(report.failures)} failure(s), {len(report.warnings)} warning(s)")
+    if not report.ok:
+        raise typer.Exit(code=1)
+
+
 def main() -> None:
     """Entry point of the ``malariasim`` console script: runs the Typer application."""
     app()
