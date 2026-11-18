@@ -1011,6 +1011,46 @@ def papers_adopt(
         raise typer.Exit(code=1)
 
 
+@papers_app.command("rescue-browser")
+def papers_rescue_browser(
+    papers_root: Path | None = typer.Option(None, "--papers-root", help=_PAPERS_ROOT_HELP),
+    headless: bool = typer.Option(True, "--headless/--headed", help="Headless Chromium (default). --headed opens windows and steals focus."),
+    max_loads: int = typer.Option(60, "--max-loads", help="Page loads per run"),
+    scratch: Path = typer.Option(Path("/tmp/papers-corpus/rescue"), "--scratch", help="Scratch directory for PDFs"),
+) -> None:
+    """Rescue open-licence paywalled papers through a real browser. Stop rules: see papers/rescue_browser.py.
+
+    Requires: uv sync --package mal-core --group rescue && playwright install chromium.
+    """
+    import json
+
+    from .papers.rescue import rescue_candidates
+    from .papers.rescue_browser import HostGate, playwright_loader, rescue_items
+    from .papers.resolve import urllib_json_getter, user_agent
+
+    cfg, root, manifest = _papers_context(papers_root)
+    ua = user_agent(cfg.unpaywall_email)
+    get_json = urllib_json_getter(user_agent_value=ua)
+    items = rescue_candidates(manifest, root, get_json=get_json, email=cfg.unpaywall_email)
+    typer.echo(f"rescue-browser: {len(items)} paywalled papers with open-licence candidates", err=True)
+    try:
+        load_pdf = playwright_loader(headless=headless, user_agent_value=ua)
+    except ImportError as exc:
+        typer.echo("papers rescue-browser: playwright not installed; uv sync --package mal-core --group rescue", err=True)
+        raise typer.Exit(code=2) from exc
+    try:
+        outcomes = rescue_items(
+            items, papers_root=root, scratch_dir=scratch, load_pdf=load_pdf, gate=HostGate(), max_loads=max_loads
+        )
+    finally:
+        load_pdf.close()  # type: ignore[attr-defined]
+    counts: dict[str, int] = {}
+    for o in outcomes:
+        counts[o.status] = counts.get(o.status, 0) + 1
+        typer.echo(json.dumps({"id": o.id, "status": o.status, "detail": o.detail, "url": o.url}, ensure_ascii=False))
+    typer.echo("rescue summary: " + ", ".join(f"{k}={v}" for k, v in sorted(counts.items())))
+
+
 @papers_app.command("extract")
 def papers_extract(
     theme: str | None = typer.Option(None, "--theme", help="Only this theme folder"),

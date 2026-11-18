@@ -33,6 +33,9 @@ ingest = []
 train = ["torch>=2.0"]
 serve = ["fastapi>=0.115", "uvicorn>=0.30"]
 papers = ["docling"]
+rescue = [
+    "playwright>=1.65.2",
+]
 
 [build-system]
 requires = ["hatchling"]
