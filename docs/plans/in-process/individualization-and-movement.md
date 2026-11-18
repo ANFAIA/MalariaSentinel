@@ -34,6 +34,19 @@ alternativas, se dice.
 | P | ¿Cómo se organizan las claves de configuración nuevas? | por especie (`species.<fila>`) o por bloque global | **por especie** (`species.<fila>`) | §12 |
 | "opción d de la revisión 2" | ¿Cómo se derivan la edad y la etapa ovárica de la hembra? | (d) híbrida: el ciclo gonotrófico es el reloj maestro y `age_days` queda como diagnóstico; las opciones (a)–(c) no se nombran en el documento | **(d)** — mismo contenido que E = (d) | §3 (`age_days`), §7 (`ovarian_stage`) |
 
+## Decisiones cerradas por el autor (ronda final)
+
+Estas decisiones son vinculantes y sustituyen a cualquier formulación anterior. Las secciones citadas ya están corregidas.
+
+| # | Tema | Decisión | Dónde se aplica |
+|---|---|---|---|
+| K-1 | Criterio G1 | G1 = la cadena de transmisión funciona de extremo a extremo en escenarios sintéticos: hay picaduras, hay transmisión y es efectiva en la persona picada. No hay densidad mínima de picaduras por mosquito ni se exige la cadena completa. Se verifica con los escenarios E00–E18, construidos a mano e incrementales. | Goals; §5.1; Nivel 6 |
+| K-2 | Personas por celda | `SLOTS_PER_CELL` es **dinámico**: máximo de `human_total` en la primera extracción de datos, más un 10 %. Se guarda en el manifiesto (`slots_per_cell`) y se reutiliza. No hay valor fijo. | §2; Paso 2; Paso 4; §12 |
+| K-3 | Duraciones de fase | DAY 8 / EVENING 4 / NIGHT 10 / DAWN 2 h, en `model_constants.yaml`. Sustituyen a la tabla compilada. Hora de inicio del día asumida: 06:00 (pendiente de confirmar). | §12.1–12.2 |
+| K-4 | Asignación de sitio de enjambre | No se eligen puntos a mano. El campo se genera con `swarm_markers_per_km2`. Regla **estocástica con acumulación**: cada macho elige entre los sitios alcanzables con peso ∝ hembras alcanzables × (1 + machos ya asignados al sitio); una opción de peso `w_suelto` = 1 [EP] lo deja **suelto** (sin sitio). Asignación en orden de `id`. Se retira `male_swarm_site_range_m`. | §8.1, §8.2, §8.5, §8.6, Paso 8, §12, E13 |
+| K-5 | Artefacto `swarm_sites.json` | Artefacto nuevo generado por el Paso 8 (recomendación aceptada). | Paso 8; Apéndice A |
+| K-6 | **Pendiente de revisión** | (a) Ausencia de separación mínima entre marcadores: se deja así y **se revisará** si E13/E15 lo muestran. (b) Simetría de la regla de la hembra: se revisará. | §8.2; §8.6 |
+
 ## Tiers de las magnitudes
 
 Cada magnitud del plan lleva su tier. Un número sin tier no entra.
@@ -185,9 +198,7 @@ paso.
 
 ## Goals
 
-*   **G1 — La cadena cierra y es observable a nivel individual.** En una corrida el
-    motor debe registrar picaduras humanas, con mosquito identificable, persona
-    identificable, fase, volumen tomado, resultado del sondeo y transmisión aplicada.
+*   **G1 — La cadena de transmisión funciona de extremo a extremo y es observable a nivel individual.** En un escenario sintético debe haber picaduras de mosquitos a personas, cada picadura registrada con mosquito, persona, fase, volumen, resultado del sondeo y transmisión aplicada; debe haber transmisión, y ésta debe ser **efectiva** en la persona picada (la infección queda establecida en su estado). G1 **no** fija una densidad mínima de picaduras por mosquito ni exige la cadena completa de una población real. Se comprueba con los escenarios E00–E18 del Apéndice A, construidos a mano e incrementales.
 *   **G2 — La decisión de picar se toma sobre individuos.** El mosquito elige una
     persona concreta por distancia y preferencia de tipo de presa; no existe "celda
     ganadora". La agregación a celda queda como **salida**, nunca como unidad de
@@ -551,11 +562,7 @@ Decisiones de diseño:
     human_id = cell_id * SLOTS_PER_CELL + slot
     ```
 
-    con `SLOTS_PER_CELL` = **65 536** (slots por celda de 1 km²) [EP] — *estimación
-    propia, sin respaldo directo*. Es el número máximo de personas que una celda puede
-    representar; el plan no fija una densidad máxima por celda (Q-E deja el
-    `human_total` por AOI sin resolver), de modo que el valor es una cota
-    deliberadamente holgada, no una medición. La clave se declara en §12.
+    con `SLOTS_PER_CELL` **dinámico**: se fija **una vez, en la primera extracción de datos del AOI**, como el máximo de `human_total` entre las celdas de esa extracción **más un 10 % de margen** (redondeado hacia arriba). Se guarda en el manifiesto como `slots_per_cell` y las extracciones posteriores lo **reutilizan**: no se recalcula, porque cambiarlo cambiaría todos los `human_id`. Si una celda supera el valor fijado, el AOI se rechaza como error de manifiesto; no se amplía en silencio. La clave se declara en §12.
     * **Unicidad**: `cell_id` ∈ [0, `n_cells`) y `slot` ∈ [0, `SLOTS_PER_CELL`) son
       rangos disjuntos, luego el par (`cell_id`, `slot`) → `human_id` es una biyección
       sobre un rango contiguo y dos personas distintas no pueden compartir identificador.
@@ -1044,24 +1051,14 @@ aritmética ** [EP]** ("estimación propia, sin respaldo directo"):
 > **retirada** `gonotrophic.feeding_success_rate`, que el motor cargaba sin consultar
 > (§12). La clave nueva `probing_success_rate` tiene rango **0,465–0,99** [EP] (§5.2);
 > el 0,825 se conserva sólo como punto de referencia histórico dentro de ese rango.
-> **El suelo de G1 se mueve con ella**: el valor de **0,036 adultos/km²** que fija el
-> Nivel 6 se deriva de estas cifras y se recalcula cuando la clave se fije por especie.
+> **G1 no tiene suelo de densidad.** El valor 0,036 adultos/km² es el dato medido del AOI (122 adultos / 3 416 km²), no un criterio: G1 se comprueba en escenarios sintéticos cuya densidad fija el propio escenario (Nivel 6).
 
 > **Nota (radio de exploración).** Esta tabla usa el disco de exploración del valor por
 > defecto **100 m** (§4, `exploration_range_m`): π·(0,1 km)² = 0,0314 km². Con la banda
 > 100–200 m el rango se multiplica por 1 a 4; la fórmula (personas en el disco ×
 > `probing_success_rate`) no cambia.
 
-Consecuencia: **G1 no se cierra sólo con el movimiento**. Con la densidad de adultos
-medida, el AOI produce del orden de **21–45 picaduras por noche en total**, es decir
-**0,172–0,366 picaduras por mosquito-noche** —una picadura cada ~2,7–5,8 mosquito-noche,
-o ~76–163 km² por picadura y noche—, frente a las **0** actuales. La densidad de picaduras escala linealmente con la densidad de adultos, de modo que el plan **debe fijar**
-(a) la densidad de adultos mínima —o un AOI de escala urbana— con la que se evalúa
-G1, y (b) que el criterio de éxito sea "picaduras humanas > 0" y no "cadena completa":
-la cadena exige además dos comidas por ciclo y la supervivencia de la hembra. Como
-referencia de escala: para alcanzar **1 picadura por mosquito-noche** el disco de
-exploración de 100 m tendría que contener ~1–2 personas, es decir una densidad de
-**≈32–68 personas/km²** (2,7–5,8× la densidad media del AOI, que es 11,8 personas/km²).
+Consecuencia: con la densidad de adultos medida, el AOI produce del orden de **21–45 picaduras por noche en total** (**0,172–0,366 picaduras por mosquito-noche**), frente a las **0** actuales. Esa cifra describe el AOI real; **no es criterio de G1** y no se fija ninguna densidad de picaduras por mosquito. G1 se comprueba en escenarios sintéticos donde deben darse picaduras, transmisión y transmisión efectiva en la persona picada (Nivel 6).
 
 **Las dos magnitudes que acotan el desplazamiento (base de la banda de E02).** La
 **longitud de trayectoria** del día está acotada por `daily_move_capacity_m` = 590 m
@@ -1096,7 +1093,7 @@ configuración (§12).
 | `olfactory_radius_m` | 30–70 | m | [P] | rastreo de pluma |
 | `visual_radius_m` | 0,25–0,72 | m | [P] | banda de aproximación visual (integrador fino) |
 | `terminal_radius_m` | 0,10–0,20 | m | [P] | radio terminal (contacto); banda única |
-| `phase_duration_hours` | DAY 12 / EVENING 3 / NIGHT 8 / DAWN 1 | h | [EP] | ventanas del enum `TimePhase` (`mobility_schedule.hpp:41-46`), **las cuatro suman 24 h**; banda **8/4/10/2 h** [EP] como variante de sensibilidad; el reparto de los bins EE/LE/EM sobre las cuatro fases lo fija §12.2 |
+| `phase_duration_hours` | DAY 8 / EVENING 4 / NIGHT 10 / DAWN 2 | h | [EP] | **decisión del autor**: valores del plan, en el YAML (`integration.phase_duration_hours`), que **sustituyen** a la tabla compilada (`mobility_schedule.hpp:41-46` sólo tiene el enum y sus ventanas en comentarios); **suman 24 h**; el reparto de los bins EE/LE/EM sobre las cuatro fases lo fija §12.2 |
 | `probing_success_rate` | 0,465–0,99 | [fracción] | [EP] | por especie; sustituye a `feeding_success_rate` (0,825), que el motor cargaba sin consultar |
 | `blood_meal_target_ul` | 0,5 | µL | [EP] | objetivo de una comida completa |
 | `first_cycle_target_ul` | 0,8 | µL | [EP] | > `blood_meal_target_ul`: hacen falta dos comidas |
@@ -1207,8 +1204,7 @@ granularidad *subcelular* del enjambre no (ver §8.3).
 | Supervivencia | tasa **propia**, separada de la hembra | **0,773 ± 0,094**/día | Epopa et al. 2017 **[M]** |
 | Sugar | dependencia de sugar como mecanismo de supervivencia | con sugar **3,84–4,94 días** de vida; sin sugar **1,94–2,99** | Gary et al. 2009 **[P]** |
 | Presupuesto de movimiento | dispersión neta **medida por experimento** (es un **rango**, no una media), no tasa diaria | **rango de 40 a 549 m** en ventana de recaptura ≤ 7 días (*coluzzii*); media **85,7 m** y **ninguno más allá de 100 m** (*arabiensis*) | Epopa 2017; Kaiser 2021 **[P]** |
-| Asignación de sitio | en la eclosión, el macho adopta **uno de los sitios alcanzables** (distancia ≤ `male_move_capacity_m`), sorteado con RNG sembrado; si no hay ninguno, **no se reproduce** (`swarm_site_id = -1`) | `male_move_capacity_m` = 50 m/día | §8.6 **[EP]** |
-| Separación entre marcadores | separación entre sitios de enjambre distintos del campo persistente; **no** es la distancia al sitio asignado | `male_swarm_site_range_m` = 100 (cota 550) m | §8.2 **[EP]** |
+| Asignación de sitio | en la eclosión, el macho elige entre los **alcanzables** (distancia ≤ `male_move_capacity_m`) con peso ∝ hembras alcanzables × (1 + machos ya asignados), o queda **suelto** (peso `w_suelto` = 1 [EP]); sin sitio (ninguno alcanzable o suelto), **no se reproduce** (`swarm_site_id = -1`) | `male_move_capacity_m` = 50 m/día | §8.6 **[EP]** |
 | Ventana de enjambre | cada noche, en la ventana posterior a la puesta de sol | inicio **18:05–18:45**; duración **28,3 min** (media del rango mensual **19–39 min**; Ouédraogo 2025 mide ≈**27 min**, compatible con esa banda); **5–33 min** tras la puesta de sol | Bimbilé Somda 2018 **[P]**; Ouédraogo 2025 **[M]** |
 | Entrada en el enjambre | un macho empieza a volar sobre el marcador 2–3 min tras la puesta de sol; otros se unen en 7–90 s | t = **46 ± 8 s** | Poda et al. 2024 **[M]** |
 | Fidelidad | el macho **conserva su sitio** durante su vida; el campo de sitios es estático, luego la permanencia es automática | un macho liberado seguía en un sitio de enjambre **8 días** después | Kaiser et al. 2021 **[P]** |
@@ -1219,10 +1215,14 @@ granularidad *subcelular* del enjambre no (ver §8.3).
 vuelo simulado) y una asistencia **por noche** (agregada por sitio).
 
 ```
+# elegir(C, H, n): s ∈ C con peso ∝ H[s] × (1 + n[s]); peso w_suelto = 1 para «suelto» (-1).
+#   H[s] = hembras alcanzables de s (para el macho); n[s] = machos ya asignados a s (acumulación).
+#   Para la hembra: M[s] = machos alcanzables de s; n_f[s] = hembras ya asignadas a s.
+# Los sitios no se eligen a mano: son el campo generado (Paso 8). Asignación en orden de id.
 al emerger el macho m (posición de la madre, x_m, y_m):
     candidatos = { s ∈ sitios : dist((x_m,y_m), s) ≤ male_move_capacity_m }   # 50 m/día
     if candidatos ≠ ∅:
-        m.swarm_site_id  = sortear_s(candidatos)          # RNG sembrado
+        m.swarm_site_id  = elegir(candidatos, H, n)       # estocástico, con acumulación; puede quedar suelto (§8.6)
         m.inseminated    = 0 ; m.nights_uninseminated = 0
     else:
         m.swarm_site_id  = -1     # estado de primera clase: SIN SITIO (§8.2);
@@ -1233,7 +1233,7 @@ al emerger la hembra f (posición de la madre, x_f, y_f):
     # mismo criterio de alcance que el macho: `male_move_capacity_m` (50 m/día)
     candidatos_f = { s ∈ sitios : dist((x_f,y_f), s) ≤ male_move_capacity_m }
     if candidatos_f ≠ ∅:
-        f.swarm_site_id  = sortear_s(candidatos_f)         # RNG sembrado
+        f.swarm_site_id  = elegir(candidatos_f, M, n_f)    # simétrica: pesa por machos alcanzables (§8.6)
     else:
         f.swarm_site_id  = -1     # SIN SITIO: no asiste a ningún enjambre
 
@@ -1311,9 +1311,8 @@ defecto es la derivada arriba.
 La unidad de la capa macho **no es la celda de 1 km**, sino el **sitio de enjambre**:
 
 *   **La hembra también recibe sitio, al nacer** (decisión F): el sitio se le asigna con
-    la misma regla de asignación que al macho (§8.2, "Regla: `male_swarm_site_range_m`
-    es la separación entre marcadores") —un sitio **alcanzable**
-    (`dist ≤ male_move_capacity_m`), sorteado con RNG sembrado—;
+    la misma regla que al macho (§8.6) —un sitio **alcanzable**
+    (`dist ≤ male_move_capacity_m`), con peso de acumulación o suelto (§8.6)—;
     si no hay ninguno alcanzable, `swarm_site_id = -1` y la hembra **no asiste a
     ningún enjambre**. El sitio de la hembra **no genera cupos**: la
     `female_attendance_rate` es la probabilidad de que una hembra **presente** en el
@@ -1339,17 +1338,7 @@ La unidad de la capa macho **no es la celda de 1 km**, sino el **sitio de enjamb
     de 1 km ⇒ un agregado anclado a la celda mezclaría machos que no pueden estar en el
     mismo sitio.
 
-**Regla: `male_swarm_site_range_m` es la separación entre marcadores, no la distancia al
-sitio asignado.** La clave describe la **separación entre los sitios de enjambre
-distintos** del campo persistente —la geometría del campo de marcadores— y **no** el
-alcance de la asignación: al nacer, el macho adopta uno de los sitios **alcanzables**,
-con `male_move_capacity_m` = 50 m/día (§8.6). Valores: **100 m** por defecto y **550 m**
-como cota **[EP]**, en el orden de magnitud del rango de dispersión neta observada
-(40–549 m, ventana de recaptura ≤ 7 días; Epopa et al. 2017 **[P]**) y del dato de
-*arabiensis* (ningún macho superó los 100 m; media 85,7 m; Kaiser et al. 2021 **[P]**).
-Consecuencia práctica: un macho que emerge a más de 50 m de cualquier marcador queda
-**sin sitio** (`swarm_site_id = -1`) y **no se reproduce** (§8.6), con independencia de
-que la separación entre marcadores sea de 100 m.
+**Regla de asignación (estocástica con acumulación).** Los sitios son el campo generado en el Paso 8 (densidad `swarm_markers_per_km2`, semilla explícita). **No se eligen a mano** y no hay separación mínima entre ellos. Al nacer, el macho considera los sitios **alcanzables** (distancia ≤ `male_move_capacity_m` = 50 m/día) y sortea uno con peso **∝ hembras alcanzables × (1 + machos ya asignados)**: se orienta hacia donde hay hembras, y el término `(1 + n)` hace que un sitio con machos atraiga más machos (acumulación). Una opción de peso `w_suelto` = 1 [EP] deja al macho **suelto**, sin sitio; así no todos los machos se asignan. Las asignaciones se hacen en orden de `id` y con RNG sembrado, para que el resultado sea reproducible. La hembra usa la misma forma con el papel invertido (peso ∝ machos alcanzables × (1 + hembras asignadas)); **esta simetría es una simplificación pendiente de revisión** (K-6). Un macho que emerge a más de 50 m de cualquier marcador queda **sin sitio** (`swarm_site_id = -1`) y **no se reproduce** (§8.6).
 
 **Campo de marcadores: estático y persistente, no un número libre por corrida.** Los
 enjambres se forman en **los mismos sitios, a las mismas horas, durante años**
@@ -1434,10 +1423,8 @@ intra-enjambre entre machos estériles individuales).
 
 **Pierde**: (a) la estructura interna del enjambre, que no discrimina la transmisión;
 (b) la heterogeneidad individual de la fidelidad al sitio (todos los machos de un
-sitio son equiprobables en la asignación, con desempate aleatorio); (c) el movimiento
-*macho → sitio* como trayectoria, modelado como un cuanto discreto: el sitio se sortea
-entre los **alcanzables** con `male_move_capacity_m` (50 m/día), y
-`male_swarm_site_range_m` sólo fija la separación entre marcadores.
+sitio: la asignación es estocástica con acumulación, §8.6); (c) el movimiento
+*macho → sitio* como trayectoria, modelado como un cuanto discreto: el sitio se sortea entre los **alcanzables** con `male_move_capacity_m` (50 m/día), con peso de acumulación, o el macho queda suelto (§8.6).
 
 #### 8.5 — Sobre la tasa de apareamiento (dos unidades distintas, `p_mate` las confundía)
 
@@ -1510,9 +1497,7 @@ cota de sensibilidad de `p_mate_pairs_per_individual`, nunca como banda de acept
 *   **Alarma**: el motor emite, por celda y noche, el número de **hembras adultas sin
     inseminar por más de N noches**. Si crece, el campo de enjambres está roto.
 *   **Asignación de sitio al nacer, y su consecuencia sobre `M(s)` y los cupos**:
-    `male_swarm_site_range_m` describe la **separación entre marcadores**, no la
-    distancia al sitio asignado; el sitio se **asigna al nacer** entre los sitios
-    **alcanzables** con `male_move_capacity_m` = 50 m/día (§8.2). Un macho sin sitio
+    el sitio se **asigna al nacer** entre los **alcanzables** con `male_move_capacity_m` = 50 m/día, sorteado con peso de acumulación, o el macho queda suelto (§8.6). Un macho sin sitio
     alcanzable conserva `swarm_site_id = -1` y **no se reproduce**: no entra en
     `M(s)` de ningún sitio, no suma en `M_disp(s)` y, por tanto, **no genera cupos**.
     Consecuencia sobre los cupos: `cupos(s) = M_disp(s) × p_mate_male_fraction`
@@ -1989,8 +1974,8 @@ retiradas, el radio que manda en el plan es
 `--disperse-max-m` (`main.cpp`) se retiran con las tres claves de `dispersal.*`; ningún
 escenario puede volver a activarlas.
 
-**Cambian:** `species.coluzzii.activity_weights` → `[0.00, 0.191, 0.676, 0.133]`
-(re-derivada con las duraciones por defecto 12/3/8/1, mapeo explícito más abajo); `species.coluzzii.salinity_hi_tol_ppt` → 10,5 (con la clave renombrada a la unidad real). `host_seeking.detect_range_m` (2000) **se retira**, no se renombra: el radio que lo sustituye es `species.<fila>.co2_activation_radius_m` = 100 m [P] (§4), y el resto de las claves de radio y de paso por celda se retiran con él (ver la tabla de retiradas).
+**Cambian:** `species.coluzzii.activity_weights` → `[0.00, 0.00, 0.735, 0.265]`
+(re-derivada con las duraciones por defecto 8/4/10/2, mapeo explícito más abajo); `species.coluzzii.salinity_hi_tol_ppt` → 10,5 (con la clave renombrada a la unidad real). `host_seeking.detect_range_m` (2000) **se retira**, no se renombra: el radio que lo sustituye es `species.<fila>.co2_activation_radius_m` = 100 m [P] (§4), y el resto de las claves de radio y de paso por celda se retiran con él (ver la tabla de retiradas).
 
 **Se crean, por especie** (`species.<fila>`; cada clave vive en las **cinco**
 superficies descritas más abajo). Inventario completo: valor, unidad, tier y
@@ -2044,7 +2029,6 @@ tampoco existe como clave configurable: su semántica es fija, §12.3).
 | `female_attendance_rate` | 0,1033 | [fracción] | [P] | Diabaté 2009 (47/455 hembras *tethered* inseminadas): probabilidad de que una hembra presente en el sitio esté en posición de cópula; **se aplica una sola vez**, en el término de presencia (`hembras_presentes(s)`, §8.1) |
 | `local_swarm_male_offer_factor` | 0 | [fracción] | [EP] | enjambre local sin marcador: no hay medición de asistencia de hembras (Kaiser et al. 2021); actúa sobre la **oferta masculina** (`male_offer_factor`), no sobre la demanda |
 | `male_move_capacity_m` | 50 (banda 40–100) | m/día | [EP] | estimación propia; orden de magnitud de la permanencia post-emergencia (< 60 % de los adultos a más de 50 m del sitio larvario) [P] y de la dispersión media 85,7 m (Kaiser et al. 2021) [P]; el escenario puede sobrescribirlo |
-| `male_swarm_site_range_m` | 100 (cota 550) | m | [EP] | **separación entre marcadores** del campo de sitios (§8.2); **no** es la distancia al sitio asignado: el alcance de la asignación lo fija `male_move_capacity_m` (50 m/día, §8.6) |
 | `male_females_per_night_max` | 3 | [hembras por macho por noche] | [M]/[NR] | Ekechukwu & Tripet 2019: límite **citado, no medido** en ese artículo |
 | `swarm_duration_min` | 28,3 (banda 19–39) | min | [P]/[M] | media del rango mensual (Bimbilé Somda et al. 2018 [P]); ≈27 min (18:05–18:45) en Ouédraogo et al. 2025 [M] |
 | `swarm_start_min_after_sunset` | 5 | min | [P] | Bimbilé Somda et al. 2018 |
@@ -2087,17 +2071,9 @@ que la cifra publicada (rango de **40 a 549 m**) es una dispersión neta **por
 experimento** con ventana ≤ 7 días, **no** una tasa diaria: la clave documenta la
 ambigüedad en vez de ocultarla.
 
-**Se crea (capa macho, bloque `mating:`)**: `male_swarm_site_range_m` — ya declarado en
-la tabla del bloque `mating:` (100 m por defecto, 550 m como cota, [EP]). Es un
-parámetro distinto de `male_move_capacity_m`: el primero fija la **separación entre
-marcadores** del campo de sitios; el segundo, **a qué sitio se asigna** el macho al
-nacer (entre los alcanzables) y cuánto se desplaza al día. **[EP]** — no hay una
-medición directa de la separación entre marcadores: se infiere del rango de dispersión;
-por eso el valor por defecto es el **conservador**.
+**No se crea (capa macho)**: `male_swarm_site_range_m` se **retira**. Su única función era fijar una separación mínima entre marcadores; la asignación ya no la usa: el campo se genera con `swarm_markers_per_km2` y el macho sortea entre los sitios alcanzables con peso de acumulación, o queda suelto (§8.6). **[EP]**
 
-**Se crea (clave global)**: `SLOTS_PER_CELL` = **65 536** slots/celda [EP]
-(estimación propia, sin respaldo directo) — número máximo de personas representadas
-por celda; con él, `human_id = cell_id * SLOTS_PER_CELL + slot` es una biyección
+**Se crea (clave de manifiesto)**: `slots_per_cell`, fijada en la primera extracción como máximo de `human_total` más 10 %; con él, `human_id = cell_id * SLOTS_PER_CELL + slot` es una biyección
 estable (§2).
 
 **Se crean (contratos, bloque `contracts:`)**: `contracts.habitat` = **"4.0"** (el
@@ -2148,7 +2124,7 @@ con **todas** las claves nuevas del plan; a partir de ahí **ninguna clave se a�
 El YAML declara hoy `activity_weights: [0.02, 0.10, 0.80, 0.08]`
 (`model_constants.yaml:66`) en el orden **[DAY, EVENING, NIGHT, DAWN]** (orden fijado
 en `species_params.hpp:30-33` y validado en `config.cc:598-610`, que exige **cuatro**
-elementos). El plan propone la fila medida `[0.00, 0.191, 0.676, 0.133]`.
+elementos). El plan propone la fila derivada con las duraciones de K-3: `[0.00, 0.00, 0.735, 0.265]` (sección 12.2).
 
 **Mapeo de los tres bins medidos a las cuatro fases del motor** (fuente:
 `papers/anopheles-dynamics/akuoko-2024-biting-behaviour-ghana.md:25-26` y la
@@ -2162,12 +2138,12 @@ derivación del propio estudio):
 
 | Fase | Horas del motor | Fracción de las horas del bin | Cálculo | Valor |
 |---|---|---|---|---|
-| DAY | 12 (06:00–18:00) | ninguna | las colecciones empezaron a las 18:00 ⇒ **no medido** | **0,000** |
-| EVENING | 3 (18:00–21:00) | 3 h de EE | 3 × 6,375 % | **0,191** |
-| NIGHT | 8 (21:00–05:00) | 1 h de EE (21–22) + 6 h de LE (22–04) + 1 h de EM (04–05) | 6,375 + 48,0 + 13,25 | **0,676** |
-| DAWN | 1 (05:00–06:00) | 1 h de EM | 13,25 | **0,133** |
+| DAY | 8 (06:00–14:00) | ninguna | ninguna hora de EE/LE/EM cae en 06–14 | **0,000** |
+| EVENING | 4 (14:00–18:00) | ninguna | ninguna hora de EE/LE/EM cae en 14–18 (las colecciones empiezan a las 18:00) | **0,000** |
+| NIGHT | 10 (18:00–04:00) | 4 h de EE (18–22) + 6 h de LE (22–04) | 4 × 6,375 + 48,0 | **0,735** |
+| DAWN | 2 (04:00–06:00) | 2 h de EM (04–06) | 2 × 13,25 | **0,265** |
 
-Suma = 1,000. La fila es `[DAY, EVENING, NIGHT, DAWN] = [0.00, 0.191, 0.676, 0.133]`, con
+Suma = 1,000. La fila es `[DAY, EVENING, NIGHT, DAWN] = [0.00, 0.00, 0.735, 0.265]`, con
 `w_DAY = 0` como **consecuencia de la falta de dato**, no como afirmación (perfil
 medido, no supuesto).
 
@@ -2179,10 +2155,7 @@ comentarios**: 06:00–18:00 / 18:00–21:00 / 21:00–05:00 / 05:00–06:00). E
 per day+phase"), **cada una de igual peso**; el único reloj es `dispersal.flight_hour`
 = 20 (`model_constants.yaml:238` → `engine.cpp:577` `set_current_hour`), usado sólo por
 `is_nighttime_hour` (`mosquito_submodel.cpp:1013`).
-El **valor por defecto** es el de esas ventanas: **DAY 12 h / EVENING 3 h / NIGHT 8 h /
-DAWN 1 h** (Σ = 24 h). La propuesta **8/4/10/2 h** queda como **variante [EP] de
-sensibilidad**, no como valor por defecto. Con el valor por defecto, el reparto
-EE/LE/EM → fases de esta tabla **no cambia**: la fila es `[0.000, 0.191, 0.676, 0.133]`.
+El **valor por defecto** son las duraciones del plan, **DAY 8 h / EVENING 4 h / NIGHT 10 h / DAWN 2 h** (Σ = 24 h), en el YAML; sustituyen a las ventanas de los comentarios de `mobility_schedule.hpp`. Para calcular el reparto hay que fijar la hora de inicio: se asume **06:00** como inicio del día, con el orden DAY → EVENING → NIGHT → DAWN, es decir, DAY 06–14, EVENING 14–18, NIGHT 18–04 y DAWN 04–06. Con ese reloj el reparto EE/LE/EM → fases es `[0.000, 0.000, 0.735, 0.265]`: la EE (18–22) y la LE (22–04) caen en NIGHT, y la EM (04–06) en DAWN. **Este reparto cambia respecto a la versión anterior del plan** y depende de la hora de inicio: si se fija otra, se recalcula.
 La tabla de duraciones vive en la configuración (`integration.phase_duration_hours`);
 `mobility_schedule.hpp` **no** contiene cálculo de duración que tocar (sólo el enum y
 sus ventanas en comentario → tabla), y el **reloj de fase se añade en el motor**
@@ -2254,7 +2227,7 @@ implementación es **0 (arnés) → 1 (línea base) → 4 (esquema) → 2, 3, 5,
 | Paso 5 — cascada y movimiento | `species.<fila>.co2_activation_radius_m`, `olfactory_radius_m`, `visual_radius_m`, `terminal_radius_m`, `flight_speed_ms`, `exploration_range_m`, `exploration_step_m`, `exploration_step_correlation`, `casting_probability`, `casting_angle_deg`, `plume_memory_s`, `anemotaxis_rule`, `wind_reference`, `wind_block_threshold_ms`, `daily_move_capacity_m`, `directed_flight_budget_h`; `integration.phase_duration_hours`, `integration.dt_terminal_s`, `integration.dt_olfactory_s`, `integration.landing_speed_mm_s`, `integration.landing_speed_hold_s` |
 | Paso 6 — estado fisiológico y seca | `arrested_daily_survival`, `gonotrophic_arrest_prob_dry`, `species.<fila>.aestivation_supported` |
 | Paso 7 — acuático por celda | `contracts.habitat` ("4.0") |
-| Paso 8 — machos y cupos | bloque `mating:` completo (`p_mate_male_fraction`, `p_mate_pairs_per_individual`, `p_mate_size_exponent`, `male_swarm_reference_size`, `female_attendance_rate`, `local_swarm_male_offer_factor`, `male_move_capacity_m`, `male_swarm_site_range_m`, `male_females_per_night_max`, `swarm_duration_min`, `swarm_start_min_after_sunset`, `swarm_height_m`, `swarm_markers_per_km2`, `swarm_markers_source`, `rain_suppresses_swarming`) y `species.<fila>.male_ratio`, `male_daily_survival` |
+| Paso 8 — machos y cupos | bloque `mating:` completo (`p_mate_male_fraction`, `p_mate_pairs_per_individual`, `p_mate_size_exponent`, `male_swarm_reference_size`, `female_attendance_rate`, `local_swarm_male_offer_factor`, `male_move_capacity_m`, `male_females_per_night_max`, `swarm_duration_min`, `swarm_start_min_after_sunset`, `swarm_height_m`, `swarm_markers_per_km2`, `swarm_markers_source`, `rain_suppresses_swarming`) y `species.<fila>.male_ratio`, `male_daily_survival` |
 | Paso 9 — sitio de oviposición | ninguna clave nueva; retira `oviposition.scale_m` |
 | Paso 10 — escenarios | sólo overrides de escenario de las claves anteriores |
 | Paso 11 — contratos y consumidores | `contracts.cogs_state` ("5.0") |
@@ -3189,8 +3162,7 @@ empieza hasta que el anterior pasa su verificación.
 
 *   **`mal-core/src/mal_core/abm/include/mal_abm_fast/human_state.hpp`** (modifica) —
     `HumanCompartmentGrid` pasa a un `HumanSoA` de individuos: `human_id` (determinista
-    y estable: `human_id = cell_id * SLOTS_PER_CELL + slot`, con `SLOTS_PER_CELL` =
-    65 536 [EP], §2), `cell_id`, `home_x/home_y` (posición fija
+    y estable: `human_id = cell_id * SLOTS_PER_CELL + slot`, con `SLOTS_PER_CELL` fijado en la primera extracción (manifiesto, §2), `cell_id`, `home_x/home_y` (posición fija
     uniforme dentro de la celda, asignada por semilla), `cur_x/cur_y` (iguales a `home`
     en esta versión), `state` y `timer`. Los compartimentos agregados pasan a
     **estadísticas derivadas** (`compute_stats()`); la API pública (`seed_infections`,
@@ -3275,10 +3247,10 @@ empieza hasta que el anterior pasa su verificación.
         `p_mate_pairs_per_individual`, `p_mate_size_exponent`,
         `male_swarm_reference_size`, `female_attendance_rate`,
         `local_swarm_male_offer_factor`, `male_move_capacity_m`,
-        `male_swarm_site_range_m`, `male_females_per_night_max`, `swarm_duration_min`,
+        `male_females_per_night_max`, `swarm_duration_min`,
         `swarm_start_min_after_sunset`, `swarm_height_m`, `swarm_markers_per_km2`,
         `swarm_markers_source`, `rain_suppresses_swarming`);
-    *   bloque global `SLOTS_PER_CELL` = 65 536;
+    *   clave de manifiesto `slots_per_cell` (fijada en la primera extracción, §2);
     *   **todas** las claves por especie de la tabla de §12 — movimiento y sensorial
         (`co2_activation_radius_m`, `olfactory_radius_m`, `visual_radius_m`,
         `terminal_radius_m`, `flight_speed_ms`, `exploration_range_m`,
@@ -3450,10 +3422,8 @@ empieza hasta que el anterior pasa su verificación.
     nuevos.
 *   **`mal-core/src/mal_core/abm/src/mosquito_submodel.cpp`** (modifica) —
     (a) **asignación de sitio al emerger**: el macho nace en la posición de la madre
-    (`mother_x`/`mother_y` de la cohorte acuática, §9) y adopta, **sorteado con RNG
-    sembrado**, uno de los sitios **alcanzables** (distancia ≤ `male_move_capacity_m`
-    = 50 m/día). `male_swarm_site_range_m` (100 m, cota 550 m) fija la **separación
-    entre marcadores**, no la distancia al sitio asignado. Si no hay ningún sitio
+    (`mother_x`/`mother_y` de la cohorte acuática, §9) y sortea uno de los sitios **alcanzables** con peso de acumulación, o queda **suelto** (distancia ≤ `male_move_capacity_m`
+    = 50 m/día). Si no hay ningún sitio
     alcanzable, `swarm_site_id = -1` ⇒ **sin sitio: no se reproduce** y no genera
     cupos (§8.6). La hembra recibe sitio al nacer con el **mismo** criterio
     (decisión F).
@@ -3756,18 +3726,8 @@ empeora, y la suite Python de `mal-core` está verde.
     *   **(a) Picaduras humanas > 0**: una corrida de 30 días del AOI de Accra registra
         **al menos una** picadura humana. Es el criterio de éxito del §P1 y el
         indicador que se compara con el estado actual (0 picaduras en 30 días).
-    *   **(b) La población de vectores no colapsa**: al final de los 30 días, la
-        densidad de adultos es **≥ el 50 %** de la densidad inicial de la misma
-        corrida, y la **densidad mínima de adultos por km² para evaluar G1 queda
-        fijada en 0,036 adultos/km²** (122 adultos / 3 416 km², [M], el valor medido
-        del §P1): por debajo de ese suelo la cascada no puede producir picaduras
-        (con 0,036 adultos/km² el presupuesto de §5.1 da **0,172–0,366 picaduras por
-        mosquito-noche** —el rango de `probing_success_rate` 0,465–0,99—, es decir
-        **21–45 picaduras por noche** en todo el AOI). El baseline
-        de la comparación es el que se capture **tras el paso acuático (Paso 7)**, no
-        el 122 → 2 actual, cuya causa el plan atribuye a otro paso. G1 **no** exige
-        la cadena completa (dos comidas por ciclo y supervivencia de la hembra): exige
-        "picaduras humanas > 0" a la densidad fijada.
+    *   **(b) La población de vectores no colapsa**: al final de los 30 días, la densidad de adultos es **≥ el 50 %** de la densidad inicial de la misma corrida. El baseline es el que se captura tras el Paso 7, no el 122 → 2 actual.
+    *   **(c) La cadena funciona en los escenarios sintéticos** (Apéndice A): hay picaduras, transmisión y la transmisión es efectiva en la persona picada. Éste es el criterio de G1; no fija ninguna densidad mínima. El 0,036 adultos/km² se conserva sólo como dato del AOI (§5.1).
 *   **Nivel 7 — revisión de la base teórica**: cada número nuevo que entra en
     `model_constants.yaml` tiene una entrada en `papers/REFERENCES.md` con su fila y
     su tier. Un número sin fila no entra.
@@ -3814,7 +3774,7 @@ AOI** (§13.3).
 | E10 | `report` | Sensibilidad a los radios | tres variantes en el mismo JSON (`variants`) | activación 50/100/200 m; olfativa 10/30/70 m; visual 0,25/0,72 m — cuantifica el peso de cada tramo de la cascada; los valores por defecto son los **verificados** |
 | E11 | `gate` | Ventana postprandial | 1 hembra alimentada el día 0 | **primer** intento de comida tras alcanzar el objetivo **no antes de 12 h** (`blood_meal_refractory_days` = 0,5 d), banda [12 h, 12 h + 1 fase]; la **reapertura progresiva** (7 % @40 h, 27 % @48 h, 68 % @72 h) se publica con banda declarada y tier **[EP]** —"estimación propia, sin respaldo directo"— y **no** es criterio de fallo |
 | E12 | `gate` | Arresto ovárico en seca | ráfaga de lluvia y después seca (`env.nc`) | fracción de hembras alimentadas sin pasar de estadio 2 ∈ **19,23–34,85 %** (*coluzzii*) **[P]**: la banda es el **dato publicado**, no un parámetro del escenario; el escenario congela la racha de secas y **mide** la fracción, que se compara contra la banda |
-| E13 | `report` | Machos y oferta de apareamiento | 100 hembras + 100 machos recién emergidos en **una celda de 1 km²** y **un único sitio de enjambre alcanzable por todos ellos** (`dist ≤ male_move_capacity_m` = 50 m para los 200 agentes, de modo que todos comparten `swarm_site_id`); `swarm_markers_per_km2` **fijado en el escenario** y `male_swarm_site_range_m` explícito | los machos se **asignan** a los sitios dentro de su alcance; la oferta se calcula con la fórmula de §8.1 y los valores por defecto (`p_mate_male_fraction` = 0,072 [P]; `female_attendance_rate` = 0,1033 [P]): con 100 hembras y 100 machos, `cupos(s)` = 100 × 0,072 = **7,2 parejas/noche** frente a 100 × 0,1033 = **10,33 hembras presentes** ⇒ `p(inseminada \| hembra)` = 0,1033 × (1 − exp(−7,2/10,33)) = **0,0518** ⇒ **≈ 85,2 % de hembras sin inseminar tras 3 noches** [EP] (derivado de la aritmética de §8.1; la banda de tolerancia la calcula y escribe el implementer a partir de esta aritmética). El 85,2 % es una **cota inferior** de la fracción sin inseminar: `M_disp` decrece con los machos ya inseminados. La banda publicada 22,3–52,8 % **se retira**: no es derivable de la fórmula |
+| E13 | `report` | Machos y oferta de apareamiento | 100 hembras + 100 machos recién emergidos en **una celda de 1 km²** y **un único sitio de enjambre alcanzable por todos ellos** (con `w_suelto` = 1, una fracción de machos puede quedar suelta: el escenario lo mide) (`dist ≤ male_move_capacity_m` = 50 m para los 200 agentes, de modo que todos comparten `swarm_site_id`); `swarm_markers_per_km2` **fijado en el escenario** | los machos se **asignan** a los sitios dentro de su alcance; la oferta se calcula con la fórmula de §8.1 y los valores por defecto (`p_mate_male_fraction` = 0,072 [P]; `female_attendance_rate` = 0,1033 [P]): con 100 hembras y 100 machos, `cupos(s)` = 100 × 0,072 = **7,2 parejas/noche** frente a 100 × 0,1033 = **10,33 hembras presentes** ⇒ `p(inseminada \| hembra)` = 0,1033 × (1 − exp(−7,2/10,33)) = **0,0518** ⇒ **≈ 85,2 % de hembras sin inseminar tras 3 noches** [EP] (derivado de la aritmética de §8.1; la banda de tolerancia la calcula y escribe el implementer a partir de esta aritmética). El 85,2 % es una **cota inferior** de la fracción sin inseminar: `M_disp` decrece con los machos ya inseminados. La banda publicada 22,3–52,8 % **se retira**: no es derivable de la fórmula |
 | E14 | `gate` | Machos presentes, enjambre todavía no | 1 hembra en celda con machos recién emergidos (antes de su primera ventana de enjambre) | **no** queda inseminada (los machos asignados a un sitio no entran al enjambre antes de la ventana); se emite la alarma `hembras_sin_inseminar`; la hembra asiste al sitio si está dentro de su alcance |
 | E15 | `gate` | *Swarm killing* | campo de marcadores + 1 enjambre en la aldea | matar los machos **asignados** al marcador deja el sitio sin oferta ⇒ la fracción de hembras sin inseminar sube; **es la prueba de que el campo de sitios es una capa estática y no un número por corrida** |
 | E16 | `report` | Contrascenario **ITN al 60 %** | el mismo campo, con ITN al 60 % | el ITN **no** compensa la pérdida de cupos del enjambre; deja por escrito un límite del modelo, no un resultado del modelo |
