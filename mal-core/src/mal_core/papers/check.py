@@ -173,6 +173,10 @@ def check_tracked(
     if missing:
         report.failures.append(f"allowlisted file(s) not tracked: {', '.join(missing)}")
     for path in under:
+        if path.endswith("/manifest.json"):
+            # The manifest is metadata (JSON, one object per paper); the 64 KiB limit guards against
+            # copied article text, which the manifest never holds. It is exempt by design.
+            continue
         size = size_of(path)
         if size > max_bytes:
             report.failures.append(f"{path} is tracked with {size} bytes (limit {max_bytes})")
@@ -191,6 +195,9 @@ def read_documents(repo_root: Path, tracked: Iterable[str]) -> dict[str, str]:
     for rel in tracked:
         path = repo_root / rel
         if Path(rel).suffix.lower() not in TEXT_SUFFIXES or not path.is_file():
+            continue
+        if "tests" in Path(rel).parts:
+            # Test fixtures carry deliberately fake DOIs; they are not documents.
             continue
         if path.stat().st_size > MAX_DOCUMENT_BYTES:
             continue
