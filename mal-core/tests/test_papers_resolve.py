@@ -146,8 +146,18 @@ def test_user_agent_carries_contact_only_when_usable():
 
 
 def test_shipped_config_has_no_credentials_and_placeholder_email():
-    cfg = load_config(DEFAULT_CONFIG)
+    cfg = load_config(DEFAULT_CONFIG, environ={})
     assert cfg.device == "cpu"
     assert cfg.output_root == "papers"
     assert cfg.unpaywall_email == PLACEHOLDER
     assert not email_is_usable(cfg.unpaywall_email)
+
+
+def test_email_env_var_overrides_shipped_placeholder_without_touching_the_file():
+    from mal_core.papers.config import EMAIL_ENV_VAR
+
+    cfg = load_config(DEFAULT_CONFIG, environ={EMAIL_ENV_VAR: "  researcher@uni-mail.org "})
+    assert cfg.unpaywall_email == "researcher@uni-mail.org"
+    assert email_is_usable(cfg.unpaywall_email)
+    # blank variable falls back to the file value
+    assert load_config(DEFAULT_CONFIG, environ={EMAIL_ENV_VAR: "  "}).unpaywall_email == PLACEHOLDER
