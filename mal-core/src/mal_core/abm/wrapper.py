@@ -131,12 +131,17 @@ def run_abm_from_manifest(
     data_root: str | Path | None = None,
     timeout: int | None = None,
     worktree: str | Path | None = None,
+    scenario: str | None = None,
     **kwargs,
 ) -> dict[str, Any]:
     """Run ABM using manifest to resolve data paths.
 
     Reads manifest, validates completeness, resolves paths,
     then calls the C++ binary via CppAbmWrapper.
+
+    ``scenario`` selects one declared scenario definition (manifest key
+    ``scenario:<id>``) and is forwarded to the binary as ``--scenario``. It is
+    looked up by id only; an undeclared id is an explicit error.
 
     When ``enable_transmission`` is true, the binary also writes a versioned
     per-run JSONL debug artifact beside its automatic transmission GIF:
@@ -146,7 +151,7 @@ def run_abm_from_manifest(
     and vector seeding/exposure/EIP event counts. This is distinct from the
     legacy ``emit_transmission_log`` daily summary JSON.
     """
-    from mal_core.download.catalog import INGEST_ARTIFACTS, resolve
+    from mal_core.download.catalog import INGEST_ARTIFACTS, resolve, resolve_scenario
     from mal_core.download.manifest import validate_completeness
 
     data_root = Path(data_root) if data_root else None
@@ -209,6 +214,11 @@ def run_abm_from_manifest(
             f"No habitat data found for AOI '{aoi}' "
             f"(manifest key '{INGEST_ARTIFACTS['habitat'].key}')"
         )
+    # Scenario: exactly the declared scenario:<id> key; no fallback to another.
+    scenario_path = (
+        resolve_scenario(aoi, scenario, data_dir=data_dir, data_root=data_root)
+        if scenario is not None else None
+    )
 
     if output_dir is None:
         output_dir = Path("runs") / aoi
@@ -254,6 +264,8 @@ def run_abm_from_manifest(
         flags["livestock_mobility"] = livestock_mobility_path
     if wind_path:
         flags["wind_field"] = wind_path
+    if scenario_path is not None:
+        flags["scenario"] = str(scenario_path)
 
     # Native in-process GIF (plan 04). `gif` arrives in three shapes:
     #   None/False   -> no GIF

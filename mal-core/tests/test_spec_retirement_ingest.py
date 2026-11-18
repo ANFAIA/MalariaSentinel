@@ -183,7 +183,9 @@ def test_habitat_gpkg_carries_the_documented_columns(tmp_path):
                 "aoi_slug"):
         assert col in gdf.columns, f"the habitat gpkg is missing the {col!r} column"
     assert set(gdf["aoi_slug"]) == {"tiny"}
-    assert set(gdf["dynamics"]) <= {"persistent", "pluvial"}
+    # The engine reads an int code (0 = persistent, 1 = pluvial), not a string.
+    assert set(gdf["dynamics"]) <= {0, 1}
+    assert gdf["dynamics"].dtype.kind == "i"
     assert (gdf["habitat_potential"] > 0).all()
 
 

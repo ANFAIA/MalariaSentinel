@@ -1,0 +1,40 @@
+{
+  "id": "E08",
+  "mode": "gate",
+  "seed": 20261117,
+  "days": 3,
+  "agents": [
+    {
+      "x": 2500,
+      "y": 2500,
+      "sex": "FEMALE",
+      "state": "HOST_SEEKING",
+      "age_days": 0
+    },
+    {
+      "x": 7500,
+      "y": 7500,
+      "sex": "FEMALE",
+      "state": "HOST_SEEKING",
+      "age_days": 0
+    }
+  ],
+  "aquatic": [],
+  "humans": [
+    {
+      "x": 2560,
+      "y": 2500,
+      "state": "SUSCEPTIBLE",
+      "timer": 0
+    },
+    {
+      "x": 7560,
+      "y": 7500,
+      "state": "SUSCEPTIBLE",
+      "timer": 0
+    }
+  ],
+  "livestock": [],
+  "overrides": {},
+  "expectations": []
+}

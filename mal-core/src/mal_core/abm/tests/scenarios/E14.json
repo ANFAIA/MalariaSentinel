@@ -1,0 +1,140 @@
+{
+  "id": "E14",
+  "mode": "gate",
+  "seed": 20261117,
+  "days": 1,
+  "agents": [
+    {
+      "x": 5200,
+      "y": 5200,
+      "sex": "FEMALE",
+      "state": "HOST_SEEKING",
+      "age_days": 0
+    },
+    {
+      "x": 5206.3,
+      "y": 5200.0,
+      "sex": "MALE",
+      "age_days": 0
+    },
+    {
+      "x": 5191.9,
+      "y": 5207.4,
+      "sex": "MALE",
+      "age_days": 0
+    },
+    {
+      "x": 5201.2,
+      "y": 5185.9,
+      "sex": "MALE",
+      "age_days": 0
+    },
+    {
+      "x": 5210.2,
+      "y": 5213.3,
+      "sex": "MALE",
+      "age_days": 0
+    },
+    {
+      "x": 5181.3,
+      "y": 5196.7,
+      "sex": "MALE",
+      "age_days": 0
+    },
+    {
+      "x": 5217.7,
+      "y": 5188.7,
+      "sex": "MALE",
+      "age_days": 0
+    },
+    {
+      "x": 5194.1,
+      "y": 5222.0,
+      "sex": "MALE",
+      "age_days": 0
+    },
+    {
+      "x": 5188.7,
+      "y": 5178.3,
+      "sex": "MALE",
+      "age_days": 0
+    },
+    {
+      "x": 5224.5,
+      "y": 5208.9,
+      "sex": "MALE",
+      "age_days": 0
+    },
+    {
+      "x": 5174.5,
+      "y": 5210.5,
+      "sex": "MALE",
+      "age_days": 0
+    },
+    {
+      "x": 5212.3,
+      "y": 5173.7,
+      "sex": "MALE",
+      "age_days": 0
+    },
+    {
+      "x": 5209.1,
+      "y": 5228.9,
+      "sex": "MALE",
+      "age_days": 0
+    },
+    {
+      "x": 5172.6,
+      "y": 5184.1,
+      "sex": "MALE",
+      "age_days": 0
+    },
+    {
+      "x": 5232.1,
+      "y": 5192.9,
+      "sex": "MALE",
+      "age_days": 0
+    },
+    {
+      "x": 5180.4,
+      "y": 5227.9,
+      "sex": "MALE",
+      "age_days": 0
+    },
+    {
+      "x": 5195.5,
+      "y": 5165.1,
+      "sex": "MALE",
+      "age_days": 0
+    },
+    {
+      "x": 5227.8,
+      "y": 5223.4,
+      "sex": "MALE",
+      "age_days": 0
+    },
+    {
+      "x": 5162.6,
+      "y": 5201.5,
+      "sex": "MALE",
+      "age_days": 0
+    },
+    {
+      "x": 5227.3,
+      "y": 5172.9,
+      "sex": "MALE",
+      "age_days": 0
+    },
+    {
+      "x": 5198.2,
+      "y": 5239.5,
+      "sex": "MALE",
+      "age_days": 0
+    }
+  ],
+  "aquatic": [],
+  "humans": [],
+  "livestock": [],
+  "overrides": {},
+  "expectations": []
+}

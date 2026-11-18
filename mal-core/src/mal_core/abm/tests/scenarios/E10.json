@@ -1,0 +1,119 @@
+{
+  "id": "E10",
+  "mode": "report",
+  "seed": 20261117,
+  "days": 3,
+  "agents": [
+    {
+      "x": 5200,
+      "y": 5200,
+      "sex": "FEMALE",
+      "state": "HOST_SEEKING",
+      "age_days": 0
+    }
+  ],
+  "aquatic": [],
+  "humans": [
+    {
+      "x": 5350,
+      "y": 5200,
+      "state": "SUSCEPTIBLE",
+      "timer": 0
+    }
+  ],
+  "livestock": [],
+  "overrides": {},
+  "expectations": [],
+  "variants": [
+    {
+      "label": "activacion_co2_50_100_200_m",
+      "id": "E10",
+      "mode": "report",
+      "seed": 20261117,
+      "days": 3,
+      "agents": [
+        {
+          "x": 5200,
+          "y": 5200,
+          "sex": "FEMALE",
+          "state": "HOST_SEEKING",
+          "age_days": 0
+        }
+      ],
+      "humans": [
+        {
+          "x": 5350,
+          "y": 5200,
+          "state": "SUSCEPTIBLE",
+          "timer": 0
+        }
+      ],
+      "aquatic": [],
+      "livestock": [],
+      "overrides": {
+        "co2_activation_radius_m": 50
+      },
+      "expectations": []
+    },
+    {
+      "label": "olfativa_10_30_70_m",
+      "id": "E10",
+      "mode": "report",
+      "seed": 20261117,
+      "days": 3,
+      "agents": [
+        {
+          "x": 5200,
+          "y": 5200,
+          "sex": "FEMALE",
+          "state": "HOST_SEEKING",
+          "age_days": 0
+        }
+      ],
+      "humans": [
+        {
+          "x": 5350,
+          "y": 5200,
+          "state": "SUSCEPTIBLE",
+          "timer": 0
+        }
+      ],
+      "aquatic": [],
+      "livestock": [],
+      "overrides": {
+        "olfactory_radius_m": 10
+      },
+      "expectations": []
+    },
+    {
+      "label": "visual_0.25_0.72_m",
+      "id": "E10",
+      "mode": "report",
+      "seed": 20261117,
+      "days": 3,
+      "agents": [
+        {
+          "x": 5200,
+          "y": 5200,
+          "sex": "FEMALE",
+          "state": "HOST_SEEKING",
+          "age_days": 0
+        }
+      ],
+      "humans": [
+        {
+          "x": 5350,
+          "y": 5200,
+          "state": "SUSCEPTIBLE",
+          "timer": 0
+        }
+      ],
+      "aquatic": [],
+      "livestock": [],
+      "overrides": {
+        "visual_radius_m": 0.25
+      },
+      "expectations": []
+    }
+  ]
+}

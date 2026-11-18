@@ -92,6 +92,20 @@ INGEST_ARTIFACTS: dict[str, IngestArtifact] = {
     ),
 }
 
+# Scenario definitions (ABM seeding/override JSON). Declared per scenario as
+# the manifest key ``scenario:<id>`` with ``files: {"<id>": "scenarios/<id>.json"}``
+# (one file per key, resolved against <data-root>/<aoi>/). Optionality is the
+# absence of the key: ``required_for_abm`` stays False. The copy is made by the
+# synthetic-AOI generator from mal-core/src/mal_core/abm/tests/scenarios/.
+SCENARIO_ARTIFACT = IngestArtifact(
+    "scenario",
+    "make_synthetic_aoi.copy_scenarios",
+    "ABM scenario definition JSON (one manifest key per scenario: scenario:<id>)",
+    required_for_abm=False,
+)
+SCENARIO_KEY_PREFIX = f"{SCENARIO_ARTIFACT.key}:"
+_SCENARIO_ID_RE = re.compile(r"^[A-Za-z0-9_\-]+$")
+
 
 # --- consumer dependency declaration ------------------------------------------
 
@@ -172,6 +186,69 @@ def resolve(
     return resolve_dataset_file(
         aoi, key, year=year, data_dir=dd, manifest={"datasets": datasets}
     )
+
+
+def scenario_key(scenario_id: str) -> str:
+    """Manifest key of one scenario definition: ``scenario:<id>``."""
+    return f"{SCENARIO_KEY_PREFIX}{scenario_id}"
+
+
+def declared_scenarios(
+    aoi: str,
+    *,
+    data_dir: Path | None = None,
+    data_root: Path | None = None,
+    manifest: dict | None = None,
+) -> list[str]:
+    """Scenario ids declared in the AOI manifest (``scenario:<id>`` keys)."""
+    _, datasets = _datasets_for(aoi, data_dir, data_root, manifest)
+    return sorted(
+        k[len(SCENARIO_KEY_PREFIX):] for k in datasets
+        if k.startswith(SCENARIO_KEY_PREFIX)
+    )
+
+
+def resolve_scenario(
+    aoi: str,
+    scenario_id: str,
+    *,
+    data_dir: Path | None = None,
+    data_root: Path | None = None,
+    manifest: dict | None = None,
+) -> Path:
+    """Path of the scenario JSON declared for ``scenario_id``.
+
+    Looks up exactly ``scenario:<scenario_id>`` and its ``files[scenario_id]``
+    entry. Never falls back to another scenario. Raises ``FileNotFoundError``
+    when the key is not declared or the declared file is missing on disk.
+    """
+    if not _SCENARIO_ID_RE.match(str(scenario_id)):
+        raise ValueError(f"invalid scenario id {scenario_id!r} (letters, digits, '_' and '-' only)")
+    dd, datasets = _datasets_for(aoi, data_dir, data_root, manifest)
+    key = scenario_key(str(scenario_id))
+    entry = datasets.get(key)
+    if entry is None:
+        declared = declared_scenarios(aoi, data_dir=dd, manifest={"datasets": datasets})
+        raise FileNotFoundError(
+            f"scenario '{scenario_id}' is not declared in the manifest for AOI "
+            f"'{aoi}' (key '{key}', {dd}). Declared scenarios: "
+            f"{', '.join(declared) or 'none'}. Declare it with "
+            f"update_dataset(aoi, '{key}', '{scenario_id}', "
+            f"'scenarios/{scenario_id}.json') or regenerate the synthetic AOI."
+        )
+    fname = (entry.get("files") or {}).get(str(scenario_id))
+    if not fname:
+        raise FileNotFoundError(
+            f"manifest entry '{key}' does not declare files['{scenario_id}'] "
+            f"({dd}/manifest.json)."
+        )
+    path = Path(dd) / fname
+    if not path.exists():
+        raise FileNotFoundError(
+            f"scenario '{scenario_id}' is declared but its file is missing on disk: "
+            f"{path}. Regenerate the AOI or fix {Path(dd) / 'manifest.json'}."
+        )
+    return path
 
 
 def resolve_inputs(
@@ -328,6 +405,12 @@ def catalog_status(
     for key, art in INGEST_ARTIFACTS.items():
         _row("artifact", key, f"ingest:{art.producer.rsplit('.', 1)[-1]}",
              required=art.required_for_abm)
+    # Scenario keys are declared per scenario (``scenario:<id>``), so one row
+    # per declared key, not one row for the bare artifact name.
+    for key in sorted(k for k in datasets if k.startswith(SCENARIO_KEY_PREFIX)):
+        _row("scenario", key,
+             f"artifact:{SCENARIO_ARTIFACT.producer.rsplit('.', 1)[-1]}",
+             required=SCENARIO_ARTIFACT.required_for_abm)
     return rows
 
 

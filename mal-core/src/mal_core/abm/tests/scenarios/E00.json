@@ -1,0 +1,20 @@
+{
+  "id": "E00",
+  "mode": "gate",
+  "seed": 20261117,
+  "days": 1,
+  "agents": [
+    {
+      "x": 2500,
+      "y": 2500,
+      "sex": "FEMALE",
+      "state": "HOST_SEEKING",
+      "age_days": 0
+    }
+  ],
+  "aquatic": [],
+  "humans": [],
+  "livestock": [],
+  "overrides": {},
+  "expectations": []
+}

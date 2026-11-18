@@ -1,0 +1,36 @@
+{
+  "id": "E07",
+  "mode": "gate",
+  "seed": 20261117,
+  "days": 3,
+  "agents": [
+    {
+      "x": 4800,
+      "y": 5200,
+      "sex": "FEMALE",
+      "state": "HOST_SEEKING",
+      "age_days": 0
+    }
+  ],
+  "aquatic": [
+    {
+      "x": 5100,
+      "y": 5200,
+      "cell_id": 45,
+      "stage": "PUPA",
+      "count": 20,
+      "development": 0.9
+    }
+  ],
+  "humans": [
+    {
+      "x": 6800,
+      "y": 5200,
+      "state": "SUSCEPTIBLE",
+      "timer": 0
+    }
+  ],
+  "livestock": [],
+  "overrides": {},
+  "expectations": []
+}

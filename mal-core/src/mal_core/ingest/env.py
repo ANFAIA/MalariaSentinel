@@ -24,6 +24,10 @@ from mal_commonlib.aoi import AOI
 
 from ._shared import register_dataset
 
+# Integer code of each habitat dynamics label, as read by the C++ engine
+# (mal-core/src/mal_core/abm/include/mal_abm_fast/wire.hpp:315).
+DYNAMICS_CODE: dict[str, int] = {"persistent": 0, "pluvial": 1}
+
 
 # -- helpers ----------------------------------------------------------------
 
@@ -77,7 +81,9 @@ def _write_habitat_patches_gpkg(
 
     # Column per habitat type + total + labelled columns.
     #   hab_type: the dominant habitat type (argmax of the six H values)
-    #   dynamics: that type's temporal class (persistent | pluvial)
+    #   dynamics: that type's temporal class as an int code (wire.hpp:315,
+    #   habitat_engine.cpp reads it with GetIntField): 0 = persistent,
+    #   1 = pluvial. A string here would be read as 0 by the engine.
     dominant_types = [
         max(_dynamics,
             key=lambda g: float(h_static[g][r, c]))
@@ -86,7 +92,8 @@ def _write_habitat_patches_gpkg(
     data: dict[str, object] = {
         "hab_type": np.array(dominant_types),
         "dynamics": np.array(
-            [_dynamics[g] for g in dominant_types]
+            [DYNAMICS_CODE[_dynamics[g]] for g in dominant_types],
+            dtype=np.int32,
         ),
         "habitat_potential": h_total[rows, cols],
         "row": rows.astype(np.int32),

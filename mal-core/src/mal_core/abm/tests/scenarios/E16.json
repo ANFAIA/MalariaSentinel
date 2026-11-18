@@ -1,0 +1,663 @@
+{
+  "id": "E16",
+  "mode": "report",
+  "seed": 20261117,
+  "days": 3,
+  "agents": [
+    {
+      "x": 5504.0,
+      "y": 5500.0,
+      "sex": "MALE",
+      "age_days": 0
+    },
+    {
+      "x": 5494.9,
+      "y": 5504.7,
+      "sex": "MALE",
+      "age_days": 0
+    },
+    {
+      "x": 5500.8,
+      "y": 5491.1,
+      "sex": "MALE",
+      "age_days": 0
+    },
+    {
+      "x": 5506.4,
+      "y": 5508.4,
+      "sex": "MALE",
+      "age_days": 0
+    },
+    {
+      "x": 5488.2,
+      "y": 5497.9,
+      "sex": "MALE",
+      "age_days": 0
+    },
+    {
+      "x": 5511.2,
+      "y": 5492.9,
+      "sex": "MALE",
+      "age_days": 0
+    },
+    {
+      "x": 5496.3,
+      "y": 5513.9,
+      "sex": "MALE",
+      "age_days": 0
+    },
+    {
+      "x": 5492.9,
+      "y": 5486.3,
+      "sex": "MALE",
+      "age_days": 0
+    },
+    {
+      "x": 5515.5,
+      "y": 5505.7,
+      "sex": "MALE",
+      "age_days": 0
+    },
+    {
+      "x": 5483.9,
+      "y": 5506.7,
+      "sex": "MALE",
+      "age_days": 0
+    },
+    {
+      "x": 5507.8,
+      "y": 5483.4,
+      "sex": "MALE",
+      "age_days": 0
+    },
+    {
+      "x": 5505.7,
+      "y": 5518.3,
+      "sex": "MALE",
+      "age_days": 0
+    },
+    {
+      "x": 5482.7,
+      "y": 5490.0,
+      "sex": "MALE",
+      "age_days": 0
+    },
+    {
+      "x": 5520.3,
+      "y": 5495.5,
+      "sex": "MALE",
+      "age_days": 0
+    },
+    {
+      "x": 5487.6,
+      "y": 5517.6,
+      "sex": "MALE",
+      "age_days": 0
+    },
+    {
+      "x": 5497.1,
+      "y": 5477.9,
+      "sex": "MALE",
+      "age_days": 0
+    },
+    {
+      "x": 5517.6,
+      "y": 5514.8,
+      "sex": "MALE",
+      "age_days": 0
+    },
+    {
+      "x": 5476.4,
+      "y": 5501.0,
+      "sex": "MALE",
+      "age_days": 0
+    },
+    {
+      "x": 5517.2,
+      "y": 5482.8,
+      "sex": "MALE",
+      "age_days": 0
+    },
+    {
+      "x": 5498.8,
+      "y": 5525.0,
+      "sex": "MALE",
+      "age_days": 0
+    },
+    {
+      "x": 5483.6,
+      "y": 5480.3,
+      "sex": "MALE",
+      "age_days": 0
+    },
+    {
+      "x": 5526.0,
+      "y": 5503.5,
+      "sex": "MALE",
+      "age_days": 0
+    },
+    {
+      "x": 5478.0,
+      "y": 5515.3,
+      "sex": "MALE",
+      "age_days": 0
+    },
+    {
+      "x": 5506.0,
+      "y": 5473.2,
+      "sex": "MALE",
+      "age_days": 0
+    },
+    {
+      "x": 5513.9,
+      "y": 5524.3,
+      "sex": "MALE",
+      "age_days": 0
+    },
+    {
+      "x": 5472.8,
+      "y": 5491.3,
+      "sex": "MALE",
+      "age_days": 0
+    },
+    {
+      "x": 5526.4,
+      "y": 5487.8,
+      "sex": "MALE",
+      "age_days": 0
+    },
+    {
+      "x": 5488.5,
+      "y": 5527.4,
+      "sex": "MALE",
+      "age_days": 0
+    },
+    {
+      "x": 5489.8,
+      "y": 5471.6,
+      "sex": "MALE",
+      "age_days": 0
+    },
+    {
+      "x": 5527.2,
+      "y": 5514.3,
+      "sex": "MALE",
+      "age_days": 0
+    },
+    {
+      "x": 5469.8,
+      "y": 5508.0,
+      "sex": "MALE",
+      "age_days": 0
+    },
+    {
+      "x": 5517.2,
+      "y": 5473.3,
+      "sex": "MALE",
+      "age_days": 0
+    },
+    {
+      "x": 5505.5,
+      "y": 5531.8,
+      "sex": "MALE",
+      "age_days": 0
+    },
+    {
+      "x": 5474.1,
+      "y": 5480.0,
+      "sex": "MALE",
+      "age_days": 0
+    },
+    {
+      "x": 5533.1,
+      "y": 5497.3,
+      "sex": "MALE",
+      "age_days": 0
+    },
+    {
+      "x": 5477.1,
+      "y": 5524.7,
+      "sex": "MALE",
+      "age_days": 0
+    },
+    {
+      "x": 5500.2,
+      "y": 5465.8,
+      "sex": "MALE",
+      "age_days": 0
+    },
+    {
+      "x": 5523.3,
+      "y": 5525.7,
+      "sex": "MALE",
+      "age_days": 0
+    },
+    {
+      "x": 5465.0,
+      "y": 5496.8,
+      "sex": "MALE",
+      "age_days": 0
+    },
+    {
+      "x": 5528.3,
+      "y": 5478.5,
+      "sex": "MALE",
+      "age_days": 0
+    },
+    {
+      "x": 5493.6,
+      "y": 5535.4,
+      "sex": "MALE",
+      "age_days": 0
+    },
+    {
+      "x": 5480.6,
+      "y": 5469.2,
+      "sex": "MALE",
+      "age_days": 0
+    },
+    {
+      "x": 5535.6,
+      "y": 5509.7,
+      "sex": "MALE",
+      "age_days": 0
+    },
+    {
+      "x": 5466.8,
+      "y": 5517.0,
+      "sex": "MALE",
+      "age_days": 0
+    },
+    {
+      "x": 5513.1,
+      "y": 5464.6,
+      "sex": "MALE",
+      "age_days": 0
+    },
+    {
+      "x": 5514.4,
+      "y": 5535.3,
+      "sex": "MALE",
+      "age_days": 0
+    },
+    {
+      "x": 5465.1,
+      "y": 5483.5,
+      "sex": "MALE",
+      "age_days": 0
+    },
+    {
+      "x": 5537.3,
+      "y": 5488.5,
+      "sex": "MALE",
+      "age_days": 0
+    },
+    {
+      "x": 5480.1,
+      "y": 5534.0,
+      "sex": "MALE",
+      "age_days": 0
+    },
+    {
+      "x": 5491.6,
+      "y": 5461.1,
+      "sex": "MALE",
+      "age_days": 0
+    },
+    {
+      "x": 5504.0,
+      "y": 5500.0,
+      "sex": "FEMALE",
+      "state": "HOST_SEEKING",
+      "age_days": 0
+    },
+    {
+      "x": 5494.9,
+      "y": 5504.7,
+      "sex": "FEMALE",
+      "state": "HOST_SEEKING",
+      "age_days": 0
+    },
+    {
+      "x": 5500.8,
+      "y": 5491.1,
+      "sex": "FEMALE",
+      "state": "HOST_SEEKING",
+      "age_days": 0
+    },
+    {
+      "x": 5506.4,
+      "y": 5508.4,
+      "sex": "FEMALE",
+      "state": "HOST_SEEKING",
+      "age_days": 0
+    },
+    {
+      "x": 5488.2,
+      "y": 5497.9,
+      "sex": "FEMALE",
+      "state": "HOST_SEEKING",
+      "age_days": 0
+    },
+    {
+      "x": 5511.2,
+      "y": 5492.9,
+      "sex": "FEMALE",
+      "state": "HOST_SEEKING",
+      "age_days": 0
+    },
+    {
+      "x": 5496.3,
+      "y": 5513.9,
+      "sex": "FEMALE",
+      "state": "HOST_SEEKING",
+      "age_days": 0
+    },
+    {
+      "x": 5492.9,
+      "y": 5486.3,
+      "sex": "FEMALE",
+      "state": "HOST_SEEKING",
+      "age_days": 0
+    },
+    {
+      "x": 5515.5,
+      "y": 5505.7,
+      "sex": "FEMALE",
+      "state": "HOST_SEEKING",
+      "age_days": 0
+    },
+    {
+      "x": 5483.9,
+      "y": 5506.7,
+      "sex": "FEMALE",
+      "state": "HOST_SEEKING",
+      "age_days": 0
+    },
+    {
+      "x": 5507.8,
+      "y": 5483.4,
+      "sex": "FEMALE",
+      "state": "HOST_SEEKING",
+      "age_days": 0
+    },
+    {
+      "x": 5505.7,
+      "y": 5518.3,
+      "sex": "FEMALE",
+      "state": "HOST_SEEKING",
+      "age_days": 0
+    },
+    {
+      "x": 5482.7,
+      "y": 5490.0,
+      "sex": "FEMALE",
+      "state": "HOST_SEEKING",
+      "age_days": 0
+    },
+    {
+      "x": 5520.3,
+      "y": 5495.5,
+      "sex": "FEMALE",
+      "state": "HOST_SEEKING",
+      "age_days": 0
+    },
+    {
+      "x": 5487.6,
+      "y": 5517.6,
+      "sex": "FEMALE",
+      "state": "HOST_SEEKING",
+      "age_days": 0
+    },
+    {
+      "x": 5497.1,
+      "y": 5477.9,
+      "sex": "FEMALE",
+      "state": "HOST_SEEKING",
+      "age_days": 0
+    },
+    {
+      "x": 5517.6,
+      "y": 5514.8,
+      "sex": "FEMALE",
+      "state": "HOST_SEEKING",
+      "age_days": 0
+    },
+    {
+      "x": 5476.4,
+      "y": 5501.0,
+      "sex": "FEMALE",
+      "state": "HOST_SEEKING",
+      "age_days": 0
+    },
+    {
+      "x": 5517.2,
+      "y": 5482.8,
+      "sex": "FEMALE",
+      "state": "HOST_SEEKING",
+      "age_days": 0
+    },
+    {
+      "x": 5498.8,
+      "y": 5525.0,
+      "sex": "FEMALE",
+      "state": "HOST_SEEKING",
+      "age_days": 0
+    },
+    {
+      "x": 5483.6,
+      "y": 5480.3,
+      "sex": "FEMALE",
+      "state": "HOST_SEEKING",
+      "age_days": 0
+    },
+    {
+      "x": 5526.0,
+      "y": 5503.5,
+      "sex": "FEMALE",
+      "state": "HOST_SEEKING",
+      "age_days": 0
+    },
+    {
+      "x": 5478.0,
+      "y": 5515.3,
+      "sex": "FEMALE",
+      "state": "HOST_SEEKING",
+      "age_days": 0
+    },
+    {
+      "x": 5506.0,
+      "y": 5473.2,
+      "sex": "FEMALE",
+      "state": "HOST_SEEKING",
+      "age_days": 0
+    },
+    {
+      "x": 5513.9,
+      "y": 5524.3,
+      "sex": "FEMALE",
+      "state": "HOST_SEEKING",
+      "age_days": 0
+    },
+    {
+      "x": 5472.8,
+      "y": 5491.3,
+      "sex": "FEMALE",
+      "state": "HOST_SEEKING",
+      "age_days": 0
+    },
+    {
+      "x": 5526.4,
+      "y": 5487.8,
+      "sex": "FEMALE",
+      "state": "HOST_SEEKING",
+      "age_days": 0
+    },
+    {
+      "x": 5488.5,
+      "y": 5527.4,
+      "sex": "FEMALE",
+      "state": "HOST_SEEKING",
+      "age_days": 0
+    },
+    {
+      "x": 5489.8,
+      "y": 5471.6,
+      "sex": "FEMALE",
+      "state": "HOST_SEEKING",
+      "age_days": 0
+    },
+    {
+      "x": 5527.2,
+      "y": 5514.3,
+      "sex": "FEMALE",
+      "state": "HOST_SEEKING",
+      "age_days": 0
+    },
+    {
+      "x": 5469.8,
+      "y": 5508.0,
+      "sex": "FEMALE",
+      "state": "HOST_SEEKING",
+      "age_days": 0
+    },
+    {
+      "x": 5517.2,
+      "y": 5473.3,
+      "sex": "FEMALE",
+      "state": "HOST_SEEKING",
+      "age_days": 0
+    },
+    {
+      "x": 5505.5,
+      "y": 5531.8,
+      "sex": "FEMALE",
+      "state": "HOST_SEEKING",
+      "age_days": 0
+    },
+    {
+      "x": 5474.1,
+      "y": 5480.0,
+      "sex": "FEMALE",
+      "state": "HOST_SEEKING",
+      "age_days": 0
+    },
+    {
+      "x": 5533.1,
+      "y": 5497.3,
+      "sex": "FEMALE",
+      "state": "HOST_SEEKING",
+      "age_days": 0
+    },
+    {
+      "x": 5477.1,
+      "y": 5524.7,
+      "sex": "FEMALE",
+      "state": "HOST_SEEKING",
+      "age_days": 0
+    },
+    {
+      "x": 5500.2,
+      "y": 5465.8,
+      "sex": "FEMALE",
+      "state": "HOST_SEEKING",
+      "age_days": 0
+    },
+    {
+      "x": 5523.3,
+      "y": 5525.7,
+      "sex": "FEMALE",
+      "state": "HOST_SEEKING",
+      "age_days": 0
+    },
+    {
+      "x": 5465.0,
+      "y": 5496.8,
+      "sex": "FEMALE",
+      "state": "HOST_SEEKING",
+      "age_days": 0
+    },
+    {
+      "x": 5528.3,
+      "y": 5478.5,
+      "sex": "FEMALE",
+      "state": "HOST_SEEKING",
+      "age_days": 0
+    },
+    {
+      "x": 5493.6,
+      "y": 5535.4,
+      "sex": "FEMALE",
+      "state": "HOST_SEEKING",
+      "age_days": 0
+    },
+    {
+      "x": 5480.6,
+      "y": 5469.2,
+      "sex": "FEMALE",
+      "state": "HOST_SEEKING",
+      "age_days": 0
+    },
+    {
+      "x": 5535.6,
+      "y": 5509.7,
+      "sex": "FEMALE",
+      "state": "HOST_SEEKING",
+      "age_days": 0
+    },
+    {
+      "x": 5466.8,
+      "y": 5517.0,
+      "sex": "FEMALE",
+      "state": "HOST_SEEKING",
+      "age_days": 0
+    },
+    {
+      "x": 5513.1,
+      "y": 5464.6,
+      "sex": "FEMALE",
+      "state": "HOST_SEEKING",
+      "age_days": 0
+    },
+    {
+      "x": 5514.4,
+      "y": 5535.3,
+      "sex": "FEMALE",
+      "state": "HOST_SEEKING",
+      "age_days": 0
+    },
+    {
+      "x": 5465.1,
+      "y": 5483.5,
+      "sex": "FEMALE",
+      "state": "HOST_SEEKING",
+      "age_days": 0
+    },
+    {
+      "x": 5537.3,
+      "y": 5488.5,
+      "sex": "FEMALE",
+      "state": "HOST_SEEKING",
+      "age_days": 0
+    },
+    {
+      "x": 5480.1,
+      "y": 5534.0,
+      "sex": "FEMALE",
+      "state": "HOST_SEEKING",
+      "age_days": 0
+    },
+    {
+      "x": 5491.6,
+      "y": 5461.1,
+      "sex": "FEMALE",
+      "state": "HOST_SEEKING",
+      "age_days": 0
+    }
+  ],
+  "aquatic": [],
+  "humans": [],
+  "livestock": [],
+  "overrides": {},
+  "expectations": []
+}
