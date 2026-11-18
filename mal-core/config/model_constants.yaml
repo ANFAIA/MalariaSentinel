@@ -266,7 +266,7 @@ oviposition:
   timeout_days: 7         # [días] timeout de búsqueda de criadero
 
 aquatic_stages:
-  egg_daily_mort: 0.08        # [1/día] mortalidad diaria de huevo; engineering prior (Giglioli no es verificable en papers/; Depinay 2004 local da ~0.99 de supervivencia diaria, ≈0.01 de mortalidad, diferencia documentada)
+  egg_daily_mort: 0.08        # [1/día] mortalidad diaria de huevo; engineering prior (Giglioli sin entrada en papers/manifest.json; Depinay 2004, doi:10.1186/1475-2875-3-29, da ~0.99 de supervivencia diaria, ≈0.01 de mortalidad, diferencia documentada)
   pupa_daily_mort: 0.05       # [1/día] mortalidad diaria de pupa
   larva_bh_s0: 0.95           # [fracción] supervivencia basal de Beverton-Holt larvaria
   larva_bh_alpha: 0.05        # [adimensional] coef de competencia α de Beverton-Holt

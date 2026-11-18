@@ -142,7 +142,7 @@ match without re-deriving it.
 | **Metric** | 90th-percentile great-circle distance from each cell that has density ≥ 0.05 × K_MAX on day 90 to the seed cell, aggregated across 5 seeds. |
 | **Target** | Median 1.0–1.4 km (Thomas 2013 negative-exp: 90th = 1.28 km; Costantini 1996: 350–650 m/day over 3 days). |
 | **Scoring** | `score = exp(-((r_90_obs − 1.2 km) / 0.4 km)²)` (Gaussian, peak at 1.2 km, σ=0.4 km). |
-| **Source** | `papers/anopheles-dynamics/dispersal-kernel-calibration.md` §2 (Thomas 2013). |
+| **Source** | `docs/papers-syntheses/dispersal-kernel-calibration.md` §2 (Thomas 2013, `doi:10.1371/journal.pone.0068679`). |
 | **Catches** | Dispersal kernel too narrow (sigma=300m, pre-commit `f7ddd44`) or too wide (sigma=1000m). |
 | **Reuses** | `mal-abm-fast/scripts/visualize_state.py` rasterio reads. |
 
@@ -163,7 +163,7 @@ match without re-deriving it.
 | **Metric** | Fraction of adults at day 30 that have `eip_progress >= EIP_THRESHOLD_GD` (110 GD). Aggregate over 5 seeds. |
 | **Target** | 0.20–0.50 at 27–28 °C (Mordecai 2013: Brière EIP curve gives ~11–14d EIP at 25–28 °C; 30d - 11d = 19d as adult, mean life 11d → 19/11 ≈ 1.7 effective cycles; with survival 0.87/day the cumulative probability of an EIP-completing adult is 0.20–0.40). |
 | **Scoring** | `score = 1.0 if 0.20 ≤ eip_frac ≤ 0.50 else exp(-((eip_frac − 0.35) / 0.15)²)`. |
-| **Source** | `papers/anopheles-dynamics/Mordecai-2013-OptimalTemperatureMalariaTransmission.md` (EIP Brière, 25 °C opt). |
+| **Source** | `doi:10.1111/ele.12015` (Mordecai et al. 2013; EIP Brière, 25 °C opt). |
 | **Catches** | EIP_BASE_C too high (EIP never completes), EIP_THRESHOLD_GD too high (no infectious adults), or mortality so high that no adult lives long enough to become infectious. |
 
 ### D4. Population stability (no extinction, no explosion)
@@ -281,9 +281,9 @@ or JSON-mode capability to return a typed Pydantic object.
 
 The system prompt template lives at
 `mal-abm-fast/tests/calibration/scorers/prompts/llm_verdict.md` and
-cites the literature directly: `papers/anopheles-dynamics/dispersal-kernel-calibration.md`
-(Thomas 2013, Costantini 1996), `papers/anopheles-dynamics/Mordecai-2013-OptimalTemperatureMalariaTransmission.md`
-(EIP Brière), plus Saarman 2019, Midega 2007, and Depinay 2004 for
+cites the literature directly: `docs/papers-syntheses/dispersal-kernel-calibration.md`
+(Thomas 2013, `doi:10.1371/journal.pone.0068679`; Costantini 1996, `doi:10.1111/j.1365-2915.1996.tb00733.x`), `doi:10.1111/ele.12015`
+(Mordecai et al. 2013, EIP Brière), plus Saarman 2019, Midega 2007, and Depinay 2004 for
 adult daily survival.
 
 ```python
@@ -637,7 +637,7 @@ cache and a deterministic-composite fallback.
 | File | Description |
 |---|---|
 | `mal-abm-fast/tests/calibration/scorers/llm_scorer.py` | The `score_with_llm` function in §3.2: `ChatOpenAI` + `with_structured_output(Verdict)`, content-hash cache, deterministic-composite fallback. One module, one client. |
-| `mal-abm-fast/tests/calibration/scorers/prompts/llm_verdict.md` | The system prompt template (the entomology calibration judge's charter). Embeds reference ranges from Costantini 1996, Saarman 2019, Midega 2007, Mordecai 2013, Depinay 2004 and cites `papers/anopheles-dynamics/dispersal-kernel-calibration.md` and `papers/anopheles-dynamics/Mordecai-2013-OptimalTemperatureMalariaTransmission.md`. |
+| `mal-abm-fast/tests/calibration/scorers/prompts/llm_verdict.md` | The system prompt template (the entomology calibration judge's charter). Embeds reference ranges from Costantini 1996, Saarman 2019, Midega 2007, Mordecai 2013, Depinay 2004 and cites `docs/papers-syntheses/dispersal-kernel-calibration.md` and `doi:10.1111/ele.12015`. |
 | `mal-abm-fast/tests/calibration/tests/test_llm_scorer.py` | Unit test for the LLM scorer with a mock `ChatOpenAI` client. Verifies cache hit, exception fallback, Pydantic validation against the `Verdict` schema. |
 | `mal-abm-fast/tests/calibration/tests/test_full_pipeline.py` | End-to-end test: 5 seeds, 90 days, LLM composite. Marked `slow` so it does not run on PR. |
 

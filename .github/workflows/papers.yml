@@ -1,0 +1,45 @@
+# Paper corpus gates (docs/plans/in-process/papers-corpus.md, §7 and §9 step 7).
+#
+# Offline and blocking: the generated index must match the manifest (drift
+# gate), and the tracked-files assertion (d) must hold (no article text under
+# papers/). DOI resolution (assertion a) is a local command, not a CI gate.
+name: papers
+
+on:
+  pull_request:
+    paths:
+      - "papers/**"
+      - "docs/papers-syntheses/**"
+      - "docs/papers-traceability.md"
+      - "mal-core/src/mal_core/papers/**"
+      - "mal-core/src/mal_core/cli.py"
+      - "mal-core/config/papers.yaml"
+      - "mal-core/tests/test_papers_*.py"
+      - ".github/workflows/papers.yml"
+  push:
+    branches: [main]
+    paths:
+      - "papers/**"
+      - "mal-core/src/mal_core/papers/**"
+      - ".github/workflows/papers.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  papers:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - name: Sync mal-core
+        run: uv sync --package mal-core
+      - name: REFERENCES.md matches the manifest (drift gate)
+        working-directory: mal-core
+        run: uv run malariasim papers generate --check
+      - name: Corpus assertions (b), (d) and manifest schema
+        working-directory: mal-core
+        run: uv run malariasim papers check
+      - name: Papers unit tests
+        working-directory: mal-core
+        run: uv run pytest tests -k papers -q --ignore=tests/test_spec_retirement_training.py --ignore=tests/test_training_pipeline.py

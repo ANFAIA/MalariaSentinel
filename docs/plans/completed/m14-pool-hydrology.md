@@ -278,9 +278,9 @@ M14 is **done** when all 11 items in §5 are checked and the calibration PR gate
 
 ## 10. References
 
-- `papers/spatial-analysis/` — TWI justification (M1.5 baseline)
-- `papers/anopheles-dynamics/` — Depinay 2004 (desiccation), Mordecai 2013 (thermal responses)
-- `papers/hydrology/` — Ward 2015 (West African pan evaporation), FAO Penman-Monteith climatology
+- Manifest theme `spatial-analysis` (`papers/manifest.json`) — TWI justification (M1.5 baseline)
+- `doi:10.1186/1475-2875-3-29` (Depinay 2004, desiccation); `doi:10.1111/ele.12015` (Mordecai 2013, thermal responses)
+- Ward 2015 (West African pan evaporation): no manifest entry; the `papers/hydrology/` folder never existed in the corpus. FAO Penman-Monteith climatology: not in the corpus.
 - KG `op-m14-pool-hydrology` (Operational), `comp-pool-hydrology` (Component), `comp-m1-5-pluvial-pool` (predecessor)
 - KG `rd-13-5da4` — the current pitfall citing the 40mm correlation as unmodeled
 - `docs/plans/in-process/m12-water-datasets.md` — sibling plan on water datasets

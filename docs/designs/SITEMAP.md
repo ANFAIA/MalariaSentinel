@@ -13,7 +13,7 @@ the same thing with different wording, which is how drift starts.
 
 | Document | Date | Author | Status | Components | Description |
 | --- | --- | --- | --- | --- | --- |
-| _(none)_ | | | | | |
+| [Papers corpus as a reconstructible artefact](../plans/in-process/papers-corpus.md) | 2026-11-17 | david-fm | Drafted plan (in process) | `papers/`, `mal-core` (papers subcommand), scoring docstrings | Replaces the versioned paper corpus with a tracked manifest, per-paper folders gitignored, generated `REFERENCES.md`, and a claims ledger. Supersedes `odd-fixes/09-docs-and-papers.md`. |
 
 ## Drafted plans (their briefs are gone)
 

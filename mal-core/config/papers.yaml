@@ -1,0 +1,8 @@
+# papers.yaml — configuration of the paper-corpus tool (mal_core.papers).
+# Plan: docs/plans/in-process/papers-corpus.md (D16, §6.5).
+# No credentials are stored here.
+
+output_root: papers                       # [path] corpus root, relative to the repository root
+unpaywall_email: REPLACE-ME@example.invalid  # [email] contact address sent to Unpaywall and Crossref
+                                          # (polite pool). The placeholder disables the Unpaywall step.
+device: cpu                               # [cpu|mps] docling accelerator; mps is opt-in

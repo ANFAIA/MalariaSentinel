@@ -132,5 +132,5 @@ M1 implementa **un único** subtipo de `HabitatPatch`: `PLUVIAL_POOL` (TWI-drive
 ---
 
 **Referencias Perplexity** (líneas, worktree):  
-`papers/perplexity-investigations/Mosquitos de la Malaria...md:1-641` · `...An. stephensi...md:1-591` · `...An. gambiae s.l...md:1-512`.  
+`local:mosquitos-de-la-malaria-biologia-comportamiento-expansion-y-variables-para-simulacion` · `local:datasets-apis-y-arquitectura-para-simulacion-geoespacial-de-habitats-de-anopheles-stephensi-capa-de-cria-y-abm` · `local:datasets-variables-y-arquitectura-para-habitats-rurales-de-anopheles-gambiae-s-l-complemento-al-sistema-abm-geoespacial-completo` (class C local sources, no DOI; the former line ranges were wrong, the Mosquitos file has 324 lines).  
 Mesa-Geo: `https://github.com/mesa/mesa-geo` v0.9.3, fuente `mesa_geo/geospace.py` y `mesa_geo/geoagent.py` consultadas vía `webfetch`.

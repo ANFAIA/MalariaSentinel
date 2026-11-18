@@ -13,7 +13,7 @@ Anchors (all papers live in papers/):
 - D19 pool persistence: Depinay 2004; Ward 2015 (promoted from the
   calibration harness 2026-10)
 - D21 dispersal: Costantini 1996; Thomas 2013; Midega 2007 (see
-  papers/anopheles-dynamics/dispersal-kernel-calibration.md)
+  docs/papers-syntheses/dispersal-kernel-calibration.md)
 - D25 cases: DHIMS II via Seidu 2026 (Mendeley 10.17632/r3c3cr7x6g)
 """
 from __future__ import annotations

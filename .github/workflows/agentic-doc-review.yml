@@ -217,6 +217,10 @@ jobs:
           PI_CODING_AGENT_DIR: ${{ runner.temp }}/pi-home
           PI_SKIP_VERSION_CHECK: "1"
           PI_TELEMETRY: "0"
+        # GitHub's default shell is `bash -eo pipefail`. Under -e a failing
+        # reviewer aborts the step before its status is captured below, and the
+        # reviewer is advisory: the step must not stop on the reviewer's exit code.
+        shell: bash --noprofile --norc -uo pipefail {0}
         run: |
           set -uo pipefail
           if [ -z "${OPENCODE_API_KEY:-}" ]; then
@@ -246,6 +250,28 @@ jobs:
                       "cacheWrite": 0
                     },
                     "contextWindow": 1048576,
+                    "maxTokens": 131072,
+                    "compat": {
+                      "supportsStore": false,
+                      "supportsDeveloperRole": false,
+                      "supportsStrictMode": true,
+                      "maxTokensField": "max_tokens"
+                    }
+                  },
+                  {
+                    "id": "minimax-m3.1-flash",
+                    "name": "MiniMax M3.1 Flash",
+                    "api": "openai-completions",
+                    "baseUrl": "https://opencode.ai/inference/go/openai/v1",
+                    "reasoning": true,
+                    "input": ["text", "image", "video"],
+                    "cost": {
+                      "input": 0.15,
+                      "output": 0.6,
+                      "cacheRead": 0.015,
+                      "cacheWrite": 0
+                    },
+                    "contextWindow": 1000000,
                     "maxTokens": 131072,
                     "compat": {
                       "supportsStore": false,

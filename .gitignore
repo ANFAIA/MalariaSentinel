@@ -100,3 +100,7 @@ mal-data-explorer/__marimo__/
 .playwright-mcp/
 .pytest_cache/
 .ruff_cache/
+papers/*/*/
+!papers/README.md
+!papers/REFERENCES.md
+!papers/manifest.json

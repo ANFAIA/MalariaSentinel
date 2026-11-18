@@ -303,8 +303,8 @@ gitagent does **not** create or use these branches. They exist only for the agen
 - [`./plan-C-oviposition-seeking.md`](./plan-C-oviposition-seeking.md)
 - `../../in-process/perf-cpp-abm-plan.md` (F1.e language, to be updated by every plan)
 - `../m7-6-wind-dispersal-plan.md` (the M7.6 windborne baseline being evolved)
-- `docs/dispersal-kernel-calibration.md` (Yang 2009 94% reduction reference)
-- `papers/anopheles-dynamics/costantini-1996-anopheles-density-survival-dispersal.md`
-- `papers/anopheles-dynamics/thomas-2013-anopheles-gambiae-gambia-dispersal.md`
-- `papers/anopheles-dynamics/depinay-2004-anopheles-simulation-model.md`
+- `docs/papers-syntheses/dispersal-kernel-calibration.md` (Yang 2009 94% reduction reference)
+- `doi:10.1111/j.1365-2915.1996.tb00733.x` (Costantini 1996)
+- `doi:10.1371/journal.pone.0068679` (Thomas 2013)
+- `doi:10.1186/1475-2875-3-29` (Depinay 2004)
 - `AGENTS.md` (calibration framework conventions in this repo)

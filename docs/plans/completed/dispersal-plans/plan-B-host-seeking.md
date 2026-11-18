@@ -24,9 +24,9 @@ We hypothesise that **wiring `approach_vector` into `HOST_SEEKING` as a directed
 
 | Source | File | Key numbers used |
 |---|---|---|
-| **Depinay et al. 2004** | `papers/anopheles-dynamics/depinay-2004-anopheles-simulation-model.md` | Active host-seeking flight along plumes; supports directed (non-random) walk during `HOST_SEEKING`. |
-| **Costantini 1996** | `papers/anopheles-dynamics/costantini-1996-anopheles-density-survival-dispersal.md` | 350–650 m/day outward displacement is a *net* of directed + passive; supports adding a 200–400 m/d directed component. |
-| **Thomas 2013** | `papers/anopheles-dynamics/thomas-2013-anopheles-gambiae-gambia-dispersal.md` | p90 1.28 km / p95 1.67 km — these are the targets for D16. Plan B's host-directed step (200–400 m/d) plus Plan A's windborne tail is expected to reach this. |
+| **Depinay et al. 2004** | `doi:10.1186/1475-2875-3-29` | Active host-seeking flight along plumes; supports directed (non-random) walk during `HOST_SEEKING`. |
+| **Costantini 1996** | `doi:10.1111/j.1365-2915.1996.tb00733.x` | 350–650 m/day outward displacement is a *net* of directed + passive; supports adding a 200–400 m/d directed component. |
+| **Thomas 2013** | `doi:10.1371/journal.pone.0068679` | p90 1.28 km / p95 1.67 km — these are the targets for D16. Plan B's host-directed step (200–400 m/d) plus Plan A's windborne tail is expected to reach this. |
 | **Huestis 2019** | `../m7-6-wind-dispersal-plan.md` | 6–11 h flights — supports the daily-step, multi-hour, directed movement. |
 | **North & Godfray 2018** | (cited in `dispersal-kernel-calibration.md`) | Settlement-to-settlement dispersal d=0.01; the *variance* of adult density per settlement cluster (D17) should match this. |
 

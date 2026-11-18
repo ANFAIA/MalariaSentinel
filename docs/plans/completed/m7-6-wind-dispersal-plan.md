@@ -76,7 +76,7 @@ D. Accept that point-sources need multi-point seeding (10+ points minimum)
 | `mal-core/.../src/main.cpp` | --wind-field CLI flag |
 | `data/ghana/wind_era5_monthly_mean_2024.tif` | 24-band ERA5 GeoTIFF |
 | `data/ghana/wind_era5_monthly_mean_2024.nc` | NetCDF source |
-| `papers/anopheles-dynamics/` | References: Huestis 2019, Faiman 2020, North & Godfray 2018, Hammond 2022 |
+| `papers/manifest.json` (theme `anopheles-dynamics`) | References: `doi:10.1038/s41586-019-1622-4` (Huestis 2019), `doi:10.1186/s12936-020-03333-2` (Faiman 2020), `doi:10.1186/s12936-018-2288-3` (North & Godfray 2018); Hammond 2022 has no manifest entry |
 
 ## References
 

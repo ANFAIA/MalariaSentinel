@@ -24,11 +24,11 @@ We hypothesise that adding a per-mosquito `natal_patch_id`, sampling a return-de
 
 | Source | File | Key numbers used |
 |---|---|---|
-| **Depinay et al. 2004** | `papers/anopheles-dynamics/depinay-2004-anopheles-simulation-model.md` | Natal site fidelity in *An. gambiae*; supports the 0.7 return probability. |
+| **Depinay et al. 2004** | `doi:10.1186/1475-2875-3-29` | Natal site fidelity in *An. gambiae*; supports the 0.7 return probability. |
 | **North & Godfray 2018** | (cited in `dispersal-kernel-calibration.md`) | Settlement-to-settlement d=0.01; supports 2 km radius for fallback. |
-| **Yang et al. 2009** | `docs/dispersal-kernel-calibration.md` | 300 m habitat removal → 94 % density reduction; supports the strong patch-bound signature D18 should match. |
-| **Costantini 1996** | `papers/anopheles-dynamics/costantini-1996-anopheles-density-survival-dispersal.md` | 350–650 m/day outward displacement — a returning female walking 200 m × 3–4 days is consistent. |
-| **Thomas 2013** | `papers/anopheles-dynamics/thomas-2013-anopheles-gambiae-gambia-dispersal.md` | p90 1.28 km — the return walk should not exceed this for a single gonotrophic cycle. |
+| **Yang et al. 2009** | `docs/papers-syntheses/dispersal-kernel-calibration.md` | 300 m habitat removal → 94 % density reduction; supports the strong patch-bound signature D18 should match. |
+| **Costantini 1996** | `doi:10.1111/j.1365-2915.1996.tb00733.x` | 350–650 m/day outward displacement — a returning female walking 200 m × 3–4 days is consistent. |
+| **Thomas 2013** | `doi:10.1371/journal.pone.0068679` | p90 1.28 km — the return walk should not exceed this for a single gonotrophic cycle. |
 | **Huestis 2019** | `../m7-6-wind-dispersal-plan.md` | 6–11 h flight — 200 m per day (one step) is conservative but consistent with the multi-day return. |
 
 ## 3. Code changes

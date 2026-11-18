@@ -6,7 +6,7 @@
 
 **MalariaSentinel is a malaria Sentinel / Decision Support System (SDSS) for malaria elimination.** It is the "Centinela" — a framework that ingests spatial and epidemiological data, models transmission risk, and surfaces actionable insights to support elimination programmes in target regions.
 
-**The reference framework is the SDSS for malaria elimination proposed by Kelly et al. (2012)** — see `papers/spatial-analysis/MalariaEliminationWithSpatialDecisionSupportSystems.md`. That paper argues for a spatial decision support framework that integrates surveillance, targeted interventions, and service delivery in endemic settings. The Centinela is the engineering realisation of that framework, parameterised for specific regions (Ghana being the first working case).
+**The reference framework is the SDSS for malaria elimination proposed by Kelly et al. (2012)** — see `doi:10.1016/j.pt.2012.04.002`. That paper argues for a spatial decision support framework that integrates surveillance, targeted interventions, and service delivery in endemic settings. The Centinela is the engineering realisation of that framework, parameterised for specific regions (Ghana being the first working case).
 
 - **Stack**: Python (uv workspace).
 - **Layout**: monorepo with 5 packages (see "Monorepo layout" below).

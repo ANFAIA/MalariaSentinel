@@ -85,20 +85,20 @@ Diallo 2026 (12,937 *An. gambiae* s.l., DNA-tagged continuous MRR, Mali, Sept-De
 
 | Source | File | Key numbers / claims |
 |---|---|---|
-| **Giraldo et al. 2023** (Current Biology) | `papers/perplexity-investigations/` (add link on import) | CO₂ plume detection up to ~60m; body odour > CO₂ for long-range; semi-field Zambia. |
+| **Giraldo et al. 2023** (Current Biology) | `doi:10.1016/j.cub.2023.04.050` | CO₂ plume detection up to ~60m; body odour > CO₂ for long-range; semi-field Zambia. |
 | **Okumu et al. 2013** (Parasites & Vectors) | (add on import) | Taxis boxes: CO₂ attracts significantly at 70m; activates at 100m. |
-| **Yang et al. 2009** (Malar J) | `papers/anopheles-dynamics/dispersal-kernel-calibration.md` §6 | Eliminating habitats within **300m of houses reduced malaria by 94%** — anchors D13 MAX. |
+| **Yang et al. 2009** (Malar J) | `docs/papers-syntheses/dispersal-kernel-calibration.md` §6 (Yang et al. 2009, no manifest entry) | Eliminating habitats within **300m of houses reduced malaria by 94%** — anchors D13 MAX. |
 | **Spitzen et al. 2013** | (cited in dispersal-kernel-calibration.md) | An. gambiae responds to CO₂ at 60–70m in low-wind nocturnal conditions. |
-| **Costantini et al. 1996** | `papers/anopheles-dynamics/costantini-1996-...md` | 350–650 m/day net displacement (directed + passive); 35m CO₂ baseline. |
-| **Thomas et al. 2013** (PLOS ONE) | `papers/anopheles-dynamics/thomas-2013-...md` | p90 1.28 km, p95 1.67 km; p95 half-Cauchy 2.83 km. Anchors D16. |
-| **Depinay et al. 2004** | `papers/anopheles-dynamics/depinay-2004-...md` | Active host-seeking flight along plumes — supports directed (non-random) walk. |
+| **Costantini et al. 1996** | `doi:10.1111/j.1365-2915.1996.tb00733.x` | 350–650 m/day net displacement (directed + passive); 35m CO₂ baseline. |
+| **Thomas et al. 2013** (PLOS ONE) | `doi:10.1371/journal.pone.0068679` | p90 1.28 km, p95 1.67 km; p95 half-Cauchy 2.83 km. Anchors D16. |
+| **Depinay et al. 2004** | `doi:10.1186/1475-2875-3-29` | Active host-seeking flight along plumes — supports directed (non-random) walk. |
 | **Okal et al. 2013** (Malar J) | (add on import) | Water vapour pre-oviposition attractant; ≥5m in semi-field; "navigate through the landscape". |
 | **Lindh et al. 2015** (Malar J) | (add on import) | Cedrol attracts gravid females at **9+m** in semi-field; 84% trap rate with soil infusion. |
 | **Mwingira et al. 2020** (J Chem Ecol) | (add on import) | Nonane, 2,4-PD attractants; DMDS/DMTS repellents; larval-stage infochemicals. |
 | **Herrera-Varela et al. 2014** (Malar J) | (add on import) | Soil infusion attracts 2× over lake water alone; chemical cues. |
 | **Diallo et al. 2026** (bioRxiv, Mali MRR) | (add on import) | **70% recaptured in different zone from release** (r=0.97). "No site fidelity" for feeding, resting, oviposition. |
 | **Epopa et al. 2017** (Parasites & Vectors) | (add on import) | Male dispersal 40–549m over 7 days; release location explains 44% of variance. |
-| **Saarman et al. 2019** (Malar J) | `papers/anopheles-dynamics/saarman-2019-...md` | Mean dispersal 579m (CI 521–636). |
+| **Saarman et al. 2019** (Malar J) | `doi:10.1186/s12936-019-3077-3` | Mean dispersal 579m (CI 521–636). |
 
 ### Anchor summary
 

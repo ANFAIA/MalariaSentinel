@@ -5,7 +5,7 @@ in the aquatic JSONs (``*_dayNNN_aquatic.json`` with ``by_stage``
 egg/larva/pupa). This scorer validates the stage distribution of the
 aquatic population against stage-duration data:
 
-- Bayoh & Lindsay 2003 (papers/anopheles-dynamics/, constant 25 C):
+- Bayoh & Lindsay 2003 (doi:10.1079/ber2003259, constant 25 C):
   egg, larval-instar and pupa durations give the expected larva and
   pupa fractions.
 - Ouedraogo et al. 2024 (semi-field, Burkina Faso): L1 -> pupation
