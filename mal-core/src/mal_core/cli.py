@@ -954,6 +954,63 @@ def papers_fetch(
     typer.echo("fetch summary: " + ", ".join(f"{k}={v}" for k, v in sorted(counts.items())))
 
 
+@papers_app.command("rescue-list")
+def papers_rescue_list(
+    papers_root: Path | None = typer.Option(None, "--papers-root", help=_PAPERS_ROOT_HELP),
+    paper_id: str | None = typer.Option(None, "--id", help="Only this manifest id"),
+) -> None:
+    """JSON list of pending_paywalled papers that have an open-licence candidate URL.
+
+    Input for the papers-rescue agent. Closed-access papers are never listed.
+    """
+    import json
+
+    from .papers.resolve import urllib_json_getter, user_agent
+    from .papers.rescue import rescue_candidates
+
+    cfg, root, manifest = _papers_context(papers_root)
+    get_json = urllib_json_getter(user_agent_value=user_agent(cfg.unpaywall_email))
+    entries = manifest.select(paper_id=paper_id) if paper_id else manifest.entries
+    items = rescue_candidates(manifest, root, get_json=get_json, email=cfg.unpaywall_email, entries=entries)
+    payload = [
+        {
+            "id": item.entry.id,
+            "theme": item.entry.theme,
+            "slug": item.entry.slug,
+            "doi": item.entry.doi,
+            "pdf_sha256": item.entry.pdf_sha256,
+            "candidates": [
+                {"resolver": c.resolver, "url": c.url, "licence": c.licence} for c in item.candidates
+            ],
+        }
+        for item in items
+    ]
+    typer.echo(json.dumps(payload, indent=2, ensure_ascii=False))
+
+
+@papers_app.command("adopt")
+def papers_adopt(
+    paper_id: str = typer.Option(..., "--id", help="Manifest id"),
+    pdf_file: Path = typer.Option(..., "--file", help="PDF obtained by the rescue agent"),
+    source_url: str = typer.Option(..., "--source-url", help="URL the PDF was obtained from"),
+    licence: str = typer.Option(..., "--licence", help="Open licence URL or name, as observed"),
+    papers_root: Path | None = typer.Option(None, "--papers-root", help=_PAPERS_ROOT_HELP),
+) -> None:
+    """Record a rescued PDF after the same checks as fetch. Refuses invalid input untouched."""
+    from .papers.rescue import adopt_pdf
+
+    _cfg, root, manifest = _papers_context(papers_root)
+    try:
+        entry = manifest.get(paper_id)
+        result = adopt_pdf(entry, root, pdf_file, source_url=source_url, licence=licence)
+    except (KeyError, ValueError) as exc:
+        typer.echo(f"papers adopt: {exc}", err=True)
+        raise typer.Exit(code=2) from exc
+    typer.echo(f"{entry.id}  {result.observed_status}  {result.pdf_path or ''}".rstrip())
+    if result.observed_status != "ok":
+        raise typer.Exit(code=1)
+
+
 @papers_app.command("extract")
 def papers_extract(
     theme: str | None = typer.Option(None, "--theme", help="Only this theme folder"),
