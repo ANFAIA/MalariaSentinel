@@ -1,6 +1,6 @@
 # Plan: `papers/` as a reconstructible artefact
 
-Status: **in-process — design closed 2026-11-17 (decisions D1–D27); implementation pending in a new session. Handoff in §12.**
+Status: **executed 2026-11-18 (steps 1–7); PR pending. Execution record in §13.**
 Date: 2026-11-17. Branch: `docs/papers`. Author: david-fm.
 Companions: none. This document is self-contained.
 
@@ -483,3 +483,51 @@ implementing session does not need to ask the author.
 
 **Order for the new session:** regenerate the manifest (step 2) → tester approval
 → ledger (step 3) → steps 4–7 as written in §9, each with its own tester gate.
+
+## 13. Execution record (2026-11-18)
+
+Steps executed in the order of §9, on branch `docs/papers`. Deviations from
+the text of the plan, each decided by the author's instruction to finish the
+work coherently with the plan:
+
+- **Step 2.** `papers/manifest.json` uses the schema of §6.2 with these
+  changes: `observed_status` is not a manifest field (it lives in each paper's
+  `provenance.yaml`); `path`, `header_notes`, `hybrid_full_text`,
+  `year_candidates` are dropped; `superseded_files` records the D27 merges;
+  `authors`, `journal`, `year` may be null when the source has no value.
+  Fifteen DOIs cited by documents were added as entries (check (b)).
+- **Step 3.** The ledger's `verified` means "quoted from the abstract in the
+  local summary", not "checked against the paper text" (stated in its
+  Purpose). Nine rows are candidates for `refuted`, decided by the author.
+- **Step 4.** Class B: two files, not four (`dispersal-kernel-calibration`,
+  `biting-rate-eip-gonotrophic-parameters-reference`), moved to
+  `docs/papers-syntheses/` (OPEN-2 default). Hybrids deleted per D23; seven
+  entries lost their only survivor file and stay in the manifest (D23).
+  AGENTS.md:9 changed as Q11 approved, to `doi:10.1016/j.pt.2012.04.002`.
+- **Step 6.** Class A summaries and class C files deleted from the working
+  tree and the index; class C entries removed from the manifest (they are not
+  papers). `tools/extract_papers.py` and the brief `docs/designs/papers-corpus.md`
+  deleted; `docs/designs/SITEMAP.md` row points at this plan.
+  The DOI of Bockarie 1995 in the class B synthesis returned 404 and was
+  replaced by its PMID with the DOI marked "not verified".
+  Recovery: commit `9172430` holds every deleted file (`git show 9172430:<path>`);
+  a local archive of the working tree before deletion is at
+  `~/.local/share/malariasim-backups/papers-pre-step6-9172430.tar.gz`.
+- **Step 7.** Assertion (d) exempts `papers/manifest.json` from the 64 KiB
+  limit: the 64 KiB rule guards against copied article text, and the manifest
+  is metadata (about 110 KB, one object per paper). Assertion (b) reads
+  documents only (tests are excluded). `REFERENCES.md` is generated;
+  `.github/workflows/papers.yml` runs the drift gate, `papers check`, and the
+  papers tests on pull requests.
+
+Open after execution:
+
+- `docs/concepts/scoring/scoring.tex:1198,1204` and `docs/concepts/scoring/questions.md:471`
+  describe the earlier state (anchors pointing into `papers/`). They belong to the
+  concept-document process and were not edited.
+- Seven class A entries have no survivor file; rebuild with `malariasim papers fetch`
+  or from git history.
+- Three slug/author mismatches against Crossref (Alemayehu 2024, Slimani 2026,
+  Nkemka 2021) were reported and not changed.
+- D9 (history rewrite) not executed; blobs of the removed files remain in history.
+
