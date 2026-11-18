@@ -403,6 +403,7 @@ OUTPUT
     int         year        = 2024;
     int         month       = 6;
     int         seed        = 1;
+    std::string scenario_path;   // --scenario <file.json> (plan 13.2)
     int         days        = 30;
     int         warmup_bands = 0;
     int         n_rollouts  = 1;
@@ -568,6 +569,13 @@ OUTPUT
                     "windborne long-range migration with night-only flight "
                     "(18-06h) during monsoon/Harmattan season (M7.6).")
         ->group("Input Data");
+
+    // ─── Scenario (plan 13.2) ────────────────────────────────────────────
+    run->add_option("--scenario", scenario_path,
+                    "Scenario JSON: individuals at metric AOI positions. "
+                    "Forces SCENARIO seeding, human seeding 'none' and "
+                    "initial human prevalence 0. Its seed and days must equal "
+                    "--seed and --days; requires --n-rollouts 1.");
 
     // ─── Seeding ─────────────────────────────────────────────────────────
     run->add_option("--seeding-mode", seeding_mode,
@@ -856,6 +864,39 @@ OUTPUT
     seeding_config.n_adults_per_patch    = seed_adults_per_patch;
     seeding_config.n_immatures_per_patch = seed_immatures_per_patch;
     seeding_config.host_weight_radius_km = host_seeding_radius_km;
+
+    // -- Scenario: the file fixes the population; the CLI must agree -------
+    if (!scenario_path.empty()) {
+        std::shared_ptr<const mal_abm_fast::ScenarioSpec> spec;
+        try {
+            spec = std::make_shared<const mal_abm_fast::ScenarioSpec>(
+                mal_abm_fast::load_scenario_spec(scenario_path));
+        } catch (const std::exception& e) {
+            std::cerr << "abm_run: " << e.what() << "\n";
+            return EXIT_FAILURE;
+        }
+        if (spec->seed != static_cast<uint64_t>(seed)) {
+            std::cerr << "abm_run: scenario seed " << spec->seed
+                      << " differs from --seed " << seed
+                      << " (the scenario file is the single source)\n";
+            return EXIT_FAILURE;
+        }
+        if (spec->days != days) {
+            std::cerr << "abm_run: scenario days " << spec->days
+                      << " differ from --days " << days << "\n";
+            return EXIT_FAILURE;
+        }
+        if (n_rollouts != 1) {
+            std::cerr << "abm_run: --scenario requires --n-rollouts 1\n";
+            return EXIT_FAILURE;
+        }
+        seeding_config.mode = mal_abm_fast::SeedingMode::SCENARIO;
+        seeding_config.scenario = spec;
+        // The scenario is the whole population: no human seeding, no
+        // prevalence seeded from the human grid.
+        human_seeding_mode = "none";
+        initial_human_prevalence = 0.0;
+    }
 
     // -- Runtime overrides for dispersal / larval parameters -----------
     mal_abm_fast::RuntimeOverrides overrides;

@@ -27,6 +27,7 @@
 
 #include <array>
 #include <cstdint>
+#include <string_view>
 
 namespace mal_abm_fast {
 
@@ -52,6 +53,13 @@ struct xoshiro256pp {
 
 // splitmix64 — 64-bit avalanche mixer used to derive sub-seeds.
 uint64_t splitmix64(uint64_t& state);
+
+// Derive an independent sub-stream seed from a master seed and a label
+// (FNV-1a over the label, mixed with the master through splitmix64).
+// Deterministic and order-independent: the result depends only on
+// (master, label), never on how many draws the master has made, so every
+// subsystem gets its own stream from the single `--seed` (plan 13.4).
+uint64_t derive_substream_seed(uint64_t master, std::string_view label);
 
 // ---------------------------------------------------------------------------
 // F1.b canonical PRNG — the type the 4 implementation subagents use.

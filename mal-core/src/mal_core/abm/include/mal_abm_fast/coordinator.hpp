@@ -156,6 +156,15 @@ public:
     /// fidelity.
     std::vector<PatchState> to_dataframe();
 
+    /// Register a grid cell that a SCENARIO places an individual or an
+    /// aquatic cohort in (plan 13.3). The cell becomes a candidate, so
+    /// `to_dataframe()` emits its PatchState even when it is not a habitat
+    /// candidate (E07 needs a breeding site outside the candidate union).
+    /// Returns the stable pid: the gpkg index when the cell carries a
+    /// habitat patch, otherwise a fresh id. Same numbering rule as
+    /// `to_dataframe()`, so the two paths agree.
+    int64_t register_scenario_cell(int32_t row, int32_t col);
+
     /// Identify viable patches (potential clear of the candidate floor)
     /// and build the per-patch seed instructions for the submodel.
     /// `config.min_water_frac` / `config.min_twi` are ignored by the
@@ -225,6 +234,9 @@ private:
     std::chrono::sys_days                     current_date_;
     std::unordered_map<std::pair<int32_t, int32_t>, int64_t, PairHash>
         patch_registry_;   ///< stable pid per (row, col) candidate cell
+    /// Cells forced into the candidate union by a scenario (see
+    /// `register_scenario_cell`). Duplicates are harmless: the union is a set.
+    std::vector<std::pair<int32_t, int32_t>> scenario_cells_;
     int64_t                              next_patch_id_ = 0;
     std::vector<PatchState>                   cached_states_;
     /// Species salinity high-tolerance (psu); default from the default species row.

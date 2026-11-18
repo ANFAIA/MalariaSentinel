@@ -34,6 +34,7 @@
 #include "mal_abm_fast/aoi.hpp"
 #include "mal_abm_fast/dispersal.hpp"
 #include "mal_abm_fast/seeding.hpp"
+#include "mal_abm_fast/prng.hpp"
 #include "mal_abm_fast/aquatic_cohort_bank.hpp"
 #include "mal_abm_fast/birth_rate.hpp"
 #include "mal_abm_fast/gonotrophic_cycle.hpp"
@@ -214,6 +215,7 @@ MosquitoSubmodel::MosquitoSubmodel(int32_t n_patches,
                                    uint64_t seed,
                                    RuntimeOverrides overrides)
     : rng_(seed), overrides_(overrides) {
+    cohort_bank_.seed_streams(derive_substream_seed(seed, "aquatic"));
     if (n_patches <= 0 || n_adults_per_patch < 0 ||
         n_immatures_per_patch < 0 ||
         (n_adults_per_patch == 0 && n_immatures_per_patch == 0)) {
@@ -301,6 +303,7 @@ MosquitoSubmodel::MosquitoSubmodel(int32_t n_patches,
                                    RuntimeOverrides overrides)
     : rng_(seed), overrides_(overrides) {
     (void)n_patches;  // not needed; instructions are explicit
+    cohort_bank_.seed_streams(derive_substream_seed(seed, "aquatic"));
     if (instructions.empty()) {
         soa_.n_alive  = 0;
         soa_.next_uid = 0;
@@ -418,6 +421,45 @@ MosquitoSubmodel::MosquitoSubmodel(int32_t n_patches,
             cohort_bank_.seed_stage(
                 inst.patch_id, AquaticStage::EGG, 0, n_egg, 0.0f);
         }
+    }
+    soa_.n_alive  = static_cast<int64_t>(soa_.uid.size());
+    soa_.next_uid = static_cast<int64_t>(soa_.uid.size());
+}
+
+void MosquitoSubmodel::seed_scenario(
+    const ScenarioSpec& spec,
+    const std::function<ScenarioCell(double, double)>& locate) {
+    for (const auto& a : spec.agents) {
+        const ScenarioCell c = locate(a.x, a.y);
+        soa_.uid.push_back(static_cast<int64_t>(soa_.uid.size()));
+        soa_.patch_id.push_back(c.pid);
+        soa_.row.push_back(c.row);
+        soa_.col.push_back(c.col);
+        soa_.stage.push_back(1);  // adult
+        soa_.sex.push_back(static_cast<uint8_t>(a.sex));
+        soa_.lon.push_back(static_cast<float>(c.lon));
+        soa_.lat.push_back(static_cast<float>(c.lat));
+        soa_.development_progress.push_back(0.0f);
+        soa_.parasite_eip_progress.push_back(0.0f);
+        soa_.aquatic_stage.push_back(0);
+        soa_.larval_instar.push_back(0);
+        soa_.stage_age.push_back(a.age_days);
+        soa_.days_since_active.push_back(0);
+        soa_.gonotrophic_state.push_back(static_cast<uint8_t>(a.state));
+        soa_.gonotrophic_timer.push_back(0);
+        soa_.gonotrophic_cycles.push_back(0);
+        soa_.feeding_success.push_back(0.0f);
+        soa_.species_id.push_back(static_cast<uint8_t>(species_params_.id));
+        soa_.vector_state.push_back(static_cast<uint8_t>(
+            a.infective ? VectorTransmissionState::INFECTIOUS
+                        : VectorTransmissionState::SUSCEPTIBLE));
+        soa_.last_patch_update_row.push_back(c.row);
+        soa_.last_patch_update_col.push_back(c.col);
+    }
+    for (const auto& aq : spec.aquatic) {
+        const ScenarioCell c = locate(aq.x, aq.y);
+        cohort_bank_.seed_stage(c.pid, aq.stage, aq.instar, aq.count,
+                                aq.development);
     }
     soa_.n_alive  = static_cast<int64_t>(soa_.uid.size());
     soa_.next_uid = static_cast<int64_t>(soa_.uid.size());

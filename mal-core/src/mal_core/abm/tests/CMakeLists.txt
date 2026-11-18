@@ -213,3 +213,11 @@ target_link_libraries(test_viz_tx
     PRIVATE mal_abm_fast_core GTest::gtest GTest::gtest_main mal_abm_fast::warnings
 )
 gtest_discover_tests(test_viz_tx DISCOVERY_TIMEOUT 30)
+
+# SCENARIO seeding (plan 13.2 / 13.3 / 13.4): strict scenario JSON loader,
+# derive_substream_seed, seed_scenario, seed_streams, register_scenario_cell.
+add_executable(test_scenario_seeding test_scenario_seeding.cpp)
+target_link_libraries(test_scenario_seeding
+    PRIVATE mal_abm_fast_core GTest::gtest GTest::gtest_main mal_abm_fast::warnings netCDF::netcdf
+)
+gtest_discover_tests(test_scenario_seeding DISCOVERY_TIMEOUT 30)

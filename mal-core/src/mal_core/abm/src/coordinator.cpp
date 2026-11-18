@@ -153,6 +153,36 @@ void CoordinatorModel::update_habitat_day(float gamma_t) {
               << " / " << (n) << "\n";
 }
 
+int64_t CoordinatorModel::register_scenario_cell(int32_t row, int32_t col) {
+    const int32_t H = climate_->h();
+    const int32_t W = climate_->w();
+    if (row < 0 || col < 0 || row >= H || col >= W) {
+        throw std::runtime_error(
+            "register_scenario_cell: cell (" + std::to_string(row) + ", " +
+            std::to_string(col) + ") is outside the " + std::to_string(H) +
+            "x" + std::to_string(W) + " grid");
+    }
+    const std::pair<int32_t, int32_t> cell{row, col};
+    scenario_cells_.push_back(cell);
+
+    // Same rule as to_dataframe(): the gpkg index (last patch in the cell
+    // wins) when the cell carries a habitat patch; else the stable registry.
+    int64_t pid = -1;
+    const auto& patches = habitat_.patches();
+    for (size_t i = 0; i < patches.size(); ++i) {
+        if (patches[i].row == row && patches[i].col == col) {
+            pid = static_cast<int64_t>(i);
+        }
+    }
+    if (pid < 0) {
+        auto reg_it = patch_registry_.find(cell);
+        pid = (reg_it != patch_registry_.end()) ? reg_it->second
+                                                : next_patch_id_++;
+    }
+    patch_registry_[cell] = pid;
+    return pid;
+}
+
 std::vector<PatchState> CoordinatorModel::to_dataframe() {
     const int32_t H = climate_->h();
     const int32_t W = climate_->w();
@@ -172,6 +202,9 @@ std::vector<PatchState> CoordinatorModel::to_dataframe() {
         if (total < habitat_candidate_min_engine()) continue;
         candidates.insert({static_cast<int32_t>(i / W),
                            static_cast<int32_t>(i % W)});
+    }
+    for (const auto& cell : scenario_cells_) {
+        candidates.insert(cell);
     }
 
     std::unordered_map<std::pair<int32_t, int32_t>, int64_t, PairHash>

@@ -18,6 +18,7 @@
 
 #include <cstdint>
 #include <functional>
+#include <random>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -72,6 +73,12 @@ public:
     void seed_stage(int64_t patch_id, AquaticStage stage,
                     uint8_t instar, int64_t count, float development);
 
+    // Seed the three aquatic sub-streams (washout, stage mortality, larval
+    // mortality) from the master seed (plan 13.4). Each stream is a member
+    // that persists across days; the streams are NOT re-seeded per call.
+    // Default-constructed banks use fixed zero seeds (tests only).
+    void seed_streams(uint64_t master_seed);
+
     // Daily update: advance development, apply mortality, promote
     // through lifecycle stages. Call once per day before
     // collect_emergence().
@@ -107,6 +114,10 @@ public:
 
 private:
     std::vector<AquaticCohort> cohorts_;
+
+    std::mt19937_64 washout_rng_{0};
+    std::mt19937_64 stage_mortality_rng_{0};
+    std::mt19937_64 larva_mortality_rng_{0};
 
     // Active species for salinity response (defaults to coluzzii: the
     // struct's in-class defaults give id + canonical_name = coluzzii).

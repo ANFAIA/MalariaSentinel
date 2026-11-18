@@ -31,8 +31,13 @@
 
 #include <array>
 #include <cstdint>
+#include <map>
+#include <memory>
+#include <string>
 #include <vector>
 
+#include "aquatic_stages.hpp"
+#include "gonotrophic_cycle.hpp"
 #include "prng.hpp"
 
 namespace mal_abm_fast {
@@ -41,12 +46,86 @@ enum class SeedingMode {
     UNIFORM,        // explicit per-patch adult/immature counts (SeedingConfig)
     RANDOM_VIABLE,  // N random points from viable patches
     EXPLICIT,       // user-provided lat/lon
-    HOST_WEIGHTED   // N viable patches sampled ∝ nearby host abundance
+    HOST_WEIGHTED,  // N viable patches sampled ∝ nearby host abundance
                     // weighted by species host preferences (mirrors
                     // HostSeekingModel::cell_attraction, no decay cap).
                     // Places the initial population where blood meals
                     // actually are; subsequent dispersal/oviposition
                     // behaviour is the model's own (M7.4.1 iteration).
+    SCENARIO        // individuals with metric positions, read from a
+                    // scenario JSON (plan 13.3). Requires `scenario`.
+};
+
+// ---------------------------------------------------------------------------
+// Scenario specification (plan 13.2 / 13.3.1). One JSON file per scenario,
+// loaded by `load_scenario_spec`. Every position is in metres of the AOI,
+// origin = south-west corner of the bbox (plan 1). Strict parsing: unknown
+// keys are an error, so a misspelt key cannot silently seed nothing.
+// ---------------------------------------------------------------------------
+
+// Mosquito individual. `x`/`y` are required; the rest default.
+struct ScenarioAgent {
+    double x = 0.0;
+    double y = 0.0;
+    AdultSex sex = AdultSex::FEMALE;
+    GonotrophicState state = GonotrophicState::TENERAL;
+    int32_t age_days = 0;
+    bool infective = false;
+};
+
+// Aquatic cohort. `cell_id` is the row-major grid index (row * cols + col)
+// and must agree with (x, y); `stage` is EGG, L1..L4 or PUPA.
+struct ScenarioAquatic {
+    double x = 0.0;
+    double y = 0.0;
+    int64_t cell_id = -1;
+    AquaticStage stage = AquaticStage::EGG;
+    uint8_t instar = 0;
+    float development = 0.0f;
+    int64_t count = 0;
+};
+
+// Human individual. Declared and validated here; seeded by Paso 2.
+struct ScenarioHuman {
+    double x = 0.0;
+    double y = 0.0;
+    std::string state = "SUSCEPTIBLE";
+    double timer_days = 0.0;
+};
+
+// Livestock individual. Declared and validated here; seeded by a later step.
+struct ScenarioLivestock {
+    double x = 0.0;
+    double y = 0.0;
+    std::string species = "cattle";
+};
+
+struct ScenarioSpec {
+    std::string id;
+    std::string mode = "report";      // "gate" | "report"
+    uint64_t seed = 0;                // master seed; must equal --seed
+    int32_t days = 0;
+    std::vector<ScenarioAgent> agents;
+    std::vector<ScenarioAquatic> aquatic;
+    std::vector<ScenarioHuman> humans;
+    std::vector<ScenarioLivestock> livestock;
+    std::map<std::string, double> overrides;   // applied from Paso 5
+};
+
+// Parse and validate one scenario JSON. Throws std::runtime_error with the
+// offending key path on any violation.
+ScenarioSpec load_scenario_spec(const std::string& path);
+
+// A scenario position resolved against the grid: the candidate-cell patch
+// id (registered by the coordinator), the grid cell, and the EPSG:4326
+// coordinates stored in the SoA (interim until Paso 5 moves the SoA to
+// metric positions).
+struct ScenarioCell {
+    int64_t pid = -1;
+    int32_t row = 0;
+    int32_t col = 0;
+    double  lon = 0.0;
+    double  lat = 0.0;
 };
 
 // A user-supplied detection point. In EXPLICIT mode the (lat, lon)
@@ -110,6 +189,10 @@ struct SeedingConfig {
     // instructions. No compiled default is allowed here.
     float host_seeking_scale_m = -1.0f;
     HostPrefWeights host_prefs;          // species host preferences
+
+    // For SCENARIO: the parsed scenario; the engine rejects a mode of
+    // SCENARIO without it. Shared so the config stays copyable.
+    std::shared_ptr<const ScenarioSpec> scenario;
 };
 
 // Per-patch seeding instruction. Built by the coordinator and

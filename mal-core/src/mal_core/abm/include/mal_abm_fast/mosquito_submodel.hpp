@@ -21,6 +21,7 @@
 
 #include <array>
 #include <cstdint>
+#include <functional>
 #include <tuple>
 #include <unordered_map>
 #include <utility>
@@ -125,6 +126,14 @@ public:
                      const std::vector<SeedInstruction>& instructions,
                      uint64_t seed,
                      RuntimeOverrides overrides = {});
+
+    // SCENARIO seeding (plan 13.3): one adult per AgentSpec and one aquatic
+    // cohort per AquaticSpec, at the spec's metric positions. `locate` maps
+    // a metric (x, y) to its grid cell and the pid registered for it. Call
+    // on a submodel built with an empty instruction list. Sex, state and
+    // infection come from the spec; nothing is drawn from the RNG.
+    void seed_scenario(const ScenarioSpec& spec,
+                       const std::function<ScenarioCell(double, double)>& locate);
 
     // Read-only access to the SoA (the submodel owns it; the
     // coordinator reads it for density aggregation).

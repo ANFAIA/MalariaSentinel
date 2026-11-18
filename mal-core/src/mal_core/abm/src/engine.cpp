@@ -34,6 +34,74 @@
 
 namespace mal_abm_fast {
 
+void Engine::seed_scenario_population_(const SeedingConfig& cfg,
+                                       uint64_t sub_seed, int32_t n_patches) {
+    if (!cfg.scenario) {
+        throw std::runtime_error(
+            "Engine: SCENARIO seeding requires a loaded scenario (--scenario)");
+    }
+    const ScenarioSpec& spec = *cfg.scenario;
+    const int32_t H = cells_per_side_h(aoi_);
+    const int32_t W = aoi_.cells_per_side();
+    const double cell_m = static_cast<double>(aoi_.resolution_m);
+    const double width_m = static_cast<double>(W) * cell_m;
+    const double height_m = static_cast<double>(H) * cell_m;
+    const double m_per_deg_lat = load_config().geodesy.metres_per_deg_lat;
+
+    // Metric (x, y) from the SW corner of the bbox (plan 1) -> grid cell,
+    // EPSG:4326 coordinates for the SoA (interim: Paso 5 moves the SoA to
+    // metric positions and routes through aoi.hpp), and the registered pid.
+    auto locate = [&](double x, double y) -> ScenarioCell {
+        if (!(x >= 0.0 && x < width_m && y >= 0.0 && y < height_m)) {
+            throw std::runtime_error(
+                "scenario position (" + std::to_string(x) + " m, " +
+                std::to_string(y) + " m) lies outside the " +
+                std::to_string(W) + "x" + std::to_string(H) + " AOI grid");
+        }
+        ScenarioCell c;
+        c.col = static_cast<int32_t>(x / cell_m);
+        c.row = H - 1 - static_cast<int32_t>(y / cell_m);
+        c.lat = aoi_.south + y / m_per_deg_lat;
+        c.lon = aoi_.west + x /
+                (m_per_deg_lat * std::cos(c.lat * 3.14159265358979323846 / 180.0));
+        c.pid = coord_->register_scenario_cell(c.row, c.col);
+        return c;
+    };
+
+    // cell_id is the row-major grid index and must agree with (x, y).
+    for (const auto& aq : spec.aquatic) {
+        const ScenarioCell c = locate(aq.x, aq.y);
+        const int64_t expected = static_cast<int64_t>(c.row) * W + c.col;
+        if (aq.cell_id != expected) {
+            throw std::runtime_error(
+                "scenario '" + spec.id + "': aquatic cohort at (" +
+                std::to_string(aq.x) + ", " + std::to_string(aq.y) +
+                ") declares cell_id " + std::to_string(aq.cell_id) +
+                " but lies in cell " + std::to_string(expected));
+        }
+    }
+
+    sub_ = std::make_unique<MosquitoSubmodel>(
+        n_patches, std::vector<SeedInstruction>{}, sub_seed, overrides_);
+    sub_->seed_scenario(spec, locate);
+
+    if (!spec.agents.empty()) {
+        const ScenarioCell first = locate(spec.agents.front().x, spec.agents.front().y);
+        seeding_patch_.patch_id = first.pid;
+        seeding_patch_.row      = first.row;
+        seeding_patch_.col      = first.col;
+    }
+    std::cout << "Engine: SCENARIO '" << spec.id << "' seeded "
+              << spec.agents.size() << " agents and " << spec.aquatic.size()
+              << " aquatic cohorts\n";
+    if (!spec.humans.empty() || !spec.livestock.empty()) {
+        std::cout << "Engine: SCENARIO '" << spec.id << "' declares "
+                  << spec.humans.size() << " humans and "
+                  << spec.livestock.size()
+                  << " livestock; not seeded yet (humans: Paso 2)\n";
+    }
+}
+
 Engine::Engine(AOI aoi,
                const std::string& env_path,
                const std::string& habitat_path,
@@ -192,6 +260,8 @@ Engine::Engine(AOI aoi,
                 n_patches, std::vector<SeedInstruction>{},
                 sub_seed, overrides_);
         }
+    } else if (seeding_config.mode == SeedingMode::SCENARIO) {
+        seed_scenario_population_(seeding_config, sub_seed, n_patches);
     } else {
         // Detection-based path: ask the coordinator to filter
         // candidate patches by the potential floor and build the
@@ -317,6 +387,12 @@ Engine::Engine(AOI aoi,
         sub_->set_transmission_params(&transmission_model_->params());
         std::cout << "Engine: initialized TransmissionModel (SEIR-SEI)\n";
     }
+
+    // Micro-integrator sub-stream (plan 13.4): drawn after every other
+    // sub-stream so their seeds are unchanged; consumed from Paso 5.
+    const uint64_t micro_seed = rng.peek_state()[0];
+    (void)rng.uniform_double();
+    micro_rng_.seed(micro_seed);
 }
 
 Engine::Engine(AOI aoi,
@@ -432,6 +508,8 @@ Engine::Engine(AOI aoi,
                 n_patches, std::vector<SeedInstruction>{},
                 sub_seed, overrides_);
         }
+    } else if (seeding_config.mode == SeedingMode::SCENARIO) {
+        seed_scenario_population_(seeding_config, sub_seed, n_patches);
     } else {
         const std::vector<SeedInstruction> instructions =
             coord_->build_seed_instructions(seeding_config);
@@ -553,6 +631,12 @@ Engine::Engine(AOI aoi,
         sub_->set_transmission_params(&transmission_model_->params());
         std::cout << "Engine: initialized TransmissionModel (SEIR-SEI)\n";
     }
+
+    // Micro-integrator sub-stream (plan 13.4): drawn after every other
+    // sub-stream so their seeds are unchanged; consumed from Paso 5.
+    const uint64_t micro_seed = rng.peek_state()[0];
+    (void)rng.uniform_double();
+    micro_rng_.seed(micro_seed);
 }
 
 void Engine::step() {

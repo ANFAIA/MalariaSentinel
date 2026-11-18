@@ -29,6 +29,7 @@
 #include <utility>
 
 #include "mal_abm_fast/aquatic_stress.hpp"
+#include "mal_abm_fast/prng.hpp"
 #include "mal_abm_fast/thermal_responses.hpp"
 
 namespace mal_abm_fast {
@@ -114,6 +115,14 @@ void AquaticCohortBank::add_eggs(int64_t patch_id, int64_t count) {
 // ---------------------------------------------------------------------------
 // seed_stage — age-structured seeding for detection-based constructor
 // ---------------------------------------------------------------------------
+void AquaticCohortBank::seed_streams(uint64_t master_seed) {
+    washout_rng_.seed(derive_substream_seed(master_seed, "aquatic/washout"));
+    stage_mortality_rng_.seed(
+        derive_substream_seed(master_seed, "aquatic/stage_mortality"));
+    larva_mortality_rng_.seed(
+        derive_substream_seed(master_seed, "aquatic/larva_mortality"));
+}
+
 void AquaticCohortBank::seed_stage(
     int64_t patch_id, AquaticStage stage,
     uint8_t instar, int64_t count, float development) {
@@ -201,7 +210,7 @@ void AquaticCohortBank::washout(
         rain_by_patch[ps.patch_id] = ps.rain_d;
     }
 
-    std::mt19937_64 rng(load_config().rng.aquatic_seed_washout);
+    auto& rng = washout_rng_;
     for (auto& c : cohorts_) {
         if (c.count <= 0) continue;
         auto it = rain_by_patch.find(c.patch_id);
@@ -224,7 +233,7 @@ void AquaticCohortBank::stage_mortality(
     // Use a simple deterministic kill fraction per stage.
     // For eggs and pupa: kill a fraction of the cohort each day.
     // Larva mortality is handled separately by larva_mortality_density.
-    std::mt19937_64 rng(load_config().rng.aquatic_seed_stage_mortality);
+    auto& rng = stage_mortality_rng_;
     for (auto& c : cohorts_) {
         if (c.count <= 0) continue;
         float mort_rate = 0.0f;
@@ -295,7 +304,7 @@ void AquaticCohortBank::larva_mortality_density(
         known_patches.insert(ps.patch_id);
     }
 
-    std::mt19937_64 rng(load_config().rng.aquatic_seed_larva_mortality);
+    auto& rng = larva_mortality_rng_;
     for (auto& c : cohorts_) {
         if (c.count <= 0 || c.stage != AquaticStage::LARVA) continue;
         const int64_t N = larva_per_patch[c.patch_id];

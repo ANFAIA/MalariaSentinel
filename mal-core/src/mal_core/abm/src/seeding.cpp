@@ -26,9 +26,13 @@
 #include <array>
 #include <cmath>
 #include <cstdint>
+#include <fstream>
 #include <iostream>
+#include <set>
 #include <stdexcept>
 #include <vector>
+
+#include <nlohmann/json.hpp>
 
 namespace mal_abm_fast {
 
@@ -288,6 +292,234 @@ std::vector<SeedInstruction> build_seed_instructions_for_patches(
         }
     }
     return out;
+}
+
+
+// ---------------------------------------------------------------------------
+// Scenario JSON loader (plan 13.2 / 13.3.1). Strict: every key is checked
+// against an allow-list, so a typo fails loudly instead of seeding nothing.
+// ---------------------------------------------------------------------------
+
+namespace {
+
+using Json = nlohmann::json;
+
+[[noreturn]] void scenario_fail(const std::string& path,
+                                const std::string& where,
+                                const std::string& what) {
+    throw std::runtime_error("scenario '" + path + "': " + where + ": " + what);
+}
+
+void check_keys(const Json& obj, const std::set<std::string>& allowed,
+                const std::string& path, const std::string& where) {
+    if (!obj.is_object()) scenario_fail(path, where, "must be a JSON object");
+    for (auto it = obj.begin(); it != obj.end(); ++it) {
+        if (allowed.count(it.key()) == 0) {
+            scenario_fail(path, where + "." + it.key(), "unknown key");
+        }
+    }
+}
+
+double number_field(const Json& obj, const char* key, const std::string& path,
+                    const std::string& where) {
+    if (!obj.contains(key) || !obj.at(key).is_number()) {
+        scenario_fail(path, where + "." + key, "required number");
+    }
+    return obj.at(key).get<double>();
+}
+
+double optional_number(const Json& obj, const char* key, double fallback,
+                       const std::string& path, const std::string& where) {
+    if (!obj.contains(key)) return fallback;
+    if (!obj.at(key).is_number()) {
+        scenario_fail(path, where + "." + key, "must be a number");
+    }
+    return obj.at(key).get<double>();
+}
+
+GonotrophicState parse_state(const std::string& name, const std::string& path,
+                             const std::string& where) {
+    if (name == "TENERAL")  return GonotrophicState::TENERAL;
+    if (name == "HOST_SEEKING") return GonotrophicState::HOST_SEEKING;
+    if (name == "BLOOD_FED") return GonotrophicState::BLOOD_FED;
+    if (name == "RESTING")  return GonotrophicState::RESTING;
+    if (name == "GRAVID")   return GonotrophicState::GRAVID;
+    scenario_fail(path, where,
+                  "unsupported agent state '" + name +
+                  "' (expected TENERAL, HOST_SEEKING, BLOOD_FED, RESTING or GRAVID)");
+}
+
+// Stage names: EGG, L1..L4 (LARVA with instar), PUPA.
+void parse_stage(const std::string& name, const std::string& path,
+                 const std::string& where, AquaticStage& stage, uint8_t& instar) {
+    if (name == "EGG")  { stage = AquaticStage::EGG;  instar = 0; return; }
+    if (name == "PUPA") { stage = AquaticStage::PUPA; instar = 0; return; }
+    if (name.size() == 2 && name[0] == 'L' && name[1] >= '1' && name[1] <= '4') {
+        stage = AquaticStage::LARVA;
+        instar = static_cast<uint8_t>(name[1] - '0');
+        return;
+    }
+    scenario_fail(path, where,
+                  "unsupported stage '" + name + "' (expected EGG, L1..L4, PUPA)");
+}
+
+}  // namespace
+
+ScenarioSpec load_scenario_spec(const std::string& path) {
+    std::ifstream in(path);
+    if (!in) throw std::runtime_error("scenario: cannot open '" + path + "'");
+    Json root;
+    try {
+        root = Json::parse(in);
+    } catch (const std::exception& e) {
+        throw std::runtime_error("scenario '" + path + "': invalid JSON: " + e.what());
+    }
+    check_keys(root,
+               {"id", "mode", "seed", "days", "agents", "aquatic", "humans",
+                "livestock", "overrides", "variants", "expectations"},
+               path, "$");
+
+    ScenarioSpec spec;
+    if (!root.contains("id") || !root.at("id").is_string()) {
+        scenario_fail(path, "$.id", "required string");
+    }
+    spec.id = root.at("id").get<std::string>();
+
+    spec.mode = root.contains("mode") ? root.at("mode").get<std::string>() : "report";
+    if (spec.mode != "gate" && spec.mode != "report") {
+        scenario_fail(path, "$.mode", "must be 'gate' or 'report'");
+    }
+
+    if (!root.contains("seed") || !root.at("seed").is_number_unsigned()) {
+        scenario_fail(path, "$.seed", "required non-negative integer");
+    }
+    spec.seed = root.at("seed").get<uint64_t>();
+
+    const double days = number_field(root, "days", path, "$");
+    if (days < 1.0 || days != static_cast<double>(static_cast<int32_t>(days))) {
+        scenario_fail(path, "$.days", "must be an integer >= 1");
+    }
+    spec.days = static_cast<int32_t>(days);
+
+    // `variants` are expanded by the harness into one file per variant; the
+    // engine never receives a file that still declares them.
+    if (root.contains("variants") && !root.at("variants").empty()) {
+        scenario_fail(path, "$.variants",
+                      "variants must be expanded by the harness before the engine runs");
+    }
+
+    // -- agents (required, may be empty) -----------------------------------
+    if (!root.contains("agents") || !root.at("agents").is_array()) {
+        scenario_fail(path, "$.agents", "required array");
+    }
+    for (size_t i = 0; i < root.at("agents").size(); ++i) {
+        const std::string where = "$.agents[" + std::to_string(i) + "]";
+        const Json& a = root.at("agents")[i];
+        check_keys(a, {"x", "y", "sex", "state", "age_days", "infective"}, path, where);
+        ScenarioAgent ag;
+        ag.x = number_field(a, "x", path, where);
+        ag.y = number_field(a, "y", path, where);
+        if (!a.contains("sex") || !a.at("sex").is_string()) {
+            scenario_fail(path, where + ".sex", "required 'MALE' or 'FEMALE'");
+        }
+        const std::string sex = a.at("sex").get<std::string>();
+        if (sex == "MALE") ag.sex = AdultSex::MALE;
+        else if (sex == "FEMALE") ag.sex = AdultSex::FEMALE;
+        else scenario_fail(path, where + ".sex", "must be 'MALE' or 'FEMALE'");
+        if (a.contains("state")) {
+            ag.state = parse_state(a.at("state").get<std::string>(), path, where + ".state");
+        }
+        ag.age_days = static_cast<int32_t>(
+            optional_number(a, "age_days", 0.0, path, where));
+        if (a.contains("infective")) {
+            if (!a.at("infective").is_boolean()) {
+                scenario_fail(path, where + ".infective", "must be a boolean");
+            }
+            ag.infective = a.at("infective").get<bool>();
+        }
+        spec.agents.push_back(ag);
+    }
+
+    // -- aquatic cohorts ----------------------------------------------------
+    if (root.contains("aquatic")) {
+        for (size_t i = 0; i < root.at("aquatic").size(); ++i) {
+            const std::string where = "$.aquatic[" + std::to_string(i) + "]";
+            const Json& c = root.at("aquatic")[i];
+            check_keys(c, {"x", "y", "cell_id", "stage", "instar", "development", "count"},
+                       path, where);
+            ScenarioAquatic aq;
+            aq.x = number_field(c, "x", path, where);
+            aq.y = number_field(c, "y", path, where);
+            aq.cell_id = static_cast<int64_t>(number_field(c, "cell_id", path, where));
+            if (!c.contains("stage") || !c.at("stage").is_string()) {
+                scenario_fail(path, where + ".stage", "required string");
+            }
+            parse_stage(c.at("stage").get<std::string>(), path, where + ".stage",
+                        aq.stage, aq.instar);
+            if (c.contains("instar") &&
+                static_cast<int>(c.at("instar").get<double>()) != aq.instar) {
+                scenario_fail(path, where + ".instar",
+                              "disagrees with stage (L1..L4 fix the instar)");
+            }
+            aq.development = static_cast<float>(
+                optional_number(c, "development", 0.0, path, where));
+            if (aq.development < 0.0f || aq.development > 1.0f) {
+                scenario_fail(path, where + ".development", "must lie in [0, 1]");
+            }
+            const double count = number_field(c, "count", path, where);
+            if (count < 0.0 || count != static_cast<double>(static_cast<int64_t>(count))) {
+                scenario_fail(path, where + ".count", "must be a non-negative integer");
+            }
+            aq.count = static_cast<int64_t>(count);
+            spec.aquatic.push_back(aq);
+        }
+    }
+
+    // -- humans (declared now, seeded by Paso 2) ---------------------------
+    if (root.contains("humans")) {
+        for (size_t i = 0; i < root.at("humans").size(); ++i) {
+            const std::string where = "$.humans[" + std::to_string(i) + "]";
+            const Json& h = root.at("humans")[i];
+            check_keys(h, {"x", "y", "state", "timer"}, path, where);
+            ScenarioHuman hu;
+            hu.x = number_field(h, "x", path, where);
+            hu.y = number_field(h, "y", path, where);
+            if (h.contains("state")) hu.state = h.at("state").get<std::string>();
+            if (hu.state != "SUSCEPTIBLE" && hu.state != "EXPOSED" &&
+                hu.state != "INFECTIOUS" && hu.state != "RECOVERED") {
+                scenario_fail(path, where + ".state",
+                              "must be SUSCEPTIBLE, EXPOSED, INFECTIOUS or RECOVERED");
+            }
+            hu.timer_days = optional_number(h, "timer", 0.0, path, where);
+            spec.humans.push_back(hu);
+        }
+    }
+
+    // -- livestock (declared now, seeded later) ----------------------------
+    if (root.contains("livestock")) {
+        for (size_t i = 0; i < root.at("livestock").size(); ++i) {
+            const std::string where = "$.livestock[" + std::to_string(i) + "]";
+            const Json& l = root.at("livestock")[i];
+            check_keys(l, {"x", "y", "species"}, path, where);
+            ScenarioLivestock ls;
+            ls.x = number_field(l, "x", path, where);
+            ls.y = number_field(l, "y", path, where);
+            if (l.contains("species")) ls.species = l.at("species").get<std::string>();
+            spec.livestock.push_back(ls);
+        }
+    }
+
+    // -- overrides: applied from Paso 5; until then a non-empty map is an
+    // error, never a silent no-op (a sensitivity band would otherwise run
+    // with the canonical value and look like a pass).
+    if (root.contains("overrides") && !root.at("overrides").empty()) {
+        if (!root.at("overrides").is_object()) {
+            scenario_fail(path, "$.overrides", "must be an object");
+        }
+        scenario_fail(path, "$.overrides",
+                      "overrides are not applied before Paso 5; must be empty");
+    }
+    return spec;
 }
 
 }  // namespace mal_abm_fast

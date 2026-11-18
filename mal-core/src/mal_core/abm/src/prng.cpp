@@ -138,6 +138,16 @@ uint64_t splitmix64(uint64_t& state) {
     return splitmix64_step(state);
 }
 
+uint64_t derive_substream_seed(uint64_t master, std::string_view label) {
+    uint64_t h = 0xcbf29ce484222325ULL;  // FNV-1a 64-bit offset basis
+    for (const unsigned char c : label) {
+        h ^= static_cast<uint64_t>(c);
+        h *= 0x100000001b3ULL;           // FNV-1a 64-bit prime
+    }
+    uint64_t state = master ^ h;
+    return splitmix64_step(state);
+}
+
 // -- F1.b canonical: Prng ----------------------------------------------------
 //
 // The `Prng` class holds its 4-word xoshiro256** state inline (s_[0..3]).

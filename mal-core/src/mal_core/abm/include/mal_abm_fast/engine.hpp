@@ -186,6 +186,12 @@ public:
     int64_t max_population() const { return max_population_; }
 
 private:
+    // SCENARIO seeding (plan 13.3): individuals at metric AOI positions.
+    // Registers each scenario cell with the coordinator and builds the
+    // submodel from the spec. Sets `sub_`.
+    void seed_scenario_population_(const SeedingConfig& cfg, uint64_t sub_seed,
+                                   int32_t n_patches);
+
     AOI                                     aoi_;
     std::shared_ptr<ClimateEngine>          climate_;
     std::unique_ptr<HabitatEngine>          habitat_;
@@ -196,6 +202,9 @@ private:
     SeedingPatch                            seeding_patch_;
     int64_t                                 max_population_ = 0;
     RuntimeOverrides                        overrides_;
+    // Micro-integrator stream (plan 13.4). Opened at construction from the
+    // master Prng; consumed by the two-band micro-integrator (Paso 5).
+    Prng                                    micro_rng_;
 
     // Optional host-seeking components (loaded when --hosts is provided).
     std::unique_ptr<HostLandscape>          host_landscape_;
