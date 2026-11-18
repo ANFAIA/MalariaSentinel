@@ -42,7 +42,7 @@ Estas decisiones son vinculantes y sustituyen a cualquier formulación anterior.
 |---|---|---|---|
 | K-1 | Criterio G1 | G1 = la cadena de transmisión funciona de extremo a extremo en escenarios sintéticos: hay picaduras, hay transmisión y es efectiva en la persona picada. No hay densidad mínima de picaduras por mosquito ni se exige la cadena completa. Se verifica con los escenarios E00–E18, construidos a mano e incrementales. | Goals; §5.1; Nivel 6 |
 | K-2 | Personas por celda | `SLOTS_PER_CELL` es **dinámico**: máximo de `human_total` en la primera extracción de datos, más un 10 %. Se guarda en el manifiesto (`slots_per_cell`) y se reutiliza. No hay valor fijo. | §2; Paso 2; Paso 4; §12 |
-| K-3 | Duraciones de fase | DAY 8 / EVENING 4 / NIGHT 10 / DAWN 2 h, en `model_constants.yaml`. Sustituyen a la tabla compilada. Hora de inicio del día asumida: 06:00 (pendiente de confirmar). | §12.1–12.2 |
+| K-3 | Duraciones de fase | DAY 12 / EVENING 4 / NIGHT 6 / DAWN 2 h, en `model_constants.yaml`, con el día empezando a las 06:00. Correspondencia uno a uno con los bins de recolección medidos (EE → EVENING, LE → NIGHT, EM → DAWN) y con la ventana DAY 06–18 del motor. Sustituyen a la tabla compilada. Las duraciones 8/4/10/2 se descartan: ninguna hora de inicio alinea sus fases con los bins. | §12.1–12.2 |
 | K-4 | Asignación de sitio de enjambre | No se eligen puntos a mano. El campo se genera con `swarm_markers_per_km2`. Regla **estocástica con acumulación**: cada macho elige entre los sitios alcanzables con peso ∝ hembras alcanzables × (1 + machos ya asignados al sitio); una opción de peso `w_suelto` = 1 [EP] lo deja **suelto** (sin sitio). Asignación en orden de `id`. Se retira `male_swarm_site_range_m`. | §8.1, §8.2, §8.5, §8.6, Paso 8, §12, E13 |
 | K-5 | Artefacto `swarm_sites.json` | Artefacto nuevo generado por el Paso 8 (recomendación aceptada). | Paso 8; Apéndice A |
 | K-6 | **Pendiente de revisión** | (a) Ausencia de separación mínima entre marcadores: se deja así y **se revisará** si E13/E15 lo muestran. (b) Simetría de la regla de la hembra: se revisará. | §8.2; §8.6 |
@@ -1093,7 +1093,7 @@ configuración (§12).
 | `olfactory_radius_m` | 30–70 | m | [P] | rastreo de pluma |
 | `visual_radius_m` | 0,25–0,72 | m | [P] | banda de aproximación visual (integrador fino) |
 | `terminal_radius_m` | 0,10–0,20 | m | [P] | radio terminal (contacto); banda única |
-| `phase_duration_hours` | DAY 8 / EVENING 4 / NIGHT 10 / DAWN 2 | h | [EP] | **decisión del autor**: valores del plan, en el YAML (`integration.phase_duration_hours`), que **sustituyen** a la tabla compilada (`mobility_schedule.hpp:41-46` sólo tiene el enum y sus ventanas en comentarios); **suman 24 h**; el reparto de los bins EE/LE/EM sobre las cuatro fases lo fija §12.2 |
+| `phase_duration_hours` | DAY 12 / EVENING 4 / NIGHT 6 / DAWN 2 | h | [EP] | **decisión del autor** (K-3): valores del plan, en el YAML (`integration.phase_duration_hours`), que **sustituyen** a la tabla compilada (`mobility_schedule.hpp:41-46` sólo tiene el enum y sus ventanas en comentarios); **suman 24 h**; el reparto de los bins EE/LE/EM sobre las cuatro fases lo fija §12.2 |
 | `probing_success_rate` | 0,465–0,99 | [fracción] | [EP] | por especie; sustituye a `feeding_success_rate` (0,825), que el motor cargaba sin consultar |
 | `blood_meal_target_ul` | 0,5 | µL | [EP] | objetivo de una comida completa |
 | `first_cycle_target_ul` | 0,8 | µL | [EP] | > `blood_meal_target_ul`: hacen falta dos comidas |
@@ -1974,8 +1974,8 @@ retiradas, el radio que manda en el plan es
 `--disperse-max-m` (`main.cpp`) se retiran con las tres claves de `dispersal.*`; ningún
 escenario puede volver a activarlas.
 
-**Cambian:** `species.coluzzii.activity_weights` → `[0.00, 0.00, 0.735, 0.265]`
-(re-derivada con las duraciones por defecto 8/4/10/2, mapeo explícito más abajo); `species.coluzzii.salinity_hi_tol_ppt` → 10,5 (con la clave renombrada a la unidad real). `host_seeking.detect_range_m` (2000) **se retira**, no se renombra: el radio que lo sustituye es `species.<fila>.co2_activation_radius_m` = 100 m [P] (§4), y el resto de las claves de radio y de paso por celda se retiran con él (ver la tabla de retiradas).
+**Cambian:** `species.coluzzii.activity_weights` → `[0.00, 0.255, 0.480, 0.265]`
+(re-derivada con las duraciones por defecto 12/4/6/2, mapeo explícito más abajo); `species.coluzzii.salinity_hi_tol_ppt` → 10,5 (con la clave renombrada a la unidad real). `host_seeking.detect_range_m` (2000) **se retira**, no se renombra: el radio que lo sustituye es `species.<fila>.co2_activation_radius_m` = 100 m [P] (§4), y el resto de las claves de radio y de paso por celda se retiran con él (ver la tabla de retiradas).
 
 **Se crean, por especie** (`species.<fila>`; cada clave vive en las **cinco**
 superficies descritas más abajo). Inventario completo: valor, unidad, tier y
@@ -2124,7 +2124,7 @@ con **todas** las claves nuevas del plan; a partir de ahí **ninguna clave se a�
 El YAML declara hoy `activity_weights: [0.02, 0.10, 0.80, 0.08]`
 (`model_constants.yaml:66`) en el orden **[DAY, EVENING, NIGHT, DAWN]** (orden fijado
 en `species_params.hpp:30-33` y validado en `config.cc:598-610`, que exige **cuatro**
-elementos). El plan propone la fila derivada con las duraciones de K-3: `[0.00, 0.00, 0.735, 0.265]` (sección 12.2).
+elementos). El plan propone la fila derivada con las duraciones de K-3: `[0.00, 0.255, 0.480, 0.265]` (sección 12.2).
 
 **Mapeo de los tres bins medidos a las cuatro fases del motor** (fuente:
 `papers/anopheles-dynamics/akuoko-2024-biting-behaviour-ghana.md:25-26` y la
@@ -2138,12 +2138,12 @@ derivación del propio estudio):
 
 | Fase | Horas del motor | Fracción de las horas del bin | Cálculo | Valor |
 |---|---|---|---|---|
-| DAY | 8 (06:00–14:00) | ninguna | ninguna hora de EE/LE/EM cae en 06–14 | **0,000** |
-| EVENING | 4 (14:00–18:00) | ninguna | ninguna hora de EE/LE/EM cae en 14–18 (las colecciones empiezan a las 18:00) | **0,000** |
-| NIGHT | 10 (18:00–04:00) | 4 h de EE (18–22) + 6 h de LE (22–04) | 4 × 6,375 + 48,0 | **0,735** |
-| DAWN | 2 (04:00–06:00) | 2 h de EM (04–06) | 2 × 13,25 | **0,265** |
+| DAY | 12 (06:00–18:00) | ninguna | las colecciones empiezan a las 18:00 ⇒ no medido | **0,000** |
+| EVENING | 4 (18:00–22:00) | EE completa | 4 × 6,375 % | **0,255** |
+| NIGHT | 6 (22:00–04:00) | LE completa | 48,0 % (tasa de 8,0 %/h × 6 h) | **0,480** |
+| DAWN | 2 (04:00–06:00) | EM completa | 2 × 13,25 % | **0,265** |
 
-Suma = 1,000. La fila es `[DAY, EVENING, NIGHT, DAWN] = [0.00, 0.00, 0.735, 0.265]`, con
+Suma = 1,000. La fila es `[DAY, EVENING, NIGHT, DAWN] = [0.00, 0.255, 0.480, 0.265]`, con
 `w_DAY = 0` como **consecuencia de la falta de dato**, no como afirmación (perfil
 medido, no supuesto).
 
@@ -2155,7 +2155,7 @@ comentarios**: 06:00–18:00 / 18:00–21:00 / 21:00–05:00 / 05:00–06:00). E
 per day+phase"), **cada una de igual peso**; el único reloj es `dispersal.flight_hour`
 = 20 (`model_constants.yaml:238` → `engine.cpp:577` `set_current_hour`), usado sólo por
 `is_nighttime_hour` (`mosquito_submodel.cpp:1013`).
-El **valor por defecto** son las duraciones del plan, **DAY 8 h / EVENING 4 h / NIGHT 10 h / DAWN 2 h** (Σ = 24 h), en el YAML; sustituyen a las ventanas de los comentarios de `mobility_schedule.hpp`. Para calcular el reparto hay que fijar la hora de inicio: se asume **06:00** como inicio del día, con el orden DAY → EVENING → NIGHT → DAWN, es decir, DAY 06–14, EVENING 14–18, NIGHT 18–04 y DAWN 04–06. Con ese reloj el reparto EE/LE/EM → fases es `[0.000, 0.000, 0.735, 0.265]`: la EE (18–22) y la LE (22–04) caen en NIGHT, y la EM (04–06) en DAWN. **Este reparto cambia respecto a la versión anterior del plan** y depende de la hora de inicio: si se fija otra, se recalcula.
+El **valor por defecto** son **DAY 12 h / EVENING 4 h / NIGHT 6 h / DAWN 2 h** (Σ = 24 h), en el YAML, con el día empezando a las **06:00** (el mismo inicio que la ventana DAY 06–18 del motor). Sustituyen a las ventanas de los comentarios de `mobility_schedule.hpp`. Cada fase corresponde a un bin medido: EVENING 18–22 = EE, NIGHT 22–04 = LE, DAWN 04–06 = EM. Con ese reloj el reparto EE/LE/EM → fases es `[0.000, 0.255, 0.480, 0.265]`. **Este reparto cambia respecto a la versión anterior del plan.** Si se fija otra hora de inicio, las fases dejan de corresponder a los bins y el reparto debe recalcularse y justificarse de nuevo.
 La tabla de duraciones vive en la configuración (`integration.phase_duration_hours`);
 `mobility_schedule.hpp` **no** contiene cálculo de duración que tocar (sólo el enum y
 sus ventanas en comentario → tabla), y el **reloj de fase se añade en el motor**
