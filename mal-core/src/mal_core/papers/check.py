@@ -51,15 +51,18 @@ _DOI_BODY = re.compile(r"10\.\d{4,9}/\S+")
 
 @dataclass
 class Report:
+    """Accumulated outcome of the corpus checks: failures block, warnings and notes do not."""
     failures: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
 
     @property
     def ok(self) -> bool:
+        """True when no check has recorded a failure."""
         return not self.failures
 
     def merge(self, other: "Report") -> None:
+        """Fold another report's failures, warnings and notes into this one."""
         self.failures += other.failures
         self.warnings += other.warnings
         self.notes += other.notes

@@ -20,10 +20,12 @@ PROVENANCE_NAME = "provenance.yaml"
 
 
 def sha256_bytes(data: bytes) -> str:
+    """Hex SHA-256 digest of data."""
     return hashlib.sha256(data).hexdigest()
 
 
 def sha256_file(path: Path, chunk_size: int = 1 << 20) -> str:
+    """Hex SHA-256 digest of a file, read in chunks of chunk_size bytes."""
     digest = hashlib.sha256()
     with path.open("rb") as handle:
         for chunk in iter(lambda: handle.read(chunk_size), b""):
@@ -32,10 +34,12 @@ def sha256_file(path: Path, chunk_size: int = 1 << 20) -> str:
 
 
 def utc_now_iso() -> str:
+    """Current UTC time as an ISO 8601 string, to the second."""
     return datetime.now(UTC).isoformat(timespec="seconds")
 
 
 def read_provenance(paper_dir: Path) -> dict[str, Any]:
+    """Parse the paper's provenance YAML; return an empty dict if absent or not a mapping."""
     path = paper_dir / PROVENANCE_NAME
     if not path.is_file():
         return {}

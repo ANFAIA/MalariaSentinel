@@ -217,6 +217,10 @@ jobs:
           PI_CODING_AGENT_DIR: ${{ runner.temp }}/pi-home
           PI_SKIP_VERSION_CHECK: "1"
           PI_TELEMETRY: "0"
+        # GitHub's default shell is `bash -eo pipefail`. Under -e a failing
+        # reviewer aborts the step before its status is captured below, and the
+        # reviewer is advisory: the step must not stop on the reviewer's exit code.
+        shell: bash --noprofile --norc -uo pipefail {0}
         run: |
           set -uo pipefail
           if [ -z "${OPENCODE_API_KEY:-}" ]; then

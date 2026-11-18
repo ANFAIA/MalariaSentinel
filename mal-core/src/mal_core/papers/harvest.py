@@ -26,6 +26,7 @@ _CLOSERS = {")": "(", "]": "["}
 
 @dataclass(frozen=True)
 class Harvest:
+    """Bibliographic fields read from a PDF's first pages, with any parsing warnings."""
     title: str | None
     authors: str | None
     journal: str | None

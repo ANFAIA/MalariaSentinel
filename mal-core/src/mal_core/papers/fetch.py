@@ -43,7 +43,9 @@ Downloader = Callable[[str], bytes]
 
 
 def urllib_downloader(*, user_agent_value: str, timeout: float = 120.0) -> Downloader:
+    """Build a Downloader that fetches URLs with urllib and the given User-Agent."""
     def download(url: str) -> bytes:
+        """Fetch url and return its bytes. Paywall HTTP codes raise DownloadError of kind 'paywalled'; other failures raise kind 'network'."""
         request = urllib.request.Request(
             url, headers={"User-Agent": user_agent_value, "Accept": "application/pdf,*/*;q=0.5"}
         )
@@ -61,6 +63,7 @@ def urllib_downloader(*, user_agent_value: str, timeout: float = 120.0) -> Downl
 
 @dataclass(frozen=True)
 class FetchResult:
+    """Outcome of fetching one paper: observed status, PDF path and hash, resolver used."""
     paper_id: str
     observed_status: str
     pdf_path: Path | None
@@ -99,6 +102,7 @@ def fetch_entry(
 
     def record(observed: str, fetch: dict | None = None, failures: tuple[str, ...] = ()) -> FetchResult:
         # Read the attempts at record time: the resolver chain fills the list lazily while candidates are consumed.
+        """Write the observed status (and fetch block, if any) to provenance and return the FetchResult."""
         blocks: dict = {
             "id": entry.id,
             "class": entry.paper_class,

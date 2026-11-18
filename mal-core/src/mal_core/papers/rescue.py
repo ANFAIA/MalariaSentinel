@@ -41,6 +41,7 @@ def is_open_licence(licence: str | None) -> bool:
 
 @dataclass(frozen=True)
 class RescueItem:
+    """A paywalled entry paired with its open-licence candidate URLs."""
     entry: Entry
     candidates: tuple[Candidate, ...]
 

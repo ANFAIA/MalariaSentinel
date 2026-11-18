@@ -44,6 +44,7 @@ JsonGetter = Callable[[str], Any]
 
 @dataclass(frozen=True)
 class Candidate:
+    """An open-licence PDF URL proposed by a resolver, with its licence when known."""
     resolver: str
     url: str
     licence: str | None = None
@@ -51,6 +52,7 @@ class Candidate:
 
 @dataclass(frozen=True)
 class Attempt:
+    """One resolver's attempt for a paper; str() gives a compact log line."""
     resolver: str
     outcome: str  # candidate | no_candidate | no_record | skipped | error
     detail: str = ""
@@ -70,6 +72,7 @@ def urllib_json_getter(*, user_agent_value: str, timeout: float = 30.0) -> JsonG
     """Default transport. HTTP 404 means "no record"; other failures raise."""
 
     def get(url: str) -> Any:
+        """Fetch url and decode its JSON body. A 404 returns None; transport errors raise TransportError."""
         request = Request(url, headers={"User-Agent": user_agent_value, "Accept": "application/json"})
         try:
             with urlopen(request, timeout=timeout) as response:

@@ -68,12 +68,15 @@ class HostGate:
     _failures: dict[str, int] = field(default_factory=lambda: defaultdict(int))
 
     def host(self, url: str) -> str:
+        """Hostname of url, or an empty string when it has none."""
         return urlsplit(url).hostname or ""
 
     def blocked(self, url: str) -> bool:
+        """True once the host has failed MAX_CONSECUTIVE_HOST_FAILURES times in a row."""
         return self._failures[self.host(url)] >= MAX_CONSECUTIVE_HOST_FAILURES
 
     def wait_turn(self, url: str) -> None:
+        """Sleep until min_interval_s has elapsed since the last request to the same host."""
         host = self.host(url)
         last = self._last.get(host)
         if last is not None:
@@ -83,12 +86,14 @@ class HostGate:
         self._last[host] = self.clock()
 
     def record(self, url: str, ok: bool) -> None:
+        """Reset the host's failure streak on success, or extend it on failure."""
         host = self.host(url)
         self._failures[host] = 0 if ok else self._failures[host] + 1
 
 
 @dataclass(frozen=True)
 class Outcome:
+    """Result of one rescue attempt: status, detail and the URL used, if any."""
     id: str
     status: str  # adopted | barrier | no_pdf | refused | host_blocked | not_attempted
     detail: str = ""
@@ -169,6 +174,7 @@ def playwright_loader(*, headless: bool = False, user_agent_value: str):
     context = browser.new_context(user_agent=user_agent_value, accept_downloads=False)
 
     def load_pdf(url: str) -> tuple[bytes | None, str | None]:
+        """Open url in the browser. Return (pdf_bytes, None), or (None, reason) when a barrier page or a denial is met."""
         page = context.new_page()
         try:
             try:
@@ -186,6 +192,7 @@ def playwright_loader(*, headless: bool = False, user_agent_value: str):
             page.close()
 
     def close() -> None:
+        """Close the browser context and browser, and stop Playwright."""
         context.close()
         browser.close()
         pw.stop()

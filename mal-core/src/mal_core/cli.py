@@ -1117,6 +1117,7 @@ def papers_check(
     tracked = git_tracked_files(REPO_ROOT)
 
     def size_of(rel: str) -> int:
+        """Size in bytes of a repo-relative file, or 0 when it is not a file."""
         path = REPO_ROOT / rel
         return path.stat().st_size if path.is_file() else 0
 

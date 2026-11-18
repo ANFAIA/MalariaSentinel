@@ -69,6 +69,7 @@ class ManifestError(ValueError):
 
 @dataclass(frozen=True)
 class Entry:
+    """One paper in the corpus manifest; field names mirror the manifest schema."""
     id: str
     paper_class: str
     theme: str
@@ -93,11 +94,13 @@ class Entry:
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> Entry:
+        """Build an Entry from a manifest mapping; superseded_files defaults to empty."""
         kwargs = {_ATTR.get(k, k): data[k] for k in FIELDS}
         kwargs["superseded_files"] = tuple(data.get("superseded_files", ()))
         return cls(**kwargs)
 
     def to_dict(self) -> dict[str, Any]:
+        """Serialise to a manifest mapping, omitting superseded_files when empty."""
         out = {k: getattr(self, _ATTR.get(k, k)) for k in FIELDS}
         if self.superseded_files:
             out["superseded_files"] = list(self.superseded_files)
@@ -106,9 +109,11 @@ class Entry:
 
 @dataclass(frozen=True)
 class Manifest:
+    """The corpus manifest: an ordered, immutable collection of Entry records."""
     entries: tuple[Entry, ...]
 
     def get(self, paper_id: str) -> Entry:
+        """Return the entry with paper_id; raise KeyError if absent."""
         for entry in self.entries:
             if entry.id == paper_id:
                 return entry

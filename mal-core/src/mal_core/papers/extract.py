@@ -42,6 +42,7 @@ Runner = Callable[..., Any]
 
 @dataclass(frozen=True)
 class ExtractResult:
+    """Outcome of extracting one paper's PDF to Markdown with docling."""
     paper_id: str
     status: str  # extracted | failed | skipped
     markdown_path: Path | None
@@ -50,6 +51,7 @@ class ExtractResult:
 
 
 def validate_device(device: str) -> str:
+    """Return the device if it is one of DEVICES; raise ValueError otherwise."""
     if device not in DEVICES:
         raise ValueError(f"device must be one of {DEVICES}, got {device!r}")
     return device
@@ -114,6 +116,7 @@ def extract_entry(
     }
 
     def failed(detail: str, returncode: int | None) -> ExtractResult:
+        """Record a failed extraction in provenance and return the matching result."""
         update_provenance(
             paper_dir,
             observed_status="pending_extraction_failed",

@@ -33,6 +33,7 @@ _RESERVED_DOMAINS = (".invalid", ".example", ".test", "example.com", "example.or
 
 @dataclass(frozen=True)
 class PapersConfig:
+    """Corpus settings: output root, contact e-mail and docling device."""
     output_root: str
     unpaywall_email: str
     device: str
