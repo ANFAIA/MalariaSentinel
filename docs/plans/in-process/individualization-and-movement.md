@@ -2571,29 +2571,120 @@ mosquito (pos_x, pos_y)
 
 ### 15. Orden de integración
 
-El orden no es negociable: cada paso necesita el anterior como termómetro.
+El orden de ejecución se revisa para priorizar **hembras y movimiento** junto con el
+arnés de comprobación y la **visualización** de corridas, e introducir **humanos y
+animales individuales** a lo largo del camino. Los identificadores de paso (0–11) se
+**mantienen**: cambia el orden, no el contenido ni las referencias a E00–E18.
+La fecundación sigue siendo automática hasta el Paso 8 (machos).
 
-| # | Paso | Precondición |
+#### 15.0 — Decisiones cerradas por el autor (2a, 2b, 2c)
+
+Prioridad declarada: **consistencia con la realidad sobre estabilidad de identificadores.**
+
+| Paso | Decisión | Consecuencia en el plan |
 |---|---|---|
-| 0 | Arnés de escenarios sobre manifiesto sintético (§13) | — |
-| 1 | Línea base: E00–E02 con la cadena actual, marcando los fallos esperados | 0 |
-| 2 | Individuos humanos + ledger de eventos + `probing_success_rate` | 1 |
-| 3 | Volumen de sangre, multipicadura, umbral gonotrófico, pre-gravídica, ventana postprandial, reloj de inanición | 2 |
-| 4 | **Esquema de configuración**: **todas** las claves nuevas del plan en las cinco superficies (§12.1, §12.4) — movimiento, integración, sangre, seca, `mating:`, `SLOTS_PER_CELL`, `contracts.habitat` y `contracts.cogs_state` | 3 |
-| 5 | Cascada de percepción y movimiento emergente por especie, con micro-integrador de dos bandas | 4 |
-| 6 | Estado fisiológico: `ovarian_stage`, `ARRESTED`, estación seca | 5 |
-| 7 | Estado acuático por celda (contrato de hábitat 4.0), `cell_id`, posición de la madre en la cohorte | 6 |
-| 8 | Machos, campo de marcadores de enjambre, cupos, alarma | 7 |
-| 9 | Elección del sitio de oviposición por estado de la cohorte de larvas y multi-sitio | 8 |
-| 10 | Modos definitivos y verificación de cobertura de los escenarios E00–E18 (las expectativas las escriben los pasos que las implementan, §13.3.1) | 9 |
-| 11 | Contratos y consumidores: valores de contrato, retirada de las claves que el código deja de leer, recalibración de los scorers y política de comparación (las claves nacieron en el Paso 4) | 10 |
+| 2a | Personas en **`HumanSoA`** dentro de `human_state.hpp` (opción A). | Sin módulo nuevo. |
+| 2a | **Posición:** uniforme dentro de la celda, asignada por semilla. | Sin edificios; `home_x/home_y` se sortean. |
+| 2a | **Número de personas:** el de la rejilla real (i), repartido por celda. | **Se descarta** `SLOTS_PER_CELL` con slots vacíos. La fórmula `human_id = cell_id * SLOTS_PER_CELL + slot` (Paso 2, E08 y §15 de la tabla) queda **sin efecto** y se reemplaza por `human_id` único y determinista por semilla. |
+| 2b | Ledger de eventos (`BiteEvent`) **sólo en modo escenario** (`--scenario`). | Las corridas de producción no cambian de tamaño. |
+| 2c | Individuos de ganado **sin infección** (solo dilución), opción A. | No hay estado de infección en animales. |
+| 2c | **Fuente:** ganado GLW por especie (`ingest/hosts.py:93`, `load_glw_livestock`), agregado sin distinguir especie en el ABM. | Especies: secundario; se trata como «animal» genérico. |
+| 2c | **Wildlife no entra como individuos.** Es un índice de idoneidad en [0, 1] (`mal_commonlib` `wildlife.py`), no un recuento. | Convertirlo en individuos exige un factor de densidad sin dato; queda **fuera de 2c** hasta que haya uno. |
+| Vis. | **Pendiente**: el usuario indica que la visualización fue absorbida por el ABM. Se decide tras el informe de investigación (§15.1). | §15.1 se reescribe. |
 
-Los pasos 2–9 tocan el mismo núcleo (`mosquito_submodel.cpp` +
-`mosquito_state.hpp`), de modo que **no se paralelizan entre sí**. El **Paso 4 no es
-paralelizable**: es la rebanada de configuración que consumen los pasos 5, 7 y 8, y
-debe precederlos (una rama separada para el esquema dejaría a los pasos
-intermedios sin configuración y con constantes compiladas, que
-`test_no_constants_guard.py` prohíbe).
+| Orden | Paso | Entrega | Precondición |
+|---|---|---|---|
+| 1 | 0 | Arnés de escenarios (§13) **y** visualización de corridas (§15.1) | — |
+| 2 | 1 | Línea base E01/E02 con la cadena actual | 1 |
+| 3 | 2a *(nuevo)* | Humanos individuales con posición uniforme por semilla en la celda, número real por celda (§15.0) | 2 |
+| 4 | 4 | Esquema de configuración completo en las cinco superficies (§12.1) | 3 |
+| 5 | 5 | Cascada de percepción y movimiento de la hembra, micro-integrador de dos bandas | 4 |
+| 6 | 2b *(nuevo)* | Ledger de eventos individual, solo en modo escenario (§15.0) | 5 |
+| 7 | 3 | Sangre: multipicadura, umbral gonotrófico, pre-gravídica, ventana postprandial | 6 |
+| 8 | 6 | Estado fisiológico y estación seca (`ovarian_stage`, `ARRESTED`) | 7 |
+| 9 | 7 | Estado acuático por celda; emergencia en la posición de la madre | 8 |
+| 10 | 9 | Elección del sitio de oviposición por el hábitat | 9 |
+| 11 | 2c *(nuevo)* | Ganado individual sin infección, fuente GLW (§15.2) | 10 |
+| 12 | 8 | Machos, sitios de enjambre, cupos y alarma | 11 |
+| 13 | 10 | Modos definitivos y cobertura de los escenarios E00–E18 | 12 |
+| 14 | 11 | Contratos 5.0 y consumidores (versionado, scorers, dataset) | 13 |
+
+**Por qué este orden y no el del borrador anterior** (cada cambio tiene su causa):
+
+*   **El Paso 4 sube antes del 3.** §12.4 exige que una clave esté en las cinco
+    superficies antes de que el paso que la consume escriba código. El borrador
+    anterior ponía el Paso 3 (que consume `blood_meal_target_ul` y
+    `probing_success_rate`) **antes** del Paso 4: era una inconsistencia del propio
+    plan, corregida aquí.
+*   **El Paso 2 se parte en 2a y 2b.** E01 y E02 necesitan a la persona a 200 m y a
+    2 000 m en metros: la parte posicional (2a) va antes de la cascada (5). El ledger
+    de eventos (2b) lo necesitan E03, E08, E09 y el criterio de picaduras humanas del
+    Nivel 6; va después de 5 y antes de 3, porque E03 cuenta eventos en el ledger.
+*   **Los machos (Paso 8) se retrasan al final del bloque de hembras.** Mientras la
+    fecundación sea automática, la cadena hembra → huevos → emergencia se puede medir
+    sin machos. El retiro de `MATE_SEEKING` en el Paso 3 no depende del orden.
+*   **El Paso 9 (sitio de oviposición) va después del 7** porque depende del registro
+    por celda; sigue siendo parte del movimiento de la hembra.
+*   **Los animales (2c) van tras el bloque de hembras**: sin la cascada y el ledger no
+    hay forma de medir si la presencia de hospederos animales desplaza picaduras
+    humanas. Ver §15.2.
+
+#### 15.1 — Visualización de corridas (decidida)
+
+**Decisión:** visualización en C++, dentro del motor. Python no entra en el camino de la
+corrida.
+
+*   **GIF:** se mantiene el GIF nativo (`viz.cpp`, `viz_tx.cpp`, `gif.h` ya vendorizado)
+    y se le añade la vista de trayectorias y picaduras de la corrida de escenario.
+*   **PNG estáticos** (mapa de un día, serie de 30 días): `stb_image_write.h` (un fichero,
+    dominio público) en `include/mal_abm_fast/third_party/`, junto a `gif.h`. Si no se
+    necesitan PNG, la serie sale en CSV.
+*   **Trayectorias por hembra:** `<stem>_agents.parquet`, escrito por el motor **sólo en
+    modo escenario** (decisión 2b). **Dependencia nueva:** Apache Arrow (C++) o un
+    escritor Parquet mínimo, a decidir en el Paso 2b; se añade a `CMakeLists.txt` en el
+    mismo commit que el escritor (regla de §Detailed Implementation Plan).
+*   **Granularidad:** posición por fase de la jornada.
+
+#### 15.1.1 — Qué cambia en el visualizador, paso a paso
+
+Regla: cada paso del plan que cambia el comportamiento simulado añade su cambio de
+visualización **en el mismo commit**. Lo que no está aquí no se redibuja.
+
+| Paso | Cambio del modelo | Cambio del visualizador |
+|---|---|---|
+| 2a | Personas individuales | Pintar personas como puntos (no como densidad por celda). |
+| 2b | Ledger de eventos | Picaduras como eventos puntuales (`BiteEvent`), no como cuadrado por celda. |
+| 3 | Multipicadura y ciclo | Mostrar en la hembra el número de picaduras de la noche. |
+| 5 | Cascada de movimiento | Trazo de la trayectoria por fase (fuente: `_agents.parquet`). |
+| 6 | Arresto ovárico en seca | Estado `ARRESTED` con un tercer tratamiento visual (no un color nuevo de la paleta). |
+| 7 | Emergencia en la posición de la madre | Las hembras nacen en el punto de la madre, no en el centro de la celda. |
+| **Puesta de huevos** (cambio pedido) | Lote de huevos ∝ volumen de sangre (`eggs_per_ul`, Paso 3) y oviposición en el sitio del hábitat (Paso 9) | Marcar en el mapa el **punto de oviposición**, no la celda; la serie de huevos pasa a usar el lote real, no el de la celda. |
+| 8 | Machos con sitio y enjambre | Enjambres como marcadores puntuales (`swarm_sites`). |
+
+**Cambios de estilo pedidos por el autor** (aplicar en el primer commit de visualización):
+
+*   **Transmisión (`viz_tx.cpp`):** las celdas **dejan de llevar color verde/rojo** (rampas
+    `kHumanCellLow/High`, `kAnimalCellLow/High`, líneas 52–55). Sólo se dibujan: los
+    **agentes**, las **picaduras** y los **agentes infectados**. Las celdas quedan en un
+    gris neutro de fondo.
+*   **Sexo:** las hembras son **disco relleno** y los machos **disco hueco**. Esto ya
+    existe en `viz.cpp:1017-1045`; se mantiene y se verifica en el GIF de transmisión
+    (`viz_tx.cpp` aún no lo distingue, línea 697-701: un solo símbolo para todos los
+    agentes).
+*   **Infectados:** anillo rojo sobre el agente (`kInfectious`), igual que en `viz.cpp:1050`.
+
+**Decidido:** el punto de oviposición se dibuja como **cruz** (símbolo propio, distinto de
+el disco de hembra y de macho).
+
+#### 15.2 — Ganado individual sin infección (Paso 2c)
+
+*   **Alcance:** animales como hospederos individuales con posición en metros, sin
+    estado de infección y sin especie (decisión §15.0).
+*   **Fuente:** los recuentos de ganado que ya produce `ingest/hosts.py` desde GLW
+    (`livestock_total` y la agregación por especie, que se suma). El escenario
+    `LivestockSpec` (§13.2) sólo sirve para pruebas sintéticas.
+*   **Fuera de alcance:** *wildlife* (`mal_commonlib` `wildlife.py`), porque es un índice
+    de idoneidad y no un recuento.
 
 **Escenario que cierra cada paso.** Cada paso tiene **su** escenario, y el criterio de
 aceptación del paso es: **su escenario pasa**. El cálculo a mano va pre-registrado
@@ -3052,7 +3143,7 @@ el motivo del rechazo, para que el implementador no las reabra sin evidencia nue
 
 ## Detailed Implementation Plan
 
-Una lista única, ordenada por el orden de integración de §15. Cada entrada indica qué
+Una lista única, ordenada por identificador de paso; el **orden de ejecución** es el de §15. Cada entrada indica qué
 cambia y por qué. Los ficheros se agrupan por el paso en que se tocan; un paso no
 empieza hasta que el anterior pasa su verificación.
 
@@ -3734,10 +3825,10 @@ empeora, y la suite Python de `mal-core` está verde.
 
 ### Dependencias y orden
 
-El orden de §15 no es negociable porque cada paso necesita el anterior como
-termómetro. Los pasos 2–9 tocan el mismo núcleo (`mosquito_submodel.cpp` +
+El orden de ejecución es el de §15 (revisado: hembras y movimiento primero).
+Cada paso necesita el anterior como termómetro. Los pasos 2–9 tocan el mismo núcleo (`mosquito_submodel.cpp` +
 `mosquito_state.hpp`) y **no se paralelizan entre sí**. **El esquema de configuración
-no se paraleliza en una rama separada**: el **Paso 4** (todas las claves nuevas) precede al Paso 5
+no se paraleliza en una rama separada**: el **Paso 4** (todas las claves nuevas) precede al Paso 3 (sangre), al Paso 5
 (cascada), al Paso 7 (acuático) y al Paso 8 (machos), y dejar el esquema en otra rama
 dejaría a esos pasos sin configuración y con constantes compiladas, que
 `test_no_constants_guard.py` prohíbe. Lo único que puede desarrollarse en paralelo es
