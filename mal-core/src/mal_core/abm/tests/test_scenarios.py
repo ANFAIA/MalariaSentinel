@@ -213,6 +213,19 @@ def test_target_e01_female_starves_by_day_3():
     assert run.observed["alive_by_day"][-1] == 0
 
 
+@pytest.mark.xfail(strict=True, raises=KeyError,
+                   reason="Step 5 (E02 report band): the harness does not yet measure "
+                   "per-night trajectory length and net displacement (outputs expose cells, "
+                   "not metres). Bounds: <= 590 m trajectory ('daily_move_capacity_m') and "
+                   "<= 200 m net (2 x 'exploration_range_m'); both keys arrive in Step 4 and "
+                   "must then replace the literals below (plan 13.6, E02)")
+def test_target_e02_nightly_movement_within_band():
+    (run,) = runs_of("E02")
+    path_m = run.observed["trajectory_m_by_night"]
+    net_m = run.observed["net_displacement_m_by_night"]
+    assert max(path_m) <= 590.0 and max(net_m) <= 200.0
+
+
 @pytest.mark.xfail(strict=True, reason="Step 5 (cascade): net displacement is bounded by "
                    "2 x exploration_range_m = 200 m per night, so in 3 nights the female "
                    "cannot cover the 2000 m to the person: no bite (plan 13.6, E02)")
