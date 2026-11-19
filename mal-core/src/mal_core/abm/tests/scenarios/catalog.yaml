@@ -79,7 +79,8 @@ E01:
     - "Baseline pin: the known-failure facts above are asserted, so any change in the chain's behaviour is flagged and must be acknowledged by updating the pin"
     - "Target gate (strict expected failure): the plan's target is asserted and is expected to fail until Step 5; when it starts passing the test fails and must be promoted"
     - "Target for E01: zero successful human bites over the run"
-    - "GIF baseline pin: three simulated days give a three-frame GIF; the target of one frame per phase of the day is a strict expected failure until the visualiser is changed"
+    - "Baseline pin: the female is alive on every day with no deaths (no starvation yet); target (strict expected failure): not alive at the end of day three, a proxy for starvation entry"
+    - "GIF baseline pin: three simulated days give a three-frame GIF (the GIF unit is the day)"
   gif: >-
     Today the transmission GIF has one frame per simulated day and no scenario
     overlay, so the day-one bite is not visible. For E01 show the female marker,
@@ -124,7 +125,7 @@ E02:
     - "The run completes through the manifest route ('validate_completeness', resolve, binary) with exit code 0"
     - "Baseline pin: the known-failure facts above are asserted, so any change in the chain's behaviour is flagged and must be acknowledged by updating the pin"
     - "Target gate (strict expected failure): the plan's target is asserted and is expected to fail until Step 5; when it starts passing the test fails and must be promoted"
-    - "Target for E02: per-night net displacement bound of 200 m"
+    - "Target for E02 (strict expected failure, Step 5): per-night trajectory length at most 590 m and net displacement at most 200 m; fails today because the harness does not yet measure nightly movement (outputs expose cells, not metres)"
   gif: >-
     Today the transmission GIF has one frame per simulated day and no scenario
     overlay. For E02 show the female track of each night in its own colour, the

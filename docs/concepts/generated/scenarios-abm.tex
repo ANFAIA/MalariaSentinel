@@ -44,7 +44,8 @@
 \item Baseline pin: the known-failure facts above are asserted, so any change in the chain's behaviour is flagged and must be acknowledged by updating the pin
 \item Target gate (strict expected failure): the plan's target is asserted and is expected to fail until Step 5; when it starts passing the test fails and must be promoted
 \item Target for E01: zero successful human bites over the run
-\item GIF baseline pin: three simulated days give a three-frame GIF; the target of one frame per phase of the day is a strict expected failure until the visualiser is changed
+\item Baseline pin: the female is alive on every day with no deaths (no starvation yet); target (strict expected failure): not alive at the end of day three, a proxy for starvation entry
+\item GIF baseline pin: three simulated days give a three-frame GIF (the GIF unit is the day)
 \end{itemize}
 \par\noindent\textbf{What the GIF must show.} Today the transmission GIF has one frame per simulated day and no scenario overlay, so the day-one bite is not visible. For E01 show the female marker, the person marker, and a circle of the 100 m activation radius around the female, redrawn in frames per phase of each night. A correct run shows the female wandering without ever entering the circle and no bite marker at any frame.
 
@@ -69,7 +70,7 @@
 \item The run completes through the manifest route ('validate\_completeness', resolve, binary) with exit code 0
 \item Baseline pin: the known-failure facts above are asserted, so any change in the chain's behaviour is flagged and must be acknowledged by updating the pin
 \item Target gate (strict expected failure): the plan's target is asserted and is expected to fail until Step 5; when it starts passing the test fails and must be promoted
-\item Target for E02: per-night net displacement bound of 200 m
+\item Target for E02 (strict expected failure, Step 5): per-night trajectory length at most 590 m and net displacement at most 200 m; fails today because the harness does not yet measure nightly movement (outputs expose cells, not metres)
 \end{itemize}
 \par\noindent\textbf{What the GIF must show.} Today the transmission GIF has one frame per simulated day and no scenario overlay. For E02 show the female track of each night in its own colour, the start point of the night, a 200 m ring around it, and the far person marker. A correct run shows each night's net shift inside its ring, while the track itself can wander and stays within the daily length budget.
 
