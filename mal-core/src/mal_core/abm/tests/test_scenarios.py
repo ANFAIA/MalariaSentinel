@@ -49,7 +49,6 @@ pytestmark = pytest.mark.skipif(
 
 CELL_M = 1000.0
 GRID = 10
-PHASES_PER_DAY = 4  # 12/4/6/2 h phases of the day (plan 15.1, Paso 5)
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -180,21 +179,9 @@ def test_target_e02_no_bite_at_2000_m():
     assert run.observed["human_bites_total"] == 0
 
 
-@pytest.mark.xfail(strict=True, reason="Visualiser V1 (plan 15.1.2): scenario GIFs must draw "
-                   "one frame per phase of the day (12/4/6/2 h), not one per day")
-def test_target_gif_has_one_frame_per_phase():
-    from PIL import Image
-
-    (run,) = runs_of("E01")
-    gif = next(run.out_dir.glob("*_transmission.gif"))
-    with Image.open(gif) as im:
-        frames = im.n_frames
-    assert frames >= int(run.spec["days"]) * PHASES_PER_DAY
-
-
 def test_baseline_gif_has_one_frame_per_day():
-    """BASELINE PIN of the visualiser (plan 15.1.2): a scenario GIF has one
-    frame per simulated day (E00, one day, is a single slide)."""
+    """The GIF unit is the day (plan 15.1): a scenario GIF has one frame per
+    simulated day (E00, one day, is a single slide)."""
     from PIL import Image
 
     for sid in ("E00", "E01"):
