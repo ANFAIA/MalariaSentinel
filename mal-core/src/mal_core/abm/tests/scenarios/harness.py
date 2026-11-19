@@ -32,7 +32,7 @@ AOI_SLUG = "accra-synth-10x10"
 AOI_BBOX = "-0.2,5.7,-0.10971147034573944,5.789842104336081"
 DATA_ROOT = REPO_ROOT / "runs" / "synthetic"
 CHECK_DIR = REPO_ROOT / "runs" / "_check_current"
-ALL_IDS = [f"E{i:02d}" for i in range(19)]
+ALL_IDS = [f"E{i:02d}" for i in range(20)]
 
 # Non-spec keys the harness itself reads from a variant element.
 _VARIANT_ONLY = {"label"}
@@ -129,6 +129,7 @@ def run_scenario(
     enable_transmission: bool = True,
     month: int = 6,
     seed_override: int | None = None,
+    debug: bool = False,
 ) -> list[ScenarioRun]:
     """Run every variant of ``scenario_id`` through the manifest route."""
     from mal_core.abm.wrapper import run_abm_from_manifest
@@ -145,10 +146,7 @@ def run_scenario(
         out_dir.mkdir(parents=True)
         # Regenerate the AOI scenario copy with the (possibly expanded) spec.
         aoi_dir = data_root / AOI_SLUG
-        # The engine rejects non-empty overrides until Paso 5 (seeding.cpp):
-        # run without them and record what was not applied.
-        unapplied = dict(eng_spec.get("overrides") or {})
-        run_spec = {**eng_spec, "overrides": {}}
+        run_spec = dict(eng_spec)
         target = aoi_dir / "scenarios" / f"{scenario_id}.json"
         original = target.read_text() if target.exists() else None
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -166,6 +164,7 @@ def run_scenario(
                 seed=int(eng_spec["seed"]),
                 output_dir=out_dir,
                 enable_transmission=enable_transmission,
+                debug=debug,
             )
         finally:
             if original is not None:
@@ -176,10 +175,32 @@ def run_scenario(
                 f"{result['returncode']}: {result.get('stderr', '')[-800:]}")
         run = ScenarioRun(scenario_id, label, out_dir, eng_spec)
         run.observed = _collect(out_dir, int(eng_spec["seed"]))
-        if unapplied:
-            run.observed["overrides_not_applied_until_paso_5"] = unapplied
         runs.append(run)
     return runs
+
+
+WIND_SCENARIOS = ("E18", "E19")
+WEAK_WIND_MAX_MS = 0.2   # below wind_block_threshold_ms (= flight_speed_ms, 0.3375)
+
+
+def _weak_wind_file(aoi_dir: Path, strong_name: str) -> Path:
+    """A copy of the synthetic wind field scaled so its speed never exceeds
+    WEAK_WIND_MAX_MS: a breeze, below the blocking threshold of the cascade."""
+    import numpy as np
+    import xarray as xr
+
+    out = aoi_dir / strong_name.replace(".nc", "_weak.nc")
+    if out.exists():
+        return out
+    with xr.open_dataset(aoi_dir / strong_name) as ds:
+        ds = ds.load()
+    speed = np.hypot(ds["u100"], ds["v100"])
+    scale = WEAK_WIND_MAX_MS / float(speed.max())
+    ds["u100"] = ds["u100"] * scale
+    ds["v100"] = ds["v100"] * scale
+    ds.attrs["title"] = str(ds.attrs.get("title", "")) + f" (scaled x{scale:.4f}: weak wind for E19)"
+    ds.to_netcdf(out)
+    return out
 
 
 def _declare(aoi_dir: Path, scenario_id: str, data_root: Path) -> None:
@@ -190,6 +211,24 @@ def _declare(aoi_dir: Path, scenario_id: str, data_root: Path) -> None:
     for key in [k for k in manifest["datasets"] if k.startswith("scenario:")]:
         if key != f"scenario:{scenario_id}":
             manifest["datasets"].pop(key)
+    # The wind field is loaded ONLY by the wind scenarios (plan 13.1/13.6): with
+    # it declared, every scenario would fly under a 2-5 m/s wind that blocks
+    # the advance of the cascade (headwind >= flight speed). Stash the entry the
+    # AOI builder wrote and put it back for them: E18 uses the field as built
+    # (strong: it blocks), E19 a weak copy (below the blocking threshold).
+    stash = aoi_dir / "wind_entry.json"
+    current = manifest["datasets"].get("wind")
+    if current is not None and "_weak" not in current["files"]["wind"]:
+        stash.write_text(json.dumps(current))      # always the STRONG entry
+    if scenario_id in WIND_SCENARIOS:
+        if stash.exists():
+            entry = json.loads(stash.read_text())
+            if scenario_id == "E19":
+                entry = dict(entry)
+                entry["files"] = {"wind": _weak_wind_file(aoi_dir, entry["files"]["wind"]).name}
+            manifest["datasets"]["wind"] = entry
+    else:
+        manifest["datasets"].pop("wind", None)
     path = aoi_dir / "manifest.json"
     path.write_text(json.dumps(manifest, indent=2))
     update_dataset(

@@ -3,7 +3,6 @@
 add_library(mal_abm_fast_core STATIC
     env_reader.cpp
     prng.cpp
-    dispersal.cpp
     eip.cpp
     climate.cpp
     habitat_engine.cpp
@@ -15,13 +14,11 @@ add_library(mal_abm_fast_core STATIC
     engine.cpp
     seeding.cpp
     host_landscape.cpp
-    host_seeking.cpp
+    host_cascade.cpp
     oviposition_seeking.cpp
-    mobility_schedule.cpp
     wind_field.cpp
     species_params.cpp
     config.cc
-    effective_host_landscape.cpp
     human_state.cpp
     transmission.cpp
     transmission_output.cpp
@@ -29,6 +26,7 @@ add_library(mal_abm_fast_core STATIC
     viz.cpp
     viz_common.cpp
     viz_tx.cpp
+    debug_parquet_writer.cpp
 )
 target_include_directories(mal_abm_fast_core
     PUBLIC
@@ -44,6 +42,8 @@ target_link_libraries(mal_abm_fast_core
 target_link_libraries(mal_abm_fast_core
     PUBLIC GDAL::GDAL netCDF::netcdf nlohmann_json::nlohmann_json Eigen3::Eigen
 )
+# Paso 2b: the --debug Parquet files are written with Apache Arrow C++.
+target_link_libraries(mal_abm_fast_core PUBLIC Arrow::arrow_shared Parquet::parquet_shared)
 if(OpenMP_CXX_FOUND)
     target_link_libraries(mal_abm_fast_core PUBLIC OpenMP::OpenMP_CXX)
 endif()

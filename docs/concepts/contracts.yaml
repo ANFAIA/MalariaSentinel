@@ -125,10 +125,3 @@ artefacts:
     compatibility: >-
       The static host grid is read by the ABM engine as the human side of the
       transmission model; it is a raster on the spatial frame of the env NC.
-
-  - key: mobility_day
-    producer: mal_core.ingest.mobility.build_mobility_dataset
-    consumers: [abm]
-    compatibility: >-
-      The daytime mobility CSR is a sparse operator on the same grid; it is
-      applied to the human counts, not to the vector counts.

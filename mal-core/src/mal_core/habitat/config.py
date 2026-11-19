@@ -46,6 +46,41 @@ __all__ = [
 ]
 
 
+# Per-species keys added by the movement / blood / dry-season / male layers
+# (plan individualization-and-movement, Paso 4).
+NEW_SPECIES_KEYS: tuple[str, ...] = (
+    "co2_activation_radius_m",
+    "olfactory_radius_m",
+    "visual_radius_m",
+    "terminal_radius_m",
+    "flight_speed_ms",
+    "exploration_range_m",
+    "exploration_step_m",
+    "exploration_step_correlation",
+    "casting_probability",
+    "casting_angle_deg",
+    "plume_memory_s",
+    "anemotaxis_rule",
+    "anemotaxis_deviation_deg",
+    "wind_reference",
+    "wind_block_threshold_ms",
+    "daily_move_capacity_m",
+    "directed_flight_budget_h",
+    "blood_meal_target_ul",
+    "first_cycle_target_ul",
+    "blood_meal_size_ul",
+    "meal_size_min_ul",
+    "blood_meal_refractory_days",
+    "probing_success_rate",
+    "eggs_per_ul",
+    "arrested_daily_survival",
+    "gonotrophic_arrest_prob_dry",
+    "aestivation_supported",
+    "male_ratio",
+    "male_daily_survival",
+)
+
+
 def load_config(path: str | os.PathLike[str] | None = None) -> types.MappingProxyType:
     """Load + validate the model constants YAML (see module docstring)."""
     return freeze(validate_model_config(path).model_dump())
@@ -86,9 +121,8 @@ def dump_raw(path: str | os.PathLike[str] | None = None) -> dict[str, Any]:
             continue
         out[f"species.{name}.weights"] = [
             float(row["weights"][g]) for g in types_list]
-        for k in ("salinity_hi_tol_ppt", "host_seeking_scale_m",
-                  "host_seeking_radius_m", "salinity_opt_ppt",
-                  "salinity_slope"):
+        for k in ("salinity_hi_tol_ppt", "salinity_opt_ppt",
+                  "salinity_slope") + NEW_SPECIES_KEYS:
             if k in row:
                 out[f"species.{name}.{k}"] = row[k]
         if "activity_weights" in row:
@@ -104,8 +138,8 @@ def dump_raw(path: str | os.PathLike[str] | None = None) -> dict[str, Any]:
     # py-only input-loader section with no C++ consumer or config_dump entry
     # (task-08), so emitting it would break the py⇄C++ key parity contract.
     for sec in ("ingest", "adults", "eip", "transmission", "dispersal",
-                "host_seeking", "oviposition", "aquatic_stages", "thermal",
-                "gonotrophic", "rng"):
+                "host_seeking", "integration", "mating", "oviposition",
+                "aquatic_stages", "thermal", "gonotrophic", "rng"):
         for k, v in data[sec].items():
             out[f"{sec}.{k}"] = v
     return out

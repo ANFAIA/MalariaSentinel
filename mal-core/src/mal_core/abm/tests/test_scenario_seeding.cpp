@@ -457,12 +457,21 @@ TEST(ScenarioSeeding, NonEmptyVariantsAreRejected) {
     EXPECT_NE(msg.find("$.variants"), std::string::npos) << msg;
 }
 
-TEST(ScenarioSeeding, NonEmptyOverridesAreRejected) {
-    // Overrides are not applied before Paso 5; a silent no-op would let a
-    // sensitivity band run with the canonical value.
-    const std::string msg = load_error("overrides_nonempty",
+TEST(ScenarioSeeding, UnknownOverrideKeyIsRejected) {
+    // A silent no-op would let a sensitivity band run with the canonical value.
+    const std::string msg = load_error("overrides_unknown",
         R"({"id":"s","seed":1,"days":1,"agents":[],"overrides":{"k":1.0}})");
-    EXPECT_NE(msg.find("$.overrides"), std::string::npos) << msg;
+    EXPECT_NE(msg.find("$.overrides.k"), std::string::npos) << msg;
+    const std::string nonnum = load_error("overrides_nonnum",
+        R"({"id":"s","seed":1,"days":1,"agents":[],"overrides":{"olfactory_radius_m":"far"}})");
+    EXPECT_NE(nonnum.find("$.overrides.olfactory_radius_m"), std::string::npos) << nonnum;
+}
+
+TEST(ScenarioSeeding, CascadeOverridesAreParsed) {
+    const ScenarioSpec s = load_scenario_spec(write_json("overrides_ok",
+        R"({"id":"s","seed":1,"days":1,"agents":[],"overrides":{"olfactory_radius_m":30,"co2_activation_radius_m":50}})"));
+    ASSERT_EQ(s.overrides.size(), 2u);
+    EXPECT_DOUBLE_EQ(s.overrides.at("olfactory_radius_m"), 30.0);
 }
 
 TEST(ScenarioSeeding, AgentsArrayIsRequired) {

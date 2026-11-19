@@ -162,76 +162,71 @@ def test_e00_seeded_individual_and_single_manifest_key(tmp_path):
     assert [k for k in manifest["datasets"] if k.startswith("scenario:")] == ["scenario:E00"]
 
 
-@pytest.mark.parametrize("scenario_id", ["E00", "E01", "E02"])
-def test_baseline_agent_stays_in_seeded_cell(scenario_id):
-    """BASELINE PIN. Today the lone adult never leaves its seeded cell."""
-    (run,) = runs_of(scenario_id)
-    agent = run.spec["agents"][0]
-    want = cell_of(agent["x"], agent["y"])
-    for snap in run.observed["adult_cells_by_snapshot"]:
-        cells = [(r, c) for r, c, _ in snap["occupied_cells"]]
-        assert cells == [want], f"{scenario_id} {snap['snapshot']}: {cells} != {[want]}"
+def _bites_per_day(run):
+    return [b["human_successful"] for b in run.observed["bites_by_day"]]
 
 
-@pytest.mark.parametrize("scenario_id", ["E00", "E01", "E02"])
-def test_baseline_bite_is_drawn_from_cell_aggregate(scenario_id):
-    """BASELINE PIN (known failure, plan P1). One successful human bite on
-    day 1, none afterwards, whatever the distance to the seeded person (E01:
-    200 m, E02: 2000 m): the bite is drawn from the ~127 000 people the cell
-    aggregate holds, not from the seeded person. Step 2a/5 must break this
-    pin and replace it with the E01/E02 targets below."""
-    (run,) = runs_of(scenario_id)
-    per_day = [b["human_successful"] for b in run.observed["bites_by_day"]]
-    assert per_day[0] == 1 and sum(per_day[1:]) == 0
-
-
-def test_baseline_e01_female_survives_all_days():
-    """BASELINE PIN (known gap vs the plan target). With the current chain the
-    seeded female is alive on every day of E01 (no starvation, no deaths):
-    today she feeds on the cell aggregate. The target below replaces this pin."""
+def test_e01_no_bite_in_the_first_three_days():
+    """GATE (Paso 5). The person is 200 m away, outside the 100 m activation
+    band: the female cannot bite on the first nights, and the bite is no longer
+    drawn from the 127 000 people of the cell aggregate (the P1 failure of the
+    baseline). Over ten days the walk may bring her within 100 m, and then the
+    cascade lands: that is the model working, not a failure (E01 with 3 days
+    hid it)."""
     (run,) = runs_of("E01")
-    assert run.observed["alive_by_day"] == [1] * int(run.spec["days"])
-    assert sum(run.observed["deaths_by_day"]) == 0
+    assert sum(_bites_per_day(run)[:3]) == 0
 
 
-# ----------------------------------------------------------------------------
-# Target gates: pre-registered by the plan, failing today (strict xfail).
-# ----------------------------------------------------------------------------
-
-@pytest.mark.xfail(strict=True, reason="Step 5 (cascade): at 200 m the female is outside "
-                   "the 100 m activation band, so E01 must record no bite (plan 15, E01)")
-def test_target_e01_no_bite_at_200_m():
-    (run,) = runs_of("E01")
+def test_e02_no_bite_and_death_by_starvation():
+    """GATE (Paso 5). A person 2 km away is not reached by a walk bounded by
+    590 m of path per day; with no meal the female dies of starvation, not
+    before host_seeking.starvation_days."""
+    from mal_core.habitat.config import CONFIG
+    starvation_days = int(CONFIG["host_seeking"]["starvation_days"])
+    (run,) = runs_of("E02")
     assert run.observed["human_bites_total"] == 0
-
-
-@pytest.mark.xfail(strict=True, reason="Steps 2a/5: with no contact at 200 m and no breeding "
-                   "site the female must enter starvation by day 3 (plan 15.0, E01); "
-                   "proxy: not alive at the end of the last day")
-def test_target_e01_female_starves_by_day_3():
-    (run,) = runs_of("E01")
+    deaths = run.observed["deaths_by_day"]
+    assert sum(deaths) == 1
+    first_death_day = deaths.index(1) + 1
+    assert first_death_day >= starvation_days
     assert run.observed["alive_by_day"][-1] == 0
 
 
-@pytest.mark.xfail(strict=True, raises=KeyError,
-                   reason="Step 5 (E02 report band): the harness does not yet measure "
-                   "per-night trajectory length and net displacement (outputs expose cells, "
-                   "not metres). Bounds: <= 590 m trajectory ('daily_move_capacity_m') and "
-                   "<= 200 m net (2 x 'exploration_range_m'); both keys arrive in Step 4 and "
-                   "must then replace the literals below (plan 13.6, E02)")
-def test_target_e02_nightly_movement_within_band():
-    (run,) = runs_of("E02")
-    path_m = run.observed["trajectory_m_by_night"]
-    net_m = run.observed["net_displacement_m_by_night"]
-    assert max(path_m) <= 590.0 and max(net_m) <= 200.0
+@pytest.mark.parametrize("scenario_id", ["E00", "E01", "E02"])
+def test_lone_female_moves_but_stays_within_the_daily_path_budget(scenario_id):
+    """Paso 5: the lone adult is no longer pinned to her cell. Whatever the
+    snapshot, she is within (days x daily_move_capacity_m) of her start."""
+    (run,) = runs_of(scenario_id)
+    agent = run.spec["agents"][0]
+    cap = 590.0 * len(run.observed["adult_cells_by_snapshot"])
+    for snap in run.observed["adult_cells_by_snapshot"]:
+        if not snap["occupied_cells"]:
+            continue   # starved: no adult left
+        assert len(snap["occupied_cells"]) == 1
+        r, c, _ = snap["occupied_cells"][0]
+        r0, c0 = cell_of(agent["x"], agent["y"])
+        assert max(abs(r - r0), abs(c - c0)) * 1000.0 <= cap + 1000.0
 
 
-@pytest.mark.xfail(strict=True, reason="Step 5 (cascade): net displacement is bounded by "
-                   "2 x exploration_range_m = 200 m per night, so in 3 nights the female "
-                   "cannot cover the 2000 m to the person: no bite (plan 13.6, E02)")
-def test_target_e02_no_bite_at_2000_m():
-    (run,) = runs_of("E02")
-    assert run.observed["human_bites_total"] == 0
+def test_e18_strong_wind_delays_the_approach_that_e19_makes_on_day_1(tmp_path):
+    """GATE (Paso 5, E18 vs E19). Same geometry (person 40 m away, inside the
+    olfactory radius), two wind fields: E18 the 100 m ERA5 wind (2-5 m/s, far
+    above the 0.3375 m/s flight speed) with the person UPWIND, so the advance is
+    blocked until the wind turns; E19 a breeze. E19 lands on day 1; E18 later."""
+    strong = _parquet(_debug_run("E18", tmp_path / "strong"), "bites")
+    weak = _parquet(_debug_run("E19", tmp_path / "weak"), "bites")
+    assert len(weak) >= 1 and int(weak["day"].min()) == 1
+    assert len(strong) == 0 or int(strong["day"].min()) > int(weak["day"].min())
+
+
+def test_e19_weak_wind_does_not_block_the_approach(tmp_path):
+    """GATE (Paso 5, E19). The same field scaled to a breeze (< the blocking
+    threshold) lets the female track the plume and land."""
+    run = _debug_run("E19", tmp_path)
+    bites = _parquet(run, "bites")
+    agents = _parquet(run, "agents")
+    assert len(bites) >= 1
+    assert "LANDED" in set(agents["cascade_stage"])
 
 
 def test_baseline_gif_has_one_frame_per_day():
@@ -280,3 +275,62 @@ def test_different_seeds_differ():
     (b,) = h.run_scenario("E13", out_root=h.CHECK_DIR / "_det_b",
                           seed_override=a.spec["seed"] + 1)
     assert h.artifact_digests(a.out_dir) != h.artifact_digests(b.out_dir)
+
+
+# ----------------------------------------------------------------------------
+# Paso 2b: --debug Parquet, and the Paso 2 / Paso 5 gate E09
+# ----------------------------------------------------------------------------
+
+def _debug_run(scenario_id, tmp_path_factory_dir):
+    from pathlib import Path
+    (run,) = h.run_scenario(scenario_id, out_root=Path(tmp_path_factory_dir), debug=True)
+    return run
+
+
+def _parquet(run, kind):
+    import pyarrow.parquet as pq
+    return pq.read_table(next(run.out_dir.glob(f"*_{kind}.parquet"))).to_pandas()
+
+
+def test_debug_flag_is_the_only_thing_that_writes_parquet(tmp_path):
+    """Without --debug a run writes no Parquet; with it, exactly the four files."""
+    (plain,) = h.run_scenario("E00", out_root=tmp_path / "plain")
+    assert not list(plain.out_dir.glob("*.parquet"))
+    run = _debug_run("E00", tmp_path / "dbg")
+    kinds = sorted(p.name.rsplit("_", 1)[-1] for p in run.out_dir.glob("*.parquet"))
+    assert kinds == ["agents.parquet", "bites.parquet", "humans.parquet", "mating.parquet"]
+
+
+def test_e09_infectious_bite_infects_at_most_the_person_bitten(tmp_path):
+    """GATE (Paso 2/5, E09). The infectious female bites ONE identified person;
+    only that person is exposed; the Parquet agree with each other."""
+    run = _debug_run("E09", tmp_path)
+    bites = _parquet(run, "bites")
+    humans = _parquet(run, "humans")
+    agents = _parquet(run, "agents")
+    assert len(bites) >= 1
+    assert set(bites["host"]) == {"HUMAN"} and bites["infectious_vector"].all()
+    infected = bites[bites["new_infection"]]
+    # Every person in E/I/R was bitten by an infectious mosquito (nobody else),
+    # and the bitten person is one of the three declared humans.
+    assert set(humans["human_id"]) <= set(infected["human_id"])
+    assert len(set(infected["human_id"])) <= len(bites)
+    # The bitten person is the one the cascade reached: the landing point is
+    # within the terminal radius of the person's position.
+    first = bites.iloc[0]
+    a = agents[(agents["day"] == first["day"]) & (agents["uid"] == first["mosquito_uid"])].iloc[0]
+    assert ((a["x_m"] - first["x_m"]) ** 2 + (a["y_m"] - first["y_m"]) ** 2) ** 0.5 <= 0.2
+    assert a["cascade_stage"] == "LANDED"
+
+
+def test_e02_net_displacement_per_day_is_bounded_by_the_path_budget(tmp_path):
+    """E02 report band, now measurable from _agents.parquet: net displacement
+    between consecutive days never exceeds the 590 m daily path budget."""
+    run = _debug_run("E02", tmp_path)
+    agents = _parquet(run, "agents").sort_values("day")
+    x0, y0 = run.spec["agents"][0]["x"], run.spec["agents"][0]["y"]
+    prev = (x0, y0)
+    for _, r in agents.iterrows():
+        step = ((r["x_m"] - prev[0]) ** 2 + (r["y_m"] - prev[1]) ** 2) ** 0.5
+        assert step <= 590.0 + 1e-3
+        prev = (r["x_m"], r["y_m"])

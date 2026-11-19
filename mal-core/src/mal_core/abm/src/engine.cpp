@@ -94,12 +94,70 @@ void Engine::seed_scenario_population_(const SeedingConfig& cfg,
     std::cout << "Engine: SCENARIO '" << spec.id << "' seeded "
               << spec.agents.size() << " agents and " << spec.aquatic.size()
               << " aquatic cohorts\n";
-    if (!spec.humans.empty() || !spec.livestock.empty()) {
+    if (!spec.livestock.empty()) {
         std::cout << "Engine: SCENARIO '" << spec.id << "' declares "
-                  << spec.humans.size() << " humans and "
                   << spec.livestock.size()
-                  << " livestock; not seeded yet (humans: Paso 2)\n";
+                  << " livestock; not seeded yet (livestock: Paso 2c)\n";
     }
+}
+
+// Individual people and the perception cascade (plan Paso 2a + Paso 5).
+// The people live in the transmission model when it exists; otherwise a
+// stand-alone population is built (the host-grid counts, or one person per
+// cell when there is no host landscape). Declared scenario humans REPLACE the
+// host-grid population. The females fly the cascade towards these people:
+// there is no other host-search path.
+void Engine::finish_individuals_(const SeedingConfig& cfg, uint64_t micro_seed) {
+    const ScenarioSpec* spec = cfg.scenario ? cfg.scenario.get() : nullptr;
+    HumanCompartmentGrid* grid = nullptr;
+    if (transmission_model_) {
+        grid = &transmission_model_->human_grid_mutable();
+    } else {
+        // People always exist: one per cell when there is no host landscape.
+        const int32_t h = cells_per_side_h(aoi_);
+        const int32_t w = aoi_.cells_per_side();
+        std::vector<float> res_h = residential_human_grid();
+        if (res_h.empty() || spec) {
+            // A scenario declares ALL its people (possibly none); without a
+            // host landscape the default is one person per cell.
+            res_h.assign(static_cast<size_t>(h) * static_cast<size_t>(w),
+                         spec ? 0.0f : 1.0f);
+        }
+        people_only_ = std::make_unique<HumanCompartmentGrid>();
+        people_only_->init(h, w, res_h, 12, 20, 180, false, 0.0,
+                           static_cast<double>(aoi_.resolution_m),
+                           derive_substream_seed(micro_seed, "human_positions"));
+        grid = people_only_.get();
+        sub_->set_human_compartment_grid(grid);
+    }
+    if (grid == nullptr) return;
+
+    if (spec) {
+        std::vector<HumanSeed> people;
+        people.reserve(spec->humans.size());
+        for (const auto& hs : spec->humans) {
+            HumanSeed p;
+            p.x = hs.x;
+            p.y = hs.y;
+            p.state = parse_human_state(hs.state);
+            p.timer_days = hs.timer_days;
+            people.push_back(p);
+        }
+        grid->set_individuals(people);
+        std::cout << "Engine: SCENARIO '" << spec->id << "' seeded "
+                  << people.size() << " individual humans\n";
+    }
+    CascadeParams cp = CascadeParams::for_species(species_params_.id);
+    if (spec) {
+        for (const auto& [key, value] : spec->overrides) {
+            cp.apply_override(key, value);
+            std::cout << "Engine: SCENARIO '" << spec->id << "' override " << key << " = " << value << "\n";
+        }
+    }
+    grid->build_spatial_index(cp.co2_activation_radius_m / 4.0);
+    sub_->set_cascade(cp, micro_seed);
+    std::cout << "Engine: perception cascade on " << grid->n_people()
+              << " individual people (spatial index built)\n";
 }
 
 Engine::Engine(AOI aoi,
@@ -111,7 +169,6 @@ Engine::Engine(AOI aoi,
                SeedingConfig seeding_config,
                RuntimeOverrides overrides,
                const std::string& hosts_path,
-               const std::string& mobility_dir,
                const std::string& wind_field_path,
                TransmissionParams transmission_params)
     : aoi_(std::move(aoi)),
@@ -215,7 +272,8 @@ Engine::Engine(AOI aoi,
         species_params_.pref_sheep,
         species_params_.pref_wildlife,
     };
-    seeding_config.host_seeking_scale_m = species_params_.host_seeking_scale_m;
+    seeding_config.host_weighting_scale_m = static_cast<float>(
+        CascadeParams::for_species(species_params_.id).daily_move_capacity_m);
 
     if (seeding_config.mode == SeedingMode::UNIFORM) {
         // UNIFORM path: explicit per-patch adult/immature counts over
@@ -288,26 +346,9 @@ Engine::Engine(AOI aoi,
     // Contract v3.0: the per-cell capacity view is filled per-day by
     // update_habitat_day (absolute K); the retired build_K_eff_grid
     // static multiplier is gone.
-    if (!mobility_dir.empty()) {
-        mobility_schedule_ = std::make_unique<MobilitySchedule>();
-        mobility_schedule_->load_from_directory(mobility_dir, aoi_);
-        if (mobility_schedule_->has_data()) {
-            std::cout << "Engine: loaded MobilitySchedule ("
-                      << mobility_schedule_->n_matrices() << " matrices) from "
-                      << mobility_dir << "\n";
-        }
-    }
-
-    // Wire host-seeking components to the submodel.
+    // Wire the host landscape (animal hosts) to the submodel.
     if (sub_ && host_landscape_) {
         sub_->set_host_landscape(host_landscape_.get());
-    }
-    if (sub_ && mobility_schedule_) {
-        sub_->set_mobility_schedule(mobility_schedule_.get());
-    }
-    if (host_landscape_) {
-        host_seeking_model_ = std::make_unique<HostSeekingModel>();
-        sub_->set_host_seeking_model(host_seeking_model_.get());
     }
 
     // -- Directed oviposition-site seeking (Plan D) --------------------------
@@ -325,23 +366,9 @@ Engine::Engine(AOI aoi,
                      "(directed oviposition walk)\n";
     }
 
-    // -- M7.8 species + effective host landscape -----------------------------
+    // -- M7.8 species --------------------------------------------------------
     sub_->set_species(species_params_);
     sub_->cohort_bank_mutable().set_species(species_params_);
-    if (host_seeking_model_) {
-        host_seeking_model_->set_species_params(species_params_);
-    }
-    if (mobility_schedule_ && mobility_schedule_->has_data() &&
-        host_landscape_) {
-        effective_hosts_ = std::make_unique<EffectiveHostLandscape>();
-        effective_hosts_->set_schedule(mobility_schedule_.get());
-        const auto res_h = residential_human_grid();
-        const auto res_l = residential_livestock_grid();
-        effective_hosts_->configure(
-            res_h, res_l, static_cast<int32_t>(res_h.size()));
-        sub_->set_effective_host_landscape(effective_hosts_.get());
-        std::cout << "Engine: wired EffectiveHostLandscape (phase-aware)\n";
-    }
 
     // -- Optional wind field (M7.6) -----------------------------------------
     if (!wind_field_path.empty()) {
@@ -375,7 +402,8 @@ Engine::Engine(AOI aoi,
 
         transmission_model_ = std::make_unique<TransmissionModel>();
         transmission_model_->init(
-            h, w, res_h, transmission_params_, trans_seed);
+            h, w, res_h, transmission_params_, trans_seed,
+            static_cast<double>(aoi_.resolution_m));
 
         if (transmission_params_.initial_vector_infected_frac > 0.0) {
             transmission_model_->seed_vector_infections(
@@ -393,6 +421,7 @@ Engine::Engine(AOI aoi,
     const uint64_t micro_seed = rng.peek_state()[0];
     (void)rng.uniform_double();
     micro_rng_.seed(micro_seed);
+    finish_individuals_(seeding_config, micro_seed);
 }
 
 Engine::Engine(AOI aoi,
@@ -403,7 +432,6 @@ Engine::Engine(AOI aoi,
                SeedingConfig seeding_config,
                RuntimeOverrides overrides,
                const std::string& hosts_path,
-               const std::string& mobility_dir,
                const std::string& wind_field_path,
                TransmissionParams transmission_params,
                int32_t warmup_bands)
@@ -469,7 +497,8 @@ Engine::Engine(AOI aoi,
         species_params_.pref_sheep,
         species_params_.pref_wildlife,
     };
-    seeding_config.host_seeking_scale_m = species_params_.host_seeking_scale_m;
+    seeding_config.host_weighting_scale_m = static_cast<float>(
+        CascadeParams::for_species(species_params_.id).daily_move_capacity_m);
 
     if (seeding_config.mode == SeedingMode::UNIFORM) {
         // UNIFORM path: explicit per-patch adult/immature counts over
@@ -532,26 +561,9 @@ Engine::Engine(AOI aoi,
     // Contract v3.0: the per-cell capacity view is filled per-day by
     // update_habitat_day (absolute K); the retired build_K_eff_grid
     // static multiplier is gone.
-    if (!mobility_dir.empty()) {
-        mobility_schedule_ = std::make_unique<MobilitySchedule>();
-        mobility_schedule_->load_from_directory(mobility_dir, aoi_);
-        if (mobility_schedule_->has_data()) {
-            std::cout << "Engine: loaded MobilitySchedule ("
-                      << mobility_schedule_->n_matrices() << " matrices) from "
-                      << mobility_dir << "\n";
-        }
-    }
-
-    // Wire host-seeking components to the submodel.
+    // Wire the host landscape (animal hosts) to the submodel.
     if (sub_ && host_landscape_) {
         sub_->set_host_landscape(host_landscape_.get());
-    }
-    if (sub_ && mobility_schedule_) {
-        sub_->set_mobility_schedule(mobility_schedule_.get());
-    }
-    if (host_landscape_) {
-        host_seeking_model_ = std::make_unique<HostSeekingModel>();
-        sub_->set_host_seeking_model(host_seeking_model_.get());
     }
 
     // -- Directed oviposition-site seeking (Plan D) --------------------------
@@ -569,23 +581,9 @@ Engine::Engine(AOI aoi,
                      "(directed oviposition walk)\n";
     }
 
-    // -- M7.8 species + effective host landscape -----------------------------
+    // -- M7.8 species --------------------------------------------------------
     sub_->set_species(species_params_);
     sub_->cohort_bank_mutable().set_species(species_params_);
-    if (host_seeking_model_) {
-        host_seeking_model_->set_species_params(species_params_);
-    }
-    if (mobility_schedule_ && mobility_schedule_->has_data() &&
-        host_landscape_) {
-        effective_hosts_ = std::make_unique<EffectiveHostLandscape>();
-        effective_hosts_->set_schedule(mobility_schedule_.get());
-        const auto res_h = residential_human_grid();
-        const auto res_l = residential_livestock_grid();
-        effective_hosts_->configure(
-            res_h, res_l, static_cast<int32_t>(res_h.size()));
-        sub_->set_effective_host_landscape(effective_hosts_.get());
-        std::cout << "Engine: wired EffectiveHostLandscape (phase-aware)\n";
-    }
 
     // -- Optional wind field (M7.6) -----------------------------------------
     if (!wind_field_path.empty()) {
@@ -619,7 +617,8 @@ Engine::Engine(AOI aoi,
 
         transmission_model_ = std::make_unique<TransmissionModel>();
         transmission_model_->init(
-            h, w, res_h, transmission_params_, trans_seed);
+            h, w, res_h, transmission_params_, trans_seed,
+            static_cast<double>(aoi_.resolution_m));
 
         if (transmission_params_.initial_vector_infected_frac > 0.0) {
             transmission_model_->seed_vector_infections(
@@ -637,6 +636,7 @@ Engine::Engine(AOI aoi,
     const uint64_t micro_seed = rng.peek_state()[0];
     (void)rng.uniform_double();
     micro_rng_.seed(micro_seed);
+    finish_individuals_(seeding_config, micro_seed);
 }
 
 void Engine::step() {
@@ -675,7 +675,7 @@ void Engine::step() {
         transmission_model_->advance_vector_eip(
             sub_->soa_mutable(), *climate_, coord_->patch_states_today(), aoi_);
         transmission_model_->advance_human_transmission(
-            sub_->bite_ledger(), aoi_);
+            sub_->bite_ledger_mutable(), aoi_);
         transmission_model_->record_daily_stats(
             day_index, sub_->soa(), sub_->bite_ledger());
     }
@@ -793,7 +793,9 @@ void Engine::snapshot_transmission(const std::string& path,
     write_transmission_cog(
         path,
         transmission_model_->human_grid(),
-        transmission_model_->infectious_pressure_grid(),
+        TransmissionModel::infectious_pressure_from_ledger(
+            sub_->bite_ledger(), transmission_model_->human_grid().h(),
+            transmission_model_->human_grid().w()),
         transmission_params_.focus_threshold,
         meta);
     write_transmission_sidecar(path, meta);

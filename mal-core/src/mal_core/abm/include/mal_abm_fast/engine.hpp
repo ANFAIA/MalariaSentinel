@@ -20,16 +20,13 @@
 #include "coordinator.hpp"
 #include "habitat_engine.hpp"
 #include "host_landscape.hpp"
-#include "host_seeking.hpp"
 #include "oviposition_seeking.hpp"
-#include "mobility_schedule.hpp"
 #include "mosquito_submodel.hpp"
 #include "prng.hpp"
 #include "seeding.hpp"
 #include "wire.hpp"
 #include "wind_field.hpp"
 #include "species_params.hpp"
-#include "effective_host_landscape.hpp"
 #include "transmission.hpp"
 #include "transmission_output.hpp"
 
@@ -73,7 +70,6 @@ public:
            SeedingConfig seeding_config = SeedingConfig{},
            RuntimeOverrides overrides = {},
            const std::string& hosts_path = "",
-           const std::string& mobility_dir = "",
            const std::string& wind_field_path = "",
            TransmissionParams transmission_params = TransmissionParams{});
 
@@ -90,7 +86,6 @@ public:
            SeedingConfig seeding_config = SeedingConfig{},
            RuntimeOverrides overrides = {},
            const std::string& hosts_path = "",
-           const std::string& mobility_dir = "",
            const std::string& wind_field_path = "",
            TransmissionParams transmission_params = TransmissionParams{},
            int32_t warmup_bands = 0);
@@ -151,14 +146,18 @@ public:
     const CoordinatorModel& coordinator() const { return *coord_; }
     const MosquitoSubmodel& submodel()    const { return *sub_; }
 
-    // Optional host / mobility / effective-host components (plan 05 §7).
-    // Nullable: they are only loaded when --hosts / a mobility dir is given.
-    // The transmission GIF reads them read-only; they never mutate state.
+    // Optional host landscape (animal hosts and the human counts of the grid).
+    // Nullable: only loaded when --hosts is given. The GIF reads it read-only.
     const HostLandscape*          host_landscape()    const { return host_landscape_.get(); }
-    const MobilitySchedule*       mobility_schedule() const { return mobility_schedule_.get(); }
-    const EffectiveHostLandscape* effective_hosts()   const { return effective_hosts_.get(); }
 
     const TransmissionModel* transmission() const { return transmission_model_.get(); }
+    /// The individual people of the run (the transmission model's, or the
+    /// stand-alone population when transmission is off); nullptr when the run
+    /// has no individual people.
+    const HumanCompartmentGrid* human_population() const {
+        if (transmission_model_) return &transmission_model_->human_grid();
+        return people_only_.get();
+    }
     TransmissionModel* transmission_mutable() { return transmission_model_.get(); }
 
     /// Optional JSON sidecar path: when set, a successful focal outbreak
@@ -191,7 +190,10 @@ private:
     // submodel from the spec. Sets `sub_`.
     void seed_scenario_population_(const SeedingConfig& cfg, uint64_t sub_seed,
                                    int32_t n_patches);
+    // Individual people + perception cascade wiring (plan Paso 2a / Paso 5).
+    void finish_individuals_(const SeedingConfig& cfg, uint64_t micro_seed);
 
+    std::unique_ptr<HumanCompartmentGrid>   people_only_;   // people when transmission is off
     AOI                                     aoi_;
     std::shared_ptr<ClimateEngine>          climate_;
     std::unique_ptr<HabitatEngine>          habitat_;
@@ -208,8 +210,6 @@ private:
 
     // Optional host-seeking components (loaded when --hosts is provided).
     std::unique_ptr<HostLandscape>          host_landscape_;
-    std::unique_ptr<MobilitySchedule>       mobility_schedule_;
-    std::unique_ptr<HostSeekingModel>       host_seeking_model_;
     std::unique_ptr<OvipositionSeekingModel> oviposition_seeking_model_;
 
     // Optional wind field (M7.6 — loaded when --wind-field is provided).
@@ -218,7 +218,6 @@ private:
     // M7.8: active species + phase-aware effective host landscape.
     SpeciesParams species_params_ =
         species_params_for(MosquitoSpeciesId::ANOPHELES_COLUZZII);
-    std::unique_ptr<EffectiveHostLandscape> effective_hosts_;
 
     // M7.4: SEIR-SEI Transmission Model
     TransmissionParams                      transmission_params_;

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
-// human_state.cpp — Spatial SEIR human compartment grid implementation.
+// human_state.cpp — Individual human population (SoA) with SEIR timers.
+// See human_state.hpp for the design (plan Paso 2a).
 #include "mal_abm_fast/human_state.hpp"
 
 #include <algorithm>
@@ -10,6 +11,61 @@
 
 namespace mal_abm_fast {
 
+namespace {
+
+double* bucket_of(HumanState s,
+                  std::vector<double>& sus, std::vector<double>& exp,
+                  std::vector<double>& inf, std::vector<double>& rec,
+                  size_t cell) {
+    switch (s) {
+        case HumanState::SUSCEPTIBLE: return &sus[cell];
+        case HumanState::EXPOSED:     return &exp[cell];
+        case HumanState::INFECTIOUS:  return &inf[cell];
+        case HumanState::RECOVERED:   return &rec[cell];
+    }
+    return &sus[cell];
+}
+
+// Uniform position of person `id` inside its cell: a pure function of
+// (seed, id), so the position never depends on insertion order.
+void uniform_in_cell(uint64_t seed, int64_t id, double& u, double& v) {
+    uint64_t st = seed ^ (static_cast<uint64_t>(id) * 0x9E3779B97F4A7C15ULL);
+    const uint64_t a = splitmix64(st);
+    const uint64_t b = splitmix64(st);
+    u = static_cast<double>(a >> 11) * (1.0 / 9007199254740992.0);
+    v = static_cast<double>(b >> 11) * (1.0 / 9007199254740992.0);
+}
+
+// Float rounding must not push a position onto the cell's upper edge.
+float below(double value, double upper) {
+    float f = static_cast<float>(value);
+    const float up = static_cast<float>(upper);
+    if (f >= up) f = std::nextafter(up, 0.0f);
+    return f;
+}
+
+}  // namespace
+
+HumanState parse_human_state(const std::string& s) {
+    if (s == "SUSCEPTIBLE") return HumanState::SUSCEPTIBLE;
+    if (s == "EXPOSED")     return HumanState::EXPOSED;
+    if (s == "INFECTIOUS")  return HumanState::INFECTIOUS;
+    if (s == "RECOVERED")   return HumanState::RECOVERED;
+    throw std::invalid_argument("unknown human state '" + s + "'");
+}
+
+void HumanSoA::clear() {
+    human_id.clear(); cell_id.clear();
+    home_x.clear(); home_y.clear(); cur_x.clear(); cur_y.clear();
+    state.clear(); timer.clear(); susceptible.clear();
+}
+
+void HumanSoA::reserve(size_t n) {
+    human_id.reserve(n); cell_id.reserve(n);
+    home_x.reserve(n); home_y.reserve(n); cur_x.reserve(n); cur_y.reserve(n);
+    state.reserve(n); timer.reserve(n); susceptible.reserve(n);
+}
+
 void HumanCompartmentGrid::init(
     int32_t h, int32_t w,
     const std::vector<float>& human_density,
@@ -17,13 +73,19 @@ void HumanCompartmentGrid::init(
     int32_t infectious_days,
     int32_t immunity_days,
     bool immunity_enabled,
-    double initial_prevalence)
+    double initial_prevalence,
+    double cell_m,
+    uint64_t seed)
 {
     if (h <= 0 || w <= 0) {
         throw std::invalid_argument("HumanCompartmentGrid: invalid grid dimensions");
     }
+    if (!(cell_m > 0.0)) {
+        throw std::invalid_argument("HumanCompartmentGrid: cell_m must be > 0");
+    }
     h_ = h;
     w_ = w;
+    cell_m_ = cell_m;
     const int64_t n_cells = static_cast<int64_t>(h_) * static_cast<int64_t>(w_);
     if (static_cast<int64_t>(human_density.size()) != n_cells) {
         throw std::invalid_argument(
@@ -37,61 +99,245 @@ void HumanCompartmentGrid::init(
     immunity_days_   = std::max(1, immunity_days);
     immunity_enabled_ = immunity_enabled;
 
-    susceptible_.assign(static_cast<size_t>(n_cells), 0.0);
-    exposed_.assign(static_cast<size_t>(n_cells), 0.0);
-    infectious_.assign(static_cast<size_t>(n_cells), 0.0);
-    recovered_.assign(static_cast<size_t>(n_cells), 0.0);
-    population_.assign(static_cast<size_t>(n_cells), 0.0);
-    daily_incidence_.assign(static_cast<size_t>(n_cells), 0.0);
-    daily_prevalence_.assign(static_cast<size_t>(n_cells), 0.0);
-
-    exposed_cohorts_.assign(
-        static_cast<size_t>(n_cells * incubation_days_), 0.0);
-    infectious_cohorts_.assign(
-        static_cast<size_t>(n_cells * infectious_days_), 0.0);
-    recovered_cohorts_.assign(
-        static_cast<size_t>(n_cells * immunity_days_), 0.0);
-
     const double init_prev = std::clamp(initial_prevalence, 0.0, 1.0);
 
+    int64_t total = 0;
+    std::vector<int64_t> count(static_cast<size_t>(n_cells), 0);
     for (int64_t c = 0; c < n_cells; ++c) {
-        const double pop = std::max(0.0, static_cast<double>(human_density[static_cast<size_t>(c)]));
-        population_[static_cast<size_t>(c)] = pop;
+        const double d = static_cast<double>(human_density[static_cast<size_t>(c)]);
+        const int64_t n = (d > 0.0) ? static_cast<int64_t>(std::llround(d)) : 0;
+        count[static_cast<size_t>(c)] = n;
+        total += n;
+    }
 
-        if (pop > 0.0 && init_prev > 0.0) {
-            const double init_inf = pop * init_prev;
-            const double init_susc = pop - init_inf;
-            susceptible_[static_cast<size_t>(c)] = init_susc;
-            infectious_[static_cast<size_t>(c)]  = init_inf;
-            daily_prevalence_[static_cast<size_t>(c)] = init_prev;
-
-            // Distribute initial infected evenly across the infectious cohort queue
-            const double per_day = init_inf / static_cast<double>(infectious_days_);
-            for (int32_t a = 0; a < infectious_days_; ++a) {
-                infectious_cohorts_[static_cast<size_t>(c * infectious_days_ + a)] = per_day;
+    soa_.clear();
+    soa_.reserve(static_cast<size_t>(total));
+    for (int64_t c = 0; c < n_cells; ++c) {
+        const int64_t n = count[static_cast<size_t>(c)];
+        const int32_t row = static_cast<int32_t>(c / w_);
+        const int32_t col = static_cast<int32_t>(c % w_);
+        // Row 0 is the northernmost row; y grows north from the SW corner.
+        const double x0 = static_cast<double>(col) * cell_m_;
+        const double y0 = static_cast<double>(h_ - 1 - row) * cell_m_;
+        const int64_t n_inf = static_cast<int64_t>(
+            std::llround(static_cast<double>(n) * init_prev));
+        for (int64_t slot = 0; slot < n; ++slot) {
+            const int64_t id = (c << 32) | slot;
+            double u, v;
+            uniform_in_cell(seed, id, u, v);
+            const float px = below(x0 + u * cell_m_, x0 + cell_m_);
+            const float py = below(y0 + v * cell_m_, y0 + cell_m_);
+            soa_.human_id.push_back(id);
+            soa_.cell_id.push_back(static_cast<int32_t>(c));
+            soa_.home_x.push_back(px);
+            soa_.home_y.push_back(py);
+            soa_.cur_x.push_back(px);
+            soa_.cur_y.push_back(py);
+            soa_.susceptible.push_back(1);
+            if (slot < n_inf) {
+                soa_.state.push_back(static_cast<uint8_t>(HumanState::INFECTIOUS));
+                // Timers spread evenly over the infectious period.
+                soa_.timer.push_back(1 + static_cast<int32_t>(slot % infectious_days_));
+            } else {
+                soa_.state.push_back(static_cast<uint8_t>(HumanState::SUSCEPTIBLE));
+                soa_.timer.push_back(0);
             }
-        } else {
-            susceptible_[static_cast<size_t>(c)] = pop;
         }
     }
+    rebuild_cell_index_();
+}
+
+void HumanCompartmentGrid::set_individuals(const std::vector<HumanSeed>& people) {
+    if (h_ <= 0 || w_ <= 0) {
+        throw std::runtime_error("HumanCompartmentGrid::set_individuals: init() first");
+    }
+    const double width_m  = static_cast<double>(w_) * cell_m_;
+    const double height_m = static_cast<double>(h_) * cell_m_;
+
+    struct Placed { int64_t cell; size_t order; };
+    std::vector<Placed> placed;
+    placed.reserve(people.size());
+    for (size_t k = 0; k < people.size(); ++k) {
+        const HumanSeed& p = people[k];
+        if (!(p.x >= 0.0 && p.x < width_m && p.y >= 0.0 && p.y < height_m)) {
+            throw std::runtime_error(
+                "human at (" + std::to_string(p.x) + " m, " + std::to_string(p.y) +
+                " m) lies outside the " + std::to_string(w_) + "x" +
+                std::to_string(h_) + " grid");
+        }
+        const int32_t col = static_cast<int32_t>(p.x / cell_m_);
+        const int32_t row = h_ - 1 - static_cast<int32_t>(p.y / cell_m_);
+        placed.push_back({static_cast<int64_t>(row) * w_ + col, k});
+    }
+    // Cell-major, declaration order inside a cell.
+    std::stable_sort(placed.begin(), placed.end(),
+                     [](const Placed& a, const Placed& b) { return a.cell < b.cell; });
+
+    soa_.clear();
+    soa_.reserve(people.size());
+    int64_t prev_cell = -1;
+    int64_t slot = 0;
+    for (const Placed& pl : placed) {
+        slot = (pl.cell == prev_cell) ? slot + 1 : 0;
+        prev_cell = pl.cell;
+        const HumanSeed& p = people[pl.order];
+        soa_.human_id.push_back((pl.cell << 32) | slot);
+        soa_.cell_id.push_back(static_cast<int32_t>(pl.cell));
+        soa_.home_x.push_back(static_cast<float>(p.x));
+        soa_.home_y.push_back(static_cast<float>(p.y));
+        soa_.cur_x.push_back(static_cast<float>(p.x));
+        soa_.cur_y.push_back(static_cast<float>(p.y));
+        soa_.susceptible.push_back(1);
+        soa_.state.push_back(static_cast<uint8_t>(p.state));
+        int32_t t = 0;
+        if (p.state != HumanState::SUSCEPTIBLE) {
+            const int32_t full =
+                (p.state == HumanState::EXPOSED)    ? incubation_days_
+              : (p.state == HumanState::INFECTIOUS) ? infectious_days_
+                                                    : immunity_days_;
+            t = (p.timer_days > 0.0)
+                    ? std::min(full, std::max(1, static_cast<int32_t>(std::lround(p.timer_days))))
+                    : full;
+        }
+        soa_.timer.push_back(t);
+    }
+    rebuild_cell_index_();
+}
+
+void HumanCompartmentGrid::build_spatial_index(double target_bin_m) {
+    if (h_ <= 0 || w_ <= 0) return;
+    const double width_m  = static_cast<double>(w_) * cell_m_;
+    const double height_m = static_cast<double>(h_) * cell_m_;
+    // Cap the number of bins (~3e7) so a country-sized AOI stays cheap.
+    constexpr double kMaxBins = 3.0e7;
+    bin_m_ = std::max(target_bin_m, std::sqrt(width_m * height_m / kMaxBins));
+    nbx_ = static_cast<int32_t>(std::ceil(width_m / bin_m_));
+    nby_ = static_cast<int32_t>(std::ceil(height_m / bin_m_));
+    const size_t nb = static_cast<size_t>(nbx_) * static_cast<size_t>(nby_);
+    bin_begin_.assign(nb + 1, 0);
+    auto key = [&](size_t i) {
+        const int32_t bx = std::min(nbx_ - 1, static_cast<int32_t>(soa_.cur_x[i] / bin_m_));
+        const int32_t by = std::min(nby_ - 1, static_cast<int32_t>(soa_.cur_y[i] / bin_m_));
+        return static_cast<size_t>(by) * static_cast<size_t>(nbx_) + static_cast<size_t>(bx);
+    };
+    const size_t n = soa_.size();
+    for (size_t i = 0; i < n; ++i) ++bin_begin_[key(i) + 1];
+    for (size_t b = 0; b < nb; ++b) bin_begin_[b + 1] += bin_begin_[b];
+    bin_people_.assign(n, 0);
+    std::vector<int64_t> fill(bin_begin_.begin(), bin_begin_.end() - 1);
+    for (size_t i = 0; i < n; ++i) bin_people_[static_cast<size_t>(fill[key(i)]++)] = static_cast<uint32_t>(i);
+}
+
+bool HumanCompartmentGrid::nearest_to_segment(
+    double x0, double y0, double x1, double y1, double radius,
+    SegmentHit& hit) const
+{
+    if (bin_begin_.empty() || radius <= 0.0) return false;
+    const double xmin = std::min(x0, x1) - radius, xmax = std::max(x0, x1) + radius;
+    const double ymin = std::min(y0, y1) - radius, ymax = std::max(y0, y1) + radius;
+    const int32_t bx0 = std::max(0, static_cast<int32_t>(std::floor(xmin / bin_m_)));
+    const int32_t bx1 = std::min(nbx_ - 1, static_cast<int32_t>(std::floor(xmax / bin_m_)));
+    const int32_t by0 = std::max(0, static_cast<int32_t>(std::floor(ymin / bin_m_)));
+    const int32_t by1 = std::min(nby_ - 1, static_cast<int32_t>(std::floor(ymax / bin_m_)));
+    const double dx = x1 - x0, dy = y1 - y0;
+    const double len2 = dx * dx + dy * dy;
+    double best_d2 = radius * radius;
+    int64_t best = -1;
+    for (int32_t by = by0; by <= by1; ++by) {
+        for (int32_t bx = bx0; bx <= bx1; ++bx) {
+            const size_t b = static_cast<size_t>(by) * static_cast<size_t>(nbx_) + static_cast<size_t>(bx);
+            for (int64_t k = bin_begin_[b]; k < bin_begin_[b + 1]; ++k) {
+                const uint32_t i = bin_people_[static_cast<size_t>(k)];
+                const double px = static_cast<double>(soa_.cur_x[i]) - x0;
+                const double py = static_cast<double>(soa_.cur_y[i]) - y0;
+                double t = (len2 > 0.0) ? (px * dx + py * dy) / len2 : 0.0;
+                t = std::clamp(t, 0.0, 1.0);
+                const double ex = px - t * dx, ey = py - t * dy;
+                const double d2 = ex * ex + ey * ey;
+                if (d2 <= best_d2) { best_d2 = d2; best = static_cast<int64_t>(i); }
+            }
+        }
+    }
+    if (best < 0) return false;
+    hit.person = best;
+    hit.d_min = std::sqrt(best_d2);
+    // First point of the segment within `radius` of the person.
+    const double px = static_cast<double>(soa_.cur_x[static_cast<size_t>(best)]) - x0;
+    const double py = static_cast<double>(soa_.cur_y[static_cast<size_t>(best)]) - y0;
+    if (len2 <= 0.0 || px * px + py * py <= radius * radius) {
+        hit.t_entry = 0.0;
+    } else {
+        // |t*d - p|^2 = r^2  =>  len2 t^2 - 2 (p.d) t + (|p|^2 - r^2) = 0, smaller root
+        const double b = px * dx + py * dy;
+        const double c = px * px + py * py - radius * radius;
+        const double disc = std::max(0.0, b * b - len2 * c);
+        hit.t_entry = std::clamp((b - std::sqrt(disc)) / len2, 0.0, 1.0);
+    }
+    return true;
+}
+
+void HumanCompartmentGrid::rebuild_cell_index_() {
+    bin_begin_.clear();
+    bin_people_.clear();
+    const size_t n_cells = static_cast<size_t>(total_cells());
+    cell_begin_.assign(n_cells + 1, 0);
+    for (size_t i = 0; i < soa_.size(); ++i) {
+        ++cell_begin_[static_cast<size_t>(soa_.cell_id[i]) + 1];
+    }
+    for (size_t c = 0; c < n_cells; ++c) cell_begin_[c + 1] += cell_begin_[c];
+
+    susceptible_.assign(n_cells, 0.0);
+    exposed_.assign(n_cells, 0.0);
+    infectious_.assign(n_cells, 0.0);
+    recovered_.assign(n_cells, 0.0);
+    population_.assign(n_cells, 0.0);
+    daily_incidence_.assign(n_cells, 0.0);
+    daily_prevalence_.assign(n_cells, 0.0);
+
+    for (size_t i = 0; i < soa_.size(); ++i) {
+        const size_t c = static_cast<size_t>(soa_.cell_id[i]);
+        population_[c] += 1.0;
+        *bucket_of(static_cast<HumanState>(soa_.state[i]),
+                   susceptible_, exposed_, infectious_, recovered_, c) += 1.0;
+    }
+    for (size_t c = 0; c < n_cells; ++c) refresh_prevalence_(c);
+}
+
+void HumanCompartmentGrid::refresh_prevalence_(size_t cell) {
+    daily_prevalence_[cell] =
+        (population_[cell] > 0.0) ? infectious_[cell] / population_[cell] : 0.0;
+}
+
+void HumanCompartmentGrid::set_state_(size_t i, HumanState to, int32_t timer) {
+    const size_t c = static_cast<size_t>(soa_.cell_id[i]);
+    *bucket_of(static_cast<HumanState>(soa_.state[i]),
+               susceptible_, exposed_, infectious_, recovered_, c) -= 1.0;
+    *bucket_of(to, susceptible_, exposed_, infectious_, recovered_, c) += 1.0;
+    soa_.state[i] = static_cast<uint8_t>(to);
+    soa_.timer[i] = timer;
+    refresh_prevalence_(c);
+}
+
+int64_t HumanCompartmentGrid::infect_first_susceptibles_(size_t cell, int64_t n) {
+    int64_t done = 0;
+    const size_t b = static_cast<size_t>(cell_begin_[cell]);
+    const size_t e = static_cast<size_t>(cell_begin_[cell + 1]);
+    for (size_t i = b; i < e && done < n; ++i) {
+        if (soa_.state[i] != static_cast<uint8_t>(HumanState::SUSCEPTIBLE)) continue;
+        // Imported cases enter at infectious age zero (full infectious period).
+        set_state_(i, HumanState::INFECTIOUS, infectious_days_);
+        ++done;
+    }
+    return done;
 }
 
 void HumanCompartmentGrid::seed_infections(int32_t row, int32_t col, double count) {
     if (row < 0 || row >= h_ || col < 0 || col >= w_) return;
-    const size_t c = static_cast<size_t>(row * w_ + col);
-    const double pop = population_[c];
-    if (pop <= 0.0 || count <= 0.0) return;
-
-    // Convert up to available susceptible to infectious
-    const double to_infect = std::min(count, susceptible_[c]);
-    if (to_infect <= 0.0) return;
-
-    susceptible_[c] -= to_infect;
-    infectious_[c]  += to_infect;
-
-    // Imported cases enter at infectious age zero, not as an already-aged cohort.
-    infectious_cohorts_[static_cast<size_t>(c * infectious_days_)] += to_infect;
-    daily_prevalence_[c] = infectious_[c] / pop;
+    if (count <= 0.0) return;
+    const size_t c = static_cast<size_t>(row) * static_cast<size_t>(w_) +
+                     static_cast<size_t>(col);
+    if (population_[c] <= 0.0) return;
+    infect_first_susceptibles_(c, static_cast<int64_t>(std::llround(count)));
 }
 
 std::vector<std::pair<int32_t, int32_t>> HumanCompartmentGrid::seed_random_viable_foci(
@@ -229,106 +475,60 @@ std::vector<std::pair<int32_t, int32_t>> HumanCompartmentGrid::seed_outbreak_clu
     return seeded;
 }
 
-void HumanCompartmentGrid::advance_day(
-    const std::vector<double>& force_of_infection,
-    Prng& rng)
-{
-    const int64_t n_cells = total_cells();
-    if (static_cast<int64_t>(force_of_infection.size()) != n_cells) {
-        throw std::invalid_argument("HumanCompartmentGrid::advance_day: force_of_infection size mismatch");
+void HumanCompartmentGrid::advance_day() {
+    std::fill(daily_incidence_.begin(), daily_incidence_.end(), 0.0);
+
+    const uint8_t S = static_cast<uint8_t>(HumanState::SUSCEPTIBLE);
+    const size_t n = soa_.size();
+    for (size_t i = 0; i < n; ++i) {
+        const uint8_t st = soa_.state[i];
+        if (st == S) continue;
+        if (--soa_.timer[i] > 0) continue;
+        switch (static_cast<HumanState>(st)) {
+            case HumanState::EXPOSED:
+                set_state_(i, HumanState::INFECTIOUS, infectious_days_);
+                break;
+            case HumanState::INFECTIOUS:
+                if (immunity_enabled_) {
+                    set_state_(i, HumanState::RECOVERED, immunity_days_);
+                } else {
+                    set_state_(i, HumanState::SUSCEPTIBLE, 0);   // I -> S, no immunity
+                }
+                break;
+            case HumanState::RECOVERED:
+                set_state_(i, HumanState::SUSCEPTIBLE, 0);       // immunity waned
+                break;
+            case HumanState::SUSCEPTIBLE:
+                break;
+        }
     }
+}
 
-    for (int64_t c = 0; c < n_cells; ++c) {
-        const size_t idx = static_cast<size_t>(c);
-        const double pop = population_[idx];
-        if (pop <= 0.0) {
-            daily_incidence_[idx]  = 0.0;
-            daily_prevalence_[idx] = 0.0;
-            continue;
-        }
+int64_t HumanCompartmentGrid::pick_person(int32_t row, int32_t col, Prng& rng) const {
+    if (row < 0 || row >= h_ || col < 0 || col >= w_) return -1;
+    const size_t c = static_cast<size_t>(row) * static_cast<size_t>(w_) +
+                     static_cast<size_t>(col);
+    const int64_t b = cell_begin_[c];
+    const int64_t n = cell_begin_[c + 1] - b;
+    if (n <= 0) return -1;
+    int64_t k = static_cast<int64_t>(rng.uniform_double() * static_cast<double>(n));
+    if (k >= n) k = n - 1;
+    return b + k;
+}
 
-        const double lambda = std::clamp(force_of_infection[idx], 0.0, 1.0);
-        double s = susceptible_[idx];
-
-        // 1. New exposures from Susceptible: S_H -> E_H
-        double new_exposed = 0.0;
-        if (s > 0.0 && lambda > 0.0) {
-            // If population is integer-like or large, binomial draw
-            const int64_t s_int = static_cast<int64_t>(std::round(s));
-            if (s_int > 0) {
-                const int64_t draws = rng.binomial(s_int, lambda);
-                new_exposed = std::min(s, static_cast<double>(draws));
-            } else {
-                new_exposed = s * lambda;
-            }
-        }
-        new_exposed = std::clamp(new_exposed, 0.0, s);
-        s -= new_exposed;
-        daily_incidence_[idx] = new_exposed;
-
-        // 2. Advance Exposed Cohorts: E_H -> I_H
-        // The oldest exposed cohort leaves exposed state and enters infectious
-        const size_t exp_offset = static_cast<size_t>(c * incubation_days_);
-        const double maturing_e = exposed_cohorts_[exp_offset + static_cast<size_t>(incubation_days_ - 1)];
-
-        for (int32_t a = incubation_days_ - 1; a >= 1; --a) {
-            exposed_cohorts_[exp_offset + static_cast<size_t>(a)] =
-                exposed_cohorts_[exp_offset + static_cast<size_t>(a - 1)];
-        }
-        exposed_cohorts_[exp_offset + 0] = new_exposed;
-
-        double sum_e = 0.0;
-        for (int32_t a = 0; a < incubation_days_; ++a) {
-            sum_e += exposed_cohorts_[exp_offset + static_cast<size_t>(a)];
-        }
-        exposed_[idx] = sum_e;
-
-        // 3. Advance Infectious Cohorts: I_H -> R_H (or S_H if no immunity)
-        // The oldest infectious cohort recovers
-        const size_t inf_offset = static_cast<size_t>(c * infectious_days_);
-        const double recovering_i = infectious_cohorts_[inf_offset + static_cast<size_t>(infectious_days_ - 1)];
-
-        for (int32_t a = infectious_days_ - 1; a >= 1; --a) {
-            infectious_cohorts_[inf_offset + static_cast<size_t>(a)] =
-                infectious_cohorts_[inf_offset + static_cast<size_t>(a - 1)];
-        }
-        infectious_cohorts_[inf_offset + 0] = maturing_e;
-
-        double sum_i = 0.0;
-        for (int32_t a = 0; a < infectious_days_; ++a) {
-            sum_i += infectious_cohorts_[inf_offset + static_cast<size_t>(a)];
-        }
-        infectious_[idx] = sum_i;
-
-        // 4. Advance Recovered Cohorts / Immunity: R_H -> S_H
-        if (immunity_enabled_ && immunity_days_ > 0) {
-            const size_t rec_offset = static_cast<size_t>(c * immunity_days_);
-            const double waning_r = recovered_cohorts_[rec_offset + static_cast<size_t>(immunity_days_ - 1)];
-
-            for (int32_t a = immunity_days_ - 1; a >= 1; --a) {
-                recovered_cohorts_[rec_offset + static_cast<size_t>(a)] =
-                    recovered_cohorts_[rec_offset + static_cast<size_t>(a - 1)];
-            }
-            recovered_cohorts_[rec_offset + 0] = recovering_i;
-
-            double sum_r = 0.0;
-            for (int32_t a = 0; a < immunity_days_; ++a) {
-                sum_r += recovered_cohorts_[rec_offset + static_cast<size_t>(a)];
-            }
-            recovered_[idx] = sum_r;
-
-            s += waning_r;
-        } else {
-            // Direct recovery without immunity: I_H -> S_H
-            s += recovering_i;
-            recovered_[idx] = 0.0;
-        }
-
-        // Clamp S to ensure total conservation
-        s = std::max(0.0, pop - (exposed_[idx] + infectious_[idx] + recovered_[idx]));
-        susceptible_[idx] = s;
-        daily_prevalence_[idx] = infectious_[idx] / pop;
+bool HumanCompartmentGrid::expose(int64_t index) {
+    if (index < 0 || index >= n_people()) return false;
+    const size_t i = static_cast<size_t>(index);
+    if (soa_.state[i] != static_cast<uint8_t>(HumanState::SUSCEPTIBLE) ||
+        soa_.susceptible[i] == 0) {
+        return false;
     }
+    // The timer starts at the full incubation period and is only decremented
+    // by the following days, so the person turns infectious after exactly
+    // `incubation_days_` further advance_day() calls.
+    set_state_(i, HumanState::EXPOSED, incubation_days_);
+    daily_incidence_[static_cast<size_t>(soa_.cell_id[i])] += 1.0;
+    return true;
 }
 
 HumanCompartmentStats HumanCompartmentGrid::compute_stats() const {
@@ -350,37 +550,59 @@ HumanCompartmentStats HumanCompartmentGrid::compute_stats() const {
 }
 
 bool HumanCompartmentGrid::validate_invariants(bool strict) const {
-    const int64_t n = total_cells();
-    for (int64_t i = 0; i < n; ++i) {
-        const size_t idx = static_cast<size_t>(i);
-        const double s = susceptible_[idx];
-        const double e = exposed_[idx];
-        const double inf = infectious_[idx];
-        const double r = recovered_[idx];
-        const double pop = population_[idx];
+    auto fail = [&](const std::string& msg) {
+        if (strict) throw std::runtime_error("HumanCompartmentGrid invariant violation: " + msg);
+        return false;
+    };
 
-        if (s < -1e-6 || e < -1e-6 || inf < -1e-6 || r < -1e-6) {
-            if (strict) {
-                throw std::runtime_error(
-                    "HumanCompartmentGrid invariant violation: negative compartment at cell " +
-                    std::to_string(i) + " (S=" + std::to_string(s) + ", E=" +
-                    std::to_string(e) + ", I=" + std::to_string(inf) + ", R=" +
-                    std::to_string(r) + ")");
-            }
-            return false;
+    const size_t n_cells = static_cast<size_t>(total_cells());
+    if (cell_begin_.size() != n_cells + 1 ||
+        cell_begin_.back() != static_cast<int64_t>(soa_.size())) {
+        return fail("cell index does not cover the population");
+    }
+
+    std::vector<double> s(n_cells, 0.0), e(n_cells, 0.0), in(n_cells, 0.0), r(n_cells, 0.0);
+    const double width_m  = static_cast<double>(w_) * cell_m_;
+    const double height_m = static_cast<double>(h_) * cell_m_;
+    for (size_t i = 0; i < soa_.size(); ++i) {
+        const int32_t cell = soa_.cell_id[i];
+        if (cell < 0 || static_cast<size_t>(cell) >= n_cells) {
+            return fail("person " + std::to_string(i) + " has cell_id out of range");
         }
-
-        const double sum = s + e + inf + r;
-        const double diff = std::abs(sum - pop);
-        const double tol = 1e-3 * std::max(1.0, pop) + 1e-4;
-        if (diff > tol) {
-            if (strict) {
-                throw std::runtime_error(
-                    "HumanCompartmentGrid invariant violation: mass not conserved at cell " +
-                    std::to_string(i) + " (sum=" + std::to_string(sum) + ", pop=" +
-                    std::to_string(pop) + ", diff=" + std::to_string(diff) + ")");
+        const size_t c = static_cast<size_t>(cell);
+        if (static_cast<int64_t>(i) < cell_begin_[c] || static_cast<int64_t>(i) >= cell_begin_[c + 1]) {
+            return fail("person " + std::to_string(i) + " is outside its cell's range");
+        }
+        if (i > 0 && soa_.human_id[i] <= soa_.human_id[i - 1]) {
+            return fail("human_id not strictly increasing at person " + std::to_string(i));
+        }
+        if ((soa_.human_id[i] >> 32) != cell) {
+            return fail("human_id of person " + std::to_string(i) + " does not encode its cell");
+        }
+        // The cell of a position: column from x, row from y (row 0 = north).
+        const int32_t pcol = static_cast<int32_t>(soa_.home_x[i] / cell_m_);
+        const int32_t prow = h_ - 1 - static_cast<int32_t>(soa_.home_y[i] / cell_m_);
+        if (!(soa_.home_x[i] >= 0.0f && soa_.home_x[i] < width_m &&
+              soa_.home_y[i] >= 0.0f && soa_.home_y[i] < height_m) ||
+            static_cast<int64_t>(prow) * w_ + pcol != cell) {
+            return fail("person " + std::to_string(i) + " is not inside its home cell");
+        }
+        const auto st = static_cast<HumanState>(soa_.state[i]);
+        if (st == HumanState::SUSCEPTIBLE) {
+            s[c] += 1.0;
+        } else {
+            if (soa_.timer[i] <= 0) {
+                return fail("person " + std::to_string(i) + " has a non-positive timer");
             }
-            return false;
+            (st == HumanState::EXPOSED ? e : st == HumanState::INFECTIOUS ? in : r)[c] += 1.0;
+        }
+    }
+    for (size_t c = 0; c < n_cells; ++c) {
+        if (s[c] != susceptible_[c] || e[c] != exposed_[c] ||
+            in[c] != infectious_[c] || r[c] != recovered_[c] ||
+            s[c] + e[c] + in[c] + r[c] != population_[c]) {
+            return fail("derived statistics of cell " + std::to_string(c) +
+                        " disagree with the individuals");
         }
     }
     return true;

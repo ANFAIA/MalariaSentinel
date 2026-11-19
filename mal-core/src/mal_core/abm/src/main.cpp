@@ -58,6 +58,7 @@
 #include "transmission.hpp"
 #include "transmission_output.hpp"
 #include "transmission_debug_log.hpp"
+#include "debug_parquet_writer.hpp"
 
 namespace {
 
@@ -355,12 +356,11 @@ ARCHITECTURE
     ├── ClimateEngine      — daily temperature + rainfall, habitat statics
     ├── HabitatEngine      — candidate habitat patches (gpkg) with potential
     ├── HostLandscape       — human/livestock density grids (optional)
-    ├── MobilitySchedule   — OD matrices for human/livestock movement
     ├── CoordinatorModel   — patch activation, state aggregation
     └── MosquitoSubmodel   — population lifecycle
           ├── AquaticCohortBank  — egg → larva → pupa development
           ├── GonotrophicCycle   — female biting/oviposition state machine
-          ├── HostSeekingModel   — spatial host attraction (optional)
+          ├── host_cascade       — perception cascade and flight of the female
           └── MosquitoSoA       — 17 parallel vectors (SoA layout)
 
 DAILY SIMULATION LOOP (Engine::step)
@@ -377,8 +377,8 @@ DAILY SIMULATION LOOP (Engine::step)
        b. collect_emergence()          — pupa → new adults (TENERAL)
        c. Gonotrophic cycle (females)
           — TENERAL → HOST_SEEKING → BLOOD_FEED → GRAVID → OVIPOSITING
-          — host-seeking via HostSeekingModel (if --hosts provided)
-       d. adult_dispersal()            — clipped Gaussian kernel
+          — host-seeking: perception cascade towards individual people
+       d. adult_dispersal()            — windborne migration only
        e. adult_mortality()            — Lardeux thermo-dependent model
   5. divergence check                  — population bounds
   6. advance date by 1 day
@@ -426,17 +426,11 @@ OUTPUT
 
     // Host data (optional; if not provided, no host-seeking).
     std::string hosts_path;
-    std::string human_mobility_day_path;
-    std::string human_mobility_night_path;
-    std::string livestock_mobility_path;
 
     // Wind field (optional; M7.6 windborne migration).
     std::string wind_field_path;
 
     // Runtime overrides for dispersal and larval parameters.
-    float disperse_prob    = mal_abm_fast::ADULT_DISPERSE_PROB();
-    float disperse_sigma_m = mal_abm_fast::ADULT_DISPERSE_SIGMA_M();
-    float disperse_max_m   = mal_abm_fast::ADULT_DISPERSE_MAX_M();
     float larva_bh_alpha   = mal_abm_fast::LARVA_BH_ALPHA();
 
     bool debug_population = false;
@@ -453,6 +447,7 @@ OUTPUT
     const mal_abm_fast::TransmissionCfg& transmission_cfg =
         mal_abm_fast::load_config().transmission;
     bool   enable_transmission          = false;
+    bool   debug_files                  = false;   // --debug (Paso 2b)
     float  beta_hv = static_cast<float>(transmission_cfg.beta_hv);
     float  beta_vh = static_cast<float>(transmission_cfg.beta_vh);
     int    human_incubation_days = transmission_cfg.human_incubation_days;
@@ -554,16 +549,6 @@ OUTPUT
                     "Host density grid (.nc). Enables host-seeking model "
                     "with human/cattle/goat/sheep/wildlife density per cell.")
         ->group("Input Data");
-    run->add_option("--human-mobility-day", human_mobility_day_path,
-                    "Human mobility OD matrix — daytime (.csr). "
-                    "Sparse OD: P(origin→dest) × host_density.")
-        ->group("Input Data");
-    run->add_option("--human-mobility-night", human_mobility_night_path,
-                    "Human mobility OD matrix — nighttime (.csr).")
-        ->group("Input Data");
-    run->add_option("--livestock-mobility", livestock_mobility_path,
-                    "Livestock mobility OD matrix — seasonal (.csr).")
-        ->group("Input Data");
     run->add_option("--wind-field", wind_field_path,
                     "ERA5 6-hourly wind field NetCDF (u100, v100). Enables "
                     "windborne long-range migration with night-only flight "
@@ -645,21 +630,6 @@ OUTPUT
         ->group("Seeding");
 
     // ─── Population Dynamics ─────────────────────────────────────────────
-    run->add_option("--disperse-prob", disperse_prob,
-                    "Adult dispersal probability per day (default 0.05). "
-                    "Fraction of adults that attempt to move each day.")
-        ->default_val(mal_abm_fast::ADULT_DISPERSE_PROB())
-        ->group("Population Dynamics");
-    run->add_option("--disperse-sigma-m", disperse_sigma_m,
-                    "Dispersal kernel sigma in metres (default 450). "
-                    "Gaussian width; controls neighbourhood movement.")
-        ->default_val(mal_abm_fast::ADULT_DISPERSE_SIGMA_M())
-        ->group("Population Dynamics");
-    run->add_option("--disperse-max-m", disperse_max_m,
-                    "Max dispersal distance in metres (default 2000). "
-                    "Hard cap on kernel; rare long-distance colonisation.")
-        ->default_val(mal_abm_fast::ADULT_DISPERSE_MAX_M())
-        ->group("Population Dynamics");
     run->add_option("--larva-bh-alpha", larva_bh_alpha,
                     "Beverton-Holt competition coefficient (default 0.05). "
                     "Controls density-dependent larval mortality: "
@@ -718,6 +688,11 @@ OUTPUT
         ->group("Output & Debug");
 
     // ─── Transmission (SEIR-SEI) ─────────────────────────────────────────
+    run->add_flag("--debug", debug_files,
+                  "Write the per-day debug Parquet files next to the output "
+                  "(<stem>_agents, _humans [E/I/R only], _bites, _mating). "
+                  "Independent of --scenario and of the GIF; the size is yours.")
+        ->group("Output & Debug");
     run->add_flag("--enable-transmission", enable_transmission,
                   "Enable spatial SEIR-SEI malaria transmission model.")
         ->group("Transmission (SEIR-SEI)");
@@ -898,11 +873,8 @@ OUTPUT
         initial_human_prevalence = 0.0;
     }
 
-    // -- Runtime overrides for dispersal / larval parameters -----------
+    // -- Runtime overrides for larval parameters -----------------------
     mal_abm_fast::RuntimeOverrides overrides;
-    overrides.disperse_prob    = disperse_prob;
-    overrides.disperse_sigma_m = disperse_sigma_m;
-    overrides.disperse_max_m   = disperse_max_m;
     overrides.larva_bh_alpha   = larva_bh_alpha;
 
     // -- AOI resolution ------------------------------------------------
@@ -1065,23 +1037,11 @@ OUTPUT
         auto thread_climate = shared_climate->clone_for_thread();
 
         // -- Build the engine -----------------------------------------
-        // Derive mobility directory from the individual file paths (if any).
-        std::string mobility_dir;
-        if (!human_mobility_day_path.empty()) {
-            mobility_dir = std::filesystem::path(human_mobility_day_path)
-                .parent_path().string();
-        } else if (!human_mobility_night_path.empty()) {
-            mobility_dir = std::filesystem::path(human_mobility_night_path)
-                .parent_path().string();
-        } else if (!livestock_mobility_path.empty()) {
-            mobility_dir = std::filesystem::path(livestock_mobility_path)
-                .parent_path().string();
-        }
         std::unique_ptr<mal_abm_fast::Engine> engine_ptr;
         try {
             engine_ptr = std::make_unique<mal_abm_fast::Engine>(
                 aoi, thread_climate, habitat_path, rng, start_date,
-                seeding_config, overrides, hosts_path, mobility_dir,
+                seeding_config, overrides, hosts_path,
                 wind_field_path, transmission_params, warmup_bands);
         } catch (const std::exception& e) {
             std::cerr << "abm_run: rollout " << i
@@ -1211,6 +1171,14 @@ OUTPUT
             }
         }
 
+        // -- Debug Parquet files (--debug, Paso 2b) --------------------
+        std::unique_ptr<mal_abm_fast::DebugParquetWriter> debug_writer;
+        if (debug_files) {
+            std::filesystem::path stem_path(rollout_path);
+            stem_path.replace_extension("");
+            debug_writer = std::make_unique<mal_abm_fast::DebugParquetWriter>(stem_path.string());
+        }
+
         // -- Step ----------------------------------------------------
         try {
             for (int d = 0; d < days; ++d) {
@@ -1230,6 +1198,7 @@ OUTPUT
                         engine.submodel().bite_ledger());
                 }
 
+                if (debug_writer) debug_writer->record_day(engine, d + 1);
                 if (collect_stats) {
                     stats_history.push_back(engine.last_day_stats());
                 }
@@ -1375,6 +1344,19 @@ OUTPUT
                 rollout_trans_log, engine.transmission()->history(), days);
             std::cout << "abm_run: rollout " << i << "/" << n_rollouts
                       << " transmission log -> " << rollout_trans_log << std::endl;
+        }
+
+        if (debug_writer) {
+            try {
+                for (const auto& path : debug_writer->finish()) {
+                    std::cout << "abm_run: rollout " << i << "/" << n_rollouts
+                              << " debug -> " << path << std::endl;
+                }
+            } catch (const std::exception& e) {
+                std::cerr << "abm_run: rollout " << i
+                          << " debug Parquet failed: " << e.what() << "\n";
+                std::exit(EXIT_FAILURE);
+            }
         }
 
         // -- Snapshot ------------------------------------------------

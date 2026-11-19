@@ -14,14 +14,14 @@ top-level `mal-abm-fast/` package no longer exists).
 
 | Path | Purpose |
 |---|---|
-| `include/mal_abm_fast/*.hpp` | Public C++ headers (params, wire, prng, dispersal, eip, climate, habitat_engine, mosquito/human state, host_seeking, coordinator, engine, output_contract, env_reader, aoi, species_params…) |
-| `src/*.cpp` | Implementations (engine loop, host landscape, aquatic cohorts, transmission, wind field, seeding, mobility schedule…) |
+| `include/mal_abm_fast/*.hpp` | Public C++ headers (params, wire, prng, eip, climate, habitat_engine, mosquito/human state, host_cascade, coordinator, engine, output_contract, env_reader, aoi, species_params…) |
+| `src/*.cpp` | Implementations (engine loop, host landscape, aquatic cohorts, transmission, wind field, seeding |
 | `src/main.cpp` | CLI entry point (CLI11) — `run` subcommand, 50+ flags |
-| `tests/test_*.cpp` | GoogleTest suites (climate, coordinator, dispersal, eip, engine, env_reader, gonotrophic, effective_hosts…) |
+| `tests/test_*.cpp` | GoogleTest suites (climate, coordinator, eip, engine, env_reader, gonotrophic, host_cascade…) |
 | `wrapper.py` | `CppAbmWrapper` — binary resolution + subprocess launch from `malariasim abm` |
 | `runner.py` | Manifest-driven run orchestration (`run_abm_from_manifest()`) |
 | `compile.py` | Build entry point behind `malariasim abm --compile` (also the remote-VM build path, e.g. hetzner-run) |
-| `scripts/` | Input overlay / visualization utilities (hosts overlay, state/mobility/transmission visualization) |
+| `scripts/` | Input overlay / visualization utilities (hosts overlay, state/transmission visualization) |
 | `pool_hydrology.py` | Pool hydrology reference model (Python parity of the C++ header) |
 | `cmake/` | Compiler-warning flags module |
 | `mal-core/tests/test_spec_retirement_abm.py` | Output-contract checks (bands, sidecar keys, naming, NoData) |
@@ -49,12 +49,16 @@ malariasim abm --compile --worktree <path>   # compile inside an isolated gawt w
 Manual build (macOS / local dev):
 
 ```bash
-brew install cmake ninja pkg-config gdal eigen cli11 nlohmann-json googletest
+brew install cmake ninja pkg-config gdal eigen cli11 nlohmann-json googletest apache-arrow
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
-      -DCMAKE_PREFIX_PATH="$(brew --prefix gdal);$(brew --prefix eigen);$(brew --prefix nlohmann-json);$(brew --prefix googletest)"
+      -DCMAKE_PREFIX_PATH="$(brew --prefix gdal);$(brew --prefix eigen);$(brew --prefix nlohmann-json);$(brew --prefix googletest);$(brew --prefix apache-arrow)"
 cmake --build build -j
 ctest --test-dir build --output-on-failure
 ```
+
+Apache Arrow and Parquet C++ are required (the `--debug` Parquet files are written with
+them): `apache-arrow` on Homebrew, `libarrow-dev libparquet-dev` from the Apache Arrow
+APT repository on Ubuntu (see `mal-execution/scripts/hetzner-run/cloud-init.yaml`).
 
 FT3 / CESGA: use `mal-execution/scripts/cesga-run/` (`sbatch run_abm.sh`).
 
@@ -83,7 +87,7 @@ Direct binary invocation (matching what the wrapper does):
 
 `./bin/mal_abm_fast run --help` documents all of them. Main groups:
 
-- **Grid/inputs**: `--aoi` | `--bbox/--crs/--resolution-m/--scale`, `--env`, `--habitat`, `--hosts`, `--human-mobility-day/night`, `--livestock-mobility`, `--wind-field`
+- **Grid/inputs**: `--aoi` | `--bbox/--crs/--resolution-m/--scale`, `--env`, `--habitat`, `--hosts`, `--wind-field`
 - **Run shape**: `--year --month --days(1..731) --seed --n-rollouts --threads --snapshot-every --max-population`
 - **Mosquito dynamics**: `--disperse-prob/--disperse-sigma-m/--disperse-max-m`, `--larva-bh-alpha`, `--seeding-mode`, `--init-frac`, detection-seeding flags (`--detection-points`, `--n-adults-per-detection`, …)
 - **Transmission**: `--beta-hv`, `--beta-vh`, `--human-incubation-days`, `--human-infectious-days`, `--immunity-duration-days`, `--initial-human-prevalence`, outbreak flags (`--human-outbreak-day/--foci/--cases/--min-density`, `--human-foci-coords`, …)

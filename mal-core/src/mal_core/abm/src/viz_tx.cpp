@@ -24,17 +24,16 @@
 #include <memory>
 #include <string>
 #include <utility>
+#include <unordered_map>
 #include <vector>
 
 #include "mal_abm_fast/aoi.hpp"
 #include "mal_abm_fast/bite_ledger.hpp"
-#include "mal_abm_fast/effective_host_landscape.hpp"
 #include "mal_abm_fast/engine.hpp"
 #include "mal_abm_fast/gonotrophic_cycle.hpp"
 #include "mal_abm_fast/habitat_engine.hpp"
 #include "mal_abm_fast/host_landscape.hpp"
 #include "mal_abm_fast/human_state.hpp"
-#include "mal_abm_fast/mobility_schedule.hpp"
 #include "mal_abm_fast/mosquito_state.hpp"
 #include "mal_abm_fast/species_params.hpp"
 #include "mal_abm_fast/transmission.hpp"
@@ -48,17 +47,13 @@ namespace {
 // Map-2 palette (chrome + mosquito colours come from viz_common).
 // ---------------------------------------------------------------------------
 
-// Layer 1: biteable-cell base classes.
-constexpr Color kHumanCellLow{214, 196, 150, 255};   // arena (few humans)
-constexpr Color kHumanCellHigh{196, 44, 44, 255};    // red (many humans)
-constexpr Color kAnimalCellLow{44, 58, 40, 255};     // dark olive (few)
-constexpr Color kAnimalCellHigh{150, 190, 80, 255};  // bright olive (many)
+// Layer 1: cell base. Cells carry no host-density colour (plan §15.1.1: only
+// agents, bites and infected agents are drawn); they are a neutral grey, and
+// cells without hosts (incl. sea) a darker one.
+constexpr Color kNeutralCell{58, 62, 70, 255};       // cell with hosts
 constexpr Color kEmptyCell{30, 33, 39, 255};         // no hosts / sea
-constexpr Color kHumanOutline{245, 240, 225, 255};   // light contour on humans
+constexpr Color kCellBorder{72, 77, 87, 255};        // cell grid line
 
-// Layer 2: movement arrows.
-constexpr Color kMoveHuman{90, 210, 235, 255};     // cyan
-constexpr Color kMoveLivestock{170, 120, 70, 255}; // brown
 
 // Layer 5: bite markers.
 constexpr Color kBiteHuman{255, 210, 90, 255};
@@ -70,12 +65,6 @@ constexpr Color kSEIR_E{235, 180, 60, 255};
 constexpr Color kSEIR_I{220, 60, 60, 255};
 constexpr Color kSEIR_R{90, 190, 120, 255};
 constexpr Color kIncidence{255, 150, 80, 255};
-
-// How the human / animal cell ramp is normalised (log1p over the run max).
-double cell_t(double v, double run_max) {
-    if (run_max <= 0.0) return 0.0;
-    return std::clamp(std::log1p(v) / std::log1p(run_max), 0.0, 1.0);
-}
 
 // Log-scale value → pixel row inside a plot rect (thin wrapper shared with
 // map 1 via viz_common::plot_y).
@@ -304,17 +293,15 @@ void draw_legend_tx(Canvas& cv, int x, int y) {
         cv.text(cx2 + 10, y2, label, kText, 2);
         cx2 += 10 + text_w(label, 2) + 20;
     };
-    sq(kHumanCellHigh, "human");
-    sq(kAnimalCellHigh, "animal");
+    sq(kSEIR_S, "S");
+    sq(kSEIR_E, "E");
+    sq(kSEIR_I, "I");
+    sq(kSEIR_R, "R");
+    sq(kNeutralCell, "cell");
     sq(kEmptyCell, "empty");
     sq(kBiteHuman, "bite H");
     sq(kBiteAnimal, "bite A");
 
-    // Row 3: movement arrows.
-    const int y3 = y + 36;
-    const int cx3 = x + 104;
-    cv.line(cx3, y3 + 10, cx3 + 14, y3 + 4, kMoveHuman);
-    cv.text(cx3 + 18, y3, "move", kText, 2);
 }
 
 }  // namespace
@@ -324,6 +311,21 @@ void draw_legend_tx(Canvas& cv, int x, int y) {
 // ---------------------------------------------------------------------------
 
 namespace tx_diag {
+
+std::string format_cell_length(double resolution_m) {
+    char buf[32];
+    if (resolution_m >= 1000.0) {
+        const double km = resolution_m / 1000.0;
+        if (std::fabs(km - std::round(km)) < 1e-9) {
+            std::snprintf(buf, sizeof(buf), "%d km", static_cast<int>(std::lround(km)));
+        } else {
+            std::snprintf(buf, sizeof(buf), "%.1f km", km);
+        }
+    } else {
+        std::snprintf(buf, sizeof(buf), "%d m", static_cast<int>(std::lround(resolution_m)));
+    }
+    return buf;
+}
 
 int classify_biteable(double humans, double livestock) {
     if (humans > 0.0) return 2;
@@ -339,40 +341,6 @@ std::vector<int64_t> build_vector_i_series(
     series.push_back(initial_vector_i);
     for (const auto& day : daily_history) series.push_back(day.vector_i);
     return series;
-}
-
-std::vector<TxFlow> extract_top_flows(const SparseOD& od,
-                                      const std::vector<float>& residential,
-                                      int32_t W, int K, double& moved_out) {
-    moved_out = 0.0;
-    std::vector<TxFlow> all;
-    if (W <= 0 || K <= 0) return all;
-    for (int32_t i = 0; i < od.n_rows; ++i) {
-        const float res = (static_cast<size_t>(i) < residential.size())
-            ? residential[static_cast<size_t>(i)]
-            : 0.0f;
-        if (res <= 0.0f) continue;
-        const int32_t start = od.row_ptr[static_cast<size_t>(i)];
-        const int32_t end = od.row_ptr[static_cast<size_t>(i) + 1];
-        for (int32_t k = start; k < end; ++k) {
-            const float frac = od.values[static_cast<size_t>(k)];
-            if (frac <= 0.0f) continue;
-            const int32_t j = od.col_idx[static_cast<size_t>(k)];
-            const float vol = frac * res;
-            if (vol <= 0.0f) continue;
-            const int32_t r0 = i / W, c0 = i % W;
-            const int32_t r1 = j / W, c1 = j % W;
-            if (r0 == r1 && c0 == c1) continue;  // staying home
-            moved_out += vol;
-            all.push_back({r0, c0, r1, c1, vol});
-        }
-    }
-    const size_t kk = std::min(all.size(), static_cast<size_t>(K));
-    std::partial_sort(all.begin(),
-                      all.begin() + static_cast<std::ptrdiff_t>(kk), all.end(),
-                      [](const TxFlow& a, const TxFlow& b) { return a.vol > b.vol; });
-    all.resize(kk);
-    return all;
 }
 
 }  // namespace tx_diag
@@ -458,41 +426,13 @@ struct GifVizTx::Impl {
                     livestock[i] = cell.cattle_present + cell.goats_present +
                                    cell.sheep_present + cell.pigs_present +
                                    cell.chickens_present + cell.wildlife_proxy;
-                    run_max_humans = std::max(run_max_humans,
-                                              static_cast<double>(cell.humans_present));
-                    run_max_livestock = std::max(run_max_livestock,
-                                                 static_cast<double>(livestock[i]));
                 }
             }
         } else {
             // No --hosts: the default is humans everywhere (degradation rule).
             std::fill(humans.begin(), humans.end(), 1.0f);
-            run_max_humans = std::max(run_max_humans, 1.0);
         }
         base_done = true;
-    }
-
-    // Static top OD flows of the DAY + total moved. Computed once (OD and
-    // residential populations are constant). Expected flows E[F] = P·H_res —
-    // the deterministic day-flow field (no RNG), satisfying plan 05 §9.4.
-    void ensure_flows(const Engine& engine) {
-        if (flows_done) return;
-        flows_done = true;
-        const MobilitySchedule* mob = engine.mobility_schedule();
-        if (mob == nullptr) return;
-        const int32_t W = base_w;
-        if (W <= 0) return;
-        const int kTop = 120;
-        if (mob->has_human()) {
-            top_human = tx_diag::extract_top_flows(
-                mob->od(TimePhase::DAY, /*is_livestock=*/false), humans, W,
-                kTop, moved_human);
-        }
-        if (mob->has_livestock()) {
-            top_livestock = tx_diag::extract_top_flows(
-                mob->od(TimePhase::DAY, /*is_livestock=*/true), livestock, W,
-                kTop, moved_livestock);
-        }
     }
 
     void draw(const Engine& engine,
@@ -515,15 +455,10 @@ struct GifVizTx::Impl {
     int base_h = 0, base_w = 0;
     std::vector<float> humans;
     std::vector<float> livestock;
-    double run_max_humans = 0.0;
-    double run_max_livestock = 0.0;
 
-    // Top flows (static).
-    bool flows_done = false;
-    std::vector<tx_diag::TxFlow> top_human;
-    std::vector<tx_diag::TxFlow> top_livestock;
-    double moved_human = 0.0;
-    double moved_livestock = 0.0;
+    // V1 (plan §15.1.2): the trail of each adult is the polyline of its daily
+    // positions (metres from the SW corner), taken from the engine state.
+    std::unordered_map<int64_t, std::vector<std::pair<float, float>>> trails;
 
     // Per-day bite series (appended once per day in observe()).
     std::vector<double> human_bites;
@@ -566,17 +501,17 @@ void GifVizTx::Impl::draw(const Engine& engine,
     const int my = body_top + (body_h - mh) / 2;
     auto cell_x = [&](int c) { return mx + static_cast<int>(std::lround(cell * c)); };
     auto cell_y = [&](int r) { return my + static_cast<int>(std::lround(cell * r)); };
-    auto lon_to_x = [&](double lon) {
-        const double t = (lon - engine.aoi().west) /
-                         std::max(1.0e-12, engine.aoi().east - engine.aoi().west);
-        return mx + static_cast<int>(std::lround(t * mw));
-    };
-    auto lat_to_y = [&](double lat) {
-        const double t = (engine.aoi().north - lat) /
-                         std::max(1.0e-12, engine.aoi().north - engine.aoi().south);
-        return my + static_cast<int>(std::lround(t * mh));
-    };
     const double res_m = static_cast<double>(std::max(1, engine.aoi().resolution_m));
+    // One metric frame for everything drawn on the map (people, bites, trails,
+    // mosquitoes): metres from the SW corner, y up, over the W x H cells of
+    // res_m metres each -- the same cells the scale rule measures.
+    const double extent_x_m = static_cast<double>(W) * res_m;
+    const double extent_y_m = static_cast<double>(H) * res_m;
+    auto m_to_px = [&](double x, double y) {
+        return std::pair<int, int>{
+            mx + std::min(mw - 1, static_cast<int>(x / extent_x_m * mw)),
+            my + std::min(mh - 1, static_cast<int>((extent_y_m - y) / extent_y_m * mh))};
+    };
 
     // -- Layer 1: biteable-cell base (3 classes) -------------------------
     for (int32_t r = 0; r < H; ++r) {
@@ -585,79 +520,65 @@ void GifVizTx::Impl::draw(const Engine& engine,
             const int x0 = cell_x(c), x1 = cell_x(c + 1);
             const int cw = std::max(1, x1 - x0), ch = std::max(1, y1 - y0);
             const size_t i = static_cast<size_t>(r) * W + c;
-            const double hu = humans[i];
-            const double li = livestock[i];
-            const int cls = tx_diag::classify_biteable(hu, li);
-            if (cls == 2) {
-                // Has humans: arena→red ramp + light contour (plan 05 §4.1).
-                cv.fill_rect(x0, y0, cw, ch,
-                             lerp(kHumanCellLow, kHumanCellHigh,
-                                  cell_t(hu, run_max_humans)));
-                cv.stroke_rect(x0, y0, cw, ch, kHumanOutline);
-            } else if (cls == 1) {
-                // Animal-only: olive ramp.
-                cv.fill_rect(x0, y0, cw, ch,
-                             lerp(kAnimalCellLow, kAnimalCellHigh,
-                                  cell_t(li, run_max_livestock)));
-            } else {
-                // No hosts (incl. sea).
-                cv.fill_rect(x0, y0, cw, ch, kEmptyCell);
+            const int cls = tx_diag::classify_biteable(humans[i], livestock[i]);
+            cv.fill_rect(x0, y0, cw, ch, cls == 0 ? kEmptyCell : kNeutralCell);
+            // Faint cell border, so the scale rule (one cell) can be checked by eye.
+            if (cw >= 6 && ch >= 6) cv.stroke_rect(x0, y0, cw, ch, kCellBorder);
+        }
+    }
+
+    // -- Layer 2b: people. One pixel per person at its position in metres
+    //    (plan §15.1.2 H1), ALL of them (no cap, no sample; people that
+    //    coincide overlap), coloured by SEIR state. Infectious people are
+    //    painted last so they stay visible on top of the rest.
+    const TransmissionModel* tr = engine.transmission();
+    if (tr != nullptr) {
+        const HumanSoA& ppl = tr->human_grid().people();
+        const double extent_x = static_cast<double>(W) * res_m;
+        const double extent_y = static_cast<double>(H) * res_m;
+        const double sx = static_cast<double>(mw) / extent_x;
+        const double sy = static_cast<double>(mh) / extent_y;
+        const size_t n_ppl = ppl.size();
+        const uint8_t kI = static_cast<uint8_t>(HumanState::INFECTIOUS);
+        for (int pass = 0; pass < 2; ++pass) {
+            for (size_t i = 0; i < n_ppl; ++i) {
+                const uint8_t st = ppl.state[i];
+                if ((st == kI) != (pass == 1)) continue;
+                const int px = mx + std::min(mw - 1, static_cast<int>(ppl.cur_x[i] * sx));
+                const int py = my + std::min(mh - 1, static_cast<int>(
+                                   (extent_y - static_cast<double>(ppl.cur_y[i])) * sy));
+                Color col = kSEIR_S;
+                switch (static_cast<HumanState>(st)) {
+                    case HumanState::SUSCEPTIBLE: col = kSEIR_S; break;
+                    case HumanState::EXPOSED:     col = kSEIR_E; break;
+                    case HumanState::INFECTIOUS:  col = kSEIR_I; break;
+                    case HumanState::RECOVERED:   col = kSEIR_R; break;
+                }
+                cv.blend(px, py, col);
             }
         }
     }
 
-    // -- Layer 2: movement arrows + DAY/NIGHT inset ----------------------
-    const int cell_cx_margin = static_cast<int>(std::lround(cell / 2));
-    ensure_flows(engine);
-    auto draw_flow = [&](const tx_diag::TxFlow& f, Color col) {
-        const int x0 = cell_x(f.fc) + cell_cx_margin;
-        const int y0 = cell_y(f.fr) + cell_cx_margin;
-        const int x1 = cell_x(f.tc) + cell_cx_margin;
-        const int y1 = cell_y(f.tr) + cell_cx_margin;
-        cv.line(x0, y0, x1, y1, col);
-        // Arrow head.
-        const double ang = std::atan2(static_cast<double>(y1 - y0),
-                                      static_cast<double>(x1 - x0));
-        const int hx = static_cast<int>(std::lround(x1 - 5 * std::cos(ang)));
-        const int hy = static_cast<int>(std::lround(y1 - 5 * std::sin(ang)));
-        cv.line(x1, y1, hx, hy + 3, col);
-        cv.line(x1, y1, hx, hy - 3, col);
-    };
-    for (const auto& f : top_livestock) draw_flow(f, kMoveLivestock);
-    for (const auto& f : top_human) draw_flow(f, kMoveHuman);
-
-    // DAY vs NIGHT H_eff inset (human), from the realized snapshot.
+    // -- Layer 2c: trails (V1): polyline of the daily positions of each adult.
     {
-        const auto& snap = engine.submodel().effective_phase_snapshot();
-        if (snap.valid) {
-            const int iw = std::max(48, static_cast<int>(std::lround(mw * 0.22)));
-            const int ih = std::max(36, static_cast<int>(std::lround(mh * 0.34)));
-            const int ix = mx + 4;
-            const int iy = my + mh - 2 * ih - 12;
-            auto panel = [&](const EffectiveGrid& g, int py, const char* label) {
-                cv.fill_rect(ix, py, iw, ih, Color{0, 0, 0, 255});
-                double gmax = 1.0;
-                for (const float v : g) gmax = std::max(gmax, static_cast<double>(v));
-                for (int32_t r = 0; r < H; ++r) {
-                    for (int32_t c = 0; c < W; ++c) {
-                        const size_t i = static_cast<size_t>(r) * W + c;
-                        if (i >= g.size()) continue;
-                        const double t = std::clamp(static_cast<double>(g[i]) / gmax, 0.0, 1.0);
-                        const int x0 = ix + c * iw / W;
-                        const int y0 = py + r * ih / H;
-                        const int x1 = ix + (c + 1) * iw / W;
-                        const int y1 = py + (r + 1) * ih / H;
-                        Color cc = lerp(Color{20, 26, 40, 255}, kMoveHuman, t);
-                        cv.fill_rect(x0, y0, std::max(1, x1 - x0),
-                                     std::max(1, y1 - y0), cc);
-                    }
-                }
-                cv.stroke_rect(ix, py, iw, ih, Color{255, 255, 255, 255});
-                cv.fill_rect(ix + 1, py + 1, text_w(label, 1) + 4, 12, Color{0, 0, 0, 190});
-                cv.text(ix + 3, py + 2, label, kText, 1);
-            };
-            panel(snap.human[static_cast<size_t>(TimePhase::DAY)], iy, "DAY");
-            panel(snap.human[static_cast<size_t>(TimePhase::NIGHT)], iy + ih + 4, "NIGHT");
+        const double ex = static_cast<double>(W) * res_m, ey = static_cast<double>(H) * res_m;
+        auto to_px = [&](float x, float y) {
+            return std::pair<int, int>{
+                mx + std::min(mw - 1, static_cast<int>(static_cast<double>(x) / ex * mw)),
+                my + std::min(mh - 1, static_cast<int>((ey - static_cast<double>(y)) / ey * mh))};
+        };
+        const MosquitoSoA& ag = engine.submodel().agents();
+        for (int64_t k = 0; k < ag.n_alive; ++k) {
+            const size_t sk = static_cast<size_t>(k);
+            if (ag.stage[sk] != 1) continue;
+            const auto it = trails.find(ag.uid[sk]);
+            if (it == trails.end() || it->second.size() < 2) continue;
+            const Color tc = (ag.sex[sk] == 1) ? Color{200, 160, 255, 255} : Color{226, 220, 205, 255};
+            for (size_t j = 1; j < it->second.size(); ++j) {
+                const auto a = to_px(it->second[j - 1].first, it->second[j - 1].second);
+                const auto b = to_px(it->second[j].first, it->second[j].second);
+                cv.line(a.first, a.second, b.first, b.second, tc);
+            }
         }
     }
 
@@ -672,8 +593,17 @@ void GifVizTx::Impl::draw(const Engine& engine,
         if (agents.vector_state[si] ==
             static_cast<uint8_t>(VectorTransmissionState::INFECTIOUS))
             ++n_infected;
-        const int ax = lon_to_x(static_cast<double>(agents.lon[si]));
-        const int ay = lat_to_y(static_cast<double>(agents.lat[si]));
+        // Same metric frame as people and trails (metres from the SW corner).
+        float mxm = si < agents.pos_x.size() ? agents.pos_x[si] : std::nanf("");
+        float mym = si < agents.pos_y.size() ? agents.pos_y[si] : std::nanf("");
+        if (std::isnan(mxm) || std::isnan(mym)) {
+            const XY xy = lonlat_to_xy(engine.aoi(), agents.lon[si], agents.lat[si]);
+            mxm = static_cast<float>(xy.x);
+            mym = static_cast<float>(xy.y);
+        }
+        const auto apx = m_to_px(mxm, mym);
+        const int ax = apx.first;
+        const int ay = apx.second;
         if (ax < mx || ax >= mx + mw || ay < my || ay >= my + mh) continue;
         Color sc = kHostSeek;
         if (female) {
@@ -705,61 +635,42 @@ void GifVizTx::Impl::draw(const Engine& engine,
             cv.ring(ax, ay, agent_r + 2, kInfectious);
     }
 
-    // -- Layer 4: today's bites (squares at the bitten cell) -------------
-    const TransmissionModel* tr = engine.transmission();
+    // -- Layer 4: today's bites, as POINT events at the position of the host
+    //    (plan §15.1.1): a square marker at the person (or the animal host's
+    //    cell position), a red ring when the vector was infectious.
     {
         const auto& ledger = engine.submodel().bite_ledger();
-        for (const auto& agg : ledger.today()) {
-            if (agg.row < 0 || agg.row >= H || agg.col < 0 || agg.col >= W) continue;
-            if (agg.successful_meals <= 0) continue;
-            const int side = std::max(3, std::min(static_cast<int>(std::lround(cell)) - 2,
-                                     static_cast<int>(std::lround(
-                                         3.0 + 1.2 * std::log1p(
-                                             static_cast<double>(agg.successful_meals))))));
-            const bool is_human = (agg.host == HostType::HUMAN);
-            const int sx = (cell_x(agg.col) + cell_x(agg.col + 1)) / 2 - side / 2;
-            const int sy = (cell_y(agg.row) + cell_y(agg.row + 1)) / 2 - side / 2;
-            cv.fill_rect(sx, sy, side, side, is_human ? kBiteHuman : kBiteAnimal);
-            cv.stroke_rect(sx, sy, side, side, Color{10, 10, 12, 255});
-            if (agg.infectious_meals > 0) {
-                cv.ring(sx + side / 2, sy + side / 2, side / 2 + 2, kInfectious);
-            }
+        for (const auto& ev : ledger.events_today()) {
+            const auto p = m_to_px(ev.x, ev.y);
+            const bool is_human = (ev.host == HostType::HUMAN);
+            const int side = 5;
+            cv.fill_rect(p.first - side / 2, p.second - side / 2, side, side,
+                         is_human ? kBiteHuman : kBiteAnimal);
+            cv.stroke_rect(p.first - side / 2, p.second - side / 2, side, side,
+                           Color{10, 10, 12, 255});
+            if (ev.infectious_vector) cv.ring(p.first, p.second, side / 2 + 3, kInfectious);
         }
     }
 
-    // -- Layer 5: human infection (I_H contour + incidence dots) ---------
-    if (tr != nullptr && tr->human_grid().h() == H && tr->human_grid().w() == W) {
-        const auto& hg = tr->human_grid();
-        for (int32_t r = 0; r < H; ++r) {
-            for (int32_t c = 0; c < W; ++c) {
-                const double ih = hg.i_at(r, c);
-                const double inc = hg.inc_at(r, c);
-                if (ih <= 0.0 && inc <= 0.0) continue;
-                const int x0 = cell_x(c), y0 = cell_y(r);
-                const int cw = std::max(1, cell_x(c + 1) - x0);
-                const int ch = std::max(1, cell_y(r + 1) - y0);
-                if (ih > 0.0) {
-                    Color rc = kPrev;
-                    rc.a = static_cast<uint8_t>(std::clamp(40.0 + 6.0 * ih, 40.0, 160.0));
-                    cv.stroke_rect(x0, y0, cw, ch, rc);
-                }
-                if (inc > 0.0) {
-                    cv.disc((x0 + cell_x(c + 1)) / 2, (y0 + cell_y(r + 1)) / 2, 2,
-                            kIncidence);
-                }
-            }
-        }
-    }
-
-    // -- scale bar + north ------------------------------------------------
+    // -- Layer 5: new human infections today: a ring on the exposed person.
     {
-        const int px_per_km = std::max(3, static_cast<int>(std::lround((1000.0 / res_m) * cell)));
-        const int len = std::min(px_per_km, mw / 3);
+        const auto& ledger = engine.submodel().bite_ledger();
+        for (const auto& ev : ledger.events_today()) {
+            if (!ev.new_infection) continue;
+            const auto p = m_to_px(ev.x, ev.y);
+            cv.ring(p.first, p.second, 5, kIncidence);
+        }
+    }
+
+    // -- scale rule + north -----------------------------------------------
+    // The rule is ONE CELL long (resolution_m, plan §15.1.2 V3), whatever the AOI.
+    {
+        const int len = std::max(3, static_cast<int>(std::lround(cell)));
         const int bx = mx + 10, by = my + mh - 12;
         cv.line(bx, by, bx + len, by, Color{255, 255, 255, 255});
         cv.line(bx, by - 3, bx, by + 3, Color{255, 255, 255, 255});
         cv.line(bx + len, by - 3, bx + len, by + 3, Color{255, 255, 255, 255});
-        cv.text(bx, by - 22, "1 km", kText, 2);
+        cv.text(bx, by - 22, tx_diag::format_cell_length(res_m), kText, 2);
         const int nx = mx + mw - 14, ny = my + 12;
         cv.text(nx - 6, ny - 6, "N", kText, 2);
         cv.line(nx, ny + 14, nx, ny + 2, Color{255, 255, 255, 255});
@@ -897,11 +808,25 @@ void GifVizTx::observe(const Engine& engine,
             else ab += static_cast<double>(agg.successful_meals);
             ib += static_cast<double>(agg.infectious_meals);
         }
+        {
+            const MosquitoSoA& ag = engine.submodel().agents();
+            for (int64_t k = 0; k < ag.n_alive; ++k) {
+                const size_t sk = static_cast<size_t>(k);
+                if (ag.stage[sk] != 1) continue;
+                float px = sk < ag.pos_x.size() ? ag.pos_x[sk] : std::nanf("");
+                float py = sk < ag.pos_y.size() ? ag.pos_y[sk] : std::nanf("");
+                if (std::isnan(px) || std::isnan(py)) {
+                    const XY xy = lonlat_to_xy(engine.aoi(), ag.lon[sk], ag.lat[sk]);
+                    px = static_cast<float>(xy.x);
+                    py = static_cast<float>(xy.y);
+                }
+                im.trails[ag.uid[sk]].emplace_back(px, py);
+            }
+        }
         im.human_bites.push_back(hb);
         im.animal_bites.push_back(ab);
         im.inf_bites.push_back(ib);
         im.ensure_base(engine);
-        im.ensure_flows(engine);
         // TransmissionModel history already holds S/E/I/R + incidence + bites.
         std::vector<TransmissionDailyStats> tx_hist;
         if (tr != nullptr) tx_hist = tr->history();

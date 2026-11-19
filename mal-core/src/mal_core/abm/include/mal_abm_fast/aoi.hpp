@@ -42,4 +42,40 @@ inline int32_t cells_per_side_h(const AOI& aoi) noexcept {
     return cells;
 }
 
+// ---- Local metric frame (plan §1) ------------------------------------------
+// Metres from the SOUTH-WEST corner of the AOI: x grows east, y grows north.
+// Row 0 is the northernmost row, so cell (row, col) spans
+//   x in [col*res, (col+1)*res), y in [(H-1-row)*res, (H-row)*res).
+// Degrees use geodesy.metres_per_deg_lat (kMetresPerDegLat()) with the
+// cos(lat) factor on longitude -- the same convention as the AOI width.
+
+struct XY { double x = 0.0; double y = 0.0; };
+struct LonLat { double lon = 0.0; double lat = 0.0; };
+
+inline LonLat xy_to_lonlat(const AOI& aoi, double x, double y) noexcept {
+    const double mpd = kMetresPerDegLat();
+    const double lat = aoi.south + y / mpd;
+    const double c = std::cos(lat * 3.14159265358979323846 / 180.0);
+    return {aoi.west + x / (mpd * (c > 1e-6 ? c : 1e-6)), lat};
+}
+
+inline XY lonlat_to_xy(const AOI& aoi, double lon, double lat) noexcept {
+    const double mpd = kMetresPerDegLat();
+    const double c = std::cos(lat * 3.14159265358979323846 / 180.0);
+    return {(lon - aoi.west) * mpd * (c > 1e-6 ? c : 1e-6),
+            (lat - aoi.south) * mpd};
+}
+
+/// Grid cell of a metric position, clamped into the grid.
+inline void xy_to_cell(const AOI& aoi, double x, double y,
+                       int32_t& row, int32_t& col) noexcept {
+    const int32_t W = aoi.cells_per_side();
+    const int32_t H = cells_per_side_h(aoi);
+    const double res = static_cast<double>(aoi.resolution_m);
+    int32_t c = static_cast<int32_t>(std::floor(x / res));
+    int32_t r = H - 1 - static_cast<int32_t>(std::floor(y / res));
+    col = c < 0 ? 0 : (c >= W ? W - 1 : c);
+    row = r < 0 ? 0 : (r >= H ? H - 1 : r);
+}
+
 }  // namespace mal_abm_fast

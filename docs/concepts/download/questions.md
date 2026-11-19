@@ -263,8 +263,7 @@ loader keys?**
 
 - Citation: `mal-core/src/mal_core/download/catalog.py:44-95`
   (`IngestArtifact`, `INGEST_ARTIFACTS` with `env`, `habitat`,
-  `host_static`, `host_manifest`, `mobility_day`, `mobility_night`,
-  `livestock_mobility`, `mobility_manifest`), `:270-290`
+  `host_static`, `host_manifest`), `:270-290`
   (`downloadable_datasets` derives the loader rows from the registry).
 - Answer: derived products (built by ingest, not fetched) need keys that no
   loader declares, so their identity lives in this one table, with the
@@ -558,13 +557,12 @@ resolved?**
 
 - Citation: `mal-core/src/mal_core/abm/wrapper.py:112-121`
   (`validate_completeness`, then the error message),
-  `:141-165` (resolution of `env`, `habitat`, `host_static`, `wind`,
-  `mobility_day`, `mobility_night`, `livestock_mobility`),
+  `:141-165` (resolution of `env`, `habitat`, `host_static`, `wind`),
   `:167-178` (hard error only when `env` or `habitat` is missing),
   `:212-222` (the optional flags).
 - Answer: the ABM first requires that every file *declared* in the manifest
-  exists, then resolves seven paths. Only `env` and `habitat` are
-  mandatory; hosts and the three mobility artefacts are passed to the binary
+  exists, then resolves four paths. Only `env` and `habitat` are
+  mandatory; hosts and the wind field are passed to the binary
   only when present. The `wind` key is resolved specially (see Q40).
 
 **40. Why is `wind` resolved under a different manifest key from the other

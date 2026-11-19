@@ -432,6 +432,18 @@ struct Loader {
         }
     }
 
+    bool boolean(const YNode* v, const std::string& dotted) {
+        if (v == nullptr || v->kind != YNode::Kind::Scalar || v->quoted) {
+            bad_type.push_back(dotted + " (expected true|false)");
+            return false;
+        }
+        const std::string s = trim(v->scalar);
+        if (s == "true") return true;
+        if (s == "false") return false;
+        bad_type.push_back(dotted + " (expected true|false)");
+        return false;
+    }
+
     std::string str(const YNode* v, const std::string& dotted) {
         if (v == nullptr || v->kind != YNode::Kind::Scalar) {
             bad_type.push_back(dotted + " (expected string)");
@@ -497,6 +509,8 @@ ModelConfig parse_config_file(const std::string& path) {
                                  "contracts.env_nc");
     cfg.contracts.cogs_state = L.str(
         L.key(contracts, "contracts", "cogs_state"), "contracts.cogs_state");
+    cfg.contracts.habitat = L.str(
+        L.key(contracts, "contracts", "habitat"), "contracts.habitat");
 
     // -- habitat_types -------------------------------------------------------
     const YNode* ht = L.section(&root, "habitat_types");
@@ -625,14 +639,93 @@ ModelConfig parse_config_file(const std::string& path) {
                 }
             }
         }
-        out.host_seeking_scale_m = L.num(
-            L.key(row, std::string("species.") + name,
-                  "host_seeking_scale_m"),
-            std::string("species.") + name + ".host_seeking_scale_m");
-        out.host_seeking_radius_m = L.num(
-            L.key(row, std::string("species.") + name,
-                  "host_seeking_radius_m"),
-            std::string("species.") + name + ".host_seeking_radius_m");
+        out.co2_activation_radius_m = L.num(
+            L.key(row, std::string("species.") + name, "co2_activation_radius_m"),
+            std::string("species.") + name + ".co2_activation_radius_m");
+        out.olfactory_radius_m = L.num(
+            L.key(row, std::string("species.") + name, "olfactory_radius_m"),
+            std::string("species.") + name + ".olfactory_radius_m");
+        out.visual_radius_m = L.num(
+            L.key(row, std::string("species.") + name, "visual_radius_m"),
+            std::string("species.") + name + ".visual_radius_m");
+        out.terminal_radius_m = L.num(
+            L.key(row, std::string("species.") + name, "terminal_radius_m"),
+            std::string("species.") + name + ".terminal_radius_m");
+        out.flight_speed_ms = L.num(
+            L.key(row, std::string("species.") + name, "flight_speed_ms"),
+            std::string("species.") + name + ".flight_speed_ms");
+        out.exploration_range_m = L.num(
+            L.key(row, std::string("species.") + name, "exploration_range_m"),
+            std::string("species.") + name + ".exploration_range_m");
+        out.exploration_step_m = L.num(
+            L.key(row, std::string("species.") + name, "exploration_step_m"),
+            std::string("species.") + name + ".exploration_step_m");
+        out.exploration_step_correlation = L.num(
+            L.key(row, std::string("species.") + name, "exploration_step_correlation"),
+            std::string("species.") + name + ".exploration_step_correlation");
+        out.casting_probability = L.num(
+            L.key(row, std::string("species.") + name, "casting_probability"),
+            std::string("species.") + name + ".casting_probability");
+        out.casting_angle_deg = L.num(
+            L.key(row, std::string("species.") + name, "casting_angle_deg"),
+            std::string("species.") + name + ".casting_angle_deg");
+        out.plume_memory_s = L.num(
+            L.key(row, std::string("species.") + name, "plume_memory_s"),
+            std::string("species.") + name + ".plume_memory_s");
+        out.anemotaxis_rule = L.str(
+            L.key(row, std::string("species.") + name, "anemotaxis_rule"),
+            std::string("species.") + name + ".anemotaxis_rule");
+        out.anemotaxis_deviation_deg = L.num(
+            L.key(row, std::string("species.") + name, "anemotaxis_deviation_deg"),
+            std::string("species.") + name + ".anemotaxis_deviation_deg");
+        out.wind_reference = L.str(
+            L.key(row, std::string("species.") + name, "wind_reference"),
+            std::string("species.") + name + ".wind_reference");
+        out.wind_block_threshold_ms = L.num(
+            L.key(row, std::string("species.") + name, "wind_block_threshold_ms"),
+            std::string("species.") + name + ".wind_block_threshold_ms");
+        out.daily_move_capacity_m = L.num(
+            L.key(row, std::string("species.") + name, "daily_move_capacity_m"),
+            std::string("species.") + name + ".daily_move_capacity_m");
+        out.directed_flight_budget_h = L.num(
+            L.key(row, std::string("species.") + name, "directed_flight_budget_h"),
+            std::string("species.") + name + ".directed_flight_budget_h");
+        out.blood_meal_target_ul = L.num(
+            L.key(row, std::string("species.") + name, "blood_meal_target_ul"),
+            std::string("species.") + name + ".blood_meal_target_ul");
+        out.first_cycle_target_ul = L.num(
+            L.key(row, std::string("species.") + name, "first_cycle_target_ul"),
+            std::string("species.") + name + ".first_cycle_target_ul");
+        out.blood_meal_size_ul = L.num(
+            L.key(row, std::string("species.") + name, "blood_meal_size_ul"),
+            std::string("species.") + name + ".blood_meal_size_ul");
+        out.meal_size_min_ul = L.num(
+            L.key(row, std::string("species.") + name, "meal_size_min_ul"),
+            std::string("species.") + name + ".meal_size_min_ul");
+        out.blood_meal_refractory_days = L.num(
+            L.key(row, std::string("species.") + name, "blood_meal_refractory_days"),
+            std::string("species.") + name + ".blood_meal_refractory_days");
+        out.probing_success_rate = L.num(
+            L.key(row, std::string("species.") + name, "probing_success_rate"),
+            std::string("species.") + name + ".probing_success_rate");
+        out.eggs_per_ul = L.num(
+            L.key(row, std::string("species.") + name, "eggs_per_ul"),
+            std::string("species.") + name + ".eggs_per_ul");
+        out.arrested_daily_survival = L.num(
+            L.key(row, std::string("species.") + name, "arrested_daily_survival"),
+            std::string("species.") + name + ".arrested_daily_survival");
+        out.gonotrophic_arrest_prob_dry = L.num(
+            L.key(row, std::string("species.") + name, "gonotrophic_arrest_prob_dry"),
+            std::string("species.") + name + ".gonotrophic_arrest_prob_dry");
+        out.aestivation_supported = L.boolean(
+            L.key(row, std::string("species.") + name, "aestivation_supported"),
+            std::string("species.") + name + ".aestivation_supported");
+        out.male_ratio = L.num(
+            L.key(row, std::string("species.") + name, "male_ratio"),
+            std::string("species.") + name + ".male_ratio");
+        out.male_daily_survival = L.num(
+            L.key(row, std::string("species.") + name, "male_daily_survival"),
+            std::string("species.") + name + ".male_daily_survival");
         cfg.species.rows[name] = out;
     }
     const YNode* neutral = L.key(sp, "species", "neutral");
@@ -652,6 +745,66 @@ ModelConfig parse_config_file(const std::string& path) {
             }
         }
     }
+
+    // -- integration ---------------------------------------------------------
+    const YNode* integ = L.section(&root, "integration");
+    if (const YNode* pd = L.key(integ, "integration", "phase_duration_hours");
+        pd != nullptr && pd->kind == YNode::Kind::List) {
+        if (pd->list.size() != 4) {
+            L.bad_type.push_back(
+                "integration.phase_duration_hours (expected 4 items)");
+        }
+        for (size_t i = 0; i < pd->list.size() && i < 4; ++i) {
+            cfg.integration.phase_duration_hours[i] = L.num(
+                &pd->list[i], "integration.phase_duration_hours[" +
+                                  std::to_string(i) + "]");
+        }
+    } else if (pd != nullptr) {
+        L.bad_type.push_back("integration.phase_duration_hours (expected list)");
+    }
+    cfg.integration.directed_flight_budget_h = L.num(
+        L.key(integ, "integration", "directed_flight_budget_h"), "integration.directed_flight_budget_h");
+    cfg.integration.dt_terminal_s = L.num(
+        L.key(integ, "integration", "dt_terminal_s"), "integration.dt_terminal_s");
+    cfg.integration.dt_olfactory_s = L.num(
+        L.key(integ, "integration", "dt_olfactory_s"), "integration.dt_olfactory_s");
+    cfg.integration.plume_memory_s = L.num(
+        L.key(integ, "integration", "plume_memory_s"), "integration.plume_memory_s");
+    cfg.integration.landing_speed_mm_s = L.num(
+        L.key(integ, "integration", "landing_speed_mm_s"), "integration.landing_speed_mm_s");
+    cfg.integration.landing_speed_hold_s = L.num(
+        L.key(integ, "integration", "landing_speed_hold_s"), "integration.landing_speed_hold_s");
+
+    // -- mating --------------------------------------------------------------
+    const YNode* mat = L.section(&root, "mating");
+    cfg.mating.p_mate_male_fraction = L.num(
+        L.key(mat, "mating", "p_mate_male_fraction"), "mating.p_mate_male_fraction");
+    cfg.mating.p_mate_pairs_per_individual = L.num(
+        L.key(mat, "mating", "p_mate_pairs_per_individual"), "mating.p_mate_pairs_per_individual");
+    cfg.mating.p_mate_size_exponent = L.num(
+        L.key(mat, "mating", "p_mate_size_exponent"), "mating.p_mate_size_exponent");
+    cfg.mating.male_swarm_reference_size = L.num(
+        L.key(mat, "mating", "male_swarm_reference_size"), "mating.male_swarm_reference_size");
+    cfg.mating.female_attendance_rate = L.num(
+        L.key(mat, "mating", "female_attendance_rate"), "mating.female_attendance_rate");
+    cfg.mating.local_swarm_male_offer_factor = L.num(
+        L.key(mat, "mating", "local_swarm_male_offer_factor"), "mating.local_swarm_male_offer_factor");
+    cfg.mating.male_move_capacity_m = L.num(
+        L.key(mat, "mating", "male_move_capacity_m"), "mating.male_move_capacity_m");
+    cfg.mating.male_females_per_night_max = L.integer(
+        L.key(mat, "mating", "male_females_per_night_max"), "mating.male_females_per_night_max");
+    cfg.mating.swarm_duration_min = L.num(
+        L.key(mat, "mating", "swarm_duration_min"), "mating.swarm_duration_min");
+    cfg.mating.swarm_start_min_after_sunset = L.num(
+        L.key(mat, "mating", "swarm_start_min_after_sunset"), "mating.swarm_start_min_after_sunset");
+    cfg.mating.swarm_height_m = L.num(
+        L.key(mat, "mating", "swarm_height_m"), "mating.swarm_height_m");
+    cfg.mating.swarm_markers_per_km2 = L.num(
+        L.key(mat, "mating", "swarm_markers_per_km2"), "mating.swarm_markers_per_km2");
+    cfg.mating.swarm_markers_source = L.str(
+        L.key(mat, "mating", "swarm_markers_source"), "mating.swarm_markers_source");
+    cfg.mating.rain_suppresses_swarming = L.boolean(
+        L.key(mat, "mating", "rain_suppresses_swarming"), "mating.rain_suppresses_swarming");
 
     // -- capacity ------------------------------------------------------------
     const YNode* cap = L.section(&root, "capacity");
@@ -755,12 +908,6 @@ ModelConfig parse_config_file(const std::string& path) {
 
     // -- dispersal -----------------------------------------------------------
     const YNode* dsp = L.section(&root, "dispersal");
-    cfg.dispersal.adult_prob_day = L.num(
-        L.key(dsp, "dispersal", "adult_prob_day"), "dispersal.adult_prob_day");
-    cfg.dispersal.adult_sigma_m = L.num(
-        L.key(dsp, "dispersal", "adult_sigma_m"), "dispersal.adult_sigma_m");
-    cfg.dispersal.adult_max_m = L.num(
-        L.key(dsp, "dispersal", "adult_max_m"), "dispersal.adult_max_m");
     cfg.dispersal.wind_migration_prob = L.num(
         L.key(dsp, "dispersal", "wind_migration_prob"),
         "dispersal.wind_migration_prob");
@@ -774,9 +921,6 @@ ModelConfig parse_config_file(const std::string& path) {
         "dispersal.wind_self_speed_ms");
     cfg.dispersal.flight_hour = L.integer(
         L.key(dsp, "dispersal", "flight_hour"), "dispersal.flight_hour");
-    cfg.dispersal.host_flight_step_m = L.num(
-        L.key(dsp, "dispersal", "host_flight_step_m"),
-        "dispersal.host_flight_step_m");
     cfg.dispersal.snap_radius_m = L.num(
         L.key(dsp, "dispersal", "snap_radius_m"), "dispersal.snap_radius_m");
     cfg.dispersal.night_start_hour = L.integer(
@@ -803,12 +947,6 @@ ModelConfig parse_config_file(const std::string& path) {
     cfg.host_seeking.indoor_fraction_rural = L.num(
         L.key(hs, "host_seeking", "indoor_fraction_rural"),
         "host_seeking.indoor_fraction_rural");
-    cfg.host_seeking.detect_range_m = L.num(
-        L.key(hs, "host_seeking", "detect_range_m"),
-        "host_seeking.detect_range_m");
-    cfg.host_seeking.approach_step_m = L.num(
-        L.key(hs, "host_seeking", "approach_step_m"),
-        "host_seeking.approach_step_m");
 
     // -- oviposition ---------------------------------------------------------
     const YNode* ov = L.section(&root, "oviposition");

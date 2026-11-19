@@ -48,6 +48,15 @@ packages:
   - libgtest-dev
 
 runcmd:
+  - |
+    # Apache Arrow and Parquet C++ (the --debug Parquet writer of mal_abm_fast)
+    # are not in the default Ubuntu repositories: add the Apache Arrow APT
+    # source, then install the development packages.
+    apt-get install -y -V lsb-release wget
+    wget -q "https://packages.apache.org/artifactory/arrow/$(lsb_release --id --short | tr 'A-Z' 'a-z')/apache-arrow-apt-source-latest-$(lsb_release --codename --short).deb" -O /tmp/arrow-apt-source.deb
+    apt-get install -y -V /tmp/arrow-apt-source.deb
+    apt-get update
+    apt-get install -y -V libarrow-dev libparquet-dev
   # Disable unattended-upgrades to avoid surprise reboots mid-job.
   - systemctl stop unattended-upgrades.service || true
   - systemctl disable unattended-upgrades.service || true

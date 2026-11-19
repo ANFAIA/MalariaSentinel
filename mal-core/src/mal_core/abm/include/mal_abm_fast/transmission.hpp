@@ -192,7 +192,8 @@ public:
     void init(int32_t h, int32_t w,
               const std::vector<float>& human_density,
               const TransmissionParams& params,
-              uint64_t seed);
+              uint64_t seed,
+              double cell_m = 1000.0);
 
     /// Seed initial vector infections in adult females (fraction of females become I_V).
     void seed_vector_infections(MosquitoSoA& soa, double fraction);
@@ -238,8 +239,14 @@ public:
                             const std::vector<PatchState>& patch_states,
                             const AOI& aoi);
 
-    /// Advance human SEIR transitions (S_H -> E_H -> I_H -> R_H -> S_H) given today's bite ledger.
-    void advance_human_transmission(const BiteLedger& bite_ledger, const AOI& aoi);
+    /// Advance the human SEIR timers one day, then apply today's infectious
+    /// bites. A bite whose event identifies the person (cascade, Paso 5)
+    /// exposes THAT person with probability beta_vh and nobody else; infectious
+    /// bites without an identified person (legacy per-cell paths) land on a
+    /// uniform person of the bitten cell. There is no per-cell force of
+    /// infection. The event's `new_infection` flag is set when it exposed
+    /// the person.
+    void advance_human_transmission(BiteLedger& bite_ledger, const AOI& aoi);
 
     /// Record daily stats from current state.
     void record_daily_stats(int64_t day,
@@ -263,11 +270,10 @@ public:
 
     bool is_enabled() const { return params_.enabled; }
 
-    /// Force of infection lambda_H grid for today (row-major, size h*w)
-    const std::vector<double>& last_force_of_infection() const { return lambda_h_; }
-
-    /// Infectious vector pressure grid (infectious bites delivered today per cell)
-    const std::vector<float>& infectious_pressure_grid() const { return infectious_pressure_; }
+    /// Infectious bites on humans delivered today per cell (row-major, h*w),
+    /// read from the bite ledger's per-cell aggregate.
+    static std::vector<float> infectious_pressure_from_ledger(
+        const BiteLedger& bite_ledger, int32_t h, int32_t w);
 
 private:
     HumanCompartmentGrid human_grid_;
@@ -277,8 +283,6 @@ private:
     int32_t h_ = 0;
     int32_t w_ = 0;
 
-    std::vector<double> lambda_h_;             // force of infection on humans
-    std::vector<float>  infectious_pressure_;  // infectious bites per cell today
     TransmissionDailyStats last_day_stats_{};
     std::vector<TransmissionDailyStats> history_;
     int64_t initial_vector_infected_ = 0;

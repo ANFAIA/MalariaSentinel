@@ -73,12 +73,6 @@ target_link_libraries(test_eip
 )
 gtest_discover_tests(test_eip DISCOVERY_TIMEOUT 30)
 
-add_executable(test_dispersal test_dispersal.cpp)
-target_link_libraries(test_dispersal
-    PRIVATE mal_abm_fast_core GTest::gtest GTest::gtest_main mal_abm_fast::warnings
-)
-gtest_discover_tests(test_dispersal DISCOVERY_TIMEOUT 30)
-
 # F1.b: per-day orchestrator.
 add_executable(test_coordinator test_coordinator.cpp)
 target_link_libraries(test_coordinator
@@ -142,20 +136,6 @@ target_link_libraries(test_gonotrophic
 )
 gtest_discover_tests(test_gonotrophic DISCOVERY_TIMEOUT 30)
 
-# G5: Host-seeking kernel + HostLandscape.
-add_executable(test_host_seeking test_host_seeking.cpp)
-target_link_libraries(test_host_seeking
-    PRIVATE mal_abm_fast_core GTest::gtest GTest::gtest_main mal_abm_fast::warnings
-)
-gtest_discover_tests(test_host_seeking DISCOVERY_TIMEOUT 30)
-
-# G6: Sparse OD mobility matrices + MobilitySchedule.
-add_executable(test_mobility test_mobility.cpp)
-target_link_libraries(test_mobility
-    PRIVATE mal_abm_fast_core GTest::gtest GTest::gtest_main mal_abm_fast::warnings
-)
-gtest_discover_tests(test_mobility DISCOVERY_TIMEOUT 30)
-
 # M7.8: Species identity + SpeciesParams registry.
 add_executable(test_species test_species.cpp)
 target_link_libraries(test_species
@@ -163,14 +143,13 @@ target_link_libraries(test_species
 )
 gtest_discover_tests(test_species DISCOVERY_TIMEOUT 30)
 
-# M7.8: EffectiveHostLandscape multinomial phase operator.
-add_executable(test_effective_hosts test_effective_hosts.cpp)
-target_link_libraries(test_effective_hosts
+# M7.4: Spatial SEIR Human Compartment Grid.
+add_executable(test_host_cascade test_host_cascade.cpp)
+target_link_libraries(test_host_cascade
     PRIVATE mal_abm_fast_core GTest::gtest GTest::gtest_main mal_abm_fast::warnings
 )
-gtest_discover_tests(test_effective_hosts DISCOVERY_TIMEOUT 30)
+gtest_discover_tests(test_host_cascade DISCOVERY_TIMEOUT 30)
 
-# M7.4: Spatial SEIR Human Compartment Grid.
 add_executable(test_human_state test_human_state.cpp)
 target_link_libraries(test_human_state
     PRIVATE mal_abm_fast_core GTest::gtest GTest::gtest_main mal_abm_fast::warnings

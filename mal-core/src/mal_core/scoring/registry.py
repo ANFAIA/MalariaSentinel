@@ -32,7 +32,6 @@ from .scorers import (
     HabitatOccupancyScorer,
     HostInputGate,
     LongHorizonPersistenceScorer,
-    MobilityGate,
     MoransScorer,
     PerformanceGate,
     PoolPersistenceScorer,
@@ -77,7 +76,6 @@ GATES: tuple[str, ...] = (
     "G7_determinism",
     "G10_perf",
     "G12_host_input",
-    "G14_mobility",
     "G24_urban_ratio",
 )
 
@@ -102,7 +100,6 @@ def build_registry() -> dict[str, ScorerSpec]:
         DeterminismGate(),           # G7
         PerformanceGate(),           # G10
         HostInputGate(),             # G12
-        MobilityGate(),              # G14
         UrbanProductivityGate(),     # G24
     ]
     registry: dict[str, ScorerSpec] = {}

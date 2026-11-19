@@ -6,7 +6,6 @@ Outputs:
   - abm_inputs/03_rainfall_timeseries.gif  (animated rainfall)
   - abm_inputs/04_water_temp_timeseries.gif (animated water temp)
   - abm_inputs/05_water_frac_timeseries.gif (animated water fraction)
-  - abm_inputs/06_mobility_matrices.png    (sparse OD matrices)
   - abm_inputs/07_habitat_patches.png      (habitat from GPKG)
   - abm_inputs/08_cohort_log.png           (simulation output)
 """
@@ -153,63 +152,6 @@ def make_timeseries_gif(var_name: str, label: str, cmap: str, filename: str, ste
     ds.close()
     return len(frames)
 
-# ── 6. Mobility matrices (sparse heatmap subsample) ────────────────
-def read_csr(path: Path):
-    """Read binary CSR: [int32 nrows, int32 ncols, int32 nnz, row_ptr(nrows+1), col_idx(nnz), values(nnz)]."""
-    with open(path, "rb") as f:
-        nrows = struct.unpack("i", f.read(4))[0]
-        ncols = struct.unpack("i", f.read(4))[0]
-        nnz = struct.unpack("i", f.read(4))[0]
-        row_ptr = np.frombuffer(f.read(4 * (nrows + 1)), dtype=np.int32)
-        col_ind = np.frombuffer(f.read(4 * nnz), dtype=np.int32) if nnz > 0 else np.array([], dtype=np.int32)
-        values = np.frombuffer(f.read(4 * nnz), dtype=np.float32) if nnz > 0 else np.array([], dtype=np.float32)
-    return nrows, ncols, nnz, row_ptr, col_ind, values
-
-def csr_to_dense_sample(path: Path, max_dim: int = 200):
-    """Load CSR and subsample to max_dim x max_dim for visualization."""
-    nrows, ncols, nnz, row_ptr, col_ind, values = read_csr(path)
-    step_r = max(1, nrows // max_dim)
-    step_c = max(1, ncols // max_dim)
-    small_r = nrows // step_r
-    small_c = ncols // step_c
-    mat = np.zeros((small_r, small_c), dtype=np.float32)
-    for r in range(nrows):
-        sr = r // step_r
-        if sr >= small_r:
-            continue
-        start, end = int(row_ptr[r]), int(row_ptr[r + 1])
-        for idx in range(start, end):
-            c = int(col_ind[idx])
-            sc = c // step_c
-            if sc < small_c:
-                mat[sr, sc] += values[idx]
-    return mat
-
-def plot_mobility():
-    print("[6/8] Mobility matrices...")
-    csr_files = [
-        ("ghana_mobility_day.csr", "Human Daytime Mobility"),
-        ("ghana_mobility_night.csr", "Human Nighttime Mobility"),
-        ("ghana_livestock_mobility.csr", "Livestock Mobility"),
-    ]
-
-    fig, axes = plt.subplots(1, 3, figsize=(22, 7))
-    fig.suptitle("ABM Input: Mobility OD Matrices (CSR sparse, subsampled)", fontsize=14, fontweight="bold")
-
-    for ax, (fname, title) in zip(axes, csr_files):
-        path = DATA / fname
-        mat = csr_to_dense_sample(path, max_dim=200)
-        mat_log = np.log1p(mat)
-        im = ax.imshow(mat_log, cmap="viridis", aspect="auto", origin="lower")
-        ax.set_title(f"{title}\n({fname})", fontsize=10)
-        ax.set_xlabel("Destination cell")
-        ax.set_ylabel("Origin cell")
-        plt.colorbar(im, ax=ax, fraction=0.03, pad=0.02)
-
-    plt.tight_layout(rect=(0, 0, 1, 0.93))
-    fig.savefig(OUT / "06_mobility_matrices.png", dpi=150, bbox_inches="tight")
-    plt.close(fig)
-
 # ── 7. Habitat patches ────────────────────────────────────────────
 def plot_habitat():
     print("[7/8] Habitat patches...")
@@ -264,7 +206,6 @@ if __name__ == "__main__":
     make_timeseries_gif("rainfall", "Rainfall (mm/day)", "Blues", "03_rainfall_timeseries.gif", step=7)
     make_timeseries_gif("water_temp_c", "Water Temperature (°C)", "RdYlBu_r", "04_water_temp_timeseries.gif", step=7)
     make_timeseries_gif("water_frac", "Water Fraction", "Blues", "05_water_frac_timeseries.gif", step=7)
-    plot_mobility()
     plot_habitat()
     plot_cohort_log()
     print(f"\nDone! All outputs in: {OUT}/")

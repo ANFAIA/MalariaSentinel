@@ -25,11 +25,8 @@ Key & Value & Unit & Read by \\
 \code{capacity.persistent\_availability} & 1.0 & adimensional & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/habitat\_availability.hpp \\
 \code{contracts.cogs\_state} & "4.0" & string & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/output\_contract.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/wire.hpp \\
 \code{contracts.env\_nc} & "3.0" & string & (loaded, never used) \\
-\code{dispersal.adult\_max\_m} & 2000.0 & m & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/dispersal.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/wire.hpp \\
-\code{dispersal.adult\_prob\_day} & 0.05 & 1/día & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/mosquito\_submodel.hpp … (+2 more) \\
-\code{dispersal.adult\_sigma\_m} & 450.0 & m & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/wire.hpp \\
+\code{contracts.habitat} & "4.0" & string & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/aquatic\_cohort\_bank.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/aquatic\_stress.hpp … (+28 more) \\
 \code{dispersal.flight\_hour} & 20 & h & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/src/engine.cpp \\
-\code{dispersal.host\_flight\_step\_m} & 500.0 & m & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/src/mosquito\_submodel.cpp \\
 \code{dispersal.night\_end\_hour} & 6 & h & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/multirate\_scheduler.hpp \\
 \code{dispersal.night\_start\_hour} & 18 & h & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/multirate\_scheduler.hpp \\
 \code{dispersal.snap\_radius\_m} & 500.0 & m & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/src/mosquito\_submodel.cpp \\
@@ -40,7 +37,7 @@ Key & Value & Unit & Read by \\
 \code{eip.base\_c} & 16.0 & °C & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/eip.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/wire.hpp \\
 \code{eip.threshold\_gd} & 110.0 & grados-día & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/eip.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/wire.hpp \\
 \code{geodesy.earth\_radius\_m} & 6371008.8 & m & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/aoi.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/wire.hpp \\
-\code{geodesy.metres\_per\_deg\_lat} & 111195.08023353292 & m/° & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/aoi.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp … (+4 more) \\
+\code{geodesy.metres\_per\_deg\_lat} & 111195.08023353292 & m/° & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/aoi.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp … (+2 more) \\
 \code{gonotrophic.cycle\_duration\_days} & 2.0 & días & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/gonotrophic\_cycle.hpp … (+2 more) \\
 \code{gonotrophic.egg\_batch\_max} & 170 & huevos & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/gonotrophic\_cycle.hpp, mal-core/src/mal\_core/abm/src/mosquito\_submodel.cpp \\
 \code{gonotrophic.egg\_batch\_mean} & 120 & huevos & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/gonotrophic\_cycle.hpp … (+2 more) \\
@@ -57,18 +54,16 @@ Key & Value & Unit & Read by \\
 \code{habitat\_types.dynamics.urban\_persistent} & "persistent" & categórico & mal-core/src/mal\_core/abm/src/config.cc \\
 \code{habitat\_types.dynamics.wetland\_persistent} & "persistent" & categórico & mal-core/src/mal\_core/abm/src/config.cc \\
 \code{habitat\_types.dynamics.wetland\_pluvial} & "pluvial" & categórico & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/src/habitat\_engine.cpp \\
-\code{habitat\_types.types} & "surface\_persistent, wetland\_persistent, urban\_persistent, wetland\_pluvial, open\_pluvial, crop\_pluvial" & --- & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/bite\_ledger.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp … (+7 more) \\
-\code{host\_seeking.approach\_step\_m} & 50.0 & m & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/src/mosquito\_submodel.cpp \\
-\code{host\_seeking.detect\_range\_m} & 2000.0 & m & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_seeking.hpp … (+3 more) \\
-\code{host\_seeking.indoor\_attraction\_add} & 0.72 & adimensional & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/src/coordinator.cpp, mal-core/src/mal\_core/abm/src/host\_seeking.cpp \\
+\code{habitat\_types.types} & "surface\_persistent, wetland\_persistent, urban\_persistent, wetland\_pluvial, open\_pluvial, crop\_pluvial" & --- & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/bite\_ledger.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp … (+5 more) \\
+\code{host\_seeking.indoor\_attraction\_add} & 0.72 & adimensional & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/src/coordinator.cpp \\
 \code{host\_seeking.indoor\_fraction\_rural} & 0.3 & fracción & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/src/host\_landscape.cpp \\
 \code{host\_seeking.indoor\_fraction\_urban} & 0.72 & fracción & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/src/host\_landscape.cpp \\
 \code{host\_seeking.starvation\_days} & 7 & días & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/wire.hpp \\
-\code{host\_seeking.urbanicity\_add} & 0.2 & adimensional & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_seeking.hpp … (+2 more) \\
-\code{oviposition.detect\_range\_m} & 2000.0 & m & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_seeking.hpp … (+3 more) \\
+\code{host\_seeking.urbanicity\_add} & 0.2 & adimensional & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/src/coordinator.cpp \\
+\code{oviposition.detect\_range\_m} & 2000.0 & m & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/oviposition\_seeking.hpp, mal-core/src/mal\_core/abm/src/mosquito\_submodel.cpp \\
 \code{oviposition.min\_attraction} & 0.3 & adimensional & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/oviposition\_seeking.hpp, mal-core/src/mal\_core/abm/src/oviposition\_seeking.cpp \\
 \code{oviposition.scale\_m} & 50.0 & m & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/oviposition\_seeking.hpp … (+3 more) \\
-\code{oviposition.step\_m} & 50.0 & m & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/oviposition\_seeking.hpp … (+3 more) \\
+\code{oviposition.step\_m} & 50.0 & m & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/oviposition\_seeking.hpp … (+2 more) \\
 \code{oviposition.timeout\_days} & 7 & días & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/wire.hpp \\
 \code{pluvial.cold\_start\_z} & 0.0 & adimensional & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/src/coordinator.cpp \\
 \code{pluvial.delta\_days} & 1.0 & días & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/habitat\_availability.hpp, mal-core/src/mal\_core/abm/src/coordinator.cpp \\
@@ -77,116 +72,278 @@ Key & Value & Unit & Read by \\
 \code{rng.aquatic\_seed\_larva\_mortality} & 123 & int & (loaded, never used) \\
 \code{rng.aquatic\_seed\_stage\_mortality} & 42 & int & (loaded, never used) \\
 \code{rng.aquatic\_seed\_washout} & 789 & int & (loaded, never used) \\
-\code{species.arabiensis.activity\_weights} & "0.02, 0.1, 0.8, 0.08" & fracción & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_seeking.hpp … (+2 more) \\
-\code{species.arabiensis.host\_seeking\_radius\_m} & 1500.0 & m & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_seeking.hpp … (+5 more) \\
-\code{species.arabiensis.host\_seeking\_scale\_m} & 120.0 & m & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_seeking.hpp … (+6 more) \\
-\code{species.arabiensis.pref.cattle} & 0.2 & --- & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_landscape.hpp … (+8 more) \\
-\code{species.arabiensis.pref.goat} & 0.15 & --- & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_seeking.hpp … (+5 more) \\
-\code{species.arabiensis.pref.human} & 0.5 & --- & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/engine.hpp … (+23 more) \\
-\code{species.arabiensis.pref.sheep} & 0.1 & --- & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_landscape.hpp … (+8 more) \\
-\code{species.arabiensis.pref.wildlife} & 0.05 & --- & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_seeking.hpp … (+5 more) \\
+\code{species.arabiensis.activity\_weights} & "0.02, 0.1, 0.8, 0.08" & fracción & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_cascade.hpp … (+3 more) \\
+\code{species.arabiensis.aestivation\_supported} & true & booleano & (loaded, never used) \\
+\code{species.arabiensis.anemotaxis\_deviation\_deg} & 30.0 & ° & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_cascade.hpp, mal-core/src/mal\_core/abm/src/host\_cascade.cpp \\
+\code{species.arabiensis.anemotaxis\_rule} & "upwind" & categórico & (loaded, never used) \\
+\code{species.arabiensis.arrested\_daily\_survival} & 0.986 & 1/día & (loaded, never used) \\
+\code{species.arabiensis.blood\_meal\_refractory\_days} & 0.5 & días & (loaded, never used) \\
+\code{species.arabiensis.blood\_meal\_size\_ul} & 0.3 & µL & (loaded, never used) \\
+\code{species.arabiensis.blood\_meal\_target\_ul} & 0.5 & µL & (loaded, never used) \\
+\code{species.arabiensis.casting\_angle\_deg} & 90.0 & ° & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_cascade.hpp, mal-core/src/mal\_core/abm/src/host\_cascade.cpp \\
+\code{species.arabiensis.casting\_probability} & 0.1 & 1/paso de rastreo & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_cascade.hpp, mal-core/src/mal\_core/abm/src/host\_cascade.cpp \\
+\code{species.arabiensis.co2\_activation\_radius\_m} & 100.0 & m & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_cascade.hpp … (+2 more) \\
+\code{species.arabiensis.daily\_move\_capacity\_m} & 590.0 & m & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_cascade.hpp … (+3 more) \\
+\code{species.arabiensis.directed\_flight\_budget\_h} & 0.4856 & h & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_cascade.hpp, mal-core/src/mal\_core/abm/src/host\_cascade.cpp \\
+\code{species.arabiensis.eggs\_per\_ul} & 223.0 & huevos/µL & (loaded, never used) \\
+\code{species.arabiensis.exploration\_range\_m} & 100.0 & m & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_cascade.hpp, mal-core/src/mal\_core/abm/src/host\_cascade.cpp \\
+\code{species.arabiensis.exploration\_step\_correlation} & 0.5 & adimensional & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_cascade.hpp, mal-core/src/mal\_core/abm/src/host\_cascade.cpp \\
+\code{species.arabiensis.exploration\_step\_m} & 50.0 & m & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_cascade.hpp, mal-core/src/mal\_core/abm/src/host\_cascade.cpp \\
+\code{species.arabiensis.first\_cycle\_target\_ul} & 0.8 & µL & (loaded, never used) \\
+\code{species.arabiensis.flight\_speed\_ms} & 0.3375 & m/s & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_cascade.hpp, mal-core/src/mal\_core/abm/src/host\_cascade.cpp \\
+\code{species.arabiensis.gonotrophic\_arrest\_prob\_dry} & 0.4454 & fracción & (loaded, never used) \\
+\code{species.arabiensis.male\_daily\_survival} & 0.773 & 1/día & (loaded, never used) \\
+\code{species.arabiensis.male\_ratio} & 0.5 & fracción & (loaded, never used) \\
+\code{species.arabiensis.meal\_size\_min\_ul} & 0.1 & µL & (loaded, never used) \\
+\code{species.arabiensis.olfactory\_radius\_m} & 50.0 & m & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_cascade.hpp, mal-core/src/mal\_core/abm/src/host\_cascade.cpp \\
+\code{species.arabiensis.plume\_memory\_s} & 0.7 & s & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_cascade.hpp, mal-core/src/mal\_core/abm/src/host\_cascade.cpp \\
+\code{species.arabiensis.pref.cattle} & 0.2 & --- & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_landscape.hpp … (+6 more) \\
+\code{species.arabiensis.pref.goat} & 0.15 & --- & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/seeding.hpp … (+3 more) \\
+\code{species.arabiensis.pref.human} & 0.5 & --- & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/engine.hpp … (+18 more) \\
+\code{species.arabiensis.pref.sheep} & 0.1 & --- & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_landscape.hpp … (+6 more) \\
+\code{species.arabiensis.pref.wildlife} & 0.05 & --- & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/seeding.hpp … (+3 more) \\
+\code{species.arabiensis.probing\_success\_rate} & 0.7275 & fracción & (loaded, never used) \\
 \code{species.arabiensis.salinity\_hi\_tol\_ppt} & 15.0 & psu & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/coordinator.hpp … (+3 more) \\
 \code{species.arabiensis.salinity\_opt\_ppt} & 0.0 & psu & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/species\_params.hpp, mal-core/src/mal\_core/abm/src/species\_params.cpp \\
 \code{species.arabiensis.salinity\_slope} & 0.15 & psu⁻¹ & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/species\_params.hpp, mal-core/src/mal\_core/abm/src/species\_params.cpp \\
+\code{species.arabiensis.terminal\_radius\_m} & 0.15 & m & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_cascade.hpp, mal-core/src/mal\_core/abm/src/host\_cascade.cpp \\
+\code{species.arabiensis.visual\_radius\_m} & 0.485 & m & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_cascade.hpp, mal-core/src/mal\_core/abm/src/host\_cascade.cpp \\
 \code{species.arabiensis.weights.crop\_pluvial} & 0.1 & --- & mal-core/src/mal\_core/abm/src/config.cc \\
 \code{species.arabiensis.weights.open\_pluvial} & 0.55 & --- & mal-core/src/mal\_core/abm/src/config.cc \\
 \code{species.arabiensis.weights.surface\_persistent} & 0.1 & --- & mal-core/src/mal\_core/abm/src/config.cc \\
 \code{species.arabiensis.weights.urban\_persistent} & 0.15 & --- & mal-core/src/mal\_core/abm/src/config.cc \\
 \code{species.arabiensis.weights.wetland\_persistent} & 0.1 & --- & mal-core/src/mal\_core/abm/src/config.cc \\
 \code{species.arabiensis.weights.wetland\_pluvial} & 0.0 & fracción & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/src/habitat\_engine.cpp \\
-\code{species.coluzzii.activity\_weights} & "0.02, 0.1, 0.8, 0.08" & fracción & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_seeking.hpp … (+2 more) \\
-\code{species.coluzzii.host\_seeking\_radius\_m} & 1500.0 & m & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_seeking.hpp … (+5 more) \\
-\code{species.coluzzii.host\_seeking\_scale\_m} & 300.0 & m & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_seeking.hpp … (+6 more) \\
-\code{species.coluzzii.pref.cattle} & 0.005 & --- & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_landscape.hpp … (+8 more) \\
-\code{species.coluzzii.pref.goat} & 0.003 & --- & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_seeking.hpp … (+5 more) \\
-\code{species.coluzzii.pref.human} & 0.99 & --- & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/engine.hpp … (+23 more) \\
-\code{species.coluzzii.pref.sheep} & 0.001 & --- & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_landscape.hpp … (+8 more) \\
-\code{species.coluzzii.pref.wildlife} & 0.001 & --- & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_seeking.hpp … (+5 more) \\
+\code{species.arabiensis.wind\_block\_threshold\_ms} & 0.3375 & m/s & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_cascade.hpp, mal-core/src/mal\_core/abm/src/host\_cascade.cpp \\
+\code{species.arabiensis.wind\_reference} & "u100/v100" & string & (loaded, never used) \\
+\code{species.coluzzii.activity\_weights} & "0.0, 0.255, 0.48, 0.265" & fracción & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_cascade.hpp … (+3 more) \\
+\code{species.coluzzii.aestivation\_supported} & true & booleano & (loaded, never used) \\
+\code{species.coluzzii.anemotaxis\_deviation\_deg} & 30.0 & ° & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_cascade.hpp, mal-core/src/mal\_core/abm/src/host\_cascade.cpp \\
+\code{species.coluzzii.anemotaxis\_rule} & "upwind" & categórico & (loaded, never used) \\
+\code{species.coluzzii.arrested\_daily\_survival} & 0.986 & 1/día & (loaded, never used) \\
+\code{species.coluzzii.blood\_meal\_refractory\_days} & 0.5 & días & (loaded, never used) \\
+\code{species.coluzzii.blood\_meal\_size\_ul} & 0.3 & µL & (loaded, never used) \\
+\code{species.coluzzii.blood\_meal\_target\_ul} & 0.5 & µL & (loaded, never used) \\
+\code{species.coluzzii.casting\_angle\_deg} & 90.0 & ° & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_cascade.hpp, mal-core/src/mal\_core/abm/src/host\_cascade.cpp \\
+\code{species.coluzzii.casting\_probability} & 0.1 & 1/paso de rastreo & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_cascade.hpp, mal-core/src/mal\_core/abm/src/host\_cascade.cpp \\
+\code{species.coluzzii.co2\_activation\_radius\_m} & 100.0 & m & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_cascade.hpp … (+2 more) \\
+\code{species.coluzzii.daily\_move\_capacity\_m} & 590.0 & m & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_cascade.hpp … (+3 more) \\
+\code{species.coluzzii.directed\_flight\_budget\_h} & 0.4856 & h & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_cascade.hpp, mal-core/src/mal\_core/abm/src/host\_cascade.cpp \\
+\code{species.coluzzii.eggs\_per\_ul} & 223.0 & huevos/µL & (loaded, never used) \\
+\code{species.coluzzii.exploration\_range\_m} & 100.0 & m & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_cascade.hpp, mal-core/src/mal\_core/abm/src/host\_cascade.cpp \\
+\code{species.coluzzii.exploration\_step\_correlation} & 0.5 & adimensional & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_cascade.hpp, mal-core/src/mal\_core/abm/src/host\_cascade.cpp \\
+\code{species.coluzzii.exploration\_step\_m} & 50.0 & m & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_cascade.hpp, mal-core/src/mal\_core/abm/src/host\_cascade.cpp \\
+\code{species.coluzzii.first\_cycle\_target\_ul} & 0.8 & µL & (loaded, never used) \\
+\code{species.coluzzii.flight\_speed\_ms} & 0.3375 & m/s & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_cascade.hpp, mal-core/src/mal\_core/abm/src/host\_cascade.cpp \\
+\code{species.coluzzii.gonotrophic\_arrest\_prob\_dry} & 0.2704 & fracción & (loaded, never used) \\
+\code{species.coluzzii.male\_daily\_survival} & 0.773 & 1/día & (loaded, never used) \\
+\code{species.coluzzii.male\_ratio} & 0.5 & fracción & (loaded, never used) \\
+\code{species.coluzzii.meal\_size\_min\_ul} & 0.1 & µL & (loaded, never used) \\
+\code{species.coluzzii.olfactory\_radius\_m} & 50.0 & m & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_cascade.hpp, mal-core/src/mal\_core/abm/src/host\_cascade.cpp \\
+\code{species.coluzzii.plume\_memory\_s} & 0.7 & s & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_cascade.hpp, mal-core/src/mal\_core/abm/src/host\_cascade.cpp \\
+\code{species.coluzzii.pref.cattle} & 0.005 & --- & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_landscape.hpp … (+6 more) \\
+\code{species.coluzzii.pref.goat} & 0.003 & --- & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/seeding.hpp … (+3 more) \\
+\code{species.coluzzii.pref.human} & 0.99 & --- & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/engine.hpp … (+18 more) \\
+\code{species.coluzzii.pref.sheep} & 0.001 & --- & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_landscape.hpp … (+6 more) \\
+\code{species.coluzzii.pref.wildlife} & 0.001 & --- & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/seeding.hpp … (+3 more) \\
+\code{species.coluzzii.probing\_success\_rate} & 0.7275 & fracción & (loaded, never used) \\
 \code{species.coluzzii.salinity\_hi\_tol\_ppt} & 30.0 & psu & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/coordinator.hpp … (+3 more) \\
 \code{species.coluzzii.salinity\_opt\_ppt} & 0.0 & psu & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/species\_params.hpp, mal-core/src/mal\_core/abm/src/species\_params.cpp \\
 \code{species.coluzzii.salinity\_slope} & 0.08 & psu⁻¹ & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/species\_params.hpp, mal-core/src/mal\_core/abm/src/species\_params.cpp \\
+\code{species.coluzzii.terminal\_radius\_m} & 0.15 & m & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_cascade.hpp, mal-core/src/mal\_core/abm/src/host\_cascade.cpp \\
+\code{species.coluzzii.visual\_radius\_m} & 0.485 & m & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_cascade.hpp, mal-core/src/mal\_core/abm/src/host\_cascade.cpp \\
 \code{species.coluzzii.weights.crop\_pluvial} & 0.05 & --- & mal-core/src/mal\_core/abm/src/config.cc \\
 \code{species.coluzzii.weights.open\_pluvial} & 0.25 & --- & mal-core/src/mal\_core/abm/src/config.cc \\
 \code{species.coluzzii.weights.surface\_persistent} & 0.4 & --- & mal-core/src/mal\_core/abm/src/config.cc \\
 \code{species.coluzzii.weights.urban\_persistent} & 0.2 & --- & mal-core/src/mal\_core/abm/src/config.cc \\
 \code{species.coluzzii.weights.wetland\_persistent} & 0.1 & --- & mal-core/src/mal\_core/abm/src/config.cc \\
 \code{species.coluzzii.weights.wetland\_pluvial} & 0.0 & fracción & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/src/habitat\_engine.cpp \\
-\code{species.default\_species} & "coluzzii" & string & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/coordinator.hpp … (+3 more) \\
-\code{species.funestus.activity\_weights} & "0.02, 0.1, 0.8, 0.08" & fracción & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_seeking.hpp … (+2 more) \\
-\code{species.funestus.host\_seeking\_radius\_m} & 1500.0 & m & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_seeking.hpp … (+5 more) \\
-\code{species.funestus.host\_seeking\_scale\_m} & 300.0 & m & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_seeking.hpp … (+6 more) \\
-\code{species.funestus.pref.cattle} & 0.005 & --- & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_landscape.hpp … (+8 more) \\
-\code{species.funestus.pref.goat} & 0.003 & --- & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_seeking.hpp … (+5 more) \\
-\code{species.funestus.pref.human} & 0.99 & --- & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/engine.hpp … (+23 more) \\
-\code{species.funestus.pref.sheep} & 0.001 & --- & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_landscape.hpp … (+8 more) \\
-\code{species.funestus.pref.wildlife} & 0.001 & --- & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_seeking.hpp … (+5 more) \\
+\code{species.coluzzii.wind\_block\_threshold\_ms} & 0.3375 & m/s & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_cascade.hpp, mal-core/src/mal\_core/abm/src/host\_cascade.cpp \\
+\code{species.coluzzii.wind\_reference} & "u100/v100" & string & (loaded, never used) \\
+\code{species.default\_species} & "coluzzii" & string & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/coordinator.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/species\_params.hpp \\
+\code{species.funestus.activity\_weights} & "0.02, 0.1, 0.8, 0.08" & fracción & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_cascade.hpp … (+3 more) \\
+\code{species.funestus.aestivation\_supported} & false & booleano & (loaded, never used) \\
+\code{species.funestus.anemotaxis\_deviation\_deg} & 30.0 & ° & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_cascade.hpp, mal-core/src/mal\_core/abm/src/host\_cascade.cpp \\
+\code{species.funestus.anemotaxis\_rule} & "upwind" & categórico & (loaded, never used) \\
+\code{species.funestus.arrested\_daily\_survival} & 0.986 & 1/día & (loaded, never used) \\
+\code{species.funestus.blood\_meal\_refractory\_days} & 0.5 & días & (loaded, never used) \\
+\code{species.funestus.blood\_meal\_size\_ul} & 0.3 & µL & (loaded, never used) \\
+\code{species.funestus.blood\_meal\_target\_ul} & 0.5 & µL & (loaded, never used) \\
+\code{species.funestus.casting\_angle\_deg} & 90.0 & ° & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_cascade.hpp, mal-core/src/mal\_core/abm/src/host\_cascade.cpp \\
+\code{species.funestus.casting\_probability} & 0.1 & 1/paso de rastreo & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_cascade.hpp, mal-core/src/mal\_core/abm/src/host\_cascade.cpp \\
+\code{species.funestus.co2\_activation\_radius\_m} & 100.0 & m & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_cascade.hpp … (+2 more) \\
+\code{species.funestus.daily\_move\_capacity\_m} & 590.0 & m & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_cascade.hpp … (+3 more) \\
+\code{species.funestus.directed\_flight\_budget\_h} & 0.4856 & h & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_cascade.hpp, mal-core/src/mal\_core/abm/src/host\_cascade.cpp \\
+\code{species.funestus.eggs\_per\_ul} & 223.0 & huevos/µL & (loaded, never used) \\
+\code{species.funestus.exploration\_range\_m} & 100.0 & m & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_cascade.hpp, mal-core/src/mal\_core/abm/src/host\_cascade.cpp \\
+\code{species.funestus.exploration\_step\_correlation} & 0.5 & adimensional & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_cascade.hpp, mal-core/src/mal\_core/abm/src/host\_cascade.cpp \\
+\code{species.funestus.exploration\_step\_m} & 50.0 & m & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_cascade.hpp, mal-core/src/mal\_core/abm/src/host\_cascade.cpp \\
+\code{species.funestus.first\_cycle\_target\_ul} & 0.8 & µL & (loaded, never used) \\
+\code{species.funestus.flight\_speed\_ms} & 0.3375 & m/s & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_cascade.hpp, mal-core/src/mal\_core/abm/src/host\_cascade.cpp \\
+\code{species.funestus.gonotrophic\_arrest\_prob\_dry} & 0.0 & fracción & (loaded, never used) \\
+\code{species.funestus.male\_daily\_survival} & 0.773 & 1/día & (loaded, never used) \\
+\code{species.funestus.male\_ratio} & 0.5 & fracción & (loaded, never used) \\
+\code{species.funestus.meal\_size\_min\_ul} & 0.1 & µL & (loaded, never used) \\
+\code{species.funestus.olfactory\_radius\_m} & 50.0 & m & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_cascade.hpp, mal-core/src/mal\_core/abm/src/host\_cascade.cpp \\
+\code{species.funestus.plume\_memory\_s} & 0.7 & s & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_cascade.hpp, mal-core/src/mal\_core/abm/src/host\_cascade.cpp \\
+\code{species.funestus.pref.cattle} & 0.005 & --- & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_landscape.hpp … (+6 more) \\
+\code{species.funestus.pref.goat} & 0.003 & --- & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/seeding.hpp … (+3 more) \\
+\code{species.funestus.pref.human} & 0.99 & --- & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/engine.hpp … (+18 more) \\
+\code{species.funestus.pref.sheep} & 0.001 & --- & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_landscape.hpp … (+6 more) \\
+\code{species.funestus.pref.wildlife} & 0.001 & --- & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/seeding.hpp … (+3 more) \\
+\code{species.funestus.probing\_success\_rate} & 0.7275 & fracción & (loaded, never used) \\
 \code{species.funestus.salinity\_hi\_tol\_ppt} & 15.0 & psu & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/coordinator.hpp … (+3 more) \\
 \code{species.funestus.salinity\_opt\_ppt} & 0.0 & psu & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/species\_params.hpp, mal-core/src/mal\_core/abm/src/species\_params.cpp \\
 \code{species.funestus.salinity\_slope} & 0.15 & psu⁻¹ & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/species\_params.hpp, mal-core/src/mal\_core/abm/src/species\_params.cpp \\
+\code{species.funestus.terminal\_radius\_m} & 0.15 & m & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_cascade.hpp, mal-core/src/mal\_core/abm/src/host\_cascade.cpp \\
+\code{species.funestus.visual\_radius\_m} & 0.485 & m & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_cascade.hpp, mal-core/src/mal\_core/abm/src/host\_cascade.cpp \\
 \code{species.funestus.weights.crop\_pluvial} & 0.05 & --- & mal-core/src/mal\_core/abm/src/config.cc \\
 \code{species.funestus.weights.open\_pluvial} & 0.1 & --- & mal-core/src/mal\_core/abm/src/config.cc \\
 \code{species.funestus.weights.surface\_persistent} & 0.45 & --- & mal-core/src/mal\_core/abm/src/config.cc \\
 \code{species.funestus.weights.urban\_persistent} & 0.1 & --- & mal-core/src/mal\_core/abm/src/config.cc \\
 \code{species.funestus.weights.wetland\_persistent} & 0.3 & --- & mal-core/src/mal\_core/abm/src/config.cc \\
 \code{species.funestus.weights.wetland\_pluvial} & 0.0 & fracción & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/src/habitat\_engine.cpp \\
-\code{species.gambiae\_ss.activity\_weights} & "0.02, 0.1, 0.8, 0.08" & fracción & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_seeking.hpp … (+2 more) \\
-\code{species.gambiae\_ss.host\_seeking\_radius\_m} & 1500.0 & m & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_seeking.hpp … (+5 more) \\
-\code{species.gambiae\_ss.host\_seeking\_scale\_m} & 300.0 & m & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_seeking.hpp … (+6 more) \\
-\code{species.gambiae\_ss.pref.cattle} & 0.005 & --- & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_landscape.hpp … (+8 more) \\
-\code{species.gambiae\_ss.pref.goat} & 0.003 & --- & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_seeking.hpp … (+5 more) \\
-\code{species.gambiae\_ss.pref.human} & 0.99 & --- & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/engine.hpp … (+23 more) \\
-\code{species.gambiae\_ss.pref.sheep} & 0.001 & --- & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_landscape.hpp … (+8 more) \\
-\code{species.gambiae\_ss.pref.wildlife} & 0.001 & --- & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_seeking.hpp … (+5 more) \\
+\code{species.funestus.wind\_block\_threshold\_ms} & 0.3375 & m/s & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_cascade.hpp, mal-core/src/mal\_core/abm/src/host\_cascade.cpp \\
+\code{species.funestus.wind\_reference} & "u100/v100" & string & (loaded, never used) \\
+\code{species.gambiae\_ss.activity\_weights} & "0.02, 0.1, 0.8, 0.08" & fracción & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_cascade.hpp … (+3 more) \\
+\code{species.gambiae\_ss.aestivation\_supported} & true & booleano & (loaded, never used) \\
+\code{species.gambiae\_ss.anemotaxis\_deviation\_deg} & 30.0 & ° & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_cascade.hpp, mal-core/src/mal\_core/abm/src/host\_cascade.cpp \\
+\code{species.gambiae\_ss.anemotaxis\_rule} & "upwind" & categórico & (loaded, never used) \\
+\code{species.gambiae\_ss.arrested\_daily\_survival} & 0.986 & 1/día & (loaded, never used) \\
+\code{species.gambiae\_ss.blood\_meal\_refractory\_days} & 0.5 & días & (loaded, never used) \\
+\code{species.gambiae\_ss.blood\_meal\_size\_ul} & 0.3 & µL & (loaded, never used) \\
+\code{species.gambiae\_ss.blood\_meal\_target\_ul} & 0.5 & µL & (loaded, never used) \\
+\code{species.gambiae\_ss.casting\_angle\_deg} & 90.0 & ° & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_cascade.hpp, mal-core/src/mal\_core/abm/src/host\_cascade.cpp \\
+\code{species.gambiae\_ss.casting\_probability} & 0.1 & 1/paso de rastreo & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_cascade.hpp, mal-core/src/mal\_core/abm/src/host\_cascade.cpp \\
+\code{species.gambiae\_ss.co2\_activation\_radius\_m} & 100.0 & m & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_cascade.hpp … (+2 more) \\
+\code{species.gambiae\_ss.daily\_move\_capacity\_m} & 590.0 & m & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_cascade.hpp … (+3 more) \\
+\code{species.gambiae\_ss.directed\_flight\_budget\_h} & 0.4856 & h & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_cascade.hpp, mal-core/src/mal\_core/abm/src/host\_cascade.cpp \\
+\code{species.gambiae\_ss.eggs\_per\_ul} & 223.0 & huevos/µL & (loaded, never used) \\
+\code{species.gambiae\_ss.exploration\_range\_m} & 100.0 & m & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_cascade.hpp, mal-core/src/mal\_core/abm/src/host\_cascade.cpp \\
+\code{species.gambiae\_ss.exploration\_step\_correlation} & 0.5 & adimensional & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_cascade.hpp, mal-core/src/mal\_core/abm/src/host\_cascade.cpp \\
+\code{species.gambiae\_ss.exploration\_step\_m} & 50.0 & m & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_cascade.hpp, mal-core/src/mal\_core/abm/src/host\_cascade.cpp \\
+\code{species.gambiae\_ss.first\_cycle\_target\_ul} & 0.8 & µL & (loaded, never used) \\
+\code{species.gambiae\_ss.flight\_speed\_ms} & 0.3375 & m/s & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_cascade.hpp, mal-core/src/mal\_core/abm/src/host\_cascade.cpp \\
+\code{species.gambiae\_ss.gonotrophic\_arrest\_prob\_dry} & 0.6838 & fracción & (loaded, never used) \\
+\code{species.gambiae\_ss.male\_daily\_survival} & 0.773 & 1/día & (loaded, never used) \\
+\code{species.gambiae\_ss.male\_ratio} & 0.5 & fracción & (loaded, never used) \\
+\code{species.gambiae\_ss.meal\_size\_min\_ul} & 0.1 & µL & (loaded, never used) \\
+\code{species.gambiae\_ss.olfactory\_radius\_m} & 50.0 & m & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_cascade.hpp, mal-core/src/mal\_core/abm/src/host\_cascade.cpp \\
+\code{species.gambiae\_ss.plume\_memory\_s} & 0.7 & s & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_cascade.hpp, mal-core/src/mal\_core/abm/src/host\_cascade.cpp \\
+\code{species.gambiae\_ss.pref.cattle} & 0.005 & --- & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_landscape.hpp … (+6 more) \\
+\code{species.gambiae\_ss.pref.goat} & 0.003 & --- & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/seeding.hpp … (+3 more) \\
+\code{species.gambiae\_ss.pref.human} & 0.99 & --- & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/engine.hpp … (+18 more) \\
+\code{species.gambiae\_ss.pref.sheep} & 0.001 & --- & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_landscape.hpp … (+6 more) \\
+\code{species.gambiae\_ss.pref.wildlife} & 0.001 & --- & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/seeding.hpp … (+3 more) \\
+\code{species.gambiae\_ss.probing\_success\_rate} & 0.7275 & fracción & (loaded, never used) \\
 \code{species.gambiae\_ss.salinity\_hi\_tol\_ppt} & 20.0 & psu & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/coordinator.hpp … (+3 more) \\
 \code{species.gambiae\_ss.salinity\_opt\_ppt} & 0.0 & psu & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/species\_params.hpp, mal-core/src/mal\_core/abm/src/species\_params.cpp \\
 \code{species.gambiae\_ss.salinity\_slope} & 0.12 & psu⁻¹ & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/species\_params.hpp, mal-core/src/mal\_core/abm/src/species\_params.cpp \\
+\code{species.gambiae\_ss.terminal\_radius\_m} & 0.15 & m & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_cascade.hpp, mal-core/src/mal\_core/abm/src/host\_cascade.cpp \\
+\code{species.gambiae\_ss.visual\_radius\_m} & 0.485 & m & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_cascade.hpp, mal-core/src/mal\_core/abm/src/host\_cascade.cpp \\
 \code{species.gambiae\_ss.weights.crop\_pluvial} & 0.1 & --- & mal-core/src/mal\_core/abm/src/config.cc \\
 \code{species.gambiae\_ss.weights.open\_pluvial} & 0.65 & --- & mal-core/src/mal\_core/abm/src/config.cc \\
 \code{species.gambiae\_ss.weights.surface\_persistent} & 0.05 & --- & mal-core/src/mal\_core/abm/src/config.cc \\
 \code{species.gambiae\_ss.weights.urban\_persistent} & 0.15 & --- & mal-core/src/mal\_core/abm/src/config.cc \\
 \code{species.gambiae\_ss.weights.wetland\_persistent} & 0.05 & --- & mal-core/src/mal\_core/abm/src/config.cc \\
 \code{species.gambiae\_ss.weights.wetland\_pluvial} & 0.0 & fracción & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/src/habitat\_engine.cpp \\
+\code{species.gambiae\_ss.wind\_block\_threshold\_ms} & 0.3375 & m/s & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_cascade.hpp, mal-core/src/mal\_core/abm/src/host\_cascade.cpp \\
+\code{species.gambiae\_ss.wind\_reference} & "u100/v100" & string & (loaded, never used) \\
 \code{species.k\_ref} & 50.0 & ind·km⁻²·d⁻¹ & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/habitat\_availability.hpp \\
-\code{species.melas.activity\_weights} & "0.02, 0.1, 0.8, 0.08" & fracción & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_seeking.hpp … (+2 more) \\
-\code{species.melas.host\_seeking\_radius\_m} & 1500.0 & m & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_seeking.hpp … (+5 more) \\
-\code{species.melas.host\_seeking\_scale\_m} & 300.0 & m & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_seeking.hpp … (+6 more) \\
-\code{species.melas.pref.cattle} & 0.005 & --- & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_landscape.hpp … (+8 more) \\
-\code{species.melas.pref.goat} & 0.003 & --- & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_seeking.hpp … (+5 more) \\
-\code{species.melas.pref.human} & 0.99 & --- & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/engine.hpp … (+23 more) \\
-\code{species.melas.pref.sheep} & 0.001 & --- & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_landscape.hpp … (+8 more) \\
-\code{species.melas.pref.wildlife} & 0.001 & --- & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_seeking.hpp … (+5 more) \\
+\code{species.melas.activity\_weights} & "0.02, 0.1, 0.8, 0.08" & fracción & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_cascade.hpp … (+3 more) \\
+\code{species.melas.aestivation\_supported} & false & booleano & (loaded, never used) \\
+\code{species.melas.anemotaxis\_deviation\_deg} & 30.0 & ° & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_cascade.hpp, mal-core/src/mal\_core/abm/src/host\_cascade.cpp \\
+\code{species.melas.anemotaxis\_rule} & "upwind" & categórico & (loaded, never used) \\
+\code{species.melas.arrested\_daily\_survival} & 0.986 & 1/día & (loaded, never used) \\
+\code{species.melas.blood\_meal\_refractory\_days} & 0.5 & días & (loaded, never used) \\
+\code{species.melas.blood\_meal\_size\_ul} & 0.3 & µL & (loaded, never used) \\
+\code{species.melas.blood\_meal\_target\_ul} & 0.5 & µL & (loaded, never used) \\
+\code{species.melas.casting\_angle\_deg} & 90.0 & ° & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_cascade.hpp, mal-core/src/mal\_core/abm/src/host\_cascade.cpp \\
+\code{species.melas.casting\_probability} & 0.1 & 1/paso de rastreo & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_cascade.hpp, mal-core/src/mal\_core/abm/src/host\_cascade.cpp \\
+\code{species.melas.co2\_activation\_radius\_m} & 100.0 & m & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_cascade.hpp … (+2 more) \\
+\code{species.melas.daily\_move\_capacity\_m} & 590.0 & m & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_cascade.hpp … (+3 more) \\
+\code{species.melas.directed\_flight\_budget\_h} & 0.4856 & h & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_cascade.hpp, mal-core/src/mal\_core/abm/src/host\_cascade.cpp \\
+\code{species.melas.eggs\_per\_ul} & 223.0 & huevos/µL & (loaded, never used) \\
+\code{species.melas.exploration\_range\_m} & 100.0 & m & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_cascade.hpp, mal-core/src/mal\_core/abm/src/host\_cascade.cpp \\
+\code{species.melas.exploration\_step\_correlation} & 0.5 & adimensional & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_cascade.hpp, mal-core/src/mal\_core/abm/src/host\_cascade.cpp \\
+\code{species.melas.exploration\_step\_m} & 50.0 & m & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_cascade.hpp, mal-core/src/mal\_core/abm/src/host\_cascade.cpp \\
+\code{species.melas.first\_cycle\_target\_ul} & 0.8 & µL & (loaded, never used) \\
+\code{species.melas.flight\_speed\_ms} & 0.3375 & m/s & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_cascade.hpp, mal-core/src/mal\_core/abm/src/host\_cascade.cpp \\
+\code{species.melas.gonotrophic\_arrest\_prob\_dry} & 0.0 & fracción & (loaded, never used) \\
+\code{species.melas.male\_daily\_survival} & 0.773 & 1/día & (loaded, never used) \\
+\code{species.melas.male\_ratio} & 0.5 & fracción & (loaded, never used) \\
+\code{species.melas.meal\_size\_min\_ul} & 0.1 & µL & (loaded, never used) \\
+\code{species.melas.olfactory\_radius\_m} & 50.0 & m & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_cascade.hpp, mal-core/src/mal\_core/abm/src/host\_cascade.cpp \\
+\code{species.melas.plume\_memory\_s} & 0.7 & s & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_cascade.hpp, mal-core/src/mal\_core/abm/src/host\_cascade.cpp \\
+\code{species.melas.pref.cattle} & 0.005 & --- & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_landscape.hpp … (+6 more) \\
+\code{species.melas.pref.goat} & 0.003 & --- & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/seeding.hpp … (+3 more) \\
+\code{species.melas.pref.human} & 0.99 & --- & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/engine.hpp … (+18 more) \\
+\code{species.melas.pref.sheep} & 0.001 & --- & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_landscape.hpp … (+6 more) \\
+\code{species.melas.pref.wildlife} & 0.001 & --- & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/seeding.hpp … (+3 more) \\
+\code{species.melas.probing\_success\_rate} & 0.7275 & fracción & (loaded, never used) \\
 \code{species.melas.salinity\_hi\_tol\_ppt} & 38.0 & psu & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/coordinator.hpp … (+3 more) \\
 \code{species.melas.salinity\_opt\_ppt} & 0.0 & psu & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/species\_params.hpp, mal-core/src/mal\_core/abm/src/species\_params.cpp \\
 \code{species.melas.salinity\_slope} & 0.02 & psu⁻¹ & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/species\_params.hpp, mal-core/src/mal\_core/abm/src/species\_params.cpp \\
+\code{species.melas.terminal\_radius\_m} & 0.15 & m & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_cascade.hpp, mal-core/src/mal\_core/abm/src/host\_cascade.cpp \\
+\code{species.melas.visual\_radius\_m} & 0.485 & m & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_cascade.hpp, mal-core/src/mal\_core/abm/src/host\_cascade.cpp \\
 \code{species.melas.weights.crop\_pluvial} & 0.05 & --- & mal-core/src/mal\_core/abm/src/config.cc \\
 \code{species.melas.weights.open\_pluvial} & 0.4 & --- & mal-core/src/mal\_core/abm/src/config.cc \\
 \code{species.melas.weights.surface\_persistent} & 0.25 & --- & mal-core/src/mal\_core/abm/src/config.cc \\
 \code{species.melas.weights.urban\_persistent} & 0.15 & --- & mal-core/src/mal\_core/abm/src/config.cc \\
 \code{species.melas.weights.wetland\_persistent} & 0.15 & --- & mal-core/src/mal\_core/abm/src/config.cc \\
 \code{species.melas.weights.wetland\_pluvial} & 0.0 & fracción & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/src/habitat\_engine.cpp \\
+\code{species.melas.wind\_block\_threshold\_ms} & 0.3375 & m/s & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_cascade.hpp, mal-core/src/mal\_core/abm/src/host\_cascade.cpp \\
+\code{species.melas.wind\_reference} & "u100/v100" & string & (loaded, never used) \\
 \code{species.neutral.weights.crop\_pluvial} & 0.05 & --- & mal-core/src/mal\_core/abm/src/config.cc \\
 \code{species.neutral.weights.open\_pluvial} & 0.4 & --- & mal-core/src/mal\_core/abm/src/config.cc \\
 \code{species.neutral.weights.surface\_persistent} & 0.25 & --- & mal-core/src/mal\_core/abm/src/config.cc \\
 \code{species.neutral.weights.urban\_persistent} & 0.15 & --- & mal-core/src/mal\_core/abm/src/config.cc \\
 \code{species.neutral.weights.wetland\_persistent} & 0.15 & --- & mal-core/src/mal\_core/abm/src/config.cc \\
 \code{species.neutral.weights.wetland\_pluvial} & 0.0 & fracción & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/src/habitat\_engine.cpp \\
-\code{species.stephensi.activity\_weights} & "0.02, 0.1, 0.8, 0.08" & fracción & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_seeking.hpp … (+2 more) \\
-\code{species.stephensi.host\_seeking\_radius\_m} & 1500.0 & m & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_seeking.hpp … (+5 more) \\
-\code{species.stephensi.host\_seeking\_scale\_m} & 300.0 & m & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_seeking.hpp … (+6 more) \\
-\code{species.stephensi.pref.cattle} & 0.15 & --- & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_landscape.hpp … (+8 more) \\
-\code{species.stephensi.pref.goat} & 0.05 & --- & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_seeking.hpp … (+5 more) \\
-\code{species.stephensi.pref.human} & 0.7 & --- & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/engine.hpp … (+23 more) \\
-\code{species.stephensi.pref.sheep} & 0.05 & --- & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_landscape.hpp … (+8 more) \\
-\code{species.stephensi.pref.wildlife} & 0.05 & --- & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_seeking.hpp … (+5 more) \\
+\code{species.stephensi.activity\_weights} & "0.02, 0.1, 0.8, 0.08" & fracción & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_cascade.hpp … (+3 more) \\
+\code{species.stephensi.aestivation\_supported} & false & booleano & (loaded, never used) \\
+\code{species.stephensi.anemotaxis\_deviation\_deg} & 30.0 & ° & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_cascade.hpp, mal-core/src/mal\_core/abm/src/host\_cascade.cpp \\
+\code{species.stephensi.anemotaxis\_rule} & "upwind" & categórico & (loaded, never used) \\
+\code{species.stephensi.arrested\_daily\_survival} & 0.986 & 1/día & (loaded, never used) \\
+\code{species.stephensi.blood\_meal\_refractory\_days} & 0.5 & días & (loaded, never used) \\
+\code{species.stephensi.blood\_meal\_size\_ul} & 0.3 & µL & (loaded, never used) \\
+\code{species.stephensi.blood\_meal\_target\_ul} & 0.5 & µL & (loaded, never used) \\
+\code{species.stephensi.casting\_angle\_deg} & 90.0 & ° & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_cascade.hpp, mal-core/src/mal\_core/abm/src/host\_cascade.cpp \\
+\code{species.stephensi.casting\_probability} & 0.1 & 1/paso de rastreo & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_cascade.hpp, mal-core/src/mal\_core/abm/src/host\_cascade.cpp \\
+\code{species.stephensi.co2\_activation\_radius\_m} & 100.0 & m & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_cascade.hpp … (+2 more) \\
+\code{species.stephensi.daily\_move\_capacity\_m} & 590.0 & m & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_cascade.hpp … (+3 more) \\
+\code{species.stephensi.directed\_flight\_budget\_h} & 0.4856 & h & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_cascade.hpp, mal-core/src/mal\_core/abm/src/host\_cascade.cpp \\
+\code{species.stephensi.eggs\_per\_ul} & 223.0 & huevos/µL & (loaded, never used) \\
+\code{species.stephensi.exploration\_range\_m} & 100.0 & m & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_cascade.hpp, mal-core/src/mal\_core/abm/src/host\_cascade.cpp \\
+\code{species.stephensi.exploration\_step\_correlation} & 0.5 & adimensional & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_cascade.hpp, mal-core/src/mal\_core/abm/src/host\_cascade.cpp \\
+\code{species.stephensi.exploration\_step\_m} & 50.0 & m & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_cascade.hpp, mal-core/src/mal\_core/abm/src/host\_cascade.cpp \\
+\code{species.stephensi.first\_cycle\_target\_ul} & 0.8 & µL & (loaded, never used) \\
+\code{species.stephensi.flight\_speed\_ms} & 0.3375 & m/s & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_cascade.hpp, mal-core/src/mal\_core/abm/src/host\_cascade.cpp \\
+\code{species.stephensi.gonotrophic\_arrest\_prob\_dry} & 0.0 & fracción & (loaded, never used) \\
+\code{species.stephensi.male\_daily\_survival} & 0.773 & 1/día & (loaded, never used) \\
+\code{species.stephensi.male\_ratio} & 0.5 & fracción & (loaded, never used) \\
+\code{species.stephensi.meal\_size\_min\_ul} & 0.1 & µL & (loaded, never used) \\
+\code{species.stephensi.olfactory\_radius\_m} & 50.0 & m & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_cascade.hpp, mal-core/src/mal\_core/abm/src/host\_cascade.cpp \\
+\code{species.stephensi.plume\_memory\_s} & 0.7 & s & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_cascade.hpp, mal-core/src/mal\_core/abm/src/host\_cascade.cpp \\
+\code{species.stephensi.pref.cattle} & 0.15 & --- & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_landscape.hpp … (+6 more) \\
+\code{species.stephensi.pref.goat} & 0.05 & --- & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/seeding.hpp … (+3 more) \\
+\code{species.stephensi.pref.human} & 0.7 & --- & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/engine.hpp … (+18 more) \\
+\code{species.stephensi.pref.sheep} & 0.05 & --- & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_landscape.hpp … (+6 more) \\
+\code{species.stephensi.pref.wildlife} & 0.05 & --- & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/seeding.hpp … (+3 more) \\
+\code{species.stephensi.probing\_success\_rate} & 0.7275 & fracción & (loaded, never used) \\
 \code{species.stephensi.salinity\_hi\_tol\_ppt} & 20.0 & psu & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/coordinator.hpp … (+3 more) \\
 \code{species.stephensi.salinity\_opt\_ppt} & 0.0 & psu & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/species\_params.hpp, mal-core/src/mal\_core/abm/src/species\_params.cpp \\
 \code{species.stephensi.salinity\_slope} & 0.15 & psu⁻¹ & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/species\_params.hpp, mal-core/src/mal\_core/abm/src/species\_params.cpp \\
+\code{species.stephensi.terminal\_radius\_m} & 0.15 & m & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_cascade.hpp, mal-core/src/mal\_core/abm/src/host\_cascade.cpp \\
+\code{species.stephensi.visual\_radius\_m} & 0.485 & m & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_cascade.hpp, mal-core/src/mal\_core/abm/src/host\_cascade.cpp \\
 \code{species.stephensi.weights.crop\_pluvial} & 0.05 & --- & mal-core/src/mal\_core/abm/src/config.cc \\
 \code{species.stephensi.weights.open\_pluvial} & 0.4 & --- & mal-core/src/mal\_core/abm/src/config.cc \\
 \code{species.stephensi.weights.surface\_persistent} & 0.25 & --- & mal-core/src/mal\_core/abm/src/config.cc \\
 \code{species.stephensi.weights.urban\_persistent} & 0.15 & --- & mal-core/src/mal\_core/abm/src/config.cc \\
 \code{species.stephensi.weights.wetland\_persistent} & 0.15 & --- & mal-core/src/mal\_core/abm/src/config.cc \\
 \code{species.stephensi.weights.wetland\_pluvial} & 0.0 & fracción & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/src/habitat\_engine.cpp \\
+\code{species.stephensi.wind\_block\_threshold\_ms} & 0.3375 & m/s & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/host\_cascade.hpp, mal-core/src/mal\_core/abm/src/host\_cascade.cpp \\
+\code{species.stephensi.wind\_reference} & "u100/v100" & string & (loaded, never used) \\
 \code{thermal.efd\_max\_eggs\_per\_day} & 0.5 & huevos·hembra⁻¹·día⁻¹ & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/birth\_rate.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp \\
 \code{thermal.efd\_tmax\_c} & 34.0 & °C & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/birth\_rate.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp \\
 \code{thermal.efd\_tmin\_c} & 16.0 & °C & mal-core/src/mal\_core/abm/include/mal\_abm\_fast/birth\_rate.hpp, mal-core/src/mal\_core/abm/include/mal\_abm\_fast/config.hpp \\

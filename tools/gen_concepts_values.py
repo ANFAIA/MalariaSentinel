@@ -1655,18 +1655,6 @@ CODE_SPECS: tuple[dict[str, Any], ...] = (
         "args": {"pattern": r"passed=0\.\d+ <= ratio <= ", "index": 1},
     },
     {
-        "name": "scoring.gate_row_sum_tolerance",
-        "path": f"{SCORING_DIR}/scorers/gates.py",
-        "kind": "line",
-        "args": {"pattern": r"\(np\.abs\(sums - 1\.0\) < ", "index": 1},
-    },
-    {
-        "name": "scoring.gate_row_sum_threshold",
-        "path": f"{SCORING_DIR}/scorers/gates.py",
-        "kind": "line",
-        "args": {"pattern": r"passed=min_fraction >= ", "index": 0},
-    },
-    {
         "name": "scoring.gate_urban_class",
         "path": f"{SCORING_DIR}/scorers/gates.py",
         "kind": "line",
@@ -1768,42 +1756,6 @@ CODE_SPECS: tuple[dict[str, Any], ...] = (
         "path": f"{INGEST_DIR}/hosts.py",
         "kind": "line",
         "args": {"pattern": r"\(urban_class < 20\), 20, 50\)", "index": 1},
-    },
-    {
-        "name": "ingest.mobility_cell_size_km",
-        "path": f"{INGEST_DIR}/mobility.py",
-        "kind": "default",
-        "args": {"qualname": "build_mobility_dataset", "arg": "cell_size_km"},
-    },
-    {
-        "name": "ingest.mobility_beta_day",
-        "path": f"{INGEST_DIR}/mobility.py",
-        "kind": "default",
-        "args": {"qualname": "build_mobility_dataset", "arg": "beta_day"},
-    },
-    {
-        "name": "ingest.mobility_beta_night",
-        "path": f"{INGEST_DIR}/mobility.py",
-        "kind": "default",
-        "args": {"qualname": "build_mobility_dataset", "arg": "beta_night"},
-    },
-    {
-        "name": "ingest.mobility_beta_livestock",
-        "path": f"{INGEST_DIR}/mobility.py",
-        "kind": "default",
-        "args": {"qualname": "build_mobility_dataset", "arg": "beta_livestock"},
-    },
-    {
-        "name": "ingest.mobility_max_distance_km",
-        "path": f"{INGEST_DIR}/mobility.py",
-        "kind": "default",
-        "args": {"qualname": "build_mobility_dataset", "arg": "max_distance_km"},
-    },
-    {
-        "name": "ingest.mobility_sparsity_threshold",
-        "path": f"{INGEST_DIR}/mobility.py",
-        "kind": "default",
-        "args": {"qualname": "build_mobility_dataset", "arg": "sparsity_threshold"},
     },
     {
         "name": "ingest.k_ref_diag_per_km2",

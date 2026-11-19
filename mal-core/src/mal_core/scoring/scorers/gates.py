@@ -215,62 +215,6 @@ class HostInputGate(Scorer):
         )
 
 
-class MobilityGate(Scorer):
-    """G14 (ex-D14): OD matrix rows are row-stochastic (sum to 1.0)."""
-
-    name = "G14_mobility"
-    kind = "gate"
-    weight = 0.0
-    description = "Mobility OD matrix rows sum to 1.0 (input validation)"
-    aoi_generalizable = True
-
-    def score(self, run_dir: Path, ctx: dict[str, Any]) -> ScorerResult:
-        """Check that the mobility origin-destination matrix is row-stochastic.
-
-        Returns the smallest fraction of rows summing to one across the
-        checked files as the value; the gate passes when every file
-        clears the tolerance.
-        """
-        csr_files = sorted(run_dir.glob("*.csr"))
-        if not csr_files:
-            for parent in (run_dir.parent, run_dir.parent / "hosts"):
-                csr_files = sorted(parent.glob("*.csr"))
-                if csr_files:
-                    break
-        if not csr_files:
-            return ScorerResult.skipped(
-                "no .csr files near run dir", target="rows sum to 1.0"
-            )
-        min_fraction = 1.0
-        checked = 0
-        for csr in csr_files:
-            try:
-                with open(csr, "rb") as f:
-                    n_rows = struct.unpack("i", f.read(4))[0]
-                    n_cols = struct.unpack("i", f.read(4))[0]
-                    nnz = struct.unpack("i", f.read(4))[0]
-                    row_ptr = np.frombuffer(f.read(4 * (n_rows + 1)), dtype=np.int32)
-                    col_idx = np.frombuffer(f.read(4 * nnz), dtype=np.int32)
-                    values = np.frombuffer(f.read(4 * nnz), dtype=np.float32)
-                del n_cols, col_idx
-                sums = np.add.reduceat(
-                    values, row_ptr[:-1].clip(max=len(values))
-                ) if nnz else np.zeros(n_rows)
-                frac = float(
-                    (np.abs(sums - 1.0) < 0.01).sum() / max(n_rows, 1)
-                )
-                min_fraction = min(min_fraction, frac)
-                checked += 1
-            except Exception as e:
-                return ScorerResult.skipped(f"csr unreadable: {e}", target="rows sum to 1.0")
-        return ScorerResult(
-            score=round(min_fraction, 4),
-            value=round(min_fraction, 4),
-            target="rows sum to 1.0 (all files)",
-            diagnostics={"files_checked": checked},
-            passed=min_fraction >= 0.99,
-        )
-
 
 class UrbanProductivityGate(Scorer):
     """G24 (ex-D24): urban cells carry less density than rural cells.

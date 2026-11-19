@@ -1,23 +1,73 @@
 // SPDX-License-Identifier: MIT
-// human_state.hpp — Spatial SEIR human compartment grid with discrete cohort queues.
+// human_state.hpp — Individual human population (SoA) with SEIR timers.
 //
-// M7.4: Implements human malaria epidemiology on the ABM grid.
-// Each grid cell maintains susceptible (S_H), exposed (E_H), infectious (I_H),
-// and recovered (R_H) compartments.
+// Plan individualization-and-movement, Paso 2a (§2, §15.0). The per-cell
+// compartment grid of M7.4 is replaced by a population of *individual*
+// people in Structure-of-Arrays form, in the same module and behind the same
+// API boundary (`HumanCompartmentGrid` keeps its name and its seeding calls):
 //
-// Discrete cohort queues (flat contiguous arrays) model non-Markovian fixed
-// duration intrinsic incubation (E_H -> I_H), human infectious period (I_H -> R_H),
-// and waning immunity (R_H -> S_H), avoiding exponential-dwell distortion.
+//   * every person has a stable `human_id`, a fixed position inside its cell
+//     (metres from the south-west corner of the AOI, drawn uniformly from the
+//     seed) and a SEIR state with a discrete timer (non-Markovian dwell, as
+//     the old cohort queues did, but per individual);
+//   * the number of people in a cell is the real one (rounded `human_total`
+//     of the grid): there is no SLOTS_PER_CELL and there are no empty slots;
+//   * S/E/I/R per cell (`s_at`, `i_at`, `prev_at`, ...) are DERIVED
+//     statistics kept in step with the individuals;
+//   * `advance_day()` advances timers only. Infection vector→human happens
+//     only at a bite, on one concrete person (`expose`); the per-cell force
+//     of infection lambda_H no longer exists.
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
-#include <vector>
-#include <cmath>
 #include <string>
+#include <tuple>
+#include <utility>
+#include <vector>
 
 #include "prng.hpp"
 
 namespace mal_abm_fast {
+
+enum class HumanState : uint8_t {
+    SUSCEPTIBLE = 0,
+    EXPOSED     = 1,
+    INFECTIOUS  = 2,
+    RECOVERED   = 3,
+};
+
+/// Parse "SUSCEPTIBLE" | "EXPOSED" | "INFECTIOUS" | "RECOVERED" (scenario
+/// JSON spelling). Throws std::invalid_argument on anything else.
+HumanState parse_human_state(const std::string& s);
+
+/// Individual people, Structure-of-Arrays. Persons are stored contiguously
+/// by cell (row-major cell order), so the people of cell `c` are the index
+/// range [cell_begin(c), cell_begin(c + 1)).
+struct HumanSoA {
+    std::vector<int64_t>  human_id;     // (cell_id << 32) | slot: unique, stable
+    std::vector<int32_t>  cell_id;      // home cell, row * W + col
+    std::vector<float>    home_x;       // m from the SW corner of the AOI
+    std::vector<float>    home_y;
+    std::vector<float>    cur_x;        // = home in this version (no mobility yet)
+    std::vector<float>    cur_y;
+    std::vector<uint8_t>  state;        // HumanState
+    std::vector<int32_t>  timer;        // days left in `state` (E, I, R)
+    std::vector<uint8_t>  susceptible;  // individual flag: 1 = can be infected
+
+    size_t size() const { return human_id.size(); }
+    void clear();
+    void reserve(size_t n);
+};
+
+/// One declared individual (scenario `humans[]`): position in metres, state
+/// and, for E/I/R, the days left in it (<= 0 means "the full duration").
+struct HumanSeed {
+    double     x = 0.0;
+    double     y = 0.0;
+    HumanState state = HumanState::SUSCEPTIBLE;
+    double     timer_days = 0.0;
+};
 
 struct HumanCompartmentStats {
     double total_susceptible = 0.0;
@@ -33,17 +83,30 @@ class HumanCompartmentGrid {
 public:
     HumanCompartmentGrid() = default;
 
-    /// Initialize grid dimensions, cohort queues, and initial human population.
-    /// If initial_prevalence > 0, seeds that fraction of humans as infectious (I_H).
+    /// Build the population. `human_density` is persons per cell (row-major,
+    /// size h*w); each cell gets round(density) people placed uniformly in
+    /// the cell from `seed`. `cell_m` is the cell side in metres
+    /// (`aoi.resolution_m`). If initial_prevalence > 0, that fraction of
+    /// each cell's people starts infectious, with timers spread evenly over
+    /// the infectious period.
     void init(int32_t h, int32_t w,
               const std::vector<float>& human_density,
               int32_t incubation_days = 12,
               int32_t infectious_days = 20,
               int32_t immunity_days = 180,
               bool immunity_enabled = false,
-              double initial_prevalence = 0.0);
+              double initial_prevalence = 0.0,
+              double cell_m = 1000.0,
+              uint64_t seed = 0);
 
-    /// Seed explicit infectious humans at a specific cell (row, col).
+    /// Replace the whole population by the declared individuals (synthetic
+    /// scenarios): only these people exist. Requires a prior `init`. Throws
+    /// std::runtime_error on a position outside the grid.
+    void set_individuals(const std::vector<HumanSeed>& people);
+
+    /// Seed explicit infectious humans at a specific cell (row, col): the
+    /// first `round(count)` susceptible people of the cell (capped at the
+    /// susceptibles available) become INFECTIOUS at age zero.
     void seed_infections(int32_t row, int32_t col, double count);
 
     /// Seed random viable foci: picks up to n_foci cells with population >= min_pop.
@@ -77,18 +140,58 @@ public:
         const std::vector<float>& mosquito_density,
         Prng& rng);
 
-    /// Advance one day given per-cell force of infection lambda_H in [0, 1].
-    /// Computes new exposures S_H -> E_H via stochastic binomial sampling,
-    /// advances discrete cohort queues E_H -> I_H, I_H -> R_H, R_H -> S_H,
-    /// updates daily incidence and prevalence, and asserts conservation invariants.
-    void advance_day(const std::vector<double>& force_of_infection, Prng& rng);
+    /// Advance ONE day of timers only: resets the daily incidence, then
+    /// E -> I, I -> R (or S without immunity) and R -> S when a timer
+    /// reaches zero. It applies no infection probability: exposure happens
+    /// at a bite, through `expose`.
+    void advance_day();
+
+    /// Index of a uniformly random person of cell (row, col), or -1 when the
+    /// cell is empty. Stand-in for "the person the bite landed on" until the
+    /// movement cascade (Paso 5) identifies the person.
+    int64_t pick_person(int32_t row, int32_t col, Prng& rng) const;
+
+    /// S -> E for the person at `index` (timer = incubation period). Returns
+    /// false, and changes nothing, unless the person is susceptible. Counts
+    /// towards today's incidence of the person's cell.
+    bool expose(int64_t index);
+
+    /// Closest person to a segment, as found by `nearest_to_segment`.
+    struct SegmentHit {
+        int64_t person = -1;      // index into the HumanSoA
+        double  d_min  = 0.0;     // minimum distance from the segment to the person (m)
+        double  t_entry = 0.0;    // first fraction of the segment at which d <= radius
+    };
+
+    /// Build the spatial index (a uniform bin grid over the AOI, finer than
+    /// the 1 km cell) used by the perception cascade. `target_bin_m` is the
+    /// preferred bin side; it is enlarged on very large AOIs to cap the
+    /// number of bins. People do not move in this version, so the index is
+    /// built once, after the population is final (init / set_individuals
+    /// invalidate it).
+    void build_spatial_index(double target_bin_m);
+    bool has_spatial_index() const { return !bin_begin_.empty(); }
+
+    /// The person closest to the segment (x0,y0)->(x1,y1) among those within
+    /// `radius` of it (x0==x1, y0==y1 gives a point query). Distances are
+    /// to the segment, not to its end point (plan §4: "d_min of the swept
+    /// segment"). Returns false when nobody is within `radius`.
+    bool nearest_to_segment(double x0, double y0, double x1, double y1,
+                            double radius, SegmentHit& hit) const;
 
     // Grid properties
     int32_t h() const { return h_; }
     int32_t w() const { return w_; }
     int64_t total_cells() const { return static_cast<int64_t>(h_) * static_cast<int64_t>(w_); }
+    double  cell_m() const { return cell_m_; }
 
-    // Compartment accessors (row-major, size h*w)
+    // Individuals
+    const HumanSoA& people() const { return soa_; }
+    int64_t n_people() const { return static_cast<int64_t>(soa_.size()); }
+    /// First person index of cell `cell` (valid for cell in [0, total_cells()]).
+    int64_t cell_begin(int64_t cell) const { return cell_begin_[static_cast<size_t>(cell)]; }
+
+    // Derived per-cell statistics (row-major, size h*w)
     const std::vector<double>& susceptible() const { return susceptible_; }
     const std::vector<double>& exposed()     const { return exposed_; }
     const std::vector<double>& infectious()  const { return infectious_; }
@@ -106,7 +209,7 @@ public:
     double prev_at(int32_t r, int32_t c) const { return daily_prevalence_[r * w_ + c]; }
     double inc_at(int32_t r, int32_t c) const { return daily_incidence_[r * w_ + c]; }
 
-    // Grid-wide summary statistics
+    // Grid-wide summary statistics (derived from the per-cell statistics)
     HumanCompartmentStats compute_stats() const;
 
     // Parameters
@@ -115,34 +218,46 @@ public:
     int32_t immunity_days()   const { return immunity_days_; }
     bool    immunity_enabled() const { return immunity_enabled_; }
 
-    // Validate conservation invariants. Returns true if valid, throws if strict=true.
+    /// Recount S/E/I/R per cell from the individuals and compare them with
+    /// the derived statistics; also checks ids, positions and timers. Returns
+    /// true if valid, throws if strict=true.
     bool validate_invariants(bool strict = true) const;
 
 private:
+    // Build the cell index (cell_begin_) and the per-cell statistics from soa_.
+    void rebuild_cell_index_();
+    // Move person `i` to `to`, keeping the per-cell statistics in step.
+    void set_state_(size_t i, HumanState to, int32_t timer);
+    void refresh_prevalence_(size_t cell);
+    // First `n` susceptible people of `cell` become INFECTIOUS (age zero).
+    int64_t infect_first_susceptibles_(size_t cell, int64_t n);
+
     int32_t h_ = 0;
     int32_t w_ = 0;
+    double  cell_m_ = 1000.0;
 
     int32_t incubation_days_ = 12;
     int32_t infectious_days_ = 20;
     int32_t immunity_days_   = 180;
     bool    immunity_enabled_ = false;
 
-    // Per-cell compartments
+    HumanSoA soa_;
+    std::vector<int64_t> cell_begin_;   // size h*w + 1
+
+    // Spatial index (see build_spatial_index): bins sorted CSR-style.
+    double bin_m_ = 0.0;
+    int32_t nbx_ = 0, nby_ = 0;
+    std::vector<int64_t> bin_begin_;    // nbx*nby + 1
+    std::vector<uint32_t> bin_people_;  // person indices grouped by bin
+
+    // Derived per-cell statistics
     std::vector<double> susceptible_;
     std::vector<double> exposed_;
     std::vector<double> infectious_;
     std::vector<double> recovered_;
     std::vector<double> population_;
-
-    // Daily per-cell outputs
     std::vector<double> daily_incidence_;   // count of new E_H today
     std::vector<double> daily_prevalence_;  // I_H / population
-
-    // Discrete age cohort queues: flat arrays of shape [total_cells * duration]
-    // Entry at cell c, age a is at: c * duration + a
-    std::vector<double> exposed_cohorts_;    // size = total_cells * incubation_days_
-    std::vector<double> infectious_cohorts_; // size = total_cells * infectious_days_
-    std::vector<double> recovered_cohorts_;  // size = total_cells * immunity_days_
 };
 
 }  // namespace mal_abm_fast

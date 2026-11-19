@@ -49,7 +49,6 @@ EXPECTED_GATES = (
     "G7_determinism",
     "G10_perf",
     "G12_host_input",
-    "G14_mobility",
     "G24_urban_ratio",
 )
 
@@ -58,12 +57,12 @@ EXPECTED_GATES = (
 # INV-5 / INV-6: the scorer suite layout and the stable ID set
 # ---------------------------------------------------------------------------
 
-def test_registry_has_exactly_the_13_composite_dims_and_6_gates():
+def test_registry_has_exactly_the_13_composite_dims_and_5_gates():
     reg = build_registry()
     dims = sorted(n for n, s in reg.items() if s.kind == "composite")
     gates = sorted(n for n, s in reg.items() if s.kind == "gate")
     assert len(dims) == 13, dims
-    assert len(gates) == 6, gates
+    assert len(gates) == 5, gates
     assert set(dims) == set(COMPOSITE_WEIGHTS)
     assert set(gates) == set(EXPECTED_GATES)
 
@@ -75,7 +74,7 @@ def test_scorer_id_set_is_stable():
     assert ids == {
         "D1", "D2", "D3", "D4", "D5", "D8", "D11", "D15", "D16", "D19",
         "D20", "D21", "D25",
-        "G6", "G7", "G10", "G12", "G14", "G24",
+        "G6", "G7", "G10", "G12", "G24",
     }
 
 

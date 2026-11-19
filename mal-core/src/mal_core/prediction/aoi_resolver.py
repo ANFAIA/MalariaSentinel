@@ -54,9 +54,6 @@ class AOIFiles:
             "env": "--env",
             "habitat": "--habitat",
             "host_static": "--hosts",
-            "mobility_day": "--human-mobility-day",
-            "mobility_night": "--human-mobility-night",
-            "livestock_mobility": "--livestock-mobility",
         }
         for ds_name, flag in mapping.items():
             files = self.get_files(ds_name)

@@ -41,10 +41,6 @@ TEST(Species, ColuzziiDefaultsComeFromYaml) {
     const auto cfg = parse_config_file(resolve_config_path());
     const auto& row = cfg.species.rows.at("coluzzii");
     EXPECT_GT(sp.pref_human, 0.9f);
-    EXPECT_FLOAT_EQ(sp.host_seeking_scale_m,
-                    static_cast<float>(row.host_seeking_scale_m));
-    EXPECT_FLOAT_EQ(sp.host_seeking_radius_m,
-                    static_cast<float>(row.host_seeking_radius_m));
     EXPECT_FLOAT_EQ(sp.gonotrophic_days,
                     static_cast<float>(cfg.gonotrophic.cycle_duration_days));
 }

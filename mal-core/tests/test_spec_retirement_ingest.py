@@ -212,57 +212,6 @@ def test_host_manifest_declares_the_nine_host_variables():
 
 
 # ---------------------------------------------------------------------------
-# INV-15 / INV-16: the mobility CSRs
-# ---------------------------------------------------------------------------
-
-def _host_static_nc(path, h=4, w=4):
-    from mal_commonlib.data.host_utils import build_host_static_nc
-    from rasterio.transform import from_bounds
-
-    grid_spec = {
-        "crs": "EPSG:4326",
-        "transform": from_bounds(0, 0, 1, 1, h, w),
-        "height": h,
-        "width": w,
-    }
-    ones = np.ones((h, w), dtype=np.float32)
-    build_host_static_nc(
-        human=ones, cattle=ones, goats=ones, sheep=ones,
-        urban_class=np.full((h, w), 50, dtype=np.int32),
-        output_path=path, grid_spec=grid_spec,
-    )
-
-
-def test_mobility_writes_the_three_csr_files_with_the_gravity_parameters(tmp_path):
-    from mal_core.ingest.mobility import build_mobility_dataset
-
-    hosts = tmp_path / "tiny_host_static.nc"
-    _host_static_nc(hosts)
-    out = tmp_path / "mobility"
-    result = build_mobility_dataset(hosts, output_dir=out, aoi_slug="tiny")
-
-    for name in ("tiny_mobility_day.csr", "tiny_mobility_night.csr",
-                 "tiny_livestock_mobility.csr"):
-        assert (out / name).exists(), f"{name} was not written"
-
-    manifest = json.loads((out / "mobility_manifest.json").read_text())
-    assert manifest["cell_size_km"] == 1.0
-    assert manifest["beta_day"] == 0.05
-    assert manifest["beta_night"] == 0.5
-    assert manifest["beta_livestock"] == 0.1
-    assert manifest["max_distance_km"] == 50.0
-    assert result["n_cells"] == 16
-
-
-def test_mobility_requires_the_host_static_file(tmp_path):
-    from mal_core.ingest.mobility import build_mobility_dataset
-
-    with pytest.raises(FileNotFoundError):
-        build_mobility_dataset(tmp_path / "missing_host_static.nc",
-                               output_dir=tmp_path / "out", aoi_slug="tiny")
-
-
-# ---------------------------------------------------------------------------
 # INV-17: ingest never downloads
 # ---------------------------------------------------------------------------
 

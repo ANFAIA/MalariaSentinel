@@ -191,18 +191,6 @@ def run_abm_from_manifest(
     wind_path = resolve(
         aoi, "wind", year=year, data_dir=data_dir, data_root=data_root
     )  # era5 manifest key ("wind" = wind_6hourly output)
-    mobility_day_path = resolve(
-        aoi, INGEST_ARTIFACTS["mobility_day"].key, data_dir=data_dir,
-        data_root=data_root,
-    )
-    mobility_night_path = resolve(
-        aoi, INGEST_ARTIFACTS["mobility_night"].key, data_dir=data_dir,
-        data_root=data_root,
-    )
-    livestock_mobility_path = resolve(
-        aoi, INGEST_ARTIFACTS["livestock_mobility"].key, data_dir=data_dir,
-        data_root=data_root,
-    )
 
     if not env_path:
         raise FileNotFoundError(
@@ -256,12 +244,6 @@ def run_abm_from_manifest(
 
     if hosts_path:
         flags["hosts"] = hosts_path
-    if mobility_day_path:
-        flags["human_mobility_day"] = mobility_day_path
-    if mobility_night_path:
-        flags["human_mobility_night"] = mobility_night_path
-    if livestock_mobility_path:
-        flags["livestock_mobility"] = livestock_mobility_path
     if wind_path:
         flags["wind_field"] = wind_path
     if scenario_path is not None:

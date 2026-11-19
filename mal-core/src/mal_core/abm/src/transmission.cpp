@@ -54,16 +54,14 @@ void TransmissionModel::init(
     int32_t h, int32_t w,
     const std::vector<float>& human_density,
     const TransmissionParams& params,
-    uint64_t seed)
+    uint64_t seed,
+    double cell_m)
 {
     h_ = h;
     w_ = w;
     params_ = params;
     rng_ = Prng(seed);
 
-    const int64_t n_cells = static_cast<int64_t>(h_) * static_cast<int64_t>(w_);
-    lambda_h_.assign(static_cast<size_t>(n_cells), 0.0);
-    infectious_pressure_.assign(static_cast<size_t>(n_cells), 0.0f);
     history_.clear();
     last_day_stats_ = TransmissionDailyStats{};
     initial_vector_infected_ = 0;
@@ -79,7 +77,9 @@ void TransmissionModel::init(
         params_.human_infectious_days,
         params_.immunity_duration_days,
         params_.immunity_enabled,
-        init_prev);
+        init_prev,
+        cell_m,
+        derive_substream_seed(seed, "human_positions"));
 
 }
 
@@ -160,7 +160,7 @@ void TransmissionModel::check_and_trigger_outbreak(
 
     // A human cell is a viable focus when adult vectors are present in
     // the cell OR in its 8-neighbourhood. The biting kernel detects and
-    // bites hosts up to species host_seeking_radius_m away, so requiring
+    // bites hosts up to the cascade finds it, so requiring
     // same-cell presence is inconsistent with the contact process: it
     // rejects the cells where transmission can actually start and waits
     // until random dispersal drops a single mosquito into the settlement.
@@ -444,39 +444,52 @@ void TransmissionModel::advance_vector_eip(
 }
 
 void TransmissionModel::advance_human_transmission(
-    const BiteLedger& bite_ledger,
+    BiteLedger& bite_ledger,
     const AOI& aoi)
 {
     (void)aoi;
-    const int64_t n_cells = static_cast<int64_t>(h_) * static_cast<int64_t>(w_);
-    std::fill(lambda_h_.begin(), lambda_h_.end(), 0.0);
-    std::fill(infectious_pressure_.begin(), infectious_pressure_.end(), 0.0f);
 
-    // Aggregate infectious bites on humans from BiteLedger
+    // 1. Timers only (E -> I -> R -> S): no infection probability per cell.
+    human_grid_.advance_day();
+
+    // 2. Infection vector -> human happens only at the bite, on one person.
+    const double beta_vh = static_cast<double>(params_.beta_vh);
+    // 2a. Bites that identify the person (the cascade): exactly that person.
+    std::vector<int64_t> covered(static_cast<size_t>(h_) * static_cast<size_t>(w_), 0);
+    for (auto& ev : bite_ledger.events_today_mutable()) {
+        if (ev.host != HostType::HUMAN || !ev.infectious_vector || ev.person_index < 0) continue;
+        if (ev.row < 0 || ev.row >= h_ || ev.col < 0 || ev.col >= w_) continue;
+        ++covered[static_cast<size_t>(ev.row) * static_cast<size_t>(w_) + static_cast<size_t>(ev.col)];
+        if (rng_.uniform_double() < beta_vh && human_grid_.expose(ev.person_index)) {
+            ev.new_infection = true;
+        }
+    }
+    // 2b. Infectious bites with no identified person (legacy per-cell paths):
+    //     a uniform person of the bitten cell.
     for (const auto& agg : bite_ledger.today()) {
         if (agg.host != HostType::HUMAN) continue;
         if (agg.row < 0 || agg.row >= h_ || agg.col < 0 || agg.col >= w_) continue;
-
-        const size_t idx = static_cast<size_t>(agg.row * w_ + agg.col);
-        infectious_pressure_[idx] += static_cast<float>(agg.infectious_meals);
-    }
-
-    // Compute force of infection lambda_H(x) = 1 - exp(- beta_vh * I_bites(x) / H(x))
-    for (int64_t c = 0; c < n_cells; ++c) {
-        const size_t idx = static_cast<size_t>(c);
-        const double pop = human_grid_.population()[idx];
-        const double i_bites = static_cast<double>(infectious_pressure_[idx]);
-
-        if (pop > 0.0 && i_bites > 0.0) {
-            const double exponent = -static_cast<double>(params_.beta_vh) * (i_bites / pop);
-            const double lambda = 1.0 - std::exp(exponent);
-            lambda_h_[idx] = std::clamp(lambda, 0.0, 1.0);
-        } else {
-            lambda_h_[idx] = 0.0;
+        const int64_t rest = agg.infectious_meals -
+            covered[static_cast<size_t>(agg.row) * static_cast<size_t>(w_) + static_cast<size_t>(agg.col)];
+        for (int64_t k = 0; k < rest; ++k) {
+            const int64_t person = human_grid_.pick_person(agg.row, agg.col, rng_);
+            if (person < 0) break;                       // empty cell: nobody to infect
+            if (rng_.uniform_double() < beta_vh) human_grid_.expose(person);
         }
     }
+}
 
-    human_grid_.advance_day(lambda_h_, rng_);
+std::vector<float> TransmissionModel::infectious_pressure_from_ledger(
+    const BiteLedger& bite_ledger, int32_t h, int32_t w)
+{
+    std::vector<float> out(static_cast<size_t>(h) * static_cast<size_t>(w), 0.0f);
+    for (const auto& agg : bite_ledger.today()) {
+        if (agg.host != HostType::HUMAN) continue;
+        if (agg.row < 0 || agg.row >= h || agg.col < 0 || agg.col >= w) continue;
+        out[static_cast<size_t>(agg.row) * static_cast<size_t>(w) +
+            static_cast<size_t>(agg.col)] += static_cast<float>(agg.infectious_meals);
+    }
+    return out;
 }
 
 void TransmissionModel::record_daily_stats(

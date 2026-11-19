@@ -106,28 +106,6 @@ def test_the_host_manifest_companion_is_written(tmp_path):
 
 
 # ---------------------------------------------------------------------------
-# INV-9: the CSR binary layout (C++ SparseOD::load_from_csr)
-# ---------------------------------------------------------------------------
-
-def test_the_csr_binary_layout_matches_the_cpp_reader(tmp_path):
-    from mal_commonlib.data.mobility import build_gravity_od, write_csr
-
-    grid = np.arange(16, dtype=np.float32).reshape(4, 4) + 1.0
-    row_ptr, col_idx, values, n_rows, n_cols = build_gravity_od(grid, 1.0, 0.5)
-    path = write_csr(row_ptr, col_idx, values, n_rows, n_cols,
-                     tmp_path / "mobility.csr")
-    raw = path.read_bytes()
-    n_rows_r = np.frombuffer(raw, dtype="<i4", count=1, offset=0)[0]
-    n_cols_r = np.frombuffer(raw, dtype="<i4", count=1, offset=4)[0]
-    nnz = np.frombuffer(raw, dtype="<i4", count=1, offset=8)[0]
-    assert n_rows_r == n_rows
-    assert n_cols_r == n_cols
-    assert nnz == col_idx.shape[0]
-    # [int32 x (n_rows+1)] row_ptr, then [int32 x nnz] col_idx, then float32 values
-    assert len(raw) == 12 + 4 * (n_rows + 1) + 4 * nnz + 4 * nnz
-
-
-# ---------------------------------------------------------------------------
 # The AOI JSON payload
 # ---------------------------------------------------------------------------
 

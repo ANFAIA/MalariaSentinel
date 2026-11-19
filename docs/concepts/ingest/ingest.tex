@@ -13,8 +13,8 @@ read} \author{MalariaSentinel conceptual documentation} \date{}
 \begin{abstract} \noindent The \emph{ingest} stage is the transform layer of the MalariaSentinel
 pipeline. It takes raw, downloaded, provider-native layers --- rainfall, air temperature,
 permanent-surface water, land cover, a coastline, and a family of host-density layers --- and
-turns them into the four artefacts the C++ simulation engine consumes: a daily environment
-NetCDF, a static habitat-patch GeoPackage, a static host grid, and three mobility operators. It
+turns them into the three artefacts the C++ simulation engine consumes: a daily environment
+NetCDF, a static habitat-patch GeoPackage and a static host grid. It
 does not fetch data on the environment path, it does not simulate, and it does not score. This
 document explains what the stage computes, in what order, on which grid, and what its numbers
 mean and do not mean. Every constant quoted here is generated from the shared constants file or
@@ -47,10 +47,9 @@ livestock are, and how each of those two populations moves between cells.
 The \emph{ingest} stage answers exactly that question, on the AOI's own grid, and nothing wider.
 It is a transform with a fixed output contract: given an area of interest and the raw products
 registered for it, it emits a self-describing set of files on disk and registers them in the
-central manifest. The three public builders are \code{build\_env\_tensor} (the daily environment
-NetCDF and the habitat GeoPackage), \code{build\_host\_dataset} (the static host grid) and
-\code{build\_mobility\_dataset} (the three origin--destination operators)
-\src{mal-core/src/mal\_core/ingest/\_\_init\_\_.py:1--10}.
+central manifest. The two public builders are \code{build\_env\_tensor} (the daily environment
+NetCDF and the habitat GeoPackage) and \code{build\_host\_dataset} (the static host grid)
+\src{mal-core/src/mal\_core/ingest/\_\_init\_\_.py}.
 
 \subsection{What would count as the stage having answered it}
 
@@ -64,8 +63,6 @@ and enumerates the candidate cells with their per-type potential and their grid 
 (\S\ref{sec:gpkg}); 
 \item the host grid exists with one plane per host layer, all on the same
 grid (\S\ref{sec:hosts}); 
-\item the mobility operators exist and are row-stochastic
-(\S\ref{sec:mobility}); 
 \item every one of those artefacts is registered in the AOI manifest
 under its own key (\S\ref{sec:manifest}).
 \end{enumerate}
@@ -77,7 +74,7 @@ elsewhere.
 
 \begin{itemize}
 \item \textbf{It is not the download stage.} The environment path fetches nothing: it resolves
-already-downloaded files through the manifest (\S\ref{sec:envinputs}). The host and mobility
+already-downloaded files through the manifest (\S\ref{sec:envinputs}). The host
 path \emph{does} fetch, through the provider loaders it calls directly
 (\S\ref{sec:hostdownloads}) --- an asymmetry the stage does not hide. 
 \item \textbf{It is not
@@ -126,10 +123,9 @@ The stage is reached in two ways.
 \item[The command line.] \code{malariasim ingest} is a subcommand with the options \code{--aoi},
 \code{--year}, \code{--month}, \code{--output-dir}, \code{--data-dir} and \code{--what}
 \src{mal-core/src/mal\_core/cli.py:198--206}. The switch \code{--what} selects which of the
-three builders runs; \code{all} is the default \src{mal-core/src/mal\_core/cli.py:196--239}.
-\item[Python.] The three builders are importable and independent
-\src{mal-core/src/mal\_core/ingest/\_\_init\_\_.py:1--10}. The only dependency between them is
-that the mobility builder reads the host grid the host builder wrote (\S\ref{sec:mobility}).
+two builders runs; \code{all} is the default \src{mal-core/src/mal\_core/cli.py:196--239}.
+\item[Python.] The two builders are importable and independent
+\src{mal-core/src/mal\_core/ingest/\_\_init\_\_.py}.
 \end{description}
 
 \subsection{Artefacts and their manifest keys}
@@ -149,12 +145,7 @@ Manifest key & Producer & On-disk name & Format & Required for the engine \\
 yes \\ \code{habitat} & \code{build\_env\_tensor} & \code{<aoi>\_habitat\_patches.gpkg} &
 GeoPackage & yes \\ \code{host\_static} & \code{build\_host\_dataset} &
 \code{<aoi>\_host\_static.nc} & NetCDF & yes \\ \code{host\_manifest} &
-\code{build\_host\_dataset} & \code{host\_manifest.json} & JSON & no \\ \code{mobility\_day} &
-\code{build\_mobility\_dataset} & \code{<aoi>\_mobility\_day.csr} & CSR binary & yes \\
-\code{mobility\_night} & \code{build\_mobility\_dataset} & \code{<aoi>\_mobility\_night.csr} &
-CSR binary & yes \\ \code{livestock\_mobility} & \code{build\_mobility\_dataset} &
-\code{<aoi>\_livestock\_mobility.csr} & CSR binary & yes \\ \code{mobility\_manifest} &
-\code{build\_mobility\_dataset} & \code{mobility\_manifest.json} & JSON & no \\
+\code{build\_host\_dataset} & \code{host\_manifest.json} & JSON & no \\
 \bottomrule
 \end{longtable}
 \end{center}
@@ -167,19 +158,17 @@ declaration \src{mal-core/src/mal\_core/download/catalog.py:55--92}. It is worth
 \src{mal-core/src/mal\_core/ingest/env.py:174--187}, and the manifest writer therefore stores
 the default \code{False} \src{mal-core/src/mal\_core/download/manifest.py:118--189}. The
 verified manifest for Ghana shows \code{required\_for\_abm: false} on both entries while the
-host grid and the mobility operators carry \code{true}. The completeness check the engine
+host grid carries \code{true}. The completeness check the engine
 performs before it runs (\S\ref{sec:seam}) therefore does not police the environment artefacts
 on this flag.
 
 \subsection{Where the CLI puts things, and where the manifest says they are}
 
-The CLI's defaults for the three builders are not mutually consistent, and the inconsistency is
+The CLI's defaults for the two builders are not mutually consistent, and the inconsistency is
 observable rather than theoretical. The environment builder is called with the output directory
 serving as \emph{both} input directory and output directory, and with the data root taken as the
 parent of that directory \src{mal-core/src/mal\_core/cli.py:221--222}. The host builder is
-called with the output directory only \src{mal-core/src/mal\_core/cli.py:225}. The mobility
-builder is called with its output hard-wired to the conventional \code{data/<aoi>} directory
-\src{mal-core/src/mal\_core/cli.py:233}. Meanwhile the host builder registers its artefact with
+called with the output directory only \src{mal-core/src/mal\_core/cli.py:225}. Meanwhile the host builder registers its artefact with
 the default data root, not with the directory it wrote to
 \src{mal-core/src/mal\_core/ingest/hosts.py:219--240}.
 
@@ -337,8 +326,7 @@ optional slot yields \code{None}, and the corresponding behaviour is skipped.
 The environment builder declares an optional dependency on the host grid
 \src{mal-core/src/mal\_core/ingest/daily\_nc.py:96}, and then never reads it: the resolved value
 is not referenced anywhere in the builder body
-\src{mal-core/src/mal\_core/ingest/daily\_nc.py:186--260}. Its only real consumer is the
-mobility builder, which reads the host grid as a file (\S\ref{sec:mobility}). The declaration is
+\src{mal-core/src/mal\_core/ingest/daily\_nc.py:186--260}. The declaration is
 a dead dependency, recorded here rather than hidden (\S\ref{sec:open} question 12).
 
 \subsection{What each input is, natively, and what the reduction costs}
@@ -390,7 +378,7 @@ reprojected onto the environment grid, one month at a time, with a bilinear resa
 \src{mal-core/src/mal\_core/ingest/daily\_nc.py:550--578}. Everything else arrives already on
 the AOI grid.
 
-\subsection{The host and mobility path downloads} \label{sec:hostdownloads}
+\subsection{The host path downloads} \label{sec:hostdownloads}
 
 The host builder does not go through the manifest. It calls the provider loaders directly:
 WorldPop population \src{mal-core/src/mal\_core/ingest/hosts.py:74}, GLW4 livestock
@@ -1095,83 +1083,6 @@ The two builder flags make the same substitutions deliberately: skipping the bui
 uses the urban heuristic \src{mal-core/src/mal\_core/ingest/hosts.py:141}, and skipping the
 wildlife layer uses the constant \src{mal-core/src/mal\_core/ingest/hosts.py:164}.
 
-\section{Mobility operators} \label{sec:mobility}
-
-\subsection{The model}
-
-The mobility builder reads the host grid back from disk and builds three row-stochastic
-origin--destination operators on a gravity model
-\src{mal-core/src/mal\_core/ingest/mobility.py:37--74}. For an origin cell $i$ and a destination
-cell $j$,
-
-\begin{equation}
-P(i \to j) \;\propto\; H(j)\, \exp\!\left(-\beta\, d(i,j)\right),
-\end{equation}
-
-\noindent where $H$ is the destination's attractiveness, $d$ the distance between cell centres
-in kilometres, and $\beta$ the friction parameter. Rows are normalised to sum to one, entries
-below a sparsity threshold are dropped, and the kept entries are renormalised
-\src{mal-commonlib/src/mal\_commonlib/data/mobility.py:21--60}. A row with no surviving entry is
-given a self-loop of one, so nobody has nowhere to go
-\src{mal-commonlib/src/mal\_commonlib/data/mobility.py:100--120}.
-
-Human attractiveness is the human population, with the NoData sentinel mapped to zero
-\src{mal-core/src/mal\_core/ingest/mobility.py:75--78}. Livestock attractiveness is the sum of
-the five livestock planes, again with the sentinel mapped to zero
-\src{mal-core/src/mal\_core/ingest/mobility.py:81--89}.
-
-\subsection{The three operators and their parameters}
-
-\begin{center}
-\small
-\begin{longtable}{@{}p{3.6cm}p{3.0cm}p{3.0cm}p{5.0cm}@{}}
-\toprule
-Operator & Attractiveness & Friction & Cutoff \\
-\midrule
-\endhead
-\code{<aoi>\_mobility\_day.csr} & human population & $\beta_{\text{day}}$
-  & \code{max\_distance\_km} \\
-\code{<aoi>\_mobility\_night.csr} & human population & $\beta_{\text{night}}$
-  & \code{max\_distance\_km} \\
-\code{<aoi>\_livestock\_mobility.csr} & sum of the five livestock planes
-  & $\beta_{\text{livestock}}$ & \code{max\_distance\_km} \\
-\end{longtable}
-\end{center}
-
-\smallskip \noindent The six parameters are \code{cell\_size\_km}, \code{beta\_day},
-\code{beta\_night}, \code{beta\_livestock}, \code{max\_distance\_km} and
-\code{sparsity\_threshold}, and they are \emph{defaults in the function signature}, not
-constants-file keys \src{mal-core/src/mal\_core/ingest/mobility.py:37--48}. Their values are
-quoted through the generated code-constant macros, which read the signature itself:
-\codeconst{ingest.mobility_cell_size_km} km for the cell size,
-\codeconst{ingest.mobility_beta_day} for the daytime friction,
-\codeconst{ingest.mobility_beta_night} for the night-time friction,
-\codeconst{ingest.mobility_beta_livestock} for the livestock friction,
-\codeconst{ingest.mobility_max_distance_km} km for the distance cutoff and
-\codeconst{ingest.mobility_sparsity_threshold} for the sparsity threshold. The three friction
-parameters are a named choice: a higher value keeps a population closer to home, and the
-daytime value is an order of magnitude smaller than the night-time value, which is the intended
-diurnal pattern.
-
-The hard distance cutoff is implemented as a disk of candidate offsets around each origin
-\src{mal-commonlib/src/mal\_commonlib/data/mobility.py:70--80}, so no pair beyond the cutoff can
-ever receive probability. The matrices are built and written one at a time so that peak memory
-stays at roughly one matrix \src{mal-core/src/mal\_core/ingest/mobility.py:84--102}.
-
-\subsection{The identity fallback}
-
-If the AOI has no livestock at all --- the summed livestock planes are zero --- the livestock
-operator degenerates to the identity \src{mal-core/src/mal\_core/ingest/mobility.py:108--118}.
-The file is still written and still registered, so the engine's optional flag can be set without
-a special case.
-
-\subsection{The companion manifest}
-
-A JSON file records the grid dimensions, the cell size, all six parameters, the number of
-non-zeros per file, the human and livestock totals and the build time
-\src{mal-core/src/mal\_core/ingest/mobility.py:121--138}. It is a record of how the operators
-were made, not a contract.
-
 \section{Manifest integration} \label{sec:manifest}
 
 \subsection{How the stage writes to the manifest}
@@ -1185,11 +1096,10 @@ optional period, a \code{+}-joined compound licence identifier and a literal att
 \code{expected\_files} list is rebuilt from scratch on every write, as the union of every
 declared file of every entry \src{mal-core/src/mal\_core/download/manifest.py:181--184}.
 
-There are eight registrations: two from the environment builder
+There are four registrations: two from the environment builder
 \src{mal-core/src/mal\_core/ingest/env.py:147--162},
-\src{mal-core/src/mal\_core/ingest/env.py:174--187}, two from the host builder
-\src{mal-core/src/mal\_core/ingest/hosts.py:219--240}, and four from the mobility builder
-\src{mal-core/src/mal\_core/ingest/mobility.py:141--161}.
+\src{mal-core/src/mal\_core/ingest/env.py:174--187} and two from the host builder
+\src{mal-core/src/mal\_core/ingest/hosts.py:219--240}.
 
 \subsection{The year key, and what it means for a multi-year file}
 
@@ -1235,9 +1145,9 @@ names are not advertised (\S\ref{sec:open} question 5).
 \subsection{What the engine resolves}
 
 Before running, the wrapper requires that every file declared in the manifest exists
-\src{mal-core/src/mal\_core/abm/wrapper.py:112--121}. It then resolves seven paths: the
-environment NetCDF with a year, the habitat GeoPackage, the host grid, the wind field, and the
-three mobility operators \src{mal-core/src/mal\_core/abm/wrapper.py:137--165}. The wind field is
+\src{mal-core/src/mal\_core/abm/wrapper.py:112--121}. It then resolves four paths: the
+environment NetCDF with a year, the habitat GeoPackage, the host grid and the wind field
+\src{mal-core/src/mal\_core/abm/wrapper.py}. The wind field is
 \emph{not} produced by this stage --- it comes from the download stage directly
 \src{mal-core/src/mal\_core/abm/wrapper.py:149--152}. The environment NetCDF and the habitat
 GeoPackage are the only two hard requirements; the rest are passed to the engine as flags when
@@ -1498,10 +1408,6 @@ is re-indexed by day, not by position} (\S\ref{sec:channels}).
 averaged over a year axis} when the source file has one (\S\ref{sec:statics}). 
 \item \textbf{The
 GeoPackage's point geometry is the cell centre}, not the cell polygon (\S\ref{sec:gpkg}). 
-\item
-\textbf{The mobility matrices are compressed sparse row} and are read by a loader that validates
-the row sums within a stated tolerance
-\src{mal-commonlib/src/mal\_commonlib/data/mobility.py:38--40}. 
 \item \textbf{The engine does
 not need the \code{hab\_<type>} columns}, so removing them from the writer would not change the
 simulation (\S\ref{sec:gpkg}).
@@ -1545,8 +1451,8 @@ absence of any coordinate reference system;
 \item the GeoPackage's feature count, column set,
 column types, the dominant-type and dynamics distributions and the amplitude range; 
 \item the
-manifest entries for the environment NetCDF, the habitat GeoPackage, the host grid and the
-mobility artefacts, including the mismatch between the habitat entry's declared variables and
+manifest entries for the environment NetCDF, the habitat GeoPackage, the host grid,
+including the mismatch between the habitat entry's declared variables and
 the file's actual columns, and the absence of the required-for-engine flag on the first two;
 \item the input files' own variable lists and attributes, including the absence of coordinate
 variables in the rainfall and temperature files and the Dynamic World class mapping recorded in

@@ -32,7 +32,6 @@
 #include <vector>
 
 #include "mal_abm_fast/aoi.hpp"
-#include "mal_abm_fast/dispersal.hpp"
 #include "mal_abm_fast/seeding.hpp"
 #include "mal_abm_fast/prng.hpp"
 #include "mal_abm_fast/aquatic_cohort_bank.hpp"
@@ -44,6 +43,7 @@
 #include "mal_abm_fast/wind_field.hpp"
 #include "mal_abm_fast/human_state.hpp"
 #include "mal_abm_fast/transmission.hpp"
+#include "mal_abm_fast/host_cascade.hpp"
 
 namespace mal_abm_fast {
 
@@ -79,12 +79,13 @@ inline void record_female_feed(
     BiteLedger& bite_ledger,
     const HumanCompartmentGrid* human_grid,
     const TransmissionParams* transmission_params,
-    Prng& rng)
+    Prng& rng,
+    int64_t person = -1)
 {
     const bool is_infectious =
         (soa.vector_state[si] == static_cast<uint8_t>(VectorTransmissionState::INFECTIOUS));
     // Epidemiological credit goes to the HOST's cell: the bite landed on
-    // a host detected up to species host_seeking_radius_m away, so both
+    // a host found by the cascade, so both
     // the infectious-meal record (vector→human pressure) and the
     // human→vector prevalence draw must use the host cell, not the
     // mosquito's resting cell.
@@ -103,7 +104,12 @@ inline void record_female_feed(
         soa.vector_state[si] == static_cast<uint8_t>(VectorTransmissionState::SUSCEPTIBLE) &&
         human_grid && transmission_params && transmission_params->enabled)
     {
-        const double prev = human_grid->prev_at(host_row, host_col);
+        // Paso 5: when the person bitten is identified, the pickup depends on
+        // THAT person (prev_h), not on the prevalence of the cell.
+        const double prev = (person >= 0)
+            ? (human_grid->people().state[static_cast<size_t>(person)] ==
+                       static_cast<uint8_t>(HumanState::INFECTIOUS) ? 1.0 : 0.0)
+            : human_grid->prev_at(host_row, host_col);
         if (dbg) {
             ++g_tdbg.human_evaluated;
             if (prev > 0.0) ++g_tdbg.human_prev_pos;
@@ -155,6 +161,9 @@ inline void swap_with_last(MosquitoSoA& soa, int64_t i, int64_t n) {
     std::swap(soa.vector_state[i],      soa.vector_state[n - 1]);
     std::swap(soa.last_patch_update_row[i], soa.last_patch_update_row[n - 1]);
     std::swap(soa.last_patch_update_col[i], soa.last_patch_update_col[n - 1]);
+    std::swap(soa.pos_x[i],             soa.pos_x[n - 1]);
+    std::swap(soa.pos_y[i],             soa.pos_y[n - 1]);
+    std::swap(soa.cascade_stage[i],     soa.cascade_stage[n - 1]);
 }
 
 // Trim every SoA vector to `new_size` (the new live range after a
@@ -183,6 +192,9 @@ inline void trim_soa(MosquitoSoA& soa, size_t new_size) {
     soa.vector_state.resize(new_size);
     soa.last_patch_update_row.resize(new_size);
     soa.last_patch_update_col.resize(new_size);
+    soa.pos_x.resize(new_size);
+    soa.pos_y.resize(new_size);
+    soa.cascade_stage.resize(new_size);
 }
 
 }  // namespace
@@ -260,6 +272,9 @@ MosquitoSubmodel::MosquitoSubmodel(int32_t n_patches,
                 static_cast<uint8_t>(VectorTransmissionState::SUSCEPTIBLE));
             soa_.last_patch_update_row.push_back(0);
             soa_.last_patch_update_col.push_back(0);
+            soa_.pos_x.push_back(std::numeric_limits<float>::quiet_NaN());
+            soa_.pos_y.push_back(std::numeric_limits<float>::quiet_NaN());
+            soa_.cascade_stage.push_back(0);
         }
         if (n_eggs > 0) {
             const int64_t n0 = n_eggs / 5;
@@ -345,6 +360,9 @@ MosquitoSubmodel::MosquitoSubmodel(int32_t n_patches,
     soa_.vector_state.reserve(cap);
     soa_.last_patch_update_row.reserve(cap);
     soa_.last_patch_update_col.reserve(cap);
+    soa_.pos_x.reserve(cap);
+    soa_.pos_y.reserve(cap);
+    soa_.cascade_stage.reserve(cap);
 
     for (const auto& inst : instructions) {
         // Contract 4.0: counts seed verbatim. The M17.4 adult cap
@@ -378,6 +396,9 @@ MosquitoSubmodel::MosquitoSubmodel(int32_t n_patches,
                 static_cast<uint8_t>(VectorTransmissionState::SUSCEPTIBLE));
             soa_.last_patch_update_row.push_back(inst.row);
             soa_.last_patch_update_col.push_back(inst.col);
+            soa_.pos_x.push_back(std::numeric_limits<float>::quiet_NaN());
+            soa_.pos_y.push_back(std::numeric_limits<float>::quiet_NaN());
+            soa_.cascade_stage.push_back(0);
         }
         // Larvae: distribute across aquatic stages with pre-set
         // development progress (age-structured seeding). This creates
@@ -455,6 +476,9 @@ void MosquitoSubmodel::seed_scenario(
                         : VectorTransmissionState::SUSCEPTIBLE));
         soa_.last_patch_update_row.push_back(c.row);
         soa_.last_patch_update_col.push_back(c.col);
+        soa_.pos_x.push_back(static_cast<float>(a.x));
+        soa_.pos_y.push_back(static_cast<float>(a.y));
+        soa_.cascade_stage.push_back(0);
     }
     for (const auto& aq : spec.aquatic) {
         const ScenarioCell c = locate(aq.x, aq.y);
@@ -544,11 +568,10 @@ void MosquitoSubmodel::advance_day(const AOI& aoi,
             }
         }
         std::fprintf(stderr,
-            "abm_tx_wiring: day=%lld eff_hosts=%d host_landscape=%d "
-            "host_seeking=%d mobility=%d n_host_seeking_start=%lld\n",
+            "abm_tx_wiring: day=%lld host_landscape=%d cascade=%d "
+            "n_host_seeking_start=%lld\n",
             static_cast<long long>(day_idx),
-            effective_hosts_ ? 1 : 0, host_landscape_ ? 1 : 0,
-            host_seeking_ ? 1 : 0, mobility_schedule_ ? 1 : 0,
+            host_landscape_ ? 1 : 0, cascade_enabled() ? 1 : 0,
             static_cast<long long>(n_hs));
     }
 
@@ -593,13 +616,21 @@ void MosquitoSubmodel::advance_day(const AOI& aoi,
                 static_cast<uint8_t>(VectorTransmissionState::SUSCEPTIBLE));
             soa_.last_patch_update_row.push_back(ev.row);
             soa_.last_patch_update_col.push_back(ev.col);
+            soa_.pos_x.push_back(std::numeric_limits<float>::quiet_NaN());
+            soa_.pos_y.push_back(std::numeric_limits<float>::quiet_NaN());
+            soa_.cascade_stage.push_back(0);
         }
         n_emerged += ev.n_adults;
         patch_daily_flux_[ev.patch_id].emerged += ev.n_adults;
     }
     soa_.n_alive = static_cast<int64_t>(soa_.uid.size());
 
+    // Adults alive after emergence: deaths of the day (starvation, windborne
+    // loss and adult mortality) are counted against this number.
+    const int64_t n_alive_after_emergence = soa_.n_alive;
+
     // -- G4: gonotrophic cycle (females only) --
+    init_positions(aoi);
     bite_ledger_.reset_day();
     int64_t n_feeding_attempts = 0;
     int64_t n_successful_feeds = 0;
@@ -619,44 +650,6 @@ void MosquitoSubmodel::advance_day(const AOI& aoi,
         advance_gonotrophic_one_day(
             g_state, g_timer, g_cycles, gonotrophic_params_);
         soa_.gonotrophic_state[si] = static_cast<uint8_t>(g_state);
-
-        // Handle HOST_APPROACH: directed flight toward detected host (Plan D).
-        if (g_state == GonotrophicState::HOST_APPROACH && host_seeking_ && host_landscape_) {
-            auto target = host_seeking_->detect_host_cell(
-                soa_.row[si], soa_.col[si], *host_landscape_, aoi,
-                load_config().host_seeking.detect_range_m);
-            if (!target) {
-                g_state = GonotrophicState::HOST_SEEKING;
-                g_timer = 0;
-                soa_.gonotrophic_state[si] = static_cast<uint8_t>(g_state);
-                soa_.gonotrophic_timer[si] = g_timer;
-            } else {
-                auto [step_r, step_c] = host_seeking_->approach_vector(
-                    soa_.row[si], soa_.col[si],
-                    target->first, target->second, aoi,
-                    static_cast<float>(load_config().host_seeking.approach_step_m));
-                // Apply step (round to nearest cell)
-                int32_t new_row = soa_.row[si] + static_cast<int32_t>(std::round(step_r));
-                int32_t new_col = soa_.col[si] + static_cast<int32_t>(std::round(step_c));
-                soa_.row[si] = new_row;
-                soa_.col[si] = new_col;
-                // Snap lon/lat to new cell centre
-                const int32_t w = aoi.cells_per_side();
-                const int32_t h = cells_per_side_h(aoi);
-                const double cellW = (aoi.east - aoi.west) / static_cast<double>(w);
-                const double cellH = (aoi.north - aoi.south) / static_cast<double>(h);
-                soa_.lon[si] = static_cast<float>(aoi.west + (static_cast<double>(new_col) + 0.5) * cellW);
-                soa_.lat[si] = static_cast<float>(aoi.north - (static_cast<double>(new_row) + 0.5) * cellH);
-                // Check if arrived at host cell
-                if (new_row == target->first && new_col == target->second) {
-                    g_state = GonotrophicState::HOST_SEEKING;
-                    g_timer = 0;
-                    soa_.gonotrophic_state[si] = static_cast<uint8_t>(g_state);
-                    soa_.gonotrophic_timer[si] = g_timer;
-                    // Will feed in the HOST_SEEKING block below
-                }
-            }
-        }
 
         // Starvation timer for HOST_SEEKING (Plan D).
         if (g_state == GonotrophicState::HOST_SEEKING) {
@@ -695,6 +688,11 @@ void MosquitoSubmodel::advance_day(const AOI& aoi,
                     const double cellH = (aoi.north - aoi.south) / static_cast<double>(h);
                     soa_.lon[si] = static_cast<float>(aoi.west + (static_cast<double>(new_col) + 0.5) * cellW);
                     soa_.lat[si] = static_cast<float>(aoi.north - (static_cast<double>(new_row) + 0.5) * cellH);
+                    {   // the oviposition walk moved her: keep the metric position in step
+                        const XY xy = lonlat_to_xy(aoi, soa_.lon[si], soa_.lat[si]);
+                        soa_.pos_x[si] = static_cast<float>(xy.x);
+                        soa_.pos_y[si] = static_cast<float>(xy.y);
+                    }
                     g_timer += 1;
                     soa_.gonotrophic_timer[si] = g_timer;
                     // Check if arrived at a viable site.
@@ -775,144 +773,15 @@ void MosquitoSubmodel::advance_day(const AOI& aoi,
             n_ovipositions += eggs;
         }
 
-        // Nightly host-seeking: attempt feeding if HOST_SEEKING.
-        // M7.8 F4: when an effective-host landscape is wired, the actual
-        // phase-aware feeding is handled AFTER this loop in a dedicated pass
-        // that builds each H_eff(d,p) once and shares it across all
-        // HOST_SEEKING females. Here we only run the single-phase residential
-        // fallback (used when mobility is absent).
-        if (g_state == GonotrophicState::HOST_SEEKING) {
-            const bool phase_aware =
-                (effective_hosts_ && host_landscape_ && host_seeking_);
-            if (!phase_aware) {
-                n_feeding_attempts++;
-                if (host_landscape_ && host_seeking_) {
-                    // Use spatial host-seeking model with real host landscape.
-                    auto attractions = host_seeking_->compute_attraction(
-                        soa_.row[si], soa_.col[si], *host_landscape_, aoi);
-                    const HostAttraction* picked =
-                        host_seeking_->select_host_entry(attractions, rng_);
-                    const HostType host = picked
-                        ? picked->primary_host : HostType::HUMAN;
-                    bite_ledger_.record_attempt(
-                        soa_.row[si], soa_.col[si], host);
-                    // Check if any hosts are present (attraction field non-empty).
-                    if (picked != nullptr) {
-                        g_state = GonotrophicState::BLOOD_FED;
-                        g_timer = 0;
-                        soa_.gonotrophic_state[si] = static_cast<uint8_t>(g_state);
-                        soa_.gonotrophic_timer[si] = g_timer;
-                        soa_.feeding_success[si] = 1.0f;
-                        n_successful_feeds++;
-                        record_female_feed(
-                            si, soa_, host, picked->row, picked->col,
-                            bite_ledger_,
-                            human_grid_, transmission_params_, rng_);
-                    }
-                } else {
-                    // Fallback: deterministic feeding with default host (HUMAN).
-                    bite_ledger_.record_attempt(
-                        soa_.row[si], soa_.col[si], HostType::HUMAN);
-                    g_state = GonotrophicState::BLOOD_FED;
-                    g_timer = 0;
-                    soa_.gonotrophic_state[si] = static_cast<uint8_t>(g_state);
-                    soa_.gonotrophic_timer[si] = g_timer;
-                    soa_.feeding_success[si] = 1.0f;
-                    n_successful_feeds++;
-                    record_female_feed(
-                        si, soa_, HostType::HUMAN,
-                        soa_.row[si], soa_.col[si],
-                        bite_ledger_,
-                        human_grid_, transmission_params_, rng_);
-                }
-            }
-            // When phase_aware, feeding happens in the post-loop pass below;
-            // leave g_state == HOST_SEEKING here.
-        }
     }
 
-    // -- M7.8 F4: phase-aware host-seeking pass ------------------------------
-    // Build H_eff(d,p) ONCE per (day, phase) and share it across all
-    // HOST_SEEKING females (plan §3.3: one realization per day+phase).
-    // A female feeds in the first active phase where hosts are detected.
-    int64_t n_phase_hs = 0;
-    int64_t n_phase_moved = 0;
-    if (effective_hosts_ && host_landscape_ && host_seeking_) {
-        const int32_t h = cells_per_side_h(aoi);
-        const int32_t w = aoi.cells_per_side();
-        // Fresh diagnostic snapshot each day the phase-aware pass runs.
-        eff_phase_snapshot_ = EffectivePhaseSnapshot{};
-        for (int p = 0; p < PHASE_WEIGHT_COUNT; ++p) {
-            const TimePhase phase = static_cast<TimePhase>(p);
-            if (!phase_active(species_params_, phase)) continue;
-
-            const EffectiveGrid eff_grid_human =
-                effective_hosts_->sample_effective_hosts(
-                    day_idx, phase, /*is_livestock=*/false, rng_);
-            const EffectiveGrid eff_grid_livestock =
-                effective_hosts_->sample_effective_hosts(
-                    day_idx, phase, /*is_livestock=*/true, rng_);
-            const HostLandscape eff =
-                HostLandscape::make_effective(
-                    *host_landscape_, eff_grid_human, eff_grid_livestock, h, w);
-            // Diagnostic copy of the realized grids (plan 05 §7): a pure copy
-            // of the already-sampled vectors, zero RNG impact.
-            eff_phase_snapshot_.human[static_cast<size_t>(p)] = eff_grid_human;
-            eff_phase_snapshot_.livestock[static_cast<size_t>(p)] =
-                eff_grid_livestock;
-            eff_phase_snapshot_.valid = true;
-
-            for (int64_t i = 0; i < soa_.n_alive; ++i) {
-                const size_t si = static_cast<size_t>(i);
-                if (soa_.stage[si] != 1) continue;
-                if (soa_.sex[si] != 1) continue;
-                const auto gs =
-                    static_cast<GonotrophicState>(soa_.gonotrophic_state[si]);
-                if (gs != GonotrophicState::HOST_SEEKING) continue;
-                ++n_phase_hs;
-
-                // Directed movement toward the best host cell (plan F3).
-                const auto target = host_seeking_->step_toward_host(
-                    soa_.row[si], soa_.col[si], eff, aoi,
-                    static_cast<float>(
-                        load_config().dispersal.host_flight_step_m));
-                if (target && (target->first != soa_.row[si] ||
-                               target->second != soa_.col[si])) {
-                    ++n_phase_moved;
-                }
-                if (target) {
-                    soa_.row[si] = target->first;
-                    soa_.col[si] = target->second;
-                    update_patch_id(i, soa_.row[si], soa_.col[si],
-                                    patch_states, aoi);
-                }
-
-                const auto attractions = host_seeking_->compute_attraction(
-                    soa_.row[si], soa_.col[si], eff, aoi);
-                const HostAttraction* picked =
-                    host_seeking_->select_host_entry(attractions, rng_);
-                const HostType host = picked
-                    ? picked->primary_host : HostType::HUMAN;
-                n_feeding_attempts++;
-                bite_ledger_.record_attempt(
-                    soa_.row[si], soa_.col[si], host);
-                if (picked != nullptr) {
-                    soa_.gonotrophic_state[si] =
-                        static_cast<uint8_t>(GonotrophicState::BLOOD_FED);
-                    soa_.gonotrophic_timer[si] = 0;
-                    soa_.feeding_success[si] = 1.0f;
-                    n_successful_feeds++;
-                    record_female_feed(
-                        si, soa_, host, picked->row, picked->col,
-                        bite_ledger_,
-                        human_grid_, transmission_params_, rng_);
-                    // BLOOD_FED: skip later phases for this female.
-                }
-            }
-        }
+    // 3c. Paso 5: perception cascade (replaces the per-cell host search).
+    if (cascade_enabled()) {
+        cascade_feeding_pass(aoi, day_idx, n_feeding_attempts, n_successful_feeds);
     }
 
-    // 4. Adult dispersal
+    // 4. Adult dispersal (windborne migration only when the cascade moves the
+    //    adults: the Gaussian kernel is retired, plan §4)
     adult_dispersal(aoi);
 
     // 4b. Update patch_id after dispersal (Plan D Phase 4).
@@ -931,7 +800,8 @@ void MosquitoSubmodel::advance_day(const AOI& aoi,
 
     // Compute stats
     const int64_t post_n_adults = count_stage(soa_, 1);
-    const int64_t n_deaths      = pre_mort_n_alive - post_mort_n_alive;
+    (void)pre_mort_n_alive;
+    const int64_t n_deaths      = n_alive_after_emergence - post_mort_n_alive;
 
     last_day_stats_.day          = day_idx;
     last_day_stats_.n_alive      = post_mort_n_alive;
@@ -982,7 +852,7 @@ void MosquitoSubmodel::advance_day(const AOI& aoi,
             "abm_tx_debug: day=%lld feeds=%lld human_feeds=%lld "
             "human_eval=%lld human_prev_pos=%lld human_infected=%lld "
             "p_sum=%.6f p_max=%.6f grid_null=%lld params_null=%lld "
-            "params_disabled=%lld n_alive=%lld phase_hs=%lld phase_moved=%lld\n",
+            "params_disabled=%lld n_alive=%lld\n",
             static_cast<long long>(day_idx),
             static_cast<long long>(g_tdbg.feeds),
             static_cast<long long>(g_tdbg.human_feeds),
@@ -993,9 +863,7 @@ void MosquitoSubmodel::advance_day(const AOI& aoi,
             static_cast<long long>(g_tdbg.grid_null),
             static_cast<long long>(g_tdbg.params_null),
             static_cast<long long>(g_tdbg.params_disabled),
-            static_cast<long long>(last_day_stats_.n_alive),
-            static_cast<long long>(n_phase_hs),
-            static_cast<long long>(n_phase_moved));
+            static_cast<long long>(last_day_stats_.n_alive));
         g_tdbg = TransmissionDebugStats{};
     }
 }
@@ -1013,8 +881,7 @@ void MosquitoSubmodel::update_patch_id(
 
     // Fast path: if position hasn't changed since last update, skip
     // the O(N_patches) scan. This is the common case — most adults
-    // don't move each day (only dispersal.adult_prob_day disperse via
-    // the Gaussian kernel).
+    // don't move between calls.
     if (soa_.last_patch_update_row[si] == new_row &&
         soa_.last_patch_update_col[si] == new_col) {
         return;
@@ -1117,30 +984,187 @@ void MosquitoSubmodel::adult_dispersal(const AOI& aoi) {
             }
         }
 
-        // --- Standard local dispersal (Gaussian kernel) ---
-        const double u = rng_.uniform_double();
-        if (u < static_cast<double>(overrides_.disperse_prob)) {
-            const DispOffset off = offset_m(
-                rng_,
-                static_cast<double>(soa_.lon[si]),
-                static_cast<double>(soa_.lat[si]),
-                static_cast<double>(overrides_.disperse_sigma_m),
-                static_cast<double>(overrides_.disperse_max_m));
-            soa_.lon[si] = static_cast<float>(
-                static_cast<double>(soa_.lon[si]) + off.dlon);
-            soa_.lat[si] = static_cast<float>(
-                static_cast<double>(soa_.lat[si]) + off.dlat);
+        // The Gaussian local-dispersal kernel is retired (plan §4): the only
+        // displacement of an adult is her flight (cascade) or this windborne
+        // jump. Keep the metric position in step with lon/lat.
+        if (wind_active && soa_.sex[si] == 1) {
+            const XY xy = lonlat_to_xy(aoi, soa_.lon[si], soa_.lat[si]);
+            soa_.pos_x[si] = static_cast<float>(xy.x);
+            soa_.pos_y[si] = static_cast<float>(xy.y);
+            int32_t r, c;
+            xy_to_cell(aoi, xy.x, xy.y, r, c);
+            soa_.row[si] = r;
+            soa_.col[si] = c;
         }
-        auto [r, c] = LonLatToCell(
-            static_cast<double>(soa_.lon[si]),
-            static_cast<double>(soa_.lat[si]), aoi);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Paso 5: perception cascade
+// ---------------------------------------------------------------------------
+
+bool MosquitoSubmodel::cascade_enabled() const {
+    return cascade_set_ && human_grid_ != nullptr &&
+           human_grid_->has_spatial_index();
+}
+
+void MosquitoSubmodel::init_positions(const AOI& aoi) {
+    const size_t n = static_cast<size_t>(soa_.n_alive);
+    if (soa_.pos_x.size() < soa_.uid.size()) {
+        soa_.pos_x.resize(soa_.uid.size(), std::numeric_limits<float>::quiet_NaN());
+        soa_.pos_y.resize(soa_.uid.size(), std::numeric_limits<float>::quiet_NaN());
+    }
+    if (soa_.cascade_stage.size() < soa_.uid.size()) {
+        soa_.cascade_stage.resize(soa_.uid.size(), 0);
+    }
+    const double wm = static_cast<double>(aoi.cells_per_side()) * aoi.resolution_m;
+    const double hm = static_cast<double>(cells_per_side_h(aoi)) * aoi.resolution_m;
+    for (size_t i = 0; i < n; ++i) {
+        if (std::isnan(soa_.pos_x[i]) || std::isnan(soa_.pos_y[i])) {
+            const XY xy = lonlat_to_xy(aoi, soa_.lon[i], soa_.lat[i]);
+            soa_.pos_x[i] = static_cast<float>(std::clamp(xy.x, 0.0, std::nextafter(wm, 0.0)));
+            soa_.pos_y[i] = static_cast<float>(std::clamp(xy.y, 0.0, std::nextafter(hm, 0.0)));
+            // row/col are derived from the metric position
+            xy_to_cell(aoi, soa_.pos_x[i], soa_.pos_y[i], soa_.row[i], soa_.col[i]);
+        }
+    }
+}
+
+void MosquitoSubmodel::cascade_feeding_pass(
+    const AOI& aoi, int64_t day_idx,
+    int64_t& n_attempts, int64_t& n_feeds)
+{
+    const HumanCompartmentGrid& hg = *human_grid_;
+    const double width_m  = static_cast<double>(aoi.cells_per_side()) * aoi.resolution_m;
+    const double height_m = static_cast<double>(cells_per_side_h(aoi)) * aoi.resolution_m;
+    const int32_t W = hg.w();
+    const int32_t hour0 = 6;   // the day starts at 06:00 (plan §12.2)
+
+    for (int64_t i = 0; i < soa_.n_alive; ++i) {
+        const size_t si = static_cast<size_t>(i);
+        if (soa_.stage[si] != 1 || soa_.sex[si] != 1) continue;
+        if (static_cast<GonotrophicState>(soa_.gonotrophic_state[si]) !=
+            GonotrophicState::HOST_SEEKING) continue;
+        ++n_attempts;
+
+        const uint64_t uid = static_cast<uint64_t>(soa_.uid[si]);
+        auto stream = [&](int phase) {
+            uint64_t st = micro_seed_ ^ (uid * 0x9E3779B97F4A7C15ULL) ^
+                          (static_cast<uint64_t>(day_idx) << 20) ^
+                          (static_cast<uint64_t>(phase) + 1ULL);
+            return Prng(splitmix64(st));
+        };
+
+        // Host class of the day: the preference enters the DRAW, not the
+        // gradient. Animals have no individuals yet (Paso 2c): an animal day
+        // feeds on the livestock of the current cell, with no flight.
+        Prng pick = stream(7);
+        if (pick.uniform_double() >= static_cast<double>(species_params_.pref_human) &&
+            host_landscape_ != nullptr) {
+            const HostCell hc = host_landscape_->at(soa_.row[si], soa_.col[si]);
+            const double nc = hc.cattle_present, ng = hc.goats_present, ns = hc.sheep_present;
+            const double tot = nc + ng + ns;
+            if (tot > 0.0) {
+                const double u = pick.uniform_double() * tot;
+                const HostType host = (u < nc) ? HostType::CATTLE
+                                    : (u < nc + ng) ? HostType::GOAT : HostType::SHEEP;
+                bite_ledger_.record_attempt(soa_.row[si], soa_.col[si], host);
+                soa_.gonotrophic_state[si] = static_cast<uint8_t>(GonotrophicState::BLOOD_FED);
+                soa_.gonotrophic_timer[si] = 0;
+                soa_.feeding_success[si] = 1.0f;
+                ++n_feeds;
+                record_female_feed(si, soa_, host, soa_.row[si], soa_.col[si],
+                                   bite_ledger_, human_grid_, transmission_params_, rng_);
+                BiteEvent ev;
+                ev.day = static_cast<int32_t>(day_idx);
+                ev.phase = 0;
+                ev.mosquito_uid = soa_.uid[si];
+                ev.host = host;
+                ev.row = soa_.row[si];
+                ev.col = soa_.col[si];
+                ev.x = soa_.pos_x[si];
+                ev.y = soa_.pos_y[si];
+                bite_ledger_.record_event(ev);
+            }
+            continue;
+        }
+
+        FlightState fs;
+        fs.x = soa_.pos_x[si];
+        fs.y = soa_.pos_y[si];
+        double clock_h = static_cast<double>(hour0);
+        for (int p = 0; p < PHASE_WEIGHT_COUNT; ++p) {
+            const double dur = cascade_.phase_duration_hours[static_cast<size_t>(p)];
+            const double mid_h = clock_h + dur / 2.0;
+            clock_h += dur;
+            if (cascade_.phase_flight_seconds(p) <= 0.0) continue;
+            WindSample w;
+            if (wind_field_) {
+                const double lat = aoi.south + fs.y / kMetresPerDegLat();
+                const LonLat ll = xy_to_lonlat(aoi, fs.x, fs.y);
+                (void)lat;
+                const WindVector wv = wind_field_->wind_at(
+                    ll.lon, ll.lat, current_day_index_,
+                    static_cast<int>(std::fmod(mid_h, 24.0)));
+                w.u = wv.u;
+                w.v = wv.v;
+            }
+            Prng rng = stream(p);
+            const PhaseOutcome out = fly_phase(
+                cascade_, hg, fs, p, w, width_m, height_m, rng);
+            if (!out.landed) continue;
+
+            // Landed on a person: the meal is on THAT person.
+            const size_t pi = static_cast<size_t>(out.person);
+            const int32_t cell = hg.people().cell_id[pi];
+            const int32_t prow = cell / W, pcol = cell % W;
+            const bool was_inf = soa_.vector_state[si] ==
+                static_cast<uint8_t>(VectorTransmissionState::INFECTIOUS);
+            const bool was_sus = soa_.vector_state[si] ==
+                static_cast<uint8_t>(VectorTransmissionState::SUSCEPTIBLE);
+            bite_ledger_.record_attempt(prow, pcol, HostType::HUMAN);
+            soa_.gonotrophic_state[si] = static_cast<uint8_t>(GonotrophicState::BLOOD_FED);
+            soa_.gonotrophic_timer[si] = 0;
+            soa_.feeding_success[si] = 1.0f;
+            ++n_feeds;
+            record_female_feed(si, soa_, HostType::HUMAN, prow, pcol,
+                               bite_ledger_, human_grid_, transmission_params_, rng_,
+                               out.person);
+            BiteEvent ev;
+            ev.day = static_cast<int32_t>(day_idx);
+            ev.phase = static_cast<uint8_t>(p);
+            ev.mosquito_uid = soa_.uid[si];
+            ev.person_index = out.person;
+            ev.human_id = hg.people().human_id[pi];
+            ev.host = HostType::HUMAN;
+            ev.row = prow;
+            ev.col = pcol;
+            ev.x = hg.people().cur_x[pi];
+            ev.y = hg.people().cur_y[pi];
+            ev.infectious_vector = was_inf;
+            ev.vector_infected = was_sus && soa_.vector_state[si] ==
+                static_cast<uint8_t>(VectorTransmissionState::EXPOSED);
+            bite_ledger_.record_event(ev);
+            break;                                   // fed: no more flight today
+        }
+
+        // Write the flight back: metric position -> derived cell and lon/lat.
+        soa_.pos_x[si] = static_cast<float>(fs.x);
+        soa_.pos_y[si] = static_cast<float>(fs.y);
+        soa_.cascade_stage[si] = static_cast<uint8_t>(fs.stage);
+        int32_t r, c;
+        xy_to_cell(aoi, fs.x, fs.y, r, c);
         soa_.row[si] = r;
         soa_.col[si] = c;
+        const LonLat ll = xy_to_lonlat(aoi, fs.x, fs.y);
+        soa_.lon[si] = static_cast<float>(ll.lon);
+        soa_.lat[si] = static_cast<float>(ll.lat);
     }
 }
 
 // ---------------------------------------------------------------------------
 // Op 6: adult mortality (thermo-dependent daily survival)
+
 // ---------------------------------------------------------------------------
 
 void MosquitoSubmodel::adult_mortality(

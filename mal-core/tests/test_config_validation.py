@@ -46,7 +46,7 @@ def _message(path: pathlib.Path) -> str:
 def test_canonical_yaml_validates_and_is_typed():
     cfg = validate_model_config()
     assert isinstance(cfg, ModelConfig)
-    assert cfg.version == 2
+    assert cfg.version == 3
     assert isinstance(cfg.pluvial.rain_scale_mm, float)
     assert cfg.pluvial.rain_scale_mm == 2.5
     assert cfg.num_persistent == 3
@@ -102,6 +102,7 @@ def test_every_model_forbids_extra_and_is_frozen():
 _MISSING_CASES = [
     ("version",),
     ("contracts", "env_nc"),
+    ("contracts", "habitat"),
     ("habitat_types", "types"),
     ("habitat", "activation_min_engine"),
     ("pluvial", "rain_scale_mm"),
@@ -119,11 +120,18 @@ _MISSING_CASES = [
     ("transmission", "beta_hv"),
     ("thermal", "efd_topt_c"),
     ("gonotrophic", "egg_batch_n"),
-    ("dispersal", "adult_prob_day"),
+    ("dispersal", "wind_migration_prob"),
     ("host_seeking", "starvation_days"),
     ("oviposition", "scale_m"),
     ("aquatic_stages", "egg_daily_mort"),
     ("rng", "aquatic_seed_washout"),
+    ("integration", "phase_duration_hours"),
+    ("integration", "dt_terminal_s"),
+    ("mating", "p_mate_male_fraction"),
+    ("mating", "rain_suppresses_swarming"),
+    ("species", "coluzzii", "olfactory_radius_m"),
+    ("species", "stephensi", "probing_success_rate"),
+    ("species", "arabiensis", "aestivation_supported"),
     ("wildlife", "class_suitability"),
     ("wildlife", "weights", "habitat"),
 ]
@@ -557,6 +565,96 @@ def test_egg_batch_ordering_invariant(tmp_path):
     message = _message(_tmp_yaml(tmp_path, mutate))
     assert "gonotrophic egg batch" in message
     assert "min <= mean <= max" in message
+
+
+# -- Paso 4: movement / blood / dry season / male / mating keys ------------------
+
+def test_paso4_keys_validate_with_plan_values():
+    cfg = validate_model_config()
+    row = cfg.species.coluzzii
+    assert row.co2_activation_radius_m == 100.0
+    assert row.daily_move_capacity_m == 590.0
+    assert row.eggs_per_ul == 223.0
+    assert row.aestivation_supported is True
+    assert cfg.species.funestus.aestivation_supported is False
+    assert cfg.integration.phase_duration_hours == [12.0, 4.0, 6.0, 2.0]
+    assert cfg.mating.p_mate_male_fraction == 0.072
+    assert cfg.mating.male_females_per_night_max == 3
+    assert cfg.mating.rain_suppresses_swarming is True
+    assert cfg.contracts.habitat == "4.0"
+    assert cfg.contracts.cogs_state == "4.0"   # flips to 5.0 in Paso 11 (single band)
+
+
+def test_directed_flight_budget_is_derived(tmp_path):
+    def mutate(data):
+        data["species"]["coluzzii"]["directed_flight_budget_h"] = 1.0
+
+    message = _message(_tmp_yaml(tmp_path, mutate))
+    assert "species.coluzzii.directed_flight_budget_h is derived" in message
+
+
+def test_cascade_radii_must_nest(tmp_path):
+    def mutate(data):
+        data["species"]["coluzzii"]["visual_radius_m"] = 60.0   # > olfactory
+
+    message = _message(_tmp_yaml(tmp_path, mutate))
+    assert "terminal < visual < olfactory < co2_activation" in message
+
+
+def test_exploration_range_must_reach_activation_radius(tmp_path):
+    def mutate(data):
+        data["species"]["coluzzii"]["exploration_range_m"] = 50.0
+
+    message = _message(_tmp_yaml(tmp_path, mutate))
+    assert "exploration_range_m must be >= co2_activation_radius_m" in message
+
+
+def test_first_cycle_target_must_exceed_meal_target(tmp_path):
+    def mutate(data):
+        data["species"]["coluzzii"]["first_cycle_target_ul"] = 0.4
+
+    message = _message(_tmp_yaml(tmp_path, mutate))
+    assert "first_cycle_target_ul must be > blood_meal_target_ul" in message
+
+
+def test_no_arrest_without_aestivation(tmp_path):
+    def mutate(data):
+        data["species"]["funestus"]["gonotrophic_arrest_prob_dry"] = 0.3
+
+    message = _message(_tmp_yaml(tmp_path, mutate))
+    assert "gonotrophic_arrest_prob_dry must be 0 when aestivation_supported" in message
+
+
+def test_phase_durations_must_add_up_to_24_hours(tmp_path):
+    def mutate(data):
+        data["integration"]["phase_duration_hours"] = [12.0, 4.0, 6.0, 3.0]
+
+    message = _message(_tmp_yaml(tmp_path, mutate))
+    assert "integration.phase_duration_hours must add up to 24 h" in message
+
+
+def test_terminal_step_is_finer_than_olfactory(tmp_path):
+    def mutate(data):
+        data["integration"]["dt_terminal_s"] = 0.5
+
+    message = _message(_tmp_yaml(tmp_path, mutate))
+    assert "dt_terminal_s must be < dt_olfactory_s" in message
+
+
+@pytest.mark.parametrize("key", ["p_mate_male_fraction", "female_attendance_rate"])
+def test_mating_fractions_in_unit_interval(tmp_path, key):
+    def mutate(data):
+        data["mating"][key] = 1.5
+
+    message = _message(_tmp_yaml(tmp_path, mutate))
+    assert f"mating.{key} must be in [0, 1]" in message
+
+
+def test_habitat_contract_format(tmp_path):
+    def mutate(data):
+        data["contracts"]["habitat"] = "four"
+
+    assert "contracts.habitat" in _message(_tmp_yaml(tmp_path, mutate))
 
 
 @pytest.mark.parametrize("hour", [-1, 24])

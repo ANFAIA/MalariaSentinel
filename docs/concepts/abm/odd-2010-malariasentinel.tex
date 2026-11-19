@@ -190,8 +190,8 @@ area of interest (AOI). It has three intended uses.
   pattern-oriented, not the production of an official forecast.
 \item \textbf{Mechanistic scenario analysis.} The model is used to ask
   where and when a vector population can establish, how the aquatic
-  stages respond to rainfall and temperature, how host distribution and
-  daily human mobility reshape biting risk, and whether a seeded human
+  stages respond to rainfall and temperature, how the distribution of individual
+  people reshapes biting risk, and whether a seeded human
   outbreak can start a transmission chain.
 \end{enumerate}
 
@@ -199,8 +199,7 @@ The model expands an earlier thin-slice formulation into a richer
 representation of the same system: individual adult mosquitoes with a
 gonotrophic cycle, cohort-based aquatic stages with thermal development
 and density-dependent mortality, static remote-sensing habitat proxies
-with a rain-driven pluvial response, a spatial host landscape with
-phase-specific human mobility, and a Ross--Macdonald-type SEIR--SEI
+with a rain-driven pluvial response, individual people with a position in metres, and a Ross--Macdonald-type SEIR--SEI
 transmission layer. The expansion is deliberate ``from basic principles
 to richer representation'': each added layer is a mechanism that the
 thin slice either omitted or aggregated.
@@ -211,8 +210,8 @@ indoor residual spraying, larviciding), drugs or vaccination, mosquito
 genetics or insecticide resistance, evolution or learning, human
 demography (births, deaths, migration of the SEIR population), water
 balance or depth-resolved hydrology, or sub-daily mosquito flight.
-Human movement is represented only as a change in the effective host
-distribution for biting, not as movement of the infection compartments.
+People do not move in this version: each person stays at a fixed position, and
+the mosquito flies to the person.
 A single mosquito species is active per run (the default is
 \emph{An.\ coluzzii}); parameter rows for six species exist, of which
 two (\emph{An.\ melas}, \emph{An.\ stephensi}) are dormant.
@@ -277,11 +276,14 @@ reported here as a project claim, not as a model fact
   The default Ghana AOI is 551 columns $\times$ 779 rows $=429{,}229$
   cells.
 
-\item[Human hosts (compartments, not agents).] Humans are not
-  individuals. Each cell carries susceptible, exposed, infectious, and
-  recovered \emph{counts}, plus three discrete age-of-infection cohort
-  queues (exposed, infectious, recovered). The human population is
-  constant during a run. In the delivered Ghana product the host grid
+\item[Human hosts (individuals).] Each person is an individual with a
+  stable identifier, a fixed position in metres inside the home cell
+  (drawn uniformly from the seed), a susceptible/exposed/infectious/
+  recovered state, and a discrete timer of the days left in that state.
+  The number of people in a cell is the rounded host-grid count of the
+  cell. The per-cell susceptible, exposed, infectious, and recovered
+  counts are statistics derived from the individuals. The human
+  population is constant during a run. In the delivered Ghana product the host grid
   integrates to about 32.0 million persons over the bounding box (which
   includes neighbouring land and sea, not only Ghana).
 
@@ -385,12 +387,12 @@ $10^{-6}\,(\mskey{ingest.cell_size_hint_m})^2\cos(\phi_i)$\,km$^2$ (about 0.99\,
 The default Ghana AOI spans 5$^\circ$ of longitude by 7$^\circ$ of
 latitude, giving 551 $\times$ 779 cells (a bounding box of about
 428,600\,km$^2$, which includes sea and neighbouring land; it is not the
-land area of Ghana). The model has no sub-cell geometry: a host, a
-patch, and an adult are all located at a cell, with continuous
-lon/lat carried for dispersal and wind displacement.
+land area of Ghana). A person is located at a metric position inside
+its cell; a patch, an adult, and every other host are located at a cell,
+with continuous lon/lat carried for dispersal and wind displacement.
 
 \textbf{Biological resolution.} Adults are individuals. Immatures are
-cohorts. Humans are compartments. Hosts are counts. This mixture is
+cohorts. Humans are individuals. Other hosts are counts. This mixture is
 deliberate: the questions asked are about adult vector abundance and
 spatial foci, for which individual adults matter, while the immature
 stages are numerous and their individual identities are irrelevant to
@@ -433,18 +435,13 @@ for d = 0 .. D-1:
         bite_ledger.reset_day()
         for each adult female in SoA order:
             RUN GONOTROPHIC CYCLE            # one state transition
-            if HOST_APPROACH: move toward host (if hosts loaded)
             if HOST_SEEKING: increment starvation timer; die at \mskey{host_seeking.starvation_days} d
             SEEK OVIPOSITION SITE AND OVIPOSIT
-            SEEK HOSTS AND FEED              # non-phase-aware fallback
-        if effective hosts loaded:           # phase-aware pass
-            for phase in DAY, EVENING, NIGHT, DAWN:
-                if species active in phase:
-                    sample H_eff(day, phase) for humans and livestock
-                    for each HOST_SEEKING female in SoA order:
-                        move one step toward best host cell
-                        SEEK HOSTS AND FEED
-        DISPERSE ADULTS                      # wind first, then Gaussian
+        for each HOST_SEEKING female in SoA order:        # perception cascade
+            for phase in DAY, EVENING, NIGHT, DAWN (flight-time budget per day):
+                fly the cascade towards the nearest person; stop when she lands
+            if landed: BLOOD_FED, bite event on that person
+        DISPERSE ADULTS                      # windborne migration only
         snap every adult to nearest active patch within \mskey{dispersal.snap_radius_m} m
         SURVIVE ADULTS                       # daily survival draw
     if transmission enabled:
@@ -478,8 +475,8 @@ Advance aquatic stages & cohort bank & cohort-vector order & asynchronous: each 
 Emerge adults & pupae with dev $\ge1$ & cohort-vector order & synchronous event list, applied after the scan \\
 Gonotrophic transition & adult females & SoA index order & asynchronous; a state change is visible in the same iteration \\
 Oviposition seeking and laying & gravid females & SoA index order & asynchronous; eggs are added immediately \\
-Host seeking and feeding & host-seeking females & SoA index order, then phase order & asynchronous; a fed female is skipped in later phases \\
-Dispersal & all adults & SoA index order & asynchronous; positions updated in place \\
+Host seeking and feeding & host-seeking females & SoA index order, then phase order & asynchronous; a fed female is skipped in later phases; random stream per (uid, day, phase) \\
+Windborne migration & gravid females & SoA index order & asynchronous; positions updated in place \\
 Patch snap & all adults & SoA index order & asynchronous; nearest active patch within \mskey{dispersal.snap_radius_m}\,m \\
 Adult survival & all adults & reverse SoA index order & asynchronous; survivors are compacted by swap-with-last \\
 Transmission & vector females and human cells & SoA index order; cells row-major & vector EIP then human SEIR; human cohorts shifted per cell \\
@@ -682,14 +679,10 @@ prediction.
 Sensing is local and perfect within a radius:
 
 \begin{itemize}
-\item \textbf{Hosts:} a female computes an attraction field over cells
-  within \mskey{species.coluzzii.host_seeking_radius_m}\,m (the species
-  attraction radius) and, for directed
-  movement, detects the best host cell within
-  \mskey{host_seeking.detect_range_m}\,m (the engine
-  detection range). The field uses the true host counts (or the
-  phase-specific effective counts when mobility is loaded). There is no
-  perceptual error, no occlusion, and no memory.
+\item \textbf{Hosts:} a female senses the nearest person through the bands of the
+  perception cascade (CO$_2$ activation \mskey{species.coluzzii.co2_activation_radius_m}\,m, olfactory
+  \mskey{species.coluzzii.olfactory_radius_m}\,m, visual \mskey{species.coluzzii.visual_radius_m}\,m, contact
+  \mskey{species.coluzzii.terminal_radius_m}\,m). There is no perceptual error, no occlusion, and no memory beyond the plume memory.
 \item \textbf{Breeding sites:} a gravid female detects active patches
   within \mskey{oviposition.detect_range_m}\,m, with attraction equal to
   the patch's static
@@ -728,9 +721,8 @@ The model has three kinds of interaction:
 
 There is no direct mosquito--mosquito interaction, no competition for
 mating (mating is instantaneous and not modelled), no communication, and
-no human behavioural response. Human mobility changes the effective host
-distribution and therefore the interaction surface, but it does not
-change the infection compartments (Appendix~A.12).
+no human behavioural response. People do not move, so the interaction surface is the fixed layout of
+the people and the flight of the mosquito.
 
 \subsection{Stochasticity}
 
@@ -754,11 +746,10 @@ finite population. The stochastic draws are:
 \item washout: Binomial($N$, $f(R)$) per cohort on heavy-rain days;
 \item host selection: one uniform draw per female per feeding attempt,
   used in a weighted roulette over attraction scores;
-\item human infection: Binomial($\operatorname{round}(S_H)$, $\lambda_H$)
-  per cell per day, with a deterministic fallback $S_H\lambda_H$ when
-  $\operatorname{round}(S_H)=0$; human cohort transitions are
-  deterministic shifts of the
-  queues;
+\item human infection: for each infectious bite on humans, one uniform
+  draw selects the person bitten within the bitten cell and one uniform
+  draw against \mskey{transmission.beta_vh} decides the exposure; the
+  individual timers advance deterministically;
 \item phase-specific human and livestock movement: a multinomial flow
   per origin cell, per phase, per day;
 \item outbreak focus selection and, in random-viable mode, the choice of
@@ -842,7 +833,17 @@ error, and no virtual ecologist. The observation layer is:
   population, mosquito density, and truncation flag of the seeded
   outbreak.
 \item \textbf{Animated GIF} (optional): a diagnostic rendering of the
-  live state, including individual adults.
+  live state, including individual adults. In the transmission GIF every
+  person is a one-pixel dot at its position in metres, coloured by its
+  SEIR state, the trail of each adult is the polyline of its daily
+  positions, and the scale rule is one cell long.
+\item \textbf{Debug Parquet files} (\code{--debug}, optional, independent of
+  \code{--scenario} and of the GIF; the size is the user's): \code{_agents} (one row
+  per adult per day: position in metres, gonotrophic state, cascade stage, vector
+  state), \code{_humans} (one row per person per day, only people in E, I or R),
+  \code{_bites} (one row per blood meal: mosquito, person, phase, position,
+  whether the vector was infectious, whether the bite infected the vector, whether it
+  exposed the person) and \code{_mating} (empty until the male layer).
 \end{itemize}
 
 The state is written at the end of the requested horizon and, optionally,
@@ -877,11 +878,9 @@ the first call to \code{step()}, the following holds.
   builds the day-0 union during construction.
 \item The adult and aquatic populations are those produced by the
   seeding mode (Section~5.2).
-\item The human compartments are initialized from the host grid
+\item The human population is created from the host grid
   (Section~5.3).
-\item No wind field, mobility schedule, or transmission model is active
-  unless the corresponding input was supplied or the transmission flag
-  was set.
+\item No wind field is active unless the corresponding input was supplied.
 \end{itemize}
 
 If \code{--warmup-bands} $n>0$ is supplied, the pluvial recursion is
@@ -911,7 +910,7 @@ selected patch unless stated.}\label{tab:seed}\\
 \code{random-viable} (default) & 3 patches drawn uniformly without replacement from the viable set (gpkg potential $\ge\mskey{habitat.candidate_min_engine}$) & 50 per patch & 30 per patch, distributed over stages \\
 \code{uniform} & every candidate cell of the day-0 union & 30 per patch & 270 per patch, distributed over stages \\
 \code{explicit} & user-supplied points; nearest viable patch within 5\,km; points with no patch in range are dropped & 50 per point (fixed by the parser) & 30 per point (fixed by the parser) \\
-\code{host-weighted} & 3 patches sampled without replacement with weight $\sum_j \text{host score}_j e^{-d_{pj}/s_s}$ within 5\,km, $s_s$ the species plume scale (\mskey{species.coluzzii.host_seeking_scale_m}\,m for the default species) & 50 per patch & 30 per patch \\
+\code{host-weighted} & 3 patches sampled without replacement with weight $\sum_j \text{host score}_j e^{-d_{pj}/s_s}$ within 5\,km, $s_s$ the daily path length (\mskey{species.coluzzii.daily_move_capacity_m}\,m for the default species) & 50 per patch & 30 per patch \\
 \end{longtable}
 
 Every seeded adult is created with \code{stage}=1, a sex drawn
@@ -947,17 +946,22 @@ detection point in range in explicit mode), the population starts empty.
 An empty population cannot produce a new generation, because there are
 no adults to lay eggs; the run then reports zero vectors throughout.
 
-\subsection*{5.3 Humans, transmission, hosts, mobility, and wind}
+\subsection*{5.3 Humans, transmission, hosts, and wind}
 
-\textbf{Human compartments.} The human population of each cell is the
-value of the \code{human} variable in the host NetCDF (WorldPop counts
-aggregated to the 1\,km cell). If no host file is supplied but
-transmission is enabled, every cell is assigned one person. The initial
-compartments are $S_H=$ population and $E_H=I_H=R_H=0$, except in the
+\textbf{Human individuals.} The number of people in each cell is the
+rounded value of the \code{human} variable in the host NetCDF (WorldPop
+counts aggregated to the 1\,km cell). If no host file is supplied but
+transmission is enabled, every cell is assigned one person. Each person
+receives the identifier $(\text{cell}\ll 32)\,|\,\text{slot}$ (unique and
+independent of the other cells) and a position drawn uniformly inside
+the cell from a function of the seed and the identifier, so the layout
+does not depend on insertion order. Everyone starts susceptible, except in the
 legacy \code{uniform-legacy} seeding mode, where a fraction
-\code{initial_human_prevalence} $=\mskey{transmission.initial_human_prevalence}$ of each cell is infectious and is
-spread evenly over the \mskey{transmission.human_infectious_days} infectious cohort bins. The human population
-does not change during the run.
+\code{initial_human_prevalence} $=\mskey{transmission.initial_human_prevalence}$ of each cell is infectious, with timers spread
+evenly over the \mskey{transmission.human_infectious_days} days of the infectious period. In a synthetic scenario, the
+declared humans replace the host-grid population: only they exist, at
+their declared positions. The human population does not change during
+the run.
 
 \textbf{Outbreak seeding.} If transmission is enabled and the human
 seeding mode is \code{random-viable} (the default), the model waits until
@@ -982,16 +986,8 @@ is created already INFECTIOUS with EIP progress at the threshold.
 
 \textbf{Host landscape.} If a host file is supplied, the per-cell human
 and livestock counts, building fraction, indoor fraction, and urbanicity
-are loaded. If it is not supplied, there is no host landscape, no host
-seeking, and the fallback feeding rule is used (Section~7.6). The host
-landscape is static except for the phase-specific redistribution by
-mobility.
-
-\textbf{Mobility.} If human and/or livestock origin--destination matrices
-are present, the phase-specific effective host grids are built; if they
-are absent, everyone stays in their residential cell. The phase-aware
-host-seeking pass requires mobility data: without them, the single-phase
-residential fallback is used.
+are loaded. If it is not supplied, there is no host landscape and the human
+population is one person per cell. The host landscape is static.
 
 \textbf{Wind.} If a wind field is supplied, windborne migration is active
 in the months and at the hour described in Section~7.7; otherwise it is
@@ -1027,8 +1023,7 @@ the climate and habitat inputs are fixed files.
 \subsection*{5.5 What is data-based and what is a scenario choice}
 
 The environmental drivers, the static habitat planes, the host counts,
-the building fraction, the urban class, and the optional mobility and
-wind fields are data-based. The initial mosquito counts, the number of
+the building fraction, the urban class, and the optional wind field are data-based. The initial mosquito counts, the number of
 detection patches, the detection radius, the outbreak size, and the
 cluster radius are scenario choices, not estimates. The model constants
 are literature values or explicit engineering priors, as recorded in the
@@ -1075,8 +1070,6 @@ Livestock & \bcode{cattle}, \bcode{goats}, \bcode{sheep}, \bcode{pigs}, \bcode{c
 Urban class & \bcode{urban_class} & class code; 1 km, static & GHS-SMOD R2023A & Nearest-neighbour aggregation. The engine's binary rule treats class $\le40$ as urban (indoor fraction \mskey{host_seeking.indoor_fraction_urban}, urbanicity 1) and $>40$ as rural (\mskey{host_seeking.indoor_fraction_rural}, 0). \\
 Building fraction & \bcode{building_fraction} & $[0,1]$; 1 km, static & Overture Maps / OpenStreetMap & Sum-preserving aggregation. Used only to derive the residential fraction. \\
 Wildlife proxy & \bcode{wildlife_host_proxy} & index $[0,1]$; 1 km, static & Dynamic World class suitability, JRC water, remoteness & Weighted combination \mskey{wildlife.weights.habitat} habitat suitability, \mskey{wildlife.weights.water} water, \mskey{wildlife.weights.remoteness} remoteness. A proxy for wild-host availability, not a count. \\
-Human mobility & \bcode{*_mobility_day.csr}, \bcode{*_mobility_night.csr} & row-stochastic fractions; cell-to-cell & Built by ingest from population and attractiveness & Sparse origin--destination matrices; no within-run update. Absent $\Rightarrow$ identity (everyone at home). \\
-Livestock mobility & \bcode{*_livestock_mobility.csr} & row-stochastic fractions; cell-to-cell & Built by ingest & One seasonal matrix reused for all phases except NIGHT (identity). \\
 Wind & \bcode{u100}, \bcode{v100} & m\,s$^{-1}$; 6-hourly, optional & ERA5 & Nearest-neighbour spatial lookup and linear temporal interpolation; queried at one hour per day. Absent from the delivered Ghana product. \\
 \end{longtable}
 
@@ -1522,66 +1515,65 @@ therefore an upper bound on perception, not on successful location.
 
 \subsection{Seek hosts and feed}
 
-Host seeking has two implementations, selected by the inputs. If a host
-landscape is loaded and a mobility schedule is present, the engine runs
-the \emph{phase-aware} path: for each of the four daily phases it builds
-a phase-specific effective host landscape and lets every female still in
-HOST\_SEEKING search and feed. If a host landscape is loaded but no
-mobility schedule is present, it runs a single-phase residential path, in
-which every HOST\_SEEKING female makes exactly one host-selection
-attempt per day. If
-no host landscape is loaded, it uses a deterministic fallback in which
-every HOST\_SEEKING female takes a HUMAN blood meal at her current cell.
+When the run has individual people (transmission enabled, or a host
+landscape, or declared scenario humans), every HOST\_SEEKING female flies
+the \emph{perception cascade}; otherwise the legacy per-cell paths run
+(a phase-aware or single-phase search on the host landscape, or, without
+a landscape, a deterministic HUMAN meal at the current cell), so that a run
+without host data still produces a gonotrophic cycle.
 
-\textbf{Attraction.} For a female at cell $i$, the attraction of a host
-cell $j$ within the species radius is
-\begin{equation}\label{eq:attraction}
-A_j=\left(\sum_k N_{jk}\pi_k\right)
-\left(1+\mskey{host_seeking.indoor_attraction_add}\,I_j\right)\left(1+\mskey{host_seeking.urbanicity_add}\,U_j\right)
-e^{-d_j/s_s},
-\end{equation}
-where $N_{jk}$ is the count of host type $k$ in cell $j$, $\pi_k$ the
-species preference for that type, $I_j$ the cell's indoor fraction, $U_j$
-its urbanicity (1 urban, 0 rural), $d_j$ the centre-to-centre distance,
-and $s_s$ the species plume scale (\mskey{species.coluzzii.host_seeking_scale_m}\,m for \emph{An.\ coluzzii};
-\mskey{species.arabiensis.host_seeking_scale_m}\,m for \emph{An.\ arabiensis}). Pigs are weighted as cattle and
-chickens as the ``other'' (wildlife) class. The preference row of
-\emph{An.\ coluzzii} is human \mskey{species.coluzzii.pref.human}, cattle \mskey{species.coluzzii.pref.cattle}, goat \mskey{species.coluzzii.pref.goat}, sheep \mskey{species.coluzzii.pref.sheep},
-wildlife \mskey{species.coluzzii.pref.wildlife}; the other species rows are in the constants file.
+\textbf{Metric position.} An adult has a continuous position in metres from the
+south-west corner of the AOI; its cell and its lon/lat are derived from it.
+Adults seeded or emerged without a position take the centre of their cell.
 
-\textbf{Effective hosts.} With mobility data, the residential host counts
-are redistributed by a row-stochastic origin--destination matrix,
-\begin{equation}\label{eq:heff}
-H^{\text{eff}}_j(d,\phi)=\sum_i P_{ij}(\phi)\,H^{\text{res}}_i,
-\end{equation}
-realized stochastically each day and phase by a multinomial flow per
-origin cell (with stochastic rounding of fractional populations). Humans
-and cattle are moved; goats, sheep, pigs, and chickens remain at their
-residential cells. The human day matrix is used for DAY, EVENING, and
-DAWN; the night matrix for NIGHT. The livestock day matrix is used for
-all phases except NIGHT, where the identity is used. When no mobility
-data are present, the effective grid is the residential grid.
+\textbf{Host class of the day.} Once per female per day a draw against the
+human preference $\pi_{\text{human}}=\mskey{species.coluzzii.pref.human}$
+(\emph{An.\ coluzzii}) chooses the host class. The preference enters the draw,
+not a gradient. An animal day feeds on the livestock of the current cell (cattle, goats and sheep, proportional to their
+counts) without flight, because animals have no individuals yet.
 
-\textbf{Phase pass.} For each phase whose species activity weight exceeds
-0.001 (with the default row, all four phases qualify), the engine samples
-the human and livestock effective grids once and shares them across all
-females. For each female still in HOST\_SEEKING, in SoA order, it:
-(i) finds the best host cell within \mskey{host_seeking.detect_range_m}\,m whose attraction exceeds
-0.5 and takes one step of \mskey{dispersal.host_flight_step_m}\,m toward it (if no such cell, she does not
-move); (ii) recomputes the attraction field within
-\mskey{species.coluzzii.host_seeking_radius_m}\,m at her new
-position; (iii) selects one cell by a roulette proportional to
-attraction; (iv) if a cell is selected, feeds with certainty, sets
-BLOOD\_FED, records the meal at the selected host cell, and uses the
-dominant host type of that cell as the host type. A female that feeds in
-an early phase is skipped by later phases. A female that does not feed
-remains in HOST\_SEEKING and may try again in the next phase. No random
-number is consumed when the attraction field is empty: the selection
-returns nothing, the attempt is still counted, and the female stays in
-HOST\_SEEKING. The same holds when the total attraction is zero, in which
-case the first cell of the field is taken without a draw; that branch is
-unreachable in practice, because a cell whose attraction is zero is
-dropped when the field is built.
+\textbf{The cascade.} On a human day the female senses the \emph{nearest person}
+through bands of distance (values of \emph{An.\ coluzzii}):
+\begin{itemize}
+\item \emph{exploration}: no person within the CO$_2$ activation radius
+  (\mskey{species.coluzzii.co2_activation_radius_m}\,m): a correlated random walk
+  with steps of \mskey{species.coluzzii.exploration_step_m}\,m (step correlation \mskey{species.coluzzii.exploration_step_correlation}),
+  inside the exploration disk of radius \mskey{species.coluzzii.exploration_range_m}\,m, with casting across the wind when
+  there is wind;
+\item \emph{activation}: a person within the CO$_2$ radius: she orients upwind
+  (without wind there is no direction and the walk continues);
+\item \emph{plume tracking}: within the olfactory radius
+  (\mskey{species.coluzzii.olfactory_radius_m}\,m): optomotor anemotaxis towards the source with deviation $\pm$\mskey{species.coluzzii.anemotaxis_deviation_deg}$^\circ$ and
+  intermittent casting (probability \mskey{species.coluzzii.casting_probability} per micro-step, memory \mskey{species.coluzzii.plume_memory_s}\,s), micro-step
+  \mskey{integration.dt_olfactory_s}\,s;
+\item \emph{visual approach}: within the visual radius
+  (\mskey{species.coluzzii.visual_radius_m}\,m), micro-step \mskey{integration.dt_terminal_s}\,s;
+\item \emph{contact}: within the terminal radius
+  (\mskey{species.coluzzii.terminal_radius_m}\,m); \emph{landing} additionally requires holding a speed below
+  \mskey{integration.landing_speed_mm_s}\,mm\,s$^{-1}$ for \mskey{integration.landing_speed_hold_s}\,s, after which she takes the blood meal on that person.
+\end{itemize}
+Entering a band is decided by $d_{\min}$, the minimum distance from the
+\emph{swept segment} to the person, never by the end point of the step, and a
+step never exceeds the radius of the next band: it is cut just past the point
+where the segment enters the band. The daily flight is bounded by a flight-time budget of
+\mskey{species.coluzzii.directed_flight_budget_h}\,h (derived: the daily path length
+\mskey{species.coluzzii.daily_move_capacity_m}\,m divided by the flight speed
+\mskey{species.coluzzii.flight_speed_ms}\,m\,s$^{-1}$), consumed per day and not per phase, and shared among the active phases in proportion to the
+activity weights [DAY, EVENING, NIGHT, DAWN] $=$ \mskey{species.coluzzii.activity_weights}
+over a clock of \mskey{integration.phase_duration_hours}\,h per phase starting at 06:00. The path length of the day never exceeds
+\mskey{species.coluzzii.daily_move_capacity_m}\,m; the net displacement is an output. When a wind field is loaded, the wind at the hour of the phase
+\emph{blocks} an advance whose headwind component reaches
+\mskey{species.coluzzii.wind_block_threshold_ms}\,m\,s$^{-1}$; without a wind field the rule is inactive. The random stream of each female and phase is derived from her
+\code{uid}, the day and the phase, so the order of the traversal does not
+change the result. A female who lands is skipped for the rest of the day; one who does not remains
+in HOST\_SEEKING.
+
+\textbf{People are found by distance.} The person is identified: the bite is
+recorded as an event (mosquito, person, phase, position, whether the vector was
+infectious, whether the bite exposed the person) and the pickup and the
+human infection use that person. A dense settlement therefore concentrates the
+bites on the people nearest to where the adults are, which is a property of
+the nearest-person rule.
 
 \textbf{Starvation.} The HOST\_SEEKING timer is incremented once per daily
 update. A female that reaches \mskey{host_seeking.starvation_days} days without a blood meal dies. The timer
@@ -1593,16 +1585,12 @@ probability
 \begin{equation}\label{eq:pinf}
 P_{\text{inf}}=\beta_{hv}\,p^{\text{prev}}_j,
 \end{equation}
-where $j$ is the host cell and $p^{\text{prev}}_j$ is its infectious
-fraction $I_H(j)/H_j$ \emph{as of the end of the previous day}: the human
-grid keeps one daily prevalence field, written at the end of each SEIR
-update, and the bite reads the value left there by the last update
-(\code{mosquito_submodel.cpp:105,111};
-\code{human_state.hpp:106};\code{human_state.cpp:330}). The hazard is
-therefore lagged by one day relative to the bites recorded on the same
-day. When the stored value is zero the code draws no random number at
-all. On success she becomes EXPOSED with EIP
-progress 0.
+where $p^{\text{prev}}$ is $1$ if the person bitten is infectious and $0$
+otherwise when the cascade identified the person (the state of
+\emph{that} person at the time of the bite), and the infectious fraction of
+the host cell as of the end of the previous day in the legacy per-cell
+paths. When the value is zero the code draws no random number at all. On
+success she becomes EXPOSED with EIP progress 0.
 
 \begin{longtable}{@{}L{5.2cm}L{3.3cm}L{1.2cm}L{1.3cm}L{3.3cm}@{}}
 \caption{Parameters of the host-seeking submodel.}\label{tab:hostparams}\\
@@ -1617,54 +1605,25 @@ progress 0.
 \bottomrule
 \endlastfoot
 \bcode{host_seeking.starvation_days} & maximum days without a host & d & \mskey{host_seeking.starvation_days} & engineering prior \\
-\bcode{host_seeking.indoor_attraction_add} & indoor modifier coefficient & -- & \mskey{host_seeking.indoor_attraction_add} & engineering prior; no recorded source \\
-\bcode{host_seeking.urbanicity_add} & urban modifier coefficient & -- & \mskey{host_seeking.urbanicity_add} & engineering prior \\
-\bcode{host_seeking.indoor_fraction_urban} & indoor fraction, urban class & -- & \mskey{host_seeking.indoor_fraction_urban} & literature anchor for \emph{An.\ gambiae} endophily \\
-\bcode{host_seeking.indoor_fraction_rural} & indoor fraction, rural class & -- & \mskey{host_seeking.indoor_fraction_rural} & literature anchor \\
-\bcode{host_seeking.detect_range_m} & directed-movement detection range & m & \mskey{host_seeking.detect_range_m} & engineering prior \\
-\bcode{host_seeking.approach_step_m} & HOST\_APPROACH step & m & \mskey{host_seeking.approach_step_m} & engineering prior; path not entered \\
-\bcode{species.<row>.host_seeking_scale_m} & plume decay $s_s$ & m & \mskey{species.coluzzii.host_seeking_scale_m} (\mskey{species.arabiensis.host_seeking_scale_m} for \emph{arabiensis}) & engineering prior; mechanism recorded as Giraldo (2023) \\
-\bcode{species.<row>.host_seeking_radius_m} & attraction-field radius & m & \mskey{species.coluzzii.host_seeking_radius_m} & engineering prior; no local plume measurement \\
-\bcode{dispersal.host_flight_step_m} & directed flight step per phase & m & \mskey{dispersal.host_flight_step_m} & engineering prior \\
-\bcode{species.<row>.activity_weights} & phase activity weights [DAY, EVENING, NIGHT, DAWN] & -- & \mskey{species.coluzzii.activity_weights} & \emph{An.\ coluzzii} row; engineering prior with a nocturnal shape \\
-\bcode{kPhaseActivityEpsilon} & phase gate & -- & 0.001 & model definition \\
+\bcode{species.<row>.co2_activation_radius_m} & activation radius & m & \mskey{species.coluzzii.co2_activation_radius_m} & measured \\
+\bcode{species.<row>.olfactory_radius_m} & plume-tracking radius & m & \mskey{species.coluzzii.olfactory_radius_m} & measured band 30--70\,m, midpoint \\
+\bcode{species.<row>.visual_radius_m} & visual-approach radius & m & \mskey{species.coluzzii.visual_radius_m} & measured band 0.25--0.72\,m, midpoint \\
+\bcode{species.<row>.terminal_radius_m} & contact radius & m & \mskey{species.coluzzii.terminal_radius_m} & measured band 0.10--0.20\,m, midpoint \\
+\bcode{species.<row>.flight_speed_ms} & own flight speed & m\,s$^{-1}$ & \mskey{species.coluzzii.flight_speed_ms} & measured band 0.225--0.45, midpoint \\
+\bcode{species.<row>.exploration_range_m} & exploration disk radius & m & \mskey{species.coluzzii.exploration_range_m} & engineering prior \\
+\bcode{species.<row>.daily_move_capacity_m} & daily path length & m & \mskey{species.coluzzii.daily_move_capacity_m} & mean of the measured 486--695\,m\,d$^{-1}$ \\
+\bcode{species.<row>.wind_block_threshold_ms} & headwind blocking threshold & m\,s$^{-1}$ & \mskey{species.coluzzii.wind_block_threshold_ms} & engineering prior \\
+\bcode{integration.phase_duration_hours} & phase clock & h & \mskey{integration.phase_duration_hours} & engineering prior \\
+\bcode{integration.dt_olfactory_s}, \bcode{integration.dt_terminal_s} & micro-steps & s & \mskey{integration.dt_olfactory_s}, \mskey{integration.dt_terminal_s} & engineering prior (25\,Hz terminal) \\
+\bcode{species.<row>.activity_weights} & phase profile [DAY, EVENING, NIGHT, DAWN] & -- & \mskey{species.coluzzii.activity_weights} & \emph{An.\ coluzzii} bins of Akuoko (2024) re-derived for the clock \\
 \bcode{species.<row>.pref} & host preference $\pi_k$ & -- & \mskey{species.coluzzii.pref.human}, \mskey{species.coluzzii.pref.cattle}, \mskey{species.coluzzii.pref.goat}, \mskey{species.coluzzii.pref.sheep}, \mskey{species.coluzzii.pref.wildlife} & \emph{An.\ coluzzii} row; model attraction weights, not observed HBI \\
 \end{longtable}
 
-\textbf{Origin and rationale.} The attraction field is a minimal
-representation of host odour and CO$_2$ plumes: host abundance, species
-preference, indoor/urban concentration, and exponential distance decay.
-It is not a plume-transport model; the decay scale is a prior, not a
-measurement. The phase pass exists because human and livestock hosts move
-during the day, so the same mosquito experiences a different host
-landscape at night and at midday. The multinomial flow preserves the
-total host count and introduces realistic day-to-day variation in who is
-where. The fallback without a host landscape is deliberately crude: it
-guarantees a blood meal at the current cell so that a run without host
-data still produces a gonotrophic cycle and eggs. It should not be used
-for a quantitative host-partitioning analysis.
-
-\textbf{Consequences worth stating.} With a \mskey{dispersal.host_flight_step_m}\,m step in each of four
-active phases, a female can move up to 2\,km per day toward hosts,
-independently of the local dispersal kernel; the phase weights gate
-activity but are not used as probabilities, so the daytime weight of
-\mskey{species.coluzzii.activity_weights} still produces a full daytime search-and-feed opportunity (Appendix~A.4).
-Because the host type is the \emph{dominant} host of the selected cell,
-and the selected cell is chosen by total attraction, the realized host
-partition is not a direct draw from $\pi_k$; in a mixed cell, the most
-attractive host type dominates the recorded bites.
-
 \subsection{Disperse adults}
 
-Every adult makes a local dispersal draw once per day. With probability
-\mskey{dispersal.adult_prob_day} it moves by an isotropic Gaussian offset,
-\begin{equation}\label{eq:disp}
-(\Delta x,\Delta y)\sim\mathcal{N}(0,\sigma^2),\qquad
-\sigma=\mskey{dispersal.adult_sigma_m}\,\text{m},
-\end{equation}
-clipped to a circle of radius \mskey{dispersal.adult_max_m}\,m and converted to degrees with
-the cosine of the local latitude. Otherwise it stays. The draw is
-independent of sex, age, and gonotrophic state.
+\textbf{The Gaussian local-dispersal kernel no longer exists.} The only
+displacement of a female is her flight in the perception cascade (Section above) and
+the windborne jump below; males do not move until the male layer.
 
 If a wind field is supplied, gravid females and females in
 OVIPOSITION\_SEEKING may additionally migrate by wind. The wind path is
@@ -1680,8 +1639,7 @@ female's own flight speed. She survives the flight with probability \mskey{dispe
 on survival she is placed at the destination and reset to
 OVIPOSITION\_SEEKING; on failure she is removed. If the wind speed is at
 most 0.1\,m\,s$^{-1}$, the displacement is zero but the survival draw and
-the state reset still occur. Local dispersal is applied afterwards, so a
-wind-migrated female can also make a local jump on the same day. Lon/lat
+the state reset still occur. Lon/lat
 may leave the AOI during wind displacement; the cell index is clamped to
 the AOI border at the next snap.
 
@@ -1706,9 +1664,6 @@ band~1 of the state output counts; band~2 counts the current cell.
 \endhead
 \bottomrule
 \endlastfoot
-\code{adult_prob_day} & daily local dispersal probability & d$^{-1}$ & \mskey{dispersal.adult_prob_day} & engineering prior \\
-\code{adult_sigma_m} & Gaussian scale $\sigma$ & m & \mskey{dispersal.adult_sigma_m} & prior inside the 350--650\,m\,d$^{-1}$ range recorded as Costantini (1996); not the midpoint \\
-\code{adult_max_m} & clip radius & m & \mskey{dispersal.adult_max_m} & compromise between the p95 values recorded as Thomas (2013) \\
 \code{wind_migration_prob} & daily wind-migration probability & d$^{-1}$ & \mskey{dispersal.wind_migration_prob} & engineering prior \\
 \code{wind_flight_hours} & flight duration & h & \mskey{dispersal.wind_flight_hours} & engineering prior; mechanism recorded as Huestis (2019) and Faiman (2020) \\
 \code{wind_survival} & survival during wind flight & -- & \mskey{dispersal.wind_survival} & engineering prior; mechanism recorded as Sanogo (2021) \\
@@ -1799,25 +1754,19 @@ Equation~\eqref{eq:pinf}; the prevalence read at the host cell is the
 one of the previous day. On
 success she becomes EXPOSED with $E=0$.
 
-\textbf{Human force of infection.} The bite ledger aggregates, per cell,
-the infectious bites delivered to humans during the day. The force of
-infection on the human population of cell $j$ is
-\begin{equation}\label{eq:foi}
-\lambda_j=1-\exp\left(-\mskey{transmission.beta_vh}\frac{B^{\text{inf}}_j}{H_j}\right),
-\end{equation}
-and the number of new exposures is
-\begin{equation}\label{eq:newexp}
-E^{\text{new}}_j\sim\text{Binomial}\left(\operatorname{round}(S_j),\lambda_j\right),
-\end{equation}
-with a deterministic fallback $E^{\text{new}}_j=S_j\lambda_j$ when
-$\operatorname{round}(S_j)=0$, and
-clamped to the susceptible count. The new exposures enter the exposed
-cohort queue at age zero. The queue is shifted by one day per update:
-a cohort exposed on day $d$ becomes infectious on day $d+\mskey{transmission.human_incubation_days}$ and recovers
+\textbf{Human infection.} The bite ledger aggregates, per cell, the
+infectious bites delivered to humans during the day. There is no force of
+infection per cell: each infectious bite lands on one person of the
+bitten cell, drawn uniformly (until the movement cascade identifies the
+person bitten), and exposes that person, and only that person, with
+probability $\mskey{transmission.beta_vh}$ if the person is susceptible; a
+second infectious bite on the same person the same day changes
+nothing. The first step of each day advances the individual timers: a
+person exposed on day $d$ becomes infectious on day $d+\mskey{transmission.human_incubation_days}$ and recovers
 on day $d+\mskey{transmission.human_infectious_days}$ after onset. With immunity disabled (the default), recovery
-returns the cohort directly to $S_H$ (an SIS-like human model) and $R_H$
-stays zero; with immunity enabled, recovered cohorts spend \mskey{transmission.human_immunity_days} days in
-$R_H$ before returning to $S_H$.
+returns the person directly to susceptible (an SIS-like human model) and
+the recovered state stays empty; with immunity enabled, a recovered person
+spends \mskey{transmission.human_immunity_days} days recovered before returning to susceptible.
 
 \textbf{Outbreak seeding.} The seeding rule is described in
 Section~5.3. Two timing details matter. First, the outbreak is checked
@@ -1914,16 +1863,14 @@ the engine under \code{mal-core/src/mal_core/abm/}.
 \item \textbf{There are no hourly host-seeking sub-steps.} The header
   \bcode{multirate_scheduler.hpp} describes 12 nightly hourly sub-steps,
   and \code{MosquitoSubmodel} holds a \code{MultirateDayState} member, but
-  that member is never advanced. Host seeking is a single daily loop plus
-  the four-phase pass described in Section~7.6.
+  that member is never advanced. Host seeking is the perception cascade:
+  one flight per female and day, with micro-steps only inside the olfactory
+  and visual bands.
 
-\item \textbf{The phase activity weights gate, but do not weight, the
-  phase pass.} \code{phase_active()} returns true when the species
-  activity weight exceeds 0.001. With the default weights
-  (\mskey{species.coluzzii.activity_weights}) all four phases are active, and each phase
-  gives a full search-and-feed opportunity. The weights are not used as
-  probabilities, so the model has substantial daytime host seeking
-  despite the nocturnal shape of the row.
+\item \textbf{The phase activity weights share the daily flight budget.}
+  The weights of the row (\mskey{species.coluzzii.activity_weights}) split the
+  daily flight-time budget over the phases; a phase with weight zero does not
+  fly. They are not probabilities.
 
 \item \textbf{The three aquatic mortality streams are fixed and
   re-seeded daily.} \code{washout()}, \code{stage_mortality()}, and
@@ -1978,15 +1925,6 @@ the engine under \code{mal-core/src/mal_core/abm/}.
   instruction constructor, which carries the cell centre and the staged
   immature distribution. The round-robin path survives for tests and
   legacy callers; a run through the engine never uses it.
-
-\item \textbf{Mobility moves hosts, not infections.} The phase-specific
-  effective host grids redistribute humans and cattle for attraction and
-  biting, but the human SEIR compartments remain at the residential
-  cells. A bite recorded at a destination cell therefore applies its
-  force of infection to the residential population of that cell. This is
-  a structural assumption, not a bug in the queue update, but it means
-  that the model does not represent the infection of a commuter at the
-  commuter's home cell.
 
 \item \textbf{\code{--max-population} is an operational abort, not a
   biological ceiling.} When set to a positive value, the engine throws and
@@ -2046,8 +1984,8 @@ for the engine's behaviour.
 \subsection*{B.2 Software testing}
 
 The engine has C++ GoogleTest suites for climate reading, the
-coordinator, dispersal, EIP, the engine facade, the env reader, the
-gonotrophic cycle, and the effective host landscape; the Python side has
+coordinator, EIP, the engine facade, the env reader, the
+gonotrophic cycle, the perception cascade and the human population; the Python side has
 tests for the wrapper, the runner, the output contract, and the habitat
 contract, plus golden fixtures that pin the per-day outputs of a small
 synthetic scenario. The Python--C++ parity that does exist compares the

@@ -4,9 +4,9 @@ This file is the question set for the conceptual document of the **ingest
 stage** of the MalariaSentinel pipeline (the stage that turns raw, downloaded
 layers into the three artefacts the C++ engine consumes: the daily
 environment NetCDF, the static habitat-patch GeoPackage, the host-density
-grid and the mobility operators). It was compiled by reading the
+grid). It was compiled by reading the
 implementation: `mal-core/src/mal_core/ingest/` (`daily_nc.py`, `env.py`,
-`hosts.py`, `mobility.py`, `_shared.py`), the habitat reference modules in
+`hosts.py`, `_shared.py`), the habitat reference modules in
 `mal-core/src/mal_core/habitat/` (`potential.py`, `availability.py`,
 `capacity.py`, `aquatic_stress.py`, `config.py`, `constants.py`), the
 constants file `mal-core/config/model_constants.yaml` and its validator
@@ -53,33 +53,24 @@ expose?**
   subcommand), `mal-core/src/mal_core/ingest/__init__.py:1-10`,
   `mal-core/src/mal_core/ingest/env.py:112-118` (`build_env_tensor`),
   `mal-core/src/mal_core/ingest/hosts.py:36-48` (`build_host_dataset`),
-  `mal-core/src/mal_core/ingest/mobility.py:37-48` (`build_mobility_dataset`),
   `mal-core/src/mal_core/ingest/daily_nc.py:150-158` (`build_daily_env_nc`).
 - Answer: the CLI `malariasim ingest --aoi … [--year …] [--month …]
-  [--output-dir …] [--data-dir …] [--what env|hosts|mobility|all]`, plus
-  three Python builders. `--what` selects which of the three builders runs;
-  `all` is the default. The three builders are independent of each other
-  except that mobility consumes the host grid produced by hosts.
+  [--output-dir …] [--data-dir …] [--what env|hosts|all]`, plus
+  two Python builders. `--what` selects which of the two builders runs;
+  `all` is the default. The two builders are independent of each other.
 
 **3. Which artefacts does the stage produce, under which names, and which
 manifest keys does it claim for them?**
 
 - Citation: `mal-core/src/mal_core/download/catalog.py:55-92`
-  (`INGEST_ARTIFACTS`: `env`, `habitat`, `host_static`, `host_manifest`,
-  `mobility_day`, `mobility_night`, `livestock_mobility`,
-  `mobility_manifest`),
+  (`INGEST_ARTIFACTS`: `env`, `habitat`, `host_static`, `host_manifest`),
   `mal-core/src/mal_core/ingest/daily_nc.py:466` (env NC name),
   `mal-core/src/mal_core/ingest/env.py:172` (gpkg name),
   `mal-core/src/mal_core/ingest/hosts.py:186` (host NC name),
-  `mal-core/src/mal_core/ingest/mobility.py:104-117` (the three CSR names),
-  `mal-core/src/mal_core/ingest/mobility.py:137` (mobility manifest name).
-- Answer: eight artefact keys, of which five are marked
-  `required_for_abm=True` (`env`, `habitat`, `host_static`, `mobility_day`,
-  `mobility_night`, `livestock_mobility`). On-disk names:
+- Answer: four artefact keys, of which three are marked
+  `required_for_abm=True` (`env`, `habitat`, `host_static`). On-disk names:
   `<aoi>_regional_<y0>_<y1>_env.nc`, `<aoi>_habitat_patches.gpkg`,
-  `<aoi>_host_static.nc`, `host_manifest.json`,
-  `<aoi>_mobility_day.csr`, `<aoi>_mobility_night.csr`,
-  `<aoi>_livestock_mobility.csr`, `mobility_manifest.json`.
+  `<aoi>_host_static.nc`, `host_manifest.json`.
 
 **4. Does ingest ever download anything?**
 
@@ -90,8 +81,7 @@ manifest keys does it claim for them?**
   `:92` (`load_glw_livestock`), `:111` (`load_ghsl_urban_class`),
   `:146` (`load_buildings_fraction`), `:169` (`load_wildlife_host_proxy`).
 - Answer: **the env/habitat path never downloads** — it resolves four
-  required manifest keys and raises when one is absent. **The host and
-  mobility path does download**: `build_host_dataset` calls the loader
+  required manifest keys and raises when one is absent. **The host path does download**: `build_host_dataset` calls the loader
   functions directly, and those loaders fetch from their providers
   (WorldPop, GLW4, GHSL, Overture, and the derived wildlife proxy). The
   retired spec's claim that "ingest never downloads"
@@ -226,8 +216,7 @@ file georeferenced?**
   declaration) versus `mal-core/src/mal_core/ingest/daily_nc.py:186-260`
   (the builder body: `resolved["host_static"]` is never read).
 - Answer: nothing — it is declared as an optional dependency and never
-  consumed by `build_daily_env_nc`. The only consumer of the host grid is
-  the mobility builder. → part (c).
+  consumed by `build_daily_env_nc`. The host grid is read by the engine, not by this builder. → part (c).
 
 **12. What are the two temporal channels, and how is each prepared?**
 
@@ -731,42 +720,7 @@ declared?**
   substituting a constant for a real layer. The constants `0.6`, `0.1` and
   `0.3` are literals in the module, not constants-file keys.
 
-**36. How is the mobility operator built, and what are its parameters?**
-
-- Citation: `mal-core/src/mal_core/ingest/mobility.py:37-48` (the
-  signature and its defaults: `cell_size_km=1.0`, `beta_day=0.05`,
-  `beta_night=0.5`, `beta_livestock=0.1`, `max_distance_km=50.0`,
-  `sparsity_threshold=5e-4`), `:84-102` (one matrix built and written at a
-  time, to bound memory), `:104-117` (day, night and livestock; an
-  identity matrix if there is no livestock), `mal-commonlib/src/mal_commonlib/data/mobility.py:21-60`
-  (the gravity model `P(i→j) ∝ H(j)·exp(−β·d(i,j))`, row-normalised,
-  sparsified and renormalised), `:161-180` (the CSR binary layout).
-- Answer: a row-stochastic gravity model on the same grid: human
-  attractiveness = population, livestock attractiveness = the sum of the
-  five livestock layers; three CSR operators (day, night, livestock) with
-  three different friction parameters and a 50 km hard cutoff. The
-  parameters are **literals in the module's signature**, not constants-file
-  keys, so the document must generate or cite them explicitly and assign
-  them a provenance tier. Verified on the real manifest
-  (`data/ghana/mobility_manifest.json`): `n_cells` 429 229, grid 779 × 551,
-  `cell_size_km` 1.0, `beta_day` 0.05, `beta_night` 0.5,
-  `beta_livestock` 0.1, `max_distance_km` 50.0,
-  `sparsity_threshold` 5 × 10⁻⁴, `human_total` 32 048 206,
-  `livestock_total` 150 902 080, with 96.2 M / 21.9 M / 197.7 M non-zeros
-  in the day / night / livestock operators — the sparsity threshold keeps
-  22 % of the day matrix and 5 % of the night matrix, so the "operator"
-  is a sparse transport graph, not a dense matrix.
-
-**37. Where do the human and livestock attractiveness values come from,
-and what happens to the NoData sentinel?**
-
-- Citation: `mal-core/src/mal_core/ingest/mobility.py:25-34` (loading the
-  host NetCDF), `:76-88` (`NODATA_SENTINEL` → 0 for the human layer and
-  for each livestock layer), `:88`/`:108-117` (the livestock total decides
-  whether the gravity model or the identity fallback is used).
-- Answer: they are read back out of the host NetCDF that the previous step
-  wrote, with the `-9999` sentinel mapped to zero. When the AOI has no
-  livestock at all, the livestock operator degenerates to the identity.
+**36–37.** *(Retired: the mobility operators are no longer built by ingest, nor read by the engine; people do not move in this version.)*
 
 ### Manifest integration
 
@@ -834,11 +788,7 @@ the manifest?**
 - Citation: `mal-core/src/mal_core/cli.py:220-222` (env: `output_dir` is
   used as the *input* directory too, and `data_root = chosen_data_dir.parent`),
   `:224-226` (hosts: `output_dir`, default `runs/ingest`),
-  `:227-237` (mobility: output hard-coded to `data/<aoi>`, input looked up
-  in `output_dir` then `data/<aoi>`), versus
-  `mal-core/src/mal_core/ingest/hosts.py:219-236` and
-  `mal-core/src/mal_core/ingest/mobility.py:141-161` (both register with
-  the **default** data root, `data/`), and
+  (registers with the **default** data root, `data/`), and
   `mal-core/src/mal_core/download/manifest.py:149-151` (the manifest path
   is `data_root/<aoi>/manifest.json`).
 - Answer: the CLI's defaults are mutually inconsistent, and the failure is
@@ -858,8 +808,7 @@ the manifest?**
   (ii) the host grid is written to `runs/ingest/` but registered in
   `data/ghana/manifest.json`, because `build_host_dataset` registers
   without a `data_root` and therefore uses the default `DATA_ROOT`
-  (`hosts.py:219-236`); (iii) the mobility operators are written to
-  `data/<aoi>/` (`cli.py:233`). A completed run therefore leaves the
+  (`hosts.py:219-236`). A completed run therefore leaves the
   manifest declaring files that are not where the manifest says they are,
   which `validate_completeness` reports as missing. → part (c).
 
@@ -868,17 +817,13 @@ the manifest?**
 **42. What does the ABM take from ingest, and how does it resolve it?**
 
 - Citation: `mal-core/src/mal_core/abm/wrapper.py:112-121`
-  (`validate_completeness` first), `:137-165` (the seven resolutions:
-  `env` with a year, `habitat`, `host_static`, `wind`, `mobility_day`,
-  `mobility_night`, `livestock_mobility`), `:183-195` and `:210-222` (the
+  (`validate_completeness` first), `:137-165` (the four resolutions: `env` with a year, `habitat`, `host_static`, `wind`), `:183-195` and `:210-222` (the
   flags the wrapper hands the binary: `env`, `habitat`, `year`, `month`,
-  `days`, `seed`, `output`, and, only when resolved, `hosts`, the three
-  mobility flags and `wind_field`), `:166-178` (only `env` and `habitat`
+  `days`, `seed`, `output`, and, only when resolved, `hosts` and `wind_field`), `:166-178` (only `env` and `habitat`
   are hard errors).
 - Answer: the engine takes the env NetCDF (mandatory), the habitat
   GeoPackage (mandatory), the host grid, the wind field (from the download
-  stage, not from ingest) and the three mobility operators (all optional at
-  the flag level). The ABM first requires that every file *declared* in the
+  stage, not from ingest) (both optional at the flag level). The ABM first requires that every file *declared* in the
   manifest exists.
 
 **43. How does the engine read the env NetCDF, and what does it do with
@@ -982,13 +927,11 @@ which are code literals?**
   `:28-32` (pluvial), `:128-129` (capacity), versus the code literals:
   `mal-core/src/mal_core/ingest/daily_nc.py:439` (generator version),
   `mal-core/src/mal_core/ingest/hosts.py:141`/`:159`/`:182` (0.6, 0.1, 0.3),
-  `mal-core/src/mal_core/ingest/mobility.py:42-47` (the six mobility
-  parameters), `mal-core/src/mal_core/habitat/capacity.py:30`
+  `mal-core/src/mal_core/habitat/capacity.py:30`
   (`K_REF_DIAG_PER_KM2`).
 - Answer: the constants-file keys are the generated ones (the existing
   `docs/concepts/generated/params-ingest.tex` already emits them); the
-  generator version, the three host fallbacks, the six mobility parameters
-  and the Python diagnostic K constant are **not** in the constants file and
+  generator version, the three host fallbacks and the Python diagnostic K constant are **not** in the constants file and
   must either be cited as code literals or promoted to keys before the
   document can quote them.
 
@@ -1060,9 +1003,6 @@ can check each of the following against the cited file:
     per-layer aggregation rule, the count-versus-density and
     centroid-versus-area distinctions, and the three fallback constants
     (Q33, Q34, Q35).
-21. **The mobility operators are described** with the gravity model, the
-    three friction parameters, the cutoff, the sparsification, and the
-    identity fallback (Q36, Q37).
 22. **The manifest integration is described**: the eight registrations, the
     fields recorded, the licence and attribution convention, and the
     year-key consequence for the multi-year env NC (Q38, Q39).
@@ -1085,7 +1025,7 @@ can check each of the following against the cited file:
 
 ## (c) Open questions
 
-1. **The host/mobility path downloads, the env path does not.**
+1. **The host path downloads, the env path does not.**
    `build_host_dataset` calls the provider loaders directly
    (`hosts.py:74`, `:92`, `:111`, `:146`, `:170`), so a "run ingest" on a
    machine with an empty cache fetches WorldPop, GLW4, GHSL, Overture and
@@ -1126,7 +1066,7 @@ can check each of the following against the cited file:
    the manifest from its own output directory. Beyond that: the env NC is
    written under `runs/ingest/` but registered in `runs/ghana/manifest.json`;
    the host grid is written under `runs/ingest/` but registered in
-   `data/ghana/manifest.json`; the mobility operators go to `data/<aoi>/`.
+   `data/ghana/manifest.json`.
    A completed run leaves a manifest whose declared files are not all where
    it says they are, which `validate_completeness` reports as missing.
 7. **The env NetCDF is registered under a single year key** although it

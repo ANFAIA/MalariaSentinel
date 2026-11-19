@@ -2,7 +2,7 @@
   "id": "E05",
   "mode": "gate",
   "seed": 20261117,
-  "days": 3,
+  "days": 10,
   "agents": [
     {
       "x": 5200,

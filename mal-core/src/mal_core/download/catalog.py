@@ -6,7 +6,7 @@ Identity of a dataset is its **manifest key**. There are exactly two kinds:
   ``DOWNLOADER.manifest_keys`` (mal-commonlib, discovered via the
   registry). This module adds NO new tables for them — it derives the
   list from the registry itself.
-* **Derived ingest artifacts** (env NC, host grid, mobility CSRs...) declare
+* **Derived ingest artifacts** (env NC, host grid...) declare
   theirs in ``INGEST_ARTIFACTS`` below — the only new table, replacing the
   key strings that used to be hardcoded at each registration site.
 
@@ -71,24 +71,6 @@ INGEST_ARTIFACTS: dict[str, IngestArtifact] = {
     "host_manifest": IngestArtifact(
         "host_manifest", "mal_core.ingest.hosts.build_host_dataset",
         "Per-variable host stats JSON",
-    ),
-    "mobility_day": IngestArtifact(
-        "mobility_day", "mal_core.ingest.mobility.build_mobility_dataset",
-        "Human daytime mobility CSR", required_for_abm=True,
-    ),
-    "mobility_night": IngestArtifact(
-        "mobility_night", "mal_core.ingest.mobility.build_mobility_dataset",
-        "Human nighttime mobility CSR", required_for_abm=True,
-    ),
-    "livestock_mobility": IngestArtifact(
-        "livestock_mobility",
-        "mal_core.ingest.mobility.build_mobility_dataset",
-        "Livestock mobility CSR", required_for_abm=True,
-    ),
-    "mobility_manifest": IngestArtifact(
-        "mobility_manifest",
-        "mal_core.ingest.mobility.build_mobility_dataset",
-        "Mobility betas/params JSON",
     ),
 }
 
@@ -509,10 +491,6 @@ def register_existing(
         "habitat": f"{aoi}_habitat_patches.gpkg",
         "host_static": f"{aoi}_host_static.nc",
         "host_manifest": "host_manifest.json",
-        "mobility_day": f"{aoi}_mobility_day.csr",
-        "mobility_night": f"{aoi}_mobility_night.csr",
-        "livestock_mobility": f"{aoi}_livestock_mobility.csr",
-        "mobility_manifest": "mobility_manifest.json",
     }
     for key, pattern in artifact_patterns.items():
         candidates = sorted(dd.glob(pattern))

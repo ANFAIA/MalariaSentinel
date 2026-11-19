@@ -678,11 +678,7 @@ Fields that are omitted in an update leave the stored value untouched
 (\code{.../manifest.py:162-174}): a re-registration with \code{license=None}
 does not erase an existing licence.
 
-Two details of that table need spelling out. \code{csr} is the
-compressed-sparse-row file the mobility builder writes
-(\code{.../ingest/mobility.py:99-110}): it is a derived product, not a
-downloaded one, and it appears in a manifest only because ingest registers
-it. The \emph{rule} for the \code{files} map is one sentence: a write that
+One detail of that table needs spelling out. The \emph{rule} for the \code{files} map is one sentence: a write that
 carries a year keys the entry by that year, as a string, and a write that
 carries no year keys it by the dataset's own manifest key. Which of the two
 happens is decided by the write path, not by the nature of the product: the
@@ -1624,16 +1620,14 @@ convention for those products rather than an enforced contract.
 
 The ABM wrapper validates completeness first
 (\code{mal-core/src/mal\_core/abm/wrapper.py:116-121}) and then resolves
-seven paths: \code{env}, \code{habitat}, \code{host\_static}, \code{wind},
-\code{mobility\_day}, \code{mobility\_night} and \code{livestock\_mobility}
-(\code{...:141-165}). Only \code{env} and \code{habitat} are mandatory; the
+four paths: \code{env}, \code{habitat}, \code{host\_static} and \code{wind}. Only \code{env} and \code{habitat} are mandatory; the
 others are passed to the binary when present
 (\code{...:167-178}). The wind path is resolved by the literal key
 \code{"wind"} rather than through a loader declaration, and the source says
 so in a comment (\code{...:149-152}). This is the one consumer that
 hard-codes a dataset key.
 
-The mapping from those seven paths back to their producers is the reader's
+The mapping from those four paths back to their producers is the reader's
 answer to ``what do I have to download to make the model run?'':
 
 \begin{longtable}{@{}llp{0.40\textwidth}@{}}
@@ -1650,24 +1644,17 @@ GeoPackage from the JRC fraction and the Dynamic World fractions \\
 WorldPop, GLW, GHSL, Overture buildings and the wildlife proxy \\
 \code{wind} & \code{wind} & the ERA5 loader's \code{wind\_6hourly} output
 (the key is the literal string \code{"wind"}) \\
-\code{mobility\_day} & \code{mobility\_day} & the ingest stage builds the
-mobility CSR from \code{host\_static} \\
-\code{mobility\_night} & \code{mobility\_night} & the ingest stage builds the
-mobility CSR from \code{host\_static} \\
-\code{livestock\_mobility} & \code{livestock\_mobility} & the ingest stage
-builds the mobility CSR from \code{host\_static} \\
 \bottomrule
 \end{longtable}
 \label{tab:abm-paths}
 
-Only one of the seven is a download in itself: the ERA5 wind. The other six
+Only one of the four is a download in itself: the ERA5 wind. The other three
 are derived by ingest, and every one of them is built from downloads that
 are in the default profile --- \code{env} from the CHIRPS rainfall, the
 ERA5 air temperature, the JRC permanent-water fraction and the Dynamic
 World class fractions; \code{habitat} from the JRC fraction and the Dynamic
 World fractions; \code{host\_static} from WorldPop, GLW, GHSL, Overture
-buildings and the wildlife proxy; and the three mobility CSRs from
-\code{host\_static}. The set of downloads the ABM needs is therefore the
+buildings and the wildlife proxy. The set of downloads the ABM needs is therefore the
 default profile of Section~\ref{sec:profile}, less the two products no
 consumer of the current contract reads.
 
@@ -1770,7 +1757,7 @@ literal credit line is stamped into the manifest entry
 \item One product carries a redistribution obligation: the Overture Maps
 buildings are ODbL 1.0, and everything derived from them --- the
 \code{building\_fraction} term of \code{host\_static}, the remoteness term
-of the wildlife proxy, the mobility CSRs --- is share-alike if it is ever
+of the wildlife proxy --- is share-alike if it is ever
 published or shared.
 \item One product carries a notification duty: the GSHHG coastline data is
 LGPL v3, and its authors ask to be notified if the data is modified for

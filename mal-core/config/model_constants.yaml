@@ -3,11 +3,12 @@
 # Toda clave es OBLIGATORIA; loaders fallan listando faltantes. Unidades entre [ ].
 # 'frozen' = contrato; cambiar requiere version-bump + PR de contratos.
 
-version: 2                                # [int] versión del esquema; bump obligatorio en cambio frozen
+version: 3                                # [int] versión del esquema; bump obligatorio en cambio frozen (3: individuos humanos, cascada de movimiento, sangre, seca, machos)
 
 contracts:              # contratos congelados de entrada/salida (plan §9.3)
   env_nc: "3.0"         # [string] contrato del env NC (entrada habitat; daily_nc.py)
-  cogs_state: "4.0"     # [string] contrato del state COG + sidecar (wire.hpp)
+  cogs_state: "4.0"     # [string] contrato del state COG + sidecar (wire.hpp); pasa a "5.0" en el Paso 11, cuando el COG publica una sola banda
+  habitat: "4.0"        # [string] contrato del registro de hábitat por celda; lo consume el Paso 7 (declarado desde el Paso 4)
 
 habitat_types:          # tipos de hábitat del motor (orden = API de índice py; C++ carga por NOMBRE)
   types: [surface_persistent, wetland_persistent, urban_persistent,
@@ -63,13 +64,40 @@ species:
   coluzzii:
     weights: {surface_persistent: 0.40, wetland_persistent: 0.10, urban_persistent: 0.20,
               wetland_pluvial: 0.00, open_pluvial: 0.25, crop_pluvial: 0.05}   # [fracción] afinidad por tipo de hábitat (Σ=1.00)
-    activity_weights: [0.02, 0.10, 0.80, 0.08]          # [fracción] actividad por fase DAY/EVENING/NIGHT/DAWN (Σ=1.00); forma nocturna de Akuoko 2024, pesos = engineering prior
+    activity_weights: [0.0, 0.255, 0.48, 0.265]         # [fracción] perfil horario por fase DAY/EVENING/NIGHT/DAWN (Σ=1.00); Akuoko 2024 (coluzzii, n=935): EE 18-22 h 25,5 %, LE 22-04 h 48,0 %, EM 04-06 h 26,5 %; DAY = 0 por falta de dato [P]
     pref: {human: 0.99, cattle: 0.005, goat: 0.003, sheep: 0.001, wildlife: 0.001}  # [fracción] preferencia por tipo de hospedador (Σ=1.00)
     salinity_opt_ppt: 0.0                               # [psu] salinidad óptima (factor = 1)
     salinity_hi_tol_ppt: 30.0                           # [psu] tolerancia máxima; por encima no cría
     salinity_slope: 0.08                                # [psu⁻¹] decaimiento del factor de salinidad
-    host_seeking_scale_m: 300.0   # [m] escala del decaimiento del penacho (mecanismo: Giraldo 2023); valor = engineering prior, sin medición local
-    host_seeking_radius_m: 1500.0 # [m] radio del campo de atracción = engineering prior (sin medición directa del penacho en las fuentes locales)
+    co2_activation_radius_m: 100.0   # [m] radio de activación por CO₂ (tramo ACTIVACIÓN de la cascada) [P]
+    olfactory_radius_m: 50.0   # [m] radio de rastreo olfativo de la pluma; banda 30–70 m, punto medio [P]
+    visual_radius_m: 0.485   # [m] radio de la banda de aproximación visual; banda 0,25–0,72 m, punto medio [P]
+    terminal_radius_m: 0.15   # [m] radio terminal (contacto); banda 0,10–0,20 m, punto medio [P]
+    flight_speed_ms: 0.3375   # [m/s] velocidad propia de vuelo en busca; banda 0,225–0,45 m/s, punto medio [P]
+    exploration_range_m: 100.0   # [m] radio del disco de exploración (>= co2_activation_radius_m); banda 100–200 m [EP]
+    exploration_step_m: 50.0   # [m] longitud nominal del paso del paseo de exploración [EP]
+    exploration_step_correlation: 0.5   # [adimensional] correlación paso–paso del paseo de exploración [EP]
+    casting_probability: 0.1   # [1/paso de rastreo] probabilidad de perder la pluma y pasar a casting [EP]
+    casting_angle_deg: 90.0   # [°] transversalidad del casting respecto al viento (90 ± 30) [EP]
+    plume_memory_s: 0.7   # [s] memoria de la pluma (segmentos de cast, Cummins 2012); banda 0,5–0,9 s, punto medio; la fila manda sobre integration.plume_memory_s [P]
+    anemotaxis_rule: "upwind"   # [categórico] regla de orientación respecto al viento (contra el viento) [EP]
+    anemotaxis_deviation_deg: 30.0   # [°] desviación máxima respecto a la dirección contra el viento (± grados) [EP]
+    wind_reference: "u100/v100"   # [string] variables del campo de viento (100 m AGL, ERA5 6-horario); único nivel disponible [M]
+    wind_block_threshold_ms: 0.3375   # [m/s] umbral de bloqueo del avance contra el viento; por defecto = flight_speed_ms [EP]
+    daily_move_capacity_m: 590.0   # [m] longitud máxima de trayectoria diaria (MDTpD), no desplazamiento neto; media de 486–695 m/día [P]
+    directed_flight_budget_h: 0.4856   # [h] DERIVADO: daily_move_capacity_m / flight_speed_ms / 3600; consumible por día; la fila manda sobre integration.directed_flight_budget_h [EP]
+    blood_meal_target_ul: 0.5   # [µL] objetivo de una comida completa [EP]
+    first_cycle_target_ul: 0.8   # [µL] objetivo de la primera comida (> blood_meal_target_ul: hacen falta dos comidas) [EP]
+    blood_meal_size_ul: 0.3   # [µL] media del volumen tomado por comida [EP]
+    meal_size_min_ul: 0.1   # [µL] volumen mínimo de una comida válida [EP]
+    blood_meal_refractory_days: 0.5   # [días] ventana postprandial tras alcanzar el objetivo [EP]
+    probing_success_rate: 0.7275   # [fracción] probabilidad de éxito del sondeo por contacto; banda 0,465–0,99, punto medio; sustituye a gonotrophic.feeding_success_rate [EP]
+    eggs_per_ul: 223.0   # [huevos/µL] huevos por µL de sangre acumulada; 0,5 µL dan ≈112 huevos (puesta medida 111,67 ± 5,36) [EP]
+    arrested_daily_survival: 0.986   # [1/día] supervivencia diaria en arresto ovárico; 212·ln(0,986) ⇒ 0,05 a los 212 días de estivación [EP]
+    gonotrophic_arrest_prob_dry: 0.2704   # [fracción] probabilidad de arresto gonotrófico en estación seca (punto medio de 19,23–34,85 / 40,09–48,98 / 68,12–68,64 % coluzzii / arabiensis / gambiae s.s.); sin dato en las demás filas ⇒ 0 [P]
+    aestivation_supported: true   # [booleano] la especie estiva (arresto ovárico); sin evidencia en funestus, melas y stephensi [EP]
+    male_ratio: 0.5   # [fracción] fracción de machos al emerger; neutral por defecto (la evidencia apunta a sesgo macho, Vielma et al. 2026) [EP]
+    male_daily_survival: 0.773   # [1/día] supervivencia diaria del macho (0,773 ± 0,094, Epopa et al. 2017); separada de la hembra [M]
   gambiae_ss:
     weights: {surface_persistent: 0.05, wetland_persistent: 0.05, urban_persistent: 0.15,
               wetland_pluvial: 0.00, open_pluvial: 0.65, crop_pluvial: 0.10}   # [fracción] afinidad por tipo de hábitat (Σ=1.00)
@@ -78,8 +106,35 @@ species:
     salinity_opt_ppt: 0.0                               # [psu] salinidad óptima (factor = 1)
     salinity_hi_tol_ppt: 20.0                           # [psu] tolerancia máxima; por encima no cría
     salinity_slope: 0.12     # [psu⁻¹] decaimiento del factor de salinidad (más abrupto que coluzzii)
-    host_seeking_scale_m: 300.0   # [m] escala del decaimiento del penacho (mecanismo: Giraldo 2023); valor = engineering prior, sin medición local
-    host_seeking_radius_m: 1500.0 # [m] radio del campo de atracción = engineering prior (sin medición directa del penacho en las fuentes locales)
+    co2_activation_radius_m: 100.0   # [m] radio de activación por CO₂ (tramo ACTIVACIÓN de la cascada) [P]
+    olfactory_radius_m: 50.0   # [m] radio de rastreo olfativo de la pluma; banda 30–70 m, punto medio [P]
+    visual_radius_m: 0.485   # [m] radio de la banda de aproximación visual; banda 0,25–0,72 m, punto medio [P]
+    terminal_radius_m: 0.15   # [m] radio terminal (contacto); banda 0,10–0,20 m, punto medio [P]
+    flight_speed_ms: 0.3375   # [m/s] velocidad propia de vuelo en busca; banda 0,225–0,45 m/s, punto medio [P]
+    exploration_range_m: 100.0   # [m] radio del disco de exploración (>= co2_activation_radius_m); banda 100–200 m [EP]
+    exploration_step_m: 50.0   # [m] longitud nominal del paso del paseo de exploración [EP]
+    exploration_step_correlation: 0.5   # [adimensional] correlación paso–paso del paseo de exploración [EP]
+    casting_probability: 0.1   # [1/paso de rastreo] probabilidad de perder la pluma y pasar a casting [EP]
+    casting_angle_deg: 90.0   # [°] transversalidad del casting respecto al viento (90 ± 30) [EP]
+    plume_memory_s: 0.7   # [s] memoria de la pluma (segmentos de cast, Cummins 2012); banda 0,5–0,9 s, punto medio; la fila manda sobre integration.plume_memory_s [P]
+    anemotaxis_rule: "upwind"   # [categórico] regla de orientación respecto al viento (contra el viento) [EP]
+    anemotaxis_deviation_deg: 30.0   # [°] desviación máxima respecto a la dirección contra el viento (± grados) [EP]
+    wind_reference: "u100/v100"   # [string] variables del campo de viento (100 m AGL, ERA5 6-horario); único nivel disponible [M]
+    wind_block_threshold_ms: 0.3375   # [m/s] umbral de bloqueo del avance contra el viento; por defecto = flight_speed_ms [EP]
+    daily_move_capacity_m: 590.0   # [m] longitud máxima de trayectoria diaria (MDTpD), no desplazamiento neto; media de 486–695 m/día [P]
+    directed_flight_budget_h: 0.4856   # [h] DERIVADO: daily_move_capacity_m / flight_speed_ms / 3600; consumible por día; la fila manda sobre integration.directed_flight_budget_h [EP]
+    blood_meal_target_ul: 0.5   # [µL] objetivo de una comida completa [EP]
+    first_cycle_target_ul: 0.8   # [µL] objetivo de la primera comida (> blood_meal_target_ul: hacen falta dos comidas) [EP]
+    blood_meal_size_ul: 0.3   # [µL] media del volumen tomado por comida [EP]
+    meal_size_min_ul: 0.1   # [µL] volumen mínimo de una comida válida [EP]
+    blood_meal_refractory_days: 0.5   # [días] ventana postprandial tras alcanzar el objetivo [EP]
+    probing_success_rate: 0.7275   # [fracción] probabilidad de éxito del sondeo por contacto; banda 0,465–0,99, punto medio; sustituye a gonotrophic.feeding_success_rate [EP]
+    eggs_per_ul: 223.0   # [huevos/µL] huevos por µL de sangre acumulada; 0,5 µL dan ≈112 huevos (puesta medida 111,67 ± 5,36) [EP]
+    arrested_daily_survival: 0.986   # [1/día] supervivencia diaria en arresto ovárico; 212·ln(0,986) ⇒ 0,05 a los 212 días de estivación [EP]
+    gonotrophic_arrest_prob_dry: 0.6838   # [fracción] probabilidad de arresto gonotrófico en estación seca (punto medio de 19,23–34,85 / 40,09–48,98 / 68,12–68,64 % coluzzii / arabiensis / gambiae s.s.); sin dato en las demás filas ⇒ 0 [P]
+    aestivation_supported: true   # [booleano] la especie estiva (arresto ovárico); sin evidencia en funestus, melas y stephensi [EP]
+    male_ratio: 0.5   # [fracción] fracción de machos al emerger; neutral por defecto (la evidencia apunta a sesgo macho, Vielma et al. 2026) [EP]
+    male_daily_survival: 0.773   # [1/día] supervivencia diaria del macho (0,773 ± 0,094, Epopa et al. 2017); separada de la hembra [M]
   funestus:
     weights: {surface_persistent: 0.45, wetland_persistent: 0.30, urban_persistent: 0.10,
               wetland_pluvial: 0.00, open_pluvial: 0.10, crop_pluvial: 0.05}   # [fracción] afinidad por tipo de hábitat (Σ=1.00)
@@ -88,8 +143,35 @@ species:
     salinity_opt_ppt: 0.0                               # [psu] salinidad óptima (factor = 1)
     salinity_hi_tol_ppt: 15.0                           # [psu] tolerancia máxima; por encima no cría
     salinity_slope: 0.15                                # [psu⁻¹] decaimiento del factor de salinidad
-    host_seeking_scale_m: 300.0   # [m] escala del decaimiento del penacho (mecanismo: Giraldo 2023); valor = engineering prior, sin medición local
-    host_seeking_radius_m: 1500.0 # [m] radio del campo de atracción = engineering prior (sin medición directa del penacho en las fuentes locales)
+    co2_activation_radius_m: 100.0   # [m] radio de activación por CO₂ (tramo ACTIVACIÓN de la cascada) [P]
+    olfactory_radius_m: 50.0   # [m] radio de rastreo olfativo de la pluma; banda 30–70 m, punto medio [P]
+    visual_radius_m: 0.485   # [m] radio de la banda de aproximación visual; banda 0,25–0,72 m, punto medio [P]
+    terminal_radius_m: 0.15   # [m] radio terminal (contacto); banda 0,10–0,20 m, punto medio [P]
+    flight_speed_ms: 0.3375   # [m/s] velocidad propia de vuelo en busca; banda 0,225–0,45 m/s, punto medio [P]
+    exploration_range_m: 100.0   # [m] radio del disco de exploración (>= co2_activation_radius_m); banda 100–200 m [EP]
+    exploration_step_m: 50.0   # [m] longitud nominal del paso del paseo de exploración [EP]
+    exploration_step_correlation: 0.5   # [adimensional] correlación paso–paso del paseo de exploración [EP]
+    casting_probability: 0.1   # [1/paso de rastreo] probabilidad de perder la pluma y pasar a casting [EP]
+    casting_angle_deg: 90.0   # [°] transversalidad del casting respecto al viento (90 ± 30) [EP]
+    plume_memory_s: 0.7   # [s] memoria de la pluma (segmentos de cast, Cummins 2012); banda 0,5–0,9 s, punto medio; la fila manda sobre integration.plume_memory_s [P]
+    anemotaxis_rule: "upwind"   # [categórico] regla de orientación respecto al viento (contra el viento) [EP]
+    anemotaxis_deviation_deg: 30.0   # [°] desviación máxima respecto a la dirección contra el viento (± grados) [EP]
+    wind_reference: "u100/v100"   # [string] variables del campo de viento (100 m AGL, ERA5 6-horario); único nivel disponible [M]
+    wind_block_threshold_ms: 0.3375   # [m/s] umbral de bloqueo del avance contra el viento; por defecto = flight_speed_ms [EP]
+    daily_move_capacity_m: 590.0   # [m] longitud máxima de trayectoria diaria (MDTpD), no desplazamiento neto; media de 486–695 m/día [P]
+    directed_flight_budget_h: 0.4856   # [h] DERIVADO: daily_move_capacity_m / flight_speed_ms / 3600; consumible por día; la fila manda sobre integration.directed_flight_budget_h [EP]
+    blood_meal_target_ul: 0.5   # [µL] objetivo de una comida completa [EP]
+    first_cycle_target_ul: 0.8   # [µL] objetivo de la primera comida (> blood_meal_target_ul: hacen falta dos comidas) [EP]
+    blood_meal_size_ul: 0.3   # [µL] media del volumen tomado por comida [EP]
+    meal_size_min_ul: 0.1   # [µL] volumen mínimo de una comida válida [EP]
+    blood_meal_refractory_days: 0.5   # [días] ventana postprandial tras alcanzar el objetivo [EP]
+    probing_success_rate: 0.7275   # [fracción] probabilidad de éxito del sondeo por contacto; banda 0,465–0,99, punto medio; sustituye a gonotrophic.feeding_success_rate [EP]
+    eggs_per_ul: 223.0   # [huevos/µL] huevos por µL de sangre acumulada; 0,5 µL dan ≈112 huevos (puesta medida 111,67 ± 5,36) [EP]
+    arrested_daily_survival: 0.986   # [1/día] supervivencia diaria en arresto ovárico; 212·ln(0,986) ⇒ 0,05 a los 212 días de estivación [EP]
+    gonotrophic_arrest_prob_dry: 0.0   # [fracción] probabilidad de arresto gonotrófico en estación seca (punto medio de 19,23–34,85 / 40,09–48,98 / 68,12–68,64 % coluzzii / arabiensis / gambiae s.s.); sin dato en las demás filas ⇒ 0 [P]
+    aestivation_supported: false   # [booleano] la especie estiva (arresto ovárico); sin evidencia en funestus, melas y stephensi [EP]
+    male_ratio: 0.5   # [fracción] fracción de machos al emerger; neutral por defecto (la evidencia apunta a sesgo macho, Vielma et al. 2026) [EP]
+    male_daily_survival: 0.773   # [1/día] supervivencia diaria del macho (0,773 ± 0,094, Epopa et al. 2017); separada de la hembra [M]
   arabiensis:
     weights: {surface_persistent: 0.10, wetland_persistent: 0.10, urban_persistent: 0.15,
               wetland_pluvial: 0.00, open_pluvial: 0.55, crop_pluvial: 0.10}   # [fracción] afinidad por tipo de hábitat (Σ=1.00)
@@ -98,8 +180,35 @@ species:
     salinity_opt_ppt: 0.0                               # [psu] salinidad óptima (factor = 1)
     salinity_hi_tol_ppt: 15.0                           # [psu] tolerancia máxima; por encima no cría
     salinity_slope: 0.15                                # [psu⁻¹] decaimiento del factor de salinidad
-    host_seeking_scale_m: 120.0   # [m] escala del penacho (mecanismo: Giraldo 2023); fila arabiensis = engineering prior de menor alcance
-    host_seeking_radius_m: 1500.0 # [m] radio del campo de atracción = engineering prior (sin medición directa del penacho en las fuentes locales)
+    co2_activation_radius_m: 100.0   # [m] radio de activación por CO₂ (tramo ACTIVACIÓN de la cascada) [P]
+    olfactory_radius_m: 50.0   # [m] radio de rastreo olfativo de la pluma; banda 30–70 m, punto medio [P]
+    visual_radius_m: 0.485   # [m] radio de la banda de aproximación visual; banda 0,25–0,72 m, punto medio [P]
+    terminal_radius_m: 0.15   # [m] radio terminal (contacto); banda 0,10–0,20 m, punto medio [P]
+    flight_speed_ms: 0.3375   # [m/s] velocidad propia de vuelo en busca; banda 0,225–0,45 m/s, punto medio [P]
+    exploration_range_m: 100.0   # [m] radio del disco de exploración (>= co2_activation_radius_m); banda 100–200 m [EP]
+    exploration_step_m: 50.0   # [m] longitud nominal del paso del paseo de exploración [EP]
+    exploration_step_correlation: 0.5   # [adimensional] correlación paso–paso del paseo de exploración [EP]
+    casting_probability: 0.1   # [1/paso de rastreo] probabilidad de perder la pluma y pasar a casting [EP]
+    casting_angle_deg: 90.0   # [°] transversalidad del casting respecto al viento (90 ± 30) [EP]
+    plume_memory_s: 0.7   # [s] memoria de la pluma (segmentos de cast, Cummins 2012); banda 0,5–0,9 s, punto medio; la fila manda sobre integration.plume_memory_s [P]
+    anemotaxis_rule: "upwind"   # [categórico] regla de orientación respecto al viento (contra el viento) [EP]
+    anemotaxis_deviation_deg: 30.0   # [°] desviación máxima respecto a la dirección contra el viento (± grados) [EP]
+    wind_reference: "u100/v100"   # [string] variables del campo de viento (100 m AGL, ERA5 6-horario); único nivel disponible [M]
+    wind_block_threshold_ms: 0.3375   # [m/s] umbral de bloqueo del avance contra el viento; por defecto = flight_speed_ms [EP]
+    daily_move_capacity_m: 590.0   # [m] longitud máxima de trayectoria diaria (MDTpD), no desplazamiento neto; media de 486–695 m/día [P]
+    directed_flight_budget_h: 0.4856   # [h] DERIVADO: daily_move_capacity_m / flight_speed_ms / 3600; consumible por día; la fila manda sobre integration.directed_flight_budget_h [EP]
+    blood_meal_target_ul: 0.5   # [µL] objetivo de una comida completa [EP]
+    first_cycle_target_ul: 0.8   # [µL] objetivo de la primera comida (> blood_meal_target_ul: hacen falta dos comidas) [EP]
+    blood_meal_size_ul: 0.3   # [µL] media del volumen tomado por comida [EP]
+    meal_size_min_ul: 0.1   # [µL] volumen mínimo de una comida válida [EP]
+    blood_meal_refractory_days: 0.5   # [días] ventana postprandial tras alcanzar el objetivo [EP]
+    probing_success_rate: 0.7275   # [fracción] probabilidad de éxito del sondeo por contacto; banda 0,465–0,99, punto medio; sustituye a gonotrophic.feeding_success_rate [EP]
+    eggs_per_ul: 223.0   # [huevos/µL] huevos por µL de sangre acumulada; 0,5 µL dan ≈112 huevos (puesta medida 111,67 ± 5,36) [EP]
+    arrested_daily_survival: 0.986   # [1/día] supervivencia diaria en arresto ovárico; 212·ln(0,986) ⇒ 0,05 a los 212 días de estivación [EP]
+    gonotrophic_arrest_prob_dry: 0.4454   # [fracción] probabilidad de arresto gonotrófico en estación seca (punto medio de 19,23–34,85 / 40,09–48,98 / 68,12–68,64 % coluzzii / arabiensis / gambiae s.s.); sin dato en las demás filas ⇒ 0 [P]
+    aestivation_supported: true   # [booleano] la especie estiva (arresto ovárico); sin evidencia en funestus, melas y stephensi [EP]
+    male_ratio: 0.5   # [fracción] fracción de machos al emerger; neutral por defecto (la evidencia apunta a sesgo macho, Vielma et al. 2026) [EP]
+    male_daily_survival: 0.773   # [1/día] supervivencia diaria del macho (0,773 ± 0,094, Epopa et al. 2017); separada de la hembra [M]
   melas:            # dormant — mangrove/brackish; sin población activa; PR de
                     # calibración NO los toca sin ticket de activación coastal
     weights: {surface_persistent: 0.25, wetland_persistent: 0.15, urban_persistent: 0.15,
@@ -109,8 +218,35 @@ species:
     salinity_opt_ppt: 0.0                               # [psu] salinidad óptima (factor = 1)
     salinity_hi_tol_ppt: 38.0   # [psu] tolerancia máxima (sobre marine PSD)
     salinity_slope: 0.02        # [psu⁻¹] decaimiento más suave de todas las filas
-    host_seeking_scale_m: 300.0   # [m] escala del decaimiento del penacho (mecanismo: Giraldo 2023); valor = engineering prior, sin medición local
-    host_seeking_radius_m: 1500.0 # [m] radio del campo de atracción = engineering prior (sin medición directa del penacho en las fuentes locales)
+    co2_activation_radius_m: 100.0   # [m] radio de activación por CO₂ (tramo ACTIVACIÓN de la cascada) [P]
+    olfactory_radius_m: 50.0   # [m] radio de rastreo olfativo de la pluma; banda 30–70 m, punto medio [P]
+    visual_radius_m: 0.485   # [m] radio de la banda de aproximación visual; banda 0,25–0,72 m, punto medio [P]
+    terminal_radius_m: 0.15   # [m] radio terminal (contacto); banda 0,10–0,20 m, punto medio [P]
+    flight_speed_ms: 0.3375   # [m/s] velocidad propia de vuelo en busca; banda 0,225–0,45 m/s, punto medio [P]
+    exploration_range_m: 100.0   # [m] radio del disco de exploración (>= co2_activation_radius_m); banda 100–200 m [EP]
+    exploration_step_m: 50.0   # [m] longitud nominal del paso del paseo de exploración [EP]
+    exploration_step_correlation: 0.5   # [adimensional] correlación paso–paso del paseo de exploración [EP]
+    casting_probability: 0.1   # [1/paso de rastreo] probabilidad de perder la pluma y pasar a casting [EP]
+    casting_angle_deg: 90.0   # [°] transversalidad del casting respecto al viento (90 ± 30) [EP]
+    plume_memory_s: 0.7   # [s] memoria de la pluma (segmentos de cast, Cummins 2012); banda 0,5–0,9 s, punto medio; la fila manda sobre integration.plume_memory_s [P]
+    anemotaxis_rule: "upwind"   # [categórico] regla de orientación respecto al viento (contra el viento) [EP]
+    anemotaxis_deviation_deg: 30.0   # [°] desviación máxima respecto a la dirección contra el viento (± grados) [EP]
+    wind_reference: "u100/v100"   # [string] variables del campo de viento (100 m AGL, ERA5 6-horario); único nivel disponible [M]
+    wind_block_threshold_ms: 0.3375   # [m/s] umbral de bloqueo del avance contra el viento; por defecto = flight_speed_ms [EP]
+    daily_move_capacity_m: 590.0   # [m] longitud máxima de trayectoria diaria (MDTpD), no desplazamiento neto; media de 486–695 m/día [P]
+    directed_flight_budget_h: 0.4856   # [h] DERIVADO: daily_move_capacity_m / flight_speed_ms / 3600; consumible por día; la fila manda sobre integration.directed_flight_budget_h [EP]
+    blood_meal_target_ul: 0.5   # [µL] objetivo de una comida completa [EP]
+    first_cycle_target_ul: 0.8   # [µL] objetivo de la primera comida (> blood_meal_target_ul: hacen falta dos comidas) [EP]
+    blood_meal_size_ul: 0.3   # [µL] media del volumen tomado por comida [EP]
+    meal_size_min_ul: 0.1   # [µL] volumen mínimo de una comida válida [EP]
+    blood_meal_refractory_days: 0.5   # [días] ventana postprandial tras alcanzar el objetivo [EP]
+    probing_success_rate: 0.7275   # [fracción] probabilidad de éxito del sondeo por contacto; banda 0,465–0,99, punto medio; sustituye a gonotrophic.feeding_success_rate [EP]
+    eggs_per_ul: 223.0   # [huevos/µL] huevos por µL de sangre acumulada; 0,5 µL dan ≈112 huevos (puesta medida 111,67 ± 5,36) [EP]
+    arrested_daily_survival: 0.986   # [1/día] supervivencia diaria en arresto ovárico; 212·ln(0,986) ⇒ 0,05 a los 212 días de estivación [EP]
+    gonotrophic_arrest_prob_dry: 0.0   # [fracción] probabilidad de arresto gonotrófico en estación seca (punto medio de 19,23–34,85 / 40,09–48,98 / 68,12–68,64 % coluzzii / arabiensis / gambiae s.s.); sin dato en las demás filas ⇒ 0 [P]
+    aestivation_supported: false   # [booleano] la especie estiva (arresto ovárico); sin evidencia en funestus, melas y stephensi [EP]
+    male_ratio: 0.5   # [fracción] fracción de machos al emerger; neutral por defecto (la evidencia apunta a sesgo macho, Vielma et al. 2026) [EP]
+    male_daily_survival: 0.773   # [1/día] supervivencia diaria del macho (0,773 ± 0,094, Epopa et al. 2017); separada de la hembra [M]
   stephensi:        # dormant — urban invader M8+
     weights: {surface_persistent: 0.25, wetland_persistent: 0.15, urban_persistent: 0.15,
               wetland_pluvial: 0.00, open_pluvial: 0.40, crop_pluvial: 0.05}   # [fracción] afinidad por tipo de hábitat (= neutral)
@@ -119,8 +255,35 @@ species:
     salinity_opt_ppt: 0.0                               # [psu] salinidad óptima (factor = 1)
     salinity_hi_tol_ppt: 20.0                           # [psu] tolerancia máxima; por encima no cría
     salinity_slope: 0.15                                # [psu⁻¹] decaimiento del factor de salinidad
-    host_seeking_scale_m: 300.0   # [m] escala del decaimiento del penacho (mecanismo: Giraldo 2023); valor = engineering prior, sin medición local
-    host_seeking_radius_m: 1500.0 # [m] radio del campo de atracción = engineering prior (sin medición directa del penacho en las fuentes locales)
+    co2_activation_radius_m: 100.0   # [m] radio de activación por CO₂ (tramo ACTIVACIÓN de la cascada) [P]
+    olfactory_radius_m: 50.0   # [m] radio de rastreo olfativo de la pluma; banda 30–70 m, punto medio [P]
+    visual_radius_m: 0.485   # [m] radio de la banda de aproximación visual; banda 0,25–0,72 m, punto medio [P]
+    terminal_radius_m: 0.15   # [m] radio terminal (contacto); banda 0,10–0,20 m, punto medio [P]
+    flight_speed_ms: 0.3375   # [m/s] velocidad propia de vuelo en busca; banda 0,225–0,45 m/s, punto medio [P]
+    exploration_range_m: 100.0   # [m] radio del disco de exploración (>= co2_activation_radius_m); banda 100–200 m [EP]
+    exploration_step_m: 50.0   # [m] longitud nominal del paso del paseo de exploración [EP]
+    exploration_step_correlation: 0.5   # [adimensional] correlación paso–paso del paseo de exploración [EP]
+    casting_probability: 0.1   # [1/paso de rastreo] probabilidad de perder la pluma y pasar a casting [EP]
+    casting_angle_deg: 90.0   # [°] transversalidad del casting respecto al viento (90 ± 30) [EP]
+    plume_memory_s: 0.7   # [s] memoria de la pluma (segmentos de cast, Cummins 2012); banda 0,5–0,9 s, punto medio; la fila manda sobre integration.plume_memory_s [P]
+    anemotaxis_rule: "upwind"   # [categórico] regla de orientación respecto al viento (contra el viento) [EP]
+    anemotaxis_deviation_deg: 30.0   # [°] desviación máxima respecto a la dirección contra el viento (± grados) [EP]
+    wind_reference: "u100/v100"   # [string] variables del campo de viento (100 m AGL, ERA5 6-horario); único nivel disponible [M]
+    wind_block_threshold_ms: 0.3375   # [m/s] umbral de bloqueo del avance contra el viento; por defecto = flight_speed_ms [EP]
+    daily_move_capacity_m: 590.0   # [m] longitud máxima de trayectoria diaria (MDTpD), no desplazamiento neto; media de 486–695 m/día [P]
+    directed_flight_budget_h: 0.4856   # [h] DERIVADO: daily_move_capacity_m / flight_speed_ms / 3600; consumible por día; la fila manda sobre integration.directed_flight_budget_h [EP]
+    blood_meal_target_ul: 0.5   # [µL] objetivo de una comida completa [EP]
+    first_cycle_target_ul: 0.8   # [µL] objetivo de la primera comida (> blood_meal_target_ul: hacen falta dos comidas) [EP]
+    blood_meal_size_ul: 0.3   # [µL] media del volumen tomado por comida [EP]
+    meal_size_min_ul: 0.1   # [µL] volumen mínimo de una comida válida [EP]
+    blood_meal_refractory_days: 0.5   # [días] ventana postprandial tras alcanzar el objetivo [EP]
+    probing_success_rate: 0.7275   # [fracción] probabilidad de éxito del sondeo por contacto; banda 0,465–0,99, punto medio; sustituye a gonotrophic.feeding_success_rate [EP]
+    eggs_per_ul: 223.0   # [huevos/µL] huevos por µL de sangre acumulada; 0,5 µL dan ≈112 huevos (puesta medida 111,67 ± 5,36) [EP]
+    arrested_daily_survival: 0.986   # [1/día] supervivencia diaria en arresto ovárico; 212·ln(0,986) ⇒ 0,05 a los 212 días de estivación [EP]
+    gonotrophic_arrest_prob_dry: 0.0   # [fracción] probabilidad de arresto gonotrófico en estación seca (punto medio de 19,23–34,85 / 40,09–48,98 / 68,12–68,64 % coluzzii / arabiensis / gambiae s.s.); sin dato en las demás filas ⇒ 0 [P]
+    aestivation_supported: false   # [booleano] la especie estiva (arresto ovárico); sin evidencia en funestus, melas y stephensi [EP]
+    male_ratio: 0.5   # [fracción] fracción de machos al emerger; neutral por defecto (la evidencia apunta a sesgo macho, Vielma et al. 2026) [EP]
+    male_daily_survival: 0.773   # [1/día] supervivencia diaria del macho (0,773 ± 0,094, Epopa et al. 2017); separada de la hembra [M]
   neutral:      # especies neutrales del motor (habitat_availability.hpp)
     weights: {surface_persistent: 0.25, wetland_persistent: 0.15, urban_persistent: 0.15,
               wetland_pluvial: 0.00, open_pluvial: 0.40, crop_pluvial: 0.05}   # [fracción] afinidad por tipo de hábitat (Σ=1.00)
@@ -228,21 +391,16 @@ gonotrophic:      # ciclo gonotrófico (gonotrophic_cycle.hpp); fuente única de
   resting_duration_days: 0.5   # [días] BLOOD_FED→RESTING (redondeo int)
 
 dispersal:
-  adult_prob_day: 0.05        # [1/día] probabilidad diaria de dispersión adulta
-  adult_sigma_m: 450.0        # [m] sigma del kernel gaussiano adulto; Costantini 1996 mide 350–650 m/día y este valor es un prior conservador DENTRO del rango (no es el punto medio)
-  adult_max_m: 2000.0         # [m] cap de distancia de dispersión adulta; Thomas 2013 da p95 1.67 km (exponencial) y 2.83 km (half-Cauchy); este cap es un prior de compromiso, no un p95
   wind_migration_prob: 0.05   # [1/día] probabilidad diaria de migración eólica
   wind_flight_hours: 4.0      # [h] duración del vuelo eólico (Huestis 2019: transporte nocturno; Faiman 2020: vuelo sostenido de horas; el cap es engineering prior)
   wind_survival: 0.85         # [fracción] supervivencia durante migración eólica (Sanogo 2021: alta supervivencia en ensayo de altitud; la fracción es engineering prior)
   wind_self_speed_ms: 1.0     # [m/s] velocidad propia añadida al viento
   flight_hour: 20             # [h] hora de set_current_hour para el vuelo
-  host_flight_step_m: 500.0   # [m] paso del vuelo dirigido a host (step_toward_host)
   snap_radius_m: 500.0        # [m] snap adulto→parche activado más cercano
   night_start_hour: 18        # [h] inicio de la ventana nocturna (dispersión eólica/multirate)
   night_end_hour: 6           # [h] fin exclusivo; si < start la ventana cruza medianoche
 
-host_seeking:   # la capa viva (la que engine ejecuta vía species_params); el per-species
-                # scale/radius vive en species.<name>
+host_seeking:   # inanición y modificadores de atracción; la cascada de percepción vive en species.<name> e integration:
   starvation_days: 7              # [días] inanición máxima sin hospedador antes de morir
   indoor_attraction_add: 0.72     # [adimensional] +(valor·indoor_fraction); engineering prior sin fuente documentada
   urbanicity_add: 0.2             # [adimensional] +(valor·urbanicity); engineering prior
@@ -250,12 +408,6 @@ host_seeking:   # la capa viva (la que engine ejecuta vía species_params); el p
   # literales replicados en C++)
   indoor_fraction_urban: 0.72     # [fracción] endofilia urbana (An. gambiae)
   indoor_fraction_rural: 0.30     # [fracción] endofilia rural
-  # rango de detección del kernel del MOTOR (el caller lo pasa explícito y
-  # gana sobre species.<fila>.host_seeking_radius_m). Ese radio per-species es un
-  # concepto DISTINTO: radio del campo de atracción de compute_attraction
-  # cuando el caller pasa el sentinel -1 (p.ej. feeding phase-aware).
-  detect_range_m: 2000.0          # [m] detect_host_cell desde HOST_APPROACH
-  approach_step_m: 50.0           # [m] paso de approach_vector
 
 oviposition:
   scale_m: 50.0       # [m] decaimiento del penacho (mecanismo: Okal 2013; escala = engineering prior)
@@ -264,6 +416,31 @@ oviposition:
   step_m: 50.0            # [m] paso de step_toward
   min_attraction: 0.3     # [adimensional] atracción mínima para aceptar un criadero
   timeout_days: 7         # [días] timeout de búsqueda de criadero
+
+integration:   # integración temporal del movimiento (plan §5, §12): fases del día y micro-integrador
+  phase_duration_hours: [12.0, 4.0, 6.0, 2.0]   # [h] duración de las fases [DAY, EVENING, NIGHT, DAWN]; suman 24 h y el día empieza a las 06:00 [EP]
+  directed_flight_budget_h: 0.4856   # [h] DERIVADO: 590 m / flight_speed_ms / 3600; valor por defecto, la fila de especie manda [EP]
+  dt_terminal_s: 0.04   # [s] paso del micro-integrador terminal (25 Hz, Nyquist sobre el giro de 0,08 s) [EP]
+  dt_olfactory_s: 0.25   # [s] paso del micro-integrador en la banda olfativa [EP]
+  plume_memory_s: 0.7   # [s] memoria de la pluma por defecto (Cummins 2012); la fila de especie manda [P]
+  landing_speed_mm_s: 50.0   # [mm/s] velocidad máxima del gate de aterrizaje (Hinze 2021) [P]
+  landing_speed_hold_s: 3.0   # [s] tiempo que se mantiene el gate de aterrizaje (Hinze 2021) [P]
+
+mating:   # capa macho y apareamiento (plan §8, §12): oferta de cupos por enjambre
+  p_mate_male_fraction: 0.072   # [fracción] fracción de machos del enjambre que se aparean por noche (0,072 ± 0,0095, Diabaté 2011) [P]
+  p_mate_pairs_per_individual: 0.167   # [pares/individuo] pares por individuo de ambos sexos y enjambre; cota de sensibilidad 0,084–0,25 (Ouédraogo 2025), no comparable con p_mate_male_fraction [M]
+  p_mate_size_exponent: 0.0   # [adimensional] exponente de la ley de eficiencia por tamaño de enjambre; banda 0–1 [EP]
+  male_swarm_reference_size: 100.0   # [machos/enjambre] tamaño de referencia de la ley de eficiencia [EP]
+  female_attendance_rate: 0.1033   # [fracción] probabilidad de que una hembra presente esté en posición de cópula (47/455, Diabaté 2009) [P]
+  local_swarm_male_offer_factor: 0.0   # [fracción] factor de oferta masculina de un enjambre local sin marcador (Kaiser 2021) [EP]
+  male_move_capacity_m: 50.0   # [m/día] alcance diario del macho hacia un sitio de enjambre; banda 40–100 [EP]
+  male_females_per_night_max: 3   # [hembras/macho/noche] máximo de hembras por macho y noche (citado, no medido: Ekechukwu & Tripet 2019) [M]
+  swarm_duration_min: 28.3   # [min] duración del enjambre; banda 19–39 (Bimbilé Somda 2018) [P]
+  swarm_start_min_after_sunset: 5.0   # [min] inicio del enjambre tras la puesta de sol (Bimbilé Somda 2018) [P]
+  swarm_height_m: 2.87   # [m] altura del enjambre (2,87 ± 0,20, Ouédraogo 2025) [M]
+  swarm_markers_per_km2: 1.0   # [marcadores/km²] densidad del campo de sitios; sin medición publicada, la fija el escenario [EP]
+  swarm_markers_source: "engineering prior"   # [string] procedencia del campo de sitios; la fija el escenario [EP]
+  rain_suppresses_swarming: true   # [booleano] la lluvia suprime el enjambre (0 parejas por enjambre en el pico de lluvias) [P]
 
 aquatic_stages:
   egg_daily_mort: 0.08        # [1/día] mortalidad diaria de huevo; engineering prior (Giglioli no es verificable en papers/; Depinay 2004 local da ~0.99 de supervivencia diaria, ≈0.01 de mortalidad, diferencia documentada)

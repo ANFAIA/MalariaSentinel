@@ -53,7 +53,7 @@ E01:
     One host-seeking female adult and one susceptible person placed just beyond
     the 100 m carbon dioxide activation radius of the female. There is no aquatic
     habitat, so the female has no breeding site to oviposit in. The run lasts
-    three days.
+    ten days.
   implies: >-
     A pass means the perception cascade respects its activation band: a person
     outside the activation radius is not contacted, and the chain does not bite
@@ -62,35 +62,32 @@ E01:
     reflect the old cell-scale contact rule instead of individual distance. In the
     field a female does not find a host she cannot sense.
   expected: >-
-    Zero successful meals, because distance does not allow contact at this range.
-    No oviposition, since there is no breeding site. The female enters starvation
-    by day three (measured here as not alive at the end of day three, a proxy: the
-    engine exposes alive and deaths per day, not a starvation state). Both are
-    targets, strict expected failures until Steps 2a/5. The baseline pin records today's
-    behaviour (one bite on day one) as a regression reference, not as an
-    expectation.
+    The female starts outside the activation band, so she cannot bite on the first
+    nights: no successful meal in the first three days. Over ten days the walk
+    (590 m of path per day) may bring her within 100 m of the person; then, and
+    only then, the cascade activates, tracks the plume and lands. With seed
+    20261117 she activates on day 4 and bites on day 5, which the first three
+    days of the previous design could not show. No oviposition, since there is
+    no breeding site. A female that never finds a host dies of starvation after
+    host_seeking.starvation_days (7) days; that is checked in E02.
   closes: 'Step 5'
   executable_today: 'seeding-only'
   today: >-
-    The current chain keeps the single adult in its seeded cell for the whole run
-    and records one successful human bite on day 1 and none afterwards; the bite
-    is drawn against the cell-aggregated human population (about 127,000 people),
-    not against the seeded person
+    The female flies the perception cascade: no bite in the first three days,
+    activation on day 4 and a bite on the identified person on day 5; the bite is
+    on the seeded person, not on a cell aggregate
   verified_now:
     - "Seeding fidelity: the adult population obeys the conservation identity on every day (adults today = adults yesterday - deaths + emerged, starting from the seeded count), so no seeded individual is dropped or invented; the cohort log and the raster output agree on the number of adults"
     - "The run completes through the manifest route ('validate_completeness', resolve, binary) with exit code 0"
-    - "Baseline pin: the known-failure facts above are asserted, so any change in the chain's behaviour is flagged and must be acknowledged by updating the pin"
-    - "Target gate (strict expected failure): the plan's target is asserted and is expected to fail until Step 5; when it starts passing the test fails and must be promoted"
-    - "Target for E01: zero successful human bites over the run"
-    - "Baseline pin: the female is alive on every day with no deaths (no starvation yet); target (strict expected failure): not alive at the end of day three, a proxy for starvation entry"
-    - "GIF baseline pin: three simulated days give a three-frame GIF (the GIF unit is the day)"
+    - "GATE (Step 5): no successful bite in the first three days; the female is never pinned to her cell (her net displacement stays within the 590 m daily path budget)"
+    - "GIF baseline pin: three simulated days give a ten-frame GIF (the GIF unit is the day)"
   gif: >-
     The standard transmission GIF: one frame per simulated day, cells in
     neutral grey, a one-cell scale bar, people as 1-pixel dots coloured by
     SEIR state, mosquitoes as circles (female filled, male hollow) with a
     polyline of their daily positions, bites as point events, and a red ring
     on infected agents. For E01 look for the female circle and the person
-    dot 200 m apart and, in the target state, no bite marker on any day. The
+    dot 200 m apart and, a bite marker on the day she lands. The
     nightly search stage of the female (`cascade_stage`) and the bites are
     in the debug agents and bites files (Step 2b); the GIF draws no radii.
 
@@ -104,7 +101,7 @@ E02:
   setup: >-
     One host-seeking female adult and one susceptible person placed far beyond
     what the female can cover in one night, with no aquatic habitat. The run lasts
-    three days. The person stays out of reach for the whole run unless the walk
+    ten days. The person stays out of reach for the whole run unless the walk
     happens to drift towards it.
   implies: >-
     The bounds say the movement law cannot produce a trajectory longer than the
@@ -121,23 +118,21 @@ E02:
   closes: 'none'
   executable_today: 'seeding-only'
   today: >-
-    The current chain keeps the single adult in its seeded cell for the whole run
-    and records one successful human bite on day 1 and none afterwards; the bite
-    is drawn against the cell-aggregated human population (about 127,000 people),
-    not against the seeded person
+    The female never reaches a person 2 km away, has no meal in ten days and dies
+    of starvation on day 8 (the starvation timer reaches host_seeking.starvation_days
+    = 7)
   verified_now:
     - "Seeding fidelity: the adult population obeys the conservation identity on every day (adults today = adults yesterday - deaths + emerged, starting from the seeded count), so no seeded individual is dropped or invented; the cohort log and the raster output agree on the number of adults"
     - "The run completes through the manifest route ('validate_completeness', resolve, binary) with exit code 0"
-    - "Baseline pin: the known-failure facts above are asserted, so any change in the chain's behaviour is flagged and must be acknowledged by updating the pin"
-    - "Target gate (strict expected failure): the plan's target is asserted and is expected to fail until Step 5; when it starts passing the test fails and must be promoted"
-    - "Target for E02 (strict expected failure, Step 5): per-night trajectory length at most 590 m and net displacement at most 200 m; fails today because the harness does not yet measure nightly movement (outputs expose cells, not metres)"
+    - "GATE (Step 5): no bite in ten days, and the death of the female is a starvation death: not before day host_seeking.starvation_days (7)"
+    - "Net displacement between consecutive days never exceeds the 590 m daily path budget (read from the debug agents file)"
   gif: >-
     The standard transmission GIF: one frame per simulated day, cells in
     neutral grey, a one-cell scale bar, people as 1-pixel dots coloured by
     SEIR state, mosquitoes as circles (female filled, male hollow) with a
     polyline of their daily positions, bites as point events, and a red ring
     on infected agents. For E02 look for the female's polyline across the
-    three days against the one-cell scale bar and the person dot 2000 m
+    ten days against the one-cell scale bar and the person dot 2000 m
     away. The nightly trajectory length and net displacement are read from
     the debug agents file (Step 2b), not drawn.
 
@@ -382,7 +377,7 @@ E09:
     infectious bite infects at most the person it bites.
   setup: >-
     One infective host-seeking female with three susceptible persons placed around
-    her at different short distances, run for three days. The infective flag is set
+    her at different short distances, run for ten days. The infective flag is set
     on the mosquito and all persons start susceptible.
   implies: >-
     If one bite infects anyone other than the person bitten, the model creates
@@ -419,13 +414,14 @@ E10:
     one radius at a time. It is a report: it measures sensitivity and does not
     gate.
   setup: >-
-    One host-seeking female and one susceptible person a short distance away, run
-    three days, once per variant. The three variants live in one file, as entries
-    in its variants list, and each varies one radius with the others at their
-    defaults. Variant one sweeps the carbon dioxide activation radius over 50, 100
-    and 200 m. Variant two sweeps the olfactory radius over 10, 30 and 70 m. Variant
-    three sweeps the visual radius over 0.25 and 0.72 m. The defaults are the
-    verified values.
+    One host-seeking female at (5200, 5200) and one susceptible person, ten days,
+    nine variants, one override each. The person is placed at a distance chosen
+    so that the value of the radius decides whether they are inside or outside
+    the band: for the carbon dioxide activation radius (50, 100 and 200 m) at
+    150 m; for the olfactory radius (10, 30 and 70 m) at 60 m; for the visual
+    radius (0.25, 0.485 and 0.72 m) at 0.5 m. The other radii keep their
+    defaults. What each variant shows is therefore what happens when the same
+    person is outside or inside that band at the start.
   implies: >-
     The result shows which radius the outcome depends on. If the outcome barely
     moves across a sweep, that stage is doing little work and the cascade is poorly
@@ -439,11 +435,10 @@ E10:
   closes: 'none'
   executable_today: 'seeding-only'
   today: >-
-    Not meaningful yet: depends on Step 5 (the cascade). Today the overrides are
-    not applied: the engine rejects non-empty overrides until Step 5, so the
-    harness runs each variant without them, with the same seed, and records the
-    overrides as not applied. The three variants therefore reduce to the same run
-    and the report cannot show sensitivity.
+    The overrides are applied by the engine (cascade keys of the species row).
+    The visual radius moves only the tick count of the last half metre, so its
+    three variants are expected to bite on the same day; the activation and
+    olfactory radii move the day of the first bite.
   verified_now:
     - "Seeding fidelity: the adult population obeys the conservation identity on every day (adults today = adults yesterday - deaths + emerged, starting from the seeded count), so no seeded individual is dropped or invented; the cohort log and the raster output agree on the number of adults"
     - "The run completes through the manifest route ('validate_completeness', resolve, binary) with exit code 0"
@@ -452,10 +447,10 @@ E10:
     neutral grey, a one-cell scale bar, people as 1-pixel dots coloured by
     SEIR state, mosquitoes as circles (female filled, male hollow) with a
     polyline of their daily positions, bites as point events, and a red ring
-    on infected agents. For E10 there is one GIF per variant. The GIF draws
+    on infected agents. For E10 there is one GIF per variant (nine). The GIF draws
     no radii: variants are compared on the day the first bite appears and on
     the polyline, and in detail on `cascade_stage` in the debug agents file.
-    If the variants look identical, the overrides are not reaching the
+    If the variants look identical, the overrides may not be reaching the
     engine.
 
 E11:
@@ -630,7 +625,7 @@ E15:
     females rises. It is the test that forces markers to be discrete and removable.
   setup: >-
     A field of swarm markers with one swarm in the village, equal numbers of males
-    and females, run for three days. The kill of the males assigned to one marker
+    and females, run for ten days. The kill of the males assigned to one marker
     is an intervention the scenario applies. The JSON does not express the kill yet;
     the flag enters with Step 8.
   implies: >-
@@ -669,7 +664,7 @@ E16:
     documented limit, not as a model output to tune.
   setup: >-
     The same swarm-site field as the swarm-killing scenario, with equal numbers of
-    males and females, run for three days, with net coverage set to 60 percent. The
+    males and females, run for ten days, with net coverage set to 60 percent. The
     net coverage belongs to the scenario definition; the JSON does not carry a net
     field yet.
   implies: >-
@@ -709,7 +704,7 @@ E17:
   setup: >-
     Equal numbers of females and males assigned to the swarm sites, with sterile
     males added and assigned to the same sites, so they compete for the same supply.
-    Run for three days. The sterility flag is not in the JSON yet; it enters with
+    Run for ten days. The sterility flag is not in the JSON yet; it enters with
     Step 10.
   implies: >-
     If supply does not fall with the number of sterile males assigned, the model
@@ -744,8 +739,9 @@ E18:
     is deflected upwind, and forward progress is blocked when the tail-wind component
     reaches her flight speed. It is the gate for the wind branch.
   setup: >-
-    One host-seeking female at the centre of the synthetic study area, run for three
-    days. The synthetic area carries a wind field of the 100 m wind components, loaded
+    One host-seeking female at the centre of the synthetic study area and one
+    susceptible person 40 m away to the south-west, which on the first nights is
+    UPWIND of her (the wind of the field blows to the north-east). Ten days. The synthetic area carries a wind field of the 100 m wind components, loaded
     at run time. The wind is not written in the JSON; it comes from the synthetic
     area inputs.
   implies: >-
@@ -764,11 +760,15 @@ E18:
   closes: 'Step 5'
   executable_today: 'seeding-only'
   today: >-
-    Not meaningful yet: depends on Step 5 (wind branch of the cascade). Without a
-    loaded wind field the wind rule is inactive.
+    The wind field is loaded and the female flies against 2 to 5 m/s of 100 m wind,
+    far above her flight speed: the advance towards an upwind person is blocked, and
+    the first bite is on day 6, when the wind has turned; E19 (same geometry, weak
+    wind) bites on day 1. This is the documented result of the 100 m level, not an
+    error.
   verified_now:
     - "Seeding fidelity: the adult population obeys the conservation identity on every day (adults today = adults yesterday - deaths + emerged, starting from the seeded count), so no seeded individual is dropped or invented; the cohort log and the raster output agree on the number of adults"
     - "The run completes through the manifest route ('validate_completeness', resolve, binary) with exit code 0"
+    - "GATE (Step 5): same geometry as E19; under the strong wind the first bite is later than the day-1 bite of E19 (or absent): the blocking rule is active"
   gif: >-
     The standard transmission GIF: one frame per simulated day, cells in
     neutral grey, a one-cell scale bar, people as 1-pixel dots coloured by
@@ -778,3 +778,36 @@ E18:
     the wind and stopping on the nights of blocked flight; the GIF draws no
     wind arrows. The wind-field values and the stage of the female per night
     are in the debug agents file.
+
+E19:
+  title: "Weak wind does not block the approach"
+  purpose: >-
+    Complements E18. E18 shows that a wind above her flight speed blocks the
+    advance. E19 loads the same wind field scaled down to a breeze (at most
+    0.2 m/s, below the blocking threshold of 0.3375 m/s) and checks that the
+    wind branch does not stop a female from finding a person that is within the
+    olfactory radius. Together they bracket the blocking rule from both sides.
+  setup: >-
+    One host-seeking female and one susceptible person 40 m away, inside the
+    olfactory radius (50 m). The synthetic study area carries a weak copy of its
+    wind field (the maximum speed is scaled to 0.2 m/s); the harness writes the
+    copy and declares it for this scenario only. Ten days.
+  implies: >-
+    If the wind branch blocked or deflected the female even under a breeze, no
+    female could reach anyone on a windy night and the transmission results would
+    depend on the wind where the physics says they should not. A pass means that
+    below the blocking threshold the wind biases the search but does not stop the
+    plume tracking.
+  expected: >-
+    Gate. The female lands on the person (at least one successful human bite,
+    stage LANDED in the debug agents file) within the ten days.
+  closes: 'Step 5'
+  executable_today: 'yes'
+  today: >-
+    The female tracks the plume under the weak wind and bites the person.
+  verified_now:
+    - "The run completes through the manifest route with exit code 0"
+    - "GATE (Step 5): at least one successful human bite and a LANDED cascade stage"
+  gif: >-
+    The standard transmission GIF. For E19 look for the female's short polyline
+    ending on the person dot, and a bite marker. The wind is not drawn.

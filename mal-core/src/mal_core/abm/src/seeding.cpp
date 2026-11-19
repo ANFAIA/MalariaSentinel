@@ -22,6 +22,7 @@
 // geodesy metres-per-degree accessor. This is a coarse approximation
 // but adequate for "snap a village to the nearest patch".
 #include "mal_abm_fast/seeding.hpp"
+#include "mal_abm_fast/host_cascade.hpp"
 
 #include <array>
 #include <cmath>
@@ -114,12 +115,12 @@ std::vector<SeedInstruction> build_seed_instructions_host_weighted(
     // Mirrors HostSeekingModel::cell_attraction's distance kernel
     // (exp(-dist/scale)) but sums host density rather than a single
     // target cell: patches surrounded by preferred hosts weigh most.
-    const double scale_m = static_cast<double>(config.host_seeking_scale_m);
+    const double scale_m = static_cast<double>(config.host_weighting_scale_m);
     if (!(scale_m > 0.0)) {
         throw std::invalid_argument(
-            "build_seed_instructions: host_seeking_scale_m not injected by "
+            "build_seed_instructions: host_weighting_scale_m not injected by "
             "the engine (no default: model_constants.yaml species.<name>."
-            "host_seeking_scale_m is the single source; review-a3 P1-4)");
+            "host_weighting_scale_m is the single source; review-a3 P1-4)");
     }
     const double radius_km = std::max(0.05, config.host_weight_radius_km);
     const int32_t search_cells = static_cast<int32_t>(
@@ -509,15 +510,22 @@ ScenarioSpec load_scenario_spec(const std::string& path) {
         }
     }
 
-    // -- overrides: applied from Paso 5; until then a non-empty map is an
-    // error, never a silent no-op (a sensitivity band would otherwise run
-    // with the canonical value and look like a pass).
-    if (root.contains("overrides") && !root.at("overrides").empty()) {
-        if (!root.at("overrides").is_object()) {
-            scenario_fail(path, "$.overrides", "must be an object");
+    // -- overrides (applied from Paso 5): numeric overrides of the cascade
+    // keys. An unknown key is an error, never a silent no-op (a sensitivity
+    // band would otherwise run with the canonical value and look like a pass).
+    if (root.contains("overrides")) {
+        const auto& ov = root.at("overrides");
+        if (!ov.is_object()) scenario_fail(path, "$.overrides", "must be an object");
+        for (auto it = ov.begin(); it != ov.end(); ++it) {
+            if (!CascadeParams::is_overridable(it.key())) {
+                scenario_fail(path, "$.overrides." + it.key(),
+                              "not an overridable cascade key");
+            }
+            if (!it.value().is_number()) {
+                scenario_fail(path, "$.overrides." + it.key(), "must be a number");
+            }
+            spec.overrides[it.key()] = it.value().get<double>();
         }
-        scenario_fail(path, "$.overrides",
-                      "overrides are not applied before Paso 5; must be empty");
     }
     return spec;
 }

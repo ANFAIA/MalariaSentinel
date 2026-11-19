@@ -11,7 +11,6 @@ Run each stage's CLI subcommand directly. There is no orchestrator (`malariasim 
 | 1 | download | plugin-based fetchers | `malariasim download` | `data/<aoi>/` |
 | 2a | ingest (env) | `build_env_tensor()` | `malariasim ingest` | `runs/ingest/` |
 | 2b | ingest (hosts) | `build_host_dataset()` | `malariasim ingest --stage hosts` | `runs/hosts/` |
-| 2c | ingest (mobility) | `build_mobility_dataset()` | `malariasim ingest --stage mobility` | `runs/mobility/` |
 | 3 | abm | `run_abm_from_manifest()` | `malariasim abm` | `runs/abm/` |
 | 4 | scoring | `run_scoring()` | `malariasim score` | `scorecard.json` inside the run dir |
 | 5 | training | `train_unet()` | `malariasim train` | `runs/training/` |
@@ -26,7 +25,7 @@ Every command accepts `--output-dir` to override the default location.
 Each stage reads artefacts written by the previous stage:
 
 - **ingest** reads raw data from `data/<aoi>/` (written by download).
-- **abm** reads the manifest at `data/<aoi>/manifest.json`, which references env, habitat, hosts, and mobility files.
+- **abm** reads the manifest at `data/<aoi>/manifest.json`, which references env, habitat, and hosts files.
 - **scoring** reads the ABM output directory passed via `--run-dir` and writes `scorecard.json` **inside** it.
 - **training** reads the ABM output (rollout snapshot tifs).
 - **prediction** reads the trained model from `runs/training/` and the env tensor from `data/<aoi>/`.
@@ -68,7 +67,7 @@ malariasim score --run-dir runs/abm --enable d25_cases_ghana    # activate a MAN
 | Module | Purpose |
 |---|---|
 | `download/` | Plugin-based data fetcher (DOWNLOADER dict, registry, runner, auth gate, manifest) |
-| `ingest/` | Build env tensor, host density, mobility matrices from raw data |
+| `ingest/` | Build env tensor and host density from raw data |
 | `abm/` | C++ ABM engine, wrapper, build scripts — see its [README](src/mal_core/abm/README.md) |
 | `scoring/` | Post-run scorers (D1..D25 + gates) + composite + scorecard writer |
 | `training/` | U-Net model, dataset, trainer, wrapper |

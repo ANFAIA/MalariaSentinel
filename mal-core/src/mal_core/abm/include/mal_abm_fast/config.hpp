@@ -50,6 +50,9 @@ struct ContractsCfg {
     /// runtime by wire.hpp CONTRACT_VERSION() and written into the state
     /// sidecar (`contracts.cogs_state`).
     std::string cogs_state;
+    /// Version string of the per-cell habitat registry contract; declared
+    /// by Paso 4 and consumed from Paso 7 (`contracts.habitat`).
+    std::string habitat;
 };
 
 /// Habitat configuration. The loader fills two instances of it: the
@@ -156,15 +159,64 @@ struct SpeciesRow {
     /// the salinity rises above the optimum
     /// (`species.<name>.salinity_slope`).
     double salinity_slope = 0.0;
-    /// Decay length (m) of the host-seeking attraction plume, i.e. how fast
-    /// the attraction of a host falls off with distance
-    /// (`species.<name>.host_seeking_scale_m`).
-    double host_seeking_scale_m = 0.0;
-    /// Radius (m) of the host-seeking attraction field: beyond it a host
-    /// exerts no attraction at all (`species.&lt;name&gt;.host_seeking_radius_m`).
-    /// A different concept from host_seeking.detect_range_m, the engine's
-    /// kernel detection radius.
-    double host_seeking_radius_m = 0.0;
+    /// [m] radio de activación por CO₂ (tramo ACTIVACIÓN de la cascada) [P] (`species.<name>.co2_activation_radius_m`).
+    double co2_activation_radius_m = 0.0;
+    /// [m] radio de rastreo olfativo de la pluma; banda 30–70 m, punto medio [P] (`species.<name>.olfactory_radius_m`).
+    double olfactory_radius_m = 0.0;
+    /// [m] radio de la banda de aproximación visual; banda 0,25–0,72 m, punto medio [P] (`species.<name>.visual_radius_m`).
+    double visual_radius_m = 0.0;
+    /// [m] radio terminal (contacto); banda 0,10–0,20 m, punto medio [P] (`species.<name>.terminal_radius_m`).
+    double terminal_radius_m = 0.0;
+    /// [m/s] velocidad propia de vuelo en busca; banda 0,225–0,45 m/s, punto medio [P] (`species.<name>.flight_speed_ms`).
+    double flight_speed_ms = 0.0;
+    /// [m] radio del disco de exploración (>= co2_activation_radius_m); banda 100–200 m [EP] (`species.<name>.exploration_range_m`).
+    double exploration_range_m = 0.0;
+    /// [m] longitud nominal del paso del paseo de exploración [EP] (`species.<name>.exploration_step_m`).
+    double exploration_step_m = 0.0;
+    /// [adimensional] correlación paso–paso del paseo de exploración [EP] (`species.<name>.exploration_step_correlation`).
+    double exploration_step_correlation = 0.0;
+    /// [1/paso de rastreo] probabilidad de perder la pluma y pasar a casting [EP] (`species.<name>.casting_probability`).
+    double casting_probability = 0.0;
+    /// [°] transversalidad del casting respecto al viento (90 ± 30) [EP] (`species.<name>.casting_angle_deg`).
+    double casting_angle_deg = 0.0;
+    /// [s] memoria de la pluma (segmentos de cast, Cummins 2012); banda 0,5–0,9 s, punto medio; la fila manda sobre integration.plume_memory_s [P] (`species.<name>.plume_memory_s`).
+    double plume_memory_s = 0.0;
+    /// [categórico] regla de orientación respecto al viento (contra el viento) [EP] (`species.<name>.anemotaxis_rule`).
+    std::string anemotaxis_rule;
+    /// [°] desviación máxima respecto a la dirección contra el viento (± grados) [EP] (`species.<name>.anemotaxis_deviation_deg`).
+    double anemotaxis_deviation_deg = 0.0;
+    /// [string] variables del campo de viento (100 m AGL, ERA5 6-horario); único nivel disponible [M] (`species.<name>.wind_reference`).
+    std::string wind_reference;
+    /// [m/s] umbral de bloqueo del avance contra el viento; por defecto = flight_speed_ms [EP] (`species.<name>.wind_block_threshold_ms`).
+    double wind_block_threshold_ms = 0.0;
+    /// [m] longitud máxima de trayectoria diaria (MDTpD), no desplazamiento neto; media de 486–695 m/día [P] (`species.<name>.daily_move_capacity_m`).
+    double daily_move_capacity_m = 0.0;
+    /// [h] DERIVADO: daily_move_capacity_m / flight_speed_ms / 3600; consumible por día; la fila manda sobre integration.directed_flight_budget_h [EP] (`species.<name>.directed_flight_budget_h`).
+    double directed_flight_budget_h = 0.0;
+    /// [µL] objetivo de una comida completa [EP] (`species.<name>.blood_meal_target_ul`).
+    double blood_meal_target_ul = 0.0;
+    /// [µL] objetivo de la primera comida (> blood_meal_target_ul: hacen falta dos comidas) [EP] (`species.<name>.first_cycle_target_ul`).
+    double first_cycle_target_ul = 0.0;
+    /// [µL] media del volumen tomado por comida [EP] (`species.<name>.blood_meal_size_ul`).
+    double blood_meal_size_ul = 0.0;
+    /// [µL] volumen mínimo de una comida válida [EP] (`species.<name>.meal_size_min_ul`).
+    double meal_size_min_ul = 0.0;
+    /// [días] ventana postprandial tras alcanzar el objetivo [EP] (`species.<name>.blood_meal_refractory_days`).
+    double blood_meal_refractory_days = 0.0;
+    /// [fracción] probabilidad de éxito del sondeo por contacto; banda 0,465–0,99, punto medio; sustituye a gonotrophic.feeding_success_rate [EP] (`species.<name>.probing_success_rate`).
+    double probing_success_rate = 0.0;
+    /// [huevos/µL] huevos por µL de sangre acumulada; 0,5 µL dan ≈112 huevos (puesta medida 111,67 ± 5,36) [EP] (`species.<name>.eggs_per_ul`).
+    double eggs_per_ul = 0.0;
+    /// [1/día] supervivencia diaria en arresto ovárico; 212·ln(0,986) ⇒ 0,05 a los 212 días de estivación [EP] (`species.<name>.arrested_daily_survival`).
+    double arrested_daily_survival = 0.0;
+    /// [fracción] probabilidad de arresto gonotrófico en estación seca (punto medio de 19,23–34,85 / 40,09–48,98 / 68,12–68,64 % coluzzii / arabiensis / gambiae s.s.); sin dato en las demás filas ⇒ 0 [P] (`species.<name>.gonotrophic_arrest_prob_dry`).
+    double gonotrophic_arrest_prob_dry = 0.0;
+    /// [booleano] la especie estiva (arresto ovárico); sin evidencia en funestus, melas y stephensi [EP] (`species.<name>.aestivation_supported`).
+    bool aestivation_supported = false;
+    /// [fracción] fracción de machos al emerger; neutral por defecto (la evidencia apunta a sesgo macho, Vielma et al. 2026) [EP] (`species.<name>.male_ratio`).
+    double male_ratio = 0.0;
+    /// [1/día] supervivencia diaria del macho (0,773 ± 0,094, Epopa et al. 2017); separada de la hembra [M] (`species.<name>.male_daily_survival`).
+    double male_daily_survival = 0.0;
 };
 
 /// Species section of the configuration: the active species, the single
@@ -406,15 +458,6 @@ struct GonotrophicCfg {
 /// the night window during which they occur (`dispersal:` section of
 /// model_constants.yaml).
 struct DispersalCfg {
-    /// Probability (per day) that an adult disperses
-    /// (`dispersal.adult_prob_day`).
-    double adult_prob_day = 0.0;
-    /// Standard deviation (m) of the Gaussian kernel of adult dispersal
-    /// (`dispersal.adult_sigma_m`).
-    double adult_sigma_m = 0.0;
-    /// Maximum distance (m) an adult may cover in one dispersal event
-    /// (`dispersal.adult_max_m`).
-    double adult_max_m = 0.0;
     /// Probability (per day) that an adult migrates with the wind
     /// (`dispersal.wind_migration_prob`).
     double wind_migration_prob = 0.0;
@@ -429,9 +472,6 @@ struct DispersalCfg {
     /// Hour of the day (0-23) at which the wind flight is triggered
     /// (`dispersal.flight_hour`).
     int flight_hour = 0;
-    /// Length (m) of the step taken by a mosquito flying towards a detected
-    /// host (`dispersal.host_flight_step_m`).
-    double host_flight_step_m = 0.0;
     /// Radius (m) within which an adult is snapped to the nearest activated
     /// patch (`dispersal.snap_radius_m`).
     double snap_radius_m = 0.0;
@@ -464,14 +504,6 @@ struct HostSeekingCfg {
     /// Indoor fraction (in [0,1]) assigned to rural cells of the host
     /// landscape (`host_seeking.indoor_fraction_rural`).
     double indoor_fraction_rural = 0.0;
-    /// Detection radius (m) within which the engine's host-seeking kernel
-    /// can see a host cell (`host_seeking.detect_range_m`). A different
-    /// concept from the per-species attraction-field radius
-    /// species.&lt;name&gt;.host_seeking_radius_m.
-    double detect_range_m = 0.0;
-    /// Length (m) of the step taken while approaching a detected host
-    /// (`host_seeking.approach_step_m`).
-    double approach_step_m = 0.0;
 };
 
 /// Search for a breeding site: the attraction plume and the geometry of
@@ -517,6 +549,57 @@ struct AquaticStagesCfg {
     /// is missing — the freshwater anchor, which yields a suitability of 1
     /// (`aquatic_stages.salinity_missing_psu`).
     double salinity_missing_psu = 0.0;
+};
+
+/// Time integration of the movement cascade (`integration:` section).
+struct IntegrationCfg {
+    /// [h] Duration of the phases [DAY, EVENING, NIGHT, DAWN]; they add up
+    /// to 24 h (`integration.phase_duration_hours`).
+    std::array<double, 4> phase_duration_hours{};
+    /// [h] DERIVADO: 590 m / flight_speed_ms / 3600; valor por defecto, la fila de especie manda [EP] (`integration.directed_flight_budget_h`).
+    double directed_flight_budget_h = 0.0;
+    /// [s] paso del micro-integrador terminal (25 Hz, Nyquist sobre el giro de 0,08 s) [EP] (`integration.dt_terminal_s`).
+    double dt_terminal_s = 0.0;
+    /// [s] paso del micro-integrador en la banda olfativa [EP] (`integration.dt_olfactory_s`).
+    double dt_olfactory_s = 0.0;
+    /// [s] memoria de la pluma por defecto (Cummins 2012); la fila de especie manda [P] (`integration.plume_memory_s`).
+    double plume_memory_s = 0.0;
+    /// [mm/s] velocidad máxima del gate de aterrizaje (Hinze 2021) [P] (`integration.landing_speed_mm_s`).
+    double landing_speed_mm_s = 0.0;
+    /// [s] tiempo que se mantiene el gate de aterrizaje (Hinze 2021) [P] (`integration.landing_speed_hold_s`).
+    double landing_speed_hold_s = 0.0;
+};
+
+/// Male layer and mating (`mating:` section).
+struct MatingCfg {
+    /// [fracción] fracción de machos del enjambre que se aparean por noche (0,072 ± 0,0095, Diabaté 2011) [P] (`mating.p_mate_male_fraction`).
+    double p_mate_male_fraction = 0.0;
+    /// [pares/individuo] pares por individuo de ambos sexos y enjambre; cota de sensibilidad 0,084–0,25 (Ouédraogo 2025), no comparable con p_mate_male_fraction [M] (`mating.p_mate_pairs_per_individual`).
+    double p_mate_pairs_per_individual = 0.0;
+    /// [adimensional] exponente de la ley de eficiencia por tamaño de enjambre; banda 0–1 [EP] (`mating.p_mate_size_exponent`).
+    double p_mate_size_exponent = 0.0;
+    /// [machos/enjambre] tamaño de referencia de la ley de eficiencia [EP] (`mating.male_swarm_reference_size`).
+    double male_swarm_reference_size = 0.0;
+    /// [fracción] probabilidad de que una hembra presente esté en posición de cópula (47/455, Diabaté 2009) [P] (`mating.female_attendance_rate`).
+    double female_attendance_rate = 0.0;
+    /// [fracción] factor de oferta masculina de un enjambre local sin marcador (Kaiser 2021) [EP] (`mating.local_swarm_male_offer_factor`).
+    double local_swarm_male_offer_factor = 0.0;
+    /// [m/día] alcance diario del macho hacia un sitio de enjambre; banda 40–100 [EP] (`mating.male_move_capacity_m`).
+    double male_move_capacity_m = 0.0;
+    /// [hembras/macho/noche] máximo de hembras por macho y noche (citado, no medido: Ekechukwu & Tripet 2019) [M] (`mating.male_females_per_night_max`).
+    int male_females_per_night_max = 0;
+    /// [min] duración del enjambre; banda 19–39 (Bimbilé Somda 2018) [P] (`mating.swarm_duration_min`).
+    double swarm_duration_min = 0.0;
+    /// [min] inicio del enjambre tras la puesta de sol (Bimbilé Somda 2018) [P] (`mating.swarm_start_min_after_sunset`).
+    double swarm_start_min_after_sunset = 0.0;
+    /// [m] altura del enjambre (2,87 ± 0,20, Ouédraogo 2025) [M] (`mating.swarm_height_m`).
+    double swarm_height_m = 0.0;
+    /// [marcadores/km²] densidad del campo de sitios; sin medición publicada, la fija el escenario [EP] (`mating.swarm_markers_per_km2`).
+    double swarm_markers_per_km2 = 0.0;
+    /// [string] procedencia del campo de sitios; la fija el escenario [EP] (`mating.swarm_markers_source`).
+    std::string swarm_markers_source;
+    /// [booleano] la lluvia suprime el enjambre (0 parejas por enjambre en el pico de lluvias) [P] (`mating.rain_suppresses_swarming`).
+    bool rain_suppresses_swarming = false;
 };
 
 /// Seeds of the engine's production random sub-streams; they make a run
@@ -576,6 +659,10 @@ struct ModelConfig {
     DispersalCfg dispersal;
     /// The `host_seeking:` section — host-seeking behaviour.
     HostSeekingCfg host_seeking;
+    /// The `integration:` section — phase clock and micro-integrator steps.
+    IntegrationCfg integration;
+    /// The `mating:` section — the male layer.
+    MatingCfg mating;
     /// The `oviposition:` section — the breeding-site search.
     OvipositionCfg oviposition;
     /// The `aquatic_stages:` section — aquatic mortality and density

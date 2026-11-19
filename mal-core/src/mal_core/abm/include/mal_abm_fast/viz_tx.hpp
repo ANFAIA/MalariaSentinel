@@ -25,25 +25,16 @@
 namespace mal_abm_fast {
 
 class Engine;
-struct SparseOD;  // forward decl (defined in mobility_schedule.hpp)
 
 /// Pure, unit-testable diagnostics for the transmission GIF.
 namespace tx_diag {
 
-struct TxFlow {
-    int32_t fr = 0, fc = 0, tr = 0, tc = 0;
-    float vol = 0.0f;
-};
-
 /// Biteable-cell class: 0 = no host, 1 = animal-only, 2 = has humans.
 int classify_biteable(double humans, double livestock);
 
-/// Top-K non-diagonal OD flows weighted by residential population
-/// (expected flow E[F] = P(i→j)·H_res(i); deterministic, no RNG).
-/// `moved_out` receives the total population moved off its home cell.
-std::vector<TxFlow> extract_top_flows(const SparseOD& od,
-                                      const std::vector<float>& residential,
-                                      int32_t W, int K, double& moved_out);
+/// Label of the scale rule, which is one cell long: "1 km" for 1000 m,
+/// "500 m" for 500 m, "1.5 km" for 1500 m.
+std::string format_cell_length(double resolution_m);
 
 }  // namespace tx_diag
 

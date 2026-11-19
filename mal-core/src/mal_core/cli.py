@@ -203,18 +203,18 @@ def ingest(
     month: int = typer.Option(6, "--month", help="Month"),
     output_dir: Path = typer.Option(Path("runs/ingest"), "--output-dir"),
     data_dir: Path | None = typer.Option(None, "--data-dir", help="Downloaded AOI directory"),
-    what: str = typer.Option("all", "--what", help="What to build: env, hosts, mobility, all"),
+    what: str = typer.Option("all", "--what", help="What to build: env, hosts, all"),
 ) -> None:
     """Build ABM-ready artifacts for an AOI.
 
-    Builds environmental tensors, host density grids, and mobility matrices.
+    Builds environmental tensors and host density grids.
     Use --what to build a specific component.
 
     Key parameters:
       --what: env (daily env NC + habitat), hosts (host_static.nc),
-              mobility (CSR OD matrices), or all (default)
+              or all (default)
     """
-    from .ingest import build_env_tensor, build_host_dataset, build_mobility_dataset
+    from .ingest import build_env_tensor, build_host_dataset
 
     results = {}
     from mal_commonlib.aoi import AOI as _AOI
@@ -226,17 +226,6 @@ def ingest(
     if what in ("hosts", "all"):
         result = build_host_dataset(aoi=aoi_obj, output_dir=output_dir)
         results["hosts"] = result
-    if what in ("mobility", "all"):
-        from pathlib import Path as P
-        hosts_path = output_dir / f"{aoi}_host_static.nc"
-        if not hosts_path.exists():
-            hosts_path = P("data") / aoi / f"{aoi}_host_static.nc"
-        if hosts_path.exists():
-            mobility_out = P("data") / aoi
-            result = build_mobility_dataset(hosts_path=hosts_path, output_dir=mobility_out, aoi_slug=aoi)
-            results["mobility"] = result
-        else:
-            typer.echo(f"Warning: host_static.nc not found, skipping mobility build", err=True)
 
     typer.echo(f"Ingest results: {list(results.keys())}")
 
@@ -279,6 +268,7 @@ def abm(
     detection_points: str = typer.Option("", "--detection-points", help="EXPLICIT mode: lat/lon points 'lat,lon;lat,lon;...' (e.g. Accra '5.6037,-0.1870')."),
     detection_radius_km: float = typer.Option(5.0, "--detection-radius-km", help="EXPLICIT mode: max snap distance (km) from each point to the nearest habitat patch."),
     enable_transmission: bool = typer.Option(False, "--enable-transmission", help="Enable spatial SEIR-SEI malaria transmission model (M7.4)."),
+    debug: bool = typer.Option(False, "--debug", help="Write the per-day debug Parquet files (_agents, _humans, _bites, _mating); independent of --scenario; the size is yours."),
     transmission_snapshot_every: int = typer.Option(0, "--transmission-snapshot-every", help="Transmission snapshot interval in days (0=final only)."),
     human_seeding_mode: str = typer.Option("random-viable", "--human-seeding-mode", help="Human infection seeding mode: 'random-viable' | 'explicit' | 'uniform-legacy' | 'none'."),
     human_outbreak_day: int = typer.Option(0, "--human-outbreak-day", help="Day of simulation to trigger human outbreak (e.g. 60 for 2-month warm-up)."),
@@ -375,6 +365,7 @@ def abm(
         detection_points=detection_points or None,
         detection_radius_km=detection_radius_km,
         enable_transmission=enable_transmission,
+        debug=debug,
         human_seeding_mode=human_seeding_mode,
         human_outbreak_day=human_outbreak_day,
         human_outbreak_foci=human_outbreak_foci,
@@ -647,7 +638,7 @@ def _ensure_env_stack(aoi: str, years: list[int], skip: bool = False) -> Path:
     """Ensure the env NC covering ``years`` (and ABM inputs) exist.
 
     Downloads raw datasets via the plugin registry and builds the daily
-    env NC + habitat/hosts/mobility artifacts when missing. Returns the
+    env NC + habitat/hosts artifacts when missing. Returns the
     env NC path.
     """
     from pathlib import Path as P
@@ -673,7 +664,7 @@ def _ensure_env_stack(aoi: str, years: list[int], skip: bool = False) -> Path:
     # Only what build_daily_env_nc + the engine actually consume under
     # contract v3.0: rainfall (chirps daily), air temperature (era5),
     # water/wetland/built/crop/open fractions (jrc + dynamic world),
-    # land_mask (coastline), hosts/mobility inputs
+    # land_mask (coastline), hosts inputs
     # (worldpop, glw, wildlife — ghsl/buildings retained as independent
     # host-density consumers).
     run_download(
@@ -709,7 +700,7 @@ def _ensure_env_stack(aoi: str, years: list[int], skip: bool = False) -> Path:
 
 
 def _ensure_abm_inputs(aoi: str, data_dir: Path) -> None:
-    """Ensure habitat patches, host grid and mobility matrices exist.
+    """Ensure habitat patches and the host grid exist.
 
     Presence checks go through the catalog (manifest = single source of
     truth; identity keys from INGEST_ARTIFACTS). Production keeps writing
@@ -718,7 +709,7 @@ def _ensure_abm_inputs(aoi: str, data_dir: Path) -> None:
     """
     from mal_commonlib.aoi import AOI
     from .download.catalog import INGEST_ARTIFACTS, resolve
-    from .ingest import build_host_dataset, build_mobility_dataset
+    from .ingest import build_host_dataset
 
     habitat = resolve(
         aoi, INGEST_ARTIFACTS["habitat"].key, data_dir=data_dir
@@ -758,18 +749,6 @@ def _ensure_abm_inputs(aoi: str, data_dir: Path) -> None:
                 "host grid build failed "
                 f"(manifest key '{INGEST_ARTIFACTS['host_static'].key}')"
             )
-
-    day_csr = resolve(
-        aoi, INGEST_ARTIFACTS["mobility_day"].key, data_dir=data_dir
-    )
-    night_csr = resolve(
-        aoi, INGEST_ARTIFACTS["mobility_night"].key, data_dir=data_dir
-    )
-    if day_csr is None or night_csr is None:
-        typer.echo("Building mobility matrices (this can take a while)...")
-        build_mobility_dataset(
-            hosts_path=hosts, output_dir=data_dir, aoi_slug=aoi
-        )
 
 
 @app.command()

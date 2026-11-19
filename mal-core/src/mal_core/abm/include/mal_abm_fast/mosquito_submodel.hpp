@@ -9,7 +9,7 @@
 //   1. aquatic_cohort_bank.advance_day() — egg/larva/pupa lifecycle
 //   2. aquatic_cohort_bank.collect_emergence() — pupa → adult
 //   3. Add emerged adults to MosquitoSoA
-//   4. adult_dispersal()
+//   4. adult_dispersal() (windborne migration)
 //   5. adult_mortality()
 //
 // Determinism
@@ -37,16 +37,12 @@
 #include "bite_ledger.hpp"
 #include "gonotrophic_cycle.hpp"
 #include "host_landscape.hpp"
-#include "host_seeking.hpp"
-#include "mobility_schedule.hpp"
 #include "multirate_scheduler.hpp"
 #include "mal_abm_fast/host_landscape.hpp"
-#include "mal_abm_fast/mobility_schedule.hpp"
-#include "mal_abm_fast/host_seeking.hpp"
 #include "mal_abm_fast/oviposition_seeking.hpp"
 #include "mal_abm_fast/wind_field.hpp"
 #include "mal_abm_fast/species_params.hpp"
-#include "mal_abm_fast/effective_host_landscape.hpp"
+#include "mal_abm_fast/host_cascade.hpp"
 
 namespace mal_abm_fast {
 
@@ -84,19 +80,6 @@ struct DailyStats {
 struct PatchDailyFlux {
     int64_t eggs_laid = 0;   // eggs deposited today by ovipositing females
     int64_t emerged   = 0;   // adults emerging today from pupae
-};
-
-/// Diagnostic copy of the phase-aware H_eff realizations for one day
-/// (plan 05 §7). Stores the ALREADY-SAMPLED effective host grids from the
-/// multinomial flow pass (no re-sampling, zero RNG impact) so the
-/// transmission GIF can render the DAY vs NIGHT host-presence contrast.
-/// A pure diagnostic: it never feeds back into the simulation.
-/// `valid=false` when the phase-aware pass did not run (no mobility /
-/// hosts / host-seeking wired).
-struct EffectivePhaseSnapshot {
-    bool valid = false;
-    std::array<EffectiveGrid, PHASE_WEIGHT_COUNT> human{};
-    std::array<EffectiveGrid, PHASE_WEIGHT_COUNT> livestock{};
 };
 
 class MosquitoSubmodel {
@@ -149,13 +132,6 @@ public:
         return patch_daily_flux_;
     }
 
-    // Realized per-phase H_eff grids for the current day (plan 05 §7).
-    // `valid=false` before the first phase-aware advance_day(). A pure
-    // diagnostic copy of the already-sampled realizations.
-    const EffectivePhaseSnapshot& effective_phase_snapshot() const {
-        return eff_phase_snapshot_;
-    }
-
     // Mutable access to the SoA (for transmission EIP / infection updates).
     MosquitoSoA& soa_mutable() { return soa_; }
 
@@ -167,6 +143,17 @@ public:
 
     // Read-only access to the bite ledger (G4).
     const BiteLedger& bite_ledger() const { return bite_ledger_; }
+    BiteLedger& bite_ledger_mutable() { return bite_ledger_; }
+
+    // Paso 5: perception cascade. With individual people carrying a spatial
+    // index (set_human_compartment_grid + build_spatial_index) and cascade
+    // parameters set, host-seeking females fly the cascade; otherwise the
+    // legacy per-cell paths run (runs without individual people).
+    void set_cascade(const CascadeParams& p, uint64_t micro_seed) {
+        cascade_ = p; cascade_set_ = true; micro_seed_ = micro_seed;
+    }
+    bool cascade_enabled() const;
+    const CascadeParams& cascade_params() const { return cascade_; }
 
     // Read-only access to gonotrophic parameters.
     const GonotrophicParams& gonotrophic_params() const { return gonotrophic_params_; }
@@ -176,8 +163,6 @@ public:
 
     // Host-seeking component setters (G14).
     void set_host_landscape(const HostLandscape* h) { host_landscape_ = h; }
-    void set_mobility_schedule(const MobilitySchedule* m) { mobility_schedule_ = m; }
-    void set_host_seeking_model(const HostSeekingModel* h) { host_seeking_ = h; }
     void set_oviposition_seeking_model(const OvipositionSeekingModel* o) { oviposition_seeking_ = o; }
     void set_habitat_engine(const HabitatEngine* h) { habitat_engine_for_ovip_ = h; }
 
@@ -189,7 +174,6 @@ public:
     // for newly created mosquitoes and the salinity context for breeding.
     void set_species(const SpeciesParams& sp) { species_params_ = sp; }
     const SpeciesParams& species_params() const { return species_params_; }
-    void set_effective_host_landscape(EffectiveHostLandscape* e) { effective_hosts_ = e; }
 
     // Wind field setter (M7.6 — windborne migration).
     void set_wind_field(const WindField* w) { wind_field_ = w; }
@@ -204,7 +188,7 @@ public:
     //   1. cohort_bank_.advance_day() — aquatic development + mortality
     //   2. cohort_bank_.collect_emergence() — pupa → adult events
     //   3. Add emerged adults to MosquitoSoA
-    //   4. adult_dispersal()
+    //   4. adult_dispersal() (windborne migration)
     //   5. adult_mortality()
     void advance_day(const AOI& aoi,
                      const std::vector<PatchState>& patch_states);
@@ -236,11 +220,19 @@ public:
 
     // -- per-day operations -----------------------------------------------
 
-    // 1. Adult dispersal: clipped Gaussian (dispersal.adult_prob_day).
+    // 1. Adult dispersal: windborne migration only (the Gaussian kernel is retired).
     void adult_dispersal(const AOI& aoi);
 
     // 2. Adult mortality — thermo-dependent daily survival.
     void adult_mortality(const std::vector<PatchState>& patch_states);
+
+    // 1b. Paso 5: one day of the perception cascade for every host-seeking
+    // female (phase clock, flight budget, micro-integrator). Returns via
+    // out-params the attempts and successful feeds of the day.
+    void cascade_feeding_pass(const AOI& aoi, int64_t day_idx,
+                              int64_t& n_attempts, int64_t& n_feeds);
+    // Derive the metric position of adults seeded without one.
+    void init_positions(const AOI& aoi);
 
     // 3. Patch tracking: update patch_id after position change (Plan D).
     void update_patch_id(int64_t idx, int32_t new_row, int32_t new_col,
@@ -274,9 +266,6 @@ private:
     // Per-patch reproductive flux for the current day (plan 04 §3).
     std::unordered_map<int64_t, PatchDailyFlux> patch_daily_flux_;
 
-    // Realized per-phase H_eff snapshot for the current day (plan 05 §7).
-    EffectivePhaseSnapshot eff_phase_snapshot_;
-
     // G4: gonotrophic cycle
     GonotrophicParams gonotrophic_params_;
     BiteLedger        bite_ledger_;
@@ -284,11 +273,13 @@ private:
 
     // Host-seeking (non-owning pointers; Engine owns the components).
     const HostLandscape*         host_landscape_         = nullptr;
-    const MobilitySchedule*      mobility_schedule_      = nullptr;
-    const HostSeekingModel*      host_seeking_           = nullptr;
     const OvipositionSeekingModel* oviposition_seeking_  = nullptr;
     const HabitatEngine*         habitat_engine_for_ovip_ = nullptr;
-    EffectiveHostLandscape*      effective_hosts_        = nullptr;
+
+    // Paso 5 cascade state.
+    CascadeParams cascade_;
+    bool          cascade_set_ = false;
+    uint64_t      micro_seed_  = 0;
 
     // Transmission (M7.4 non-owning pointers).
     const HumanCompartmentGrid*  human_grid_             = nullptr;

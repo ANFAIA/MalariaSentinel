@@ -3205,11 +3205,109 @@ empieza hasta que el anterior pasa su verificación.
     que el fichero nuevo**: sin ellos el módulo y los tests nuevos **no se compilan ni
     aparecen en `ctest`**, y el paso se vería verde sin haber probado nada.
 
-### Estado de ejecución (actualizado 2026-11-18, rama `sim/individualization-movement`)
+### Estado de ejecución (actualizado 2026-11-19, rama `sim/individualization-movement`)
 
-**Pasos 0 y 1: hechos y verificados; sin commit todavía** (el árbol de trabajo lleva los
-cambios). **Siguiente paso a ejecutar: 2a** (humanos individuales, §15.0), luego 4, 5, 2b…
-en el orden de §15. Quien arranque en una sesión nueva debe leer esta sección y §15.1.2.
+**Pasos 0, 1, 2a, 4, 5 y 2b: hechos y verificados.** **Siguiente paso a ejecutar: 3** (sangre:
+multipicadura, umbral gonotrófico), luego 6, 7, 9, 2c y 8 en el orden de §15. Quien arranque
+en una sesión nueva debe leer esta sección y §15.1.2.
+
+**Paso 5 (cascada) y 2b (Parquet `--debug`), lo que quedó:**
+
+*   `host_cascade.hpp/.cpp` (módulo nuevo, no se reescribe `host_seeking.cpp`): bandas
+    EXPLORACIÓN → ACTIVACIÓN → PLUMA → VISUAL → CONTACTO/ATERRIZAJE por **persona más cercana**;
+    entrada en banda por `d_min` del **segmento barrido** (el paso se corta 1 mm pasada la
+    entrada); presupuesto de vuelo derivado, **por día** y repartido por `activity_weights`;
+    tope de 590 m de trayectoria; viento (bloqueo por viento de cara ≥ umbral, sólo con campo de
+    viento cargado); micro-pasos 0,25 s (olfativa) y 0,04 s (visual); gate de aterrizaje de 3 s;
+    stream por (`uid`, día, fase). Índice espacial por bins de 25 m en `HumanCompartmentGrid`
+    (`nearest_to_segment`). Posición métrica `pos_x/pos_y` en el SoA (derivadas fila/col/lon/lat;
+    `xy_to_lonlat`/`lonlat_to_xy` en `aoi.hpp`). `activity_weights` de *coluzzii* re-derivado a
+    `[0, 0,255, 0,48, 0,265]`. Los *overrides* de escenario (claves de la cascada) ya se aplican.
+*   **Caminos antiguos borrados (2026-11-19):** `host_seeking.*` (campo de atracción por celda,
+    `detect_host_cell`, `approach_vector`…), `effective_host_landscape.*`, `mobility_schedule.*`,
+    `dispersal.*` (paseo gaussiano), el relleno de alimentación determinista/residencial, el bloque
+    `HOST_APPROACH`, las flechas e inset de movilidad del GIF, las flags `--disperse-*` y
+    `--human-mobility-*`/`--livestock-mobility`, y las claves `dispersal.adult_*`,
+    `dispersal.host_flight_step_m`, `host_seeking.detect_range_m`/`approach_step_m` y
+    `species.<fila>.host_seeking_scale_m`/`_radius_m` (el esquema sigue en `version: 3`). Las
+    personas existen siempre (una por celda sin paisaje de hospederos); un escenario declara **todas**
+    sus personas (puede ser ninguna). La siembra `host-weighted` usa `daily_move_capacity_m` como
+    escala. La movilidad se borró de punta a punta: `ingest/mobility.py`, `mal_commonlib/data/mobility.py`, `build_mobility.py`, `visualize_mobility.py`, los artefactos `mobility_*` del catálogo, el scorer G14, `--what mobility` y las secciones de los documentos de ingest, download y scoring. Los `*.csr` de `data/` quedan en disco (carpeta protegida) hasta que el autor los borre.
+*   Humano→vector usa el estado de **la persona picada** (`prev_h`) y la infección humana cae
+    sobre **esa** persona (`BiteEvent`, `person_index`); los días de «presa animal» la hembra come del
+    ganado agregado de su celda sin volar (hasta el Paso 2c).
+*   **2b:** `BiteEvent` en el ledger (siempre en memoria) y `--debug` (`cli.py`, `wrapper.py`,
+    `main.cpp`): `DebugParquetWriter` con Apache Arrow C++ → `_agents`, `_humans` (sólo E/I/R),
+    `_bites` (con `new_infection`), `_mating` (vacío hasta el Paso 8). Dependencia nueva: Arrow y
+    Parquet en `CMakeLists.txt` (**falta añadirla a la instalación del CI**).
+*   GIF: trazo de cada adulto = polilínea de sus posiciones diarias (V1).
+*   Arnés: el viento sólo se declara en E18 (antes todos los escenarios volaban con 2–5 m/s, que
+    bloquea la cascada); E01/E02 sin picadura pasan a pruebas normales; `n_deaths` ahora cuenta
+    inanición y pérdidas por viento (la identidad de conservación de E12 lo exigía).
+*   **Hallazgo a decidir (no es un fallo del código):** con la regla «persona más cercana» y adultos
+    casi inmóviles (no hay vuelo de oviposición hasta el Paso 9 ni emergencia en la posición de la
+    madre hasta el Paso 7), las picaduras se concentran en pocas personas (Accra coast, 60 d: 2 657
+    picaduras sobre 148 personas, 58 % sobre 10 personas, una recibe 211) y la cadena de transmisión
+    no arranca (0 picaduras infecciosas; los 30 casos sembrados están a ≥ 165 m de todo adulto).
+    El motor anterior también tenía 0 picaduras infecciosas en esta corrida, pero por otra causa.
+*   **Escenarios a 10 días:** con 3 días E01 parecía «sin contacto»; a 10 días la hembra llega a la
+    persona a 200 m el día 5 (semilla 20261117). Gates actuales: E01 sin picadura los 3 primeros días;
+    E02 sin picadura y muerte por inanición no antes del día 7; E18 (viento fuerte, persona a favor
+    del viento) primera picadura el día 6 frente al día 1 de **E19** (viento débil, escenario nuevo).
+    E10 corre una sola variante por etiqueta (un valor de *override* por variante del JSON).
+
+**Paso 2a (humanos individuales), lo que quedó:**
+
+*   `human_state.hpp/.cpp`: `HumanSoA` (`human_id` = `(cell_id << 32) | slot`, único y
+    estable aunque cambien las demás celdas; `cell_id`; `home`/`cur` en metros desde la
+    esquina SW; `state`; `timer`; `susceptible`) tras la misma API
+    (`HumanCompartmentGrid`: `init`, `seed_*`, `compute_stats`, `validate_invariants`).
+    Nº de personas por celda = `round(human_total)`; posición uniforme en la celda, función
+    pura de (semilla, `human_id`). **Sin `SLOTS_PER_CELL`** (decisión 2a de §15.0).
+    `advance_day()` avanza sólo temporizadores; `expose(i)` es la única vía de infección.
+*   `transmission.cpp`: se retiran `advance_human_transmission` por celda, `lambda_h_` e
+    `infectious_pressure_`. Cada picadura infecciosa elige **una persona uniforme de la celda
+    picada** (`pick_person`, sustituto hasta que la cascada del Paso 5 identifique a la
+    persona) y la expone con probabilidad `beta_vh`: una picadura infecta como máximo a una
+    persona. La presión infecciosa del COG se lee del ledger
+    (`infectious_pressure_from_ledger`).
+*   Escenarios: los `humans[]` declarados **sustituyen** a la población de la rejilla
+    (`Engine::apply_scenario_humans_`); exige `--enable-transmission`.
+*   GIF de transmisión (`viz_tx.cpp`): celdas en gris neutro (sin rampas verde/rojo), cada
+    persona = 1 píxel por estado SEIR (todas, las infecciosas se pintan al final), regla de
+    escala de **una celda** (`format_cell_length`). El símbolo de sexo relleno/hueco ya
+    existía en `viz_tx.cpp`.
+*   Golden `transmission_seed42_day90.json` regenerado (cambió el mecanismo de infección
+    humana); los goldens sin transmisión no cambian.
+*   **Pendiente, no hecho en 2a:** el pickup humano→vector sigue leyendo la prevalencia de la
+    celda (`prev_at`), que es la esperanza de la persona picada; pasa a `prev_h` (estado de la
+    persona picada) cuando el Paso 5 identifique a la persona. El ledger de eventos y los
+    Parquet son del Paso 2b.
+
+**Paso 4 (esquema de configuración), lo que quedó:** `version: 3`; las claves nuevas
+(por especie, `integration:`, `mating:`, `contracts.habitat`) en las cinco superficies, con
+invariantes en el validador (radios anidados, presupuesto de vuelo derivado, fases = 24 h,
+sin arresto sin estivación…) y tests de paridad. Los valores de banda se fijaron en el
+**punto medio** de la banda del plan y quedan como prior documentado en el comentario de cada
+clave. Desviaciones que hay que conocer (el plan las contradice o no las cubre):
+
+*   **`slots_per_cell` / `SLOTS_PER_CELL` no se crea**: la decisión 2a de §15.0 lo descarta.
+    La viñeta de este Paso 4 y §12/§12.4 que lo nombran quedan **sin efecto**.
+*   **`contracts.cogs_state` se queda en `"4.0"`**: pasarlo a `"5.0"` ahora etiquetaría COG
+    de 5 bandas que aún se publican en 4.0; se cambia en el Paso 11, que es su consumidor.
+    `contracts.habitat` = `"4.0"` sí se declara (inerte hasta el Paso 7).
+*   **No se retira ninguna clave**: las retiradas (`host_seeking.detect_range_m`,
+    `dispersal.adult_*`, `gonotrophic.feeding_success_rate`, `egg_batch_n/mean/min`…) se
+    eliminan en el commit del paso cuyo código deja de usarlas (§12.4); `egg_batch_max` ya
+    existe, y la redefinición del bloque `gonotrophic` es del Paso 3.
+*   **`meals_per_cycle_mean` no se crea**: el plan no da valor ni consumidor ("el que declare
+    el YAML") y el umbral real es `first_cycle_target_ul`.
+*   **Clave añadida, no inventariada:** `species.<fila>.anemotaxis_deviation_deg` (30°) para
+    el «± 30°» de `anemotaxis_rule`; sin ella la desviación sería una constante compilada.
+*   `swarm_markers_per_km2` = 1,0 y `swarm_markers_source` = «engineering prior» son
+    marcadores de posición (el plan sólo dice «la fija el escenario»).
+*   Filas sin dato (*funestus*, *melas*, *stephensi*): `aestivation_supported: false` y
+    `gonotrophic_arrest_prob_dry: 0`; el resto de claves copian a *coluzzii*.
 
 *Qué existe y dónde:*
 
@@ -3253,8 +3351,8 @@ se publica en el documento ABM, apéndice «Scenario harness», generada por
     suelo de potencial 0,01 no descarta ninguna celda de esta ventana.
 *   Los `overrides` no vacíos los **rechaza** el motor hasta el Paso 5: el arnés los quita
     del JSON ejecutado y los anota (`overrides_not_applied_until_paso_5`). E10 declara
-    claves (`co2_activation_radius_m`, `olfactory_radius_m`, `visual_radius_m`) que aún
-    **no existen** en `model_constants.yaml` (Paso 4).
+    claves (`co2_activation_radius_m`, `olfactory_radius_m`, `visual_radius_m`) que ya
+    existen en `model_constants.yaml` desde el Paso 4; el motor las aplicará en el Paso 5.
 *   El parser aún no admite `PRE_GRAVID` (E06 usa `TENERAL`), `blood_volume_ul` (E04/E05),
     sitios de enjambre y `swarm_site_id` (E13–E17), ITN (E16) ni machos estériles (E17):
     cada paso amplía el esquema que necesita.
@@ -3472,7 +3570,7 @@ se publica en el documento ABM, apéndice «Scenario harness», generada por
         `male_females_per_night_max`, `swarm_duration_min`,
         `swarm_start_min_after_sunset`, `swarm_height_m`, `swarm_markers_per_km2`,
         `swarm_markers_source`, `rain_suppresses_swarming`);
-    *   clave de manifiesto `slots_per_cell` (fijada en la primera extracción, §2);
+    *   ~~clave de manifiesto `slots_per_cell`~~ — **no se crea** (decisión 2a de §15.0: sin `SLOTS_PER_CELL`);
     *   **todas** las claves por especie de la tabla de §12 — movimiento y sensorial
         (`co2_activation_radius_m`, `olfactory_radius_m`, `visual_radius_m`,
         `terminal_radius_m`, `flight_speed_ms`, `exploration_range_m`,

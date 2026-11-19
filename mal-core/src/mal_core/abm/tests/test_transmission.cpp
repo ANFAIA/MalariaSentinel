@@ -30,35 +30,74 @@ TEST(TransmissionModel, Initialization) {
     EXPECT_NEAR(tm.human_grid().prev_at(0, 0), 0.05, 1e-4);
 }
 
-TEST(TransmissionModel, ForceOfInfectionHazardFormula) {
+// Paso 2a: no per-cell force of infection. Each infectious bite exposes, with
+// probability beta_vh, ONE person of the bitten cell and nobody else.
+TEST(TransmissionModel, InfectiousBiteInfectsAtMostThePersonBitten) {
     TransmissionModel tm;
     TransmissionParams params;
     params.enabled = true;
-    params.beta_vh = 0.50f;
+    params.beta_vh = 1.0f;                       // every infectious bite is effective
     params.initial_human_prevalence = 0.0;
 
     std::vector<float> human_pop = {100.0f, 0.0f};
     tm.init(1, 2, human_pop, params, 100);
 
     BiteLedger bites;
-    // Record 10 infectious bites at (0, 0) and 5 at (0, 1) (where H=0)
-    for (int i = 0; i < 10; ++i) {
-        bites.record_infectious_success(0, 0, HostType::HUMAN);
-    }
+    bites.record_infectious_success(0, 0, HostType::HUMAN);   // 1 bite where H = 100
     for (int i = 0; i < 5; ++i) {
-        bites.record_infectious_success(0, 1, HostType::HUMAN);
+        bites.record_infectious_success(0, 1, HostType::HUMAN);  // bites where H = 0
     }
 
     AOI aoi;
     tm.advance_human_transmission(bites, aoi);
 
-    const auto& lambda = tm.last_force_of_infection();
-    // At (0, 0): lambda = 1 - exp(- 0.50 * 10 / 100) = 1 - exp(-0.05) ≈ 0.04877
-    const double expected_lambda_0 = 1.0 - std::exp(-0.50 * 10.0 / 100.0);
-    EXPECT_NEAR(lambda[0], expected_lambda_0, 1e-5);
+    const auto& hg = tm.human_grid();
+    EXPECT_DOUBLE_EQ(hg.e_at(0, 0), 1.0);        // one bite -> one person, no more
+    EXPECT_DOUBLE_EQ(hg.s_at(0, 0), 99.0);
+    EXPECT_DOUBLE_EQ(hg.inc_at(0, 0), 1.0);
+    EXPECT_DOUBLE_EQ(hg.pop_at(0, 1), 0.0);      // empty cell: nobody to infect
+    EXPECT_DOUBLE_EQ(hg.e_at(0, 1), 0.0);
+    EXPECT_TRUE(hg.validate_invariants());
+}
 
-    // At (0, 1): H=0 -> lambda must be strictly 0.0
-    EXPECT_DOUBLE_EQ(lambda[1], 0.0);
+TEST(TransmissionModel, InfectiousBitesNeverExceedTheBitesDelivered) {
+    TransmissionModel tm;
+    TransmissionParams params;
+    params.enabled = true;
+    params.beta_vh = 1.0f;
+    std::vector<float> human_pop = {1000.0f};
+    tm.init(1, 1, human_pop, params, 7);
+
+    BiteLedger bites;
+    for (int i = 0; i < 10; ++i) bites.record_infectious_success(0, 0, HostType::HUMAN);
+    AOI aoi;
+    tm.advance_human_transmission(bites, aoi);
+    EXPECT_LE(tm.human_grid().e_at(0, 0), 10.0);   // repeats on the same person collapse
+    EXPECT_GE(tm.human_grid().e_at(0, 0), 1.0);
+}
+
+TEST(TransmissionModel, ZeroBetaInfectsNobody) {
+    TransmissionModel tm;
+    TransmissionParams params;
+    params.enabled = true;
+    params.beta_vh = 0.0f;
+    tm.init(1, 1, {100.0f}, params, 3);
+    BiteLedger bites;
+    for (int i = 0; i < 20; ++i) bites.record_infectious_success(0, 0, HostType::HUMAN);
+    AOI aoi;
+    tm.advance_human_transmission(bites, aoi);
+    EXPECT_DOUBLE_EQ(tm.human_grid().e_at(0, 0), 0.0);
+}
+
+TEST(TransmissionModel, InfectiousPressureComesFromTheLedger) {
+    BiteLedger bites;
+    bites.record_infectious_success(0, 1, HostType::HUMAN);
+    bites.record_infectious_success(0, 1, HostType::HUMAN);
+    bites.record_infectious_success(0, 0, HostType::CATTLE);   // animals do not count
+    const auto grid = TransmissionModel::infectious_pressure_from_ledger(bites, 1, 2);
+    ASSERT_EQ(grid.size(), 2u);
+    EXPECT_FLOAT_EQ(grid[0], 0.0f);
+    EXPECT_FLOAT_EQ(grid[1], 2.0f);
 }
 
 TEST(TransmissionModel, VectorEipProgressionAtConstantTemp) {

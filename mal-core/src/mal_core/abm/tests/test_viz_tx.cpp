@@ -7,7 +7,6 @@
 #include <filesystem>
 #include <vector>
 
-#include "mobility_schedule.hpp"
 #include "transmission.hpp"
 #include "viz_tx.hpp"
 
@@ -20,8 +19,7 @@ std::vector<int64_t> build_vector_i_series(
 }  // namespace mal_abm_fast::tx_diag
 
 using mal_abm_fast::tx_diag::classify_biteable;
-using mal_abm_fast::tx_diag::extract_top_flows;
-using mal_abm_fast::tx_diag::TxFlow;
+using mal_abm_fast::tx_diag::format_cell_length;
 
 // ---------------------------------------------------------------------------
 // Biteable-cell classification (plan 05 §4.1): human / animal-only / empty.
@@ -33,6 +31,15 @@ TEST(VizTxCells, ClassifyBiteableThreeClasses) {
     EXPECT_EQ(classify_biteable(0.0, 0.0), 0);    // empty (incl. sea)
     EXPECT_EQ(classify_biteable(3.0, 2.0), 2);    // humans present dominate
     EXPECT_EQ(classify_biteable(0.0, 0.4), 1);    // any livestock counts
+}
+
+// The scale rule is one cell long, whatever the resolution (plan §15.1.2 V3).
+TEST(VizTxScale, RuleLabelIsTheCellLength) {
+    EXPECT_EQ(format_cell_length(1000.0), "1 km");
+    EXPECT_EQ(format_cell_length(2000.0), "2 km");
+    EXPECT_EQ(format_cell_length(1500.0), "1.5 km");
+    EXPECT_EQ(format_cell_length(500.0), "500 m");
+    EXPECT_EQ(format_cell_length(100.0), "100 m");
 }
 
 TEST(VizTxTransmission, VectorISeriesStartsWithSeededDayZeroThenDailyHistory) {
@@ -50,72 +57,6 @@ TEST(VizTxTransmission, VectorISeriesStartsWithSeededDayZeroThenDailyHistory) {
     EXPECT_EQ(series[1], 8);   // daily history follows, in order
     EXPECT_EQ(series[2], 6);
     EXPECT_EQ(series[3], 11);
-}
-
-// ---------------------------------------------------------------------------
-// Top-OD flow extraction (plan 05 §9.4): expected E[F] = P·H_res.
-// ---------------------------------------------------------------------------
-
-namespace {
-
-// 2x2 grid (W=2 → 4 cells). Rows 0 and 2 have residents.
-//   cell0 (r0,c0): 10 ppl, 50% stay / 50% -> cell1
-//   cell2 (r1,c0): 5 ppl, 20% stay / 80% -> cell3
-// Off-diagonal expected flows: cell0->cell1 = 5, cell2->cell3 = 4.
-mal_abm_fast::SparseOD make_tiny_od() {
-    std::vector<int32_t> rp = {0, 2, 2, 4, 4};
-    std::vector<int32_t> ci = {0, 1, 2, 3};
-    std::vector<float>   vl = {0.5f, 0.5f, 0.2f, 0.8f};
-    return mal_abm_fast::SparseOD(std::move(rp), std::move(ci),
-                                  std::move(vl), 4, 4);
-}
-
-}  // namespace
-
-TEST(VizTxFlows, ExtractsTopFlowsAndMovedTotal) {
-    const auto od = make_tiny_od();
-    const std::vector<float> res = {10.0f, 0.0f, 5.0f, 0.0f};
-    double moved = 0.0;
-    const auto flows = extract_top_flows(od, res, /*W=*/2, /*K=*/10, moved);
-
-    EXPECT_NEAR(moved, 9.0, 1e-6);  // 5 + 4
-    ASSERT_EQ(flows.size(), 2u);
-    // Sorted by volume descending.
-    EXPECT_NEAR(flows[0].vol, 5.0f, 1e-6);
-    EXPECT_EQ(flows[0].fr, 0); EXPECT_EQ(flows[0].fc, 0);
-    EXPECT_EQ(flows[0].tr, 0); EXPECT_EQ(flows[0].tc, 1);
-    EXPECT_NEAR(flows[1].vol, 4.0f, 1e-6);
-    EXPECT_EQ(flows[1].fr, 1); EXPECT_EQ(flows[1].fc, 0);
-    EXPECT_EQ(flows[1].tr, 1); EXPECT_EQ(flows[1].tc, 1);
-}
-
-TEST(VizTxFlows, RespectsTopKLimit) {
-    const auto od = make_tiny_od();
-    const std::vector<float> res = {10.0f, 0.0f, 5.0f, 0.0f};
-    double moved = 0.0;
-    const auto flows = extract_top_flows(od, res, /*W=*/2, /*K=*/1, moved);
-    ASSERT_EQ(flows.size(), 1u);
-    EXPECT_NEAR(flows[0].vol, 5.0f, 1e-6);  // the largest only
-    EXPECT_NEAR(moved, 9.0, 1e-6);          // moved total is independent of K
-}
-
-TEST(VizTxFlows, IdentityOnlyYieldsNoMovement) {
-    // Everyone stays home: all flows are diagonal → nothing moves.
-    const auto od = mal_abm_fast::SparseOD::identity(4);
-    const std::vector<float> res = {10.0f, 1.0f, 5.0f, 2.0f};
-    double moved = 0.0;
-    const auto flows = extract_top_flows(od, res, /*W=*/2, /*K=*/10, moved);
-    EXPECT_TRUE(flows.empty());
-    EXPECT_NEAR(moved, 0.0, 1e-9);
-}
-
-TEST(VizTxFlows, ZeroPopulationYieldsNoFlows) {
-    const auto od = make_tiny_od();
-    const std::vector<float> res = {0.0f, 0.0f, 0.0f, 0.0f};
-    double moved = 0.0;
-    const auto flows = extract_top_flows(od, res, /*W=*/2, /*K=*/10, moved);
-    EXPECT_TRUE(flows.empty());
-    EXPECT_NEAR(moved, 0.0, 1e-9);
 }
 
 // ---------------------------------------------------------------------------

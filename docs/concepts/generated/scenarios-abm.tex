@@ -25,7 +25,7 @@
 \subsection*{E01 --- Person beyond the activation radius}
 \begin{tabular}{@{}ll@{}}
 \textit{Mode} & gate \\
-\textit{Seed / days} & 20261117 / 3 \\
+\textit{Seed / days} & 20261117 / 10 \\
 \textit{Mosquitoes seeded} & 1 female, 0 male \\
 \textit{People} & 1; distance from the first mosquito: 200 m \\
 \textit{Closes} & Step 5 \\
@@ -33,26 +33,23 @@
 \end{tabular}
 
 \par\smallskip\noindent\textbf{Purpose.} Tests whether a host-seeking female with a person a short distance away, but outside her carbon dioxide activation radius, makes contact at all. It is the first check of the perception cascade and the baseline of the current chain, recorded at Step 1.
-\par\smallskip\noindent\textbf{Setup.} One host-seeking female adult and one susceptible person placed just beyond the 100 m carbon dioxide activation radius of the female. There is no aquatic habitat, so the female has no breeding site to oviposit in. The run lasts three days.
+\par\smallskip\noindent\textbf{Setup.} One host-seeking female adult and one susceptible person placed just beyond the 100 m carbon dioxide activation radius of the female. There is no aquatic habitat, so the female has no breeding site to oviposit in. The run lasts ten days.
 \par\smallskip\noindent\textbf{What passing or failing implies.} A pass means the perception cascade respects its activation band: a person outside the activation radius is not contacted, and the chain does not bite people the sensory model should exclude. A fail means the chain still bites at distances the individual geometry rules out, so the transmission numbers would reflect the old cell-scale contact rule instead of individual distance. In the field a female does not find a host she cannot sense.
-\par\smallskip\noindent\textbf{Expected behaviour.} Zero successful meals, because distance does not allow contact at this range. No oviposition, since there is no breeding site. The female enters starvation by day three (measured here as not alive at the end of day three, a proxy: the engine exposes alive and deaths per day, not a starvation state). Both are targets, strict expected failures until Steps 2a/5. The baseline pin records today's behaviour (one bite on day one) as a regression reference, not as an expectation.
-\par\smallskip\noindent\textbf{What the current chain does.} The current chain keeps the single adult in its seeded cell for the whole run and records one successful human bite on day 1 and none afterwards; the bite is drawn against the cell-aggregated human population (about 127,000 people), not against the seeded person
+\par\smallskip\noindent\textbf{Expected behaviour.} The female starts outside the activation band, so she cannot bite on the first nights: no successful meal in the first three days. Over ten days the walk (590 m of path per day) may bring her within 100 m of the person; then, and only then, the cascade activates, tracks the plume and lands. With seed 20261117 she activates on day 4 and bites on day 5, which the first three days of the previous design could not show. No oviposition, since there is no breeding site. A female that never finds a host dies of starvation after host\_seeking.starvation\_days (7) days; that is checked in E02.
+\par\smallskip\noindent\textbf{What the current chain does.} The female flies the perception cascade: no bite in the first three days, activation on day 4 and a bite on the identified person on day 5; the bite is on the seeded person, not on a cell aggregate
 \par\smallskip\noindent\textbf{Checked today by the test suite.}
 \begin{itemize}
 \item Seeding fidelity: the adult population obeys the conservation identity on every day (adults today = adults yesterday - deaths + emerged, starting from the seeded count), so no seeded individual is dropped or invented; the cohort log and the raster output agree on the number of adults
 \item The run completes through the manifest route ('validate\_completeness', resolve, binary) with exit code 0
-\item Baseline pin: the known-failure facts above are asserted, so any change in the chain's behaviour is flagged and must be acknowledged by updating the pin
-\item Target gate (strict expected failure): the plan's target is asserted and is expected to fail until Step 5; when it starts passing the test fails and must be promoted
-\item Target for E01: zero successful human bites over the run
-\item Baseline pin: the female is alive on every day with no deaths (no starvation yet); target (strict expected failure): not alive at the end of day three, a proxy for starvation entry
-\item GIF baseline pin: three simulated days give a three-frame GIF (the GIF unit is the day)
+\item GATE (Step 5): no successful bite in the first three days; the female is never pinned to her cell (her net displacement stays within the 590 m daily path budget)
+\item GIF baseline pin: three simulated days give a ten-frame GIF (the GIF unit is the day)
 \end{itemize}
-\par\noindent\textbf{What to look for in the GIF.} The standard transmission GIF: one frame per simulated day, cells in neutral grey, a one-cell scale bar, people as 1-pixel dots coloured by SEIR state, mosquitoes as circles (female filled, male hollow) with a polyline of their daily positions, bites as point events, and a red ring on infected agents. For E01 look for the female circle and the person dot 200 m apart and, in the target state, no bite marker on any day. The nightly search stage of the female (`cascade\_stage`) and the bites are in the debug agents and bites files (Step 2b); the GIF draws no radii.
+\par\noindent\textbf{What to look for in the GIF.} The standard transmission GIF: one frame per simulated day, cells in neutral grey, a one-cell scale bar, people as 1-pixel dots coloured by SEIR state, mosquitoes as circles (female filled, male hollow) with a polyline of their daily positions, bites as point events, and a red ring on infected agents. For E01 look for the female circle and the person dot 200 m apart and, a bite marker on the day she lands. The nightly search stage of the female (`cascade\_stage`) and the bites are in the debug agents and bites files (Step 2b); the GIF draws no radii.
 
 \subsection*{E02 --- Night trajectory versus net displacement}
 \begin{tabular}{@{}ll@{}}
 \textit{Mode} & report \\
-\textit{Seed / days} & 20261117 / 3 \\
+\textit{Seed / days} & 20261117 / 10 \\
 \textit{Mosquitoes seeded} & 1 female, 0 male \\
 \textit{People} & 1; distance from the first mosquito: 2000 m \\
 \textit{Closes} & none \\
@@ -60,24 +57,23 @@
 \end{tabular}
 
 \par\smallskip\noindent\textbf{Purpose.} Reports how far a female travels in one night and how far she ends from her start, when the person is far beyond any single night's reach. It checks the limits of the movement law, not contact, so the arrival of the female at the person is not a pass or fail criterion.
-\par\smallskip\noindent\textbf{Setup.} One host-seeking female adult and one susceptible person placed far beyond what the female can cover in one night, with no aquatic habitat. The run lasts three days. The person stays out of reach for the whole run unless the walk happens to drift towards it.
+\par\smallskip\noindent\textbf{Setup.} One host-seeking female adult and one susceptible person placed far beyond what the female can cover in one night, with no aquatic habitat. The run lasts ten days. The person stays out of reach for the whole run unless the walk happens to drift towards it.
 \par\smallskip\noindent\textbf{What passing or failing implies.} The bounds say the movement law cannot produce a trajectory longer than the daily flight budget, nor a net shift beyond the exploration disc, so females cannot be carried across the landscape in one step. If either bound is exceeded, the macro-step or the exploration disc is wrong. A female reaching the person is not a failure, because the direction of the walk decides it.
 \par\smallskip\noindent\textbf{Expected behaviour.} Report only. Per night, the trajectory length is at most 590 m ('daily\_move\_capacity\_m', [P], the mean distance travelled per day in the literature). Per night, the net displacement is at most 200 m, which is 2 x 'exploration\_range\_m' (100 m, [EP]). The earlier band of 1,410 to 2,000 m is withdrawn because it cannot be reached under these bounds.
-\par\smallskip\noindent\textbf{What the current chain does.} The current chain keeps the single adult in its seeded cell for the whole run and records one successful human bite on day 1 and none afterwards; the bite is drawn against the cell-aggregated human population (about 127,000 people), not against the seeded person
+\par\smallskip\noindent\textbf{What the current chain does.} The female never reaches a person 2 km away, has no meal in ten days and dies of starvation on day 8 (the starvation timer reaches host\_seeking.starvation\_days = 7)
 \par\smallskip\noindent\textbf{Checked today by the test suite.}
 \begin{itemize}
 \item Seeding fidelity: the adult population obeys the conservation identity on every day (adults today = adults yesterday - deaths + emerged, starting from the seeded count), so no seeded individual is dropped or invented; the cohort log and the raster output agree on the number of adults
 \item The run completes through the manifest route ('validate\_completeness', resolve, binary) with exit code 0
-\item Baseline pin: the known-failure facts above are asserted, so any change in the chain's behaviour is flagged and must be acknowledged by updating the pin
-\item Target gate (strict expected failure): the plan's target is asserted and is expected to fail until Step 5; when it starts passing the test fails and must be promoted
-\item Target for E02 (strict expected failure, Step 5): per-night trajectory length at most 590 m and net displacement at most 200 m; fails today because the harness does not yet measure nightly movement (outputs expose cells, not metres)
+\item GATE (Step 5): no bite in ten days, and the death of the female is a starvation death: not before day host\_seeking.starvation\_days (7)
+\item Net displacement between consecutive days never exceeds the 590 m daily path budget (read from the debug agents file)
 \end{itemize}
-\par\noindent\textbf{What to look for in the GIF.} The standard transmission GIF: one frame per simulated day, cells in neutral grey, a one-cell scale bar, people as 1-pixel dots coloured by SEIR state, mosquitoes as circles (female filled, male hollow) with a polyline of their daily positions, bites as point events, and a red ring on infected agents. For E02 look for the female's polyline across the three days against the one-cell scale bar and the person dot 2000 m away. The nightly trajectory length and net displacement are read from the debug agents file (Step 2b), not drawn.
+\par\noindent\textbf{What to look for in the GIF.} The standard transmission GIF: one frame per simulated day, cells in neutral grey, a one-cell scale bar, people as 1-pixel dots coloured by SEIR state, mosquitoes as circles (female filled, male hollow) with a polyline of their daily positions, bites as point events, and a red ring on infected agents. For E02 look for the female's polyline across the ten days against the one-cell scale bar and the person dot 2000 m away. The nightly trajectory length and net displacement are read from the debug agents file (Step 2b), not drawn.
 
 \subsection*{E03 --- Several bites per night in a contact cluster}
 \begin{tabular}{@{}ll@{}}
 \textit{Mode} & gate \\
-\textit{Seed / days} & 20261117 / 3 \\
+\textit{Seed / days} & 20261117 / 10 \\
 \textit{Mosquitoes seeded} & 20 female, 0 male \\
 \textit{People} & 5; distance from the first mosquito: 141 m, 424 m, 707 m, 728 m, 728 m \\
 \textit{Closes} & Step 3 \\
@@ -99,7 +95,7 @@
 \subsection*{E04 --- Partial meal does not start the cycle}
 \begin{tabular}{@{}ll@{}}
 \textit{Mode} & gate \\
-\textit{Seed / days} & 20261117 / 3 \\
+\textit{Seed / days} & 20261117 / 10 \\
 \textit{Mosquitoes seeded} & 1 female, 0 male \\
 \textit{People} & 1; distance from the first mosquito: 200 m \\
 \textit{Closes} & Step 3 \\
@@ -121,7 +117,7 @@
 \subsection*{E05 --- Egg batch proportional to accumulated blood}
 \begin{tabular}{@{}ll@{}}
 \textit{Mode} & gate \\
-\textit{Seed / days} & 20261117 / 3 \\
+\textit{Seed / days} & 20261117 / 10 \\
 \textit{Mosquitoes seeded} & 2 female, 0 male \\
 \textit{People} & 1; distance from the first mosquito: 200 m \\
 \textit{Closes} & Step 3 \\
@@ -143,7 +139,7 @@
 \subsection*{E06 --- First cycle needs two meals}
 \begin{tabular}{@{}ll@{}}
 \textit{Mode} & gate \\
-\textit{Seed / days} & 20261117 / 3 \\
+\textit{Seed / days} & 20261117 / 10 \\
 \textit{Mosquitoes seeded} & 1 female, 0 male \\
 \textit{People} & 1; distance from the first mosquito: 200 m \\
 \textit{Closes} & Step 3 \\
@@ -165,7 +161,7 @@
 \subsection*{E07 --- Breeding site beats the host}
 \begin{tabular}{@{}ll@{}}
 \textit{Mode} & gate \\
-\textit{Seed / days} & 20261117 / 3 \\
+\textit{Seed / days} & 20261117 / 10 \\
 \textit{Mosquitoes seeded} & 1 female, 0 male \\
 \textit{Aquatic cohorts} & 20 PUPA at (5100, 5200) m \\
 \textit{People} & 1; distance from the first mosquito: 2000 m \\
@@ -189,7 +185,7 @@
 \subsection*{E08 --- Two females, two persons, distinct identities}
 \begin{tabular}{@{}ll@{}}
 \textit{Mode} & gate \\
-\textit{Seed / days} & 20261117 / 3 \\
+\textit{Seed / days} & 20261117 / 10 \\
 \textit{Mosquitoes seeded} & 2 female, 0 male \\
 \textit{People} & 2; distance from the first mosquito: 60 m, 7114 m \\
 \textit{Closes} & Step 2 \\
@@ -211,7 +207,7 @@
 \subsection*{E09 --- Infective female, several persons}
 \begin{tabular}{@{}ll@{}}
 \textit{Mode} & gate \\
-\textit{Seed / days} & 20261117 / 3 \\
+\textit{Seed / days} & 20261117 / 10 \\
 \textit{Mosquitoes seeded} & 1 female, 0 male \\
 \textit{People} & 3; distance from the first mosquito: 40 m, 60 m, 64 m \\
 \textit{Closes} & Step 2 \\
@@ -219,7 +215,7 @@
 \end{tabular}
 
 \par\smallskip\noindent\textbf{Purpose.} Checks the one-way rule of transmission at the bite: an infective female gives several infectious bites across the run when several persons are around, the infection can reach more than one person across the set of runs, and each infectious bite infects at most the person it bites.
-\par\smallskip\noindent\textbf{Setup.} One infective host-seeking female with three susceptible persons placed around her at different short distances, run for three days. The infective flag is set on the mosquito and all persons start susceptible.
+\par\smallskip\noindent\textbf{Setup.} One infective host-seeking female with three susceptible persons placed around her at different short distances, run for ten days. The infective flag is set on the mosquito and all persons start susceptible.
 \par\smallskip\noindent\textbf{What passing or failing implies.} If one bite infects anyone other than the person bitten, the model creates transmission that no contact produced and inflates incidence. If the infection never reaches a second person across the runs, the spread between persons is missing and the model cannot show onward transmission.
 \par\smallskip\noindent\textbf{Expected behaviour.} Gate at Step 2. The run contains several infectious bites; the probability that more than one person is infected is above zero; each infectious bite infects at most the person bitten. The check is structural, not a fixed band.
 \par\smallskip\noindent\textbf{What the current chain does.} Not meaningful yet: depends on Step 2 (individual humans and the per-bite ledger).
@@ -233,31 +229,31 @@
 \subsection*{E10 --- Sensitivity to the three perception radii}
 \begin{tabular}{@{}ll@{}}
 \textit{Mode} & report \\
-\textit{Seed / days} & 20261117 / 3 \\
+\textit{Seed / days} & 20261117 / 10 \\
 \textit{Mosquitoes seeded} & 1 female, 0 male \\
 \textit{People} & 1; distance from the first mosquito: 150 m \\
-\textit{Variants} & activacion\_co2\_50\_100\_200\_m, olfativa\_10\_30\_70\_m, visual\_0.25\_0.72\_m \\
+\textit{Variants} & co2\_50m\_persona\_a\_150p0m, co2\_100m\_persona\_a\_150p0m, co2\_200m\_persona\_a\_150p0m, olf\_10m\_persona\_a\_60p0m, olf\_30m\_persona\_a\_60p0m, olf\_70m\_persona\_a\_60p0m, vis\_0p25m\_persona\_a\_0p5m, vis\_0p485m\_persona\_a\_0p5m, vis\_0p72m\_persona\_a\_0p5m \\
 \textit{Overrides} & co2\_activation\_radius\_m, olfactory\_radius\_m, visual\_radius\_m \\
 \textit{Closes} & none \\
 \textit{Runs a behaviour test today} & seeding-only \\
 \end{tabular}
 
 \par\smallskip\noindent\textbf{Purpose.} Quantifies how much each stage of the sensory cascade (carbon dioxide activation, olfactory tracking, visual approach) moves the outcome, by sweeping one radius at a time. It is a report: it measures sensitivity and does not gate.
-\par\smallskip\noindent\textbf{Setup.} One host-seeking female and one susceptible person a short distance away, run three days, once per variant. The three variants live in one file, as entries in its variants list, and each varies one radius with the others at their defaults. Variant one sweeps the carbon dioxide activation radius over 50, 100 and 200 m. Variant two sweeps the olfactory radius over 10, 30 and 70 m. Variant three sweeps the visual radius over 0.25 and 0.72 m. The defaults are the verified values.
+\par\smallskip\noindent\textbf{Setup.} One host-seeking female at (5200, 5200) and one susceptible person, ten days, nine variants, one override each. The person is placed at a distance chosen so that the value of the radius decides whether they are inside or outside the band: for the carbon dioxide activation radius (50, 100 and 200 m) at 150 m; for the olfactory radius (10, 30 and 70 m) at 60 m; for the visual radius (0.25, 0.485 and 0.72 m) at 0.5 m. The other radii keep their defaults. What each variant shows is therefore what happens when the same person is outside or inside that band at the start.
 \par\smallskip\noindent\textbf{What passing or failing implies.} The result shows which radius the outcome depends on. If the outcome barely moves across a sweep, that stage is doing little work and the cascade is poorly identified there; if it moves a lot, the default needs evidence, which the plan marks as [EP] where there is none. This tells the team which radius to calibrate first.
 \par\smallskip\noindent\textbf{Expected behaviour.} Report only, with no pass or fail. For each variant the observed contacts and outcome are written next to the default run. The plan gives no band here, because the sweep is itself the result.
-\par\smallskip\noindent\textbf{What the current chain does.} Not meaningful yet: depends on Step 5 (the cascade). Today the overrides are not applied: the engine rejects non-empty overrides until Step 5, so the harness runs each variant without them, with the same seed, and records the overrides as not applied. The three variants therefore reduce to the same run and the report cannot show sensitivity.
+\par\smallskip\noindent\textbf{What the current chain does.} The overrides are applied by the engine (cascade keys of the species row). The visual radius moves only the tick count of the last half metre, so its three variants are expected to bite on the same day; the activation and olfactory radii move the day of the first bite.
 \par\smallskip\noindent\textbf{Checked today by the test suite.}
 \begin{itemize}
 \item Seeding fidelity: the adult population obeys the conservation identity on every day (adults today = adults yesterday - deaths + emerged, starting from the seeded count), so no seeded individual is dropped or invented; the cohort log and the raster output agree on the number of adults
 \item The run completes through the manifest route ('validate\_completeness', resolve, binary) with exit code 0
 \end{itemize}
-\par\noindent\textbf{What to look for in the GIF.} The standard transmission GIF: one frame per simulated day, cells in neutral grey, a one-cell scale bar, people as 1-pixel dots coloured by SEIR state, mosquitoes as circles (female filled, male hollow) with a polyline of their daily positions, bites as point events, and a red ring on infected agents. For E10 there is one GIF per variant. The GIF draws no radii: variants are compared on the day the first bite appears and on the polyline, and in detail on `cascade\_stage` in the debug agents file. If the variants look identical, the overrides are not reaching the engine.
+\par\noindent\textbf{What to look for in the GIF.} The standard transmission GIF: one frame per simulated day, cells in neutral grey, a one-cell scale bar, people as 1-pixel dots coloured by SEIR state, mosquitoes as circles (female filled, male hollow) with a polyline of their daily positions, bites as point events, and a red ring on infected agents. For E10 there is one GIF per variant (nine). The GIF draws no radii: variants are compared on the day the first bite appears and on the polyline, and in detail on `cascade\_stage` in the debug agents file. If the variants look identical, the overrides may not be reaching the engine.
 
 \subsection*{E11 --- Postprandial window after a full meal}
 \begin{tabular}{@{}ll@{}}
 \textit{Mode} & gate \\
-\textit{Seed / days} & 20261117 / 3 \\
+\textit{Seed / days} & 20261117 / 10 \\
 \textit{Mosquitoes seeded} & 1 female, 0 male \\
 \textit{People} & 1; distance from the first mosquito: 100 m \\
 \textit{Closes} & Step 3 \\
@@ -301,7 +297,7 @@
 \subsection*{E13 --- Males and mating supply at one swarm site}
 \begin{tabular}{@{}ll@{}}
 \textit{Mode} & report \\
-\textit{Seed / days} & 20261117 / 3 \\
+\textit{Seed / days} & 20261117 / 10 \\
 \textit{Mosquitoes seeded} & 100 female, 100 male \\
 \textit{Closes} & none \\
 \textit{Runs a behaviour test today} & seeding-only \\
@@ -344,14 +340,14 @@
 \subsection*{E15 --- Swarm killing empties the site}
 \begin{tabular}{@{}ll@{}}
 \textit{Mode} & gate \\
-\textit{Seed / days} & 20261117 / 3 \\
+\textit{Seed / days} & 20261117 / 10 \\
 \textit{Mosquitoes seeded} & 50 female, 50 male \\
 \textit{Closes} & Step 8 \\
 \textit{Runs a behaviour test today} & seeding-only \\
 \end{tabular}
 
 \par\smallskip\noindent\textbf{Purpose.} Checks that the swarm field is a static, discrete layer: killing the males assigned to one marker removes that site's supply, so the share of uninseminated females rises. It is the test that forces markers to be discrete and removable.
-\par\smallskip\noindent\textbf{Setup.} A field of swarm markers with one swarm in the village, equal numbers of males and females, run for three days. The kill of the males assigned to one marker is an intervention the scenario applies. The JSON does not express the kill yet; the flag enters with Step 8.
+\par\smallskip\noindent\textbf{Setup.} A field of swarm markers with one swarm in the village, equal numbers of males and females, run for ten days. The kill of the males assigned to one marker is an intervention the scenario applies. The JSON does not express the kill yet; the flag enters with Step 8.
 \par\smallskip\noindent\textbf{What passing or failing implies.} If killing the males at a marker does not reduce supply, the swarm is a number rather than a place, and the model could not represent a targeted intervention. A pass supports the static site layer; a fail means site assignment does not reach the supply.
 \par\smallskip\noindent\textbf{Expected behaviour.} Gate, directional. After the kill the supply of the killed site falls to zero, and the share of uninseminated females is higher than in the same-seed run without the kill. The plan gives no numeric threshold for the rise, so the test checks the direction of the change and that the killed site's supply is removed.
 \par\smallskip\noindent\textbf{What the current chain does.} Not meaningful yet: depends on Step 8 (site supply and the swarm-killing flag).
@@ -366,14 +362,14 @@
 \subsection*{E16 --- Nets at 60 percent do not offset swarm supply}
 \begin{tabular}{@{}ll@{}}
 \textit{Mode} & report \\
-\textit{Seed / days} & 20261117 / 3 \\
+\textit{Seed / days} & 20261117 / 10 \\
 \textit{Mosquitoes seeded} & 50 female, 50 male \\
 \textit{Closes} & none \\
 \textit{Runs a behaviour test today} & seeding-only \\
 \end{tabular}
 
 \par\smallskip\noindent\textbf{Purpose.} Counter-scenario that records a model limit: individual protection from insecticide-treated nets at 60 percent coverage does not restore the swarm supply lost at a site. It is a report because the plan treats the result as a documented limit, not as a model output to tune.
-\par\smallskip\noindent\textbf{Setup.} The same swarm-site field as the swarm-killing scenario, with equal numbers of males and females, run for three days, with net coverage set to 60 percent. The net coverage belongs to the scenario definition; the JSON does not carry a net field yet.
+\par\smallskip\noindent\textbf{Setup.} The same swarm-site field as the swarm-killing scenario, with equal numbers of males and females, run for ten days, with net coverage set to 60 percent. The net coverage belongs to the scenario definition; the JSON does not carry a net field yet.
 \par\smallskip\noindent\textbf{What passing or failing implies.} If nets appeared to restore supply, the model would be suggesting that individual protection can compensate for lost swarm sites, which the plan does not support. Keeping the limit in the report stops a reader from taking net coverage as a mating-supply intervention.
 \par\smallskip\noindent\textbf{Expected behaviour.} Report only, with no band in the plan. The report records the uninseminated share and the supply per site with nets and without, and states that the nets do not compensate for the supply loss. The plan records this as a documented limit of the model, not as a result.
 \par\smallskip\noindent\textbf{What the current chain does.} Not meaningful yet: depends on Step 8 (the swarm supply the nets are compared against).
@@ -387,14 +383,14 @@
 \subsection*{E17 --- Sterile males compete for site supply}
 \begin{tabular}{@{}ll@{}}
 \textit{Mode} & gate \\
-\textit{Seed / days} & 20261117 / 3 \\
+\textit{Seed / days} & 20261117 / 10 \\
 \textit{Mosquitoes seeded} & 50 female, 50 male \\
 \textit{Closes} & Step 10 \\
 \textit{Runs a behaviour test today} & seeding-only \\
 \end{tabular}
 
 \par\smallskip\noindent\textbf{Purpose.} Checks that sterile males assigned to the same swarm sites as the fertile males take a proportional share of the supply, so that supply per site falls with their number and the uninseminated share rises. It is the sterile-insect test on site supply.
-\par\smallskip\noindent\textbf{Setup.} Equal numbers of females and males assigned to the swarm sites, with sterile males added and assigned to the same sites, so they compete for the same supply. Run for three days. The sterility flag is not in the JSON yet; it enters with Step 10.
+\par\smallskip\noindent\textbf{Setup.} Equal numbers of females and males assigned to the swarm sites, with sterile males added and assigned to the same sites, so they compete for the same supply. Run for ten days. The sterility flag is not in the JSON yet; it enters with Step 10.
 \par\smallskip\noindent\textbf{What passing or failing implies.} If supply does not fall with the number of sterile males assigned, the model cannot represent sterile-insect release, an intervention a programme may run. Competition among individual sterile males inside a swarm is not simulated (N11, section 8.6), so the test covers supply per site, not competition within the swarm.
 \par\smallskip\noindent\textbf{Expected behaviour.} Gate. Supply per site falls in proportion to the number of sterile males assigned to it, and the uninseminated female share rises. The Step 10 criterion also requires that two identical runs match byte for byte (Level 5).
 \par\smallskip\noindent\textbf{What the current chain does.} Not meaningful yet: depends on Step 10 (sterile males on the site supply).
@@ -408,20 +404,44 @@
 \subsection*{E18 --- Wind deflection and night blocking}
 \begin{tabular}{@{}ll@{}}
 \textit{Mode} & gate \\
-\textit{Seed / days} & 20261117 / 3 \\
+\textit{Seed / days} & 20261117 / 10 \\
 \textit{Mosquitoes seeded} & 1 female, 0 male \\
+\textit{People} & 1; distance from the first mosquito: 40 m \\
 \textit{Closes} & Step 5 \\
 \textit{Runs a behaviour test today} & seeding-only \\
 \end{tabular}
 
 \par\smallskip\noindent\textbf{Purpose.} Checks the wind branch of the movement law: a female flying against the wind is deflected upwind, and forward progress is blocked when the tail-wind component reaches her flight speed. It is the gate for the wind branch.
-\par\smallskip\noindent\textbf{Setup.} One host-seeking female at the centre of the synthetic study area, run for three days. The synthetic area carries a wind field of the 100 m wind components, loaded at run time. The wind is not written in the JSON; it comes from the synthetic area inputs.
+\par\smallskip\noindent\textbf{Setup.} One host-seeking female at the centre of the synthetic study area and one susceptible person 40 m away to the south-west, which on the first nights is UPWIND of her (the wind of the field blows to the north-east). Ten days. The synthetic area carries a wind field of the 100 m wind components, loaded at run time. The wind is not written in the JSON; it comes from the synthetic area inputs.
 \par\smallskip\noindent\textbf{What passing or failing implies.} If the female ignores the wind, the model cannot show how wind affects dispersal and therefore the reach of transmission. If the block never occurs, females would fly against strong winds at full speed. The wind is taken at 100 m, not at flight height, so the branch can only be validated against the synthetic area; this is a declared limit.
 \par\smallskip\noindent\textbf{Expected behaviour.} Gate. The flight is deflected upwind by up to 30 degrees ('anemotaxis\_rule', [EP]). Forward progress is blocked when the tail-wind component, projected on the heading, reaches the flight speed of 0.225 to 0.45 m/s [P]. The threshold is computed at run time from the configured flight speed and is never hard-coded. A permanent night block under the measured wind is accepted as a documented result of the 100 m level, not as an error.
-\par\smallskip\noindent\textbf{What the current chain does.} Not meaningful yet: depends on Step 5 (wind branch of the cascade). Without a loaded wind field the wind rule is inactive.
+\par\smallskip\noindent\textbf{What the current chain does.} The wind field is loaded and the female flies against 2 to 5 m/s of 100 m wind, far above her flight speed: the advance towards an upwind person is blocked, and the first bite is on day 6, when the wind has turned; E19 (same geometry, weak wind) bites on day 1. This is the documented result of the 100 m level, not an error.
 \par\smallskip\noindent\textbf{Checked today by the test suite.}
 \begin{itemize}
 \item Seeding fidelity: the adult population obeys the conservation identity on every day (adults today = adults yesterday - deaths + emerged, starting from the seeded count), so no seeded individual is dropped or invented; the cohort log and the raster output agree on the number of adults
 \item The run completes through the manifest route ('validate\_completeness', resolve, binary) with exit code 0
+\item GATE (Step 5): same geometry as E19; under the strong wind the first bite is later than the day-1 bite of E19 (or absent): the blocking rule is active
 \end{itemize}
 \par\noindent\textbf{What to look for in the GIF.} The standard transmission GIF: one frame per simulated day, cells in neutral grey, a one-cell scale bar, people as 1-pixel dots coloured by SEIR state, mosquitoes as circles (female filled, male hollow) with a polyline of their daily positions, bites as point events, and a red ring on infected agents. For E18 look for the female's polyline bent against the wind and stopping on the nights of blocked flight; the GIF draws no wind arrows. The wind-field values and the stage of the female per night are in the debug agents file.
+
+\subsection*{E19 --- Weak wind does not block the approach}
+\begin{tabular}{@{}ll@{}}
+\textit{Mode} & gate \\
+\textit{Seed / days} & 20261117 / 10 \\
+\textit{Mosquitoes seeded} & 1 female, 0 male \\
+\textit{People} & 1; distance from the first mosquito: 40 m \\
+\textit{Closes} & Step 5 \\
+\textit{Runs a behaviour test today} & yes \\
+\end{tabular}
+
+\par\smallskip\noindent\textbf{Purpose.} Complements E18. E18 shows that a wind above her flight speed blocks the advance. E19 loads the same wind field scaled down to a breeze (at most 0.2 m/s, below the blocking threshold of 0.3375 m/s) and checks that the wind branch does not stop a female from finding a person that is within the olfactory radius. Together they bracket the blocking rule from both sides.
+\par\smallskip\noindent\textbf{Setup.} One host-seeking female and one susceptible person 40 m away, inside the olfactory radius (50 m). The synthetic study area carries a weak copy of its wind field (the maximum speed is scaled to 0.2 m/s); the harness writes the copy and declares it for this scenario only. Ten days.
+\par\smallskip\noindent\textbf{What passing or failing implies.} If the wind branch blocked or deflected the female even under a breeze, no female could reach anyone on a windy night and the transmission results would depend on the wind where the physics says they should not. A pass means that below the blocking threshold the wind biases the search but does not stop the plume tracking.
+\par\smallskip\noindent\textbf{Expected behaviour.} Gate. The female lands on the person (at least one successful human bite, stage LANDED in the debug agents file) within the ten days.
+\par\smallskip\noindent\textbf{What the current chain does.} The female tracks the plume under the weak wind and bites the person.
+\par\smallskip\noindent\textbf{Checked today by the test suite.}
+\begin{itemize}
+\item The run completes through the manifest route with exit code 0
+\item GATE (Step 5): at least one successful human bite and a LANDED cascade stage
+\end{itemize}
+\par\noindent\textbf{What to look for in the GIF.} The standard transmission GIF. For E19 look for the female's short polyline ending on the person dot, and a bite marker. The wind is not drawn.

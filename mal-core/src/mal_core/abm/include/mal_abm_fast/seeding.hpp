@@ -48,7 +48,7 @@ enum class SeedingMode {
     EXPLICIT,       // user-provided lat/lon
     HOST_WEIGHTED,  // N viable patches sampled ∝ nearby host abundance
                     // weighted by species host preferences (mirrors
-                    // HostSeekingModel::cell_attraction, no decay cap).
+                    // the cell attraction of the coordinator, no decay cap).
                     // Places the initial population where blood meals
                     // actually are; subsequent dispersal/oviposition
                     // behaviour is the model's own (M7.4.1 iteration).
@@ -109,7 +109,7 @@ struct ScenarioSpec {
     std::vector<ScenarioAquatic> aquatic;
     std::vector<ScenarioHuman> humans;
     std::vector<ScenarioLivestock> livestock;
-    std::map<std::string, double> overrides;   // applied from Paso 5
+    std::map<std::string, double> overrides;   // cascade keys, applied by the engine (Paso 5)
 };
 
 // Parse and validate one scenario JSON. Throws std::runtime_error with the
@@ -184,10 +184,10 @@ struct SeedingConfig {
     double host_weight_radius_km = 5.0;  // search radius around each patch
     // Review-a3 P1-4: the seeding-local scale mirror is GONE. This is an
     // engine-injected slot: engine.cpp always overwrites it with
-    // SpeciesParams::host_seeking_scale_m (model_constants.yaml
-    // species.<name>.host_seeking_scale_m) before the coordinator builds
+    // the species daily_move_capacity_m (model_constants.yaml
+    // species.<name>.daily_move_capacity_m) before the coordinator builds
     // instructions. No compiled default is allowed here.
-    float host_seeking_scale_m = -1.0f;
+    float host_weighting_scale_m = -1.0f;
     HostPrefWeights host_prefs;          // species host preferences
 
     // For SCENARIO: the parsed scenario; the engine rejects a mode of

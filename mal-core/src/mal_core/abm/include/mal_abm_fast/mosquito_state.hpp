@@ -58,6 +58,14 @@ struct MosquitoSoA {
     std::vector<int32_t>  last_patch_update_row;
     std::vector<int32_t>  last_patch_update_col;
 
+    // Paso 5: continuous metric position (plan §1/§3), metres from the
+    // south-west corner of the AOI. NaN = "not set yet": the submodel derives
+    // it from lon/lat on the first day. row/col/lon/lat become DERIVED from it.
+    std::vector<float>    pos_x;
+    std::vector<float>    pos_y;
+    // Last stage the perception cascade reached for this adult (CascadeStage).
+    std::vector<uint8_t>  cascade_stage;
+
     int64_t n_alive  = 0;   // valid prefix length of all SoA vectors
     int64_t next_uid = 0;   // next unique_id to allocate
 };

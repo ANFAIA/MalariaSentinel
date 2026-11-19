@@ -627,7 +627,7 @@ them from composite dimensions, and each is visible in the code:
       \code{gates}.
 \end{itemize}
 
-\subsection{The six gates}
+\subsection{The five gates}
 
 \begin{longtable}{@{}p{2.4cm}p{5.2cm}p{6.4cm}@{}}
 \toprule
@@ -657,13 +657,6 @@ and can be overridden
 through the context; the gate passes when the ratio lies in
 $[\codeconst{scoring.gate_ratio_band_min}, \codeconst{scoring.gate_ratio_band_max}]$
 (\code{gates.py:156-194}). \\
-\code{G14\_mobility} & Mobility origin--destination matrices are
-row-stochastic & Each \code{.csr} file next to the run directory (or in its
-parent, or in a sibling \code{hosts} directory) is read as a sparse matrix;
-the fraction of rows whose values sum to one within a tolerance of
-$\codeconst{scoring.gate_row_sum_tolerance}$ is
-computed per file, the minimum over files is the score, and the gate passes
-at or above $\codeconst{scoring.gate_row_sum_threshold}$ (\code{gates.py:206-245}). \\
 \code{G24\_urban\_ratio} & Urban cells carry less adult density than rural
 ones & Mean adult density over urban-class $\codeconst{scoring.gate_urban_class}$
 cells divided by the mean
@@ -1083,9 +1076,9 @@ nothing is wrong now, but there are two sources of truth and no rule about
 which wins when they disagree. \\
 \code{hard\_floor} & eleven composite dimensions & Never read anywhere in
 the package. Its intended role is not settled by the code. \\
-\code{aoi\_generalizable} & five of the six gates (\code{gates.py:46},
-\code{:87}, \code{:123}, \code{:154}, \code{:204}) & Never read
-anywhere in the package. The sixth gate, the urban-ratio gate, declares no
+\code{aoi\_generalizable} & four of the five gates (\code{gates.py:46},
+\code{:87}, \code{:123}, \code{:154}) & Never read
+anywhere in the package. The fifth gate, the urban-ratio gate, declares no
 such attribute at all; it carries \code{manual = True}
 (\code{gates.py:259}) instead. \\
 \end{longtable}
@@ -1206,7 +1199,7 @@ for a decision.
 \item \textbf{Engineering prior.} Numbers with no literature behind them,
       written straight into the scorer: the activation floor and pulse of
       D19, the sampling cap of G6, the wall-time target of G10, the
-      reference population of G12, the tolerance and pass fraction of G14,
+      reference population of G12,
       the urban-ratio limit of G24, the coverage radii of D16.
 \item \textbf{Scenario default.} The choices the two campaigns make: the
       detection campaign's run length, the number of simulated years and

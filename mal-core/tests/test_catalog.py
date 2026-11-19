@@ -117,7 +117,7 @@ class TestCatalogStatus:
         assert "dw_class_fractions" in keys
         assert "smap_salinity" in keys
         # Ingest artifacts derived from INGEST_ARTIFACTS
-        assert {"env", "habitat", "host_static", "mobility_day"} <= keys
+        assert {"env", "habitat", "host_static"} <= keys
         kinds = {r["key"]: r["kind"] for r in rows}
         assert kinds["env"] == "artifact"
         assert kinds["jrc_habitat_features"] == "download"
@@ -148,9 +148,6 @@ class TestRegisterExisting:
         (d / "ghana_elevation.tif").touch()
         (d / "ghana_host_static.nc").touch()
         (d / "host_manifest.json").touch()
-        (d / "ghana_mobility_day.csr").touch()
-        (d / "ghana_mobility_night.csr").touch()
-        (d / "ghana_livestock_mobility.csr").touch()
         (d / "ghana_regional_2024_2025_env.nc").touch()
         (d / "ghana_habitat_patches.gpkg").touch()
         return d
@@ -172,7 +169,7 @@ class TestRegisterExisting:
         # Ingest artifacts keyed by INGEST_ARTIFACTS, with abm flags
         assert "host_static" in manifest
         assert manifest["host_static"]["required_for_abm"] is True
-        assert "mobility_day" in manifest
+        assert "host_static" in manifest
         assert "env" in manifest
         # Second run never overwrites / duplicates
         summary2 = register_existing("ghana", data_dir=d)
@@ -194,8 +191,7 @@ class TestRegisterExisting:
         expected = {key for key, art in INGEST_ARTIFACTS.items()
                     if art.required_for_abm}
         assert expected == {
-            "env", "habitat", "host_static", "mobility_day",
-            "mobility_night", "livestock_mobility",
+            "env", "habitat", "host_static",
         }
         actual = {key for key, entry in manifest.items()
                   if entry.get("required_for_abm")}
@@ -215,12 +211,11 @@ class TestIngestArtifactsTable:
     """INGEST_ARTIFACTS — the single source of derived-artifact identity."""
 
     def test_expected_keys_present(self):
-        assert {"env", "habitat", "host_static", "host_manifest",
-                "mobility_day", "mobility_night", "livestock_mobility",
-                "mobility_manifest"} == set(INGEST_ARTIFACTS)
+        assert {"env", "habitat", "host_static",
+                "host_manifest"} == set(INGEST_ARTIFACTS)
         assert all(art.producer.startswith("mal_core.ingest.")
                    for art in INGEST_ARTIFACTS.values())
         assert INGEST_ARTIFACTS["env"].required_for_abm
-        assert INGEST_ARTIFACTS["mobility_day"].required_for_abm
+        assert INGEST_ARTIFACTS["host_static"].required_for_abm
         assert not INGEST_ARTIFACTS["host_manifest"].required_for_abm
 

@@ -85,7 +85,7 @@ density–suitability coupling, D11 aquatic stage structure, D15 long-horizon
 persistence, D16 detection coverage, D19 pluvial habitat persistence, D20
 washout response, D21 dispersal kernel, D25 reported cases (Ghana) — and six
 gates — G6 data validity, G7 determinism, G10 performance, G12 host input,
-G14 mobility, G24 urban/rural ratio (`registry.py:69-76`).
+G24 urban/rural ratio (`registry.py:69-76`).
 
 **Q7. What are the weights, and where do they come from?**
 Citation: `mal-core/src/mal_core/scoring/registry.py:53-67`; `mal-core/src/mal_core/scoring/config.py:30-31`.
@@ -208,8 +208,7 @@ Answer: G6 — every state-COG band value finite and ≥ 0 (sampled to 48 files
 if more than 48 exist, `gates.py:52-54`); G7 — per-seed state files
 byte-identical by MD5 (`gates.py:89-113`); G10 — wall time ≤ 30 s from
 `run_metadata.json` (`gates.py:116-144`); G12 — the input human grid total
-within ±20 % of a census reference (`gates.py:147-194`); G14 — mobility OD
-matrix rows sum to 1.0 for ≥ 99 % of rows (`gates.py:197-245`); G24 — urban
+within ±20 % of a census reference (`gates.py:147-194`); G24 — urban
 mean adult density ≤ 0.7 × rural mean (`gates.py:248-303`).
 
 **Q20. How does a gate treat missing data — fail or skip?**

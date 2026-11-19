@@ -2,7 +2,7 @@
   "id": "E10",
   "mode": "report",
   "seed": 20261117,
-  "days": 3,
+  "days": 10,
   "agents": [
     {
       "x": 5200,
@@ -26,11 +26,10 @@
   "expectations": [],
   "variants": [
     {
-      "label": "activacion_co2_50_100_200_m",
       "id": "E10",
       "mode": "report",
       "seed": 20261117,
-      "days": 3,
+      "days": 10,
       "agents": [
         {
           "x": 5200,
@@ -40,27 +39,27 @@
           "age_days": 0
         }
       ],
+      "aquatic": [],
       "humans": [
         {
-          "x": 5350,
+          "x": 5350.0,
           "y": 5200,
           "state": "SUSCEPTIBLE",
           "timer": 0
         }
       ],
-      "aquatic": [],
       "livestock": [],
       "overrides": {
         "co2_activation_radius_m": 50
       },
-      "expectations": []
+      "expectations": [],
+      "label": "co2_50m_persona_a_150p0m"
     },
     {
-      "label": "olfativa_10_30_70_m",
       "id": "E10",
       "mode": "report",
       "seed": 20261117,
-      "days": 3,
+      "days": 10,
       "agents": [
         {
           "x": 5200,
@@ -70,27 +69,87 @@
           "age_days": 0
         }
       ],
+      "aquatic": [],
       "humans": [
         {
-          "x": 5350,
+          "x": 5350.0,
           "y": 5200,
           "state": "SUSCEPTIBLE",
           "timer": 0
         }
       ],
+      "livestock": [],
+      "overrides": {
+        "co2_activation_radius_m": 100
+      },
+      "expectations": [],
+      "label": "co2_100m_persona_a_150p0m"
+    },
+    {
+      "id": "E10",
+      "mode": "report",
+      "seed": 20261117,
+      "days": 10,
+      "agents": [
+        {
+          "x": 5200,
+          "y": 5200,
+          "sex": "FEMALE",
+          "state": "HOST_SEEKING",
+          "age_days": 0
+        }
+      ],
       "aquatic": [],
+      "humans": [
+        {
+          "x": 5350.0,
+          "y": 5200,
+          "state": "SUSCEPTIBLE",
+          "timer": 0
+        }
+      ],
+      "livestock": [],
+      "overrides": {
+        "co2_activation_radius_m": 200
+      },
+      "expectations": [],
+      "label": "co2_200m_persona_a_150p0m"
+    },
+    {
+      "id": "E10",
+      "mode": "report",
+      "seed": 20261117,
+      "days": 10,
+      "agents": [
+        {
+          "x": 5200,
+          "y": 5200,
+          "sex": "FEMALE",
+          "state": "HOST_SEEKING",
+          "age_days": 0
+        }
+      ],
+      "aquatic": [],
+      "humans": [
+        {
+          "x": 5260.0,
+          "y": 5200,
+          "state": "SUSCEPTIBLE",
+          "timer": 0
+        }
+      ],
       "livestock": [],
       "overrides": {
         "olfactory_radius_m": 10
       },
-      "expectations": []
+      "expectations": [],
+      "label": "olf_10m_persona_a_60p0m"
     },
     {
-      "label": "visual_0.25_0.72_m",
       "id": "E10",
       "mode": "report",
       "seed": 20261117,
-      "days": 3,
+      "days": 10,
       "agents": [
         {
           "x": 5200,
@@ -100,20 +159,141 @@
           "age_days": 0
         }
       ],
+      "aquatic": [],
       "humans": [
         {
-          "x": 5350,
+          "x": 5260.0,
           "y": 5200,
           "state": "SUSCEPTIBLE",
           "timer": 0
         }
       ],
+      "livestock": [],
+      "overrides": {
+        "olfactory_radius_m": 30
+      },
+      "expectations": [],
+      "label": "olf_30m_persona_a_60p0m"
+    },
+    {
+      "id": "E10",
+      "mode": "report",
+      "seed": 20261117,
+      "days": 10,
+      "agents": [
+        {
+          "x": 5200,
+          "y": 5200,
+          "sex": "FEMALE",
+          "state": "HOST_SEEKING",
+          "age_days": 0
+        }
+      ],
       "aquatic": [],
+      "humans": [
+        {
+          "x": 5260.0,
+          "y": 5200,
+          "state": "SUSCEPTIBLE",
+          "timer": 0
+        }
+      ],
+      "livestock": [],
+      "overrides": {
+        "olfactory_radius_m": 70
+      },
+      "expectations": [],
+      "label": "olf_70m_persona_a_60p0m"
+    },
+    {
+      "id": "E10",
+      "mode": "report",
+      "seed": 20261117,
+      "days": 10,
+      "agents": [
+        {
+          "x": 5200,
+          "y": 5200,
+          "sex": "FEMALE",
+          "state": "HOST_SEEKING",
+          "age_days": 0
+        }
+      ],
+      "aquatic": [],
+      "humans": [
+        {
+          "x": 5200.5,
+          "y": 5200,
+          "state": "SUSCEPTIBLE",
+          "timer": 0
+        }
+      ],
       "livestock": [],
       "overrides": {
         "visual_radius_m": 0.25
       },
-      "expectations": []
+      "expectations": [],
+      "label": "vis_0p25m_persona_a_0p5m"
+    },
+    {
+      "id": "E10",
+      "mode": "report",
+      "seed": 20261117,
+      "days": 10,
+      "agents": [
+        {
+          "x": 5200,
+          "y": 5200,
+          "sex": "FEMALE",
+          "state": "HOST_SEEKING",
+          "age_days": 0
+        }
+      ],
+      "aquatic": [],
+      "humans": [
+        {
+          "x": 5200.5,
+          "y": 5200,
+          "state": "SUSCEPTIBLE",
+          "timer": 0
+        }
+      ],
+      "livestock": [],
+      "overrides": {
+        "visual_radius_m": 0.485
+      },
+      "expectations": [],
+      "label": "vis_0p485m_persona_a_0p5m"
+    },
+    {
+      "id": "E10",
+      "mode": "report",
+      "seed": 20261117,
+      "days": 10,
+      "agents": [
+        {
+          "x": 5200,
+          "y": 5200,
+          "sex": "FEMALE",
+          "state": "HOST_SEEKING",
+          "age_days": 0
+        }
+      ],
+      "aquatic": [],
+      "humans": [
+        {
+          "x": 5200.5,
+          "y": 5200,
+          "state": "SUSCEPTIBLE",
+          "timer": 0
+        }
+      ],
+      "livestock": [],
+      "overrides": {
+        "visual_radius_m": 0.72
+      },
+      "expectations": [],
+      "label": "vis_0p72m_persona_a_0p5m"
     }
   ]
 }

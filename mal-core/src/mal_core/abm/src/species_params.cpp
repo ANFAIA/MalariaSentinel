@@ -34,6 +34,8 @@ std::string yaml_name(MosquitoSpeciesId id) {
 
 }  // namespace
 
+std::string species_row_name(MosquitoSpeciesId id) { return yaml_name(id); }
+
 SpeciesParams species_params_for(MosquitoSpeciesId id) {
     SpeciesParams sp;
     sp.id = id;
@@ -58,10 +60,6 @@ SpeciesParams species_params_for(MosquitoSpeciesId id) {
     sp.pref_goat     = static_cast<float>(row.pref[2]);
     sp.pref_sheep    = static_cast<float>(row.pref[3]);
     sp.pref_wildlife = static_cast<float>(row.pref[4]);
-    sp.host_seeking_scale_m =
-        static_cast<float>(row.host_seeking_scale_m);
-    sp.host_seeking_radius_m =
-        static_cast<float>(row.host_seeking_radius_m);
     sp.salinity_opt_ppt    = static_cast<float>(row.salinity_opt_ppt);
     sp.salinity_hi_tol_ppt = static_cast<float>(row.salinity_hi_tol_ppt);
     sp.salinity_slope      = static_cast<float>(row.salinity_slope);

@@ -9,7 +9,6 @@
 #include "mal_abm_fast/config.hpp"
 #include "mal_abm_fast/birth_rate.hpp"
 #include "mal_abm_fast/gonotrophic_cycle.hpp"
-#include "mal_abm_fast/host_seeking.hpp"
 #include "mal_abm_fast/species_params.hpp"
 #include "mal_abm_fast/thermal_responses.hpp"
 #include "mal_abm_fast/transmission.hpp"
@@ -44,9 +43,10 @@ static std::string canonical_yaml() {
 
 TEST(ConfigParser, ParsesCanonicalModelConstants) {
     const auto cfg = mal_abm_fast::parse_config_file(canonical_yaml());
-    EXPECT_EQ(cfg.version, 2);
+    EXPECT_EQ(cfg.version, 3);
     EXPECT_EQ(cfg.contracts.env_nc, "3.0");
     EXPECT_EQ(cfg.contracts.cogs_state, "4.0");
+    EXPECT_EQ(cfg.contracts.habitat, "4.0");
     EXPECT_FLOAT_EQ(cfg.pluvial.rain_scale_mm, 2.5f);
     EXPECT_FLOAT_EQ(cfg.habitat.activation_min_engine, 0.01f);
     EXPECT_FLOAT_EQ(cfg.habitat.candidate_min_engine, 0.01f);
@@ -168,11 +168,95 @@ TEST(ConfigParser, MissingKeysListedTogether) {
     }
 }
 
+// -- Paso 4: the keys of the individualization/movement plan ---------------------
+
+TEST(ConfigPaso4, PlanValuesAreParsedIntoEveryRow) {
+    const auto cfg = mal_abm_fast::parse_config_file(canonical_yaml());
+    const auto& c = cfg.species.rows.at("coluzzii");
+    EXPECT_DOUBLE_EQ(c.co2_activation_radius_m, 100.0);
+    EXPECT_DOUBLE_EQ(c.exploration_range_m, 100.0);
+    EXPECT_DOUBLE_EQ(c.exploration_step_m, 50.0);
+    EXPECT_DOUBLE_EQ(c.daily_move_capacity_m, 590.0);
+    EXPECT_DOUBLE_EQ(c.blood_meal_target_ul, 0.5);
+    EXPECT_DOUBLE_EQ(c.first_cycle_target_ul, 0.8);
+    EXPECT_DOUBLE_EQ(c.eggs_per_ul, 223.0);
+    EXPECT_DOUBLE_EQ(c.arrested_daily_survival, 0.986);
+    EXPECT_DOUBLE_EQ(c.male_daily_survival, 0.773);
+    EXPECT_EQ(c.anemotaxis_rule, "upwind");
+    EXPECT_EQ(c.wind_reference, "u100/v100");
+    EXPECT_TRUE(c.aestivation_supported);
+    // Derived key: 590 m / flight_speed_ms / 3600 s/h.
+    EXPECT_NEAR(c.directed_flight_budget_h,
+                c.daily_move_capacity_m / c.flight_speed_ms / 3600.0, 1e-3);
+    // Dry-season arrest differs per species; species with no evidence do not estivate.
+    EXPECT_GT(cfg.species.rows.at("gambiae_ss").gonotrophic_arrest_prob_dry,
+              cfg.species.rows.at("arabiensis").gonotrophic_arrest_prob_dry);
+    for (const char* name : {"funestus", "melas", "stephensi"}) {
+        EXPECT_FALSE(cfg.species.rows.at(name).aestivation_supported) << name;
+        EXPECT_DOUBLE_EQ(cfg.species.rows.at(name).gonotrophic_arrest_prob_dry, 0.0) << name;
+    }
+    // Every named row carries the keys (none is left at the struct default).
+    for (const auto& [name, row] : cfg.species.rows) {
+        EXPECT_GT(row.flight_speed_ms, 0.0) << name;
+        EXPECT_GT(row.terminal_radius_m, 0.0) << name;
+        EXPECT_GT(row.probing_success_rate, 0.0) << name;
+    }
+}
+
+TEST(ConfigPaso4, IntegrationAndMatingBlocks) {
+    const auto cfg = mal_abm_fast::parse_config_file(canonical_yaml());
+    double hours = 0.0;
+    for (const double d : cfg.integration.phase_duration_hours) hours += d;
+    EXPECT_DOUBLE_EQ(hours, 24.0);
+    EXPECT_DOUBLE_EQ(cfg.integration.phase_duration_hours[0], 12.0);   // DAY
+    EXPECT_DOUBLE_EQ(cfg.integration.dt_terminal_s, 0.04);
+    EXPECT_DOUBLE_EQ(cfg.integration.dt_olfactory_s, 0.25);
+    EXPECT_DOUBLE_EQ(cfg.integration.landing_speed_mm_s, 50.0);
+    EXPECT_DOUBLE_EQ(cfg.mating.p_mate_male_fraction, 0.072);
+    EXPECT_DOUBLE_EQ(cfg.mating.female_attendance_rate, 0.1033);
+    EXPECT_DOUBLE_EQ(cfg.mating.male_move_capacity_m, 50.0);
+    EXPECT_EQ(cfg.mating.male_females_per_night_max, 3);
+    EXPECT_TRUE(cfg.mating.rain_suppresses_swarming);
+}
+
+TEST(ConfigPaso4, MissingNewKeysAreNamed) {
+    const std::string path = write_temp("paso4_miss.yaml", "version: 3\n");
+    try {
+        mal_abm_fast::parse_config_file(path);
+        FAIL() << "expected ConfigError";
+    } catch (const mal_abm_fast::ConfigError& e) {
+        const std::string msg = e.what();
+        EXPECT_NE(msg.find("integration"), std::string::npos);
+        EXPECT_NE(msg.find("mating"), std::string::npos);
+        EXPECT_NE(msg.find("contracts"), std::string::npos);
+    }
+}
+
+TEST(ConfigPaso4, BooleanMustBeTrueOrFalse) {
+    std::ifstream in(canonical_yaml());
+    std::stringstream buf;
+    buf << in.rdbuf();
+    std::string text = buf.str();
+    const std::string good = "rain_suppresses_swarming: true";
+    const auto at = text.find(good);
+    ASSERT_NE(at, std::string::npos);
+    text.replace(at, good.size(), "rain_suppresses_swarming: \"yes\"");
+    const std::string path = write_temp("paso4_bool.yaml", text);
+    try {
+        mal_abm_fast::parse_config_file(path);
+        FAIL() << "expected ConfigError";
+    } catch (const mal_abm_fast::ConfigError& e) {
+        EXPECT_NE(std::string(e.what()).find(
+                      "mating.rain_suppresses_swarming (expected true|false)"),
+                  std::string::npos);
+    }
+}
+
 // -- singleton + env override -------------------------------------------------
 
 TEST(ConfigParser, LoadConfigSingletonResolved) {
     const auto& cfg = mal_abm_fast::load_config();
-    EXPECT_EQ(cfg.version, 2);
+    EXPECT_EQ(cfg.version, 3);
 }
 
 // -- task-07: struct defaults are YAML-bound (no compiled model values) -------
@@ -208,19 +292,6 @@ TEST(ConfigBoundDefaults, TransmissionParamsComeFromYaml) {
                      cfg.transmission.initial_vector_infected_frac);
 }
 
-TEST(ConfigBoundDefaults, HostPreferenceComesFromYaml) {
-    // Compare against the same singleton the struct reads (an env override
-    // must not make this test compare different files).
-    const auto& cfg = mal_abm_fast::load_config();
-    const auto& row = cfg.species.rows.at(cfg.species.default_species);
-    const mal_abm_fast::HostPreference pref;
-    EXPECT_FLOAT_EQ(pref.human, float(row.pref[0]));
-    EXPECT_FLOAT_EQ(pref.cattle, float(row.pref[1]));
-    EXPECT_FLOAT_EQ(pref.goat, float(row.pref[2]));
-    EXPECT_FLOAT_EQ(pref.sheep, float(row.pref[3]));
-    EXPECT_FLOAT_EQ(pref.wildlife, float(row.pref[4]));
-}
-
 TEST(ConfigBoundDefaults, SpeciesParamsComeFromYaml) {
     const auto& cfg = mal_abm_fast::load_config();
     const auto& row = cfg.species.rows.at(cfg.species.default_species);
@@ -234,10 +305,6 @@ TEST(ConfigBoundDefaults, SpeciesParamsComeFromYaml) {
     EXPECT_FLOAT_EQ(sp.pref_goat, float(row.pref[2]));
     EXPECT_FLOAT_EQ(sp.pref_sheep, float(row.pref[3]));
     EXPECT_FLOAT_EQ(sp.pref_wildlife, float(row.pref[4]));
-    EXPECT_FLOAT_EQ(sp.host_seeking_scale_m,
-                    float(row.host_seeking_scale_m));
-    EXPECT_FLOAT_EQ(sp.host_seeking_radius_m,
-                    float(row.host_seeking_radius_m));
     EXPECT_FLOAT_EQ(sp.salinity_opt_ppt, float(row.salinity_opt_ppt));
     EXPECT_FLOAT_EQ(sp.salinity_hi_tol_ppt, float(row.salinity_hi_tol_ppt));
     EXPECT_FLOAT_EQ(sp.salinity_slope, float(row.salinity_slope));

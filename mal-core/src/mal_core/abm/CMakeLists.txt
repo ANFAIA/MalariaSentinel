@@ -17,6 +17,8 @@ find_package(OpenMP REQUIRED)
 if(OpenMP_CXX_FOUND)
     message(STATUS "OpenMP found: ${OpenMP_CXX_FLAGS}")
 endif()
+find_package(Arrow   REQUIRED)
+find_package(Parquet REQUIRED)
 find_package(GTest REQUIRED)
 
 include(cmake/CompilerWarnings.cmake)

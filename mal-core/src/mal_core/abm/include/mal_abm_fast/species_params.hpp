@@ -57,13 +57,6 @@ struct SpeciesParams {
     float pref_wildlife =
         static_cast<float>(detail::default_species_row().pref[4]);
 
-    // Host-seeking kernel scale/radius (metres), from the default species
-    // row (species.<name>.host_seeking_scale_m / _radius_m).
-    float host_seeking_scale_m =
-        static_cast<float>(detail::default_species_row().host_seeking_scale_m);
-    float host_seeking_radius_m =
-        static_cast<float>(detail::default_species_row().host_seeking_radius_m);
-
     // Salinity response (psu). salinity_suitability() below maps a psu
     // value to a habitat-fitness multiplier in [0,1].
     float salinity_opt_ppt =
@@ -79,6 +72,9 @@ struct SpeciesParams {
     float gonotrophic_days =
         static_cast<float>(load_config().gonotrophic.cycle_duration_days);
 };
+
+/// Name of the `species.<row>` of model_constants.yaml of a species id.
+std::string species_row_name(MosquitoSpeciesId id);
 
 /// Registry: returns the canonical parameter set for a species id.
 /// MVP instantiates only ANOPHELES_COLUZZII.

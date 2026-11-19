@@ -82,7 +82,7 @@ def test_canonical_loads_and_derives():
         {"surface_persistent", "wetland_persistent", "urban_persistent"})
     assert pluvial_names() == frozenset(
         {"wetland_pluvial", "open_pluvial", "crop_pluvial"})
-    assert CONFIG["version"] == 2
+    assert CONFIG["version"] == 3
     assert CONFIG["contracts"]["env_nc"] == "3.0"
     assert CONFIG["contracts"]["cogs_state"] == "4.0"
     assert CONFIG["pluvial"]["rain_scale_mm"] == 2.5

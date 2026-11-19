@@ -38,15 +38,6 @@ inline double EIP_BASE_C() { return static_cast<double>(load_config().eip.base_c
 /// days (config key: `eip.threshold_gd`); a mosquito is infective once its
 /// accumulated EIP progress reaches it.
 inline double EIP_THRESHOLD_GD() { return static_cast<double>(load_config().eip.threshold_gd); }
-/// Daily probability that an adult mosquito disperses, in 1/day
-/// (config key: `dispersal.adult_prob_day`).
-inline double ADULT_DISPERSE_PROB() { return static_cast<double>(load_config().dispersal.adult_prob_day); }
-/// Standard deviation of the isotropic Gaussian adult dispersal step, in metres
-/// (config key: `dispersal.adult_sigma_m`).
-inline double ADULT_DISPERSE_SIGMA_M() { return static_cast<double>(load_config().dispersal.adult_sigma_m); }
-/// Radius at which the Gaussian adult dispersal step is clipped to a disc, in
-/// metres (config key: `dispersal.adult_max_m`).
-inline double ADULT_DISPERSE_MAX_M() { return static_cast<double>(load_config().dispersal.adult_max_m); }
 /// Daily probability that a gravid female attempts a windborne migration, in
 /// 1/day (config key: `dispersal.wind_migration_prob`).
 inline double WIND_MIGRATION_PROB() { return static_cast<double>(load_config().dispersal.wind_migration_prob); }
@@ -157,12 +148,6 @@ inline std::string CONTRACT_VERSION() { return load_config().contracts.cogs_stat
 /// Runtime-configurable overrides for dispersal and larval parameters.
 /// Used by CLI to override wire.hpp defaults for invasion simulations.
 struct RuntimeOverrides {
-    /// Daily adult dispersal probability, in 1/day (overrides `dispersal.adult_prob_day`).
-    float disperse_prob    = static_cast<float>(load_config().dispersal.adult_prob_day);
-    /// Gaussian sigma of the dispersal step, in metres (overrides `dispersal.adult_sigma_m`).
-    float disperse_sigma_m = static_cast<float>(load_config().dispersal.adult_sigma_m);
-    /// Clipping radius of the dispersal step, in metres (overrides `dispersal.adult_max_m`).
-    float disperse_max_m   = static_cast<float>(load_config().dispersal.adult_max_m);
     /// Beverton-Holt larval competition coefficient, dimensionless (overrides
     /// `aquatic_stages.larva_bh_alpha`).
     float larva_bh_alpha   = static_cast<float>(load_config().aquatic_stages.larva_bh_alpha);

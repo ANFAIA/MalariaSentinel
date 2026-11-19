@@ -6,7 +6,7 @@
 // Root cause pinned here: `TransmissionModel::check_and_trigger_outbreak`
 // used to require adult vectors in the SAME grid cell as the human focus,
 // while the host-seeking kernel detects and bites hosts up to
-// host_seeking_radius_m (~1.5 km, i.e. the 8-neighbourhood at 1 km cells)
+// the host-seeking reach (the 8-neighbourhood at 1 km cells)
 // away. The outbreak therefore waited for a random dispersal event to drop
 // a single mosquito into the settlement and the human infectious window
 // closed before the vector cohort could complete an EIP.
@@ -19,7 +19,6 @@
 #include "mal_abm_fast/aoi.hpp"
 #include "mal_abm_fast/climate.hpp"
 #include "mal_abm_fast/host_landscape.hpp"
-#include "mal_abm_fast/host_seeking.hpp"
 #include "mal_abm_fast/mosquito_submodel.hpp"
 #include "mal_abm_fast/seeding.hpp"
 #include "mal_abm_fast/transmission.hpp"
@@ -112,7 +111,7 @@ TEST(TransmissionChain, CompletesHumanVectorHumanCycle) {
     params.human_outbreak_cases = 200.0;
     params.human_min_cell_pop = 50.0;
     params.human_outbreak_foci = 1;
-    tm.init(h, w, human_pop, params, 7);
+    tm.init(h, w, human_pop, params, 7, static_cast<double>(aoi.resolution_m));
     tm.check_and_trigger_outbreak(0, density);
     ASSERT_GT(tm.human_grid().i_at(focus_r, focus_c), 0.0);
 
@@ -125,25 +124,33 @@ TEST(TransmissionChain, CompletesHumanVectorHumanCycle) {
     HostLandscape hosts = HostLandscape::make_effective(
         residential, h_eff, h, w);
 
-    HostSeekingModel host_seeking;
-
-    SeedInstruction inst;
-    inst.patch_id = static_cast<int32_t>(
-        static_cast<size_t>(vector_r) * w + vector_c);
-    inst.row = vector_r;
-    inst.col = vector_c;
+    // 20 resting sites spaced ~33 m along the first 700 m of the cell next to
+    // the focus: each site has its OWN nearest person (the cascade targets the
+    // nearest person, so one site would depend on a single person's state).
     const double cell_w = (aoi.east - aoi.west) / static_cast<double>(w);
     const double cell_h = (aoi.north - aoi.south) / static_cast<double>(h);
-    inst.lon = aoi.west + (vector_c + 0.5) * cell_w;
-    inst.lat = aoi.north - (vector_r + 0.5) * cell_h;
-    inst.n_adults = 400;
-    inst.n_larvae = 0;
-    std::vector<SeedInstruction> instructions{inst};
+    std::vector<SeedInstruction> instructions;
+    for (int k = 0; k < 20; ++k) {
+        SeedInstruction inst;
+        inst.patch_id = static_cast<int32_t>(
+            static_cast<size_t>(vector_r) * w + vector_c);
+        inst.row = vector_r;
+        inst.col = vector_c;
+        // 20 m inside the cell next to the focus, spread north-south.
+        inst.lon = aoi.west + vector_c * cell_w + 0.0002;
+        inst.lat = aoi.north - vector_r * cell_h - (0.0003 * (k + 1));
+        inst.n_adults = 20;
+        inst.n_larvae = 0;
+        instructions.push_back(inst);
+    }
 
     MosquitoSubmodel sub(1, instructions, 11);
     sub.set_host_landscape(&hosts);
-    sub.set_host_seeking_model(&host_seeking);
+    // The people of the focus cell are individuals with a spatial index; the
+    // females fly the perception cascade towards them.
+    tm.human_grid_mutable().build_spatial_index(25.0);
     sub.set_human_compartment_grid(&tm.human_grid());
+    sub.set_cascade(CascadeParams::for_species(MosquitoSpeciesId::ANOPHELES_COLUZZII), 99);
     sub.set_transmission_params(&params);
 
     const std::vector<PatchState> patch_states = make_patch_states(h, w);
@@ -158,7 +165,7 @@ TEST(TransmissionChain, CompletesHumanVectorHumanCycle) {
     for (int32_t day = 0; day < 45; ++day) {
         sub.advance_day(aoi, patch_states);
         tm.advance_vector_eip(sub.soa_mutable(), climate, patch_states, aoi);
-        tm.advance_human_transmission(sub.bite_ledger(), aoi);
+        tm.advance_human_transmission(sub.bite_ledger_mutable(), aoi);
         tm.record_daily_stats(day, sub.soa(), sub.bite_ledger());
 
         const auto& stats = tm.last_day_stats();

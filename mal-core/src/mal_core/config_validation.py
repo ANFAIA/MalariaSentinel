@@ -115,9 +115,10 @@ class _StrictModel(BaseModel):
 # ---------------------------------------------------------------------------
 
 class Contracts(_StrictModel):
-    """The version strings of the two data contracts: the environment NetCDF and the state COG."""
+    """The version strings of the data contracts: the environment NetCDF, the state COG and the per-cell habitat registry."""
     env_nc: str
     cogs_state: str
+    habitat: str
 
 
 class HabitatTypes(_StrictModel):
@@ -166,8 +167,35 @@ class SpeciesRow(_StrictModel):
     salinity_opt_ppt: float
     salinity_hi_tol_ppt: float
     salinity_slope: float
-    host_seeking_scale_m: float
-    host_seeking_radius_m: float
+    co2_activation_radius_m: float
+    olfactory_radius_m: float
+    visual_radius_m: float
+    terminal_radius_m: float
+    flight_speed_ms: float
+    exploration_range_m: float
+    exploration_step_m: float
+    exploration_step_correlation: float
+    casting_probability: float
+    casting_angle_deg: float
+    plume_memory_s: float
+    anemotaxis_rule: str
+    anemotaxis_deviation_deg: float
+    wind_reference: str
+    wind_block_threshold_ms: float
+    daily_move_capacity_m: float
+    directed_flight_budget_h: float
+    blood_meal_target_ul: float
+    first_cycle_target_ul: float
+    blood_meal_size_ul: float
+    meal_size_min_ul: float
+    blood_meal_refractory_days: float
+    probing_success_rate: float
+    eggs_per_ul: float
+    arrested_daily_survival: float
+    gonotrophic_arrest_prob_dry: float
+    aestivation_supported: bool
+    male_ratio: float
+    male_daily_survival: float
 
 
 class NeutralRow(_StrictModel):
@@ -295,15 +323,11 @@ class Gonotrophic(_StrictModel):
 
 class Dispersal(_StrictModel):
     """The dispersal and migration parameters: daily adult movement, wind-driven migration and the night flight window."""
-    adult_prob_day: float
-    adult_sigma_m: float
-    adult_max_m: float
     wind_migration_prob: float
     wind_flight_hours: float
     wind_survival: float
     wind_self_speed_ms: float
     flight_hour: int
-    host_flight_step_m: float
     snap_radius_m: float
     night_start_hour: int
     night_end_hour: int
@@ -316,8 +340,6 @@ class HostSeeking(_StrictModel):
     urbanicity_add: float
     indoor_fraction_urban: float
     indoor_fraction_rural: float
-    detect_range_m: float
-    approach_step_m: float
 
 
 class Oviposition(_StrictModel):
@@ -327,6 +349,36 @@ class Oviposition(_StrictModel):
     step_m: float
     min_attraction: float
     timeout_days: int
+
+
+class Integration(_StrictModel):
+    """The time integration of the movement cascade: phase durations and the two micro-integrator steps."""
+    phase_duration_hours: list[float] = Field(
+        min_length=ACTIVITY_PHASES, max_length=ACTIVITY_PHASES)
+    directed_flight_budget_h: float
+    dt_terminal_s: float
+    dt_olfactory_s: float
+    plume_memory_s: float
+    landing_speed_mm_s: float
+    landing_speed_hold_s: float
+
+
+class Mating(_StrictModel):
+    """The male layer: swarm offer, attendance and the swarm-site field."""
+    p_mate_male_fraction: float
+    p_mate_pairs_per_individual: float
+    p_mate_size_exponent: float
+    male_swarm_reference_size: float
+    female_attendance_rate: float
+    local_swarm_male_offer_factor: float
+    male_move_capacity_m: float
+    male_females_per_night_max: int
+    swarm_duration_min: float
+    swarm_start_min_after_sunset: float
+    swarm_height_m: float
+    swarm_markers_per_km2: float
+    swarm_markers_source: str
+    rain_suppresses_swarming: bool
 
 
 class AquaticStages(_StrictModel):
@@ -366,6 +418,8 @@ class ModelConfig(_StrictModel):
     transmission: Transmission
     dispersal: Dispersal
     host_seeking: HostSeeking
+    integration: Integration
+    mating: Mating
     oviposition: Oviposition
     aquatic_stages: AquaticStages
     thermal: Thermal
@@ -379,6 +433,117 @@ class ModelConfig(_StrictModel):
         """Path the config was loaded from (set by ``validate_model_config``)."""
         return self._source_path
 
+    def _check_movement_blood_male_keys(self, errors: list[str]) -> None:
+        """Invariants of the keys of the movement cascade, blood, dry season, males and mating."""
+        for name, row in self.species.named_rows().items():
+            pre = f"species.{name}"
+            positive = (
+                "co2_activation_radius_m", "olfactory_radius_m",
+                "visual_radius_m", "terminal_radius_m", "flight_speed_ms",
+                "exploration_range_m", "exploration_step_m",
+                "wind_block_threshold_ms", "daily_move_capacity_m",
+                "directed_flight_budget_h", "blood_meal_target_ul",
+                "first_cycle_target_ul", "blood_meal_size_ul",
+                "meal_size_min_ul", "blood_meal_refractory_days",
+                "eggs_per_ul", "plume_memory_s")
+            for key in positive:
+                if getattr(row, key) <= 0:
+                    errors.append(f"{pre}.{key} must be > 0, got {getattr(row, key)!r}")
+            fractions = (
+                "casting_probability", "probing_success_rate",
+                "gonotrophic_arrest_prob_dry", "male_ratio",
+                "male_daily_survival", "arrested_daily_survival")
+            for key in fractions:
+                if not (0.0 <= getattr(row, key) <= 1.0):
+                    errors.append(
+                        f"{pre}.{key} must be in [0, 1], got {getattr(row, key)!r}")
+            if not (0.0 <= row.exploration_step_correlation < 1.0):
+                errors.append(
+                    f"{pre}.exploration_step_correlation must be in [0, 1), got "
+                    f"{row.exploration_step_correlation!r}")
+            if not (0.0 <= row.casting_angle_deg <= 180.0):
+                errors.append(
+                    f"{pre}.casting_angle_deg must be in [0, 180], got "
+                    f"{row.casting_angle_deg!r}")
+            if not (0.0 <= row.anemotaxis_deviation_deg <= 90.0):
+                errors.append(
+                    f"{pre}.anemotaxis_deviation_deg must be in [0, 90], got "
+                    f"{row.anemotaxis_deviation_deg!r}")
+            if row.anemotaxis_rule != "upwind":
+                errors.append(
+                    f"{pre}.anemotaxis_rule must be 'upwind', got "
+                    f"{row.anemotaxis_rule!r}")
+            if row.wind_reference != "u100/v100":
+                errors.append(
+                    f"{pre}.wind_reference must be 'u100/v100' (the only wind "
+                    f"level available), got {row.wind_reference!r}")
+            # Cascade radii nest: terminal < visual < olfactory < CO2 activation.
+            if not (row.terminal_radius_m < row.visual_radius_m
+                    < row.olfactory_radius_m < row.co2_activation_radius_m):
+                errors.append(
+                    f"{pre}: radii must satisfy terminal < visual < olfactory "
+                    "< co2_activation")
+            if row.exploration_range_m < row.co2_activation_radius_m:
+                errors.append(
+                    f"{pre}.exploration_range_m must be >= "
+                    "co2_activation_radius_m (the activation stage must be "
+                    "reachable)")
+            derived_h = row.daily_move_capacity_m / row.flight_speed_ms / 3600.0
+            if not math.isclose(row.directed_flight_budget_h, derived_h,
+                                rel_tol=0.0, abs_tol=1e-3):
+                errors.append(
+                    f"{pre}.directed_flight_budget_h is derived: "
+                    "daily_move_capacity_m / flight_speed_ms / 3600 = "
+                    f"{derived_h!r}, got {row.directed_flight_budget_h!r}")
+            if row.first_cycle_target_ul <= row.blood_meal_target_ul:
+                errors.append(
+                    f"{pre}.first_cycle_target_ul must be > blood_meal_target_ul")
+            if row.meal_size_min_ul > row.blood_meal_size_ul:
+                errors.append(
+                    f"{pre}.meal_size_min_ul must be <= blood_meal_size_ul")
+            if not row.aestivation_supported and row.gonotrophic_arrest_prob_dry != 0.0:
+                errors.append(
+                    f"{pre}: gonotrophic_arrest_prob_dry must be 0 when "
+                    "aestivation_supported is false")
+
+        integ = self.integration
+        if any(d <= 0 for d in integ.phase_duration_hours):
+            errors.append("integration.phase_duration_hours must all be > 0")
+        if not math.isclose(sum(integ.phase_duration_hours), 24.0,
+                            rel_tol=0.0, abs_tol=_TOL):
+            errors.append(
+                "integration.phase_duration_hours must add up to 24 h, got "
+                f"{sum(integ.phase_duration_hours)!r}")
+        for key in ("directed_flight_budget_h", "dt_terminal_s",
+                    "dt_olfactory_s", "plume_memory_s", "landing_speed_mm_s",
+                    "landing_speed_hold_s"):
+            if getattr(integ, key) <= 0:
+                errors.append(
+                    f"integration.{key} must be > 0, got {getattr(integ, key)!r}")
+        if integ.dt_terminal_s >= integ.dt_olfactory_s:
+            errors.append(
+                "integration.dt_terminal_s must be < dt_olfactory_s (the "
+                "terminal band is the finer one)")
+
+        mating = self.mating
+        for key in ("p_mate_male_fraction", "p_mate_pairs_per_individual",
+                    "female_attendance_rate", "local_swarm_male_offer_factor"):
+            if not (0.0 <= getattr(mating, key) <= 1.0):
+                errors.append(
+                    f"mating.{key} must be in [0, 1], got {getattr(mating, key)!r}")
+        for key in ("male_swarm_reference_size", "male_move_capacity_m",
+                    "swarm_duration_min", "swarm_height_m"):
+            if getattr(mating, key) <= 0:
+                errors.append(
+                    f"mating.{key} must be > 0, got {getattr(mating, key)!r}")
+        for key in ("p_mate_size_exponent", "swarm_start_min_after_sunset",
+                    "swarm_markers_per_km2"):
+            if getattr(mating, key) < 0:
+                errors.append(
+                    f"mating.{key} must be >= 0, got {getattr(mating, key)!r}")
+        if mating.male_females_per_night_max < 1:
+            errors.append("mating.male_females_per_night_max must be >= 1")
+
     @pydantic.model_validator(mode="after")
     def _check_invariants(self) -> "ModelConfig":
         """Check every cross-section invariant, reporting all violations together."""
@@ -391,7 +556,8 @@ class ModelConfig(_StrictModel):
 
         for name, value in (
                 ("contracts.env_nc", self.contracts.env_nc),
-                ("contracts.cogs_state", self.contracts.cogs_state)):
+                ("contracts.cogs_state", self.contracts.cogs_state),
+                ("contracts.habitat", self.contracts.habitat)):
             if not _CONTRACT_RE.match(value):
                 errors.append(
                     f"{name}: expected 'mayor.menor' string, got {value!r}")
@@ -476,6 +642,8 @@ class ModelConfig(_StrictModel):
         if self.species.k_ref <= 0:
             errors.append(
                 f"species.k_ref must be > 0, got {self.species.k_ref!r}")
+
+        self._check_movement_blood_male_keys(errors)
 
         expected_mpd = math.pi * self.geodesy.earth_radius_m / 180.0
         if not math.isclose(
@@ -607,14 +775,6 @@ class ModelConfig(_StrictModel):
                 f"<= n, got {gono.egg_batch_min!r}/{gono.egg_batch_mean!r}/"
                 f"{gono.egg_batch_max!r}/{gono.egg_batch_n!r}")
 
-        if self.host_seeking.detect_range_m <= 0:
-            errors.append(
-                "host_seeking.detect_range_m must be > 0, got "
-                f"{self.host_seeking.detect_range_m!r}")
-        if self.host_seeking.approach_step_m <= 0:
-            errors.append(
-                "host_seeking.approach_step_m must be > 0, got "
-                f"{self.host_seeking.approach_step_m!r}")
         if self.oviposition.detect_range_m <= 0:
             errors.append(
                 "oviposition.detect_range_m must be > 0, got "

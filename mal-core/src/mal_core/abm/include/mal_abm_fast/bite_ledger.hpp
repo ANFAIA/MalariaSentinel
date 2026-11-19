@@ -25,6 +25,26 @@ struct BiteEventAggregate {
     int64_t mosquito_deaths = 0;  // from ITN/IRS (future) or feeding failure
 };
 
+/// One blood meal as an individual event (plan §11, Paso 5/2b): WHO bit WHOM,
+/// WHEN and WHERE. `human_id` is the persistent identifier of the person bitten
+/// (-1 for an animal host); `new_infection` is set by the transmission step when
+/// the bite exposed that person.
+struct BiteEvent {
+    int32_t   day            = 0;
+    uint8_t   phase          = 0;       // TimePhase of the contact
+    int64_t   mosquito_uid   = -1;
+    int64_t   human_id       = -1;      // -1 = animal host
+    int64_t   person_index   = -1;      // index into HumanSoA (-1 = none)
+    HostType  host           = HostType::HUMAN;
+    int32_t   row            = 0;       // cell of the host
+    int32_t   col            = 0;
+    float     x              = 0.0f;    // host position (m from the SW corner)
+    float     y              = 0.0f;
+    bool      infectious_vector = false;  // the mosquito was I_V
+    bool      vector_infected   = false;  // the bite infected a susceptible mosquito (E_V)
+    bool      new_infection     = false;  // the bite exposed the person
+};
+
 /// Aggregate feeding events per cell per host type per day.
 ///
 /// The submodel calls record_attempt / record_success / record_death
@@ -59,10 +79,17 @@ public:
         agg.mosquito_deaths++;
     }
 
-    /// Reset all aggregates for the next day.
+    /// Reset all aggregates (and events) for the next day.
     void reset_day() {
         today_.clear();
+        events_.clear();
     }
+
+    /// Individual blood-meal events of today (one per successful meal on a
+    /// person; the aggregate above stays the contract of the COG and ITN/IRS).
+    void record_event(const BiteEvent& e) { events_.push_back(e); }
+    const std::vector<BiteEvent>& events_today() const { return events_; }
+    std::vector<BiteEvent>& events_today_mutable() { return events_; }
 
     /// Read-only access to today's aggregates.
     const std::vector<BiteEventAggregate>& today() const { return today_; }
@@ -96,6 +123,7 @@ public:
 
 private:
     std::vector<BiteEventAggregate> today_;
+    std::vector<BiteEvent> events_;
 
     /// Find existing aggregate for (row, col, host) or create a new one.
     BiteEventAggregate& find_or_create(int32_t row, int32_t col, HostType host) {

@@ -18,6 +18,7 @@
 #include <vector>
 
 #include "aoi.hpp"
+#include "people_fixture.hpp"
 #include "wire.hpp"
 #include "aquatic_cohort_bank.hpp"
 #include "thermal_responses.hpp"
@@ -234,6 +235,7 @@ TEST(MosquitoSubmodelG3, UniformCountsConstructorSeedsAdultsAndEggs) {
 TEST(MosquitoSubmodelG3, ThirtyDayRolloutWithLifecycle) {
     mal_abm_fast::MosquitoSubmodel sub(100, 30, 270, 42);
     const auto aoi = make_test_aoi();
+    const auto people = mal_abm_fast::testing::attach_people_near_adults(sub, aoi);
     const auto ps  = make_patch_states(25.0f);
 
     // Run 30 days — eggs should develop and some should emerge as adults

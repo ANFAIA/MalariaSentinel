@@ -17,7 +17,6 @@ from .gates import (
     DataValidGate,
     DeterminismGate,
     HostInputGate,
-    MobilityGate,
     PerformanceGate,
     UrbanProductivityGate,
 )
@@ -41,7 +40,6 @@ __all__ = [
     "DataValidGate",
     "DeterminismGate",
     "HostInputGate",
-    "MobilityGate",
     "PerformanceGate",
     "UrbanProductivityGate",
 ]

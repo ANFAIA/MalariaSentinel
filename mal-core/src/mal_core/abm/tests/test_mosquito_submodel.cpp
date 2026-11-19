@@ -82,33 +82,21 @@ TEST(MalAbmFastMosquitoSubmodel, ThirtyDayRollout) {
     EXPECT_FALSE(adults.empty());
 }
 
-TEST(MalAbmFastMosquitoSubmodel, AdultDispersalUpdatesRowCol) {
+TEST(MalAbmFastMosquitoSubmodel, AdultCellIsDerivedFromTheMetricPosition) {
     mal_abm_fast::MosquitoSubmodel sub(100, 30, 270, 42);
     const auto aoi = make_test_aoi();
     const auto ps  = make_test_patch_states();
     sub.advance_day(aoi, ps);
 
-    const int32_t w = aoi.cells_per_side();
-    const int32_t h = mal_abm_fast::cells_per_side_h(aoi);
-    const double cellW = (aoi.east - aoi.west) / static_cast<double>(w);
-    const double cellH = (aoi.north - aoi.south) / static_cast<double>(h);
     const auto& soa = sub.soa();
-
     for (int64_t i = 0; i < soa.n_alive; ++i) {
         const size_t si = static_cast<size_t>(i);
         if (soa.stage[si] != 1) continue;
-        int32_t expected_col = static_cast<int32_t>(
-            (static_cast<double>(soa.lon[si]) - aoi.west) / cellW);
-        int32_t expected_row = static_cast<int32_t>(
-            (aoi.north - static_cast<double>(soa.lat[si])) / cellH);
-        if (expected_col < 0) expected_col = 0;
-        if (expected_col >= w) expected_col = w - 1;
-        if (expected_row < 0) expected_row = 0;
-        if (expected_row >= h) expected_row = h - 1;
-        EXPECT_EQ(soa.row[si], expected_row)
-            << "agent " << soa.uid[si] << " row mismatch";
-        EXPECT_EQ(soa.col[si], expected_col)
-            << "agent " << soa.uid[si] << " col mismatch";
+        ASSERT_FALSE(std::isnan(soa.pos_x[si]));
+        int32_t r, c;
+        mal_abm_fast::xy_to_cell(aoi, soa.pos_x[si], soa.pos_y[si], r, c);
+        EXPECT_EQ(soa.row[si], r) << "agent " << soa.uid[si] << " row mismatch";
+        EXPECT_EQ(soa.col[si], c) << "agent " << soa.uid[si] << " col mismatch";
     }
 }
 

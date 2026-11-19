@@ -12,8 +12,8 @@ pipeline logic — stable pipeline code belongs in `mal-core`.
 | `src/mal_commonlib/aois.yaml` | **AOI registry** — single source of truth for slug → AOI mappings (add a new AOI here, no code changes) |
 | `src/mal_commonlib/model_constants.py` | The shared py⇄C++ model constants, read from `mal-core/config/model_constants.yaml` |
 | `src/mal_commonlib/config.py` | Repo paths, the deprecated AOI/grid constants, the env layer file names, the legacy v1 rollout knobs (`SimParams`) and the training constants |
-| `src/mal_commonlib/data/` | Data utilities: host loaders (`loaders/`), `host_utils.py`, mobility helpers, generic utils |
-| `tests/` | pytest suites (chirps, coastline, host loaders, mobility) |
+| `src/mal_commonlib/data/` | Data utilities: host loaders (`loaders/`), `host_utils.py`, generic utils |
+| `tests/` | pytest suites (chirps, coastline, host loaders) |
 
 ## Adding a new AOI
 

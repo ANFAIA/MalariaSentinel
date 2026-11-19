@@ -15,7 +15,6 @@ or `mal-commonlib` and the scripts here are updated to call it.
 |---|---|
 | `build_environment.py` | Build environmental tensors for an AOI (thin wrapper over `mal_core.ingest.env`) |
 | `build_hosts.py` | Build host-density NetCDF (thin wrapper over `mal_core.ingest.hosts`) |
-| `build_mobility.py` | Build mobility OD matrices (thin wrapper over `mal_core.ingest.mobility`) |
 | `train_unet.py` | Train the U-Net surrogate on ABM rollouts (M3-M4) |
 | `train_unet_subsample.py` | Same, on a spatial subsample |
 | `validate_unet.py` | Validate the U-Net on a held-out region |

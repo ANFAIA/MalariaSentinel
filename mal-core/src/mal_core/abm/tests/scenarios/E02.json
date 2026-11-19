@@ -2,7 +2,7 @@
   "id": "E02",
   "mode": "report",
   "seed": 20261117,
-  "days": 3,
+  "days": 10,
   "agents": [
     {
       "x": 3500,
