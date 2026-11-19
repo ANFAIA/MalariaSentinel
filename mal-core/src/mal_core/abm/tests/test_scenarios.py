@@ -137,6 +137,31 @@ def test_seed_sensitivity_of_mortality(scenario_id):
 # Baseline pins: the current chain (Paso 1). Known failures, not expectations.
 # ----------------------------------------------------------------------------
 
+def test_e00_seeded_individual_and_single_manifest_key(tmp_path):
+    """E00 closes Paso 0: ONE mosquito, ONE day. The spec seeds a female in
+    HOST_SEEKING at (2500, 2500) m; after the day it is alive and in that cell
+    (the outputs expose cells, not metres, sex or state: those are asserted on
+    the spec here and on the seeded engine state by ctest
+    SeedScenarioPlacesAdultsAtSpecPositions). The manifest declares exactly
+    one scenario key, scenario:E00."""
+    (run,) = runs_of("E00")
+    (agent,) = run.spec["agents"]
+    assert (agent["x"], agent["y"]) == (2500, 2500)
+    assert agent["sex"] == "FEMALE" and agent["state"] == "HOST_SEEKING"
+    assert int(run.spec["days"]) == 1
+    assert run.observed["alive_by_day"] == [1]
+    (snap,) = run.observed["adult_cells_by_snapshot"]
+    assert [(r, c) for r, c, _ in snap["occupied_cells"]] == [cell_of(2500, 2500)]
+
+    out = tmp_path / h.AOI_SLUG
+    script = h.REPO_ROOT / "mal-execution" / "scripts" / "make_synthetic_aoi.py"
+    subprocess.run([sys.executable, str(script), "--out", str(out), "--scenario", "E00"],
+                   check=True, cwd=h.REPO_ROOT, capture_output=True)
+    import json
+    manifest = json.loads((out / "manifest.json").read_text())
+    assert [k for k in manifest["datasets"] if k.startswith("scenario:")] == ["scenario:E00"]
+
+
 @pytest.mark.parametrize("scenario_id", ["E00", "E01", "E02"])
 def test_baseline_agent_stays_in_seeded_cell(scenario_id):
     """BASELINE PIN. Today the lone adult never leaves its seeded cell."""
@@ -160,6 +185,15 @@ def test_baseline_bite_is_drawn_from_cell_aggregate(scenario_id):
     assert per_day[0] == 1 and sum(per_day[1:]) == 0
 
 
+def test_baseline_e01_female_survives_all_days():
+    """BASELINE PIN (known gap vs the plan target). With the current chain the
+    seeded female is alive on every day of E01 (no starvation, no deaths):
+    today she feeds on the cell aggregate. The target below replaces this pin."""
+    (run,) = runs_of("E01")
+    assert run.observed["alive_by_day"] == [1] * int(run.spec["days"])
+    assert sum(run.observed["deaths_by_day"]) == 0
+
+
 # ----------------------------------------------------------------------------
 # Target gates: pre-registered by the plan, failing today (strict xfail).
 # ----------------------------------------------------------------------------
@@ -169,6 +203,14 @@ def test_baseline_bite_is_drawn_from_cell_aggregate(scenario_id):
 def test_target_e01_no_bite_at_200_m():
     (run,) = runs_of("E01")
     assert run.observed["human_bites_total"] == 0
+
+
+@pytest.mark.xfail(strict=True, reason="Steps 2a/5: with no contact at 200 m and no breeding "
+                   "site the female must enter starvation by day 3 (plan 15.0, E01); "
+                   "proxy: not alive at the end of the last day")
+def test_target_e01_female_starves_by_day_3():
+    (run,) = runs_of("E01")
+    assert run.observed["alive_by_day"][-1] == 0
 
 
 @pytest.mark.xfail(strict=True, reason="Step 5 (cascade): net displacement is bounded by "

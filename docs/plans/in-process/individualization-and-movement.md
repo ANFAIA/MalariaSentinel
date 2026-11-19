@@ -2742,7 +2742,7 @@ criterio es una banda que se revisa, no un fallo de CI.
 | Paso | Escenario | Modo | Cálculo a mano pre-registrado (criterio del paso) |
 |---|---|---|---|
 | 0 | E00 | `gate` | 1 mosquito sembrado, 1 día: posición, sexo y estado; y el manifiesto declara **una sola** clave `scenario:E00` |
-| 1 | E01 + E02 | `gate` + `report` | E01: 1 hembra, 1 persona a 200 m, 0 criaderos ⇒ **0 comidas** (la distancia no permite el contacto) y entrada en inanición el día 3 — es el **baseline** de la cadena actual, no una expectativa; E02: banda de distancia **derivada del modelo** (`report`) |
+| 1 | E01 + E02 | `gate` + `report` | E01: 1 hembra, 1 persona a 200 m, 0 criaderos. **Objetivo** (xfail estricto hasta el Paso 5): **0 comidas** (la distancia no permite el contacto) y entrada en inanición el día 3. **Baseline medido hoy** (regresión, no expectativa): 1 picadura el día 1 —sale del agregado de la celda (≈127 000 personas), no de la persona sembrada— y la hembra sigue viva los 3 días. Los pasos 2a y 5 lo acercan al objetivo; E02: banda de distancia **derivada del modelo** (`report`) |
 | 2 | E08 + E09 | `gate` | E08: `human_id = cell_id * SLOTS_PER_CELL + slot` y nº de personas por celda, verificables **por construcción** (unicidad y estabilidad), sin "celda ganadora"; E09: una picadura infecciosa infecta **como máximo** a la persona picada |
 | 3 | E03, E04, E05, E06, E11 | `gate` | E03: nº de eventos por noche en el ledger (multipicadura) = N·p·P(contacto); E04: comida parcial ⇒ el ciclo **no** arranca; E05: umbral alcanzado ⇒ lote de huevos ∝ volumen acumulado (`eggs_per_ul` = 223); E06: `first_cycle_target_ul` (0,8 µL) exige dos comidas; E11: la ventana postprandial no se reabre antes de 12 h |
 | 4 | **paridad de configuración** (E01 se cierra en el Paso 5) | `gate` | cada clave nueva devuelve el valor del YAML en las **cinco** superficies (pydantic, `struct` C++, enlace por nombre, volcado, golden). El Paso 4 no escribe expectativas: su criterio es la **paridad de las cinco superficies**, que es un test, no un escenario |
@@ -3281,7 +3281,10 @@ se publica en el documento ABM, apéndice «Scenario harness», generada por
     motor lee un **int** (`habitat_engine.cpp:220`) ⇒ siempre 0. El productor pasa a
     escribir el int; el gpkg sintético también.
 *   **`mal-core/src/mal_core/ingest/daily_nc.py`** y
-    **`mal-core/src/mal_core/habitat/potential.py`** (modifican) — producción del
+    **`mal-core/src/mal_core/habitat/potential.py`** (**sin modificar en el Paso 0**: el
+    potencial del AOI sintético lo calcula `make_synthetic_aoi.py` con
+    `habitat.potential` tal cual; la producción en el ingest real queda **pendiente** hasta
+    el paso que la consuma) — producción del
     **potencial y la salinidad por celda** para la rejilla completa (§9): el motor
     necesita el potencial de todas las celdas, no sólo de las candidatas, porque
     `k_habitat == 0 ⇒ p = 0` y el potencial entra en el registro por celda.
@@ -3340,8 +3343,8 @@ se publica en el documento ABM, apéndice «Scenario harness», generada por
     **en metros**; `make_golden_fixtures.py` (AOI **8×8**) existe para los **goldens de
     `ctest`** y se queda como está (§13.1).
 *   **`mal-core/tests/test_scenario_manifest.py`** (nuevo) — verifica que el manifiesto
-    sintético valida, que el escenario se resuelve y que dos corridas con la misma
-    semilla producen artefactos idénticos byte a byte.
+    sintético valida y que el escenario se resuelve por su id. El **determinismo byte a
+    byte** (E01/E02/E13) lo prueba `abm/tests/test_scenarios.py`, no este fichero.
 
 ### Paso 1 — Línea base
 
