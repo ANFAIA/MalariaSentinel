@@ -365,10 +365,10 @@ implementación o se declaran como tales en el documento final.
 | **Coste del micro-integrador**: el motor no tiene tick sub-segundo y el integrador fino no puede correr en todo el AOI | El micro-integrador corre **sólo dentro de la banda de percepción** (NFR-3, N12); el presupuesto declarado es de **0,16–16 s por mosquito-día** [EP] y el objetivo es **< 10 s** en el AOI sintético 10×10 y **≤ 10 min** para 30 días en Accra. **Criterio de abandono**: si un día supera **60 s**, se acorta la corrida o se reduce `N_dentro` | Paso 5 (NFR-3) |
 | **Coste de la búsqueda nearest-person**: el repo **no tiene** índice espacial (ni KD-tree ni quadtree), y `host_seeking.cpp` recorre una ventana de celdas | La capa humana indexa a las personas **por celda** (misma rejilla de 1 km) y expone `for_each_person_in_radius`; con radio de 100 m < 1 km la consulta toca **como mucho dos celdas** y se acota por distancia en metros. El plan **no** introduce un índice espacial | Paso 5 (estructura en `human_state.hpp`) |
 | **Acoplamiento del arnés al comportamiento del manifiesto de producción**: el arnés depende de rutas de carga que hoy sólo existen para los datos reales | El arnés **pasa siempre por el manifiesto** (restricción del autor, §13): el manifiesto sintético se construye igual que uno real y las trampas del catálogo están enumeradas en el Apéndice B; no hay ruta alternativa de ejecución que mantener en paralelo | Paso 0 (Apéndice B) |
-| **Filas por persona re-identificables** en los artefactos nuevos (ledger JSONL y parquet individual llevan una fila por persona) | El modelo no contiene datos de personas reales: las personas son sintéticas y su `human_id` es un índice determinista, no un identificador de persona. Los artefactos quedan **en el directorio de corrida** y el prune los declara "conservar" (NFR-7), no "publicar" | Paso 2 (NFR-7) |
+| **Filas por persona re-identificables** en los artefactos nuevos (los ledgers y el parquet individual llevan una fila por persona) | El modelo no contiene datos de personas reales: las personas son sintéticas y su `human_id` es un índice determinista, no un identificador de persona. Los artefactos quedan **en el directorio de corrida** y el prune los declara "conservar" (NFR-7), no "publicar" | Paso 2 (NFR-7) |
 | **Regeneración de goldens**: el cambio de contrato (estado 5.0, hábitat 4.0) invalida los goldens byte a byte y los checkpoints del surrogate | La regeneración va **en el Paso 11**, no como efecto colateral; el Nivel 5 excluye los GeoPackages de la comparación byte a byte (el gpkg sella `last_change`) y el surrogate se reentrena (N4) | Paso 11, Nivel 5 |
 | **Bloqueo nocturno permanente por el viento**: con el único nivel disponible (ERA5 `u100`/`v100`, 100 m) el caso nocturno de 5,1 m/s bloquearía el avance toda la noche | Se **acepta como resultado documentado** (no como error) y se declara la limitación del nivel de referencia; los escenarios sintéticos **no** cargan campo de viento —salvo **E18**, que sí lo carga y ejercita el desvío y el bloqueo (§13.6)— ⇒ en el resto la regla queda inactiva y el comportamiento queda documentado | Paso 5 (§4) |
-| **Artefactos por persona sin cota de tamaño**: `_humans.parquet` (una fila por persona y por día) puede alcanzar **decenas de GB** a escala de país (50–100 M de personas, §2) | `_humans.parquet` va **muestreado al 1 % con pesos** (§11) y el Nivel 5 lo compara **por contenido**, no byte a byte; la cota de tamaño del conjunto de artefactos nuevos (**decenas de GB** [EP]) queda declarada en §11 | Paso 2 (NFR-7), Nivel 5 |
+| **Artefactos por persona sin cota de tamaño**: `_humans.parquet` (una fila por persona y por día) puede alcanzar **decenas de GB** a escala de país (50–100 M de personas, §2) | `_humans.parquet` **no escribe a los susceptibles**: sólo las personas en E, I o R, sin muestreo (§11); y todo `--debug` es opcional. La cota de tamaño del conjunto (**decenas de GB** [EP]) queda declarada en §11 | Paso 2 (NFR-7), Nivel 5 |
 | **Rama de viento validada sólo contra el AOI sintético**: el único nivel de viento disponible (ERA5 `u100`/`v100`, a 100 m) no es la altura de vuelo, así que la rama no puede validarse contra Ghana | La rama queda cerrada por el escenario **E18** (`gate`), que ejercita el desvío *upwind* y el bloqueo nocturno con campo de viento; la limitación del nivel de referencia queda **declarada** como **[NR]** (§4) | Paso 5 (E18) |
 | **Radio de exploración menor que el radio de activación CO₂**: con `exploration_range_m` < `co2_activation_radius_m` la activación por CO₂ sería inalcanzable | **Riesgo cerrado**: el valor por defecto de `exploration_range_m` es **100 m**, igual que `co2_activation_radius_m` (100 m), y la banda 100–200 m [EP] mantiene la condición (§4, §5.2) | §4 |
 | **Un lector antiguo acepta el contrato nuevo**: al pasar el COG de estado a una banda, un lector que espere dos bandas leería la segunda como otra cosa | Todo cambio de forma de salida lleva bump de versión **y** regla de rechazo explícita en los lectores (NFR-6); no hay migraciones silenciosas | Paso 11 (NFR-6) |
@@ -1859,10 +1859,10 @@ runs/<run>/
   <run>_dayNNN.tif          COG de estado (1 banda en 5.0)
   <run>_dayNNN.json         sidecar (deprecated_bands, stats por individuo)
   <run>_aquatic.json        sidecar acuático (cell_id, cohortes, madre)
-  <run>_bites.jsonl         ◀ NUEVO: ledger de eventos de picadura
-  <run>_mating.jsonl       ◀ NUEVO: ledger de apareamiento (sitio, cupos, parejas)
-  <run>_agents.parquet      ◀ NUEVO: estado por mosquito y por día
-  <run>_humans.parquet      ◀ NUEVO: estado por persona (muestreado al 1 % con pesos)
+  <run>_bites.parquet       ◀ NUEVO (--debug): ledger de eventos de picadura
+  <run>_mating.parquet      ◀ NUEVO (--debug): ledger de apareamiento (sitio, cupos, parejas)
+  <run>_agents.parquet      ◀ NUEVO (--debug): estado por mosquito y por día
+  <run>_humans.parquet      ◀ NUEVO (--debug): estado por persona en E, I o R y por día
 ```
 
 **Ledger de picaduras** — de agregado a eventos:
@@ -1876,11 +1876,12 @@ BiteEvent
   volume_ul
   probing_ok
   transmission_applied   (β_vh × su_h en el evento; β_hv × prev_h al vector)
+  new_infection          (booleano: la picadura pasó a la persona de S a E)
   cell_id              (derivado, para agregados)
 ```
 
-**Granularidad, consumidores y cota** del ledger de picaduras: una línea JSONL por
-evento de picadura; **consumidores**: el diagnóstico de picaduras (CUJ 1, CUJ 5) y el
+**Granularidad, consumidores y cota** del ledger de picaduras: una fila Parquet por
+evento de picadura (`<run>_bites.parquet`); **consumidores**: el diagnóstico de picaduras (CUJ 1, CUJ 5) y el
 COG de transmisión, que sigue leyendo los agregados de `today()`; **cota de tamaño**:
 escala con el número de picaduras, no con el número de personas.
 
@@ -1895,7 +1896,7 @@ individual (§11).
 **Artefacto individual por mosquito — `_agents.parquet`**: una fila **por mosquito y por
 día** (no por tick: el tick no es una unidad de publicación reproducible y multiplicaría
 el tamaño por el número de sub-pasos). Columnas: `uid`, especie, `sex`, `pos_x`,
-`pos_y`, `cell_id`, estado gonotrófico, `blood_volume_ul`, `ovarian_stage`,
+`pos_y`, `cell_id`, estado gonotrófico, **etapa de la cascada de percepción en la que está** (`cascade_stage`: la que alcanzó entre activación, orientación olfativa, aproximación visual y aterrizaje; sustituye a los anillos del GIF), `blood_volume_ul`, `ovarian_stage`,
 `gonotrophic_cycles`, `inseminated`, `vector_state`, `age_days` y —**para los machos**—
 `swarm_site_id` y `nights_uninseminated`. **Consumidores**: el diagnóstico de la alarma
 de enjambre (§8.6) y la reconstrucción de cadenas (§11, CUJ 5). **Cota de tamaño**: el
@@ -1903,15 +1904,16 @@ fichero escala con el número de mosquitos × días; a escala de país forma par
 cota de **decenas de GB** del conjunto de artefactos nuevos (§11, «Riesgos»).
 
 **Artefacto individual por persona — `_humans.parquet`**: una fila **por persona y por
-día**, **muestreada al 1 % con pesos** (`weight` = 1 / probabilidad de inclusión): la
-población humana es la que domina el tamaño (40 B por persona en memoria, §2).
-Columnas: `human_id`, `cell_id`, `x`, `y`, `state`, `timer`, `susceptible`.
-**Consumidores**: las estadísticas derivadas (`compute_stats()`) y el control de la
-exposición individual. El `human_id` sigue siendo el identificador determinista y
-estable, de modo que el muestreo **no** rompe el contrato de observación (§2).
+día**, **sólo para las personas en E, I o R ese día**, **sin muestreo**. **Los
+susceptibles (S) no se escriben** (decisión del autor): el número de filas escala con la
+prevalencia y no con la población (40 B por persona en memoria, §2). Columnas: `human_id`,
+`cell_id`, `x`, `y`, `state` (E, I o R), `timer`. **Consumidores**: el seguimiento de las
+personas infectadas. El denominador de prevalencia **no** sale de este fichero (las S no
+están): sale de las estadísticas del motor (`compute_stats()`, que no cambia). El
+`human_id` sigue siendo el identificador determinista y estable (§2).
 
 **Ledger de apareamiento** — eventos de la capa macho, en su **propio** fichero
-(`<run>_mating.jsonl`):
+(`<run>_mating.parquet`):
 
 ```
 MatingEvent
@@ -1925,15 +1927,15 @@ MatingEvent
 
 Es el instrumento con el que se lee la **alarma** de §8.6 (hembras adultas sin
 inseminar por más de N noches) y con el que se evalúa una intervención de *swarm
-killing*. **Granularidad**: una línea JSONL por **sitio y noche**. **Consumidores**: la
+killing*. **Granularidad**: una fila Parquet por **sitio y noche**. **Consumidores**: la
 alarma de enjambre (§8.6) y los escenarios E13–E15 y E17. **Cota de tamaño**: escala
 con el número de sitios × noches, no con el número de personas.
 
 **Cota de tamaño del conjunto de artefactos nuevos.** A escala de país
-(50–100 M de personas, §2) el conjunto `_humans.parquet` + `_agents.parquet` +
-`_mating.jsonl` es del orden de **decenas de GB** [EP] (cota declarada, no medición).
-Por eso `_humans.parquet` va **muestreado al 1 % con pesos** y por eso el Nivel 5
-compara ese artefacto **por contenido**, no byte a byte.
+(50–100 M de personas, §2) el conjunto `_agents.parquet` + `_humans.parquet` +
+`_bites.parquet` + `_mating.parquet` es del orden de **decenas de GB** [EP] (cota
+declarada, no medición); por eso son artefactos de `--debug` y no se escriben por
+defecto. `_humans.parquet` la reduce al no escribir a los susceptibles.
 
 ### 12. Configuración: qué cambia en `model_constants.yaml`
 
@@ -2530,7 +2532,7 @@ el **Apéndice B**.
                                     ▼
         ┌───────────────────────────┼───────────────────────────┐
         ▼                           ▼                           ▼
-  CellState[] → COG estado    HumanSoA → stats        BiteEvent → JSONL
+  CellState[] → COG estado    HumanSoA → stats        BiteEvent → Parquet
   (bandas)      + sidecar      (agregados derivados)   (eventos)
 ```
 
@@ -2586,20 +2588,20 @@ Prioridad declarada: **consistencia con la realidad sobre estabilidad de identif
 | 2a | Personas en **`HumanSoA`** dentro de `human_state.hpp` (opción A). | Sin módulo nuevo. |
 | 2a | **Posición:** uniforme dentro de la celda, asignada por semilla. | Sin edificios; `home_x/home_y` se sortean. |
 | 2a | **Número de personas:** el de la rejilla real (i), repartido por celda. | **Se descarta** `SLOTS_PER_CELL` con slots vacíos. La fórmula `human_id = cell_id * SLOTS_PER_CELL + slot` (Paso 2, E08 y §15 de la tabla) queda **sin efecto** y se reemplaza por `human_id` único y determinista por semilla. |
-| 2b | Ledger de eventos (`BiteEvent`) **sólo en modo escenario** (`--scenario`). | Las corridas de producción no cambian de tamaño. |
+| 2b | Ledger de eventos (`BiteEvent`) y Parquet individuales **sólo con `--debug`**, flag **independiente** de `--scenario` y libre (cualquier AOI, con o sin escenario; el usuario asume el tamaño). | Sin `--debug` las corridas no cambian de tamaño ni de artefactos. |
 | 2c | Individuos de ganado **sin infección** (solo dilución), opción A. | No hay estado de infección en animales. |
 | 2c | **Fuente:** ganado GLW por especie (`ingest/hosts.py:93`, `load_glw_livestock`), agregado sin distinguir especie en el ABM. | Especies: secundario; se trata como «animal» genérico. |
 | 2c | **Wildlife no entra como individuos.** Es un índice de idoneidad en [0, 1] (`mal_commonlib` `wildlife.py`), no un recuento. | Convertirlo en individuos exige un factor de densidad sin dato; queda **fuera de 2c** hasta que haya uno. |
-| Vis. | Visualización **dentro del motor C++**, un fotograma **por día** (sin fases), trazo = polilínea de las posiciones diarias, mosquito como círculo (§15.1). | §15.1 y §15.1.2 reescritos; V1 y el `xfail` por fase se sustituyen. |
+| Vis. | **Dos patas de depuración**: datos en Parquet (`--debug`, que no influye en el GIF) y GIF C++ de siempre mejorado, sin flag, separadas de los **escenarios** (método de prueba aparte, no es visualización) (§15.1). | §15.1 y §15.1.2 reescritos; V0, V4, V6 y el `xfail` por fase salen del plan. |
 
 | Orden | Paso | Entrega | Precondición |
 |---|---|---|---|
-| 1 | 0 | Arnés de escenarios (§13) **y** visualización de corridas (§15.1) | — |
+| 1 | 0 | Arnés de escenarios (§13). La visualización **no** forma parte de este paso | — |
 | 2 | 1 | Línea base E01/E02 con la cadena actual | 1 |
 | 3 | 2a *(nuevo)* | Humanos individuales con posición uniforme por semilla en la celda, número real por celda (§15.0) | 2 |
 | 4 | 4 | Esquema de configuración completo en las cinco superficies (§12.1) | 3 |
 | 5 | 5 | Cascada de percepción y movimiento de la hembra, micro-integrador de dos bandas | 4 |
-| 6 | 2b *(nuevo)* | Ledger de eventos individual, solo en modo escenario (§15.0) | 5 |
+| 6 | 2b *(nuevo)* | Ledger de eventos individual y Parquet de depuración, solo con `--debug` (§15.0) | 5 |
 | 7 | 3 | Sangre: multipicadura, umbral gonotrófico, pre-gravídica, ventana postprandial | 6 |
 | 8 | 6 | Estado fisiológico y estación seca (`ovarian_stage`, `ARRESTED`) | 7 |
 | 9 | 7 | Estado acuático por celda; emergencia en la posición de la madre | 8 |
@@ -2629,27 +2631,38 @@ Prioridad declarada: **consistencia con la realidad sobre estabilidad de identif
     hay forma de medir si la presencia de hospederos animales desplaza picaduras
     humanas. Ver §15.2.
 
-#### 15.1 — Visualización de corridas (decidida)
+#### 15.1 — Depuración y visualización de corridas (decidida)
 
-**Decisión:** visualización en C++, dentro del motor. Python no entra en el camino de la
-corrida.
+**Separación.** Hay dos mecanismos distintos y no se mezclan:
 
-*   **GIF:** se mantiene el GIF nativo (`viz.cpp`, `viz_tx.cpp`, `gif.h` ya vendorizado)
-    y se le añade la vista de trayectorias y picaduras de la corrida de escenario.
-*   **PNG estáticos** (mapa de un día, serie de 30 días): `stb_image_write.h` (un fichero,
-    dominio público) en `include/mal_abm_fast/third_party/`, junto a `gif.h`. Si no se
-    necesitan PNG, la serie sale en CSV.
-*   **Trayectorias por hembra:** las dibuja el propio motor con las posiciones que ya
-    tiene en memoria; el visualizador es el mismo C++ y lee las mismas variables. **No
-    lee `_agents.parquet`**, de modo que la visualización **no añade** la dependencia de
-    Apache Arrow (el Parquet sigue siendo un artefacto de análisis, §11).
-*   **Granularidad:** **un fotograma por día simulado**, sin fases. El **trazo** de cada
-    mosquito es la polilínea de sus posiciones diarias acumuladas; el mosquito se dibuja
-    como círculo (hembra relleno, macho hueco). Las posiciones **por fase** del día no se
-    visualizan.
-*   **Consecuencia aceptada:** un escenario de 1 día (E00, E01) da un GIF de **1 fotograma**
-    con la siembra y el resultado en la misma imagen. Lo que lo hace legible es V2/V3
-    (marcadores en metros, anillos de la cascada y regla), no el número de fotogramas.
+*   **Escenarios** (`--scenario`, §13): método de **prueba** con casos base que comprueba que
+    el sistema funciona. **No es visualización.** Del lado visual sólo cuenta lo ya hecho:
+    generar el AOI sintético (`make_synthetic_aoi.py`).
+*   **Depuración**, con **dos patas** que no se activan igual:
+    1.  **Datos** (`--debug`): flag **independiente** de `--scenario`, libre (cualquier
+        corrida y AOI; el usuario asume el tamaño). **`--debug` no influye en el GIF:
+        sólo genera los ficheros de depuración aparte.** Sin `--debug` la corrida no
+        cambia de artefactos ni de tamaño. Parquet con el detalle que el GIF no muestra: movimiento, picaduras
+        diarias, infecciones diarias y lo que falte. Son `<stem>_agents.parquet`,
+        `<stem>_humans.parquet` (sólo personas en E, I o R, §11) y los ledgers `_bites` y `_mating` de §11, todos Parquet.
+        **Decidido:** se escriben con **Apache Arrow C++** (`find_package(Arrow)` y
+        `find_package(Parquet)`); descartados el driver Parquet de GDAL (depende de cómo se
+        compiló GDAL en cada máquina) y un escritor propio. **Dependencia nueva** en
+        `CMakeLists.txt`, en el mismo commit que el escritor (Paso 2b), y en la instalación
+        del proyecto y del CI.
+    2.  **Visual** (sin flag): el **GIF nativo** de siempre (`viz.cpp`, `viz_tx.cpp`,
+        `gif.h`), dibujado dentro del motor con las variables que ya tiene en memoria
+        (**no lee los Parquet**; Python no entra en el render). Se mejora para poder
+        depurar a ojo, sobre todo los **humanos**: en el GIF de transmisión cada persona es
+        un punto de **1 píxel** en su posición en metros, **todas, sin tope ni muestra**
+        (si coinciden, se solapan), coloreado por su estado **SEIR**.
+
+*   **Sin PNG ni CSV nuevos (decidido):** las salidas son el GIF (visual) y los Parquet de
+    `--debug` (datos). No se vendoriza `stb_image_write.h`. La serie diaria se lee del
+    Parquet; sin `--debug`, solo existe el panel de series dentro del GIF.
+*   **Granularidad:** un fotograma **por día simulado**, sin fases; el trazo de cada
+    mosquito es la polilínea de sus posiciones diarias; el mosquito es un círculo (hembra
+    relleno, macho hueco). Las posiciones por fase del día no se visualizan.
 
 #### 15.1.1 — Qué cambia en el visualizador, paso a paso
 
@@ -2684,36 +2697,30 @@ el disco de hembra y de macho).
 
 #### 15.1.2 — Estado del visualizador y trabajo pendiente (medido el 2026-11-18)
 
-**Estado hoy (medido, no supuesto).** Una corrida de escenario con `--enable-transmission`
-escribe `<stem>_transmission.gif` (`viz_tx.cpp`) con **un fotograma por día simulado**:
-E00 (1 día) produce un GIF de **1 diapositiva**, E01/E02 (3 días) uno de **3**. No hay
-ninguna vista de escenario: las celdas siguen coloreadas por densidad (rampas
-`kHumanCellLow/High`, `kAnimalCellLow/High`), todos los agentes llevan el mismo símbolo y
-las picaduras salen como cuadrado por celda. Por eso un GIF de escenario **no sirve hoy
-para confirmar ni refutar** ninguna expectativa: no se ve a la persona sembrada, ni la
-distancia, ni la trayectoria. El test `test_baseline_gif_has_one_frame_per_day` fija este
-estado, y **sigue siendo correcto**: la unidad del GIF es el día (decisión del autor,
-§15.1). `test_target_gif_has_one_frame_per_phase` (`xfail` estricto, objetivo
-≥ `days × 4`) **queda sin objeto** y se **elimina** en el commit de V5/V6; el objetivo
-que lo sustituye es V1 (trazo) y V6 (humo).
+**Estado hoy (medido).** El GIF de transmisión (`viz_tx.cpp`) sale con un fotograma por día
+simulado, con las celdas coloreadas por densidad (`kHumanCellLow/High`,
+`kAnimalCellLow/High`), el mismo símbolo para todos los agentes y las picaduras como
+cuadrado por celda. **No existe** `--debug` ni ningún Parquet de depuración. Los GIF de los
+escenarios son los de este visualizador y **no son evidencia** de comportamiento.
 
-**Cambios pendientes del visualizador** (además de la tabla de §15.1.1, que sigue
-vigente; cada uno va en el commit del paso que lo hace posible, no antes):
+**Eliminado del plan** (pertenecía a la mezcla escenario/visualización): V0 (flag `--gif`
+del arnés), V4 (rótulo de escenario), V6 (humo de GIF en CI sobre escenarios) y el `xfail`
+`test_target_gif_has_one_frame_per_phase`, **ya retirado** de `test_scenarios.py`. `test_baseline_gif_has_one_frame_per_day` se queda: el GIF sigue
+siendo diario.
 
-| Id | Cambio | Paso que lo habilita | Fichero |
+**Cambios pendientes** (cada uno va en el commit del paso que lo hace posible):
+
+| Id | Cambio | Paso | Fichero |
 |---|---|---|---|
-| V0 | El arnés pide el GIF de forma explícita (`--gif`) sólo en modo escenario y lo archiva junto a `<id>.observed.json`; hoy sale como efecto lateral de `enable_transmission`. | 0 (hecho en el arnés; falta el flag explícito) | `harness.py` |
-| V1 | **Trazo del mosquito**: polilínea de sus posiciones diarias acumuladas, dibujada por el motor desde su estado en memoria; el mosquito sigue siendo un círculo (hembra relleno, macho hueco). **Sin fotogramas por fase**: un fotograma por día. Mínimo comprobable: `n_frames == days` y la polilínea del fotograma `d` tiene `d+1` vértices. | 5 (antes la hembra no sale de su celda y el trazo sería un punto) | `viz_tx.cpp`, `engine.cpp` |
-| V2 | **Marcadores de escenario**: persona como punto en su posición en metros; ganado; cohortes acuáticas / criaderos; sitios de enjambre. Hoy el visualizador sólo conoce celdas. | 2a (personas), 2c (ganado), 7 (criaderos), 8 (enjambres) | `viz_tx.cpp` |
-| V3 | **Anillos de la cascada** alrededor de la hembra (activación, olfativa, visual: radios de §4) y regla de escala en metros: es lo que permite ver *a ojo* que a 200 m no hay contacto (E01) y a 2 000 m tampoco (E02). | 5 | `viz_tx.cpp` |
-| V4 | **Rótulo de escenario**: id, día, modo (`gate`/`report`) y el valor observado frente al esperado en el pie del fotograma (la banda del `catalog.yaml`). | 5 (primera expectativa en forma cerrada) | `viz_tx.cpp`, `harness.py` |
-| V5 | Quitar las rampas verde/rojo de celdas (decisión del autor, §15.1) y distinguir sexo (disco relleno/hueco) también en `viz_tx.cpp:697-701`. | 0/2a, primer commit de visualización | `viz_tx.cpp` |
-| V6 | Prueba de humo del GIF en CI: abrirlo y comprobar `n_frames == days` y que no es uniforme (no todo gris). Sustituye al `xfail` eliminado. | con V1 | `test_scenarios.py` |
+| D1 | Flag `--debug` en `cli.py`, `wrapper.py` y `main.cpp`, independiente de `--scenario`. | 2b | `cli.py`, `wrapper.py`, `main.cpp` |
+| D2 | Escritor Parquet de depuración con Apache Arrow C++: `_agents.parquet`, `_humans.parquet` (sólo E/I/R), `_bites.parquet` (con `new_infection`) y `_mating.parquet`. | 2b | `engine.cpp`, `CMakeLists.txt` |
+| V1 | Trazo del mosquito: polilínea de posiciones diarias, desde el estado en memoria (círculo hembra relleno / macho hueco). | 5 | `viz_tx.cpp` |
+| V2 | Marcadores en metros: persona (punto), ganado, criaderos, sitios de enjambre. | 2a, 2c, 7, 8 | `viz_tx.cpp` |
+| V3 | **Regla de escala en metros, siempre** (todo GIF, cualquier AOI), de la **longitud de una celda** (`resolution_m`, ≈ 1 km por lo general), como referencia de distancia. **Sin anillos de la cascada** (descartados por el autor: a escala de kilómetro son ruido). | 2a (primer commit de visualización) | `viz_tx.cpp` |
+| V5 | Quitar las rampas verde/rojo de celdas (decisión del autor) y distinguir sexo (relleno/hueco) también en `viz_tx.cpp:697-701`. | 2a (primer commit de visualización) | `viz_tx.cpp` |
+| H1 | En el **GIF de transmisión** (`viz_tx.cpp`), **siempre** (no depende de `--debug`), cada persona es un punto de 1 píxel coloreado por su **estado SEIR**, con la paleta del panel de series (`kSEIR_S/E/I/R`, líneas 68–71); todas, sin tope. | 2a | `viz_tx.cpp` |
 
-**Qué NO está hecho y no debe darse por hecho.** Ninguna de V0–V6 está implementada. Los
-GIF de los 19 escenarios existen (los escribe el arnés en `runs/_check_current/<id>/`)
-pero son los del visualizador actual; documentarlos como evidencia de comportamiento
-sería un error.
+**Ninguna de estas filas está implementada.**
 
 #### 15.2 — Ganado individual sin infección (Paso 2c)
 
@@ -3100,7 +3107,7 @@ el motivo del rechazo, para que el implementador no las reabra sin evidencia nue
 
 *   **NFR-1 — Determinismo bit a bit.** Una corrida con la misma semilla maestra y el
     mismo manifiesto produce el mismo resultado, byte a byte, en todas las salidas
-    (COG, sidecars, JSONL, parquet). Los sub-streams de todos los subsistemas —incluidos
+    (COG, sidecars, parquet). Los sub-streams de todos los subsistemas —incluidos
     el banco acuático y el micro-integrador, que hoy no derivan de la semilla maestra—
     se derivan de ella.
 *   **NFR-2 — El motor sigue siendo C++ de un solo hilo por rollout.** La lógica
@@ -3232,7 +3239,7 @@ se publica en el documento ABM, apéndice «Scenario harness», generada por
 *   **Baseline de la cadena actual (E00/E01/E02):** la hembra no sale de su celda; la
     picadura sale del agregado de celda (ver arriba).
 *   **Objetivos del plan como `xfail` estricto:** E01 sin picadura a 200 m, E02 sin
-    picadura a 2 000 m, y el trazo del GIF (V1). Fallan hoy por la razón
+    picadura a 2 000 m. Fallan hoy por la razón
     correcta; al pasar, el test se pone rojo y obliga a promoverlos.
 *   **Lo que NO comprueban:** ningún comportamiento biológico de E03–E18 (sangre, seca,
     machos, viento…): dependen de pasos posteriores y su expectativa la escribe cada
@@ -3255,7 +3262,7 @@ se publica en el documento ABM, apéndice «Scenario harness», generada por
     unitario. `mode`, `humans[].state` y `livestock[].species` no validan el tipo antes de
     leer (lanzan `type_error` en vez del error con ruta).
 *   Los GIF de escenario son los del visualizador actual (1 fotograma por día) y no
-    prueban nada: ver §15.1.2 (V0–V6).
+    prueban nada: ver §15.1.2.
 
 ### Paso 0 — Arnés de escenarios sobre manifiesto sintético
 
@@ -3904,12 +3911,10 @@ empeora, y la suite Python de `mal-core` está verde.
     `gpkg_contents.last_change` y **no** es reproducible byte a byte
     (`mal-core/src/mal_core/abm/tests/golden/README.md:15-17`,
     `fixtures/make_golden_fixtures.py:17-19`). Se comparan byte a byte el **COG de
-    estado**, los **sidecars JSON**, los **JSONL** (`_bites.jsonl` y `_mating.jsonl`) y
-    `_agents.parquet`; los **gpkg** se comparan **por contenido** (tabla de atributos
-    ordenada, con `row`/`col`/`potential` recalculados). **`_humans.parquet` queda
-    excluido** de la comparación byte a byte porque va **muestreado al 1 % con pesos**
-    (§11): se compara **por contenido** (conjunto de `human_id` muestreados y sus
-    pesos, con la misma semilla). El **input sintético**
+    estado**, los **sidecars JSON**, los **Parquet** de `--debug` (`_bites`, `_mating`, `_agents` y
+    `_humans`, con la misma versión de Arrow); los **gpkg** se comparan **por contenido**
+    (tabla de atributos ordenada, con `row`/`col`/`potential` recalculados).
+    `_humans.parquet` ya no va muestreado, así que entra en la comparación byte a byte. El **input sintético**
     (`runs/synthetic/accra-synth-10x10/`) queda **exento** de la comparación byte a
     byte: es la entrada, no la salida. Este test es el que detecta que un sub-stream
     se ha auto-sembrado (el hueco de `aquatic_cohort_bank.cpp:204/227/298`).
