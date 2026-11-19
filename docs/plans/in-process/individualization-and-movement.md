@@ -3367,7 +3367,8 @@ se publica en el documento ABM, apéndice «Scenario harness», generada por
 
 *   **`mal-core/src/mal_core/abm/include/mal_abm_fast/human_state.hpp`** (modifica) —
     `HumanCompartmentGrid` pasa a un `HumanSoA` de individuos: `human_id` (determinista
-    y estable: `human_id = cell_id * SLOTS_PER_CELL + slot`, con `SLOTS_PER_CELL` fijado en la primera extracción (manifiesto, §2), `cell_id`, `home_x/home_y` (posición fija
+    y estable, único por semilla: **sin `SLOTS_PER_CELL`**, decisión 2a de §15.0: el
+    número de personas por celda es el de la rejilla real), `cell_id`, `home_x/home_y` (posición fija
     uniforme dentro de la celda, asignada por semilla), `cur_x/cur_y` (iguales a `home`
     en esta versión), `state` y `timer`. Los compartimentos agregados pasan a
     **estadísticas derivadas** (`compute_stats()`); la API pública (`seed_infections`,
@@ -3401,7 +3402,23 @@ se publica en el documento ABM, apéndice «Scenario harness», generada por
     que se detectó el "cero picaduras humanas" del §P1).
 *   **`mal-core/src/mal_core/abm/src/main.cpp`** (modifica) — flags de siembra humana
     por celda → por posición, para que el escenario pueda fijar la posición de una
-    persona a 200 m (por debajo de la resolución de 1 km).
+    persona a 200 m (por debajo de la resolución de 1 km); y la flag **`--debug`**
+    (§15.1, D1), independiente de `--scenario`.
+*   **`mal-core/src/mal_core/cli.py`** y **`mal-core/src/mal_core/abm/wrapper.py`**
+    (modifican) — pasan `--debug` al binario (§15.1.2, D1).
+*   **`mal-core/src/mal_core/abm/src/debug_parquet_writer.cpp`** y
+    **`include/mal_abm_fast/debug_parquet_writer.hpp`** (nuevos) — escritor con Apache
+    Arrow C++ de los cuatro Parquet de `--debug` (`_agents`, `_humans` sólo E/I/R,
+    `_bites` con `new_infection`, `_mating`), sólo cuando `--debug` está activo (§11,
+    §15.1.2, D2). Los ledgers pasan de JSONL a Parquet.
+*   **`mal-core/src/mal_core/abm/CMakeLists.txt`** (modifica) — `find_package(Arrow)` y
+    `find_package(Parquet)` en el mismo commit que el escritor; y la instalación del
+    proyecto y del CI incluyen Arrow (§15.1).
+*   **`mal-core/src/mal_core/abm/src/viz_tx.cpp`** (modifica) — GIF de transmisión: celdas
+    en gris neutro, **personas como puntos de 1 píxel por estado SEIR**, sexo
+    relleno/hueco, **regla de una celda** (H1, V3, V5, §15.1.2); sin depender de `--debug`.
+*   **`mal-core/src/mal_core/abm/tests/`** (modifica) — pruebas del escritor Parquet y del
+    GIF (`n_frames == days`); `test_scenarios.py` fija el baseline.
 
 ### Paso 3 — Fisiología de la sangre
 
@@ -3546,6 +3563,11 @@ se publica en el documento ABM, apéndice «Scenario harness», generada por
     documentada, no un fallo.*   **`mal-core/src/mal_core/abm/src/oviposition_seeking.cpp`** (reescribe en el
     **Paso 9**) — el núcleo de oviposición (búsqueda de criadero) se reescribe en el
     Paso 9, no aquí: la cascada sólo sustituye el **campo de búsqueda de hospedero**.
+*   **`mal-core/src/mal_core/abm/src/viz_tx.cpp`** (modifica) — trazo del mosquito:
+    polilínea de las posiciones diarias, dibujada desde el estado en memoria (V1,
+    §15.1.2); sin anillos. Los marcadores de personas (2a), ganado (2c), criaderos y
+    punto de oviposición (7, 9) y sitios de enjambre (8) siguen la tabla de §15.1.1 en el
+    commit de su paso; `cascade_stage` se escribe en `_agents.parquet`.
 *   **`mal-core/src/mal_core/abm/tests/test_host_seeking.cpp`** (reescribe) — casos
     por tramo, con distancias medidas.
 *   **`mal-core/src/mal_core/abm/tests/test_mobility.cpp`** (modifica) — el módulo de

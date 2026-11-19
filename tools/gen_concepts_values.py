@@ -2463,7 +2463,7 @@ def emit_scenarios() -> str:
         for item in items:
             out.append(f"\\item {esc(' '.join(str(item).split()))}")
         out.append("\\end{itemize}")
-        out.append(f"\\par\\noindent\\textbf{{What the GIF must show.}} "
+        out.append(f"\\par\\noindent\\textbf{{What to look for in the GIF.}} "
                    f"{esc(' '.join(str(entry['gif']).split()))}")
         out.append("")
     return "\n".join(out)

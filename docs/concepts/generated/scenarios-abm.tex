@@ -20,7 +20,7 @@
 \item Position pin: the agent remains in the seeded cell
 \item GIF baseline pin: the transmission GIF of the one-day run has exactly one frame (a single slide); this is the visualiser state to be improved, not a result
 \end{itemize}
-\par\noindent\textbf{What the GIF must show.} Today the transmission GIF has one frame per simulated day and no scenario overlay. For E00 the informative version would show the single female marker at its seeded position, with the cell boundary drawn in every frame and a day label. A marker that stays inside its seeded cell confirms the position pin by eye; any jump out of the cell would be visible at once.
+\par\noindent\textbf{What to look for in the GIF.} The standard transmission GIF: one frame per simulated day, cells in neutral grey, a one-cell scale bar, people as 1-pixel dots coloured by SEIR state, mosquitoes as circles (female filled, male hollow) with a polyline of their daily positions, bites as point events, and a red ring on infected agents. For E00 the single female is one filled circle at its seeded position and stays inside its cell; there are no people. One frame, because the run lasts one day. Position, sex and state in detail are in the debug agents file (Step 2b).
 
 \subsection*{E01 --- Person beyond the activation radius}
 \begin{tabular}{@{}ll@{}}
@@ -47,7 +47,7 @@
 \item Baseline pin: the female is alive on every day with no deaths (no starvation yet); target (strict expected failure): not alive at the end of day three, a proxy for starvation entry
 \item GIF baseline pin: three simulated days give a three-frame GIF (the GIF unit is the day)
 \end{itemize}
-\par\noindent\textbf{What the GIF must show.} Today the transmission GIF has one frame per simulated day and no scenario overlay, so the day-one bite is not visible. For E01 show the female marker, the person marker, and a circle of the 100 m activation radius around the female, redrawn in frames per phase of each night. A correct run shows the female wandering without ever entering the circle and no bite marker at any frame.
+\par\noindent\textbf{What to look for in the GIF.} The standard transmission GIF: one frame per simulated day, cells in neutral grey, a one-cell scale bar, people as 1-pixel dots coloured by SEIR state, mosquitoes as circles (female filled, male hollow) with a polyline of their daily positions, bites as point events, and a red ring on infected agents. For E01 look for the female circle and the person dot 200 m apart and, in the target state, no bite marker on any day. The nightly search stage of the female (`cascade\_stage`) and the bites are in the debug agents and bites files (Step 2b); the GIF draws no radii.
 
 \subsection*{E02 --- Night trajectory versus net displacement}
 \begin{tabular}{@{}ll@{}}
@@ -72,7 +72,7 @@
 \item Target gate (strict expected failure): the plan's target is asserted and is expected to fail until Step 5; when it starts passing the test fails and must be promoted
 \item Target for E02 (strict expected failure, Step 5): per-night trajectory length at most 590 m and net displacement at most 200 m; fails today because the harness does not yet measure nightly movement (outputs expose cells, not metres)
 \end{itemize}
-\par\noindent\textbf{What the GIF must show.} Today the transmission GIF has one frame per simulated day and no scenario overlay. For E02 show the female track of each night in its own colour, the start point of the night, a 200 m ring around it, and the far person marker. A correct run shows each night's net shift inside its ring, while the track itself can wander and stays within the daily length budget.
+\par\noindent\textbf{What to look for in the GIF.} The standard transmission GIF: one frame per simulated day, cells in neutral grey, a one-cell scale bar, people as 1-pixel dots coloured by SEIR state, mosquitoes as circles (female filled, male hollow) with a polyline of their daily positions, bites as point events, and a red ring on infected agents. For E02 look for the female's polyline across the three days against the one-cell scale bar and the person dot 2000 m away. The nightly trajectory length and net displacement are read from the debug agents file (Step 2b), not drawn.
 
 \subsection*{E03 --- Several bites per night in a contact cluster}
 \begin{tabular}{@{}ll@{}}
@@ -94,7 +94,7 @@
 \item Seeding fidelity: the adult population obeys the conservation identity on every day (adults today = adults yesterday - deaths + emerged, starting from the seeded count), so no seeded individual is dropped or invented; the cohort log and the raster output agree on the number of adults
 \item The run completes through the manifest route ('validate\_completeness', resolve, binary) with exit code 0
 \end{itemize}
-\par\noindent\textbf{What the GIF must show.} One frame per phase of each night. Each female is a marker and each bite is a flash on the person it hits, with a running count of bites per person for the night. A correct run shows several flashes in one night from the same female, and the flashes land on different people as the females move.
+\par\noindent\textbf{What to look for in the GIF.} The standard transmission GIF: one frame per simulated day, cells in neutral grey, a one-cell scale bar, people as 1-pixel dots coloured by SEIR state, mosquitoes as circles (female filled, male hollow) with a polyline of their daily positions, bites as point events, and a red ring on infected agents. For E03 look for the bite markers of the day landing on different people. How many bites one female makes in a night, and in which phase, is in the debug bites file (`mosquito\_uid`, `phase`, `host\_id`).
 
 \subsection*{E04 --- Partial meal does not start the cycle}
 \begin{tabular}{@{}ll@{}}
@@ -116,7 +116,7 @@
 \item Seeding fidelity: the adult population obeys the conservation identity on every day (adults today = adults yesterday - deaths + emerged, starting from the seeded count), so no seeded individual is dropped or invented; the cohort log and the raster output agree on the number of adults
 \item The run completes through the manifest route ('validate\_completeness', resolve, binary) with exit code 0
 \end{itemize}
-\par\noindent\textbf{What the GIF must show.} One frame per phase. The female is drawn in host-seeking colour, with a blood volume bar beside her that grows with each meal and a cycle timer beside it. A correct run keeps the female in host-seeking colour after the partial meal and the cycle timer stays at zero.
+\par\noindent\textbf{What to look for in the GIF.} The standard transmission GIF: one frame per simulated day, cells in neutral grey, a one-cell scale bar, people as 1-pixel dots coloured by SEIR state, mosquitoes as circles (female filled, male hollow) with a polyline of their daily positions, bites as point events, and a red ring on infected agents. For E04 the GIF shows only the female and the bite marker of the day. The partial meal and the cycle state are read from the debug agents file (`blood\_volume\_ul`, gonotrophic state).
 
 \subsection*{E05 --- Egg batch proportional to accumulated blood}
 \begin{tabular}{@{}ll@{}}
@@ -138,7 +138,7 @@
 \item Seeding fidelity: the adult population obeys the conservation identity on every day (adults today = adults yesterday - deaths + emerged, starting from the seeded count), so no seeded individual is dropped or invented; the cohort log and the raster output agree on the number of adults
 \item The run completes through the manifest route ('validate\_completeness', resolve, binary) with exit code 0
 \end{itemize}
-\par\noindent\textbf{What the GIF must show.} Two females side by side, each with a blood volume bar and an egg count shown at the end of the run. A correct run shows the two bars in the same ratio as the two egg counts.
+\par\noindent\textbf{What to look for in the GIF.} The standard transmission GIF: one frame per simulated day, cells in neutral grey, a one-cell scale bar, people as 1-pixel dots coloured by SEIR state, mosquitoes as circles (female filled, male hollow) with a polyline of their daily positions, bites as point events, and a red ring on infected agents. For E05 the GIF shows the two females as circles; the two egg batches appear as oviposition crosses at their points on the day they are laid. The blood volumes and batch sizes are in the debug agents file.
 
 \subsection*{E06 --- First cycle needs two meals}
 \begin{tabular}{@{}ll@{}}
@@ -160,7 +160,7 @@
 \item Seeding fidelity: the adult population obeys the conservation identity on every day (adults today = adults yesterday - deaths + emerged, starting from the seeded count), so no seeded individual is dropped or invented; the cohort log and the raster output agree on the number of adults
 \item The run completes through the manifest route ('validate\_completeness', resolve, binary) with exit code 0
 \end{itemize}
-\par\noindent\textbf{What the GIF must show.} One frame per phase, with the female's blood volume bar and a marker for the first-cycle target. A correct run shows the bar crossing the usual target after the first meal but not the first-cycle target, and the cycle completes only after the second meal.
+\par\noindent\textbf{What to look for in the GIF.} The standard transmission GIF: one frame per simulated day, cells in neutral grey, a one-cell scale bar, people as 1-pixel dots coloured by SEIR state, mosquitoes as circles (female filled, male hollow) with a polyline of their daily positions, bites as point events, and a red ring on infected agents. For E06 the GIF shows the female and her bite markers on the two feeding days. The crossing of the first-cycle target is read from the debug agents file (`blood\_volume\_ul`).
 
 \subsection*{E07 --- Breeding site beats the host}
 \begin{tabular}{@{}ll@{}}
@@ -184,7 +184,7 @@
 \item The run completes through the manifest route ('validate\_completeness', resolve, binary) with exit code 0
 \item Seeded pupae emerge: between one and the seeded number of adults emerge from the pupae seeded at the breeding site outside the candidate cells, so aquatic seeding at a metric position is live
 \end{itemize}
-\par\noindent\textbf{What the GIF must show.} One frame per phase. The pupal cohort is a marker with its emergence point, the female has a track, and the person is a far marker. For A the new adult should appear on the pupal marker, not at the cell centre. For B the female's track should end on the habitat marker rather than on the person.
+\par\noindent\textbf{What to look for in the GIF.} The standard transmission GIF: one frame per simulated day, cells in neutral grey, a one-cell scale bar, people as 1-pixel dots coloured by SEIR state, mosquitoes as circles (female filled, male hollow) with a polyline of their daily positions, bites as point events, and a red ring on infected agents. For E07 look for the new female appearing on the mother's point and not at the cell centre (case A), and for the oviposition cross on the habitat site and not on the person (case B).
 
 \subsection*{E08 --- Two females, two persons, distinct identities}
 \begin{tabular}{@{}ll@{}}
@@ -206,7 +206,7 @@
 \item Seeding fidelity: the adult population obeys the conservation identity on every day (adults today = adults yesterday - deaths + emerged, starting from the seeded count), so no seeded individual is dropped or invented; the cohort log and the raster output agree on the number of adults
 \item The run completes through the manifest route ('validate\_completeness', resolve, binary) with exit code 0
 \end{itemize}
-\par\noindent\textbf{What the GIF must show.} One frame per phase, with each person drawn in a colour fixed by identifier, so that a person keeps the same colour across frames. A correct run shows each person keeping its colour and each bite landing on exactly one of them.
+\par\noindent\textbf{What to look for in the GIF.} The standard transmission GIF: one frame per simulated day, cells in neutral grey, a one-cell scale bar, people as 1-pixel dots coloured by SEIR state, mosquitoes as circles (female filled, male hollow) with a polyline of their daily positions, bites as point events, and a red ring on infected agents. For E08 each person is a dot, and each bite marker lands on exactly one of them. Person identity (`human\_id`) and the bite- to-person link are in the debug humans and bites files.
 
 \subsection*{E09 --- Infective female, several persons}
 \begin{tabular}{@{}ll@{}}
@@ -228,7 +228,7 @@
 \item Seeding fidelity: the adult population obeys the conservation identity on every day (adults today = adults yesterday - deaths + emerged, starting from the seeded count), so no seeded individual is dropped or invented; the cohort log and the raster output agree on the number of adults
 \item The run completes through the manifest route ('validate\_completeness', resolve, binary) with exit code 0
 \end{itemize}
-\par\noindent\textbf{What the GIF must show.} One frame per phase. The infective female is a red marker, the persons are grey until infected, and each infectious bite turns its person red. A correct run shows red bite flashes that change only the bitten person, never a neighbour.
+\par\noindent\textbf{What to look for in the GIF.} The standard transmission GIF: one frame per simulated day, cells in neutral grey, a one-cell scale bar, people as 1-pixel dots coloured by SEIR state, mosquitoes as circles (female filled, male hollow) with a polyline of their daily positions, bites as point events, and a red ring on infected agents. For E09 the infective female carries a red ring; after an infectious bite only the bitten person's dot changes from S to E colour, never a neighbour's. The `new\_infection` flag of the debug bites file records which bite did it.
 
 \subsection*{E10 --- Sensitivity to the three perception radii}
 \begin{tabular}{@{}ll@{}}
@@ -252,7 +252,7 @@
 \item Seeding fidelity: the adult population obeys the conservation identity on every day (adults today = adults yesterday - deaths + emerged, starting from the seeded count), so no seeded individual is dropped or invented; the cohort log and the raster output agree on the number of adults
 \item The run completes through the manifest route ('validate\_completeness', resolve, binary) with exit code 0
 \end{itemize}
-\par\noindent\textbf{What the GIF must show.} One GIF per variant. Each shows the female track, the person, and the radius circle drawn at the swept value. Once the overrides apply, the three GIFs should differ in circle size and in when contact happens; if they look the same, the sweep is not reaching the engine.
+\par\noindent\textbf{What to look for in the GIF.} The standard transmission GIF: one frame per simulated day, cells in neutral grey, a one-cell scale bar, people as 1-pixel dots coloured by SEIR state, mosquitoes as circles (female filled, male hollow) with a polyline of their daily positions, bites as point events, and a red ring on infected agents. For E10 there is one GIF per variant. The GIF draws no radii: variants are compared on the day the first bite appears and on the polyline, and in detail on `cascade\_stage` in the debug agents file. If the variants look identical, the overrides are not reaching the engine.
 
 \subsection*{E11 --- Postprandial window after a full meal}
 \begin{tabular}{@{}ll@{}}
@@ -274,7 +274,7 @@
 \item Seeding fidelity: the adult population obeys the conservation identity on every day (adults today = adults yesterday - deaths + emerged, starting from the seeded count), so no seeded individual is dropped or invented; the cohort log and the raster output agree on the number of adults
 \item The run completes through the manifest route ('validate\_completeness', resolve, binary) with exit code 0
 \end{itemize}
-\par\noindent\textbf{What the GIF must show.} One frame per phase, with the time since the meal shown on the female marker and a shaded window of the first 12 hours. A correct run shows no bite or attempt inside the shaded window and the first attempt just after it.
+\par\noindent\textbf{What to look for in the GIF.} The standard transmission GIF: one frame per simulated day, cells in neutral grey, a one-cell scale bar, people as 1-pixel dots coloured by SEIR state, mosquitoes as circles (female filled, male hollow) with a polyline of their daily positions, bites as point events, and a red ring on infected agents. For E11 the daily frame shows the female and her bite marker; the 12-hour postprandial window is not visible at day resolution. Read the time of the first new attempt from the `phase` and `tick` of the debug bites file.
 
 \subsection*{E12 --- Ovarian arrest in the dry season}
 \begin{tabular}{@{}ll@{}}
@@ -296,7 +296,7 @@
 \item Seeding fidelity: the adult population obeys the conservation identity on every day (adults today = adults yesterday - deaths + emerged, starting from the seeded count), so no seeded individual is dropped or invented; the cohort log and the raster output agree on the number of adults
 \item The run completes through the manifest route ('validate\_completeness', resolve, binary) with exit code 0
 \end{itemize}
-\par\noindent\textbf{What the GIF must show.} One frame per day, with the females coloured by ovarian state (pre-gravid, gravid or arrested) and the rain burst and dry spell drawn as a background band. A correct run shows the arrested share rising during the dry spell and the arrested females still alive when the rain returns.
+\par\noindent\textbf{What to look for in the GIF.} The standard transmission GIF: one frame per simulated day, cells in neutral grey, a one-cell scale bar, people as 1-pixel dots coloured by SEIR state, mosquitoes as circles (female filled, male hollow) with a polyline of their daily positions, bites as point events, and a red ring on infected agents. For E12 look for the female circles with the third visual treatment of the arrested state (not a new palette colour) growing in number during the dry spell. The `ovarian\_stage` of each female is in the debug agents file.
 
 \subsection*{E13 --- Males and mating supply at one swarm site}
 \begin{tabular}{@{}ll@{}}
@@ -318,7 +318,7 @@
 \item The run completes through the manifest route ('validate\_completeness', resolve, binary) with exit code 0
 \item Seed sensitivity: two master seeds give different mortality among the 200 seeded adults, so the sub-streams really derive from the single seed
 \end{itemize}
-\par\noindent\textbf{What the GIF must show.} One frame per night, with the swarm site marked, the males and females near it coloured by assignment and by insemination state, and a running count of inseminated females at the top. A correct run shows the inseminated count rising and levelling off, with a visible share still uninseminated after three nights.
+\par\noindent\textbf{What to look for in the GIF.} The standard transmission GIF: one frame per simulated day, cells in neutral grey, a one-cell scale bar, people as 1-pixel dots coloured by SEIR state, mosquitoes as circles (female filled, male hollow) with a polyline of their daily positions, bites as point events, and a red ring on infected agents. For E13 look for the swarm site as a point marker, with males (hollow circles) and females near it. The inseminated count per night and the unmated females are in the debug mating file and in `inseminated` of the agents file.
 
 \subsection*{E14 --- Males present before the swarm window}
 \begin{tabular}{@{}ll@{}}
@@ -339,7 +339,7 @@
 \item Seeding fidelity: the adult population obeys the conservation identity on every day (adults today = adults yesterday - deaths + emerged, starting from the seeded count), so no seeded individual is dropped or invented; the cohort log and the raster output agree on the number of adults
 \item The run completes through the manifest route ('validate\_completeness', resolve, binary) with exit code 0
 \end{itemize}
-\par\noindent\textbf{What the GIF must show.} One frame per phase, with the swarm window shaded in the evening. The males are grey before the window and turn to swarm colour only inside it. A correct run shows no male in swarm colour before the shaded window and no insemination during the run.
+\par\noindent\textbf{What to look for in the GIF.} The standard transmission GIF: one frame per simulated day, cells in neutral grey, a one-cell scale bar, people as 1-pixel dots coloured by SEIR state, mosquitoes as circles (female filled, male hollow) with a polyline of their daily positions, bites as point events, and a red ring on infected agents. For E14 look for the swarm site marker and the males as hollow circles; the evening window is not visible at day resolution. Whether any male entered early, and the unmated-female alarm, are in the debug mating file.
 
 \subsection*{E15 --- Swarm killing empties the site}
 \begin{tabular}{@{}ll@{}}
@@ -361,7 +361,7 @@
 \item The run completes through the manifest route ('validate\_completeness', resolve, binary) with exit code 0
 \item Seed sensitivity: two master seeds give different mortality among the seeded adults
 \end{itemize}
-\par\noindent\textbf{What the GIF must show.} One frame per night, with the markers as fixed points, the males and females coloured by assignment, and the killed marker crossed out after the kill. A correct run shows the killed site's males disappearing and its females staying uninseminated while other sites keep mating.
+\par\noindent\textbf{What to look for in the GIF.} The standard transmission GIF: one frame per simulated day, cells in neutral grey, a one-cell scale bar, people as 1-pixel dots coloured by SEIR state, mosquitoes as circles (female filled, male hollow) with a polyline of their daily positions, bites as point events, and a red ring on infected agents. For E15 look for the killed site's marker and its males disappearing from the day of the kill, while the other sites keep their males. Supply per site is in the debug mating file.
 
 \subsection*{E16 --- Nets at 60 percent do not offset swarm supply}
 \begin{tabular}{@{}ll@{}}
@@ -382,7 +382,7 @@
 \item Seeding fidelity: the adult population obeys the conservation identity on every day (adults today = adults yesterday - deaths + emerged, starting from the seeded count), so no seeded individual is dropped or invented; the cohort log and the raster output agree on the number of adults
 \item The run completes through the manifest route ('validate\_completeness', resolve, binary) with exit code 0
 \end{itemize}
-\par\noindent\textbf{What the GIF must show.} Same layout as the swarm-killing GIF, with a net coverage indicator at 60 percent drawn on the frame. A correct run shows the sites that lose supply staying weak with nets in place.
+\par\noindent\textbf{What to look for in the GIF.} The standard transmission GIF: one frame per simulated day, cells in neutral grey, a one-cell scale bar, people as 1-pixel dots coloured by SEIR state, mosquitoes as circles (female filled, male hollow) with a polyline of their daily positions, bites as point events, and a red ring on infected agents. For E16 the GIF shows the same swarm sites as in E15; the nets are not drawn. Read the weakened supply of the sites from the debug mating file.
 
 \subsection*{E17 --- Sterile males compete for site supply}
 \begin{tabular}{@{}ll@{}}
@@ -403,7 +403,7 @@
 \item Seeding fidelity: the adult population obeys the conservation identity on every day (adults today = adults yesterday - deaths + emerged, starting from the seeded count), so no seeded individual is dropped or invented; the cohort log and the raster output agree on the number of adults
 \item The run completes through the manifest route ('validate\_completeness', resolve, binary) with exit code 0
 \end{itemize}
-\par\noindent\textbf{What the GIF must show.} One frame per night, with fertile and sterile males drawn in different colours at each site and the supply of each site shown as a bar. A correct run shows each site's supply shrinking as its sterile share grows, and the uninseminated count rising with it.
+\par\noindent\textbf{What to look for in the GIF.} The standard transmission GIF: one frame per simulated day, cells in neutral grey, a one-cell scale bar, people as 1-pixel dots coloured by SEIR state, mosquitoes as circles (female filled, male hollow) with a polyline of their daily positions, bites as point events, and a red ring on infected agents. For E17 the sites show their males as hollow circles; fertile and sterile males are not told apart in the GIF. The supply per site and the sterile share are in the debug mating file.
 
 \subsection*{E18 --- Wind deflection and night blocking}
 \begin{tabular}{@{}ll@{}}
@@ -424,4 +424,4 @@
 \item Seeding fidelity: the adult population obeys the conservation identity on every day (adults today = adults yesterday - deaths + emerged, starting from the seeded count), so no seeded individual is dropped or invented; the cohort log and the raster output agree on the number of adults
 \item The run completes through the manifest route ('validate\_completeness', resolve, binary) with exit code 0
 \end{itemize}
-\par\noindent\textbf{What the GIF must show.} One frame per phase, with the female track and wind arrows drawn at each frame, the arrow length showing wind speed. A correct run shows the track bent upwind relative to the wind arrows, and forward progress stopping when the tail-wind arrow reaches the flight speed.
+\par\noindent\textbf{What to look for in the GIF.} The standard transmission GIF: one frame per simulated day, cells in neutral grey, a one-cell scale bar, people as 1-pixel dots coloured by SEIR state, mosquitoes as circles (female filled, male hollow) with a polyline of their daily positions, bites as point events, and a red ring on infected agents. For E18 look for the female's polyline bent against the wind and stopping on the nights of blocked flight; the GIF draws no wind arrows. The wind-field values and the stage of the female per night are in the debug agents file.
